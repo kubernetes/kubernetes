@@ -33,12 +33,13 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
-	cronjobLong = templates.LongDesc(`
-		Create a cronjob with the specified name.`)
+	cronjobLong = templates.LongDesc(i18n.T(`
+		Create a cronjob with the specified name.`))
 
 	cronjobExample = templates.Examples(`
 		# Create a cronjob

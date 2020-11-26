@@ -21,20 +21,23 @@ package dockershim
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	utilexec "k8s.io/utils/exec"
-
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 type streamingRuntime struct {
@@ -47,16 +50,17 @@ var _ streaming.Runtime = &streamingRuntime{}
 const maxMsgSize = 1024 * 1024 * 16
 
 func (r *streamingRuntime) Exec(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
-	return r.exec(containerID, cmd, in, out, err, tty, resize, 0)
+	return r.exec(context.TODO(), containerID, cmd, in, out, err, tty, resize, 0)
 }
 
 // Internal version of Exec adds a timeout.
-func (r *streamingRuntime) exec(containerID string, cmd []string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
+func (r *streamingRuntime) exec(ctx context.Context, containerID string, cmd []string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	container, err := checkContainerStatus(r.client, containerID)
 	if err != nil {
 		return err
 	}
-	return r.execHandler.ExecInContainer(r.client, container, cmd, in, out, errw, tty, resize, timeout)
+
+	return r.execHandler.ExecInContainer(ctx, r.client, container, cmd, in, out, errw, tty, resize, timeout)
 }
 
 func (r *streamingRuntime) Attach(containerID string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
@@ -77,16 +81,21 @@ func (r *streamingRuntime) PortForward(podSandboxID string, port int32, stream i
 
 // ExecSync executes a command in the container, and returns the stdout output.
 // If command exits with a non-zero exit code, an error is returned.
-func (ds *dockerService) ExecSync(_ context.Context, req *runtimeapi.ExecSyncRequest) (*runtimeapi.ExecSyncResponse, error) {
+func (ds *dockerService) ExecSync(ctx context.Context, req *runtimeapi.ExecSyncRequest) (*runtimeapi.ExecSyncResponse, error) {
 	timeout := time.Duration(req.Timeout) * time.Second
 	var stdoutBuffer, stderrBuffer bytes.Buffer
-	err := ds.streamingRuntime.exec(req.ContainerId, req.Cmd,
+	err := ds.streamingRuntime.exec(ctx, req.ContainerId, req.Cmd,
 		nil, // in
 		ioutils.WriteCloserWrapper(ioutils.LimitWriter(&stdoutBuffer, maxMsgSize)),
 		ioutils.WriteCloserWrapper(ioutils.LimitWriter(&stderrBuffer, maxMsgSize)),
 		false, // tty
 		nil,   // resize
 		timeout)
+
+	// kubelet's remote runtime expects a grpc error with status code DeadlineExceeded on time out.
+	if errors.Is(err, context.DeadlineExceeded) {
+		return nil, status.Errorf(codes.DeadlineExceeded, err.Error())
+	}
 
 	var exitCode int32
 	if err != nil {

@@ -164,28 +164,6 @@ func (cfgCtlr *configController) dumpRequests(w http.ResponseWriter, r *http.Req
 	endLine(tabWriter)
 	for _, plState := range cfgCtlr.priorityLevelStates {
 		if plState.queues == nil {
-			tabPrint(tabWriter, row(
-				plState.pl.Name, // 1
-				"<none>",        // 2
-				"<none>",        // 3
-				"<none>",        // 4
-				"<none>",        // 5
-				"<none>",        // 6
-			))
-			if includeRequestDetails {
-				continueLine(tabWriter)
-				tabPrint(tabWriter, row(
-					"<none>", // 7
-					"<none>", // 8
-					"<none>", // 9
-					"<none>", // 10
-					"<none>", // 11
-					"<none>", // 12
-					"<none>", // 13
-					"<none>", // 14
-				))
-			}
-			endLine(tabWriter)
 			continue
 		}
 		queueSetDigest := plState.queues.Dump(includeRequestDetails)

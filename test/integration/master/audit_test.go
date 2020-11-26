@@ -58,18 +58,34 @@ var (
 apiVersion: {version}
 kind: Policy
 rules:
-  - level: {level}
+  - level: RequestResponse
+    namespaces: ["no-webhook-namespace"]
+    resources:
+      - group: "" # core
+        resources: ["configmaps"]
+  - level: Metadata
+    namespaces: ["webhook-audit-metadata"]
+    resources:
+      - group: "" # core
+        resources: ["configmaps"]
+  - level: Request
+    namespaces: ["webhook-audit-request"]
+    resources:
+      - group: "" # core
+        resources: ["configmaps"]
+  - level: RequestResponse
+    namespaces: ["webhook-audit-response"]
     resources:
       - group: "" # core
         resources: ["configmaps"]
 
 `
-	namespace              = "default"
-	watchTestTimeout int64 = 1
-	watchOptions           = metav1.ListOptions{TimeoutSeconds: &watchTestTimeout}
-	patch, _               = json.Marshal(jsonpatch.Patch{})
-	auditTestUser          = "system:apiserver"
-	versions               = map[string]schema.GroupVersion{
+	nonAdmissionWebhookNamespace       = "no-webhook-namespace"
+	watchTestTimeout             int64 = 1
+	watchOptions                       = metav1.ListOptions{TimeoutSeconds: &watchTestTimeout}
+	patch, _                           = json.Marshal(jsonpatch.Patch{})
+	auditTestUser                      = "system:apiserver"
+	versions                           = map[string]schema.GroupVersion{
 		"audit.k8s.io/v1":      auditv1.SchemeGroupVersion,
 		"audit.k8s.io/v1beta1": auditv1beta1.SchemeGroupVersion,
 	}
@@ -78,96 +94,96 @@ rules:
 		{
 			Level:             auditinternal.LevelRequestResponse,
 			Stage:             auditinternal.StageResponseComplete,
-			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps", namespace),
+			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps", nonAdmissionWebhookNamespace),
 			Verb:              "create",
 			Code:              201,
 			User:              auditTestUser,
 			Resource:          "configmaps",
-			Namespace:         namespace,
+			Namespace:         nonAdmissionWebhookNamespace,
 			RequestObject:     true,
 			ResponseObject:    true,
 			AuthorizeDecision: "allow",
 		}, {
 			Level:             auditinternal.LevelRequestResponse,
 			Stage:             auditinternal.StageResponseComplete,
-			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", namespace),
+			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", nonAdmissionWebhookNamespace),
 			Verb:              "get",
 			Code:              200,
 			User:              auditTestUser,
 			Resource:          "configmaps",
-			Namespace:         namespace,
+			Namespace:         nonAdmissionWebhookNamespace,
 			RequestObject:     false,
 			ResponseObject:    true,
 			AuthorizeDecision: "allow",
 		}, {
 			Level:             auditinternal.LevelRequestResponse,
 			Stage:             auditinternal.StageResponseComplete,
-			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps", namespace),
+			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps", nonAdmissionWebhookNamespace),
 			Verb:              "list",
 			Code:              200,
 			User:              auditTestUser,
 			Resource:          "configmaps",
-			Namespace:         namespace,
+			Namespace:         nonAdmissionWebhookNamespace,
 			RequestObject:     false,
 			ResponseObject:    true,
 			AuthorizeDecision: "allow",
 		}, {
 			Level:             auditinternal.LevelRequestResponse,
 			Stage:             auditinternal.StageResponseStarted,
-			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
+			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeout=%ds&timeoutSeconds=%d&watch=true", nonAdmissionWebhookNamespace, watchTestTimeout, watchTestTimeout),
 			Verb:              "watch",
 			Code:              200,
 			User:              auditTestUser,
 			Resource:          "configmaps",
-			Namespace:         namespace,
+			Namespace:         nonAdmissionWebhookNamespace,
 			RequestObject:     false,
 			ResponseObject:    false,
 			AuthorizeDecision: "allow",
 		}, {
 			Level:             auditinternal.LevelRequestResponse,
 			Stage:             auditinternal.StageResponseComplete,
-			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
+			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeout=%ds&timeoutSeconds=%d&watch=true", nonAdmissionWebhookNamespace, watchTestTimeout, watchTestTimeout),
 			Verb:              "watch",
 			Code:              200,
 			User:              auditTestUser,
 			Resource:          "configmaps",
-			Namespace:         namespace,
+			Namespace:         nonAdmissionWebhookNamespace,
 			RequestObject:     false,
 			ResponseObject:    false,
 			AuthorizeDecision: "allow",
 		}, {
 			Level:             auditinternal.LevelRequestResponse,
 			Stage:             auditinternal.StageResponseComplete,
-			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", namespace),
+			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", nonAdmissionWebhookNamespace),
 			Verb:              "update",
 			Code:              200,
 			User:              auditTestUser,
 			Resource:          "configmaps",
-			Namespace:         namespace,
+			Namespace:         nonAdmissionWebhookNamespace,
 			RequestObject:     true,
 			ResponseObject:    true,
 			AuthorizeDecision: "allow",
 		}, {
 			Level:             auditinternal.LevelRequestResponse,
 			Stage:             auditinternal.StageResponseComplete,
-			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", namespace),
+			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", nonAdmissionWebhookNamespace),
 			Verb:              "patch",
 			Code:              200,
 			User:              auditTestUser,
 			Resource:          "configmaps",
-			Namespace:         namespace,
+			Namespace:         nonAdmissionWebhookNamespace,
 			RequestObject:     true,
 			ResponseObject:    true,
 			AuthorizeDecision: "allow",
 		}, {
 			Level:             auditinternal.LevelRequestResponse,
 			Stage:             auditinternal.StageResponseComplete,
-			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", namespace),
+			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", nonAdmissionWebhookNamespace),
 			Verb:              "delete",
 			Code:              200,
 			User:              auditTestUser,
 			Resource:          "configmaps",
-			Namespace:         namespace,
+			Namespace:         nonAdmissionWebhookNamespace,
 			RequestObject:     true,
 			ResponseObject:    true,
 			AuthorizeDecision: "allow",
@@ -177,45 +193,15 @@ rules:
 
 // TestAudit ensures that both v1beta1 and v1 version audit api could work.
 func TestAudit(t *testing.T) {
-	tcs := []struct {
-		auditLevel            auditinternal.Level
-		enableMutatingWebhook bool
-	}{
-		{
-			auditLevel:            auditinternal.LevelRequestResponse,
-			enableMutatingWebhook: false,
-		},
-		{
-			auditLevel:            auditinternal.LevelMetadata,
-			enableMutatingWebhook: true,
-		},
-		{
-			auditLevel:            auditinternal.LevelRequest,
-			enableMutatingWebhook: true,
-		},
-		{
-			auditLevel:            auditinternal.LevelRequestResponse,
-			enableMutatingWebhook: true,
-		},
-	}
 	for version := range versions {
-		for _, tc := range tcs {
-			t.Run(fmt.Sprintf("%s.%s.%t", version, tc.auditLevel, tc.enableMutatingWebhook), func(t *testing.T) {
-				testAudit(t, version, tc.auditLevel, tc.enableMutatingWebhook)
-			})
-		}
+		runTestWithVersion(t, version)
 	}
 }
 
-func testAudit(t *testing.T, version string, level auditinternal.Level, enableMutatingWebhook bool) {
-	var url string
-	var err error
-	closeFunc := func() {}
-	if enableMutatingWebhook {
-		webhookMux := http.NewServeMux()
-		webhookMux.Handle("/mutation", utils.AdmissionWebhookHandler(t, admitFunc))
-		url, closeFunc, err = utils.NewAdmissionWebhookServer(webhookMux)
-	}
+func runTestWithVersion(t *testing.T, version string) {
+	webhookMux := http.NewServeMux()
+	webhookMux.Handle("/mutation", utils.AdmissionWebhookHandler(t, admitFunc))
+	url, closeFunc, err := utils.NewAdmissionWebhookServer(webhookMux)
 	defer closeFunc()
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -223,7 +209,6 @@ func testAudit(t *testing.T, version string, level auditinternal.Level, enableMu
 
 	// prepare audit policy file
 	auditPolicy := strings.Replace(auditPolicyPattern, "{version}", version, 1)
-	auditPolicy = strings.Replace(auditPolicy, "{level}", string(level), 1)
 	policyFile, err := ioutil.TempFile("", "audit-policy.yaml")
 	if err != nil {
 		t.Fatalf("Failed to create audit policy file: %v", err)
@@ -258,16 +243,51 @@ func testAudit(t *testing.T, version string, level auditinternal.Level, enableMu
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if enableMutatingWebhook {
-		if err := createV1beta1MutationWebhook(kubeclient, url+"/mutation"); err != nil {
-			t.Fatal(err)
-		}
+	if err := createV1beta1MutationWebhook(kubeclient, url+"/mutation"); err != nil {
+		t.Fatal(err)
 	}
 
+	tcs := []struct {
+		auditLevel            auditinternal.Level
+		enableMutatingWebhook bool
+		namespace             string
+	}{
+		{
+			auditLevel:            auditinternal.LevelRequestResponse,
+			enableMutatingWebhook: false,
+			namespace:             nonAdmissionWebhookNamespace,
+		},
+		{
+			auditLevel:            auditinternal.LevelMetadata,
+			enableMutatingWebhook: true,
+			namespace:             "webhook-audit-metadata",
+		},
+		{
+			auditLevel:            auditinternal.LevelRequest,
+			enableMutatingWebhook: true,
+			namespace:             "webhook-audit-request",
+		},
+		{
+			auditLevel:            auditinternal.LevelRequestResponse,
+			enableMutatingWebhook: true,
+			namespace:             "webhook-audit-response",
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(fmt.Sprintf("%s.%s.%t", version, tc.auditLevel, tc.enableMutatingWebhook), func(t *testing.T) {
+			testAudit(t, version, tc.auditLevel, tc.enableMutatingWebhook, tc.namespace, kubeclient, logFile)
+		})
+	}
+}
+
+func testAudit(t *testing.T, version string, level auditinternal.Level, enableMutatingWebhook bool, namespace string, kubeclient kubernetes.Interface, logFile *os.File) {
 	var lastMissingReport string
+	createNamespace(t, kubeclient, namespace)
+
 	if err := wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 		// perform configmap operations
-		configMapOperations(t, kubeclient)
+		configMapOperations(t, kubeclient, namespace)
 
 		// check for corresponding audit logs
 		stream, err := os.Open(logFile.Name())
@@ -275,7 +295,7 @@ func testAudit(t *testing.T, version string, level auditinternal.Level, enableMu
 			return false, fmt.Errorf("unexpected error: %v", err)
 		}
 		defer stream.Close()
-		missingReport, err := utils.CheckAuditLines(stream, getExpectedEvents(level, enableMutatingWebhook), versions[version])
+		missingReport, err := utils.CheckAuditLines(stream, getExpectedEvents(level, enableMutatingWebhook, namespace), versions[version])
 		if err != nil {
 			return false, fmt.Errorf("unexpected error: %v", err)
 		}
@@ -289,7 +309,7 @@ func testAudit(t *testing.T, version string, level auditinternal.Level, enableMu
 	}
 }
 
-func getExpectedEvents(level auditinternal.Level, enableMutatingWebhook bool) []utils.AuditEvent {
+func getExpectedEvents(level auditinternal.Level, enableMutatingWebhook bool, namespace string) []utils.AuditEvent {
 	if !enableMutatingWebhook {
 		return expectedEvents
 	}
@@ -350,15 +370,22 @@ func getExpectedEvents(level auditinternal.Level, enableMutatingWebhook bool) []
 // configMapOperations is a set of known operations performed on the configmap type
 // which correspond to the expected events.
 // This is shared by the dynamic test
-func configMapOperations(t *testing.T, kubeclient kubernetes.Interface) {
+func configMapOperations(t *testing.T, kubeclient kubernetes.Interface, namespace string) {
 	// create, get, watch, update, patch, list and delete configmap.
 	configMap := &apiv1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "audit-configmap",
+			Name:      "audit-configmap",
+			Namespace: namespace,
 		},
 		Data: map[string]string{
 			"map-key": "map-value",
 		},
+	}
+	// add admission label to config maps that are to be sent to webhook
+	if namespace != nonAdmissionWebhookNamespace {
+		configMap.Labels = map[string]string{
+			"admission": "true",
+		}
 	}
 
 	_, err := kubeclient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
@@ -440,9 +467,20 @@ func createV1beta1MutationWebhook(client clientset.Interface, endpoint string) e
 				Operations: []admissionv1beta1.OperationType{admissionv1beta1.Create, admissionv1beta1.Update},
 				Rule:       admissionv1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
 			}},
+			ObjectSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"admission": "true"}},
 			FailurePolicy:           &fail,
 			AdmissionReviewVersions: []string{"v1beta1"},
 		}},
 	}, metav1.CreateOptions{})
 	return err
+}
+
+func createNamespace(t *testing.T, kubeclient clientset.Interface, namespace string) {
+	ns := &apiv1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+		},
+	}
+	_, err := kubeclient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+	expectNoError(t, err, fmt.Sprintf("failed to create namespace ns %s", namespace))
 }

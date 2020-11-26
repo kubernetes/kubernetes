@@ -77,6 +77,15 @@ type Manager interface {
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
 	GetTopologyHints(*v1.Pod, *v1.Container) map[string][]topologymanager.TopologyHint
+
+	// GetCPUs implements the podresources.CPUsProvider interface to provide allocated
+	// cpus for the container
+	GetCPUs(podUID, containerName string) []int64
+
+	// GetPodTopologyHints implements the topologymanager.HintProvider Interface
+	// and is consulted to achieve NUMA aware resource alignment per Pod
+	// among this and other resource controllers.
+	GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint
 }
 
 type manager struct {
@@ -126,7 +135,7 @@ func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManager creates new cpu manager based on provided policy
-func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, numaNodeInfo topology.NUMANodeInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
+func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
 	var topo *topology.CPUTopology
 	var policy Policy
 
@@ -137,7 +146,7 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 
 	case PolicyStatic:
 		var err error
-		topo, err = topology.Discover(machineInfo, numaNodeInfo)
+		topo, err = topology.Discover(machineInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -300,6 +309,13 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 	return m.policy.GetTopologyHints(m.state, pod, container)
 }
 
+func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	// Garbage collect any stranded resources before providing TopologyHints
+	m.removeStaleState()
+	// Delegate to active policy
+	return m.policy.GetPodTopologyHints(m.state, pod)
+}
+
 type reconciledContainer struct {
 	podName       string
 	containerName string
@@ -460,4 +476,13 @@ func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) 
 		&runtimeapi.LinuxContainerResources{
 			CpusetCpus: cpus.String(),
 		})
+}
+
+func (m *manager) GetCPUs(podUID, containerName string) []int64 {
+	cpus := m.state.GetCPUSetOrDefault(string(podUID), containerName)
+	result := []int64{}
+	for _, cpu := range cpus.ToSliceNoSort() {
+		result = append(result, int64(cpu))
+	}
+	return result
 }

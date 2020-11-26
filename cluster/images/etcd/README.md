@@ -26,7 +26,7 @@ server.
 
 `migrate` writes a `version.txt` file to track the "current" version
 of etcd that was used to persist data to disk. A "target" version may also be provided
-by the `TARGET_STORAGE` (e.g. "etcd3") and `TARGET_VERSION` (e.g. "3.4.9" )
+by the `TARGET_STORAGE` (e.g. "etcd3") and `TARGET_VERSION` (e.g. "3.4.13" )
 environment variables. If the persisted version differs from the target version,
 `migrate-if-needed.sh` will migrate the data from the current to the target
 version.

@@ -24,7 +24,7 @@ import (
 	"strings"
 )
 
-// Version is an opqaue representation of a version number
+// Version is an opaque representation of a version number
 type Version struct {
 	components    []uint
 	semver        bool
@@ -195,6 +195,9 @@ func (v *Version) WithBuildMetadata(buildMetadata string) *Version {
 // ParseGeneric, this will not include the trailing uninterpreted portion of the version
 // number.
 func (v *Version) String() string {
+	if v == nil {
+		return "<nil>"
+	}
 	var buffer bytes.Buffer
 
 	for i, comp := range v.components {

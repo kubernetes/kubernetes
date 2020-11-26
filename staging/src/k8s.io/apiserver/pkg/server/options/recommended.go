@@ -126,7 +126,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
 		config.FlowControl = utilflowcontrol.New(
 			config.SharedInformerFactory,
-			kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1alpha1(),
+			kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1beta1(),
 			config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
 			config.RequestTimeout/4,
 		)

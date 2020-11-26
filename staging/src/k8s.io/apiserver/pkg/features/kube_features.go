@@ -61,6 +61,7 @@ const (
 
 	// owner: @ilackams
 	// alpha: v1.7
+	// beta: v1.16
 	//
 	// Enables compression of REST responses (GET and LIST only)
 	APIResponseCompression featuregate.Feature = "APIResponseCompression"
@@ -85,6 +86,7 @@ const (
 
 	// owner: @caesarxuchao
 	// alpha: v1.15
+	// beta: v1.16
 	//
 	// Allow apiservers to show a count of remaining items in the response
 	// to a chunking list request.
@@ -105,6 +107,12 @@ const (
 	// document.
 	StorageVersionHash featuregate.Feature = "StorageVersionHash"
 
+	// owner: @caesarxuchao @roycaihw
+	// alpha: v1.20
+	//
+	// Enable the storage version API.
+	StorageVersionAPI featuregate.Feature = "StorageVersionAPI"
+
 	// owner: @wojtek-t
 	// alpha: v1.15
 	// beta: v1.16
@@ -122,6 +130,7 @@ const (
 
 	// owner: @wojtek-t
 	// alpha: v1.16
+	// beta: v1.20
 	//
 	// Deprecates and removes SelfLink from ObjectMeta and ListMeta.
 	RemoveSelfLink featuregate.Feature = "RemoveSelfLink"
@@ -129,6 +138,7 @@ const (
 	// owner: @shaloulcy, @wojtek-t
 	// alpha: v1.18
 	// beta: v1.19
+	// GA: v1.20
 	//
 	// Allows label and field based indexes in apiserver watch cache to accelerate list operations.
 	SelectorIndex featuregate.Feature = "SelectorIndex"
@@ -138,6 +148,18 @@ const (
 	//
 	// Allows sending warning headers in API responses.
 	WarningHeaders featuregate.Feature = "WarningHeaders"
+
+	// owner: @wojtek-t
+	// alpha: v1.20
+	//
+	// Allows for updating watchcache resource version with progress notify events.
+	EfficientWatchResumption featuregate.Feature = "EfficientWatchResumption"
+
+	// owner: @roycaihw
+	// alpha: v1.20
+	//
+	// Assigns each kube-apiserver an ID in a cluster.
+	APIServerIdentity featuregate.Feature = "APIServerIdentity"
 )
 
 func init() {
@@ -148,18 +170,21 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	StreamingProxyRedirects: {Default: true, PreRelease: featuregate.Deprecated},
-	ValidateProxyRedirects:  {Default: true, PreRelease: featuregate.Beta},
-	AdvancedAuditing:        {Default: true, PreRelease: featuregate.GA},
-	APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
-	APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
-	DryRun:                  {Default: true, PreRelease: featuregate.GA},
-	RemainingItemCount:      {Default: true, PreRelease: featuregate.Beta},
-	ServerSideApply:         {Default: true, PreRelease: featuregate.Beta},
-	StorageVersionHash:      {Default: true, PreRelease: featuregate.Beta},
-	WatchBookmark:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	APIPriorityAndFairness:  {Default: false, PreRelease: featuregate.Alpha},
-	RemoveSelfLink:          {Default: false, PreRelease: featuregate.Alpha},
-	SelectorIndex:           {Default: true, PreRelease: featuregate.Beta},
-	WarningHeaders:          {Default: true, PreRelease: featuregate.Beta},
+	StreamingProxyRedirects:  {Default: true, PreRelease: featuregate.Deprecated},
+	ValidateProxyRedirects:   {Default: true, PreRelease: featuregate.Beta},
+	AdvancedAuditing:         {Default: true, PreRelease: featuregate.GA},
+	APIResponseCompression:   {Default: true, PreRelease: featuregate.Beta},
+	APIListChunking:          {Default: true, PreRelease: featuregate.Beta},
+	DryRun:                   {Default: true, PreRelease: featuregate.GA},
+	RemainingItemCount:       {Default: true, PreRelease: featuregate.Beta},
+	ServerSideApply:          {Default: true, PreRelease: featuregate.Beta},
+	StorageVersionHash:       {Default: true, PreRelease: featuregate.Beta},
+	StorageVersionAPI:        {Default: false, PreRelease: featuregate.Alpha},
+	WatchBookmark:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	APIPriorityAndFairness:   {Default: true, PreRelease: featuregate.Beta},
+	RemoveSelfLink:           {Default: true, PreRelease: featuregate.Beta},
+	SelectorIndex:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	WarningHeaders:           {Default: true, PreRelease: featuregate.Beta},
+	EfficientWatchResumption: {Default: false, PreRelease: featuregate.Alpha},
+	APIServerIdentity:        {Default: false, PreRelease: featuregate.Alpha},
 }

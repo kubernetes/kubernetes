@@ -9,6 +9,7 @@ go_library(
         "path.go",
         "report.go",
         "report_compare.go",
+        "report_references.go",
         "report_reflect.go",
         "report_slices.go",
         "report_text.go",

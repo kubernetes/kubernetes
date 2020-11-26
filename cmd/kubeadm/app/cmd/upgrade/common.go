@@ -185,7 +185,15 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 	// If option was specified in both args and config file, args will overwrite the config file.
 	if len(args) == 1 {
 		newK8sVersion = args[0]
-		cfg.KubernetesVersion = newK8sVersion
+		if upgradeApply {
+			// The `upgrade apply` version always overwrites the KubernetesVersion in the returned cfg with the target
+			// version. While this is not the same for `upgrade plan` where the KubernetesVersion should be the old
+			// one (because the call to getComponentConfigVersionStates requires the currently installed version).
+			// This also makes the KubernetesVersion value returned for `upgrade plan` consistent as that command
+			// allows to not specify a target version in which case KubernetesVersion will always hold the currently
+			// installed one.
+			cfg.KubernetesVersion = newK8sVersion
+		}
 	}
 
 	// If features gates are passed to the command line, use it (otherwise use featureGates from configuration)

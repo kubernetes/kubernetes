@@ -6,9 +6,9 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//pkg/scheduler/framework:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
     ],
 )
 
@@ -17,7 +17,7 @@ go_test(
     srcs = ["priority_sort_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//pkg/scheduler/framework:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
     ],
 )

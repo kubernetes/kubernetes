@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -366,7 +367,7 @@ func (s *Plugin) getServiceAccountTokens(serviceAccount *corev1.ServiceAccount) 
 			continue
 		}
 
-		if serviceaccount.IsServiceAccountToken(secret, serviceAccount) {
+		if apiserverserviceaccount.IsServiceAccountToken(secret, serviceAccount) {
 			tokens = append(tokens, secret)
 		}
 	}

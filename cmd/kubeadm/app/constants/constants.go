@@ -199,6 +199,21 @@ const (
 	// We need at least ten, because the DNS service is always at the tenth cluster clusterIP
 	MinimumAddressesInServiceSubnet = 10
 
+	// MaximumBitsForServiceSubnet defines maximum possible size of the service subnet in terms of bits.
+	// For example, if the value is 20, then the largest supported service subnet is /12 for IPv4 and /108 for IPv6.
+	// Note however that anything in between /108 and /112 will be clamped to /112 due to the limitations of the underlying allocation logic.
+	// TODO: https://github.com/kubernetes/enhancements/pull/1881
+	MaximumBitsForServiceSubnet = 20
+
+	// MinimumAddressesInPodSubnet defines minimum amount of pods in the cluster.
+	// We need at least more than services, an IPv4 /28 or IPv6 /128 subnet means 14 util addresses
+	MinimumAddressesInPodSubnet = 14
+
+	// PodSubnetNodeMaskMaxDiff is limited to 16 due to an issue with uncompressed IP bitmap in core:
+	// xref: #44918
+	// The node subnet mask size must be no more than the pod subnet mask size + 16
+	PodSubnetNodeMaskMaxDiff = 16
+
 	// DefaultTokenDuration specifies the default amount of time that a bootstrap token will be valid
 	// Default behaviour is 24 hours
 	DefaultTokenDuration = 24 * time.Hour
@@ -210,9 +225,12 @@ const (
 	// CertificateKeySize specifies the size of the key used to encrypt certificates on uploadcerts phase
 	CertificateKeySize = 32
 
-	// LabelNodeRoleMaster specifies that a node is a control-plane
-	// This is a duplicate definition of the constant in pkg/controller/service/controller.go
-	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
+	// LabelNodeRoleOldControlPlane specifies that a node hosts control-plane components
+	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
+	LabelNodeRoleOldControlPlane = "node-role.kubernetes.io/master"
+
+	// LabelNodeRoleControlPlane specifies that a node hosts control-plane components
+	LabelNodeRoleControlPlane = "node-role.kubernetes.io/control-plane"
 
 	// AnnotationKubeadmCRISocket specifies the annotation kubeadm uses to preserve the crisocket information given to kubeadm at
 	// init/join time for use later. kubeadm annotates the node object with this information
@@ -265,7 +283,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.4.9-1"
+	DefaultEtcdVersion = "3.4.13-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -350,6 +368,10 @@ const (
 	// ControlPlaneNumCPU is the number of CPUs required on control-plane
 	ControlPlaneNumCPU = 2
 
+	// ControlPlaneMem is the number of megabytes of memory required on the control-plane
+	// Below that amount of RAM running a stable control plane would be difficult.
+	ControlPlaneMem = 1700
+
 	// KubeadmCertsSecret specifies in what Secret in the kube-system namespace the certificates should be stored
 	KubeadmCertsSecret = "kubeadm-certs"
 
@@ -395,15 +417,29 @@ const (
 )
 
 var (
+	// OldControlPlaneTaint is the taint to apply on the PodSpec for being able to run that Pod on the control-plane
+	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
+	OldControlPlaneTaint = v1.Taint{
+		Key:    LabelNodeRoleOldControlPlane,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+
+	// OldControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
+	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
+	OldControlPlaneToleration = v1.Toleration{
+		Key:    LabelNodeRoleOldControlPlane,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+
 	// ControlPlaneTaint is the taint to apply on the PodSpec for being able to run that Pod on the control-plane
 	ControlPlaneTaint = v1.Taint{
-		Key:    LabelNodeRoleMaster,
+		Key:    LabelNodeRoleControlPlane,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
 	// ControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
 	ControlPlaneToleration = v1.Toleration{
-		Key:    LabelNodeRoleMaster,
+		Key:    LabelNodeRoleControlPlane,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
@@ -417,13 +453,13 @@ var (
 	ControlPlaneComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.18.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.19.0")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.18.0")
+	MinimumKubeletVersion = version.MustParseSemantic("v1.19.0")
 
 	// CurrentKubernetesVersion specifies current Kubernetes version supported by kubeadm
-	CurrentKubernetesVersion = version.MustParseSemantic("v1.19.0")
+	CurrentKubernetesVersion = version.MustParseSemantic("v1.20.0")
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
@@ -434,7 +470,8 @@ var (
 		17: "3.4.3-0",
 		18: "3.4.3-0",
 		19: "3.4.9-1",
-		20: "3.4.9-1",
+		20: "3.4.13-0",
+		21: "3.4.13-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

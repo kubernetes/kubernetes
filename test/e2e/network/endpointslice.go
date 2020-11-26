@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -143,8 +144,11 @@ var _ = SIGDescribe("EndpointSlice", func() {
 			framework.Failf("Endpoints resource not deleted after Service %s/%s was deleted: %s", svc.Namespace, svc.Name, err)
 		}
 
-		// Expect EndpointSlice resource to be deleted when Service is.
-		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		// Expect EndpointSlice resource to be deleted when Service is. Wait for
+		// up to 90 seconds since garbage collector only polls every 30 seconds
+		// and may need to retry informer resync at some point during an e2e
+		// run.
+		if err := wait.PollImmediate(2*time.Second, 90*time.Second, func() (bool, error) {
 			endpointSliceList, err := cs.DiscoveryV1beta1().EndpointSlices(svc.Namespace).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
 			})
@@ -406,9 +410,13 @@ func expectEndpointsAndSlices(cs clientset.Interface, ns string, svc *v1.Service
 		framework.Failf("Expected 1 EndpointSlice, got %d", len(endpointSlices))
 	}
 
-	totalEndpointSliceAddresses := 0
+	// Use a set for deduping values. Duplicate addresses are technically valid
+	// here although rare.
+	esAddresses := sets.NewString()
 	for _, endpointSlice := range endpointSlices {
-		totalEndpointSliceAddresses += len(endpointSlice.Endpoints)
+		for _, endpoint := range endpointSlice.Endpoints {
+			esAddresses.Insert(endpoint.Addresses[0])
+		}
 		if len(pods) == 0 && len(endpointSlice.Ports) != 0 {
 			framework.Failf("Expected EndpointSlice to have 0 ports, got %d", len(endpointSlice.Ports))
 		}
@@ -463,8 +471,8 @@ func expectEndpointsAndSlices(cs clientset.Interface, ns string, svc *v1.Service
 		}
 	}
 
-	if len(pods) != totalEndpointSliceAddresses {
-		framework.Failf("Expected %d addresses, got %d", len(pods), totalEndpointSliceAddresses)
+	if len(pods) != esAddresses.Len() {
+		framework.Failf("Expected %d addresses, got %d", len(pods), esAddresses.Len())
 	}
 }
 
@@ -492,8 +500,12 @@ func hasMatchingEndpointSlices(cs clientset.Interface, ns, svcName string, numEn
 		framework.Logf("EndpointSlice for Service %s/%s not found", ns, svcName)
 		return []discoveryv1beta1.EndpointSlice{}, false
 	}
-	if len(esList.Items) != numSlices {
-		framework.Logf("Expected %d EndpointSlices for Service %s/%s, got %d", numSlices, ns, svcName, len(esList.Items))
+	// In some cases the EndpointSlice controller will create more
+	// EndpointSlices than necessary resulting in some duplication. This is
+	// valid and tests should only fail here if less EndpointSlices than
+	// expected are added.
+	if len(esList.Items) < numSlices {
+		framework.Logf("Expected at least %d EndpointSlices for Service %s/%s, got %d", numSlices, ns, svcName, len(esList.Items))
 		for i, epSlice := range esList.Items {
 			epsData, err := json.Marshal(epSlice)
 			if err != nil {

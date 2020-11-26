@@ -22,9 +22,11 @@ import (
 
 	"github.com/pkg/errors"
 
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -250,4 +252,32 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 		}
 	}
 	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
+}
+
+// LabelOldControlPlaneNodes finds all nodes with the legacy node-role label and also applies
+// the "control-plane" node-role label to them.
+// TODO: https://github.com/kubernetes/kubeadm/issues/2200
+func LabelOldControlPlaneNodes(client clientset.Interface) error {
+	selectorOldControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
+		kubeadmconstants.LabelNodeRoleOldControlPlane: "",
+	}))
+	nodesWithOldLabel, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+		LabelSelector: selectorOldControlPlane.String(),
+	})
+	if err != nil {
+		return errors.Wrapf(err, "could not list nodes labeled with %q", kubeadmconstants.LabelNodeRoleOldControlPlane)
+	}
+
+	for _, n := range nodesWithOldLabel.Items {
+		if _, hasNewLabel := n.ObjectMeta.Labels[kubeadmconstants.LabelNodeRoleControlPlane]; hasNewLabel {
+			continue
+		}
+		err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
+			n.ObjectMeta.Labels[kubeadmconstants.LabelNodeRoleControlPlane] = ""
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

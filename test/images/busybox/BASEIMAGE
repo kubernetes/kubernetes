@@ -1,3 +1,3 @@
-windows/amd64/1809=mcr.microsoft.com/windows/servercore:ltsc2019
-windows/amd64/1903=mcr.microsoft.com/windows/servercore:1903
-windows/amd64/1909=mcr.microsoft.com/windows/servercore:1909
+windows/amd64/1809=mcr.microsoft.com/windows/nanoserver:1809
+windows/amd64/1903=mcr.microsoft.com/windows/nanoserver:1903
+windows/amd64/1909=mcr.microsoft.com/windows/nanoserver:1909

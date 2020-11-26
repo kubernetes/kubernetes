@@ -30,21 +30,33 @@ limitations under the License.
 // ones named
 //     autoConvert_<pkg1>_<type>_To_<pkg2>_<type>
 // for each such pair of types --- both with (pkg1,pkg2) =
-// (internal,external) and (pkg1,pkg2) = (external,internal).
-// Additionally: if the destination package does not contain one in a
-// non-generated file then a function named
+// (internal,external) and (pkg1,pkg2) = (external,internal).  The
+// generated conversion functions recurse on the structure of the data
+// types.  For structs, source and destination fields are matched up
+// according to name; if a source field has no corresponding
+// destination or there is a fundamental mismatch in the type of the
+// field then the generated autoConvert_... function has just a
+// warning comment about that field.  The generated conversion
+// functions use standard value assignment wherever possible.  For
+// compound types, the generated conversion functions call the
+// `Convert...` functions for the subsidiary types.
+//
+// For each pair of types `conversion-gen` will also generate a
+// function named
 //     Convert_<pkg1>_<type>_To_<pkg2>_<type>
-// is also generated and it simply calls the `autoConvert...`
-// function.  The generated conversion functions use standard value
-// assignment wherever possible.  For compound types, the generated
-// conversion functions call the `Convert...` functions for the
-// subsidiary types.  Thus developers can override the behavior for
-// selected types.  For a top-level object type (i.e., the type of an
-// object that will be input to an apiserver), for such an override to
-// be used by the apiserver the developer-maintained conversion
-// functions must also be registered by invoking the
-// `AddConversionFunc`/`AddGeneratedConversionFunc` method of the
-// relevant `Scheme` object from k8s.io/apimachinery/pkg/runtime.
+// if both of two conditions are met: (1) the destination package does
+// not contain a function of that name in a non-generated file and (2)
+// the generation of the corresponding autoConvert_...  function did
+// not run into trouble with a missing or fundamentally differently
+// typed field.  A generated Convert_... function simply calls the
+// corresponding `autoConvert...` function.  `conversion_gen` also
+// generates a function that updates a given `runtime.Scheme` by
+// registering all the Convert_... functions found and generated.
+// Thus developers can override the generated behavior for selected
+// type pairs by putting the desired Convert_... functions in
+// non-generated files.  Further, developers are practically required
+// to override the generated behavior when there are missing or
+// fundamentally differently typed fields.
 //
 // `conversion-gen` will scan its `--input-dirs`, looking at the
 // package defined in each of those directories for comment tags that

@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+
 	"github.com/spf13/pflag"
 	"k8s.io/utils/path"
 
@@ -84,7 +85,7 @@ func (o *EgressSelectorOptions) Validate() []error {
 
 	errs := []error{}
 
-	if exists, err := path.Exists(path.CheckFollowSymlink, o.ConfigFile); exists == false || err != nil {
+	if exists, err := path.Exists(path.CheckFollowSymlink, o.ConfigFile); !exists || err != nil {
 		errs = append(errs, fmt.Errorf("egress-selector-config-file %s does not exist", o.ConfigFile))
 	}
 

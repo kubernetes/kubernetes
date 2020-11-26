@@ -511,13 +511,23 @@ func (r Request) finalURLTemplate() url.URL {
 	}
 	r.params = newParams
 	url := r.URL()
-	segments := strings.Split(r.URL().Path, "/")
+
+	segments := strings.Split(url.Path, "/")
 	groupIndex := 0
 	index := 0
-	if r.URL() != nil && r.c.base != nil && strings.Contains(r.URL().Path, r.c.base.Path) {
-		groupIndex += len(strings.Split(r.c.base.Path, "/"))
+	trimmedBasePath := ""
+	if url != nil && r.c.base != nil && strings.Contains(url.Path, r.c.base.Path) {
+		p := strings.TrimPrefix(url.Path, r.c.base.Path)
+		if !strings.HasPrefix(p, "/") {
+			p = "/" + p
+		}
+		// store the base path that we have trimmed so we can append it
+		// before returning the URL
+		trimmedBasePath = r.c.base.Path
+		segments = strings.Split(p, "/")
+		groupIndex = 1
 	}
-	if groupIndex >= len(segments) {
+	if len(segments) <= 2 {
 		return *url
 	}
 
@@ -563,7 +573,7 @@ func (r Request) finalURLTemplate() url.URL {
 			segments[index+3] = "{name}"
 		}
 	}
-	url.Path = path.Join(segments...)
+	url.Path = path.Join(trimmedBasePath, path.Join(segments...))
 	return *url
 }
 
@@ -638,7 +648,7 @@ func (b *throttledLogger) attemptToLog() (klog.Level, bool) {
 	return -1, false
 }
 
-// Infof will write a log message at each logLevel specified by the reciever's throttleSettings
+// Infof will write a log message at each logLevel specified by the receiver's throttleSettings
 // as long as it hasn't written a log message more recently than minLogInterval.
 func (b *throttledLogger) Infof(message string, args ...interface{}) {
 	if logLevel, ok := b.attemptToLog(); ok {

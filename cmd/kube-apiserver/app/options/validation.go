@@ -55,9 +55,12 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 	}
 
 	// Secondary IP validation
+	// while api-server dualstack bits does not have dependency on EndPointSlice, its
+	// a good idea to have validation consistent across all components (ControllerManager
+	// needs EndPointSlice + DualStack feature flags).
 	secondaryServiceClusterIPRangeUsed := (options.SecondaryServiceClusterIPRange.IP != nil)
-	if secondaryServiceClusterIPRangeUsed && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		errs = append(errs, fmt.Errorf("--secondary-service-cluster-ip-range can only be used if %v feature is enabled", string(features.IPv6DualStack)))
+	if secondaryServiceClusterIPRangeUsed && (!utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) || !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice)) {
+		errs = append(errs, fmt.Errorf("secondary service cluster-ip range(--service-cluster-ip-range[1]) can only be used if %v and %v feature is enabled", string(features.IPv6DualStack), string(features.EndpointSlice)))
 	}
 
 	// note: While the cluster might be dualstack (i.e. pods with multiple IPs), the user may choose
@@ -68,14 +71,14 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 		// Should be dualstack IPFamily(PrimaryServiceClusterIPRange) != IPFamily(SecondaryServiceClusterIPRange)
 		dualstack, err := netutils.IsDualStackCIDRs([]*net.IPNet{&options.PrimaryServiceClusterIPRange, &options.SecondaryServiceClusterIPRange})
 		if err != nil {
-			errs = append(errs, errors.New("error attempting to validate dualstack for --service-cluster-ip-range and --secondary-service-cluster-ip-range"))
+			errs = append(errs, fmt.Errorf("error attempting to validate dualstack for --service-cluster-ip-range value error:%v", err))
 		}
 
 		if !dualstack {
-			errs = append(errs, errors.New("--service-cluster-ip-range and --secondary-service-cluster-ip-range must be of different IP family"))
+			errs = append(errs, errors.New("--service-cluster-ip-range[0] and --service-cluster-ip-range[1] must be of different IP family"))
 		}
 
-		if err := validateMaxCIDRRange(options.SecondaryServiceClusterIPRange, maxCIDRBits, "--secondary-service-cluster-ip-range"); err != nil {
+		if err := validateMaxCIDRRange(options.SecondaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range[1]"); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -117,15 +120,7 @@ func validateTokenRequest(options *ServerRunOptions) []error {
 
 	enableSucceeded := options.ServiceAccountIssuer != nil
 
-	if enableAttempted && !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		errs = append(errs, errors.New("the TokenRequest feature is not enabled but --service-account-signing-key-file, --service-account-issuer and/or --api-audiences flags were passed"))
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) && !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		errs = append(errs, errors.New("the BoundServiceAccountTokenVolume feature depends on the TokenRequest feature, but the TokenRequest features is not enabled"))
-	}
-
-	if !enableAttempted && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
+	if !enableAttempted {
 		errs = append(errs, errors.New("--service-account-signing-key-file and --service-account-issuer are required flags"))
 	}
 
@@ -138,17 +133,17 @@ func validateTokenRequest(options *ServerRunOptions) []error {
 
 func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && options.GenericServerRunOptions.EnablePriorityAndFairness {
-		// We need the alpha API enabled.  There are only a few ways to turn it on
+		// If none of the following runtime config options are specified, APF is
+		// assumed to be turned on.
 		enabledAPIString := options.APIEnablement.RuntimeConfig.String()
-		switch {
-		case strings.Contains(enabledAPIString, "api/all=true"):
-			return nil
-		case strings.Contains(enabledAPIString, "api/alpha=true"):
-			return nil
-		case strings.Contains(enabledAPIString, "flowcontrol.apiserver.k8s.io/v1alpha1=true"):
-			return nil
-		default:
-			return []error{fmt.Errorf("enabling APIPriorityAndFairness requires --runtime-confg=flowcontrol.apiserver.k8s.io/v1alpha1=true to enable the required API")}
+		testConfigs := []string{"flowcontrol.apiserver.k8s.io/v1beta1", "api/beta", "api/all"} // in the order of precedence
+		for _, testConfig := range testConfigs {
+			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=false", testConfig)) {
+				return []error{fmt.Errorf("%s=false conflicts with APIPriorityAndFairness feature gate", testConfig)}
+			}
+			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=true", testConfig)) {
+				return nil
+			}
 		}
 	}
 
@@ -170,11 +165,16 @@ func (s *ServerRunOptions) Validate() []error {
 	errs = append(errs, s.Authorization.Validate()...)
 	errs = append(errs, s.Audit.Validate()...)
 	errs = append(errs, s.Admission.Validate()...)
-	errs = append(errs, s.InsecureServing.Validate()...)
 	errs = append(errs, s.APIEnablement.Validate(legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme)...)
 	errs = append(errs, validateTokenRequest(s)...)
 	errs = append(errs, s.Metrics.Validate()...)
 	errs = append(errs, s.Logs.Validate()...)
+	if s.IdentityLeaseDurationSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("--identity-lease-duration-seconds should be a positive number, but value '%d' provided", s.IdentityLeaseDurationSeconds))
+	}
+	if s.IdentityLeaseRenewIntervalSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("--identity-lease-renew-interval-seconds should be a positive number, but value '%d' provided", s.IdentityLeaseRenewIntervalSeconds))
+	}
 
 	return errs
 }

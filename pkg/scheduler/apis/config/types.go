@@ -55,6 +55,9 @@ const (
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta
 
+	// Parallelism defines the amount of parallelism in algorithms for scheduling a Pods. Must be greater than 0. Defaults to 16
+	Parallelism int32
+
 	// AlgorithmSource specifies the scheduler algorithm source.
 	// TODO(#87526): Remove AlgorithmSource from this package
 	// DEPRECATED: AlgorithmSource is removed in the v1beta1 ComponentConfig
@@ -409,7 +412,7 @@ type ExtenderTLSConfig struct {
 	CertData []byte
 	// KeyData holds PEM-encoded bytes (typically read from a client certificate key file).
 	// KeyData takes precedence over KeyFile
-	KeyData []byte
+	KeyData []byte `datapolicy:"security-key"`
 	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
 	// CAData takes precedence over CAFile
 	CAData []byte

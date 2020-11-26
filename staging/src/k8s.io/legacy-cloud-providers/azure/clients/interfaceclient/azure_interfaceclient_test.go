@@ -134,7 +134,7 @@ func TestGetVirtualMachineScaleSetNetworkInterface(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/0/networkInterfaces/nic1"
 	testInterface := getTestVMSSInterface("nic1")
 	networkInterface, err := testInterface.MarshalJSON()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	response := &http.Response{
 		StatusCode: http.StatusOK,
 		Body:       ioutil.NopCloser(bytes.NewReader(networkInterface)),

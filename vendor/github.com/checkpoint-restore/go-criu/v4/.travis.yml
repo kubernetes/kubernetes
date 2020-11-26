@@ -1,5 +1,5 @@
 language: go
-sudo: required
+dist: bionic
 os:
   - linux
 go:
@@ -13,6 +13,7 @@ env:
 install:
   - sudo apt-get update
   - sudo apt-get install -y libprotobuf-dev libprotobuf-c0-dev protobuf-c-compiler protobuf-compiler python-protobuf libnl-3-dev libnet-dev libcap-dev
+  - make install.tools
   - go get github.com/checkpoint-restore/go-criu
   - git clone --single-branch -b ${CRIU_BRANCH} https://github.com/checkpoint-restore/criu.git
   - cd criu; make
@@ -20,6 +21,8 @@ install:
   - cd ..
 script:
   # This builds the code without running the tests.
-  - make build phaul test/test test/phaul test/piggie
+  - make lint build phaul test/test test/phaul test/piggie
   # Run actual test as root as it uses CRIU.
   - sudo make test phaul-test
+  # This builds crit-go
+  - make -C crit-go/magic-gen lint build magicgen test

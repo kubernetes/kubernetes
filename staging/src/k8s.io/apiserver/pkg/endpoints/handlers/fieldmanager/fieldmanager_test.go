@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager_test
+package fieldmanager
 
 import (
 	"errors"
@@ -36,17 +36,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/v3/merge"
-	"sigs.k8s.io/structured-merge-diff/v3/typed"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/merge"
+	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"sigs.k8s.io/yaml"
 )
 
-var fakeSchema = prototesting.Fake{
+var kubernetesSwaggerSchema = prototesting.Fake{
 	Path: filepath.Join(
 		strings.Repeat(".."+string(filepath.Separator), 8),
 		"api", "openapi-spec", "swagger.json"),
@@ -80,22 +78,26 @@ type fakeObjectDefaulter struct{}
 func (d *fakeObjectDefaulter) Default(in runtime.Object) {}
 
 type TestFieldManager struct {
-	fieldManager *fieldmanager.FieldManager
+	fieldManager *FieldManager
 	emptyObj     runtime.Object
 	liveObj      runtime.Object
 }
 
 func NewDefaultTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
-	return NewTestFieldManager(gvk, nil)
+	return NewTestFieldManager(gvk, false, nil)
 }
 
-func NewTestFieldManager(gvk schema.GroupVersionKind, chainFieldManager func(fieldmanager.Manager) fieldmanager.Manager) TestFieldManager {
+func NewSubresourceTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
+	return NewTestFieldManager(gvk, true, nil)
+}
+
+func NewTestFieldManager(gvk schema.GroupVersionKind, ignoreManagedFieldsFromRequestObject bool, chainFieldManager func(Manager) Manager) TestFieldManager {
 	m := NewFakeOpenAPIModels()
 	typeConverter := NewFakeTypeConverter(m)
-	converter := internal.NewVersionConverter(typeConverter, &fakeObjectConvertor{}, gvk.GroupVersion())
+	converter := newVersionConverter(typeConverter, &fakeObjectConvertor{}, gvk.GroupVersion())
 	apiVersion := fieldpath.APIVersion(gvk.GroupVersion().String())
 	objectConverter := &fakeObjectConvertor{converter, apiVersion}
-	f, err := fieldmanager.NewStructuredMergeManager(
+	f, err := NewStructuredMergeManager(
 		typeConverter,
 		objectConverter,
 		&fakeObjectDefaulter{},
@@ -108,23 +110,24 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, chainFieldManager func(fie
 	live := &unstructured.Unstructured{}
 	live.SetKind(gvk.Kind)
 	live.SetAPIVersion(gvk.GroupVersion().String())
-	f = fieldmanager.NewStripMetaManager(f)
-	f = fieldmanager.NewManagedFieldsUpdater(f)
-	f = fieldmanager.NewBuildManagerInfoManager(f, gvk.GroupVersion())
-	f = fieldmanager.NewLastAppliedManager(f, typeConverter, objectConverter, gvk.GroupVersion())
-	f = fieldmanager.NewLastAppliedUpdater(f)
+	f = NewStripMetaManager(f)
+	f = NewManagedFieldsUpdater(f)
+	f = NewBuildManagerInfoManager(f, gvk.GroupVersion())
+	f = NewProbabilisticSkipNonAppliedManager(f, &fakeObjectCreater{gvk: gvk}, gvk, DefaultTrackOnCreateProbability)
+	f = NewLastAppliedManager(f, typeConverter, objectConverter, gvk.GroupVersion())
+	f = NewLastAppliedUpdater(f)
 	if chainFieldManager != nil {
 		f = chainFieldManager(f)
 	}
 	return TestFieldManager{
-		fieldManager: fieldmanager.NewFieldManager(f),
+		fieldManager: NewFieldManager(f, ignoreManagedFieldsFromRequestObject),
 		emptyObj:     live,
 		liveObj:      live.DeepCopyObject(),
 	}
 }
 
-func NewFakeTypeConverter(m proto.Models) internal.TypeConverter {
-	tc, err := internal.NewTypeConverter(m, false)
+func NewFakeTypeConverter(m proto.Models) TypeConverter {
+	tc, err := NewTypeConverter(m, false)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to build TypeConverter: %v", err))
 	}
@@ -132,7 +135,7 @@ func NewFakeTypeConverter(m proto.Models) internal.TypeConverter {
 }
 
 func NewFakeOpenAPIModels() proto.Models {
-	d, err := fakeSchema.OpenAPISchema()
+	d, err := kubernetesSwaggerSchema.OpenAPISchema()
 	if err != nil {
 		panic(err)
 	}
@@ -1039,6 +1042,145 @@ spec:
 	}
 }
 
+func TestNoTrackManagedFieldsForClientSideApply(t *testing.T) {
+	f := NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
+
+	// create object
+	newObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	deployment := []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-app
+spec:
+  replicas: 100
+`)
+	if err := yaml.Unmarshal(deployment, &newObj.Object); err != nil {
+		t.Errorf("error decoding YAML: %v", err)
+	}
+	if err := f.Update(newObj, "test_kubectl_create"); err != nil {
+		t.Errorf("failed to update object: %v", err)
+	}
+	if m := f.ManagedFields(); len(m) == 0 {
+		t.Errorf("expected to have managed fields, but got: %v", m)
+	}
+
+	// stop tracking managed fields
+	newObj = &unstructured.Unstructured{Object: map[string]interface{}{}}
+	deployment = []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  managedFields: [] # stop tracking managed fields
+  labels:
+    app: my-app
+spec:
+  replicas: 100
+`)
+	if err := yaml.Unmarshal(deployment, &newObj.Object); err != nil {
+		t.Errorf("error decoding YAML: %v", err)
+	}
+	newObj.SetUID("nonempty")
+	if err := f.Update(newObj, "test_kubectl_replace"); err != nil {
+		t.Errorf("failed to update object: %v", err)
+	}
+	if m := f.ManagedFields(); len(m) != 0 {
+		t.Errorf("expected to have stop tracking managed fields, but got: %v", m)
+	}
+
+	// check that we still don't track managed fields
+	newObj = &unstructured.Unstructured{Object: map[string]interface{}{}}
+	deployment = []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-app
+spec:
+  replicas: 100
+`)
+	if err := yaml.Unmarshal(deployment, &newObj.Object); err != nil {
+		t.Errorf("error decoding YAML: %v", err)
+	}
+	if err := setLastAppliedFromEncoded(newObj, deployment); err != nil {
+		t.Errorf("failed to set last applied: %v", err)
+	}
+	if err := f.Update(newObj, "test_k_client_side_apply"); err != nil {
+		t.Errorf("failed to update object: %v", err)
+	}
+	if m := f.ManagedFields(); len(m) != 0 {
+		t.Errorf("expected to continue to not track managed fields, but got: %v", m)
+	}
+	lastApplied, err := getLastApplied(f.liveObj)
+	if err != nil {
+		t.Errorf("failed to get last applied: %v", err)
+	}
+	if !strings.Contains(lastApplied, "my-app") {
+		t.Errorf("expected last applied annotation to be set properly, but got: %q", lastApplied)
+	}
+
+	// start tracking managed fields
+	newObj = &unstructured.Unstructured{Object: map[string]interface{}{}}
+	deployment = []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-app
+spec:
+  replicas: 100
+`)
+	if err := yaml.Unmarshal(deployment, &newObj.Object); err != nil {
+		t.Errorf("error decoding YAML: %v", err)
+	}
+	if err := f.Apply(newObj, "test_server_side_apply_without_upgrade", false); err != nil {
+		t.Errorf("error applying object: %v", err)
+	}
+	if m := f.ManagedFields(); len(m) < 2 {
+		t.Errorf("expected to start tracking managed fields with at least 2 field managers, but got: %v", m)
+	}
+	if e, a := "test_server_side_apply_without_upgrade", f.ManagedFields()[0].Manager; e != a {
+		t.Fatalf("exected first manager name to be %v, but got %v: %#v", e, a, f.ManagedFields())
+	}
+	if e, a := "before-first-apply", f.ManagedFields()[1].Manager; e != a {
+		t.Fatalf("exected second manager name to be %v, but got %v: %#v", e, a, f.ManagedFields())
+	}
+
+	// upgrade management of the object from client-side apply to server-side apply
+	newObj = &unstructured.Unstructured{Object: map[string]interface{}{}}
+	deployment = []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-app-v2 # change
+spec:
+  replicas: 8 # change
+`)
+	if err := yaml.Unmarshal(deployment, &newObj.Object); err != nil {
+		t.Errorf("error decoding YAML: %v", err)
+	}
+	if err := f.Apply(newObj, "kubectl", false); err != nil {
+		t.Errorf("error applying object: %v", err)
+	}
+	if m := f.ManagedFields(); len(m) == 0 {
+		t.Errorf("expected to track managed fields, but got: %v", m)
+	}
+	lastApplied, err = getLastApplied(f.liveObj)
+	if err != nil {
+		t.Errorf("failed to get last applied: %v", err)
+	}
+	if !strings.Contains(lastApplied, "my-app-v2") {
+		t.Errorf("expected last applied annotation to be updated, but got: %q", lastApplied)
+	}
+}
+
 func yamlToJSON(y []byte) (string, error) {
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal(y, &obj.Object); err != nil {
@@ -1063,20 +1205,6 @@ func setLastAppliedFromEncoded(obj runtime.Object, lastApplied []byte) error {
 	return setLastApplied(obj, lastAppliedJSON)
 }
 
-func setLastApplied(obj runtime.Object, lastApplied string) error {
-	accessor := meta.NewAccessor()
-	annotations, err := accessor.Annotations(obj)
-	if err != nil {
-		return fmt.Errorf("failed to access annotations: %v", err)
-	}
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
-	annotations[corev1.LastAppliedConfigAnnotation] = lastApplied
-	accessor.SetAnnotations(obj, annotations)
-	return nil
-}
-
 func getLastApplied(obj runtime.Object) (string, error) {
 	accessor := meta.NewAccessor()
 	annotations, err := accessor.Annotations(obj)
@@ -1092,4 +1220,57 @@ func getLastApplied(obj runtime.Object) (string, error) {
 		return "", fmt.Errorf("expected last applied annotation, but got none for object: %v", obj)
 	}
 	return lastApplied, nil
+}
+
+func TestUpdateViaSubresources(t *testing.T) {
+	f := NewSubresourceTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
+
+	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal([]byte(`{
+		"apiVersion": "v1",
+		"kind": "Pod",
+		"metadata": {
+			"labels": {
+				"a":"b"
+			},
+		}
+	}`), &obj.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+	obj.SetManagedFields([]metav1.ManagedFieldsEntry{
+		{
+			Manager:    "test",
+			Operation:  metav1.ManagedFieldsOperationApply,
+			APIVersion: "apps/v1",
+			FieldsType: "FieldsV1",
+			FieldsV1: &metav1.FieldsV1{
+				[]byte(`{"f:metadata":{"f:labels":{"f:another_field":{}}}}`),
+			},
+		},
+	})
+
+	// Check that managed fields cannot be changed via subresources
+	expectedManager := "fieldmanager_test_subresource"
+	if err := f.Update(obj, expectedManager); err != nil {
+		t.Fatalf("failed to apply object: %v", err)
+	}
+
+	managedFields := f.ManagedFields()
+	if len(managedFields) != 1 {
+		t.Fatalf("Expected new managed fields to have one entry. Got:\n%#v", managedFields)
+	}
+	if managedFields[0].Manager != expectedManager {
+		t.Fatalf("Expected first item to have manager set to: %s. Got: %s", expectedManager, managedFields[0].Manager)
+	}
+
+	// Check that managed fields cannot be reset via subresources
+	newObj := obj.DeepCopy()
+	newObj.SetManagedFields([]metav1.ManagedFieldsEntry{})
+	if err := f.Update(newObj, expectedManager); err != nil {
+		t.Fatalf("failed to apply object: %v", err)
+	}
+	newManagedFields := f.ManagedFields()
+	if len(newManagedFields) != 1 {
+		t.Fatalf("Expected new managed fields to have one entry. Got:\n%#v", newManagedFields)
+	}
 }

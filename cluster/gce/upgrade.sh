@@ -313,7 +313,7 @@ function do-single-node-upgrade() {
   # Drain node
   echo "== Draining ${instance}. == " >&2
   local drain_rc
-  "${KUBE_ROOT}/cluster/kubectl.sh" drain --delete-local-data --force --ignore-daemonsets "${instance}" \
+  "${KUBE_ROOT}/cluster/kubectl.sh" drain --delete-emptydir-data --force --ignore-daemonsets "${instance}" \
     && drain_rc=$? || drain_rc=$?
   if [[ "${drain_rc}" != 0 ]]; then
     echo "== FAILED to drain ${instance} =="
@@ -462,16 +462,24 @@ function update-coredns-config() {
 
   # clean up
   cleanup() {
-    rm -rf "${download_dir}"
+    if [ -n "${download_dir:-}" ]; then
+      rm -rf "${download_dir}"
+    fi
   }
-  trap cleanup EXIT
+  trap cleanup RETURN
 
   # Get the new installed CoreDNS version
-  echo "Waiting for CoreDNS to update"
-  until [[ $("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}') -ne ${COREDNS_DEPLOY_RESOURCE_VERSION} ]]; do
+  echo "== Waiting for CoreDNS to update =="
+  local -r endtime=$(date -ud "3 minute" +%s)
+  until [[ $("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}') -ne ${COREDNS_DEPLOY_RESOURCE_VERSION} ]] || [[ $(date -u +%s) -gt $endtime ]]; do
      sleep 1
   done
-  echo "Fetching the latest installed CoreDNS version"
+
+  if [[ $("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}') -ne ${COREDNS_DEPLOY_RESOURCE_VERSION} ]]; then
+    echo "== CoreDNS ResourceVersion changed =="
+  fi
+
+  echo "== Fetching the latest installed CoreDNS version =="
   NEW_COREDNS_VERSION=$("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | cut -d ":" -f 2)
 
   case "$(uname -m)" in

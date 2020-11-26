@@ -97,6 +97,7 @@ go_test(
         "gce_annotations_test.go",
         "gce_disks_test.go",
         "gce_healthchecks_test.go",
+        "gce_instances_test.go",
         "gce_loadbalancer_external_test.go",
         "gce_loadbalancer_internal_test.go",
         "gce_loadbalancer_metrics_test.go",

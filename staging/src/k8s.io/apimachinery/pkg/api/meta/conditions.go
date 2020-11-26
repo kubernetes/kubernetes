@@ -51,6 +51,7 @@ func SetStatusCondition(conditions *[]metav1.Condition, newCondition metav1.Cond
 
 	existingCondition.Reason = newCondition.Reason
 	existingCondition.Message = newCondition.Message
+	existingCondition.ObservedGeneration = newCondition.ObservedGeneration
 }
 
 // RemoveStatusCondition removes the corresponding conditionType from conditions.

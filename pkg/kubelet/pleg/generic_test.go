@@ -650,9 +650,7 @@ func TestRelistIPChange(t *testing.T) {
 }
 
 func TestRunningPodAndContainerCount(t *testing.T) {
-	fakeRuntime := &containertest.FakeRuntime{}
-	runtimeCache, _ := kubecontainer.NewRuntimeCache(fakeRuntime)
-	metrics.Register(runtimeCache)
+	metrics.Register()
 	testPleg := newTestGenericPLEG()
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 

@@ -20,6 +20,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/system"
 	libcontainerUtils "github.com/opencontainers/runc/libcontainer/utils"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
 
 	"golang.org/x/sys/unix"
@@ -100,7 +101,7 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig) (err error) {
 
 	s := iConfig.SpecState
 	s.Pid = unix.Getpid()
-	s.Status = configs.Creating
+	s.Status = specs.StateCreating
 	if err := iConfig.Config.Hooks[configs.CreateContainer].RunHooks(s); err != nil {
 		return err
 	}
@@ -110,7 +111,7 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig) (err error) {
 	} else if config.Namespaces.Contains(configs.NEWNS) {
 		err = pivotRoot(config.Rootfs)
 	} else {
-		err = chroot(config.Rootfs)
+		err = chroot()
 	}
 	if err != nil {
 		return newSystemErrorWithCause(err, "jailing process inside rootfs")
@@ -836,10 +837,10 @@ func msMoveRoot(rootfs string) error {
 	if err := unix.Mount(rootfs, "/", "", unix.MS_MOVE, ""); err != nil {
 		return err
 	}
-	return chroot(rootfs)
+	return chroot()
 }
 
-func chroot(rootfs string) error {
+func chroot() error {
 	if err := unix.Chroot("."); err != nil {
 		return err
 	}

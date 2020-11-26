@@ -22,7 +22,7 @@ import (
 	"runtime"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -90,7 +90,7 @@ func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.NFS != nil)
 }
 
-func (plugin *nfsPlugin) RequiresRemount() bool {
+func (plugin *nfsPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -259,7 +259,7 @@ func (nfsMounter *nfsMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 		options = append(options, "ro")
 	}
 	mountOptions := util.JoinMountOptions(nfsMounter.mountOptions, options)
-	err = nfsMounter.mounter.Mount(source, dir, "nfs", mountOptions)
+	err = nfsMounter.mounter.MountSensitiveWithoutSystemd(source, dir, "nfs", mountOptions, nil)
 	if err != nil {
 		notMnt, mntErr := mount.IsNotMountPoint(nfsMounter.mounter, dir)
 		if mntErr != nil {

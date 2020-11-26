@@ -89,10 +89,11 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
-        "//vendor/github.com/go-openapi/strfmt:go_default_library",
-        "//vendor/github.com/go-openapi/validate:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/validation/spec:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/validation/strfmt:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/validation/validate:go_default_library",
     ],
 )
 

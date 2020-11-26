@@ -241,5 +241,22 @@ over the AWS_CA_BUNDLE environment variable, and will be used if both are set.
 Setting a custom HTTPClient in the aws.Config options will override this setting.
 To use this option and custom HTTP client, the HTTP client needs to be provided
 when creating the session. Not the service client.
+
+The endpoint of the EC2 IMDS client can be configured via the environment
+variable, AWS_EC2_METADATA_SERVICE_ENDPOINT when creating the client with a
+Session. See Options.EC2IMDSEndpoint for more details.
+
+  AWS_EC2_METADATA_SERVICE_ENDPOINT=http://169.254.169.254
+
+If using an URL with an IPv6 address literal, the IPv6 address
+component must be enclosed in square brackets.
+
+  AWS_EC2_METADATA_SERVICE_ENDPOINT=http://[::1]
+
+The custom EC2 IMDS endpoint can also be specified via the Session options.
+
+  sess, err := session.NewSessionWithOptions(session.Options{
+      EC2IMDSEndpoint: "http://[::1]",
+  })
 */
 package session

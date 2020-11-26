@@ -26,8 +26,10 @@ import (
 	"k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/utils/net"
 )
@@ -47,7 +49,7 @@ type EndpointSliceCache struct {
 
 	makeEndpointInfo makeEndpointFunc
 	hostname         string
-	isIPv6Mode       *bool
+	ipFamily         v1.IPFamily
 	recorder         record.EventRecorder
 }
 
@@ -76,22 +78,23 @@ type endpointSliceInfo struct {
 // Addresses and Topology are copied from EndpointSlice Endpoints.
 type endpointInfo struct {
 	Addresses []string
+	NodeName  *string
 	Topology  map[string]string
 }
 
 // spToEndpointMap stores groups Endpoint objects by ServicePortName and
-// EndpointSlice name.
+// IP address.
 type spToEndpointMap map[ServicePortName]map[string]Endpoint
 
 // NewEndpointSliceCache initializes an EndpointSliceCache.
-func NewEndpointSliceCache(hostname string, isIPv6Mode *bool, recorder record.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
+func NewEndpointSliceCache(hostname string, ipFamily v1.IPFamily, recorder record.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
 	if makeEndpointInfo == nil {
 		makeEndpointInfo = standardEndpointInfo
 	}
 	return &EndpointSliceCache{
 		trackerByServiceMap: map[types.NamespacedName]*endpointSliceTracker{},
 		hostname:            hostname,
-		isIPv6Mode:          isIPv6Mode,
+		ipFamily:            ipFamily,
 		makeEndpointInfo:    makeEndpointInfo,
 		recorder:            recorder,
 	}
@@ -120,10 +123,14 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 	if !remove {
 		for _, endpoint := range endpointSlice.Endpoints {
 			if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
-				esInfo.Endpoints = append(esInfo.Endpoints, &endpointInfo{
+				eInfo := endpointInfo{
 					Addresses: endpoint.Addresses,
 					Topology:  endpoint.Topology,
-				})
+				}
+				if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName) {
+					eInfo.NodeName = endpoint.NodeName
+				}
+				esInfo.Endpoints = append(esInfo.Endpoints, &eInfo)
 			}
 		}
 
@@ -248,14 +255,20 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 
 		// Filter out the incorrect IP version case. Any endpoint port that
 		// contains incorrect IP version will be ignored.
-		if cache.isIPv6Mode != nil && utilnet.IsIPv6String(endpoint.Addresses[0]) != *cache.isIPv6Mode {
+		if (cache.ipFamily == v1.IPv6Protocol) != utilnet.IsIPv6String(endpoint.Addresses[0]) {
 			// Emit event on the corresponding service which had a different IP
 			// version than the endpoint.
 			utilproxy.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], serviceNN.Namespace, serviceNN.Name, "")
 			continue
 		}
 
-		isLocal := cache.isLocal(endpoint.Topology[v1.LabelHostname])
+		isLocal := false
+		if endpoint.NodeName != nil {
+			isLocal = cache.isLocal(*endpoint.NodeName)
+		} else {
+			isLocal = cache.isLocal(endpoint.Topology[v1.LabelHostname])
+		}
+
 		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology)
 
 		// This logic ensures we're deduping potential overlapping endpoints

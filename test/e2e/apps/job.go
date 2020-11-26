@@ -246,13 +246,7 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By(fmt.Sprintf("Checking that %d pod created and status is failed", backoff+1))
 		pods, err := e2ejob.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectNoError(err, "failed to get PodList for job %s in namespace: %s", job.Name, f.Namespace.Name)
-		// gomega.Expect(pods.Items).To(gomega.HaveLen(backoff + 1))
-		// due to NumRequeus not being stable enough, especially with failed status
-		// updates we need to allow more than backoff+1
-		// TODO revert this back to above when https://github.com/kubernetes/kubernetes/issues/64787 gets fixed
-		if len(pods.Items) < backoff+1 {
-			framework.Failf("Not enough pod created expected at least %d, got %#v", backoff+1, pods.Items)
-		}
+		gomega.Expect(pods.Items).To(gomega.HaveLen(backoff + 1))
 		for _, pod := range pods.Items {
 			framework.ExpectEqual(pod.Status.Phase, v1.PodFailed)
 		}

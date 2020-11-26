@@ -38,7 +38,6 @@ const (
 
 // PortMapping represents a network port in a container
 type PortMapping struct {
-	Name          string
 	HostPort      int32
 	ContainerPort int32
 	Protocol      v1.Protocol

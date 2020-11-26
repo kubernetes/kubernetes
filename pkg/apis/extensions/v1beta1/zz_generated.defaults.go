@@ -21,6 +21,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"reflect"
+
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -111,7 +113,9 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			v1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -159,7 +163,9 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			v1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -204,9 +210,12 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
+		v1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			v1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {
 			b := &a.EphemeralContainerCommon.Env[j]
@@ -325,7 +334,9 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			v1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -373,7 +384,9 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			v1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -418,9 +431,12 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
+		v1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			v1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {
 			b := &a.EphemeralContainerCommon.Env[j]
@@ -580,7 +596,9 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			v1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -628,7 +646,9 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			v1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -673,9 +693,12 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
+		v1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			v1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {
 			b := &a.EphemeralContainerCommon.Env[j]

@@ -50,7 +50,7 @@ import (
 )
 
 const (
-	testKubeletHostname = "127.0.0.1"
+	testKubeletHostname = "hostname"
 )
 
 // TODO(mtaufen): below is ported from the old kubelet_node_status_test.go code, potentially add more test coverage for NodeAddress setter in future
@@ -86,8 +86,8 @@ func TestNodeAddress(t *testing.T) {
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
 			expectedAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
 				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
 			shouldError: false,
@@ -416,7 +416,7 @@ func TestNodeAddress(t *testing.T) {
 			}
 
 			// construct setter
-			setter := NodeAddress(nodeIP,
+			setter := NodeAddress([]net.IP{nodeIP},
 				nodeIPValidator,
 				hostname,
 				testCase.hostnameOverride,
@@ -433,9 +433,69 @@ func TestNodeAddress(t *testing.T) {
 				return
 			}
 
-			// Sort both sets for consistent equality
-			sortNodeAddresses(testCase.expectedAddresses)
-			sortNodeAddresses(existingNode.Status.Addresses)
+			assert.True(t, apiequality.Semantic.DeepEqual(testCase.expectedAddresses, existingNode.Status.Addresses),
+				"Diff: %s", diff.ObjectDiff(testCase.expectedAddresses, existingNode.Status.Addresses))
+		})
+	}
+}
+
+// We can't test failure or autodetection cases here because the relevant code isn't mockable
+func TestNodeAddress_NoCloudProvider(t *testing.T) {
+	cases := []struct {
+		name              string
+		nodeIPs           []net.IP
+		expectedAddresses []v1.NodeAddress
+	}{
+		{
+			name:    "Single --node-ip",
+			nodeIPs: []net.IP{net.ParseIP("10.1.1.1")},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			name:    "Dual --node-ips",
+			nodeIPs: []net.IP{net.ParseIP("10.1.1.1"), net.ParseIP("fd01::1234")},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			// testCase setup
+			existingNode := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
+				Spec:       v1.NodeSpec{},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{},
+				},
+			}
+
+			nodeIPValidator := func(nodeIP net.IP) error {
+				return nil
+			}
+			nodeAddressesFunc := func() ([]v1.NodeAddress, error) {
+				return nil, fmt.Errorf("not reached")
+			}
+
+			// construct setter
+			setter := NodeAddress(testCase.nodeIPs,
+				nodeIPValidator,
+				testKubeletHostname,
+				false, // hostnameOverridden
+				false, // externalCloudProvider
+				nil,   // cloud
+				nodeAddressesFunc)
+
+			// call setter on existing node
+			err := setter(existingNode)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
 			assert.True(t, apiequality.Semantic.DeepEqual(testCase.expectedAddresses, existingNode.Status.Addresses),
 				"Diff: %s", diff.ObjectDiff(testCase.expectedAddresses, existingNode.Status.Addresses))
@@ -1049,15 +1109,16 @@ func TestReadyCondition(t *testing.T) {
 	}
 
 	cases := []struct {
-		desc                     string
-		node                     *v1.Node
-		runtimeErrors            error
-		networkErrors            error
-		storageErrors            error
-		appArmorValidateHostFunc func() error
-		cmStatus                 cm.Status
-		expectConditions         []v1.NodeCondition
-		expectEvents             []testEvent
+		desc                      string
+		node                      *v1.Node
+		runtimeErrors             error
+		networkErrors             error
+		storageErrors             error
+		appArmorValidateHostFunc  func() error
+		cmStatus                  cm.Status
+		nodeShutdownManagerErrors error
+		expectConditions          []v1.NodeCondition
+		expectEvents              []testEvent
 	}{
 		{
 			desc:             "new, ready",
@@ -1093,6 +1154,12 @@ func TestReadyCondition(t *testing.T) {
 			node:             withCapacity.DeepCopy(),
 			storageErrors:    errors.New("some storage error"),
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "some storage error", now, now)},
+		},
+		{
+			desc:                      "new, not ready: shutdown active",
+			node:                      withCapacity.DeepCopy(),
+			nodeShutdownManagerErrors: errors.New("node is shutting down"),
+			expectConditions:          []v1.NodeCondition{*makeReadyCondition(false, "node is shutting down", now, now)},
 		},
 		{
 			desc:             "new, not ready: runtime and network errors",
@@ -1174,6 +1241,9 @@ func TestReadyCondition(t *testing.T) {
 			cmStatusFunc := func() cm.Status {
 				return tc.cmStatus
 			}
+			nodeShutdownErrorsFunc := func() error {
+				return tc.nodeShutdownManagerErrors
+			}
 			events := []testEvent{}
 			recordEventFunc := func(eventType, event string) {
 				events = append(events, testEvent{
@@ -1182,7 +1252,7 @@ func TestReadyCondition(t *testing.T) {
 				})
 			}
 			// construct setter
-			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, storageErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, recordEventFunc)
+			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, storageErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, nodeShutdownErrorsFunc, recordEventFunc)
 			// call setter on node
 			if err := setter(tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -1677,19 +1747,6 @@ func TestVolumeLimits(t *testing.T) {
 }
 
 // Test Helpers:
-
-// sortableNodeAddress is a type for sorting []v1.NodeAddress
-type sortableNodeAddress []v1.NodeAddress
-
-func (s sortableNodeAddress) Len() int { return len(s) }
-func (s sortableNodeAddress) Less(i, j int) bool {
-	return (string(s[i].Type) + s[i].Address) < (string(s[j].Type) + s[j].Address)
-}
-func (s sortableNodeAddress) Swap(i, j int) { s[j], s[i] = s[i], s[j] }
-
-func sortNodeAddresses(addrs sortableNodeAddress) {
-	sort.Sort(addrs)
-}
 
 // testEvent is used to record events for tests
 type testEvent struct {

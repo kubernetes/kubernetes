@@ -214,7 +214,7 @@ func TestCreateOrUpdateWithNeverRateLimiter(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	rcCreateOrUpdatetErr := &retry.Error{
+	rcCreateOrUpdateErr := &retry.Error{
 		RawError:  fmt.Errorf("azure cloud provider rate limited(%s) for operation %q", "write", "RouteTableCreateOrUpdate"),
 		Retriable: true,
 	}
@@ -224,7 +224,7 @@ func TestCreateOrUpdateWithNeverRateLimiter(t *testing.T) {
 
 	routetableClient := getTestRouteTableClientWithNeverRateLimiter(armClient)
 	rerr := routetableClient.CreateOrUpdate(context.TODO(), "rg", "rt1", rt1, "")
-	assert.Equal(t, rcCreateOrUpdatetErr, rerr)
+	assert.Equal(t, rcCreateOrUpdateErr, rerr)
 }
 
 func TestCreateOrUpdateRetryAfterReader(t *testing.T) {

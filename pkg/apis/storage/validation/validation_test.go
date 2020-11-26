@@ -1665,6 +1665,7 @@ func TestCSIDriverValidation(t *testing.T) {
 	attachNotRequired := false
 	podInfoOnMount := true
 	notPodInfoOnMount := false
+	notRequiresRepublish := false
 	supportedFSGroupPolicy := storage.FileFSGroupPolicy
 	invalidFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
 	invalidFSGroupPolicy = "invalid-mode"
@@ -1672,68 +1673,77 @@ func TestCSIDriverValidation(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &podInfoOnMount,
+				AttachRequired:    &attachRequired,
+				PodInfoOnMount:    &podInfoOnMount,
+				RequiresRepublish: &notRequiresRepublish,
 			},
 		},
 		{
 			// driver name: dot only
 			ObjectMeta: metav1.ObjectMeta{Name: "io.kubernetes.storage.csi.driver"},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &podInfoOnMount,
+				AttachRequired:    &attachRequired,
+				PodInfoOnMount:    &podInfoOnMount,
+				RequiresRepublish: &notRequiresRepublish,
 			},
 		},
 		{
 			// driver name: dash only
 			ObjectMeta: metav1.ObjectMeta{Name: "io-kubernetes-storage-csi-driver"},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:    &attachRequired,
+				PodInfoOnMount:    &notPodInfoOnMount,
+				RequiresRepublish: &notRequiresRepublish,
 			},
 		},
 		{
 			// driver name: numbers
 			ObjectMeta: metav1.ObjectMeta{Name: "1csi2driver3"},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &podInfoOnMount,
+				AttachRequired:    &attachRequired,
+				PodInfoOnMount:    &podInfoOnMount,
+				RequiresRepublish: &notRequiresRepublish,
 			},
 		},
 		{
 			// driver name: dot and dash
 			ObjectMeta: metav1.ObjectMeta{Name: "io.kubernetes.storage.csi-driver"},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &podInfoOnMount,
+				AttachRequired:    &attachRequired,
+				PodInfoOnMount:    &podInfoOnMount,
+				RequiresRepublish: &notRequiresRepublish,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:    &attachRequired,
+				PodInfoOnMount:    &notPodInfoOnMount,
+				RequiresRepublish: &notRequiresRepublish,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &podInfoOnMount,
+				AttachRequired:    &attachRequired,
+				PodInfoOnMount:    &podInfoOnMount,
+				RequiresRepublish: &notRequiresRepublish,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:    &attachNotRequired,
+				PodInfoOnMount:    &notPodInfoOnMount,
+				RequiresRepublish: &notRequiresRepublish,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:    &attachNotRequired,
+				PodInfoOnMount:    &notPodInfoOnMount,
+				RequiresRepublish: &notRequiresRepublish,
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 					storage.VolumeLifecyclePersistent,
 				},
@@ -1742,8 +1752,9 @@ func TestCSIDriverValidation(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:    &attachNotRequired,
+				PodInfoOnMount:    &notPodInfoOnMount,
+				RequiresRepublish: &notRequiresRepublish,
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 					storage.VolumeLifecycleEphemeral,
 				},
@@ -1752,22 +1763,24 @@ func TestCSIDriverValidation(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
-				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
-					storage.VolumeLifecycleEphemeral,
-					storage.VolumeLifecyclePersistent,
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: driverName},
-			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:    &attachNotRequired,
+				PodInfoOnMount:    &notPodInfoOnMount,
+				RequiresRepublish: &notRequiresRepublish,
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 					storage.VolumeLifecycleEphemeral,
 					storage.VolumeLifecyclePersistent,
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired:    &attachNotRequired,
+				PodInfoOnMount:    &notPodInfoOnMount,
+				RequiresRepublish: &notRequiresRepublish,
+				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+					storage.VolumeLifecycleEphemeral,
+					storage.VolumeLifecyclePersistent,
 					storage.VolumeLifecycleEphemeral,
 				},
 			},
@@ -1775,9 +1788,10 @@ func TestCSIDriverValidation(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
-				FSGroupPolicy:  &supportedFSGroupPolicy,
+				AttachRequired:    &attachNotRequired,
+				PodInfoOnMount:    &notPodInfoOnMount,
+				RequiresRepublish: &notRequiresRepublish,
+				FSGroupPolicy:     &supportedFSGroupPolicy,
 			},
 		},
 	}
@@ -1855,11 +1869,16 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 	attachNotRequired := false
 	podInfoOnMount := true
 	notPodInfoOnMount := false
+	notRequiresRepublish := false
+	resourceVersion := "1"
+	invalidFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
+	invalidFSGroupPolicy = "invalid-mode"
 	old := storage.CSIDriver{
-		ObjectMeta: metav1.ObjectMeta{Name: driverName},
+		ObjectMeta: metav1.ObjectMeta{Name: driverName, ResourceVersion: resourceVersion},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired: &attachNotRequired,
-			PodInfoOnMount: &notPodInfoOnMount,
+			AttachRequired:    &attachNotRequired,
+			PodInfoOnMount:    &notPodInfoOnMount,
+			RequiresRepublish: &notRequiresRepublish,
 			VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 				storage.VolumeLifecycleEphemeral,
 				storage.VolumeLifecyclePersistent,
@@ -1867,11 +1886,27 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 		},
 	}
 
-	// Currently there is only one success case: exactly the same
-	// as the existing object.
-	successCases := []storage.CSIDriver{old}
+	// Currently we compare the object against itself
+	// and ensure updates succeed
+	successCases := []storage.CSIDriver{
+		old,
+		// An invalid FSGroupPolicy should still pass
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName, ResourceVersion: resourceVersion},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+					storage.VolumeLifecycleEphemeral,
+					storage.VolumeLifecyclePersistent,
+				},
+				FSGroupPolicy: &invalidFSGroupPolicy,
+			},
+		},
+	}
 	for _, csiDriver := range successCases {
-		if errs := ValidateCSIDriverUpdate(&csiDriver, &old); len(errs) != 0 {
+		newDriver := csiDriver.DeepCopy()
+		if errs := ValidateCSIDriverUpdate(&csiDriver, newDriver); len(errs) != 0 {
 			t.Errorf("expected success for %+v: %v", csiDriver, errs)
 		}
 	}
@@ -1945,6 +1980,21 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 				new.Spec.VolumeLifecycleModes = []storage.VolumeLifecycleMode{
 					storage.VolumeLifecyclePersistent,
 				}
+			},
+		},
+		{
+			name: "FSGroupPolicy invalidated",
+			modify: func(new *storage.CSIDriver) {
+				invalidFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
+				invalidFSGroupPolicy = "invalid"
+				new.Spec.FSGroupPolicy = &invalidFSGroupPolicy
+			},
+		},
+		{
+			name: "FSGroupPolicy changed",
+			modify: func(new *storage.CSIDriver) {
+				fileFSGroupPolicy := storage.FileFSGroupPolicy
+				new.Spec.FSGroupPolicy = &fileFSGroupPolicy
 			},
 		},
 	}
@@ -2059,4 +2109,78 @@ func TestValidateCSIStorageCapacity(t *testing.T) {
 		})
 	}
 
+}
+
+func TestCSIServiceAccountToken(t *testing.T) {
+	driverName := "test-driver"
+	gcp := "gcp"
+	aws := "aws"
+	notRequiresRepublish := false
+	tests := []struct {
+		desc      string
+		csiDriver *storage.CSIDriver
+		wantErr   bool
+	}{
+		{
+			desc: "invalid - TokenRequests has tokens with the same audience",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{Name: driverName},
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:     []storage.TokenRequest{{Audience: gcp}, {Audience: gcp}},
+					RequiresRepublish: &notRequiresRepublish,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			desc: "invalid - TokenRequests has tokens with ExpirationSeconds less than 10min",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{Name: driverName},
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:     []storage.TokenRequest{{Audience: gcp, ExpirationSeconds: utilpointer.Int64Ptr(10)}},
+					RequiresRepublish: &notRequiresRepublish,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			desc: "invalid - TokenRequests has tokens with ExpirationSeconds less than 10min",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{Name: driverName},
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:     []storage.TokenRequest{{Audience: gcp, ExpirationSeconds: utilpointer.Int64Ptr(1<<32 + 1)}},
+					RequiresRepublish: &notRequiresRepublish,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			desc: "valid - TokenRequests has at most one token with empty string audience",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{Name: driverName},
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:     []storage.TokenRequest{{Audience: ""}},
+					RequiresRepublish: &notRequiresRepublish,
+				},
+			},
+		},
+		{
+			desc: "valid - TokenRequests has tokens with different audience",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{Name: driverName},
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:     []storage.TokenRequest{{}, {Audience: gcp}, {Audience: aws}},
+					RequiresRepublish: &notRequiresRepublish,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test.csiDriver.Spec.AttachRequired = new(bool)
+		test.csiDriver.Spec.PodInfoOnMount = new(bool)
+		if errs := ValidateCSIDriver(test.csiDriver); test.wantErr != (len(errs) != 0) {
+			t.Errorf("ValidateCSIDriver = %v, want err: %v", errs, test.wantErr)
+		}
+	}
 }

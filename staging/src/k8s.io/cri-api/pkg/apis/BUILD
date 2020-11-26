@@ -20,6 +20,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1:all-srcs",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:all-srcs",
         "//staging/src/k8s.io/cri-api/pkg/apis/testing:all-srcs",
     ],

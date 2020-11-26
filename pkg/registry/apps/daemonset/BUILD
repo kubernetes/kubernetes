@@ -18,7 +18,6 @@ go_library(
         "//pkg/api/pod:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/validation:go_default_library",
-        "//pkg/apis/core/validation:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta2:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",

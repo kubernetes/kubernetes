@@ -36,7 +36,7 @@ func TestTar(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmp)
+	defer os.RemoveAll(tmp)
 
 	if err := os.Mkdir(filepath.Join(tmp, "subdir"), os.FileMode(0755)); err != nil {
 		t.Fatal(err)

@@ -764,6 +764,7 @@ func (c *linuxContainer) checkCriuVersion(minVersion int) error {
 	}
 
 	criu := criu.MakeCriu()
+	criu.SetCriuPath(c.criuPath)
 	var err error
 	c.criuVersion, err = criu.GetCriuVersion()
 	if err != nil {
@@ -834,6 +835,78 @@ func (c *linuxContainer) handleCriuConfigurationFile(rpcOpts *criurpc.CriuOpts) 
 		// a default CRIU configuration file.
 		rpcOpts.ConfigFile = proto.String("/etc/criu/runc.conf")
 	}
+}
+
+func (c *linuxContainer) criuSupportsExtNS(t configs.NamespaceType) bool {
+	var minVersion int
+	switch t {
+	case configs.NEWNET:
+		// CRIU supports different external namespace with different released CRIU versions.
+		// For network namespaces to work we need at least criu 3.11.0 => 31100.
+		minVersion = 31100
+	case configs.NEWPID:
+		// For PID namespaces criu 31500 is needed.
+		minVersion = 31500
+	default:
+		return false
+	}
+	return c.checkCriuVersion(minVersion) == nil
+}
+
+func (c *linuxContainer) criuNsToKey(t configs.NamespaceType) string {
+	return "extRoot" + strings.Title(configs.NsName(t)) + "NS"
+}
+
+func (c *linuxContainer) handleCheckpointingExternalNamespaces(rpcOpts *criurpc.CriuOpts, t configs.NamespaceType) error {
+	if !c.criuSupportsExtNS(t) {
+		return nil
+	}
+
+	nsPath := c.config.Namespaces.PathOf(t)
+	if nsPath == "" {
+		return nil
+	}
+	// CRIU expects the information about an external namespace
+	// like this: --external <TYPE>[<inode>]:<key>
+	// This <key> is always 'extRoot<TYPE>NS'.
+	var ns unix.Stat_t
+	if err := unix.Stat(nsPath, &ns); err != nil {
+		return err
+	}
+	criuExternal := fmt.Sprintf("%s[%d]:%s", configs.NsName(t), ns.Ino, c.criuNsToKey(t))
+	rpcOpts.External = append(rpcOpts.External, criuExternal)
+
+	return nil
+}
+
+func (c *linuxContainer) handleRestoringExternalNamespaces(rpcOpts *criurpc.CriuOpts, extraFiles *[]*os.File, t configs.NamespaceType) error {
+	if !c.criuSupportsExtNS(t) {
+		return nil
+	}
+
+	nsPath := c.config.Namespaces.PathOf(t)
+	if nsPath == "" {
+		return nil
+	}
+	// CRIU wants the information about an existing namespace
+	// like this: --inherit-fd fd[<fd>]:<key>
+	// The <key> needs to be the same as during checkpointing.
+	// We are always using 'extRoot<TYPE>NS' as the key in this.
+	nsFd, err := os.Open(nsPath)
+	if err != nil {
+		logrus.Errorf("If a specific network namespace is defined it must exist: %s", err)
+		return fmt.Errorf("Requested network namespace %v does not exist", nsPath)
+	}
+	inheritFd := new(criurpc.InheritFd)
+	inheritFd.Key = proto.String(c.criuNsToKey(t))
+	// The offset of four is necessary because 0, 1, 2 and 3 is already
+	// used by stdin, stdout, stderr, 'criu swrk' socket.
+	inheritFd.Fd = proto.Int32(int32(4 + len(*extraFiles)))
+	rpcOpts.InheritFd = append(rpcOpts.InheritFd, inheritFd)
+	// All open FDs need to be transferred to CRIU via extraFiles
+	*extraFiles = append(*extraFiles, nsFd)
+
+	return nil
 }
 
 func (c *linuxContainer) Checkpoint(criuOpts *CriuOpts) error {
@@ -909,25 +982,13 @@ func (c *linuxContainer) Checkpoint(criuOpts *CriuOpts) error {
 	// will expect that the namespace exists during restore.
 	// This basically means that CRIU will ignore the namespace
 	// and expect to be setup correctly.
-	nsPath := c.config.Namespaces.PathOf(configs.NEWNET)
-	if nsPath != "" {
-		// For this to work we need at least criu 3.11.0 => 31100.
-		// As there was already a successful version check we will
-		// not error out if it fails. runc will just behave as it used
-		// to do and ignore external network namespaces.
-		err := c.checkCriuVersion(31100)
-		if err == nil {
-			// CRIU expects the information about an external namespace
-			// like this: --external net[<inode>]:<key>
-			// This <key> is always 'extRootNetNS'.
-			var netns unix.Stat_t
-			err = unix.Stat(nsPath, &netns)
-			if err != nil {
-				return err
-			}
-			criuExternal := fmt.Sprintf("net[%d]:extRootNetNS", netns.Ino)
-			rpcOpts.External = append(rpcOpts.External, criuExternal)
-		}
+	if err := c.handleCheckpointingExternalNamespaces(&rpcOpts, configs.NEWNET); err != nil {
+		return err
+	}
+
+	// Same for possible external PID namespaces
+	if err := c.handleCheckpointingExternalNamespaces(&rpcOpts, configs.NEWPID); err != nil {
+		return err
 	}
 
 	// CRIU can use cgroup freezer; when rpcOpts.FreezeCgroup
@@ -1251,33 +1312,13 @@ func (c *linuxContainer) Restore(process *Process, criuOpts *CriuOpts) error {
 	// Same as during checkpointing. If the container has a specific network namespace
 	// assigned to it, this now expects that the checkpoint will be restored in a
 	// already created network namespace.
-	nsPath := c.config.Namespaces.PathOf(configs.NEWNET)
-	if nsPath != "" {
-		// For this to work we need at least criu 3.11.0 => 31100.
-		// As there was already a successful version check we will
-		// not error out if it fails. runc will just behave as it used
-		// to do and ignore external network namespaces.
-		err := c.checkCriuVersion(31100)
-		if err == nil {
-			// CRIU wants the information about an existing network namespace
-			// like this: --inherit-fd fd[<fd>]:<key>
-			// The <key> needs to be the same as during checkpointing.
-			// We are always using 'extRootNetNS' as the key in this.
-			netns, err := os.Open(nsPath)
-			if err != nil {
-				logrus.Errorf("If a specific network namespace is defined it must exist: %s", err)
-				return fmt.Errorf("Requested network namespace %v does not exist", nsPath)
-			}
-			defer netns.Close()
-			inheritFd := new(criurpc.InheritFd)
-			inheritFd.Key = proto.String("extRootNetNS")
-			// The offset of four is necessary because 0, 1, 2 and 3 is already
-			// used by stdin, stdout, stderr, 'criu swrk' socket.
-			inheritFd.Fd = proto.Int32(int32(4 + len(extraFiles)))
-			req.Opts.InheritFd = append(req.Opts.InheritFd, inheritFd)
-			// All open FDs need to be transferred to CRIU via extraFiles
-			extraFiles = append(extraFiles, netns)
-		}
+	if err := c.handleRestoringExternalNamespaces(req.Opts, &extraFiles, configs.NEWNET); err != nil {
+		return err
+	}
+
+	// Same for PID namespaces.
+	if err := c.handleRestoringExternalNamespaces(req.Opts, &extraFiles, configs.NEWPID); err != nil {
+		return err
 	}
 
 	// This will modify the rootfs of the container in the same way runc
@@ -1345,7 +1386,14 @@ func (c *linuxContainer) Restore(process *Process, criuOpts *CriuOpts) error {
 			req.Opts.InheritFd = append(req.Opts.InheritFd, inheritFd)
 		}
 	}
-	return c.criuSwrk(process, req, criuOpts, extraFiles)
+	err = c.criuSwrk(process, req, criuOpts, extraFiles)
+
+	// Now that CRIU is done let's close all opened FDs CRIU needed.
+	for _, fd := range extraFiles {
+		fd.Close()
+	}
+
+	return err
 }
 
 func (c *linuxContainer) criuApplyCgroups(pid int, req *criurpc.CriuReq) error {
@@ -1863,7 +1911,7 @@ func (c *linuxContainer) currentOCIState() (*specs.State, error) {
 	if err != nil {
 		return nil, err
 	}
-	state.Status = status.String()
+	state.Status = specs.ContainerState(status.String())
 	if status != Stopped {
 		if c.initProcess != nil {
 			state.Pid = c.initProcess.pid()

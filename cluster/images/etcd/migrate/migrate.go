@@ -65,8 +65,8 @@ func runMigrate() {
 	}
 
 	migrate(
-		opts.name, opts.port, opts.peerListenUrls, opts.peerAdvertiseUrls, opts.binDir,
-		opts.dataDir, opts.etcdDataPrefix, opts.ttlKeysDirectory, opts.initialCluster,
+		opts.name, opts.port, opts.peerListenUrls, opts.peerAdvertiseUrls, opts.clientListenUrls,
+		opts.binDir, opts.dataDir, opts.etcdDataPrefix, opts.ttlKeysDirectory, opts.initialCluster,
 		target, opts.supportedVersions, opts.etcdServerArgs)
 }
 
@@ -84,7 +84,8 @@ func copyBinaries() {
 }
 
 // migrate opens or initializes the etcd data directory, configures the migrator, and starts the migration.
-func migrate(name string, port uint64, peerListenUrls string, peerAdvertiseUrls string, binPath string, dataDirPath string, etcdDataPrefix string, ttlKeysDirectory string,
+func migrate(name string, port uint64, peerListenUrls string, peerAdvertiseUrls string, clientListenUrls string,
+	binPath string, dataDirPath string, etcdDataPrefix string, ttlKeysDirectory string,
 	initialCluster string, target *EtcdVersionPair, bundledVersions SupportedVersions, etcdServerArgs string) {
 
 	dataDir, err := OpenOrCreateDataDirectory(dataDirPath)
@@ -98,6 +99,7 @@ func migrate(name string, port uint64, peerListenUrls string, peerAdvertiseUrls 
 		port:              port,
 		peerListenUrls:    peerListenUrls,
 		peerAdvertiseUrls: peerAdvertiseUrls,
+		clientListenUrls:  clientListenUrls,
 		etcdDataPrefix:    etcdDataPrefix,
 		ttlKeysDirectory:  ttlKeysDirectory,
 		initialCluster:    initialCluster,

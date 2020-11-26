@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
-	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // daemonSetStrategy implements verification logic for daemon sets.
@@ -116,9 +115,8 @@ func (daemonSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 // Validate validates a new daemon set.
 func (daemonSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	daemonSet := obj.(*apps.DaemonSet)
-	allErrs := validation.ValidateDaemonSet(daemonSet)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&daemonSet.Spec.Template, nil, field.NewPath("spec.template"))...)
-	return allErrs
+	opts := pod.GetValidationOptionsFromPodTemplate(&daemonSet.Spec.Template, nil)
+	return validation.ValidateDaemonSet(daemonSet, opts)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -135,9 +133,10 @@ func (daemonSetStrategy) AllowCreateOnUpdate() bool {
 func (daemonSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newDaemonSet := obj.(*apps.DaemonSet)
 	oldDaemonSet := old.(*apps.DaemonSet)
-	allErrs := validation.ValidateDaemonSet(obj.(*apps.DaemonSet))
-	allErrs = append(allErrs, validation.ValidateDaemonSetUpdate(newDaemonSet, oldDaemonSet)...)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template, field.NewPath("spec.template"))...)
+
+	opts := pod.GetValidationOptionsFromPodTemplate(&newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template)
+	allErrs := validation.ValidateDaemonSet(obj.(*apps.DaemonSet), opts)
+	allErrs = append(allErrs, validation.ValidateDaemonSetUpdate(newDaemonSet, oldDaemonSet, opts)...)
 
 	// Update is not allowed to set Spec.Selector for apps/v1 and apps/v1beta2 (allowed for extensions/v1beta1).
 	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)

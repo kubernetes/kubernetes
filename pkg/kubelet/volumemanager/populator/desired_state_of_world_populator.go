@@ -91,7 +91,8 @@ func NewDesiredStateOfWorldPopulator(
 	kubeContainerRuntime kubecontainer.Runtime,
 	keepTerminatedPodVolumes bool,
 	csiMigratedPluginManager csimigration.PluginManager,
-	intreeToCSITranslator csimigration.InTreeToCSITranslator) DesiredStateOfWorldPopulator {
+	intreeToCSITranslator csimigration.InTreeToCSITranslator,
+	volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		kubeClient:                kubeClient,
 		loopSleepDuration:         loopSleepDuration,
@@ -108,6 +109,7 @@ func NewDesiredStateOfWorldPopulator(
 		hasAddedPodsLock:         sync.RWMutex{},
 		csiMigratedPluginManager: csiMigratedPluginManager,
 		intreeToCSITranslator:    intreeToCSITranslator,
+		volumePluginMgr:          volumePluginMgr,
 	}
 }
 
@@ -127,6 +129,7 @@ type desiredStateOfWorldPopulator struct {
 	hasAddedPodsLock          sync.RWMutex
 	csiMigratedPluginManager  csimigration.PluginManager
 	intreeToCSITranslator     csimigration.InTreeToCSITranslator
+	volumePluginMgr           *volume.VolumePluginMgr
 }
 
 type processedPods struct {
@@ -222,6 +225,20 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
 		pod, podExists := dswp.podManager.GetPodByUID(volumeToMount.Pod.UID)
 		if podExists {
+
+			// check if the attachability has changed for this volume
+			if volumeToMount.PluginIsAttachable {
+				attachableVolumePlugin, err := dswp.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
+				// only this means the plugin is truly non-attachable
+				if err == nil && attachableVolumePlugin == nil {
+					// It is not possible right now for a CSI plugin to be both attachable and non-deviceMountable
+					// So the uniqueVolumeName should remain the same after the attachability change
+					dswp.desiredStateOfWorld.MarkVolumeAttachability(volumeToMount.VolumeName, false)
+					klog.Infof("Volume %v changes from attachable to non-attachable.", volumeToMount.VolumeName)
+					continue
+				}
+			}
+
 			// Skip running pods
 			if !dswp.isPodTerminated(pod) {
 				continue

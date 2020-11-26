@@ -41,11 +41,12 @@ import (
 	"k8s.io/client-go/dynamic"
 	watchtools "k8s.io/client-go/tools/watch"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
-	waitLong = templates.LongDesc(`
+	waitLong = templates.LongDesc(i18n.T(`
 		Experimental: Wait for a specific condition on one or many resources.
 
 		The command takes multiple resources and waits until the specified condition
@@ -55,7 +56,7 @@ var (
 		by providing the "delete" keyword as the value to the --for flag.
 
 		A successful message will be printed to stdout indicating when the specified
-        condition has been met. One can use -o option to change to output destination.`)
+        condition has been met. One can use -o option to change to output destination.`))
 
 	waitExample = templates.Examples(`
 		# Wait for the pod "busybox1" to contain the status condition of type "Ready".
@@ -108,7 +109,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 
 	cmd := &cobra.Command{
 		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available]",
-		Short:   "Experimental: Wait for a specific condition on one or many resources.",
+		Short:   i18n.T("Experimental: Wait for a specific condition on one or many resources."),
 		Long:    waitLong,
 		Example: waitExample,
 
@@ -165,6 +166,7 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 		ResourceFinder: builder,
 		DynamicClient:  dynamicClient,
 		Timeout:        effectiveTimeout,
+		ForCondition:   flags.ForCondition,
 
 		Printer:     printer,
 		ConditionFn: conditionFn,
@@ -215,6 +217,7 @@ type WaitOptions struct {
 	UIDMap        UIDMap
 	DynamicClient dynamic.Interface
 	Timeout       time.Duration
+	ForCondition  string
 
 	Printer     printers.ResourcePrinter
 	ConditionFn ConditionFunc
@@ -227,7 +230,7 @@ type ConditionFunc func(info *resource.Info, o *WaitOptions) (finalObject runtim
 // RunWait runs the waiting logic
 func (o *WaitOptions) RunWait() error {
 	visitCount := 0
-	err := o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
+	visitFunc := func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
@@ -242,7 +245,13 @@ func (o *WaitOptions) RunWait() error {
 			return fmt.Errorf("%v unsatisified for unknown reason", finalObject)
 		}
 		return err
-	})
+	}
+	visitor := o.ResourceFinder.Do()
+	if visitor, ok := visitor.(*resource.Result); ok && strings.ToLower(o.ForCondition) == "delete" {
+		visitor.IgnoreErrors(apierrors.IsNotFound)
+	}
+
+	err := visitor.Visit(visitFunc)
 	if err != nil {
 		return err
 	}

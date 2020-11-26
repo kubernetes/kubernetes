@@ -28,7 +28,8 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -37,12 +38,12 @@ import (
 
 func TestPreScoreStateEmptyNodes(t *testing.T) {
 	tests := []struct {
-		name               string
-		pod                *v1.Pod
-		nodes              []*v1.Node
-		objs               []runtime.Object
-		defaultConstraints []v1.TopologySpreadConstraint
-		want               *preScoreState
+		name   string
+		pod    *v1.Pod
+		nodes  []*v1.Node
+		objs   []runtime.Object
+		config config.PodTopologySpreadArgs
+		want   *preScoreState
 	}{
 		{
 			name: "normal case",
@@ -54,6 +55,9 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label(v1.LabelHostname, "node-a").Obj(),
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label(v1.LabelHostname, "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label(v1.LabelHostname, "node-x").Obj(),
+			},
+			config: config.PodTopologySpreadArgs{
+				DefaultingType: config.ListDefaulting,
 			},
 			want: &preScoreState{
 				Constraints: []topologySpreadConstraint{
@@ -87,6 +91,9 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label(v1.LabelHostname, "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label(v1.LabelHostname, "node-x").Obj(),
 			},
+			config: config.PodTopologySpreadArgs{
+				DefaultingType: config.ListDefaulting,
+			},
 			want: &preScoreState{
 				Constraints: []topologySpreadConstraint{
 					{
@@ -108,12 +115,47 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			},
 		},
 		{
+			name: "system defaults constraints and a replica set",
+			pod:  st.MakePod().Name("p").Label("foo", "tar").Label("baz", "sup").Obj(),
+			config: config.PodTopologySpreadArgs{
+				DefaultingType: config.SystemDefaulting,
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Label(v1.LabelTopologyZone, "mars").Obj(),
+			},
+			objs: []runtime.Object{
+				&appsv1.ReplicaSet{Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
+			},
+			want: &preScoreState{
+				Constraints: []topologySpreadConstraint{
+					{
+						MaxSkew:     3,
+						TopologyKey: v1.LabelHostname,
+						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
+					},
+					{
+						MaxSkew:     5,
+						TopologyKey: v1.LabelTopologyZone,
+						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
+					},
+				},
+				IgnoredNodes: sets.NewString(),
+				TopologyPairToPodCounts: map[topologyPair]*int64{
+					{key: v1.LabelTopologyZone, value: "mars"}: pointer.Int64Ptr(0),
+				},
+				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(1)},
+			},
+		},
+		{
 			name: "defaults constraints and a replica set",
 			pod:  st.MakePod().Name("p").Label("foo", "tar").Label("baz", "sup").Obj(),
-			defaultConstraints: []v1.TopologySpreadConstraint{
-				{MaxSkew: 1, TopologyKey: v1.LabelHostname, WhenUnsatisfiable: v1.ScheduleAnyway},
-				{MaxSkew: 2, TopologyKey: "rack", WhenUnsatisfiable: v1.DoNotSchedule},
-				{MaxSkew: 2, TopologyKey: "planet", WhenUnsatisfiable: v1.ScheduleAnyway},
+			config: config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{MaxSkew: 1, TopologyKey: v1.LabelHostname, WhenUnsatisfiable: v1.ScheduleAnyway},
+					{MaxSkew: 2, TopologyKey: "rack", WhenUnsatisfiable: v1.DoNotSchedule},
+					{MaxSkew: 2, TopologyKey: "planet", WhenUnsatisfiable: v1.ScheduleAnyway},
+				},
+				DefaultingType: config.ListDefaulting,
 			},
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("rack", "rack1").Label(v1.LabelHostname, "node-a").Label("planet", "mars").Obj(),
@@ -144,8 +186,11 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 		{
 			name: "defaults constraints and a replica set that doesn't match",
 			pod:  st.MakePod().Name("p").Label("foo", "bar").Label("baz", "sup").Obj(),
-			defaultConstraints: []v1.TopologySpreadConstraint{
-				{MaxSkew: 2, TopologyKey: "planet", WhenUnsatisfiable: v1.ScheduleAnyway},
+			config: config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{MaxSkew: 2, TopologyKey: "planet", WhenUnsatisfiable: v1.ScheduleAnyway},
+				},
+				DefaultingType: config.ListDefaulting,
 			},
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("planet", "mars").Obj(),
@@ -162,8 +207,11 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			pod: st.MakePod().Name("p").Label("foo", "bar").Label("baz", "sup").
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Label("foo", "bar").Obj()).
 				SpreadConstraint(2, "planet", v1.ScheduleAnyway, st.MakeLabelSelector().Label("baz", "sup").Obj()).Obj(),
-			defaultConstraints: []v1.TopologySpreadConstraint{
-				{MaxSkew: 2, TopologyKey: "galaxy", WhenUnsatisfiable: v1.ScheduleAnyway},
+			config: config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{MaxSkew: 2, TopologyKey: "galaxy", WhenUnsatisfiable: v1.ScheduleAnyway},
+				},
+				DefaultingType: config.ListDefaulting,
 			},
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("planet", "mars").Label("galaxy", "andromeda").Obj(),
@@ -191,17 +239,21 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
-			pl := PodTopologySpread{
-				sharedLister: cache.NewSnapshot(nil, tt.nodes),
-				args: config.PodTopologySpreadArgs{
-					DefaultConstraints: tt.defaultConstraints,
-				},
+			f, err := frameworkruntime.NewFramework(nil, nil, nil,
+				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(nil, tt.nodes)),
+				frameworkruntime.WithInformerFactory(informerFactory))
+			if err != nil {
+				t.Fatalf("Failed creating framework runtime: %v", err)
 			}
-			pl.setListers(informerFactory)
+			pl, err := New(&tt.config, f)
+			if err != nil {
+				t.Fatalf("Failed creating plugin: %v", err)
+			}
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
+			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
-			if s := pl.PreScore(context.Background(), cs, tt.pod, tt.nodes); !s.IsSuccess() {
+			if s := p.PreScore(context.Background(), cs, tt.pod, tt.nodes); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 
@@ -675,7 +727,7 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 		{
 			name: "1000nodes/single-constraint-zone",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, v1.LabelZoneFailureDomain, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelFailureDomainBetaZone, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
 			allNodesNum:      1000,
@@ -693,7 +745,7 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 		{
 			name: "1000nodes/two-Constraints-zone-node",
 			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
-				SpreadConstraint(1, v1.LabelZoneFailureDomain, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelFailureDomainBetaZone, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				SpreadConstraint(1, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("bar").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
@@ -755,6 +807,11 @@ var (
 			existingPodsNum: 10000,
 			allNodesNum:     1000,
 		},
+		{
+			name:            "5000nodes",
+			existingPodsNum: 50000,
+			allNodesNum:     5000,
+		},
 	}
 )
 
@@ -765,24 +822,25 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.allNodesNum)
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(existingPods, allNodes)
-			p := &PodTopologySpread{
-				sharedLister: snapshot,
-				args: config.PodTopologySpreadArgs{
-					DefaultConstraints: []v1.TopologySpreadConstraint{
-						{MaxSkew: 1, TopologyKey: v1.LabelHostname, WhenUnsatisfiable: v1.ScheduleAnyway},
-						{MaxSkew: 1, TopologyKey: v1.LabelZoneFailureDomain, WhenUnsatisfiable: v1.ScheduleAnyway},
-					},
-				},
-			}
 			client := fake.NewSimpleClientset(
 				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}},
 			)
 			ctx := context.Background()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			p.setListers(informerFactory)
+			f, err := frameworkruntime.NewFramework(nil, nil, nil,
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory))
+			if err != nil {
+				b.Fatalf("Failed creating framework runtime: %v", err)
+			}
+			pl, err := New(&config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting}, f)
+			if err != nil {
+				b.Fatalf("Failed creating plugin: %v", err)
+			}
+			p := pl.(*PodTopologySpread)
+
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
-
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {

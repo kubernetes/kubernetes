@@ -33,6 +33,10 @@ spec:
   attachRequired: false
   fsGroupPolicy: /ʕVŚ(ĿȊ甞谐颋ǅSǡ
   podInfoOnMount: false
+  requiresRepublish: false
   storageCapacity: true
+  tokenRequests:
+  - audience: "19"
+    expirationSeconds: -8506428344202195448
   volumeLifecycleModes:
   - r鯹)晿<o,c鮽ort昍řČ扷5ƗǸ

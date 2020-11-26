@@ -48,7 +48,7 @@ func getNestedMountpoints(name, baseDir string, pod v1.Pod) ([]string, error) {
 		for _, myMountPoint := range myMountPoints {
 			if strings.HasPrefix(myMountPoint, parentPrefix) {
 				// Don't let a container trick us into creating directories outside of its rootfs
-				return fmt.Errorf("Invalid container mount point %v", myMountPoint)
+				return fmt.Errorf("invalid container mount point %v", myMountPoint)
 			}
 			myMPSlash := myMountPoint + string(os.PathSeparator)
 			// The previously found nested mountpoint (or "" if none found yet)
@@ -75,10 +75,7 @@ func getNestedMountpoints(name, baseDir string, pod v1.Pod) ([]string, error) {
 	var retErr error
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
 		retErr = checkContainer(c)
-		if retErr != nil {
-			return false
-		}
-		return true
+		return retErr == nil
 	})
 	if retErr != nil {
 		return nil, retErr
@@ -96,7 +93,7 @@ func MakeNestedMountpoints(name, baseDir string, pod v1.Pod) error {
 	for _, dir := range dirs {
 		err := os.MkdirAll(filepath.Join(baseDir, dir), 0755)
 		if err != nil {
-			return fmt.Errorf("Unable to create nested volume mountpoints: %v", err)
+			return fmt.Errorf("unable to create nested volume mountpoints: %v", err)
 		}
 	}
 	return nil

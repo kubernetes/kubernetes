@@ -26,7 +26,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/scheduler/metrics/resources:all-srcs",
+    ],
     tags = ["automanaged"],
 )
 

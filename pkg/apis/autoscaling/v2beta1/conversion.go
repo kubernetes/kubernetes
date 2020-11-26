@@ -35,6 +35,28 @@ func Convert_v2beta1_CrossVersionObjectReference_To_autoscaling_MetricTarget(in 
 	return nil
 }
 
+func Convert_v2beta1_ContainerResourceMetricStatus_To_autoscaling_ContainerResourceMetricStatus(in *autoscalingv2beta1.ContainerResourceMetricStatus, out *autoscaling.ContainerResourceMetricStatus, s conversion.Scope) error {
+	out.Name = core.ResourceName(in.Name)
+	out.Container = in.Container
+	utilization := in.CurrentAverageUtilization
+	averageValue := in.CurrentAverageValue
+	out.Current = autoscaling.MetricValueStatus{
+		AverageValue:       &averageValue,
+		AverageUtilization: utilization,
+	}
+	return nil
+}
+
+func Convert_autoscaling_ContainerResourceMetricStatus_To_v2beta1_ContainerResourceMetricStatus(in *autoscaling.ContainerResourceMetricStatus, out *autoscalingv2beta1.ContainerResourceMetricStatus, s conversion.Scope) error {
+	out.Name = v1.ResourceName(in.Name)
+	out.Container = in.Container
+	out.CurrentAverageUtilization = in.Current.AverageUtilization
+	if in.Current.AverageValue != nil {
+		out.CurrentAverageValue = *in.Current.AverageValue
+	}
+	return nil
+}
+
 func Convert_v2beta1_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(in *autoscalingv2beta1.ResourceMetricStatus, out *autoscaling.ResourceMetricStatus, s conversion.Scope) error {
 	out.Name = core.ResourceName(in.Name)
 	utilization := in.CurrentAverageUtilization
@@ -308,4 +330,30 @@ func Convert_v2beta1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutosca
 
 func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta1_HorizontalPodAutoscalerSpec(in *autoscaling.HorizontalPodAutoscalerSpec, out *autoscalingv2beta1.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
 	return autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta1_HorizontalPodAutoscalerSpec(in, out, s)
+}
+
+func Convert_v2beta1_ContainerResourceMetricSource_To_autoscaling_ContainerResourceMetricSource(in *autoscalingv2beta1.ContainerResourceMetricSource, out *autoscaling.ContainerResourceMetricSource, s conversion.Scope) error {
+	out.Name = core.ResourceName(in.Name)
+	utilization := in.TargetAverageUtilization
+	averageValue := in.TargetAverageValue
+
+	var metricType autoscaling.MetricTargetType
+	if utilization == nil {
+		metricType = autoscaling.AverageValueMetricType
+	} else {
+		metricType = autoscaling.UtilizationMetricType
+	}
+	out.Target = autoscaling.MetricTarget{
+		Type:               metricType,
+		AverageValue:       averageValue,
+		AverageUtilization: utilization,
+	}
+	return nil
+}
+
+func Convert_autoscaling_ContainerResourceMetricSource_To_v2beta1_ContainerResourceMetricSource(in *autoscaling.ContainerResourceMetricSource, out *autoscalingv2beta1.ContainerResourceMetricSource, s conversion.Scope) error {
+	out.Name = v1.ResourceName(in.Name)
+	out.TargetAverageUtilization = in.Target.AverageUtilization
+	out.TargetAverageValue = in.Target.AverageValue
+	return nil
 }

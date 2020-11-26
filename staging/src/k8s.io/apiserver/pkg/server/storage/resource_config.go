@@ -85,11 +85,7 @@ func (o *ResourceConfig) EnableVersions(versions ...schema.GroupVersion) {
 
 func (o *ResourceConfig) VersionEnabled(version schema.GroupVersion) bool {
 	enabled, _ := o.GroupVersionConfigs[version]
-	if enabled {
-		return true
-	}
-
-	return false
+	return enabled
 }
 
 func (o *ResourceConfig) DisableResources(resources ...schema.GroupVersionResource) {

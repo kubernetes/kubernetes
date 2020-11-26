@@ -29,11 +29,11 @@ import (
 
 var (
 	defaultZoneLabels = map[string]string{
-		v1.LabelZoneFailureDomain: "us-east-1a",
-		v1.LabelZoneRegion:        "us-east-1",
+		v1.LabelFailureDomainBetaZone:   "us-east-1a",
+		v1.LabelFailureDomainBetaRegion: "us-east-1",
 	}
 	regionalPDLabels = map[string]string{
-		v1.LabelZoneFailureDomain: "europe-west1-b__europe-west1-c",
+		v1.LabelFailureDomainBetaZone: "europe-west1-b__europe-west1-c",
 	}
 )
 
@@ -104,7 +104,7 @@ func TestTopologyTranslation(t *testing.T) {
 		},
 		{
 			name:                 "GCE PD with existing topology (beta keys)",
-			pv:                   makeGCEPDPV(nil /*labels*/, makeTopology(v1.LabelZoneFailureDomain, "us-east-2a")),
+			pv:                   makeGCEPDPV(nil /*labels*/, makeTopology(v1.LabelFailureDomainBetaZone, "us-east-2a")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "us-east-2a"),
 		},
 		{
@@ -114,7 +114,7 @@ func TestTopologyTranslation(t *testing.T) {
 		},
 		{
 			name:                 "GCE PD with zone labels and topology",
-			pv:                   makeGCEPDPV(defaultZoneLabels, makeTopology(v1.LabelZoneFailureDomain, "us-east-2a")),
+			pv:                   makeGCEPDPV(defaultZoneLabels, makeTopology(v1.LabelFailureDomainBetaZone, "us-east-2a")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "us-east-2a"),
 		},
 		{
@@ -124,20 +124,20 @@ func TestTopologyTranslation(t *testing.T) {
 		},
 		{
 			name:                 "GCE PD with regional topology",
-			pv:                   makeGCEPDPV(nil /*labels*/, makeTopology(v1.LabelZoneFailureDomain, "europe-west1-b", "europe-west1-c")),
+			pv:                   makeGCEPDPV(nil /*labels*/, makeTopology(v1.LabelFailureDomainBetaZone, "europe-west1-b", "europe-west1-c")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "europe-west1-b", "europe-west1-c"),
 		},
 		{
 			name:                 "GCE PD with regional zone and topology",
-			pv:                   makeGCEPDPV(regionalPDLabels, makeTopology(v1.LabelZoneFailureDomain, "europe-west1-f", "europe-west1-g")),
+			pv:                   makeGCEPDPV(regionalPDLabels, makeTopology(v1.LabelFailureDomainBetaZone, "europe-west1-f", "europe-west1-g")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "europe-west1-f", "europe-west1-g"),
 		},
 		{
 			name: "GCE PD with multiple node selector terms",
 			pv: makeGCEPDPVMultTerms(
 				nil, /*labels*/
-				makeTopology(v1.LabelZoneFailureDomain, "europe-west1-f"),
-				makeTopology(v1.LabelZoneFailureDomain, "europe-west1-g")),
+				makeTopology(v1.LabelFailureDomainBetaZone, "europe-west1-f"),
+				makeTopology(v1.LabelFailureDomainBetaZone, "europe-west1-g")),
 			expectedNodeAffinity: makeNodeAffinity(
 				true, /*multiTerms*/
 				plugins.GCEPDTopologyKey, "europe-west1-f", "europe-west1-g"),
@@ -150,7 +150,7 @@ func TestTopologyTranslation(t *testing.T) {
 		},
 		{
 			name:                 "AWS EBS with zone labels and topology",
-			pv:                   makeAWSEBSPV(defaultZoneLabels, makeTopology(v1.LabelZoneFailureDomain, "us-east-2a")),
+			pv:                   makeAWSEBSPV(defaultZoneLabels, makeTopology(v1.LabelFailureDomainBetaZone, "us-east-2a")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.AWSEBSTopologyKey, "us-east-2a"),
 		},
 		// Cinder test cases: test mosty topology key, i.e., don't repeat testing done with GCE
@@ -161,7 +161,7 @@ func TestTopologyTranslation(t *testing.T) {
 		},
 		{
 			name:                 "OpenStack Cinder with zone labels and topology",
-			pv:                   makeCinderPV(defaultZoneLabels, makeTopology(v1.LabelZoneFailureDomain, "us-east-2a")),
+			pv:                   makeCinderPV(defaultZoneLabels, makeTopology(v1.LabelFailureDomainBetaZone, "us-east-2a")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.CinderTopologyKey, "us-east-2a"),
 		},
 	}

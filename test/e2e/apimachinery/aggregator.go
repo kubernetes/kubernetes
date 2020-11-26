@@ -375,7 +375,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 			if !ok {
 				return false, err
 			}
-			if status.Status().Code == 503 {
+			if status.Status().Code == 403 || status.Status().Code == 503 {
 				return false, nil
 			}
 			if status.Status().Code == 404 && strings.HasPrefix(err.Error(), "the server could not find the requested resource") {

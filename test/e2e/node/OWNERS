@@ -5,11 +5,12 @@ approvers:
 - derekwaynecarr
 - tallclair
 - yujuhong
-- dashpole
 - sjenning
+- mrunalp
 emeritus_approvers:
 - vishh
 - dchen1107
+- dashpole
 reviewers:
 - sig-node-reviewers
 labels:

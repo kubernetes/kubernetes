@@ -21,6 +21,13 @@ const (
 	// the manifest or image tag after the last push.
 	ErrCodeImageAlreadyExistsException = "ImageAlreadyExistsException"
 
+	// ErrCodeImageDigestDoesNotMatchException for service response error code
+	// "ImageDigestDoesNotMatchException".
+	//
+	// The specified image digest does not match the digest that Amazon ECR calculated
+	// for the image.
+	ErrCodeImageDigestDoesNotMatchException = "ImageDigestDoesNotMatchException"
+
 	// ErrCodeImageNotFoundException for service response error code
 	// "ImageNotFoundException".
 	//
@@ -63,6 +70,12 @@ const (
 	// characters.
 	ErrCodeInvalidTagParameterException = "InvalidTagParameterException"
 
+	// ErrCodeKmsException for service response error code
+	// "KmsException".
+	//
+	// The operation failed due to a KMS exception.
+	ErrCodeKmsException = "KmsException"
+
 	// ErrCodeLayerAlreadyExistsException for service response error code
 	// "LayerAlreadyExistsException".
 	//
@@ -98,8 +111,8 @@ const (
 	// ErrCodeLifecyclePolicyPreviewInProgressException for service response error code
 	// "LifecyclePolicyPreviewInProgressException".
 	//
-	// The previous lifecycle policy preview request has not completed. Please try
-	// again later.
+	// The previous lifecycle policy preview request has not completed. Wait and
+	// try again.
 	ErrCodeLifecyclePolicyPreviewInProgressException = "LifecyclePolicyPreviewInProgressException"
 
 	// ErrCodeLifecyclePolicyPreviewNotFoundException for service response error code
@@ -112,10 +125,15 @@ const (
 	// "LimitExceededException".
 	//
 	// The operation did not succeed because it would have exceeded a service limit
-	// for your account. For more information, see Amazon ECR Default Service Limits
-	// (https://docs.aws.amazon.com/AmazonECR/latest/userguide/service_limits.html)
+	// for your account. For more information, see Amazon ECR Service Quotas (https://docs.aws.amazon.com/AmazonECR/latest/userguide/service-quotas.html)
 	// in the Amazon Elastic Container Registry User Guide.
 	ErrCodeLimitExceededException = "LimitExceededException"
+
+	// ErrCodeReferencedImagesNotFoundException for service response error code
+	// "ReferencedImagesNotFoundException".
+	//
+	// The manifest list is referencing an image that does not exist.
+	ErrCodeReferencedImagesNotFoundException = "ReferencedImagesNotFoundException"
 
 	// ErrCodeRepositoryAlreadyExistsException for service response error code
 	// "RepositoryAlreadyExistsException".
@@ -164,10 +182,16 @@ const (
 	// of tags that can be applied to a repository is 50.
 	ErrCodeTooManyTagsException = "TooManyTagsException"
 
+	// ErrCodeUnsupportedImageTypeException for service response error code
+	// "UnsupportedImageTypeException".
+	//
+	// The image is of a type that cannot be scanned.
+	ErrCodeUnsupportedImageTypeException = "UnsupportedImageTypeException"
+
 	// ErrCodeUploadNotFoundException for service response error code
 	// "UploadNotFoundException".
 	//
-	// The upload could not be found, or the specified upload id is not valid for
+	// The upload could not be found, or the specified upload ID is not valid for
 	// this repository.
 	ErrCodeUploadNotFoundException = "UploadNotFoundException"
 )
@@ -175,12 +199,14 @@ const (
 var exceptionFromCode = map[string]func(protocol.ResponseMetadata) error{
 	"EmptyUploadException":                      newErrorEmptyUploadException,
 	"ImageAlreadyExistsException":               newErrorImageAlreadyExistsException,
+	"ImageDigestDoesNotMatchException":          newErrorImageDigestDoesNotMatchException,
 	"ImageNotFoundException":                    newErrorImageNotFoundException,
 	"ImageTagAlreadyExistsException":            newErrorImageTagAlreadyExistsException,
 	"InvalidLayerException":                     newErrorInvalidLayerException,
 	"InvalidLayerPartException":                 newErrorInvalidLayerPartException,
 	"InvalidParameterException":                 newErrorInvalidParameterException,
 	"InvalidTagParameterException":              newErrorInvalidTagParameterException,
+	"KmsException":                              newErrorKmsException,
 	"LayerAlreadyExistsException":               newErrorLayerAlreadyExistsException,
 	"LayerInaccessibleException":                newErrorLayerInaccessibleException,
 	"LayerPartTooSmallException":                newErrorLayerPartTooSmallException,
@@ -189,6 +215,7 @@ var exceptionFromCode = map[string]func(protocol.ResponseMetadata) error{
 	"LifecyclePolicyPreviewInProgressException": newErrorLifecyclePolicyPreviewInProgressException,
 	"LifecyclePolicyPreviewNotFoundException":   newErrorLifecyclePolicyPreviewNotFoundException,
 	"LimitExceededException":                    newErrorLimitExceededException,
+	"ReferencedImagesNotFoundException":         newErrorReferencedImagesNotFoundException,
 	"RepositoryAlreadyExistsException":          newErrorRepositoryAlreadyExistsException,
 	"RepositoryNotEmptyException":               newErrorRepositoryNotEmptyException,
 	"RepositoryNotFoundException":               newErrorRepositoryNotFoundException,
@@ -196,5 +223,6 @@ var exceptionFromCode = map[string]func(protocol.ResponseMetadata) error{
 	"ScanNotFoundException":                     newErrorScanNotFoundException,
 	"ServerException":                           newErrorServerException,
 	"TooManyTagsException":                      newErrorTooManyTagsException,
+	"UnsupportedImageTypeException":             newErrorUnsupportedImageTypeException,
 	"UploadNotFoundException":                   newErrorUploadNotFoundException,
 }

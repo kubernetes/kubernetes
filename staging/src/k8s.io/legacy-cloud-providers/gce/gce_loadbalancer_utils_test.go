@@ -34,7 +34,7 @@ import (
 	compute "google.golang.org/api/compute/v1"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
@@ -94,6 +94,8 @@ func createAndInsertNodes(gce *Cloud, nodeNames []string, zoneName string) ([]*v
 					Tags: &compute.Tags{
 						Items: []string{name},
 					},
+					// add Instance.Zone, otherwise InstanceID() won't return a right instanceID.
+					Zone: zoneName,
 				},
 			)
 			if err != nil {
@@ -107,8 +109,8 @@ func createAndInsertNodes(gce *Cloud, nodeNames []string, zoneName string) ([]*v
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 					Labels: map[string]string{
-						v1.LabelHostname:          name,
-						v1.LabelZoneFailureDomain: zoneName,
+						v1.LabelHostname:              name,
+						v1.LabelFailureDomainBetaZone: zoneName,
 					},
 				},
 				Status: v1.NodeStatus{

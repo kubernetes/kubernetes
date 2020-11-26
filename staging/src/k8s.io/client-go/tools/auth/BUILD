@@ -29,6 +29,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/client-go/tools/auth/exec:all-srcs",
+    ],
     tags = ["automanaged"],
 )
