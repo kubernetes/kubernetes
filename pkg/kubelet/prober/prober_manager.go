@@ -257,6 +257,8 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 				ready = !exists
 			}
 			podStatus.ContainerStatuses[i].Ready = ready
+		} else {
+			podStatus.ContainerStatuses[i].Ready = false
 		}
 	}
 	// init containers are ready if they have exited with success or if a readiness probe has
