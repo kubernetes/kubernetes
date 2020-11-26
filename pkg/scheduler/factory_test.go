@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -184,6 +184,7 @@ func TestCreateFromConfig(t *testing.T) {
 					Enabled: []schedulerapi.Plugin{
 						{Name: "PodTopologySpread"},
 						{Name: "InterPodAffinity"},
+						{Name: "NodeAffinity"},
 						{Name: "TaintToleration"},
 					},
 				},
@@ -295,7 +296,12 @@ func TestCreateFromConfig(t *testing.T) {
 					},
 				},
 				PostFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
-				PreScore:   &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "InterPodAffinity"}}},
+				PreScore: &schedulerapi.PluginSet{
+					Enabled: []schedulerapi.Plugin{
+						{Name: "InterPodAffinity"},
+						{Name: "NodeAffinity"},
+					},
+				},
 				Score: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "InterPodAffinity", Weight: 1},
@@ -360,7 +366,11 @@ func TestCreateFromConfig(t *testing.T) {
 					},
 				},
 				PostFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
-				PreScore:   &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "InterPodAffinity"}}},
+				PreScore: &schedulerapi.PluginSet{
+					Enabled: []schedulerapi.Plugin{
+						{Name: "InterPodAffinity"},
+					},
+				},
 				Score: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "InterPodAffinity", Weight: 1},
