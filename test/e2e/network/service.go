@@ -2645,7 +2645,7 @@ var _ = SIGDescribe("Services", func() {
 		port := 80
 
 		ginkgo.By("creating a service with no endpoints")
-		_, err = jig.CreateTCPServiceWithPort(nil, int32(port))
+		svc, err := jig.CreateTCPServiceWithPort(nil, int32(port))
 		framework.ExpectNoError(err)
 
 		nodeName := nodes.Items[0].Name
@@ -2656,7 +2656,7 @@ var _ = SIGDescribe("Services", func() {
 			pod.Spec.NodeName = nodeName
 		})
 
-		serviceAddress := net.JoinHostPort(serviceName, strconv.Itoa(port))
+		serviceAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(port))
 		framework.Logf("waiting up to %v to connect to %v", e2eservice.KubeProxyEndpointLagTimeout, serviceAddress)
 		cmd := fmt.Sprintf("/agnhost connect --timeout=3s %s", serviceAddress)
 
