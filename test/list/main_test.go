@@ -18,6 +18,7 @@ package main
 
 import (
 	"errors"
+	"go/ast"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -85,6 +86,60 @@ var _ = framework.KubeDescribe("Feature", func() {
 	},
 }
 
+var funcNameCases = []struct{
+	astExpr ast.Expr
+	output string
+}{
+	{&ast.SelectorExpr{
+		X: &ast.Ident{Name: "time"},
+		Sel: &ast.Ident{Name: "NewTimer"},
+	},"time.NewTimer"},
+	{&ast.SelectorExpr{
+		X: &ast.Ident{Name: "fmt"},
+		Sel: &ast.Ident{Name: "Sprintf"},
+	},"fmt.Sprintf"},
+	{&ast.SelectorExpr{
+		X: &ast.Ident{Name: "rand"},
+		Sel: &ast.Ident{Name: "Intn"},
+	},"rand.Intn"},
+	{&ast.SelectorExpr{
+		X: &ast.SelectorExpr{
+			X:   &ast.Ident{Name: "foo"},
+			Sel: &ast.Ident{Name: "bar"},
+		},
+		Sel: &ast.Ident{Name: "foobar"},
+	},""},
+}
+
+var isSprintfCases = []struct{
+	astExpr ast.Expr
+	isSprintf bool
+}{
+	{&ast.SelectorExpr{
+		X: &ast.SelectorExpr{
+			X:   &ast.Ident{Name: "foo"},
+			Sel: &ast.Ident{Name: "bar"},
+		},
+		Sel: &ast.Ident{Name: "foobar"},
+	}, false},
+	{&ast.CallExpr{
+		Fun: &ast.SelectorExpr{
+			X: &ast.Ident{Name: "fmt"},
+			Sel: &ast.Ident{Name: "Sprintf"},
+		},
+		Args: []ast.Expr{
+			// c.App.Context
+			&ast.SelectorExpr{
+				X: &ast.SelectorExpr{
+					X:   &ast.Ident{Name: "foo"},
+					Sel: &ast.Ident{Name: "bar"},
+				},
+				Sel: &ast.Ident{Name: "foo"},
+			},
+		},
+	}, true},
+}
+
 func TestCollect(t *testing.T) {
 	for _, test := range collectCases {
 		code := "package test\n" + test.code
@@ -109,3 +164,22 @@ func TestHandlePath(t *testing.T) {
 		t.Error("should skip third_party")
 	}
 }
+
+func TestFuncName(t *testing.T) {
+	for _, test := range funcNameCases {
+		result := funcName(test.astExpr)
+		if result != test.output {
+			t.Errorf("funcName test\ngot  %v\nwant %v", result, test.output)
+		}
+	}
+}
+
+func TestIsSprintf(t *testing.T) {
+	for _, test := range isSprintfCases {
+		result := isSprintf(test.astExpr)
+		if result != test.isSprintf {
+			t.Errorf("isSprintf test\ngot  %v\nwant %v", result, test.isSprintf)
+		}
+	}
+}
+
