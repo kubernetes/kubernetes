@@ -20,14 +20,15 @@ package emptydir
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/sys/unix"
+
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-
-	"k8s.io/api/core/v1"
 )
 
 // Defined by Linux - the type number for tmpfs mounts.
@@ -49,6 +50,13 @@ func getPageSize(path string, mounter mount.Interface) (*resource.Quantity, erro
 	if err != nil {
 		return nil, fmt.Errorf("error listing mount points: %v", err)
 	}
+
+	realPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		klog.V(3).Infof("failed to evaluate path %s: %v", path, err)
+		realPath = path
+	}
+
 	// Find mount point for the path
 	mountPoint, err := func(mps []mount.MountPoint, mpPath string) (*mount.MountPoint, error) {
 		for _, mp := range mps {
@@ -57,7 +65,7 @@ func getPageSize(path string, mounter mount.Interface) (*resource.Quantity, erro
 			}
 		}
 		return nil, fmt.Errorf("mount point for %s not found", mpPath)
-	}(mountPoints, path)
+	}(mountPoints, realPath)
 	if err != nil {
 		return nil, err
 	}
