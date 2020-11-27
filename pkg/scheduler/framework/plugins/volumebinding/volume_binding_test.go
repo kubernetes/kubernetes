@@ -227,7 +227,7 @@ func TestVolumeBinding(t *testing.T) {
 				claimsToBind:     []*v1.PersistentVolumeClaim{},
 				podVolumesByNode: map[string]*scheduling.PodVolumes{},
 			},
-			wantFilterStatus: framework.NewStatus(framework.Error, `could not find v1.PersistentVolume "pv-a"`),
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, `pvc(s) bound to non-existent pv(s)`),
 		},
 	}
 
