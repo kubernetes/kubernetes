@@ -62,7 +62,6 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 	// 1. If the value is nil, default to 0.0.0.0 and default scheduler port
 	// 2. If there is a value set, attempt to split it. If it's just a port (ie, ":1234"), default to 0.0.0.0 with that port
 	// 3. If splitting the value fails, check if the value is even a valid IP. If so, use that with the default port.
-	// Otherwise use the default bind address
 	defaultBindAddress := net.JoinHostPort("0.0.0.0", strconv.Itoa(config.DefaultInsecureSchedulerPort))
 	if obj.HealthzBindAddress == nil {
 		obj.HealthzBindAddress = &defaultBindAddress
@@ -79,9 +78,6 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 			if host := net.ParseIP(*obj.HealthzBindAddress); host != nil {
 				hostPort := net.JoinHostPort(*obj.HealthzBindAddress, strconv.Itoa(config.DefaultInsecureSchedulerPort))
 				obj.HealthzBindAddress = &hostPort
-			} else {
-				// TODO: in v1beta1 we should let this error instead of stomping with a default value
-				obj.HealthzBindAddress = &defaultBindAddress
 			}
 		}
 	}
@@ -101,9 +97,6 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 			if host := net.ParseIP(*obj.MetricsBindAddress); host != nil {
 				hostPort := net.JoinHostPort(*obj.MetricsBindAddress, strconv.Itoa(config.DefaultInsecureSchedulerPort))
 				obj.MetricsBindAddress = &hostPort
-			} else {
-				// TODO: in v1beta1 we should let this error instead of stomping with a default value
-				obj.MetricsBindAddress = &defaultBindAddress
 			}
 		}
 	}
