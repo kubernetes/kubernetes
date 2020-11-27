@@ -285,6 +285,12 @@ func (nfsMounter *nfsMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 		os.Remove(dir)
 		return err
 	}
+
+	if !nfsMounter.readOnly {
+		volume.SetVolumeOwnership(nfsMounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(nfsMounter.plugin, nil))
+	}
+
+	klog.V(4).Infof("Successfully mounted %s", dir)
 	return nil
 }
 
