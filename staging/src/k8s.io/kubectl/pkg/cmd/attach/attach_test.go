@@ -200,7 +200,7 @@ func TestAttach(t *testing.T) {
 		name, version, podPath, fetchPodPath, attachPath, container string
 		pod                                                         *corev1.Pod
 		remoteAttachErr                                             bool
-		exepctedErr                                                 string
+		expectedErr                                                 string
 	}{
 		{
 			name:         "pod attach",
@@ -220,7 +220,7 @@ func TestAttach(t *testing.T) {
 			pod:             attachPod(),
 			remoteAttachErr: true,
 			container:       "bar",
-			exepctedErr:     "attach error",
+			expectedErr:     "attach error",
 		},
 		{
 			name:         "container not found error",
@@ -230,7 +230,7 @@ func TestAttach(t *testing.T) {
 			attachPath:   "/api/" + version + "/namespaces/test/pods/foo/attach",
 			pod:          attachPod(),
 			container:    "foo",
-			exepctedErr:  "cannot attach to the container: container not found (foo)",
+			expectedErr:  "cannot attach to the container: container not found (foo)",
 		},
 	}
 	for _, test := range tests {
@@ -290,15 +290,15 @@ func TestAttach(t *testing.T) {
 			}
 
 			err := options.Run()
-			if test.exepctedErr != "" && err.Error() != test.exepctedErr {
+			if test.expectedErr != "" && err.Error() != test.expectedErr {
 				t.Errorf("%s: Unexpected exec error: %v", test.name, err)
 				return
 			}
-			if test.exepctedErr == "" && err != nil {
+			if test.expectedErr == "" && err != nil {
 				t.Errorf("%s: Unexpected error: %v", test.name, err)
 				return
 			}
-			if test.exepctedErr != "" {
+			if test.expectedErr != "" {
 				return
 			}
 			if remoteAttach.url.Path != test.attachPath {
