@@ -87,11 +87,6 @@ type ServiceStorage interface {
 	rest.ResetFieldsStrategy
 }
 
-type EndpointsStorage interface {
-	rest.Getter
-	rest.GracefulDeleter
-}
-
 // NewREST returns a wrapper around the underlying generic storage and performs
 // allocations and deallocations of various service related resources like ports.
 // TODO: all transactional behavior should be supported from within generic storage
@@ -212,49 +207,7 @@ func (al *RESTAllocStuff) allocateCreate(service *api.Service, dryRun bool) (tra
 }
 
 func (rs *REST) Delete(ctx context.Context, id string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	// TODO: handle graceful
-	obj, _, err := rs.services.Delete(ctx, id, deleteValidation, options)
-	if err != nil {
-		return nil, false, err
-	}
-
-	svc := obj.(*api.Service)
-	// (khenidak) double check that this is in fact the best place for this
-
-	// delete strategy handles graceful delete only. It expects strategy
-	// to implement Graceful-Delete related interface. Hence we are not doing
-	// the below there. instead we are doing it locally. Until strategy.BeforeDelete works without
-	// having to implement graceful delete management
-	// set ClusterIPs based on ClusterIP
-	// because we depend on ClusterIPs and data might be saved without ClusterIPs ..
-
-	if svc.Spec.ClusterIPs == nil && len(svc.Spec.ClusterIP) > 0 {
-		svc.Spec.ClusterIPs = []string{svc.Spec.ClusterIP}
-	}
-
-	// Only perform the cleanup if this is a non-dryrun deletion
-	if !dryrun.IsDryRun(options.DryRun) {
-		// TODO: can leave dangling endpoints, and potentially return incorrect
-		// endpoints if a new service is created with the same name
-		_, _, err = rs.endpoints.Delete(ctx, id, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
-		if err != nil && !errors.IsNotFound(err) {
-			return nil, false, err
-		}
-
-		rs.alloc.releaseAllocatedResources(svc)
-	}
-
-	// TODO: this is duplicated from the generic storage, when this wrapper is fully removed we can drop this
-	details := &metav1.StatusDetails{
-		Name: svc.Name,
-		UID:  svc.UID,
-	}
-	if info, ok := genericapirequest.RequestInfoFrom(ctx); ok {
-		details.Group = info.APIGroup
-		details.Kind = info.Resource // legacy behavior
-	}
-	status := &metav1.Status{Status: metav1.StatusSuccess, Details: details}
-	return status, true, nil
+	return rs.services.Delete(ctx, id, deleteValidation, options)
 }
 
 func (al *RESTAllocStuff) releaseAllocatedResources(svc *api.Service) {
