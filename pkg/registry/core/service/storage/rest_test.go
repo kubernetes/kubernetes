@@ -144,9 +144,17 @@ func (s *serviceStorage) Update(ctx context.Context, name string, objInfo rest.U
 }
 
 func (s *serviceStorage) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	ret := s.Services[name]
+	ret, del, err := s.inner.Delete(ctx, name, deleteValidation, options)
+	if err != nil {
+		return ret, del, err
+	}
+
+	if dryrun.IsDryRun(options.DryRun) {
+		return ret.DeepCopyObject(), del, nil
+	}
 	delete(s.Services, name)
-	return ret, false, nil
+
+	return ret.DeepCopyObject(), del, err
 }
 
 func (s *serviceStorage) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
@@ -264,7 +272,13 @@ func newInnerREST(t *testing.T, etcdStorage *storagebackend.ConfigForResource, i
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "services",
 	}
-	inner, _, err := NewGenericREST(restOptions, api.IPv4Protocol, ipAllocs, portAlloc)
+	endpoints, err := endpointstore.NewREST(generic.RESTOptions{
+		StorageConfig:  etcdStorage,
+		Decorator:      generic.UndecoratedStorage,
+		ResourcePrefix: "endpoints",
+	})
+
+	inner, _, err := NewGenericREST(restOptions, api.IPv4Protocol, ipAllocs, portAlloc, endpoints)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}

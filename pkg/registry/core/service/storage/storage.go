@@ -21,11 +21,14 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/cri-api/pkg/errors"
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/printers"
@@ -40,11 +43,17 @@ import (
 	netutil "k8s.io/utils/net"
 )
 
+type EndpointsStorage interface {
+	rest.Getter
+	rest.GracefulDeleter
+}
+
 type GenericREST struct {
 	*genericregistry.Store
 	primaryIPFamily   api.IPFamily
 	secondaryIPFamily api.IPFamily
 	alloc             RESTAllocStuff
+	endpoints         EndpointsStorage
 }
 
 // NewGenericREST returns a RESTStorage object that will work against services.
@@ -52,7 +61,8 @@ func NewGenericREST(
 	optsGetter generic.RESTOptionsGetter,
 	serviceIPFamily api.IPFamily,
 	ipAllocs map[api.IPFamily]ipallocator.Interface,
-	portAlloc portallocator.Interface) (*GenericREST, *StatusREST, error) {
+	portAlloc portallocator.Interface,
+	endpoints EndpointsStorage) (*GenericREST, *StatusREST, error) {
 
 	strategy, _ := svcreg.StrategyForServiceCIDRs(ipAllocs[serviceIPFamily].CIDR(), len(ipAllocs) > 1)
 
@@ -84,8 +94,15 @@ func NewGenericREST(
 	if len(ipAllocs) > 1 {
 		secondaryIPFamily = otherFamily(serviceIPFamily)
 	}
-	genericStore := &GenericREST{store, primaryIPFamily, secondaryIPFamily, makeAlloc(serviceIPFamily, ipAllocs, portAlloc)}
+	genericStore := &GenericREST{
+		Store:             store,
+		primaryIPFamily:   primaryIPFamily,
+		secondaryIPFamily: secondaryIPFamily,
+		alloc:             makeAlloc(serviceIPFamily, ipAllocs, portAlloc),
+		endpoints:         endpoints,
+	}
 	store.Decorator = genericStore.defaultOnRead
+	store.AfterDelete = genericStore.afterDelete
 	store.BeginCreate = genericStore.beginCreate
 	store.BeginUpdate = genericStore.beginUpdate
 
@@ -246,6 +263,32 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) {
 				service.Spec.IPFamilyPolicy = &requireDualStack
 			}
 		}
+	}
+}
+
+func (r *GenericREST) afterDelete(obj runtime.Object, options *metav1.DeleteOptions) {
+	svc := obj.(*api.Service)
+
+	// Normally this defaulting is done automatically, but the hook (Decorator)
+	// is called at the end of this process, and we want the fully-formed
+	// object.
+	r.defaultOnReadService(svc)
+
+	// Only perform the cleanup if this is a non-dryrun deletion
+	if !dryrun.IsDryRun(options.DryRun) {
+		// It would be better if we had the caller context, but that changes
+		// this hook signature.
+		ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), svc.Namespace)
+		// TODO: This is clumsy.  It was added for fear that the endpoints
+		// controller might lag, and we could end up rusing the service name
+		// with old endpoints.  We should solve that better and remove this, or
+		// else we should do this for EndpointSlice, too.
+		_, _, err := r.endpoints.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			klog.Errorf("delete service endpoints %s/%s failed: %v", svc.Name, svc.Namespace, err)
+		}
+
+		r.alloc.releaseAllocatedResources(svc)
 	}
 }
 
