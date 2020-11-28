@@ -25,7 +25,9 @@ import (
 // but we don't want an client library (which must include types), depending on a server library
 const allAuthenticated = "system:authenticated"
 
-func Convert_v1beta1_Policy_To_abac_Policy(in *Policy, out *abac.Policy, s conversion.Scope) error {
+// ConvertV1beta1PolicyToAbacPolicy converts a V1beta1-format policy into the current format,
+// and stores the result in the "out" buffer
+func ConvertV1beta1PolicyToAbacPolicy(in *Policy, out *abac.Policy, s conversion.Scope) error {
 	if err := autoConvert_v1beta1_Policy_To_abac_Policy(in, out, s); err != nil {
 		return err
 	}

@@ -34,7 +34,7 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
 	if err := s.AddConversionFunc((*Policy)(nil), (*abac.Policy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v0_Policy_To_abac_Policy(a.(*Policy), b.(*abac.Policy), scope)
+		return ConvertV0PolicyToAbacPolicy(a.(*Policy), b.(*abac.Policy), scope)
 	}); err != nil {
 		return err
 	}

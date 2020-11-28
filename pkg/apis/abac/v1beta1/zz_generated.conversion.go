@@ -49,7 +49,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 		return err
 	}
 	if err := s.AddConversionFunc((*Policy)(nil), (*abac.Policy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Policy_To_abac_Policy(a.(*Policy), b.(*abac.Policy), scope)
+		return ConvertV1beta1PolicyToAbacPolicy(a.(*Policy), b.(*abac.Policy), scope)
 	}); err != nil {
 		return err
 	}
