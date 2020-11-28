@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"reflect"
@@ -58,6 +59,16 @@ func makePortAllocator(ports machineryutilnet.PortRange) portallocator.Interface
 		panic(fmt.Sprintf("error creating port allocator: %v", err))
 	}
 	return al
+}
+
+type fakeEndpoints struct{}
+
+func (fakeEndpoints) Delete(_ context.Context, _ string, _ rest.ValidateObjectFunc, _ *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	return nil, false, nil
+}
+
+func (fakeEndpoints) Get(_ context.Context, _ string, _ *metav1.GetOptions) (runtime.Object, error) {
+	return nil, nil
 }
 
 func ipIsAllocated(t *testing.T, alloc ipallocator.Interface, ipstr string) bool {
@@ -104,7 +115,7 @@ func newStorage(t *testing.T, ipFamilies []api.IPFamily) (*GenericREST, *StatusR
 
 	portAlloc := makePortAllocator(*(machineryutilnet.ParsePortRangeOrDie("30000-32767")))
 
-	serviceStorage, statusStorage, err := NewGenericREST(restOptions, ipFamilies[0], ipAllocs, portAlloc)
+	serviceStorage, statusStorage, err := NewGenericREST(restOptions, ipFamilies[0], ipAllocs, portAlloc, fakeEndpoints{})
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -639,15 +650,6 @@ func TestCreateIgnoresIPFamilyWithoutDualStack(t *testing.T) {
 			}
 			defer storage.Delete(ctx, tc.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
 			createdSvc := createdObj.(*api.Service)
-			//FIXME: HACK!!  Delete above calls "inner" which doesn't
-			// yet call the allocators - no release = alloc errors!
-			defer func() {
-				for _, al := range storage.alloc.serviceIPAllocatorsByFamily {
-					for _, ip := range createdSvc.Spec.ClusterIPs {
-						al.Release(net.ParseIP(ip))
-					}
-				}
-			}()
 
 			// The gate is off - these should always be empty.
 			if want, got := fmtIPFamilyPolicy(nil), fmtIPFamilyPolicy(createdSvc.Spec.IPFamilyPolicy); want != got {
@@ -4696,15 +4698,6 @@ func TestCreateInitIPFields(t *testing.T) {
 						t.Fatalf("unexpected success creating service")
 					}
 					createdSvc := createdObj.(*api.Service)
-					//FIXME: HACK!!  Delete above calls "inner" which doesn't
-					// yet call the allocators - no release = alloc errors!
-					defer func() {
-						for _, al := range storage.alloc.serviceIPAllocatorsByFamily {
-							for _, ip := range createdSvc.Spec.ClusterIPs {
-								al.Release(net.ParseIP(ip))
-							}
-						}
-					}()
 
 					if want, got := fmtIPFamilyPolicy(&itc.expectPolicy), fmtIPFamilyPolicy(createdSvc.Spec.IPFamilyPolicy); want != got {
 						t.Errorf("wrong IPFamilyPolicy: want %s, got %s", want, got)
@@ -4735,7 +4728,7 @@ func TestCreateInitIPFields(t *testing.T) {
 	}
 }
 
-func TestCreateReallocation(t *testing.T) {
+func TestCreateDeleteReuse(t *testing.T) {
 	testCases := []struct {
 		name string
 		svc  *api.Service
@@ -4760,37 +4753,69 @@ func TestCreateReallocation(t *testing.T) {
 			defer storage.Store.DestroyFunc()
 
 			ctx := genericapirequest.NewDefaultContext()
+
+			// Create it
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error creating service: %v", err)
 			}
 			createdSvc := createdObj.(*api.Service)
 
+			// Ensure IPs and ports were allocated
+			for i, fam := range createdSvc.Spec.IPFamilies {
+				if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[fam], createdSvc.Spec.ClusterIPs[i]) {
+					t.Errorf("expected IP to be allocated: %v", createdSvc.Spec.ClusterIPs[i])
+				}
+			}
+			for _, p := range createdSvc.Spec.Ports {
+				if !portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+					t.Errorf("expected port to be allocated: %v", p.NodePort)
+				}
+			}
+
+			// Delete it
 			_, _, err = storage.Delete(ctx, tc.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error creating service: %v", err)
 			}
-			//FIXME: HACK!!  Delete above calls "inner" which doesn't
-			// yet call the allocators - no release = test errors!
-			for _, al := range storage.alloc.serviceIPAllocatorsByFamily {
-				for _, ip := range createdSvc.Spec.ClusterIPs {
-					al.Release(net.ParseIP(ip))
+
+			// Ensure IPs and ports were deallocated
+			for i, fam := range createdSvc.Spec.IPFamilies {
+				if ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[fam], createdSvc.Spec.ClusterIPs[i]) {
+					t.Errorf("expected IP to not be allocated: %v", createdSvc.Spec.ClusterIPs[i])
 				}
 			}
 			for _, p := range createdSvc.Spec.Ports {
-				storage.alloc.serviceNodePorts.Release(int(p.NodePort))
+				if portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+					t.Errorf("expected port to not be allocated: %v", p.NodePort)
+				}
 			}
 
 			// Force the same IPs and ports
 			svc2 := tc.svc.DeepCopy()
+			svc2.Name += "2"
 			svc2.Spec.ClusterIP = createdSvc.Spec.ClusterIP
 			svc2.Spec.ClusterIPs = createdSvc.Spec.ClusterIPs
 			svc2.Spec.Ports = createdSvc.Spec.Ports
 
+			// Create again
 			_, err = storage.Create(ctx, svc2, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error creating service: %v", err)
 			}
+
+			// Ensure IPs and ports were allocated
+			for i, fam := range createdSvc.Spec.IPFamilies {
+				if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[fam], createdSvc.Spec.ClusterIPs[i]) {
+					t.Errorf("expected IP to be allocated: %v", createdSvc.Spec.ClusterIPs[i])
+				}
+			}
+			for _, p := range createdSvc.Spec.Ports {
+				if !portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+					t.Errorf("expected port to be allocated: %v", p.NodePort)
+				}
+			}
+
 		})
 	}
 }
@@ -5119,18 +5144,6 @@ func TestCreateInitNodePorts(t *testing.T) {
 				t.Fatalf("unexpected success creating service")
 			}
 			createdSvc := createdObj.(*api.Service)
-			//FIXME: HACK!!  Delete above calls "inner" which doesn't
-			// yet call the allocators - no release = alloc errors!
-			defer func() {
-				for _, al := range storage.alloc.serviceIPAllocatorsByFamily {
-					for _, ip := range createdSvc.Spec.ClusterIPs {
-						al.Release(net.ParseIP(ip))
-					}
-				}
-				for _, p := range createdSvc.Spec.Ports {
-					storage.alloc.serviceNodePorts.Release(int(p.NodePort))
-				}
-			}()
 
 			// Produce a map of port index to nodeport value, excluding zero.
 			ports := map[int]*api.ServicePort{}
@@ -5549,23 +5562,23 @@ func TestCreateDryRun(t *testing.T) {
 
 			// Ensure IPs were allocated
 			if net.ParseIP(createdSvc.Spec.ClusterIP) == nil {
-				t.Errorf("expected valid clusterIP: %v", createdSvc.Spec.ClusterIP)
+				t.Errorf("expected valid clusterIP: %q", createdSvc.Spec.ClusterIP)
 			}
 
 			// Ensure the IP allocators are clean.
 			if !tc.enableDualStack {
 				if ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[api.IPv4Protocol], createdSvc.Spec.ClusterIP) {
-					t.Errorf("expected IP to not be allocated: %v", createdSvc.Spec.ClusterIP)
+					t.Errorf("expected IP to not be allocated: %q", createdSvc.Spec.ClusterIP)
 				}
 			} else {
 				for _, ip := range createdSvc.Spec.ClusterIPs {
 					if net.ParseIP(ip) == nil {
-						t.Errorf("expected valid clusterIP: %v", createdSvc.Spec.ClusterIP)
+						t.Errorf("expected valid clusterIP: %q", createdSvc.Spec.ClusterIP)
 					}
 				}
 				for i, fam := range createdSvc.Spec.IPFamilies {
 					if ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[fam], createdSvc.Spec.ClusterIPs[i]) {
-						t.Errorf("expected IP to not be allocated: %v", createdSvc.Spec.ClusterIPs[i])
+						t.Errorf("expected IP to not be allocated: %q", createdSvc.Spec.ClusterIPs[i])
 					}
 				}
 			}
@@ -5573,9 +5586,87 @@ func TestCreateDryRun(t *testing.T) {
 			if tc.svc.Spec.Type != api.ServiceTypeClusterIP {
 				for _, p := range createdSvc.Spec.Ports {
 					if portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
-						t.Errorf("expected port to not be allocated: %v", p.NodePort)
+						t.Errorf("expected port to not be allocated: %d", p.NodePort)
 					}
 				}
+			}
+		})
+	}
+}
+
+// Prove that a dry-run delete doesn't actually deallocate IPs or ports.
+func TestDeleteDryRun(t *testing.T) {
+	testCases := []struct {
+		name            string
+		enableDualStack bool
+		svc             *api.Service
+	}{{
+		name:            "gate:off",
+		enableDualStack: false,
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+	}, {
+		name:            "gate:on",
+		enableDualStack: true,
+		svc: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+
+			families := []api.IPFamily{api.IPv4Protocol}
+			if tc.enableDualStack {
+				families = append(families, api.IPv6Protocol)
+			}
+
+			storage, _, server := newStorage(t, families)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			ctx := genericapirequest.NewDefaultContext()
+			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error creating service: %v", err)
+			}
+			createdSvc := createdObj.(*api.Service)
+
+			// Ensure IPs and ports were allocated
+			for i, fam := range createdSvc.Spec.IPFamilies {
+				if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[fam], createdSvc.Spec.ClusterIPs[i]) {
+					t.Errorf("expected IP to be allocated: %q", createdSvc.Spec.ClusterIPs[i])
+				}
+			}
+			for _, p := range createdSvc.Spec.Ports {
+				if !portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+					t.Errorf("expected port to be allocated: %d", p.NodePort)
+				}
+			}
+			if !portIsAllocated(t, storage.alloc.serviceNodePorts, createdSvc.Spec.HealthCheckNodePort) {
+				t.Errorf("expected port to be allocated: %d", createdSvc.Spec.HealthCheckNodePort)
+			}
+
+			_, _, err = storage.Delete(ctx, tc.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
+			if err != nil {
+				t.Fatalf("unexpected error deleting service: %v", err)
+			}
+
+			// Ensure they are still allocated.
+			for i, fam := range createdSvc.Spec.IPFamilies {
+				if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[fam], createdSvc.Spec.ClusterIPs[i]) {
+					t.Errorf("expected IP to still be allocated: %q", createdSvc.Spec.ClusterIPs[i])
+				}
+			}
+			for _, p := range createdSvc.Spec.Ports {
+				if !portIsAllocated(t, storage.alloc.serviceNodePorts, p.NodePort) {
+					t.Errorf("expected port to still be allocated: %d", p.NodePort)
+				}
+			}
+			if !portIsAllocated(t, storage.alloc.serviceNodePorts, createdSvc.Spec.HealthCheckNodePort) {
+				t.Errorf("expected port to still be allocated: %d", createdSvc.Spec.HealthCheckNodePort)
 			}
 		})
 	}
