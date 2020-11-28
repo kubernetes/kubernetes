@@ -29,6 +29,7 @@ filegroup(
         "//plugin/pkg/admission/noderestriction:all-srcs",
         "//plugin/pkg/admission/nodetaint:all-srcs",
         "//plugin/pkg/admission/podnodeselector:all-srcs",
+        "//plugin/pkg/admission/podtcpresolution:all-srcs",
         "//plugin/pkg/admission/podtolerationrestriction:all-srcs",
         "//plugin/pkg/admission/priority:all-srcs",
         "//plugin/pkg/admission/resourcequota:all-srcs",
