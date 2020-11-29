@@ -254,6 +254,7 @@ go_library(
             "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
             "//staging/src/k8s.io/component-base/metrics:go_default_library",
+            "//vendor/golang.org/x/sys/windows:go_default_library",
             "//vendor/k8s.io/utils/net:go_default_library",
         ],
         "//conditions:default": [],
@@ -263,6 +264,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "init_windows_test.go",
         "server_others_test.go",
         "server_test.go",
     ],
