@@ -162,6 +162,7 @@ func DefaultOffAdmissionPlugins() sets.String {
 		certsigning.PluginName,                  // CertificateSigning
 		certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 		defaultingressclass.PluginName,          //DefaultIngressClass
+		podtcpresolution.PluginName,             // PodTCPResolution
 	)
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)
