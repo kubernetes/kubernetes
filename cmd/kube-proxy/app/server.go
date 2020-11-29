@@ -113,6 +113,12 @@ type Options struct {
 	// WindowsService should be set to true if kube-proxy is running as a service on Windows.
 	// Its corresponding flag only gets registered in Windows builds
 	WindowsService bool
+	// WindowsPriorityClass sets the priority class associated with the kube-proxy process
+	// Its corresponding flag only gets registered in Windows builds
+	// The default priority class associated with any process in Windows is NORMAL_PRIORITY_CLASS. Keeping it as is
+	// to maintain backwards compatibility.
+	// Source: https://docs.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities
+	WindowsPriorityClass string
 	// config is the proxy server's configuration object.
 	config *kubeproxyconfig.KubeProxyConfiguration
 	// watcher is used to watch on the update change of ConfigFile
@@ -480,7 +486,7 @@ with the apiserver API to configure the proxy.`,
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
 
-			if err := initForOS(opts.WindowsService); err != nil {
+			if err := initForOS(opts.WindowsService, opts.WindowsPriorityClass); err != nil {
 				klog.Fatalf("failed OS init: %v", err)
 			}
 

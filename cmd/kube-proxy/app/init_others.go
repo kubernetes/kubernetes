@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-func initForOS(service bool) error {
+func initForOS(service bool, windowsPriorityClass string) error {
 	return nil
 }
 
