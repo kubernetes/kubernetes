@@ -2960,6 +2960,27 @@ func (c *Cloud) describeLoadBalancerv2(name string) (*elbv2.LoadBalancer, error)
 	return nil, fmt.Errorf("NLB '%s' could not be found", name)
 }
 
+func (c *Cloud) addLoadBalancerTagsv2(loadBalancerArn string, requested map[string]string) error {
+	var tags []*elbv2.Tag
+	for k, v := range requested {
+		tag := &elbv2.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		}
+		tags = append(tags, tag)
+	}
+
+	request := &elbv2.AddTagsInput{}
+	request.ResourceArns = []*string{&loadBalancerArn}
+	request.Tags = tags
+
+	_, err := c.elbv2.AddTags(request)
+	if err != nil {
+		return fmt.Errorf("error adding tags to load balancer: %v", err)
+	}
+	return nil
+}
+
 // Retrieves instance's vpc id from metadata
 func (c *Cloud) findVPCID() (string, error) {
 	macs, err := c.metadata.GetMetadata("network/interfaces/macs/")

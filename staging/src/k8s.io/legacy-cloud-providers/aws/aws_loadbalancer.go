@@ -32,9 +32,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -365,6 +365,14 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 						}
 						dirty = true
 					}
+				}
+			}
+
+			// add additional tags
+			if len(tags) > 0 {
+				err := c.addLoadBalancerTagsv2(aws.StringValue(loadBalancer.LoadBalancerArn), tags)
+				if err != nil {
+					return nil, fmt.Errorf("unable to create additional load balancer tags: %v", err)
 				}
 			}
 		}
