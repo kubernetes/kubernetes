@@ -268,7 +268,7 @@ func setMockLBs(az *Cloud, ctrl *gomock.Controller, expectedLBs *[]network.LoadB
 	for _, lb := range *expectedLBs {
 		mockLBsClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, *lb.Name, gomock.Any()).Return((*expectedLBs)[lbIndex], nil).MaxTimes(2)
 	}
-	mockLBsClient.EXPECT().List(gomock.Any(), az.ResourceGroup).Return(*expectedLBs, nil).MaxTimes(3)
+	mockLBsClient.EXPECT().List(gomock.Any(), az.ResourceGroup).Return(*expectedLBs, nil).AnyTimes()
 	mockLBsClient.EXPECT().List(gomock.Any(), gomock.Not(az.ResourceGroup)).Return([]network.LoadBalancer{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
 	mockLBsClient.EXPECT().Get(gomock.Any(), gomock.Not(az.ResourceGroup), gomock.Any(), gomock.Any()).Return(network.LoadBalancer{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
 	mockLBsClient.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).MaxTimes(1)
@@ -415,7 +415,7 @@ func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 	setMockEnv(az, ctrl, expectedInterfaces, expectedVirtualMachines, serviceCount)
 
 	selectedAvailabilitySetName1 := getAvailabilitySetName(az, 0, availabilitySetCount)
-	selectedAvailabilitySetName2 := getAvailabilitySetName(az, 1, availabilitySetCount)
+	//selectedAvailabilitySetName2 := getAvailabilitySetName(az, 1, availabilitySetCount)
 
 	expectedLBs := make([]network.LoadBalancer, 0)
 
@@ -428,10 +428,10 @@ func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 		} else {
 			svc = getTestService(svcName, v1.ProtocolTCP, nil, false, int32(index))
 		}
-		lbMode := fmt.Sprintf("%s,%s", selectedAvailabilitySetName1, selectedAvailabilitySetName2)
+		lbMode := selectedAvailabilitySetName1
 		setLoadBalancerModeAnnotation(&svc, lbMode)
 
-		setMockLBs(az, ctrl, &expectedLBs, "service", 2, index, isInternal)
+		setMockLBs(az, ctrl, &expectedLBs, "service", 1, index, isInternal)
 
 		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
@@ -442,7 +442,7 @@ func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 		}
 
 		// expected is MIN(index, 2)
-		expectedNumOfLB := int(math.Min(float64(index), float64(2)))
+		expectedNumOfLB := int(math.Min(float64(index), float64(1)))
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 		result, _ := az.LoadBalancerClient.List(ctx, az.Config.ResourceGroup)
@@ -1115,7 +1115,7 @@ func TestReconcileSecurityGroupNewServiceAddsPort(t *testing.T) {
 	expectedLBs := make([]network.LoadBalancer, 0)
 	setMockLBs(az, ctrl, &expectedLBs, "service", 1, 1, false)
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc1, clusterResources.nodes, true)
-	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc1, lb)
+	lbStatus, _, _ := az.getServiceLoadBalancerStatus(&svc1, lb)
 
 	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, &lbStatus.Ingress[0].IP, true /* wantLb */)
 	if err != nil {
@@ -1140,7 +1140,7 @@ func TestReconcileSecurityGroupNewInternalServiceAddsPort(t *testing.T) {
 	setMockLBs(az, ctrl, &expectedLBs, "service", 1, 1, true)
 
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc1, clusterResources.nodes, true)
-	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc1, lb)
+	lbStatus, _, _ := az.getServiceLoadBalancerStatus(&svc1, lb)
 	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, &lbStatus.Ingress[0].IP, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
@@ -1165,7 +1165,7 @@ func TestReconcileSecurityGroupRemoveService(t *testing.T) {
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &service1, clusterResources.nodes, true)
 	az.reconcileLoadBalancer(testClusterName, &service2, clusterResources.nodes, true)
 
-	lbStatus, _ := az.getServiceLoadBalancerStatus(&service1, lb)
+	lbStatus, _, _ := az.getServiceLoadBalancerStatus(&service1, lb)
 
 	sg := getTestSecurityGroup(az, service1, service2)
 	validateSecurityGroup(t, sg, service1, service2)
@@ -1192,7 +1192,7 @@ func TestReconcileSecurityGroupRemoveServiceRemovesPort(t *testing.T) {
 	expectedLBs := make([]network.LoadBalancer, 0)
 	setMockLBs(az, ctrl, &expectedLBs, "service", 1, 1, true)
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true)
-	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc, lb)
+	lbStatus, _, _ := az.getServiceLoadBalancerStatus(&svc, lb)
 
 	sg, err := az.reconcileSecurityGroup(testClusterName, &svcUpdated, &lbStatus.Ingress[0].IP, true /* wantLb */)
 	if err != nil {
@@ -1219,7 +1219,7 @@ func TestReconcileSecurityWithSourceRanges(t *testing.T) {
 	expectedLBs := make([]network.LoadBalancer, 0)
 	setMockLBs(az, ctrl, &expectedLBs, "service", 1, 1, false)
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true)
-	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc, lb)
+	lbStatus, _, _ := az.getServiceLoadBalancerStatus(&svc, lb)
 
 	sg, err := az.reconcileSecurityGroup(testClusterName, &svc, &lbStatus.Ingress[0].IP, true /* wantLb */)
 	if err != nil {
@@ -1255,7 +1255,7 @@ func TestReconcileSecurityGroupEtagMismatch(t *testing.T) {
 	setMockLBs(az, ctrl, &expectedLBs, "service", 1, 1, true)
 
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc1, clusterResources.nodes, true)
-	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc1, lb)
+	lbStatus, _, _ := az.getServiceLoadBalancerStatus(&svc1, lb)
 
 	newSG, err := az.reconcileSecurityGroup(testClusterName, &svc1, &lbStatus.Ingress[0].IP, true /* wantLb */)
 	assert.Nil(t, newSG)

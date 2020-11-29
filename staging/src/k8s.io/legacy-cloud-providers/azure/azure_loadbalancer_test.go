@@ -2261,7 +2261,7 @@ func TestGetServiceLoadBalancerStatus(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		status, err := az.getServiceLoadBalancerStatus(test.service, test.lb)
+		status, _, err := az.getServiceLoadBalancerStatus(test.service, test.lb)
 		assert.Equal(t, test.expectedStatus, status, "TestCase[%d]: %s", i, test.desc)
 		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]: %s", i, test.desc)
 	}
@@ -3593,5 +3593,62 @@ func TestEnsurePIPTagged(t *testing.T) {
 		changed := cloud.ensurePIPTagged(&service, &pip)
 		assert.True(t, changed)
 		assert.Equal(t, expectedPIP, pip)
+	})
+}
+
+func TestShouldChangeLoadBalancer(t *testing.T) {
+	t.Run("shouldChangeLoadBalancer should return true if the mode is different from the current vm set", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		cloud := GetTestCloud(ctrl)
+		cloud.LoadBalancerSku = loadBalancerSkuBasic
+		annotations := map[string]string{
+			ServiceAnnotationLoadBalancerMode: "as2",
+		}
+		service := getTestService("service1", v1.ProtocolTCP, annotations, false, 80)
+		res := cloud.shouldChangeLoadBalancer(&service, "as1", "testCluster")
+		assert.True(t, res)
+	})
+}
+
+func TestRemoveFrontendIPConfigurationFromLoadBalancerDelete(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	t.Run("removeFrontendIPConfigurationFromLoadBalancer should remove the unwanted frontend IP configuration and delete the orphaned LB", func(t *testing.T) {
+		fip := &network.FrontendIPConfiguration{Name: to.StringPtr("testCluster")}
+		service := getTestService("svc1", v1.ProtocolTCP, nil, false, 80)
+		lb := getTestLoadBalancer(to.StringPtr("lb"), to.StringPtr("rg"), to.StringPtr("testCluster"), to.StringPtr("testCluster"), service, "standard")
+		bid := "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool1-00000000-nic-0/ipConfigurations/ipconfig1"
+		lb.BackendAddressPools = &[]network.BackendAddressPool{
+			{
+				Name: to.StringPtr("testCluster"),
+				BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
+					BackendIPConfigurations: &[]network.InterfaceIPConfiguration{
+						{ID: to.StringPtr(bid)},
+					},
+				},
+			},
+		}
+		cloud := GetTestCloud(ctrl)
+		mockLBClient := cloud.LoadBalancerClient.(*mockloadbalancerclient.MockInterface)
+		mockLBClient.EXPECT().Delete(gomock.Any(), "rg", "lb").Return(nil)
+		err := cloud.removeFrontendIPConfigurationFromLoadBalancer(&lb, fip, "testCluster", &service)
+		assert.NoError(t, err)
+	})
+}
+
+func TestRemoveFrontendIPConfigurationFromLoadBalancerUpdate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	t.Run("removeFrontendIPConfigurationFromLoadBalancer should remove the unwanted frontend IP configuration and update the LB if there are remaining frontend IP configurations", func(t *testing.T) {
+		fip := &network.FrontendIPConfiguration{Name: to.StringPtr("testCluster")}
+		service := getTestService("svc1", v1.ProtocolTCP, nil, false, 80)
+		lb := getTestLoadBalancer(to.StringPtr("lb"), to.StringPtr("rg"), to.StringPtr("testCluster"), to.StringPtr("testCluster"), service, "standard")
+		*lb.FrontendIPConfigurations = append(*lb.FrontendIPConfigurations, network.FrontendIPConfiguration{Name: to.StringPtr("fip1")})
+		cloud := GetTestCloud(ctrl)
+		mockLBClient := cloud.LoadBalancerClient.(*mockloadbalancerclient.MockInterface)
+		mockLBClient.EXPECT().CreateOrUpdate(gomock.Any(), "rg", "lb", gomock.Any(), gomock.Any()).Return(nil)
+		err := cloud.removeFrontendIPConfigurationFromLoadBalancer(&lb, fip, "testCluster", &service)
+		assert.NoError(t, err)
 	})
 }

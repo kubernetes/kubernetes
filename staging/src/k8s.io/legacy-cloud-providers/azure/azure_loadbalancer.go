@@ -50,15 +50,16 @@ const (
 	// to specify what subnet it is exposed on
 	ServiceAnnotationLoadBalancerInternalSubnet = "service.beta.kubernetes.io/azure-load-balancer-internal-subnet"
 
-	// ServiceAnnotationLoadBalancerMode is the annotation used on the service to specify the
-	// Azure load balancer selection based on availability sets
+	// ServiceAnnotationLoadBalancerMode is the annotation used on the service to specify
+	// which load balancer should be associated with the service. This is valid when using the basic
+	// load balancer or turn on the multiple standard load balancers mode, or it would be ignored.
 	// There are currently three possible load balancer selection modes :
 	// 1. Default mode - service has no annotation ("service.beta.kubernetes.io/azure-load-balancer-mode")
-	//	  In this case the Loadbalancer of the primary Availability set is selected
-	// 2. "__auto__" mode - service is annotated with __auto__ value, this when loadbalancer from any availability set
+	//	  In this case the Loadbalancer of the primary VMSS/VMAS is selected.
+	// 2. "__auto__" mode - service is annotated with __auto__ value, this when loadbalancer from any VMSS/VMAS
 	//    is selected which has the minimum rules associated with it.
-	// 3. "as1,as2" mode - this is when the load balancer from the specified availability sets is selected that has the
-	//    minimum rules associated with it.
+	// 3. "name" mode - the load balancer from the specified VMSS/VMAS that has the
+	//    minimum rules associated with it is selected.
 	ServiceAnnotationLoadBalancerMode = "service.beta.kubernetes.io/azure-load-balancer-mode"
 
 	// ServiceAnnotationLoadBalancerAutoModeValue is the annotation used on the service to specify the
@@ -194,7 +195,7 @@ func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, ser
 		return nil, err
 	}
 
-	lbStatus, err := az.getServiceLoadBalancerStatus(service, lb)
+	lbStatus, _, err := az.getServiceLoadBalancerStatus(service, lb)
 	if err != nil {
 		klog.Errorf("getServiceLoadBalancerStatus(%s) failed: %v", serviceName, err)
 		return nil, err
@@ -351,6 +352,125 @@ func (az *Cloud) cleanBackendpoolForPrimarySLB(primarySLB *network.LoadBalancer,
 	return primarySLB, nil
 }
 
+// shouldChangeLoadBalancer determines if the load balancer of the service should be switched to another one
+// according to the mode annotation on the service. This could be happened when the LB selection mode of an
+// existing service is changed to another VMSS/VMAS.
+func (az *Cloud) shouldChangeLoadBalancer(service *v1.Service, currLBName, clusterName string) bool {
+	hasMode, isAuto, vmSetName := az.getServiceLoadBalancerMode(service)
+	// if no mode is given or the mode is `__auto__`, the current LB should be kept
+	if !hasMode || isAuto {
+		return false
+	}
+	// if using the single standard load balancer, the current LB should be kept
+	useSingleSLB := az.useStandardLoadBalancer() && !az.EnableMultipleStandardLoadBalancers
+	if useSingleSLB {
+		return false
+	}
+	// if the current LB is what we want, keep it
+	lbName := strings.TrimSuffix(currLBName, InternalLoadBalancerNameSuffix)
+	if strings.EqualFold(lbName, vmSetName) {
+		return false
+	}
+	if strings.EqualFold(vmSetName, az.VMSet.GetPrimaryVMSetName()) && strings.EqualFold(clusterName, lbName) {
+		return false
+	}
+	// if the VMSS/VMAS of the current LB is different from the mode, change the LB
+	// to another one
+	klog.V(2).Infof("shouldChangeLoadBalancer(%s, %s, %s): change the LB to another one", service.Name, currLBName, clusterName)
+	return true
+}
+
+func (az *Cloud) removeFrontendIPConfigurationFromLoadBalancer(lb *network.LoadBalancer, fip *network.FrontendIPConfiguration, clusterName string, service *v1.Service) error {
+	if lb == nil || lb.LoadBalancerPropertiesFormat == nil || lb.FrontendIPConfigurations == nil {
+		return nil
+	}
+	fipConfigs := *lb.FrontendIPConfigurations
+	for i, fipConfig := range fipConfigs {
+		if strings.EqualFold(to.String(fipConfig.Name), to.String(fip.Name)) {
+			fipConfigs = append(fipConfigs[:i], fipConfigs[i+1:]...)
+			break
+		}
+	}
+	lb.FrontendIPConfigurations = &fipConfigs
+
+	// also remove the corresponding rules/probes
+	if lb.LoadBalancingRules != nil {
+		lbRules := *lb.LoadBalancingRules
+		for i := len(lbRules) - 1; i >= 0; i-- {
+			if strings.Contains(to.String(lbRules[i].Name), to.String(fip.Name)) {
+				lbRules = append(lbRules[:i], lbRules[i+1:]...)
+			}
+		}
+		lb.LoadBalancingRules = &lbRules
+	}
+	if lb.Probes != nil {
+		lbProbes := *lb.Probes
+		for i := len(lbProbes) - 1; i >= 0; i-- {
+			if strings.Contains(to.String(lbProbes[i].Name), to.String(fip.Name)) {
+				lbProbes = append(lbProbes[:i], lbProbes[i+1:]...)
+			}
+		}
+		lb.Probes = &lbProbes
+	}
+
+	if len(fipConfigs) == 0 {
+		klog.V(2).Infof("removeFrontendIPConfigurationFromLoadBalancer(%s, %s, %s, %s): deleting load balancer because there is no remaining frontend IP configurations", to.String(lb.Name), to.String(fip.Name), clusterName, service.Name)
+		err := az.cleanOrphanedLoadBalancer(lb, service, clusterName)
+		if err != nil {
+			klog.Errorf("removeFrontendIPConfigurationFromLoadBalancer(%s, %s, %s, %s): failed to cleanupOrphanedLoadBalancer: %v", to.String(lb.Name), to.String(fip.Name), clusterName, service.Name, err)
+			return err
+		}
+	} else {
+		klog.V(2).Infof("removeFrontendIPConfigurationFromLoadBalancer(%s, %s, %s, %s): updating the load balancer", to.String(lb.Name), to.String(fip.Name), clusterName, service.Name)
+		err := az.CreateOrUpdateLB(service, *lb)
+		if err != nil {
+			klog.Errorf("removeFrontendIPConfigurationFromLoadBalancer(%s, %s, %s, %s): failed to CreateOrUpdateLB: %v", to.String(lb.Name), to.String(fip.Name), clusterName, service.Name, err)
+			return err
+		}
+		az.lbCache.Delete(to.String(lb.Name))
+	}
+	return nil
+}
+
+func (az *Cloud) cleanOrphanedLoadBalancer(lb *network.LoadBalancer, service *v1.Service, clusterName string) error {
+	lbName := to.String(lb.Name)
+	serviceName := getServiceName(service)
+	isBackendPoolPreConfigured := az.isBackendPoolPreConfigured(service)
+	lbResourceGroup := az.getLoadBalancerResourceGroup()
+	lbBackendPoolName := getBackendPoolName(clusterName, service)
+	lbBackendPoolID := az.getBackendPoolID(lbName, lbResourceGroup, lbBackendPoolName)
+	if isBackendPoolPreConfigured {
+		klog.V(2).Infof("cleanOrphanedLoadBalancer(%s, %s, %s): ignore cleanup of dirty lb because the lb is pre-configured", lbName, serviceName, clusterName)
+	} else {
+		// When FrontendIPConfigurations is empty, we need to delete the Azure load balancer resource itself,
+		// because an Azure load balancer cannot have an empty FrontendIPConfigurations collection
+		klog.V(2).Infof("cleanOrphanedLoadBalancer(%s, %s, %s): deleting the LB since there are no remaining frontendIPConfigurations", lbName, serviceName, clusterName)
+
+		// Remove backend pools from vmSets. This is required for virtual machine scale sets before removing the LB.
+		vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
+		if _, ok := az.VMSet.(*availabilitySet); ok {
+			// do nothing for availability set
+			lb.BackendAddressPools = nil
+		}
+		err := az.VMSet.EnsureBackendPoolDeleted(service, lbBackendPoolID, vmSetName, lb.BackendAddressPools)
+		if err != nil {
+			klog.Errorf("cleanOrphanedLoadBalancer(%s, %s, %s): failed to EnsureBackendPoolDeleted: %v", lbName, serviceName, clusterName, err)
+			return err
+		}
+		klog.V(10).Infof("cleanOrphanedLoadBalancer(%s, %s, %s): EnsureBackendPoolDeleted finished", lbName, serviceName, clusterName)
+
+		// Remove the LB.
+		klog.V(10).Infof("cleanOrphanedLoadBalancer(%s, %s, %s): az.DeleteLB starts", lbName, serviceName, clusterName)
+		err = az.DeleteLB(service, lbName)
+		if err != nil {
+			klog.V(2).Infof("cleanOrphanedLoadBalancer(%s, %s, %s): failed to DeleteLB: %v", lbName, serviceName, clusterName, err)
+			return err
+		}
+		klog.V(10).Infof("cleanOrphanedLoadBalancer(%s, %s, %s): az.DeleteLB finished", lbName, serviceName, clusterName)
+	}
+	return nil
+}
+
 // getServiceLoadBalancer gets the loadbalancer for the service if it already exists.
 // If wantLb is TRUE then -it selects a new load balancer.
 // In case the selected load balancer does not exist it returns network.LoadBalancer struct
@@ -384,7 +504,7 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 		if isInternalLoadBalancer(&existingLB) != isInternal {
 			continue
 		}
-		status, err = az.getServiceLoadBalancerStatus(service, &existingLB)
+		status, fipConfig, err := az.getServiceLoadBalancerStatus(service, &existingLB)
 		if err != nil {
 			return nil, nil, false, err
 		}
@@ -392,19 +512,22 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 			// service is not on this load balancer
 			continue
 		}
-
+		// select another load balancer instead of returning
+		// the current one if the change is needed
+		if wantLb && az.shouldChangeLoadBalancer(service, to.String(existingLB.Name), clusterName) {
+			if err := az.removeFrontendIPConfigurationFromLoadBalancer(&existingLB, fipConfig, clusterName, service); err != nil {
+				klog.Errorf("getServiceLoadBalancer(%s, %s, %v): failed to remove frontend IP configuration from load balancer: %v", service.Name, clusterName, wantLb, err)
+				return nil, nil, false, err
+			}
+			break
+		}
 		return &existingLB, status, true, nil
-	}
-
-	hasMode, _, _ := getServiceLoadBalancerMode(service)
-	useSingleSLB := az.useStandardLoadBalancer() && !az.EnableMultipleStandardLoadBalancers
-	if useSingleSLB && hasMode {
-		klog.Warningf("single standard load balancer doesn't work with annotation %q, would ignore it", ServiceAnnotationLoadBalancerMode)
 	}
 
 	// Service does not have a load balancer, select one.
 	// Single standard load balancer doesn't need this because
 	// all backends nodes should be added to same LB.
+	useSingleSLB := az.useStandardLoadBalancer() && !az.EnableMultipleStandardLoadBalancers
 	if wantLb && !useSingleSLB {
 		// select new load balancer for service
 		selectedLB, exists, err := az.selectLoadBalancer(clusterName, service, &existingLBs, nodes)
@@ -452,8 +575,8 @@ func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, exi
 		mapExistingLBs[*lb.Name] = lb
 	}
 	selectedLBRuleCount := math.MaxInt32
-	for _, currASName := range *vmSetNames {
-		currLBName := az.getAzureLoadBalancerName(clusterName, currASName, isInternal)
+	for _, currVMSetName := range *vmSetNames {
+		currLBName := az.getAzureLoadBalancerName(clusterName, currVMSetName, isInternal)
 		lb, exists := mapExistingLBs[currLBName]
 		if !exists {
 			// select this LB as this is a new LB and will have minimum rules
@@ -500,21 +623,21 @@ func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, exi
 	return selectedLB, existsLb, nil
 }
 
-func (az *Cloud) getServiceLoadBalancerStatus(service *v1.Service, lb *network.LoadBalancer) (status *v1.LoadBalancerStatus, err error) {
+func (az *Cloud) getServiceLoadBalancerStatus(service *v1.Service, lb *network.LoadBalancer) (status *v1.LoadBalancerStatus, fipConfig *network.FrontendIPConfiguration, err error) {
 	if lb == nil {
 		klog.V(10).Info("getServiceLoadBalancerStatus: lb is nil")
-		return nil, nil
+		return nil, nil, nil
 	}
 	if lb.FrontendIPConfigurations == nil || *lb.FrontendIPConfigurations == nil {
 		klog.V(10).Info("getServiceLoadBalancerStatus: lb.FrontendIPConfigurations is nil")
-		return nil, nil
+		return nil, nil, nil
 	}
 	isInternal := requiresInternalLoadBalancer(service)
 	serviceName := getServiceName(service)
 	for _, ipConfiguration := range *lb.FrontendIPConfigurations {
 		owns, isPrimaryService, err := az.serviceOwnsFrontendIP(ipConfiguration, service)
 		if err != nil {
-			return nil, fmt.Errorf("get(%s): lb(%s) - failed to filter frontend IP configs with error: %v", serviceName, to.String(lb.Name), err)
+			return nil, nil, fmt.Errorf("get(%s): lb(%s) - failed to filter frontend IP configs with error: %v", serviceName, to.String(lb.Name), err)
 		}
 		if owns {
 			klog.V(2).Infof("get(%s): lb(%s) - found frontend IP config, primary service: %v", serviceName, to.String(lb.Name), isPrimaryService)
@@ -524,19 +647,19 @@ func (az *Cloud) getServiceLoadBalancerStatus(service *v1.Service, lb *network.L
 				lbIP = ipConfiguration.PrivateIPAddress
 			} else {
 				if ipConfiguration.PublicIPAddress == nil {
-					return nil, fmt.Errorf("get(%s): lb(%s) - failed to get LB PublicIPAddress is Nil", serviceName, *lb.Name)
+					return nil, nil, fmt.Errorf("get(%s): lb(%s) - failed to get LB PublicIPAddress is Nil", serviceName, *lb.Name)
 				}
 				pipID := ipConfiguration.PublicIPAddress.ID
 				if pipID == nil {
-					return nil, fmt.Errorf("get(%s): lb(%s) - failed to get LB PublicIPAddress ID is Nil", serviceName, *lb.Name)
+					return nil, nil, fmt.Errorf("get(%s): lb(%s) - failed to get LB PublicIPAddress ID is Nil", serviceName, *lb.Name)
 				}
 				pipName, err := getLastSegment(*pipID, "/")
 				if err != nil {
-					return nil, fmt.Errorf("get(%s): lb(%s) - failed to get LB PublicIPAddress Name from ID(%s)", serviceName, *lb.Name, *pipID)
+					return nil, nil, fmt.Errorf("get(%s): lb(%s) - failed to get LB PublicIPAddress Name from ID(%s)", serviceName, *lb.Name, *pipID)
 				}
 				pip, existsPip, err := az.getPublicIPAddress(az.getPublicIPAddressResourceGroup(service), pipName)
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 				if existsPip {
 					lbIP = pip.IPAddress
@@ -544,11 +667,11 @@ func (az *Cloud) getServiceLoadBalancerStatus(service *v1.Service, lb *network.L
 			}
 
 			klog.V(2).Infof("getServiceLoadBalancerStatus gets ingress IP %q from frontendIPConfiguration %q for service %q", to.String(lbIP), to.String(ipConfiguration.Name), serviceName)
-			return &v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{{IP: to.String(lbIP)}}}, nil
+			return &v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{{IP: to.String(lbIP)}}}, &ipConfiguration, nil
 		}
 	}
 
-	return nil, nil
+	return nil, nil, nil
 }
 
 func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) (string, bool, error) {
@@ -1427,35 +1550,10 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	// If it is not exist, and no change to that, we don't CreateOrUpdate LB
 	if dirtyLb {
 		if lb.FrontendIPConfigurations == nil || len(*lb.FrontendIPConfigurations) == 0 {
-			if isBackendPoolPreConfigured {
-				klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s) - ignore cleanup of dirty lb because the lb is pre-configured", serviceName, lbName)
-			} else {
-				// When FrontendIPConfigurations is empty, we need to delete the Azure load balancer resource itself,
-				// because an Azure load balancer cannot have an empty FrontendIPConfigurations collection
-				klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s) - deleting; no remaining frontendIPConfigurations", serviceName, lbName)
-
-				// Remove backend pools from vmSets. This is required for virtual machine scale sets before removing the LB.
-				vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
-				klog.V(10).Infof("EnsureBackendPoolDeleted(%s,%s) for service %s: start", lbBackendPoolID, vmSetName, serviceName)
-				if _, ok := az.VMSet.(*availabilitySet); ok {
-					// do nothing for availability set
-					lb.BackendAddressPools = nil
-				}
-				err := az.VMSet.EnsureBackendPoolDeleted(service, lbBackendPoolID, vmSetName, lb.BackendAddressPools)
-				if err != nil {
-					klog.Errorf("EnsureBackendPoolDeleted(%s) for service %s failed: %v", lbBackendPoolID, serviceName, err)
-					return nil, err
-				}
-				klog.V(10).Infof("EnsureBackendPoolDeleted(%s) for service %s: end", lbBackendPoolID, serviceName)
-
-				// Remove the LB.
-				klog.V(10).Infof("reconcileLoadBalancer: az.DeleteLB(%q): start", lbName)
-				err = az.DeleteLB(service, lbName)
-				if err != nil {
-					klog.V(2).Infof("reconcileLoadBalancer for service(%s) abort backoff: lb(%s) - deleting; no remaining frontendIPConfigurations", serviceName, lbName)
-					return nil, err
-				}
-				klog.V(10).Infof("az.DeleteLB(%q): end", lbName)
+			err := az.cleanOrphanedLoadBalancer(lb, service, clusterName)
+			if err != nil {
+				klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s) - failed to cleanOrphanedLoadBalancer: %v", serviceName, lbName)
+				return nil, err
 			}
 		} else {
 			klog.V(2).Infof("reconcileLoadBalancer: reconcileLoadBalancer for service(%s): lb(%s) - updating", serviceName, lbName)
@@ -2504,25 +2602,15 @@ func subnet(service *v1.Service) *string {
 // getServiceLoadBalancerMode parses the mode value.
 // if the value is __auto__ it returns isAuto = TRUE.
 // if anything else it returns the unique VM set names after trimming spaces.
-func getServiceLoadBalancerMode(service *v1.Service) (hasMode bool, isAuto bool, vmSetNames []string) {
+func (az *Cloud) getServiceLoadBalancerMode(service *v1.Service) (hasMode bool, isAuto bool, vmSetName string) {
 	mode, hasMode := service.Annotations[ServiceAnnotationLoadBalancerMode]
+	useSingleSLB := az.useStandardLoadBalancer() && !az.EnableMultipleStandardLoadBalancers
+	if useSingleSLB && hasMode {
+		klog.Warningf("single standard load balancer doesn't work with annotation %q, would ignore it", ServiceAnnotationLoadBalancerMode)
+	}
 	mode = strings.TrimSpace(mode)
 	isAuto = strings.EqualFold(mode, ServiceAnnotationLoadBalancerAutoModeValue)
-	if !isAuto {
-		// Break up list of "AS1,AS2"
-		vmSetParsedList := strings.Split(mode, ",")
-
-		// Trim the VM set names and remove duplicates
-		//  e.g. {"AS1"," AS2", "AS3", "AS3"} => {"AS1", "AS2", "AS3"}
-		vmSetNameSet := sets.NewString()
-		for _, v := range vmSetParsedList {
-			vmSetNameSet.Insert(strings.TrimSpace(v))
-		}
-
-		vmSetNames = vmSetNameSet.List()
-	}
-
-	return hasMode, isAuto, vmSetNames
+	return hasMode, isAuto, mode
 }
 
 func useSharedSecurityRule(service *v1.Service) bool {

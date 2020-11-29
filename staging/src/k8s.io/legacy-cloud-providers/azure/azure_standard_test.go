@@ -1157,7 +1157,7 @@ func TestGetStandardVMSetNames(t *testing.T) {
 					},
 				},
 			},
-			expectedVMSetNames: &[]string{"myavailabilityset"},
+			expectedVMSetNames: &[]string{"myAvailabilitySet"},
 		},
 	}
 

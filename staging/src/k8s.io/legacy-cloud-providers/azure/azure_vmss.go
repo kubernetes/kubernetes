@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -736,12 +735,11 @@ func (ss *scaleSet) getAgentPoolScaleSets(nodes []*v1.Node) (*[]string, error) {
 	return agentPoolScaleSets, nil
 }
 
-// GetVMSetNames selects all possible availability sets or scale sets
-// (depending vmType configured) for service load balancer. If the service has
+// GetVMSetNames selects all possible scale sets for service load balancer. If the service has
 // no loadbalancer mode annotation returns the primary VMSet. If service annotation
 // for loadbalancer exists then return the eligible VMSet.
-func (ss *scaleSet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (vmSetNames *[]string, err error) {
-	hasMode, isAuto, serviceVMSetNames := getServiceLoadBalancerMode(service)
+func (ss *scaleSet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (scaleSetNames *[]string, err error) {
+	hasMode, isAuto, serviceVMSetName := ss.getServiceLoadBalancerMode(service)
 	useSingleSLB := ss.useStandardLoadBalancer() && !ss.EnableMultipleStandardLoadBalancers
 	if !hasMode || useSingleSLB {
 		// no mode specified in service annotation or use single SLB mode
@@ -750,7 +748,7 @@ func (ss *scaleSet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (vmSetN
 		return scaleSetNames, nil
 	}
 
-	scaleSetNames, err := ss.getAgentPoolScaleSets(nodes)
+	scaleSetNames, err = ss.getAgentPoolScaleSets(nodes)
 	if err != nil {
 		klog.Errorf("ss.GetVMSetNames - getAgentPoolScaleSets failed err=(%v)", err)
 		return nil, err
@@ -760,32 +758,23 @@ func (ss *scaleSet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (vmSetN
 		return nil, fmt.Errorf("no scale sets found for nodes, node count(%d)", len(nodes))
 	}
 
-	// sort the list to have deterministic selection
-	sort.Strings(*scaleSetNames)
-
 	if !isAuto {
-		if serviceVMSetNames == nil || len(serviceVMSetNames) == 0 {
-			return nil, fmt.Errorf("service annotation for LoadBalancerMode is empty, it should have __auto__ or availability sets value")
-		}
-		// validate scale set exists
-		var found bool
-		for sasx := range serviceVMSetNames {
-			for asx := range *scaleSetNames {
-				if strings.EqualFold((*scaleSetNames)[asx], serviceVMSetNames[sasx]) {
-					found = true
-					serviceVMSetNames[sasx] = (*scaleSetNames)[asx]
-					break
-				}
-			}
-			if !found {
-				klog.Errorf("ss.GetVMSetNames - scale set (%s) in service annotation not found", serviceVMSetNames[sasx])
-				return nil, fmt.Errorf("scale set (%s) - not found", serviceVMSetNames[sasx])
+		found := false
+		for asx := range *scaleSetNames {
+			if strings.EqualFold((*scaleSetNames)[asx], serviceVMSetName) {
+				found = true
+				serviceVMSetName = (*scaleSetNames)[asx]
+				break
 			}
 		}
-		vmSetNames = &serviceVMSetNames
+		if !found {
+			klog.Errorf("ss.GetVMSetNames - scale set (%s) in service annotation not found", serviceVMSetName)
+			return nil, fmt.Errorf("scale set (%s) - not found", serviceVMSetName)
+		}
+		return &[]string{serviceVMSetName}, nil
 	}
 
-	return vmSetNames, nil
+	return scaleSetNames, nil
 }
 
 // extractResourceGroupByVMSSNicID extracts the resource group name by vmss nicID.
