@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/nodetaint"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
+	"k8s.io/kubernetes/plugin/pkg/admission/podtcpresolution"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
 	"k8s.io/kubernetes/plugin/pkg/admission/runtimeclass"
@@ -93,6 +94,7 @@ var AllOrderedPlugins = []string{
 	certsigning.PluginName,                  // CertificateSigning
 	certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 	defaultingressclass.PluginName,          // DefaultIngressClass
+	podtcpresolution.PluginName,             // PodTCPResolution
 
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
@@ -127,6 +129,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	podtolerationrestriction.Register(plugins)
 	runtimeclass.Register(plugins)
 	resourcequota.Register(plugins)
+	podtcpresolution.Register(plugins)
 	podsecuritypolicy.Register(plugins)
 	podpriority.Register(plugins)
 	scdeny.Register(plugins)
