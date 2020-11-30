@@ -615,11 +615,6 @@ func verifyAttachmentStatus(attachment *storage.VolumeAttachment, volumeHandle s
 		klog.Error(log("VolumeAttachment [%s] has been deleted, will not continue to wait for attachment", volumeHandle))
 		return false, errors.New("volume attachment has been deleted")
 	}
-	// if being deleted, fail fast
-	if attachment.GetDeletionTimestamp() != nil {
-		klog.Error(log("VolumeAttachment [%s] has deletion timestamp, will not continue to wait for attachment", attachment.Name))
-		return false, errors.New("volume attachment is being deleted")
-	}
 	// attachment OK
 	if attachment.Status.Attached {
 		return true, nil
@@ -629,6 +624,11 @@ func verifyAttachmentStatus(attachment *storage.VolumeAttachment, volumeHandle s
 	if attachErr != nil {
 		klog.Error(log("attachment for %v failed: %v", volumeHandle, attachErr.Message))
 		return false, errors.New(attachErr.Message)
+	}
+	// if being deleted, fail fast
+	if attachment.GetDeletionTimestamp() != nil {
+		klog.Error(log("VolumeAttachment [%s] has deletion timestamp, will not continue to wait for attachment", attachment.Name))
+		return false, errors.New("volume attachment is being deleted")
 	}
 	return false, nil
 }
