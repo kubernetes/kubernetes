@@ -49,7 +49,7 @@ func TestInternalToVersionedInitConfigurationConversion(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			versioned := &InitConfiguration{}
-			err := Convert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(&tc.in, versioned, nil)
+			err := ConvertKubeadmInitConfigurationToV1beta1InitConfiguration(&tc.in, versioned, nil)
 			if err == nil && tc.expectedError {
 				t.Error("unexpected success")
 			} else if err != nil && !tc.expectedError {
@@ -138,7 +138,7 @@ func TestInternalToVersionedJoinControlPlaneConversion(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			versioned := &JoinControlPlane{}
-			err := Convert_kubeadm_JoinControlPlane_To_v1beta1_JoinControlPlane(&tc.in, versioned, nil)
+			err := ConvertKubeadmJoinControlPlaneToV1beta1JoinControlPlane(&tc.in, versioned, nil)
 			if err == nil && tc.expectedError {
 				t.Error("unexpected success")
 			} else if err != nil && !tc.expectedError {

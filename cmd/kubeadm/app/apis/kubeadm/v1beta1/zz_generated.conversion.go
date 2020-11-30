@@ -233,17 +233,17 @@ func RegisterConversions(s *runtime.Scheme) error {
 		return err
 	}
 	if err := s.AddConversionFunc((*kubeadm.InitConfiguration)(nil), (*InitConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(a.(*kubeadm.InitConfiguration), b.(*InitConfiguration), scope)
+		return ConvertKubeadmInitConfigurationToV1beta1InitConfiguration(a.(*kubeadm.InitConfiguration), b.(*InitConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	if err := s.AddConversionFunc((*kubeadm.JoinControlPlane)(nil), (*JoinControlPlane)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_kubeadm_JoinControlPlane_To_v1beta1_JoinControlPlane(a.(*kubeadm.JoinControlPlane), b.(*JoinControlPlane), scope)
+		return ConvertKubeadmJoinControlPlaneToV1beta1JoinControlPlane(a.(*kubeadm.JoinControlPlane), b.(*JoinControlPlane), scope)
 	}); err != nil {
 		return err
 	}
 	if err := s.AddConversionFunc((*kubeadm.NodeRegistrationOptions)(nil), (*NodeRegistrationOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_kubeadm_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(a.(*kubeadm.NodeRegistrationOptions), b.(*NodeRegistrationOptions), scope)
+		return ConvertKubeadmNodeRegistrationOptionsToV1beta1NodeRegistrationOptions(a.(*kubeadm.NodeRegistrationOptions), b.(*NodeRegistrationOptions), scope)
 	}); err != nil {
 		return err
 	}
@@ -684,7 +684,7 @@ func autoConvert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(in *kube
 		return err
 	}
 	out.BootstrapTokens = *(*[]BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
-	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+	if err := ConvertKubeadmNodeRegistrationOptionsToV1beta1NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}
 	if err := Convert_kubeadm_APIEndpoint_To_v1beta1_APIEndpoint(&in.LocalAPIEndpoint, &out.LocalAPIEndpoint, s); err != nil {
@@ -720,7 +720,7 @@ func Convert_v1beta1_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConf
 }
 
 func autoConvert_kubeadm_JoinConfiguration_To_v1beta1_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
-	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
+	if err := ConvertKubeadmNodeRegistrationOptionsToV1beta1NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}
 	out.CACertPath = in.CACertPath
@@ -730,7 +730,7 @@ func autoConvert_kubeadm_JoinConfiguration_To_v1beta1_JoinConfiguration(in *kube
 	if in.ControlPlane != nil {
 		in, out := &in.ControlPlane, &out.ControlPlane
 		*out = new(JoinControlPlane)
-		if err := Convert_kubeadm_JoinControlPlane_To_v1beta1_JoinControlPlane(*in, *out, s); err != nil {
+		if err := ConvertKubeadmJoinControlPlaneToV1beta1JoinControlPlane(*in, *out, s); err != nil {
 			return err
 		}
 	} else {

@@ -22,7 +22,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func Convert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
+// ConvertKubeadmInitConfigurationToV1beta1InitConfiguration ...
+func ConvertKubeadmInitConfigurationToV1beta1InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
 	if err := autoConvert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(in, out, s); err != nil {
 		return err
 	}
@@ -34,7 +35,8 @@ func Convert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(in *kubeadm.
 	return nil
 }
 
-func Convert_kubeadm_JoinControlPlane_To_v1beta1_JoinControlPlane(in *kubeadm.JoinControlPlane, out *JoinControlPlane, s conversion.Scope) error {
+// ConvertKubeadmJoinControlPlaneToV1beta1JoinControlPlane ...
+func ConvertKubeadmJoinControlPlaneToV1beta1JoinControlPlane(in *kubeadm.JoinControlPlane, out *JoinControlPlane, s conversion.Scope) error {
 	if err := autoConvert_kubeadm_JoinControlPlane_To_v1beta1_JoinControlPlane(in, out, s); err != nil {
 		return err
 	}
@@ -46,7 +48,8 @@ func Convert_kubeadm_JoinControlPlane_To_v1beta1_JoinControlPlane(in *kubeadm.Jo
 	return nil
 }
 
-func Convert_kubeadm_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(in *kubeadm.NodeRegistrationOptions, out *NodeRegistrationOptions, s conversion.Scope) error {
+// ConvertKubeadmNodeRegistrationOptionsToV1beta1NodeRegistrationOptions ..
+func ConvertKubeadmNodeRegistrationOptionsToV1beta1NodeRegistrationOptions(in *kubeadm.NodeRegistrationOptions, out *NodeRegistrationOptions, s conversion.Scope) error {
 	if err := autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(in, out, s); err != nil {
 		return err
 	}

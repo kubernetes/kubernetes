@@ -26,6 +26,7 @@ import (
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 )
 
+// BootstrapTokenString ...
 // DEPRECATED - This group version of BootstrapTokenString is deprecated by apis/kubeadm/v1beta2/BootstrapTokenString.
 // BootstrapTokenString is a token of the format abcdef.abcdef0123456789 that is used
 // for both validation of the practically of the API server from a joining node's point

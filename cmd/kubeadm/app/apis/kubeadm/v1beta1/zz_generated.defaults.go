@@ -36,31 +36,31 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
-	SetDefaults_ClusterConfiguration(in)
-	SetDefaults_APIServer(&in.APIServer)
+	SetDefaultsClusterConfiguration(in)
+	SetDefaultsAPIServer(&in.APIServer)
 }
 
 func SetObjectDefaults_ClusterStatus(in *ClusterStatus) {
 }
 
 func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
-	SetDefaults_InitConfiguration(in)
+	SetDefaultsInitConfiguration(in)
 	SetObjectDefaults_ClusterConfiguration(&in.ClusterConfiguration)
 	for i := range in.BootstrapTokens {
 		a := &in.BootstrapTokens[i]
-		SetDefaults_BootstrapToken(a)
+		SetDefaultsBootstrapToken(a)
 	}
-	SetDefaults_APIEndpoint(&in.LocalAPIEndpoint)
+	SetDefaultsAPIEndpoint(&in.LocalAPIEndpoint)
 }
 
 func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
-	SetDefaults_JoinConfiguration(in)
-	SetDefaults_Discovery(&in.Discovery)
+	SetDefaultsJoinConfiguration(in)
+	SetDefaultsDiscovery(&in.Discovery)
 	if in.Discovery.File != nil {
-		SetDefaults_FileDiscovery(in.Discovery.File)
+		SetDefaultsFileDiscovery(in.Discovery.File)
 	}
 	if in.ControlPlane != nil {
-		SetDefaults_JoinControlPlane(in.ControlPlane)
-		SetDefaults_APIEndpoint(&in.ControlPlane.LocalAPIEndpoint)
+		SetDefaultsJoinControlPlane(in.ControlPlane)
+		SetDefaultsAPIEndpoint(&in.ControlPlane.LocalAPIEndpoint)
 	}
 }
