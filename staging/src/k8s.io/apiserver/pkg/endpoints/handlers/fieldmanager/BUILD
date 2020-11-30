@@ -56,6 +56,7 @@ go_test(
         "fieldmanager_test.go",
         "lastappliedmanager_test.go",
         "lastappliedupdater_test.go",
+        "managedfieldsupdater_test.go",
         "skipnonapplied_test.go",
     ],
     data = [
