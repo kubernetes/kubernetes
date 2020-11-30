@@ -287,6 +287,10 @@ func (c *ManagedDiskController) ResizeDisk(diskURI string, oldSize resource.Quan
 		return newSizeQuant, nil
 	}
 
+	if result.DiskProperties.DiskState != compute.Unattached {
+		return oldSize, fmt.Errorf("azureDisk - disk resize is only supported on Unattached disk, current disk state: %s, already attached to %s", result.DiskProperties.DiskState, to.String(result.ManagedBy))
+	}
+
 	diskParameter := compute.DiskUpdate{
 		DiskUpdateProperties: &compute.DiskUpdateProperties{
 			DiskSizeGB: &requestGiB,
