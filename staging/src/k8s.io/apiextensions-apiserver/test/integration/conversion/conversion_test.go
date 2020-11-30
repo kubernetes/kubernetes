@@ -685,7 +685,7 @@ func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, verb := range []string{"get", "list", "create", "udpate", "patch", "delete", "deletecollection"} {
+		for _, verb := range []string{"get", "list", "create", "update", "patch", "delete", "deletecollection"} {
 			t.Run(verb, func(t *testing.T) {
 				switch verb {
 				case "get":
@@ -712,7 +712,7 @@ func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *
 			})
 		}
 		for _, subresource := range []string{"status", "scale"} {
-			for _, verb := range []string{"get", "udpate", "patch"} {
+			for _, verb := range []string{"get", "update", "patch"} {
 				t.Run(fmt.Sprintf("%s-%s", subresource, verb), func(t *testing.T) {
 					switch verb {
 					case "create":
