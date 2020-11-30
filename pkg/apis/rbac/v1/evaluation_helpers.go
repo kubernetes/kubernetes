@@ -97,11 +97,18 @@ func ResourceNameMatches(rule *rbacv1.PolicyRule, requestedName string) bool {
 }
 
 func NonResourceURLMatches(rule *rbacv1.PolicyRule, requestedURL string) bool {
+	var pathOnly string
+	if i := strings.Index(requestedURL, "?"); i >= 0 {
+		pathOnly = requestedURL[0:i]
+	} else {
+		pathOnly = requestedURL
+	}
+
 	for _, ruleURL := range rule.NonResourceURLs {
 		if ruleURL == rbacv1.NonResourceAll {
 			return true
 		}
-		if ruleURL == requestedURL {
+		if ruleURL == requestedURL || ruleURL == pathOnly {
 			return true
 		}
 		if strings.HasSuffix(ruleURL, "*") && strings.HasPrefix(requestedURL, strings.TrimRight(ruleURL, "*")) {

@@ -356,6 +356,22 @@ func TestRuleMatches(t *testing.T) {
 			},
 		},
 		{
+			name: "star nonresource, exact match other with querystring",
+			rule: rbacv1helpers.NewRule("verb1").URLs("*").RuleOrDie(),
+			requestsToExpected: map[authorizer.AttributesRecord]bool{
+				nonresourceRequest("verb1").URL("/foo?timeout=32s").New():         true,
+				nonresourceRequest("verb1").URL("/foo/bar?timeout=32s").New():     true,
+				nonresourceRequest("verb1").URL("/foo/baz?timeout=32s").New():     true,
+				nonresourceRequest("verb1").URL("/foo/bar/one?timeout=32s").New(): true,
+				nonresourceRequest("verb1").URL("/foo/baz/one?timeout=32s").New(): true,
+				nonresourceRequest("verb2").URL("/foo?timeout=32s").New():         false,
+				nonresourceRequest("verb2").URL("/foo/bar?timeout=32s").New():     false,
+				nonresourceRequest("verb2").URL("/foo/baz?timeout=32s").New():     false,
+				nonresourceRequest("verb2").URL("/foo/bar/one?timeout=32s").New(): false,
+				nonresourceRequest("verb2").URL("/foo/baz/one?timeout=32s").New(): false,
+			},
+		},
+		{
 			name: "star nonresource subpath",
 			rule: rbacv1helpers.NewRule("verb1").URLs("/foo/*").RuleOrDie(),
 			requestsToExpected: map[authorizer.AttributesRecord]bool{
@@ -372,6 +388,22 @@ func TestRuleMatches(t *testing.T) {
 			},
 		},
 		{
+			name: "star nonresource subpath with querystring",
+			rule: rbacv1helpers.NewRule("verb1").URLs("/foo/*").RuleOrDie(),
+			requestsToExpected: map[authorizer.AttributesRecord]bool{
+				nonresourceRequest("verb1").URL("/foo?timeout=32s").New():            false,
+				nonresourceRequest("verb1").URL("/foo/bar?timeout=32s").New():        true,
+				nonresourceRequest("verb1").URL("/foo/baz?timeout=32s").New():        true,
+				nonresourceRequest("verb1").URL("/foo/bar/one?timeout=32s").New():    true,
+				nonresourceRequest("verb1").URL("/foo/baz/one?timeout=32s").New():    true,
+				nonresourceRequest("verb1").URL("/notfoo?timeout=32s").New():         false,
+				nonresourceRequest("verb1").URL("/notfoo/bar?timeout=32s").New():     false,
+				nonresourceRequest("verb1").URL("/notfoo/baz?timeout=32s").New():     false,
+				nonresourceRequest("verb1").URL("/notfoo/bar/one?timeout=32s").New(): false,
+				nonresourceRequest("verb1").URL("/notfoo/baz/one?timeout=32s").New(): false,
+			},
+		},
+		{
 			name: "star verb, exact nonresource",
 			rule: rbacv1helpers.NewRule("*").URLs("/foo", "/foo/bar/one").RuleOrDie(),
 			requestsToExpected: map[authorizer.AttributesRecord]bool{
@@ -385,6 +417,22 @@ func TestRuleMatches(t *testing.T) {
 				nonresourceRequest("verb2").URL("/foo/baz").New():     false,
 				nonresourceRequest("verb2").URL("/foo/bar/one").New(): true,
 				nonresourceRequest("verb2").URL("/foo/baz/one").New(): false,
+			},
+		},
+		{
+			name: "star verb, exact nonresource with querystring",
+			rule: rbacv1helpers.NewRule("*").URLs("/foo", "/foo/bar/one").RuleOrDie(),
+			requestsToExpected: map[authorizer.AttributesRecord]bool{
+				nonresourceRequest("verb1").URL("/foo?timeout=32s").New():         true,
+				nonresourceRequest("verb1").URL("/foo/bar?timeout=32s").New():     false,
+				nonresourceRequest("verb1").URL("/foo/baz?timeout=32s").New():     false,
+				nonresourceRequest("verb1").URL("/foo/bar/one?timeout=32s").New(): true,
+				nonresourceRequest("verb1").URL("/foo/baz/one?timeout=32s").New(): false,
+				nonresourceRequest("verb2").URL("/foo?timeout=32s").New():         true,
+				nonresourceRequest("verb2").URL("/foo/bar?timeout=32s").New():     false,
+				nonresourceRequest("verb2").URL("/foo/baz?timeout=32s").New():     false,
+				nonresourceRequest("verb2").URL("/foo/bar/one?timeout=32s").New(): true,
+				nonresourceRequest("verb2").URL("/foo/baz/one?timeout=32s").New(): false,
 			},
 		},
 	}
