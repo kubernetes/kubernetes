@@ -6,10 +6,14 @@
 
 // func servicemain(argc uint32, argv **uint16)
 TEXT ·servicemain(SB),7,$0
+	MOVQ	SP, AX
+	ANDQ	$~15, SP	// alignment as per Windows requirement
+	SUBQ	$48, SP		// room for SP and 4 args as per Windows requirement
+				// plus one extra word to keep stack 16 bytes aligned
+	MOVQ	AX, 32(SP)
+
 	MOVL	CX, ·sArgc(SB)
 	MOVQ	DX, ·sArgv(SB)
-
-	SUBQ	$32, SP		// stack for the first 4 syscall params
 
 	MOVQ	·sName(SB), CX
 	MOVQ	$·servicectlhandler(SB), DX
@@ -32,7 +36,7 @@ TEXT ·servicemain(SB),7,$0
 	CALL	AX
 
 exit:
-	ADDQ	$32, SP
+	MOVQ	32(SP), SP
 	RET
 
 // I do not know why, but this seems to be the only way to call
