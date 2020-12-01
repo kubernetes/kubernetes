@@ -192,7 +192,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 		l.testCase.Class.MountOptions = dInfo.SupportedMountOption.Union(dInfo.RequiredMountOption).List()
 		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
-			PVWriteReadSingleNodeCheck(l.cs, claim, l.config.ClientNodeSelection)
+			PVWriteReadSingleNodeCheck(l.cs, f.Timeouts, claim, l.config.ClientNodeSelection)
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
@@ -469,7 +469,7 @@ func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v
 // persistent across pods.
 //
 // This is a common test that can be called from a StorageClassTest.PvCheck.
-func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClaim, node e2epod.NodeSelection) *v1.PersistentVolume {
+func PVWriteReadSingleNodeCheck(client clientset.Interface, timeouts *framework.TimeoutContext, claim *v1.PersistentVolumeClaim, node e2epod.NodeSelection) *v1.PersistentVolume {
 	ginkgo.By(fmt.Sprintf("checking the created volume is writable on node %+v", node))
 	command := "echo 'hello world' > /mnt/test/data"
 	pod := StartInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-volume-tester-writer", command, node)
@@ -477,7 +477,7 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 		// pod might be nil now.
 		StopPod(client, pod)
 	}()
-	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(client, pod.Name, pod.Namespace))
+	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(client, pod.Name, pod.Namespace, timeouts.PodStartSlow))
 	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
 	actualNodeName := runningPod.Spec.NodeName
@@ -502,7 +502,7 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 	if framework.NodeOSDistroIs("windows") {
 		command = "select-string 'hello world' /mnt/test/data"
 	}
-	RunInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-volume-tester-reader", command, e2epod.NodeSelection{Name: actualNodeName})
+	RunInPodWithVolume(client, timeouts, claim.Namespace, claim.Name, "pvc-volume-tester-reader", command, e2epod.NodeSelection{Name: actualNodeName})
 
 	return e2evolume
 }
@@ -521,7 +521,7 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 // persistent across pods and across nodes.
 //
 // This is a common test that can be called from a StorageClassTest.PvCheck.
-func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClaim, node e2epod.NodeSelection) {
+func PVMultiNodeCheck(client clientset.Interface, timeouts *framework.TimeoutContext, claim *v1.PersistentVolumeClaim, node e2epod.NodeSelection) {
 	framework.ExpectEqual(node.Name, "", "this test only works when not locked onto a single node")
 
 	var pod *v1.Pod
@@ -533,7 +533,7 @@ func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClai
 	ginkgo.By(fmt.Sprintf("checking the created volume is writable on node %+v", node))
 	command := "echo 'hello world' > /mnt/test/data"
 	pod = StartInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-writer-node1", command, node)
-	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(client, pod.Name, pod.Namespace))
+	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(client, pod.Name, pod.Namespace, timeouts.PodStartSlow))
 	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
 	actualNodeName := runningPod.Spec.NodeName
@@ -549,7 +549,7 @@ func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClai
 		command = "select-string 'hello world' /mnt/test/data"
 	}
 	pod = StartInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-reader-node2", command, secondNode)
-	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(client, pod.Name, pod.Namespace))
+	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(client, pod.Name, pod.Namespace, timeouts.PodStartSlow))
 	runningPod, err = client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
 	framework.ExpectNotEqual(runningPod.Spec.NodeName, actualNodeName, "second pod should have run on a different node")
@@ -644,10 +644,10 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 
 // RunInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
 // It starts, checks, collects output and stops it.
-func RunInPodWithVolume(c clientset.Interface, ns, claimName, podName, command string, node e2epod.NodeSelection) {
+func RunInPodWithVolume(c clientset.Interface, t *framework.TimeoutContext, ns, claimName, podName, command string, node e2epod.NodeSelection) {
 	pod := StartInPodWithVolume(c, ns, claimName, podName, command, node)
 	defer StopPod(c, pod)
-	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
+	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, pod.Namespace, t.PodStartSlow))
 }
 
 // StartInPodWithVolume starts a command in a pod with given claim mounted to /mnt directory

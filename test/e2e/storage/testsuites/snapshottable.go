@@ -156,7 +156,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 			originalMntTestData = fmt.Sprintf("hello from %s namespace", pvc.GetNamespace())
 			command := fmt.Sprintf("echo '%s' > %s", originalMntTestData, datapath)
 
-			RunInPodWithVolume(cs, pvc.Namespace, pvc.Name, "pvc-snapshottable-tester", command, config.ClientNodeSelection)
+			RunInPodWithVolume(cs, f.Timeouts, pvc.Namespace, pvc.Name, "pvc-snapshottable-tester", command, config.ClientNodeSelection)
 
 			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, f.Timeouts.ClaimProvision)
 			framework.ExpectNoError(err)
@@ -242,7 +242,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 				ginkgo.By("modifying the data in the source PVC")
 
 				command := fmt.Sprintf("echo '%s' > %s", modifiedMntTestData, datapath)
-				RunInPodWithVolume(cs, pvc.Namespace, pvc.Name, "pvc-snapshottable-data-tester", command, config.ClientNodeSelection)
+				RunInPodWithVolume(cs, f.Timeouts, pvc.Namespace, pvc.Name, "pvc-snapshottable-data-tester", command, config.ClientNodeSelection)
 
 				ginkgo.By("creating a pvc from the snapshot")
 				restoredPVC = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{

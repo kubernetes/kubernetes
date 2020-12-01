@@ -1009,7 +1009,7 @@ func formatVolume(f *framework.Framework, pod *v1.Pod) {
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating volume init pod")
 
-	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+	err = e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for volume init pod to succeed")
 
 	err = e2epod.DeletePodWithWait(f.ClientSet, pod)

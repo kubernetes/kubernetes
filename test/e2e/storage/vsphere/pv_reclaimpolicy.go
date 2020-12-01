@@ -173,7 +173,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimRetain)
 			framework.ExpectNoError(err)
 
-			writeContentToVSpherePV(c, pvc, volumeFileContent)
+			writeContentToVSpherePV(c, f.Timeouts, pvc, volumeFileContent)
 
 			ginkgo.By("Delete PVC")
 			framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
@@ -197,7 +197,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 
 			ginkgo.By("wait for the pv and pvc to bind")
 			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc))
-			verifyContentOfVSpherePV(c, pvc, volumeFileContent)
+			verifyContentOfVSpherePV(c, f.Timeouts, pvc, volumeFileContent)
 
 		})
 	})

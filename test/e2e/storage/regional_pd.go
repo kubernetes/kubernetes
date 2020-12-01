@@ -75,7 +75,7 @@ var _ = utils.SIGDescribe("Regional PD", func() {
 
 	ginkgo.Describe("RegionalPD", func() {
 		ginkgo.It("should provision storage [Slow]", func() {
-			testVolumeProvisioning(c, ns)
+			testVolumeProvisioning(c, f.Timeouts, ns)
 		})
 
 		ginkgo.It("should provision storage with delayed binding [Slow]", func() {
@@ -98,7 +98,7 @@ var _ = utils.SIGDescribe("Regional PD", func() {
 	})
 })
 
-func testVolumeProvisioning(c clientset.Interface, ns string) {
+func testVolumeProvisioning(c clientset.Interface, t *framework.TimeoutContext, ns string) {
 	cloudZones := getTwoRandomZones(c)
 
 	// This test checks that dynamic provisioning can provision a volume
@@ -117,7 +117,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			ClaimSize:    repdMinSize,
 			ExpectedSize: repdMinSize,
 			PvCheck: func(claim *v1.PersistentVolumeClaim) {
-				volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
+				volume := testsuites.PVWriteReadSingleNodeCheck(c, t, claim, e2epod.NodeSelection{})
 				gomega.Expect(volume).NotTo(gomega.BeNil())
 
 				err := checkGCEPD(volume, "pd-standard")
@@ -139,7 +139,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			ClaimSize:    repdMinSize,
 			ExpectedSize: repdMinSize,
 			PvCheck: func(claim *v1.PersistentVolumeClaim) {
-				volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
+				volume := testsuites.PVWriteReadSingleNodeCheck(c, t, claim, e2epod.NodeSelection{})
 				gomega.Expect(volume).NotTo(gomega.BeNil())
 
 				err := checkGCEPD(volume, "pd-standard")

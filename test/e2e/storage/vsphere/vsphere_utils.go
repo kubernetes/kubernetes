@@ -196,14 +196,14 @@ func getVSpherePersistentVolumeClaimSpec(namespace string, labels map[string]str
 }
 
 // function to write content to the volume backed by given PVC
-func writeContentToVSpherePV(client clientset.Interface, pvc *v1.PersistentVolumeClaim, expectedContent string) {
-	utils.RunInPodWithVolume(client, pvc.Namespace, pvc.Name, "echo "+expectedContent+" > /mnt/test/data")
+func writeContentToVSpherePV(client clientset.Interface, timeouts *framework.TimeoutContext, pvc *v1.PersistentVolumeClaim, expectedContent string) {
+	utils.RunInPodWithVolume(client, timeouts, pvc.Namespace, pvc.Name, "echo "+expectedContent+" > /mnt/test/data")
 	framework.Logf("Done with writing content to volume")
 }
 
 // function to verify content is matching on the volume backed for given PVC
-func verifyContentOfVSpherePV(client clientset.Interface, pvc *v1.PersistentVolumeClaim, expectedContent string) {
-	utils.RunInPodWithVolume(client, pvc.Namespace, pvc.Name, "grep '"+expectedContent+"' /mnt/test/data")
+func verifyContentOfVSpherePV(client clientset.Interface, timeouts *framework.TimeoutContext, pvc *v1.PersistentVolumeClaim, expectedContent string) {
+	utils.RunInPodWithVolume(client, timeouts, pvc.Namespace, pvc.Name, "grep '"+expectedContent+"' /mnt/test/data")
 	framework.Logf("Successfully verified content of the volume")
 }
 

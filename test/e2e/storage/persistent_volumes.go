@@ -49,7 +49,7 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 	// 2. create the nfs writer pod, test if the write was successful,
 	//    then delete the pod and verify that it was deleted
 	ginkgo.By("Checking pod has write access to PersistentVolume")
-	framework.ExpectNoError(createWaitAndDeletePod(c, ns, pvc, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')"))
+	framework.ExpectNoError(createWaitAndDeletePod(c, f.Timeouts, ns, pvc, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')"))
 
 	// 3. delete the PVC, wait for PV to become "Released"
 	ginkgo.By("Deleting the PVC to invoke the reclaim policy.")
@@ -80,7 +80,7 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 			return fmt.Errorf("internal: pvols map is missing volume %q", pvc.Spec.VolumeName)
 		}
 		// TODO: currently a serialized test of each PV
-		if err = createWaitAndDeletePod(c, pvcKey.Namespace, pvc, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')"); err != nil {
+		if err = createWaitAndDeletePod(c, f.Timeouts, pvcKey.Namespace, pvc, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')"); err != nil {
 			return err
 		}
 	}
@@ -285,7 +285,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
 				pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
-				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns))
+				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, ns, f.Timeouts.PodStart))
 
 				ginkgo.By("Deleting the claim")
 				framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
@@ -303,7 +303,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				pod = e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
 				pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
-				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns))
+				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, ns, f.Timeouts.PodStart))
 
 				framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
 				framework.Logf("Pod exited without failure; the volume has been recycled.")
@@ -437,7 +437,7 @@ func makeStatefulSetWithPVCs(ns, cmd string, mounts []v1.VolumeMount, claims []v
 // createWaitAndDeletePod creates the test pod, wait for (hopefully) success, and then delete the pod.
 // Note: need named return value so that the err assignment in the defer sets the returned error.
 //       Has been shown to be necessary using Go 1.7.
-func createWaitAndDeletePod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, command string) (err error) {
+func createWaitAndDeletePod(c clientset.Interface, t *framework.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, command string) (err error) {
 	framework.Logf("Creating nfs test pod")
 	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, command)
 	runPod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
@@ -451,7 +451,7 @@ func createWaitAndDeletePod(c clientset.Interface, ns string, pvc *v1.Persistent
 		}
 	}()
 
-	err = testPodSuccessOrFail(c, ns, runPod)
+	err = testPodSuccessOrFail(c, t, ns, runPod)
 	if err != nil {
 		return fmt.Errorf("pod %q did not exit with Success: %v", runPod.Name, err)
 	}
@@ -459,9 +459,9 @@ func createWaitAndDeletePod(c clientset.Interface, ns string, pvc *v1.Persistent
 }
 
 // testPodSuccessOrFail tests whether the pod's exit code is zero.
-func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
+func testPodSuccessOrFail(c clientset.Interface, t *framework.TimeoutContext, ns string, pod *v1.Pod) error {
 	framework.Logf("Pod should terminate with exitcode 0 (success)")
-	if err := e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns); err != nil {
+	if err := e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, ns, t.PodStart); err != nil {
 		return fmt.Errorf("pod %q failed to reach Success: %v", pod.Name, err)
 	}
 	framework.Logf("Pod %v succeeded ", pod.Name)

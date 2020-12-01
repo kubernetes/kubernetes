@@ -822,7 +822,7 @@ func (f *Framework) MatchContainerOutput(
 	}()
 
 	// Wait for client pod to complete.
-	podErr := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, createdPod.Name, ns)
+	podErr := e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, createdPod.Name, ns, f.Timeouts.PodStart)
 
 	// Grab its logs.  Get host first.
 	podStatus, err := podClient.Get(context.TODO(), createdPod.Name, metav1.GetOptions{})

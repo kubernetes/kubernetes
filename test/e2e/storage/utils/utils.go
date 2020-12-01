@@ -446,7 +446,7 @@ func TestVolumeUnmapsFromForceDeletedPod(c clientset.Interface, f *framework.Fra
 }
 
 // RunInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
-func RunInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
+func RunInPodWithVolume(c clientset.Interface, t *framework.TimeoutContext, ns, claimName, command string) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -489,7 +489,7 @@ func RunInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 	defer func() {
 		e2epod.DeletePodOrFail(c, ns, pod.Name)
 	}()
-	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
+	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, pod.Namespace, t.PodStartSlow))
 }
 
 // StartExternalProvisioner create external provisioner pod
