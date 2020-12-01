@@ -380,7 +380,7 @@ func isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersio
 
 	// Check if there are any plugins/options which needs to be removed or is a new default
 	for _, dep := range deprecated {
-		if dep.Severity == "removed" || dep.Severity == "newDefault" {
+		if dep.Severity == "removed" || dep.Severity == "newdefault" {
 			isMigrationRequired = true
 		}
 	}
