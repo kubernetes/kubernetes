@@ -37,7 +37,6 @@ filegroup(
         "//pkg/apis/batch/install:all-srcs",
         "//pkg/apis/batch/v1:all-srcs",
         "//pkg/apis/batch/v1beta1:all-srcs",
-        "//pkg/apis/batch/v2alpha1:all-srcs",
         "//pkg/apis/batch/validation:all-srcs",
     ],
     tags = ["automanaged"],
