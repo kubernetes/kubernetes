@@ -14629,6 +14629,11 @@ func TestValidateNamespace(t *testing.T) {
 				Finalizers: []core.FinalizerName{"example.com/something", "example.com/other"},
 			},
 		},
+		// The following success case, when validated, confirms that GeneratedName implementations result in generated names that are
+		// additionally added as kubernetes.io/metadata.namespace labels
+		{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "abc"},
+		},
 	}
 	for _, successCase := range successCases {
 		if errs := ValidateNamespace(&successCase); len(errs) != 0 {
@@ -14657,6 +14662,41 @@ func TestValidateNamespace(t *testing.T) {
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
+	}
+	labelsTestCases := map[string]struct {
+		ns          *core.Namespace
+		expectError bool
+	}{
+		"Valid: namespace name label exists": {
+			ns: &core.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc-xyz", Labels: map[string]string{"kubernetes.io/metadata.name": "abc-xyz"}},
+			},
+			expectError: false,
+		},
+		"Invalid: namespace name label does not exist": {
+			ns: &core.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc-xyz"},
+			},
+			expectError: true,
+		},
+		"Invalid: incorrect namespace name label exists": {
+			ns: &core.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc-xyz", Labels: map[string]string{"kubernetes.io/metadata.name": "i-be-wrong"}},
+			},
+			expectError: true,
+		},
+	}
+	for tcName, tc := range labelsTestCases {
+		t.Run(tcName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NamespaceDefaultLabelName, true)()
+			errs := ValidateNamespace(tc.ns)
+			if tc.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !tc.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
 	}
 }
 

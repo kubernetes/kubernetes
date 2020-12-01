@@ -5656,6 +5656,11 @@ func ValidateNamespace(namespace *core.Namespace) field.ErrorList {
 	for i := range namespace.Spec.Finalizers {
 		allErrs = append(allErrs, validateFinalizerName(string(namespace.Spec.Finalizers[i]), field.NewPath("spec", "finalizers"))...)
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
+		if namespace.Labels[v1.LabelMetadataName] != namespace.Name {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "labels").Key(v1.LabelMetadataName), namespace.Labels[v1.LabelMetadataName], fmt.Sprintf("must be %s", namespace.Name)))
+		}
+	}
 	return allErrs
 }
 

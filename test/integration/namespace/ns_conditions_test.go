@@ -19,10 +19,10 @@ package namespace
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"testing"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -112,6 +112,35 @@ func TestNamespaceCondition(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestNamespaceLabels tests for default labels added in https://github.com/kubernetes/kubernetes/pull/96968
+func TestNamespaceLabels(t *testing.T) {
+	closeFn, _, _, kubeClient, _ := namespaceLifecycleSetup(t)
+	defer closeFn()
+	nsName := "test-namespace-labels-generated"
+	// Create a new namespace w/ no name
+	ns, err := kubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: nsName,
+		},
+	}, metav1.CreateOptions{})
+
+	if _, ok := ns.ObjectMeta.Labels[corev1.LabelMetadataName]; !ok {
+		t.Fatal(fmt.Errorf("missing metadata name label from namespace (initial create) "))
+	}
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if nsList, err := kubeClient.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{}); err != nil {
+		for _, ns := range nsList.Items {
+			if _, ok := ns.ObjectMeta.Labels[corev1.LabelMetadataName]; !ok {
+				t.Fatal(fmt.Errorf("missing metadata name label from namespace (post create)"))
+			}
+		}
 	}
 }
 

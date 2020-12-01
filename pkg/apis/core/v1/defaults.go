@@ -323,6 +323,28 @@ func SetDefaults_HTTPGetAction(obj *v1.HTTPGetAction) {
 		obj.Scheme = v1.URISchemeHTTP
 	}
 }
+
+// SetDefaults_Namespace adds a default label for all namespaces
+func SetDefaults_Namespace(obj *v1.Namespace) {
+	// TODO, remove this in 1.22
+	// we cant SetDefaults for nameless namespaces (generateName),
+	// we don't need to overwrite the pre-existing labelMetadataName
+	if len(obj.Name) > 0 && obj.Labels[v1.LabelMetadataName] != obj.Name {
+		if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
+		}
+		if !utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
+			return
+		}
+		if obj.Labels == nil {
+			obj.Labels = map[string]string{}
+		}
+		// Default label that matches the name of the namespace, for selecting w/o apriori knowledge of labels.
+		// Update to this label is not allowed. Hence, the value of the label is intentionally overridden here
+		// with the namespace name.
+		obj.Labels[v1.LabelMetadataName] = obj.Name
+	}
+}
+
 func SetDefaults_NamespaceStatus(obj *v1.NamespaceStatus) {
 	if obj.Phase == "" {
 		obj.Phase = v1.NamespaceActive
