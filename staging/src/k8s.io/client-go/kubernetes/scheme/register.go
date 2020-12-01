@@ -34,7 +34,6 @@ import (
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
@@ -88,7 +87,6 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	autoscalingv2beta2.AddToScheme,
 	batchv1.AddToScheme,
 	batchv1beta1.AddToScheme,
-	batchv2alpha1.AddToScheme,
 	certificatesv1.AddToScheme,
 	certificatesv1beta1.AddToScheme,
 	coordinationv1beta1.AddToScheme,
