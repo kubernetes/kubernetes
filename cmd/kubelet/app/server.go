@@ -263,8 +263,14 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// set up signal context here in order to be reused by kubelet and docker shim
 			ctx := genericapiserver.SetupSignalContext()
 
-			// run the kubelet
+			// make kubelet configuration safe for logging
+			for k := range kubeletServer.KubeletConfiguration.StaticPodURLHeader {
+				kubeletServer.KubeletConfiguration.StaticPodURLHeader[k] = []string{"<redacted>"}
+			}
+
 			klog.V(5).Infof("KubeletConfiguration: %#v", kubeletServer.KubeletConfiguration)
+
+			// run the kubelet
 			if err := Run(ctx, kubeletServer, kubeletDeps, utilfeature.DefaultFeatureGate); err != nil {
 				klog.Fatal(err)
 			}
