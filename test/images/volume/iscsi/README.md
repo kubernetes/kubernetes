@@ -9,6 +9,3 @@ Inspired by https://github.com/rvykydal/dockerfile-iscsid
 * The container needs to run with docker --privileged
 
 block.tar.gz is a small ext2 filesystem created by `create_block.sh` (run as root!)
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/volumes-tester/iscsi/README.md?pixel)]()

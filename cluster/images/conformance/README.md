@@ -29,7 +29,7 @@ $ make push VERSION={target_version} ARCH=s390x
 # ---> k8s.gcr.io/conformance-s390x:VERSION
 ```
 
-If you don't want to push the images, run `make` or `make build` instead
+If you don't want to push the images, run `make` or `make build` instead.
 
 
 #### How to run tests
@@ -37,5 +37,3 @@ If you don't want to push the images, run `make` or `make build` instead
 ```
 kubectl create -f conformance-e2e.yaml
 ```
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/images/conformance/README.md?pixel)]()

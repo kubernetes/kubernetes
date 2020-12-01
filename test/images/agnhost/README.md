@@ -304,7 +304,6 @@ kubectl run logs-generator \
   -- logs-generator -t 10 -d 1s
 ```
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/logs-generator/README.md?pixel)]()
 
 
 ### mounttest
@@ -373,7 +372,6 @@ HTTP server:
         -d '{"LocalAddr":"127.0.0.1:9999"}'
 ```
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/net/README.md?pixel)]()
 
 ### netexec
 
@@ -571,7 +569,6 @@ Usage:
     kubectl exec test-agnhost -- /agnhost porter
 ```
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/porter/README.md?pixel)]()
 
 
 ### resource-consumer-controller
@@ -613,9 +610,6 @@ Usage:
     kubectl exec test-agnhost -- /agnhost serve-hostname [--tcp] [--udp] [--http] [--close] [--port <port>]
 ```
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/for-demos/serve_hostname/README.md?pixel)]()
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/serve_hostname/README.md?pixel)]()
 
 
 ### test-webserver

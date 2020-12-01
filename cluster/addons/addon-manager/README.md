@@ -56,4 +56,4 @@ $ make push ARCH=s390x
 # ---> staging-k8s.gcr.io/kube-addon-manager-s390x:VERSION
 ```
 
-If you don't want to push the images, run `make` or `make build` instead
+If you don't want to push the images, run `make` or `make build` instead.
