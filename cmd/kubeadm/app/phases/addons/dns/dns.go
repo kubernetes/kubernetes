@@ -285,12 +285,10 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 			// to ignore preflight check errors.
 			canMigrateCorefile = false
 			klog.Warningf("the CoreDNS Configuration was not migrated: %v. The existing CoreDNS Corefile configuration has been retained.", err)
-			if err := apiclient.CreateOrRetainConfigMap(client, coreDNSConfigMap, kubeadmconstants.CoreDNSConfigMap); err != nil {
-				return err
-			}
 		}
-	} else {
-		if err := apiclient.CreateOrUpdateConfigMap(client, coreDNSConfigMap); err != nil {
+	}  
+	if !canMigrateCorefile || !corefileMigrationRequired {
+		if err := apiclient.CreateOrRetainConfigMap(client, coreDNSConfigMap, kubeadmconstants.CoreDNSConfigMap); err != nil {
 			return err
 		}
 	}
