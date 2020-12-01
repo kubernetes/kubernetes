@@ -383,11 +383,11 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 	// it's expected for the caller to do it.) Technically, the first few delete
 	// attempts may fail, as the volume is still attached to a node because
 	// kubelet is slowly cleaning up the previous pod, however it should succeed
-	// in a couple of minutes. Wait 20 minutes to recover from random cloud
-	// hiccups.
+	// in a couple of minutes. Wait 20 minutes (or whatever custom value is specified in
+	// t.Timeouts.PVDeleteSlow) to recover from random cloud hiccups.
 	if pv != nil && pv.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
 		ginkgo.By(fmt.Sprintf("deleting the claim's PV %q", pv.Name))
-		framework.ExpectNoError(e2epv.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, 20*time.Minute))
+		framework.ExpectNoError(e2epv.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, t.Timeouts.PVDeleteSlow))
 	}
 
 	return pv
