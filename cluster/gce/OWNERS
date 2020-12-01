@@ -10,6 +10,7 @@ reviewers:
   - jingax10
   - yujuhong
   - mtaufen
+  - jeremyje
   - sig-scalability-reviewers
 approvers:
   - bowei
@@ -21,6 +22,7 @@ approvers:
   - jingax10
   - yujuhong
   - mtaufen
+  - jeremyje
   - sig-scalability-approvers
 emeritus_approvers:
   - jszczepkowski
