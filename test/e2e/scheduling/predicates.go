@@ -657,9 +657,14 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		Release: v1.16
 		Testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
 		Description: Pods with the same HostPort value MUST be able to be scheduled to the same node
-		if the HostIP or Protocol is different.
+		if the HostIP or Protocol is different. This test is marked LinuxOnly since hostNetwork is not supported on
+		Windows.
 	*/
-	framework.ConformanceIt("validates that there is no conflict between pods with same hostPort but different hostIP and protocol", func() {
+
+	// TODO: Add a new e2e test to scheduler which validates if hostPort is working and move this test to e2e/network
+	//		 so that appropriate team owns the e2e.
+	//		 xref: https://github.com/kubernetes/kubernetes/issues/98075.
+	framework.ConformanceIt("validates that there is no conflict between pods with same hostPort but different hostIP and protocol [LinuxOnly]", func() {
 
 		nodeName := GetNodeThatCanRunPod(f)
 		localhost := "127.0.0.1"
