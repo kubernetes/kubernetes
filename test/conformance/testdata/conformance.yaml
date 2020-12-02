@@ -2033,9 +2033,10 @@
 - testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that there is
     no conflict between pods with same hostPort but different hostIP and protocol
-    [Conformance]'
+    [LinuxOnly] [Conformance]'
   description: Pods with the same HostPort value MUST be able to be scheduled to the
-    same node if the HostIP or Protocol is different.
+    same node if the HostIP or Protocol is different. This test is marked LinuxOnly
+    since hostNetwork is not supported on Windows.
   release: v1.16
   file: test/e2e/scheduling/predicates.go
 - testname: Pod preemption verification
