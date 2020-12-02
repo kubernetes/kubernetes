@@ -176,6 +176,9 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.DurationVar(&s.StorageConfig.CountMetricPollPeriod, "etcd-count-metric-poll-period", s.StorageConfig.CountMetricPollPeriod, ""+
 		"Frequency of polling etcd for number of resources per type. 0 disables the metric collection.")
+
+	fs.Int64Var(&s.StorageConfig.LeaseReuseDurationSeconds, "lease-reuse-duration-seconds", s.StorageConfig.LeaseReuseDurationSeconds,
+		"The time in seconds that each lease is reused. A lower value could avoid large number of objects reusing the same lease. Notice that a too small value may cause performance problems at storage layer.")
 }
 
 func (s *EtcdOptions) ApplyTo(c *server.Config) error {

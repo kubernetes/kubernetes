@@ -28,7 +28,8 @@ const (
 	StorageTypeUnset = ""
 	StorageTypeETCD3 = "etcd3"
 
-	DefaultCompactInterval = 5 * time.Minute
+	DefaultCompactInterval           = 5 * time.Minute
+	DefaultLeaseReuseDurationSeconds = 60
 )
 
 // TransportConfig holds all connection related info,  i.e. equal TransportConfig means equal servers we talk to.
@@ -71,13 +72,16 @@ type Config struct {
 	CompactionInterval time.Duration
 	// CountMetricPollPeriod specifies how often should count metric be updated
 	CountMetricPollPeriod time.Duration
+	// LeaseReuseDurationSeconds specifies time in seconds that each lease is reused. See pkg/storage/etcd3/lease_manager.go
+	LeaseReuseDurationSeconds int64
 }
 
 func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 	return &Config{
-		Paging:             true,
-		Prefix:             prefix,
-		Codec:              codec,
-		CompactionInterval: DefaultCompactInterval,
+		Paging:                    true,
+		Prefix:                    prefix,
+		Codec:                     codec,
+		CompactionInterval:        DefaultCompactInterval,
+		LeaseReuseDurationSeconds: DefaultLeaseReuseDurationSeconds,
 	}
 }
