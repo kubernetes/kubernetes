@@ -1840,6 +1840,7 @@ k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing
 k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise
 k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise/lockingpromise
 k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset
+k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing
 k8s.io/apiserver/pkg/util/flowcontrol/format
 k8s.io/apiserver/pkg/util/flowcontrol/metrics
 k8s.io/apiserver/pkg/util/flushwriter
