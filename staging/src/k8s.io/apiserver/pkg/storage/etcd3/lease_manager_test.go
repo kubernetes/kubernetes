@@ -17,6 +17,7 @@ limitations under the License.
 package etcd3
 
 import (
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"testing"
 )
 
@@ -34,7 +35,7 @@ func TestGetReuseDurationSeconds(t *testing.T) {
 			duration: 50,
 		},
 	}
-	lm := newDefaultLeaseManager(nil)
+	lm := newDefaultLeaseManager(nil, storagebackend.DefaultLeaseReuseDurationSeconds)
 	for i := 0; i < len(testCases); i++ {
 		dur := lm.getReuseDurationSecondsLocked(testCases[i].ttl)
 		if dur != testCases[i].duration {

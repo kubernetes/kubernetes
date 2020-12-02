@@ -27,6 +27,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/storage/cacher:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd3:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
