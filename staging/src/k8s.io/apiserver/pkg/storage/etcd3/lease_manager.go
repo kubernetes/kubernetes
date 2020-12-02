@@ -42,8 +42,8 @@ type leaseManager struct {
 }
 
 // newDefaultLeaseManager creates a new lease manager using default setting.
-func newDefaultLeaseManager(client *clientv3.Client) *leaseManager {
-	return newLeaseManager(client, 60, 0.05)
+func newDefaultLeaseManager(client *clientv3.Client, leaseReuseDurationSeconds int64) *leaseManager {
+	return newLeaseManager(client, leaseReuseDurationSeconds, 0.05)
 }
 
 // newLeaseManager creates a new lease manager with the number of buffered
@@ -55,14 +55,6 @@ func newLeaseManager(client *clientv3.Client, leaseReuseDurationSeconds int64, l
 		leaseReuseDurationSeconds: leaseReuseDurationSeconds,
 		leaseReuseDurationPercent: leaseReuseDurationPercent,
 	}
-}
-
-// setLeaseReuseDurationSeconds is used for testing purpose. It is used to
-// reduce the extra lease duration to avoid unnecessary timeout in testing.
-func (l *leaseManager) setLeaseReuseDurationSeconds(duration int64) {
-	l.leaseMu.Lock()
-	defer l.leaseMu.Unlock()
-	l.leaseReuseDurationSeconds = duration
 }
 
 // GetLease returns a lease based on requested ttl: if the cached previous
