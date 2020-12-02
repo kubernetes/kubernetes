@@ -233,6 +233,17 @@ rules:
       branch: master
     - repository: client-go
       branch: master
+  - source:
+      branch: release-1.20
+      dir: staging/src/k8s.io/component-helpers
+    name: release-1.20
+    dependencies:
+    - repository: apimachinery
+      branch: release-1.20
+    - repository: api
+      branch: release-1.20
+    - repository: client-go
+      branch: release-1.20
 
 - destination: apiserver
   library: true
