@@ -28,12 +28,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	apierrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -121,6 +121,13 @@ type configController struct {
 	// name to the state for that level.  Every name referenced from a
 	// member of `flowSchemas` has an entry here.
 	priorityLevelStates map[string]*priorityLevelState
+
+	tenMostRecentUpdates []updateResult
+}
+
+type updateResult struct {
+	timeUpdated  time.Time
+	updatedItems sets.String
 }
 
 // priorityLevelState holds the state specific to a priority level.
@@ -294,7 +301,10 @@ func (cfgCtlr *configController) syncOne() bool {
 		klog.Errorf("Unable to list FlowSchema objects: %s", err.Error())
 		return false
 	}
-	err = cfgCtlr.digestConfigObjects(newPLs, newFSs)
+	suggestedDelay, err := cfgCtlr.digestConfigObjects(newPLs, newFSs)
+	if suggestedDelay > 0 {
+		cfgCtlr.configQueue.AddAfter(0, suggestedDelay)
+	}
 	if err == nil {
 		return true
 	}
@@ -339,10 +349,24 @@ type fsStatusUpdate struct {
 
 // digestConfigObjects is given all the API objects that configure
 // cfgCtlr and writes its consequent new configState.
-func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.PriorityLevelConfiguration, newFSs []*flowcontrol.FlowSchema) error {
+func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.PriorityLevelConfiguration, newFSs []*flowcontrol.FlowSchema) (time.Duration, error) {
 	fsStatusUpdates := cfgCtlr.lockAndDigestConfigObjects(newPLs, newFSs)
 	var errs []error
+	currResult := updateResult{
+		timeUpdated:  time.Now(),
+		updatedItems: sets.String{},
+	}
+	suggestedDelay := 0 * time.Minute
 	for _, fsu := range fsStatusUpdates {
+		// if we should skip this name, indicate we will need a delay, but continue with other entries
+		if cfgCtlr.shouldDelayUpdate(fsu.flowSchema.Name) {
+			suggestedDelay = 1 * time.Minute // our memory is only one minute long.
+			continue
+		}
+
+		// if we are going to issue an update, be sure we track every name we update so we know if we update it too often.
+		currResult.updatedItems.Insert(fsu.flowSchema.Name)
+
 		enc, err := json.Marshal(fsu.condition)
 		if err != nil {
 			// should never happen because these conditions are created here and well formed
@@ -354,10 +378,39 @@ func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.Prior
 			errs = append(errs, errors.Wrap(err, fmt.Sprintf("failed to set a status.condition for FlowSchema %s", fsu.flowSchema.Name)))
 		}
 	}
+	cfgCtlr.addUpdateResult(currResult)
+
 	if len(errs) == 0 {
-		return nil
+		return suggestedDelay, nil
 	}
-	return apierrors.NewAggregate(errs)
+	return suggestedDelay, apierrors.NewAggregate(errs)
+}
+
+// shouldDelayUpdate checks to see if a flowschema has been updated too often and returns true if a delay is needed.
+func (cfgCtlr *configController) shouldDelayUpdate(flowSchemaName string) bool {
+	numUpdatesInPastMinute := 0
+	oneMinuteAgo := time.Now().Add(-1 * time.Minute)
+	for _, update := range cfgCtlr.tenMostRecentUpdates {
+		if update.timeUpdated.After(oneMinuteAgo) {
+			continue
+		}
+		if update.updatedItems.Has(flowSchemaName) {
+			numUpdatesInPastMinute++
+		}
+	}
+	if numUpdatesInPastMinute > 5 {
+		return true
+	}
+	return false
+}
+
+// addUpdateResult adds the result and keeps the only the most recent 10. It isn't a ring buffer because I'm lazy and
+// this is small and rate limited
+func (cfgCtlr *configController) addUpdateResult(result updateResult) {
+	cfgCtlr.tenMostRecentUpdates = append([]updateResult{result}, cfgCtlr.tenMostRecentUpdates...)
+	if len(cfgCtlr.tenMostRecentUpdates) > 10 {
+		cfgCtlr.tenMostRecentUpdates = cfgCtlr.tenMostRecentUpdates[:10]
+	}
 }
 
 func (cfgCtlr *configController) lockAndDigestConfigObjects(newPLs []*flowcontrol.PriorityLevelConfiguration, newFSs []*flowcontrol.FlowSchema) []fsStatusUpdate {
