@@ -75,6 +75,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
@@ -263,12 +264,8 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// set up signal context here in order to be reused by kubelet and docker shim
 			ctx := genericapiserver.SetupSignalContext()
 
-			// make kubelet configuration safe for logging
-			for k := range kubeletServer.KubeletConfiguration.StaticPodURLHeader {
-				kubeletServer.KubeletConfiguration.StaticPodURLHeader[k] = []string{"<redacted>"}
-			}
-
-			klog.V(5).Infof("KubeletConfiguration: %#v", kubeletServer.KubeletConfiguration)
+			// log the kubelet's config for inspection
+			logConfig(kubeletServer.KubeletConfiguration)
 
 			// run the kubelet
 			if err := Run(ctx, kubeletServer, kubeletDeps, utilfeature.DefaultFeatureGate); err != nil {
@@ -305,6 +302,15 @@ func newFlagSetWithGlobals() *pflag.FlagSet {
 	// explicitly add flags from libs that register global flags
 	options.AddGlobalFlags(fs)
 	return fs
+}
+
+// logConfig logs the kubelet's configuration.
+// Special care is taken to avoid logging sensitive parts of the configuration.
+func logConfig(config kubeletconfig.KubeletConfiguration) {
+	for k := range config.StaticPodURLHeader {
+		config.StaticPodURLHeader[k] = []string{"<redacted>"}
+	}
+	klog.V(5).Infof("KubeletConfiguration: %#v", config)
 }
 
 // newFakeFlagSet constructs a pflag.FlagSet with the same flags as fs, but where
