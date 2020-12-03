@@ -28,6 +28,7 @@ import (
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
@@ -251,12 +252,17 @@ func TestConfigConsumer(t *testing.T) {
 				queues:          map[string]*ctlrTestQueueSet{},
 			}
 			ctlr := newTestableController(TestableConfig{
-				InformerFactory:        informerFactory,
-				FlowcontrolClient:      flowcontrolClient,
-				ServerConcurrencyLimit: 100,
-				RequestWaitLimit:       time.Minute,
-				ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
-				QueueSetFactory:        cts,
+				Name:                       "Controller",
+				Clock:                      clock.RealClock{},
+				FinishHandlingNotification: enqueueEverything,
+				AsFieldManager:             ConfigConsumerAsFieldManager,
+				FoundToDangling:            func(found bool) bool { return !found },
+				InformerFactory:            informerFactory,
+				FlowcontrolClient:          flowcontrolClient,
+				ServerConcurrencyLimit:     100,         // server concurrency limit
+				RequestWaitLimit:           time.Minute, // request wait limit
+				ObsPairGenerator:           metrics.PriorityLevelConcurrencyObserverPairGenerator,
+				QueueSetFactory:            cts,
 			})
 			cts.cfgCtlr = ctlr
 			persistingPLNames := sets.NewString()

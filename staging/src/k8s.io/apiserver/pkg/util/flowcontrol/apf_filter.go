@@ -28,6 +28,7 @@ import (
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	kubeinformers "k8s.io/client-go/informers"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
@@ -78,18 +79,59 @@ func New(
 	requestWaitLimit time.Duration,
 ) Interface {
 	grc := counter.NoOp{}
+	clk := clock.RealClock{}
 	return NewTestable(TestableConfig{
-		InformerFactory:        informerFactory,
-		FlowcontrolClient:      flowcontrolClient,
-		ServerConcurrencyLimit: serverConcurrencyLimit,
-		RequestWaitLimit:       requestWaitLimit,
-		ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		QueueSetFactory:        fqs.NewQueueSetFactory(&clock.RealClock{}, grc),
+		Name:                       "Controller",
+		Clock:                      clk,
+		FinishHandlingNotification: enqueueEverything,
+		AsFieldManager:             ConfigConsumerAsFieldManager,
+		FoundToDangling:            func(found bool) bool { return !found },
+		InformerFactory:            informerFactory,
+		FlowcontrolClient:          flowcontrolClient,
+		ServerConcurrencyLimit:     serverConcurrencyLimit,
+		RequestWaitLimit:           requestWaitLimit,
+		ObsPairGenerator:           metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		QueueSetFactory:            fqs.NewQueueSetFactory(clk, grc),
 	})
+}
+
+// TestableInterface adds the methods used in integration tests
+type TestableInterface interface {
+	Interface
+
+	// WaitForCacheSync waits for the caches of the informers of the
+	// implementation to sync.
+	WaitForCacheSync(stopCh <-chan struct{}) bool
+
+	// SyncOne attempts to sync all the API Priority and Fairness
+	// config objects.  Writes to FlowSchema objects are recorded in
+	// the given map, with an entry mapping
+	// `cache.MetaNamespaceKeyFunc(fs)` to `fs.ResourceVersion`.
+	SyncOne(flowSchemaRVs map[string]string) SyncReport
 }
 
 // TestableConfig carries the parameters to an implementation that is testable
 type TestableConfig struct {
+	// Name of the controller
+	Name string
+
+	// Clock to use in timing deliberate delays
+	Clock clock.PassiveClock
+
+	// FinishHandlingNotification is what to do when notified by an
+	// informer about a config object.  In the case of an update
+	// notification, the object appearing here is the new one.  In the
+	// case of a delete, it might be a `DeletedFinalStateUnknown`.
+	FinishHandlingNotification func(wq workqueue.RateLimitingInterface, obj interface{})
+
+	// AsFieldManager is the string to use in the metadata for server-side apply
+	AsFieldManager string
+
+	// FoundToDangling maps the boolean indicating whether a
+	// FlowSchema's referenced PLC exists to the boolean indicating
+	// that FlowSchema's status should indicate a dangling reference
+	FoundToDangling func(bool) bool
+
 	// InformerFactory to use in building the controller
 	InformerFactory kubeinformers.SharedInformerFactory
 
@@ -110,7 +152,7 @@ type TestableConfig struct {
 }
 
 // NewTestable is extra flexible to facilitate testing
-func NewTestable(config TestableConfig) Interface {
+func NewTestable(config TestableConfig) TestableInterface {
 	return newTestableController(config)
 }
 
