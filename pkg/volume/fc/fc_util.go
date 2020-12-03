@@ -111,6 +111,16 @@ func findDiskWWIDs(wwid string, io ioHandler, deviceUtil volumeutil.DeviceUtil) 
 	return "", ""
 }
 
+// Flushes any outstanding I/O to the device
+func flushDevice(deviceName string, exec utilexec.Interface) {
+	out, err := exec.Command("blockdev", "--flushbufs", deviceName).CombinedOutput()
+	if err != nil {
+		// Ignore the error and continue deleting the device. There is will be no retry on error.
+		klog.Warningf("Failed to flush device %s: %s\n%s", deviceName, err, string(out))
+	}
+	klog.V(4).Infof("Flushed device %s", deviceName)
+}
+
 // Removes a scsi device based upon /dev/sdX name
 func removeFromScsiSubsystem(deviceName string, io ioHandler) {
 	fileName := "/sys/block/" + deviceName + "/device/delete"
@@ -294,7 +304,7 @@ func (util *fcUtil) DetachDisk(c fcDiskUnmounter, devicePath string) error {
 	klog.V(4).Infof("fc: DetachDisk devicePath: %v, dstPath: %v, devices: %v", devicePath, dstPath, devices)
 	var lastErr error
 	for _, device := range devices {
-		err := util.detachFCDisk(c.io, device)
+		err := util.detachFCDisk(c.io, c.exec, device)
 		if err != nil {
 			klog.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
 			lastErr = fmt.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
@@ -308,11 +318,12 @@ func (util *fcUtil) DetachDisk(c fcDiskUnmounter, devicePath string) error {
 }
 
 // detachFCDisk removes scsi device file such as /dev/sdX from the node.
-func (util *fcUtil) detachFCDisk(io ioHandler, devicePath string) error {
+func (util *fcUtil) detachFCDisk(io ioHandler, exec utilexec.Interface, devicePath string) error {
 	// Remove scsi device from the node.
 	if !strings.HasPrefix(devicePath, "/dev/") {
 		return fmt.Errorf("fc detach disk: invalid device name: %s", devicePath)
 	}
+	flushDevice(devicePath, exec)
 	arr := strings.Split(devicePath, "/")
 	dev := arr[len(arr)-1]
 	removeFromScsiSubsystem(dev, io)
@@ -393,7 +404,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	}
 	var lastErr error
 	for _, device := range devices {
-		err = util.detachFCDisk(c.io, device)
+		err = util.detachFCDisk(c.io, c.exec, device)
 		if err != nil {
 			klog.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
 			lastErr = fmt.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
