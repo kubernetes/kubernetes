@@ -823,7 +823,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HPAContainerMetrics:                            {Default: false, PreRelease: featuregate.Alpha},
 	RootCAConfigMap:                                {Default: true, PreRelease: featuregate.Beta},
 	SizeMemoryBackedVolumes:                        {Default: false, PreRelease: featuregate.Alpha},
-	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default in v1.21 and remove in v1.22
+	ExecProbeTimeout:                               {Default: false, PreRelease: featuregate.Alpha}, // lock to default in v1.21 and remove in v1.22
 	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
 	GracefulNodeShutdown:                           {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLBNodePortControl:                       {Default: false, PreRelease: featuregate.Alpha},
