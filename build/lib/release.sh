@@ -393,6 +393,7 @@ EOF
           "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
         fi
         "${DOCKER[@]}" save -o "${binary_file_path}.tar" "${docker_image_tag}" "${release_docker_image_tag}"
+        echo "${release_docker_image_tag}" > "${binary_file_path}.docker_image_name"
         echo "${docker_tag}" > "${binary_file_path}.docker_tag"
         rm -rf "${docker_build_path}"
         ln "${binary_file_path}.tar" "${images_dir}/"
