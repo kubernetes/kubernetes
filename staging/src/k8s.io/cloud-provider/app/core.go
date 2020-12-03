@@ -104,8 +104,8 @@ func startServiceController(ctx *config.CompletedConfig, cloud cloudprovider.Int
 }
 
 func startRouteController(ctx *config.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
-	if !ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs || !ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes {
-		klog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs, ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
+	if !ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes {
+		klog.Infof("Will not configure cloud provider routes, --configure-cloud-routes: %v", ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
 		return nil, false, nil
 	}
 
