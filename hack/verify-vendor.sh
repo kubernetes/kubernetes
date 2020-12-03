@@ -26,8 +26,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # create a nice clean place to put our new vendor tree
-mkdir -p "${KUBE_ROOT}/_tmp"
-_tmpdir="$(mktemp -d "${KUBE_ROOT}/_tmp/kube-vendor.XXXXXX")"
+_tmpdir="$(mktemp -d "${KUBE_ROOT}/kube-vendor.XXXXXX")"
 
 if [[ -z ${KEEP_TMP:-} ]]; then
     KEEP_TMP=false
