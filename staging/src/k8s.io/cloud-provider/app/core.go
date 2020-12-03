@@ -112,7 +112,7 @@ func startRouteController(ctx *config.CompletedConfig, cloud cloudprovider.Inter
 	// If CIDRs should be allocated for pods and set on the CloudProvider, then start the route controller
 	routes, ok := cloud.Routes()
 	if !ok {
-		klog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
+		klog.Warning("--configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		return nil, false, nil
 	}
 
