@@ -266,7 +266,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// make the kubelet's config safe for logging
 			config := kubeletServer.KubeletConfiguration.DeepCopy()
 			for k := range config.StaticPodURLHeader {
-				config.StaticPodURLHeader[k] = []string{"<redacted>"}
+				config.StaticPodURLHeader[k] = []string{"<masked>"}
 			}
 			// log the kubelet's config for inspection
 			klog.V(5).Infof("KubeletConfiguration: %#v", config)
