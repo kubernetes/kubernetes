@@ -327,5 +327,7 @@ func intPtr(x int) *int {
 }
 
 func fakeCloudProviderFactory(io.Reader) (cloudprovider.Interface, error) {
-	return &fake.Cloud{}, nil
+	return &fake.Cloud{
+		DisableRoutes: true, // disable routes for server tests, otherwise --cluster-cidr is required
+	}, nil
 }
