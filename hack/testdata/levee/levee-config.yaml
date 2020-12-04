@@ -18,8 +18,9 @@
 # Sanitizers permit sources to safely reach a sink.
 # False positives may be suppressed in the Exclude block.
 # Note that `*RE` keys have regexp values.
+
+# For additional details, see KEP-1933.
 ---
-# TODO Refer to documentation link
 
 # These field tags were introduced by KEP-1753 to indicate fields which may contain credentials
 FieldTags:
