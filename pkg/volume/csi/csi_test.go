@@ -37,6 +37,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
+	core "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -279,6 +280,27 @@ func TestCSI_VolumeAll(t *testing.T) {
 			factory := informers.NewSharedInformerFactory(client, time.Hour /* disable resync */)
 			csiDriverInformer := factory.Storage().V1().CSIDrivers()
 			volumeAttachmentInformer := factory.Storage().V1().VolumeAttachments()
+
+			// Right now we expect a VolumeAttachment to exist before calling waitForVolumeAttachDetachStatus().
+			// This reactor exists to update the lister and make these VolumeAttachments immediately available
+			// so we can proceed with calling waitForVolumeAttachDetachStatus().
+			// TODO(#64429): Remove this reactor once you remove the above requirement and have a way of responding
+			// to the watch.Added event.
+			client.Fake.PrependReactor("*", "volumeattachments", func(action core.Action) (bool, runtime.Object, error) {
+				var err error
+				switch action.GetVerb() {
+				case "create":
+					err = volumeAttachmentInformer.Informer().GetStore().Add(action.(core.CreateAction).GetObject())
+				case "update":
+					err = volumeAttachmentInformer.Informer().GetStore().Update(action.(core.UpdateAction).GetObject())
+				case "delete":
+					err = volumeAttachmentInformer.Informer().GetStore().Delete(action.(core.DeleteAction).GetName())
+				default:
+					err = fmt.Errorf("Unknown action verb: %s", action.GetVerb())
+				}
+				return false, nil, err
+			})
+
 			if driverInfo != nil {
 				csiDriverInformer.Informer().GetStore().Add(driverInfo)
 			}

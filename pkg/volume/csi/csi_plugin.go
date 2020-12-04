@@ -211,8 +211,6 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			if p.serviceAccountTokenGetter == nil {
 				klog.Error(log("ServiceAccountTokenGetter not found on KubeletVolumeHost"))
 			}
-			// We don't run the volumeAttachmentLister in the kubelet context
-			p.volumeAttachmentLister = nil
 		}
 	}
 

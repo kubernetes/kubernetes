@@ -201,7 +201,7 @@ func TestAttacherAttach(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("test case: %s", tc.name)
-			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil, false)
+			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil, true)
 			defer os.RemoveAll(tmpDir)
 
 			attacher, err := plug.NewAttacher()
@@ -286,7 +286,7 @@ func TestAttacherAttachWithInline(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("test case: %s", tc.name)
-			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil, false)
+			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil, true)
 			defer os.RemoveAll(tmpDir)
 
 			attacher, err := plug.NewAttacher()
@@ -709,7 +709,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil, false)
+			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil, true)
 			defer os.RemoveAll(tmpDir)
 
 			attacher, err := plug.NewAttacher()
@@ -1598,6 +1598,26 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset, setupInf
 	if setupInformer {
 		volumeAttachmentInformer = factory.Storage().V1().VolumeAttachments()
 		volumeAttachmentLister = volumeAttachmentInformer.Lister()
+
+		// Right now we expect a VolumeAttachment to exist before calling waitForVolumeAttachDetachStatus().
+		// This reactor exists to update the lister and make these VolumeAttachments immediately available
+		// so we can proceed with calling waitForVolumeAttachDetachStatus().
+		// TODO(#64429): Remove this reactor once you remove the above requirement and have a way of responding
+		// to the watch.Added event.
+		fakeClient.Fake.PrependReactor("*", "volumeattachments", func(action core.Action) (bool, runtime.Object, error) {
+			var err error
+			switch action.GetVerb() {
+			case "create":
+				err = volumeAttachmentInformer.Informer().GetStore().Add(action.(core.CreateAction).GetObject())
+			case "update":
+				err = volumeAttachmentInformer.Informer().GetStore().Update(action.(core.UpdateAction).GetObject())
+			case "delete":
+				err = volumeAttachmentInformer.Informer().GetStore().Delete(action.(core.DeleteAction).GetName())
+			default:
+				err = fmt.Errorf("Unknown action verb: %s", action.GetVerb())
+			}
+			return false, nil, err
+		})
 	}
 
 	factory.Start(wait.NeverStop)
