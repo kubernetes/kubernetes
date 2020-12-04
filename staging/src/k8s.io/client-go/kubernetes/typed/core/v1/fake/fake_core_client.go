@@ -65,7 +65,7 @@ func (c *FakeCoreV1) PersistentVolumeClaims(namespace string) v1.PersistentVolum
 }
 
 func (c *FakeCoreV1) Pods(namespace string) v1.PodInterface {
-	return &FakePods{c, namespace}
+	return &FakePods{c, namespace, make(map[string]string)}
 }
 
 func (c *FakeCoreV1) PodTemplates(namespace string) v1.PodTemplateInterface {

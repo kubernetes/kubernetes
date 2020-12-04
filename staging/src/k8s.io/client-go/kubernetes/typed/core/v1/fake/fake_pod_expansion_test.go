@@ -31,21 +31,48 @@ func TestFakePodsGetLogs(t *testing.T) {
 		Fake: &FakeCoreV1{Fake: &cgtesting.Fake{}},
 		ns:   "default",
 	}
-	req := fp.GetLogs("foo", &corev1.PodLogOptions{})
-	body, err := req.Stream(context.Background())
-	if err != nil {
-		t.Fatal("Stream pod logs:", err)
+
+	testData := []struct {
+		pod       string
+		container string
+		logs      string
+	}{
+		{
+			pod:       "foo",
+			logs:      defaultFakeLogs,
+		},
+		{
+			pod:       "foo",
+			container: "sidecar",
+			logs:      "custom log from user",
+		},
 	}
-	var buf bytes.Buffer
-	n, err := io.Copy(&buf, body)
-	if err != nil {
-		t.Fatal("Read pod logs:", err)
-	}
-	if n == 0 {
-		t.Fatal("Empty log")
-	}
-	err = body.Close()
-	if err != nil {
-		t.Fatal("Close response body:", err)
+
+	for i := range testData {
+		d := testData[i]
+		if d.container != "" && d.logs != defaultFakeLogs {
+			if err := fp.SetContainerFakeLogs(d.container, d.logs); err != nil {
+				t.Fatal("Set container logs:", err)
+			}
+		}
+		req := fp.GetLogs(d.pod, &corev1.PodLogOptions{
+			Container: d.container,
+		})
+		body, err := req.Stream(context.Background())
+		if err != nil {
+			t.Fatal("Stream pod logs:", err)
+		}
+		var buf bytes.Buffer
+		n, err := io.Copy(&buf, body)
+		if err != nil {
+			t.Fatal("Read pod logs:", err)
+		}
+		if int64(len(d.logs)) != n || buf.String() != d.logs {
+			t.Fatal("Fake logs mismatch")
+		}
+		err = body.Close()
+		if err != nil {
+			t.Fatal("Close response body:", err)
+		}
 	}
 }

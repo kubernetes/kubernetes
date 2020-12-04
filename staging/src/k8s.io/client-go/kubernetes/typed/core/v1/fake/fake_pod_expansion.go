@@ -54,6 +54,8 @@ func (c *FakePods) GetBinding(name string) (result *v1.Binding, err error) {
 	return obj.(*v1.Binding), err
 }
 
+const defaultFakeLogs string = "fake logs"
+
 func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request {
 	action := core.GenericActionImpl{}
 	action.Verb = "get"
@@ -63,11 +65,17 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Requ
 	action.Value = opts
 
 	_, _ = c.Fake.Invokes(action, &v1.Pod{})
+
+	fakeLogs := defaultFakeLogs
+	if l, ok := c.fakeLogs[opts.Container]; ok {
+		fakeLogs = l
+	}
+
 	fakeClient := &fakerest.RESTClient{
 		Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
 			resp := &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(strings.NewReader("fake logs")),
+				Body:       ioutil.NopCloser(strings.NewReader(fakeLogs)),
 			}
 			return resp, nil
 		}),
@@ -92,4 +100,17 @@ func (c *FakePods) Evict(ctx context.Context, eviction *policy.Eviction) error {
 
 func (c *FakePods) ProxyGet(scheme, name, port, path string, params map[string]string) restclient.ResponseWrapper {
 	return c.Fake.InvokesProxy(core.NewProxyGetAction(podsResource, c.ns, scheme, name, port, path, params))
+}
+
+// SetContainerFakeLogs set fake logs for specified container and log content
+func (c *FakePods) SetContainerFakeLogs(container, fakeLogs string) error {
+	if container == "" {
+		return fmt.Errorf("container name can not be empty")
+	}
+
+	if c.fakeLogs == nil {
+		c.fakeLogs = make(map[string]string)
+	}
+	c.fakeLogs[container] = fakeLogs
+	return nil
 }

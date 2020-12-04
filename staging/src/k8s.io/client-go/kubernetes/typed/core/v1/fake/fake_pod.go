@@ -32,8 +32,9 @@ import (
 
 // FakePods implements PodInterface
 type FakePods struct {
-	Fake *FakeCoreV1
-	ns   string
+	Fake     *FakeCoreV1
+	ns       string
+	fakeLogs map[string]string
 }
 
 var podsResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
