@@ -46,9 +46,7 @@ func (s *service) CreateVolume(
 	if req.VolumeCapabilities == nil {
 		return nil, status.Error(codes.InvalidArgument, "Volume Capabilities cannot be empty")
 	}
-	if hookVal, hookMsg := s.execHook("CreateVolumeStart"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
-	}
+
 	// Check to see if the volume already exists.
 	if i, v := s.findVolByName(ctx, req.Name); i >= 0 {
 		// Requested volume name already exists, need to check if the existing volume's
@@ -608,10 +606,6 @@ func (s *service) CreateSnapshot(ctx context.Context,
 	}
 	if len(req.GetSourceVolumeId()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Snapshot SourceVolumeId cannot be empty")
-	}
-
-	if hookVal, hookMsg := s.execHook("CreateSnapshotStart"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
 	}
 
 	// Check to see if the snapshot already exists.

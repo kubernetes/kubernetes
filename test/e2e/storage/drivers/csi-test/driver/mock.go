@@ -19,7 +19,6 @@ package driver
 import (
 	"net"
 
-	"github.com/kubernetes-csi/csi-test/v4/utils"
 	"google.golang.org/grpc"
 )
 
@@ -31,10 +30,11 @@ type MockCSIDriverServers struct {
 
 type MockCSIDriver struct {
 	CSIDriver
-	conn *grpc.ClientConn
+	conn        *grpc.ClientConn
+	interceptor grpc.UnaryServerInterceptor
 }
 
-func NewMockCSIDriver(servers *MockCSIDriverServers) *MockCSIDriver {
+func NewMockCSIDriver(servers *MockCSIDriverServers, interceptor grpc.UnaryServerInterceptor) *MockCSIDriver {
 	return &MockCSIDriver{
 		CSIDriver: CSIDriver{
 			servers: &CSIDriverServers{
@@ -43,6 +43,7 @@ func NewMockCSIDriver(servers *MockCSIDriverServers) *MockCSIDriver {
 				Identity:   servers.Identity,
 			},
 		},
+		interceptor: interceptor,
 	}
 }
 
@@ -53,7 +54,7 @@ func (m *MockCSIDriver) StartOnAddress(network, address string) error {
 		return err
 	}
 
-	if err := m.CSIDriver.Start(l); err != nil {
+	if err := m.CSIDriver.Start(l, m.interceptor); err != nil {
 		l.Close()
 		return err
 	}
@@ -65,22 +66,6 @@ func (m *MockCSIDriver) StartOnAddress(network, address string) error {
 func (m *MockCSIDriver) Start() error {
 	// Listen on a port assigned by the net package
 	return m.StartOnAddress("tcp", "127.0.0.1:0")
-}
-
-func (m *MockCSIDriver) Nexus() (*grpc.ClientConn, error) {
-	// Start server
-	err := m.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a client connection
-	m.conn, err = utils.Connect(m.Address(), grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
-
-	return m.conn, nil
 }
 
 func (m *MockCSIDriver) Close() {

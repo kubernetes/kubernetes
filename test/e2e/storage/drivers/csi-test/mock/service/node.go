@@ -18,7 +18,6 @@ package service
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"strconv"
 
@@ -34,10 +33,6 @@ func (s *service) NodeStageVolume(
 	ctx context.Context,
 	req *csi.NodeStageVolumeRequest) (
 	*csi.NodeStageVolumeResponse, error) {
-
-	if hookVal, hookMsg := s.execHook("NodeStageVolumeStart"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
-	}
 
 	device, ok := req.PublishContext["device"]
 	if !ok {
@@ -62,7 +57,7 @@ func (s *service) NodeStageVolume(
 		return nil, status.Error(codes.InvalidArgument, "Volume Capability cannot be empty")
 	}
 
-	exists, err := checkTargetExists(req.StagingTargetPath)
+	exists, err := s.config.IO.DirExists(req.StagingTargetPath)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -111,10 +106,6 @@ func (s *service) NodeUnstageVolume(
 
 	if len(req.GetStagingTargetPath()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Staging Target Path cannot be empty")
-	}
-
-	if hookVal, hookMsg := s.execHook("NodeUnstageVolumeStart"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
 	}
 
 	s.volsRWL.Lock()
@@ -178,7 +169,7 @@ func (s *service) NodePublishVolume(
 
 	// May happen with old (or, at this time, even the current) Kubernetes
 	// although it shouldn't (https://github.com/kubernetes/kubernetes/issues/75535).
-	exists, err := checkTargetExists(req.TargetPath)
+	exists, err := s.config.IO.DirExists(req.TargetPath)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -220,13 +211,13 @@ func (s *service) NodePublishVolume(
 		}
 	} else {
 		if req.GetTargetPath() != "" {
-			exists, err := checkTargetExists(req.GetTargetPath())
+			exists, err := s.config.IO.DirExists(req.GetTargetPath())
 			if err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
 			if !exists {
 				// If target path does not exist we need to create the directory where volume will be staged
-				if err = os.Mkdir(req.TargetPath, os.FileMode(0755)); err != nil {
+				if err = s.config.IO.Mkdir(req.TargetPath); err != nil {
 					msg := fmt.Sprintf("NodePublishVolume: could not create target dir %q: %v", req.TargetPath, err)
 					return nil, status.Error(codes.Internal, msg)
 				}
@@ -281,7 +272,7 @@ func (s *service) NodeUnpublishVolume(
 		}
 
 		// Delete any created paths
-		err := os.RemoveAll(v.VolumeContext[nodeMntPathKey])
+		err := s.config.IO.RemoveAll(v.VolumeContext[nodeMntPathKey])
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Unable to delete previously created target directory")
 		}
@@ -415,10 +406,6 @@ func (s *service) NodeGetInfo(ctx context.Context,
 func (s *service) NodeGetVolumeStats(ctx context.Context,
 	req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 
-	if hookVal, hookMsg := s.execHook("NodeGetVolumeStatsStart"); hookVal != codes.OK {
-		return nil, status.Errorf(hookVal, hookMsg)
-	}
-
 	resp := &csi.NodeGetVolumeStatsResponse{
 		VolumeCondition: &csi.VolumeCondition{},
 	}
@@ -460,17 +447,4 @@ func (s *service) NodeGetVolumeStats(ctx context.Context,
 	}
 
 	return resp, nil
-}
-
-// checkTargetExists checks if a given path exists.
-func checkTargetExists(targetPath string) (bool, error) {
-	_, err := os.Stat(targetPath)
-	switch {
-	case err == nil:
-		return true, nil
-	case os.IsNotExist(err):
-		return false, nil
-	default:
-		return false, err
-	}
 }

@@ -27,11 +27,10 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 )
 
 var (
@@ -75,7 +74,10 @@ type CSIDriver struct {
 	running  bool
 	lock     sync.Mutex
 	creds    *CSICreds
+	logGRPC  LogGRPC
 }
+
+type LogGRPC func(method string, request, reply interface{}, err error)
 
 func NewCSIDriver(servers *CSIDriverServers) *CSIDriver {
 	return &CSIDriver{
@@ -90,7 +92,12 @@ func (c *CSIDriver) goServe(started chan<- bool) {
 func (c *CSIDriver) Address() string {
 	return c.listener.Addr().String()
 }
-func (c *CSIDriver) Start(l net.Listener) error {
+
+// Start runs a gRPC server with all enabled services. If an interceptor
+// is give, then it will be used. Otherwise, an interceptor which
+// handles simple credential checks and logs gRPC calls in JSON format
+// will be used.
+func (c *CSIDriver) Start(l net.Listener, interceptor grpc.UnaryServerInterceptor) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -98,9 +105,10 @@ func (c *CSIDriver) Start(l net.Listener) error {
 	c.listener = l
 
 	// Create a new grpc server
-	c.server = grpc.NewServer(
-		grpc.UnaryInterceptor(c.callInterceptor),
-	)
+	if interceptor == nil {
+		interceptor = c.callInterceptor
+	}
+	c.server = grpc.NewServer(grpc.UnaryInterceptor(interceptor))
 
 	// Register Mock servers
 	if c.servers.Controller != nil {
@@ -112,7 +120,6 @@ func (c *CSIDriver) Start(l net.Listener) error {
 	if c.servers.Node != nil {
 		csi.RegisterNodeServer(c.server, c.servers.Node)
 	}
-	reflection.Register(c.server)
 
 	// Start listening for requests
 	waitForServer := make(chan bool)
@@ -140,10 +147,6 @@ func (c *CSIDriver) IsRunning() bool {
 // SetDefaultCreds sets the default secrets for CSI creds.
 func (c *CSIDriver) SetDefaultCreds() {
 	setDefaultCreds(c.creds)
-}
-
-func (c *CSIDriver) callInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	return callInterceptor(ctx, c.creds, req, info, handler)
 }
 
 // goServe starts a grpc server.
@@ -187,14 +190,17 @@ func setDefaultCreds(creds *CSICreds) {
 	}
 }
 
-func callInterceptor(ctx context.Context, creds *CSICreds, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	err := authInterceptor(creds, req)
+func (c *CSIDriver) callInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	err := authInterceptor(c.creds, req)
 	if err != nil {
 		logGRPC(info.FullMethod, req, nil, err)
 		return nil, err
 	}
 	rsp, err := handler(ctx, req)
 	logGRPC(info.FullMethod, req, rsp, err)
+	if c.logGRPC != nil {
+		c.logGRPC(info.FullMethod, req, rsp, err)
+	}
 	return rsp, err
 }
 

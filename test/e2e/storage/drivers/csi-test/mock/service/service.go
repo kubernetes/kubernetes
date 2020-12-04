@@ -18,21 +18,17 @@ package service
 
 import (
 	"fmt"
-	"reflect"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
 
-	"k8s.io/klog"
-
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/kubernetes-csi/csi-test/v4/mock/cache"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
+	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/cache"
 
 	"github.com/golang/protobuf/ptypes"
-
-	"github.com/robertkrimen/otto"
 )
 
 const (
@@ -51,47 +47,7 @@ const (
 
 // Manifest is the SP's manifest.
 var Manifest = map[string]string{
-	"url": "https://github.com/kubernetes-csi/csi-test/mock",
-}
-
-// JavaScript hooks to be run to perform various tests
-type Hooks struct {
-	Globals                        string `yaml:"globals"` // will be executed once before all other scripts
-	CreateVolumeStart              string `yaml:"createVolumeStart"`
-	CreateVolumeEnd                string `yaml:"createVolumeEnd"`
-	DeleteVolumeStart              string `yaml:"deleteVolumeStart"`
-	DeleteVolumeEnd                string `yaml:"deleteVolumeEnd"`
-	ControllerPublishVolumeStart   string `yaml:"controllerPublishVolumeStart"`
-	ControllerPublishVolumeEnd     string `yaml:"controllerPublishVolumeEnd"`
-	ControllerUnpublishVolumeStart string `yaml:"controllerUnpublishVolumeStart"`
-	ControllerUnpublishVolumeEnd   string `yaml:"controllerUnpublishVolumeEnd"`
-	ValidateVolumeCapabilities     string `yaml:"validateVolumeCapabilities"`
-	ListVolumesStart               string `yaml:"listVolumesStart"`
-	ListVolumesEnd                 string `yaml:"listVolumesEnd"`
-	GetCapacity                    string `yaml:"getCapacity"`
-	ControllerGetCapabilitiesStart string `yaml:"controllerGetCapabilitiesStart"`
-	ControllerGetCapabilitiesEnd   string `yaml:"controllerGetCapabilitiesEnd"`
-	CreateSnapshotStart            string `yaml:"createSnapshotStart"`
-	CreateSnapshotEnd              string `yaml:"createSnapshotEnd"`
-	DeleteSnapshotStart            string `yaml:"deleteSnapshotStart"`
-	DeleteSnapshotEnd              string `yaml:"deleteSnapshotEnd"`
-	ListSnapshots                  string `yaml:"listSnapshots"`
-	ControllerExpandVolumeStart    string `yaml:"controllerExpandVolumeStart"`
-	ControllerExpandVolumeEnd      string `yaml:"controllerExpandVolumeEnd"`
-	NodeStageVolumeStart           string `yaml:"nodeStageVolumeStart"`
-	NodeStageVolumeEnd             string `yaml:"nodeStageVolumeEnd"`
-	NodeUnstageVolumeStart         string `yaml:"nodeUnstageVolumeStart"`
-	NodeUnstageVolumeEnd           string `yaml:"nodeUnstageVolumeEnd"`
-	NodePublishVolumeStart         string `yaml:"nodePublishVolumeStart"`
-	NodePublishVolumeEnd           string `yaml:"nodePublishVolumeEnd"`
-	NodeUnpublishVolumeStart       string `yaml:"nodeUnpublishVolumeStart"`
-	NodeUnpublishVolumeEnd         string `yaml:"nodeUnpublishVolumeEnd"`
-	NodeExpandVolumeStart          string `yaml:"nodeExpandVolumeStart"`
-	NodeExpandVolumeEnd            string `yaml:"nodeExpandVolumeEnd"`
-	NodeGetCapabilities            string `yaml:"nodeGetCapabilities"`
-	NodeGetInfo                    string `yaml:"nodeGetInfo"`
-	NodeGetVolumeStatsStart        string `yaml:"nodeGetVolumeStatsStart"`
-	NodeGetVolumeStatsEnd          string `yaml:"nodeGetVolumeStatsEnd"`
+	"url": "https://k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock",
 }
 
 type Config struct {
@@ -103,7 +59,41 @@ type Config struct {
 	DisableOnlineExpansion     bool
 	PermissiveTargetPath       bool
 	EnableTopology             bool
-	ExecHooks                  *Hooks
+	IO                         DirIO
+}
+
+// DirIO is an abstraction over direct os calls.
+type DirIO interface {
+	// DirExists returns false if the path doesn't exist, true if it exists and is a directory, an error otherwise.
+	DirExists(path string) (bool, error)
+	// Mkdir creates the directory, but not its parents, with 0755 permissions.
+	Mkdir(path string) error
+	// RemoveAll removes the path and everything contained inside it. It's not an error if the path does not exist.
+	RemoveAll(path string) error
+}
+
+type OSDirIO struct{}
+
+func (o OSDirIO) DirExists(path string) (bool, error) {
+	info, err := os.Stat(path)
+	switch {
+	case err == nil && !info.IsDir():
+		return false, fmt.Errorf("%s: not a directory", path)
+	case err == nil:
+		return true, nil
+	case os.IsNotExist(err):
+		return false, nil
+	default:
+		return false, err
+	}
+}
+
+func (o OSDirIO) Mkdir(path string) error {
+	return os.Mkdir(path, os.FileMode(0755))
+}
+
+func (o OSDirIO) RemoveAll(path string) error {
+	return os.RemoveAll(path)
 }
 
 // Service is the CSI Mock service provider.
@@ -122,7 +112,6 @@ type service struct {
 	snapshots    cache.SnapshotCache
 	snapshotsNID uint64
 	config       Config
-	hooksVm      *otto.Otto
 }
 
 type Volume struct {
@@ -144,13 +133,8 @@ func New(config Config) Service {
 		nodeID: config.DriverName,
 		config: config,
 	}
-	if config.ExecHooks != nil {
-		s.hooksVm = otto.New()
-		s.hooksVm.Run(grpcJSCodes) // set global variables with gRPC error codes
-		_, err := s.hooksVm.Run(s.config.ExecHooks.Globals)
-		if err != nil {
-			klog.Exitf("Error encountered in the global exec hook: %v. Exiting\n", err)
-		}
+	if s.config.IO == nil {
+		s.config.IO = OSDirIO{}
 	}
 	s.snapshots = cache.NewSnapshotCache()
 	s.vols = []csi.Volume{
@@ -288,22 +272,5 @@ func (s *service) getAttachCount(devPathKey string) int64 {
 }
 
 func (s *service) execHook(hookName string) (codes.Code, string) {
-	if s.hooksVm != nil {
-		script := reflect.ValueOf(*s.config.ExecHooks).FieldByName(hookName).String()
-		if len(script) > 0 {
-			result, err := s.hooksVm.Run(script)
-			if err != nil {
-				klog.Exitf("Exec hook %s error: %v; exiting\n", hookName, err)
-			}
-			rv, err := result.ToInteger()
-			if err == nil {
-				// Function returned an integer, use it
-				return codes.Code(rv), fmt.Sprintf("Exec hook %s returned non-OK code", hookName)
-			} else {
-				// Function returned non-integer data type, discard it
-				return codes.OK, ""
-			}
-		}
-	}
 	return codes.OK, ""
 }
