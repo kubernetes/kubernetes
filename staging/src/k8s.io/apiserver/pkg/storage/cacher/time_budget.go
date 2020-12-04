@@ -19,11 +19,17 @@ package cacher
 import (
 	"sync"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/clock"
+
+	"golang.org/x/time/rate"
 )
 
 const (
-	refreshPerSecond = 50 * time.Millisecond
-	maxBudget        = 100 * time.Millisecond
+	// timeBudget has 50ms available in every 1s, and its maxBudget is 100ms,
+	// use rate.limiter with 50 rate per second and 100 burst to implement timeBudget.
+	refreshPerSecond = 50
+	maxBudget        = 100
 )
 
 // timeBudget implements a budget of time that you can use and is
@@ -48,48 +54,34 @@ type timeBudgetImpl struct {
 	sync.Mutex
 	budget time.Duration
 
-	refresh   time.Duration
 	maxBudget time.Duration
+	clock     clock.Clock
+	limiter   *rate.Limiter
 }
 
-func newTimeBudget(stopCh <-chan struct{}) timeBudget {
-	result := &timeBudgetImpl{
+func newTimeBudget() timeBudget {
+	return &timeBudgetImpl{
+		clock:     clock.RealClock{},
 		budget:    time.Duration(0),
-		refresh:   refreshPerSecond,
-		maxBudget: maxBudget,
-	}
-	go result.periodicallyRefresh(stopCh)
-	return result
-}
-
-func (t *timeBudgetImpl) periodicallyRefresh(stopCh <-chan struct{}) {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			t.Lock()
-			if t.budget = t.budget + t.refresh; t.budget > t.maxBudget {
-				t.budget = t.maxBudget
-			}
-			t.Unlock()
-		case <-stopCh:
-			return
-		}
+		maxBudget: maxBudget * time.Millisecond,
+		limiter:   rate.NewLimiter(refreshPerSecond, maxBudget),
 	}
 }
 
 func (t *timeBudgetImpl) takeAvailable() time.Duration {
-	t.Lock()
-	defer t.Unlock()
-	result := t.budget
+	tokens := 0
+	for t.limiter.AllowN(t.clock.Now(), refreshPerSecond) && tokens < maxBudget {
+		tokens += refreshPerSecond
+	}
+	result := t.budget + time.Duration(tokens)*time.Millisecond
+	if result > t.maxBudget {
+		result = t.maxBudget
+	}
 	t.budget = time.Duration(0)
 	return result
 }
 
 func (t *timeBudgetImpl) returnUnused(unused time.Duration) {
-	t.Lock()
-	defer t.Unlock()
 	if unused < 0 {
 		// We used more than allowed.
 		return

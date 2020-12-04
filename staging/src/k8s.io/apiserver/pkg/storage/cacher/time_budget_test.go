@@ -19,14 +19,22 @@ package cacher
 import (
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/clock"
+
+	"golang.org/x/time/rate"
 )
 
 func TestTimeBudget(t *testing.T) {
+	fakeClock := clock.NewFakeClock(time.Now())
 	budget := &timeBudgetImpl{
 		budget:    time.Duration(0),
 		maxBudget: time.Duration(200),
+		clock:     fakeClock,
+		limiter:   rate.NewLimiter(refreshPerSecond, maxBudget),
 	}
-	if res := budget.takeAvailable(); res != time.Duration(0) {
+	// bucket has full token so takeAvailable returns budget.maxBudget.
+	if res := budget.takeAvailable(); res != budget.maxBudget {
 		t.Errorf("Expected: %v, got: %v", time.Duration(0), res)
 	}
 	budget.budget = time.Duration(100)
@@ -49,5 +57,24 @@ func TestTimeBudget(t *testing.T) {
 	budget.returnUnused(time.Duration(500))
 	if res := budget.takeAvailable(); res != time.Duration(200) {
 		t.Errorf("Expected: %v, got: %v", time.Duration(200), res)
+	}
+
+	budget.maxBudget = maxBudget * time.Millisecond
+	nextTime := time.Now().Add(3 * time.Second)
+	fakeClock.SetTime(nextTime)
+	if res := budget.takeAvailable(); res != budget.maxBudget {
+		t.Errorf("Expected: %v, got: %v", budget.maxBudget, res)
+	}
+
+	nextTime = nextTime.Add(time.Duration(1500) * time.Millisecond)
+	fakeClock.SetTime(nextTime)
+	if res := budget.takeAvailable(); res != refreshPerSecond*time.Millisecond {
+		t.Errorf("Expected: %v, got: %v", refreshPerSecond*time.Millisecond, res)
+	}
+
+	nextTime = nextTime.Add(time.Duration(1500) * time.Millisecond)
+	fakeClock.SetTime(nextTime)
+	if res := budget.takeAvailable(); res != budget.maxBudget {
+		t.Errorf("Expected: %v, got: %v", budget.maxBudget, res)
 	}
 }
