@@ -74,6 +74,9 @@ var _ = SIGDescribe("API priority and fairness", func() {
 	// higher QPS client cannot drown out the other one despite having higher
 	// priority.
 	ginkgo.It("should ensure that requests can't be drowned out (priority)", func() {
+		// See https://github.com/kubernetes/kubernetes/issues/96710
+		ginkgo.Skip("skipping test until flakiness is resolved")
+
 		flowSchemaNamePrefix := "e2e-testing-flowschema-" + f.UniqueName
 		priorityLevelNamePrefix := "e2e-testing-prioritylevel-" + f.UniqueName
 		loadDuration := 10 * time.Second
@@ -83,13 +86,13 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		type client struct {
 			username                    string
 			qps                         float64
-			priorityLevelName           string
-			concurrencyMultiplier       float64
+			priorityLevelName           string  //lint:ignore U1000 field is actually used
+			concurrencyMultiplier       float64 //lint:ignore U1000 field is actually used
 			concurrency                 int32
-			flowSchemaName              string
-			matchingPrecedence          int32
+			flowSchemaName              string //lint:ignore U1000 field is actually used
+			matchingPrecedence          int32  //lint:ignore U1000 field is actually used
 			completedRequests           int32
-			expectedCompletedPercentage float64
+			expectedCompletedPercentage float64 //lint:ignore U1000 field is actually used
 		}
 		clients := []client{
 			// "highqps" refers to a client that creates requests at a much higher
@@ -154,6 +157,9 @@ var _ = SIGDescribe("API priority and fairness", func() {
 	// the two clients and not allow one client to drown out the other despite
 	// having a higher QPS.
 	ginkgo.It("should ensure that requests can't be drowned out (fairness)", func() {
+		// See https://github.com/kubernetes/kubernetes/issues/96710
+		ginkgo.Skip("skipping test until flakiness is resolved")
+
 		priorityLevelName := "e2e-testing-prioritylevel-" + f.UniqueName
 		flowSchemaName := "e2e-testing-flowschema-" + f.UniqueName
 		loadDuration := 10 * time.Second
@@ -171,10 +177,10 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		type client struct {
 			username                    string
 			qps                         float64
-			concurrencyMultiplier       float64
+			concurrencyMultiplier       float64 //lint:ignore U1000 field is actually used
 			concurrency                 int32
 			completedRequests           int32
-			expectedCompletedPercentage float64
+			expectedCompletedPercentage float64 //lint:ignore U1000 field is actually used
 		}
 		clients := []client{
 			{username: highQPSClientName, qps: 100.0, concurrencyMultiplier: 2.0, expectedCompletedPercentage: 0.75},
@@ -242,6 +248,7 @@ func createPriorityLevel(f *framework.Framework, priorityLevelName string, assur
 	}
 }
 
+//lint:ignore U1000 function is actually referenced
 func getPriorityLevelConcurrency(f *framework.Framework, priorityLevelName string) int32 {
 	resp, err := f.ClientSet.CoreV1().RESTClient().Get().RequestURI("/metrics").DoRaw(context.TODO())
 	framework.ExpectNoError(err)
