@@ -3184,6 +3184,12 @@ function main() {
      chmod -R g+s /var/log/pods/
   fi
 
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    if [[ -n "${GKE_AUTOPILOT_SSHD_CONFIG:-}" ]]; then
+      gke-configure-autopilot-sshd
+    fi
+  fi
+
   start-kubelet
 
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
