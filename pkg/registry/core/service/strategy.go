@@ -120,7 +120,6 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
 
-	patchAllocatedValues(newService, oldService)
 	//FIXME: Normalize is now called from BeginUpdate in pkg/registry/core/service/storage
 	NormalizeClusterIPs(oldService, newService)
 	dropServiceDisabledFields(newService, oldService)
@@ -305,11 +304,12 @@ func (serviceStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runt
 	return nil
 }
 
-// patchAllocatedValues allows clients to avoid a read-modify-write cycle while
+// PatchAllocatedValues allows clients to avoid a read-modify-write cycle while
 // preserving values that we allocated on their behalf.  For example, they
 // might create a Service without specifying the ClusterIP, in which case we
 // allocate one.  If they resubmit that same YAML, we want it to succeed.
-func patchAllocatedValues(newSvc, oldSvc *api.Service) {
+//FIXME: move this to pkg/registry/core/service/storage
+func PatchAllocatedValues(newSvc, oldSvc *api.Service) {
 	if needsClusterIP(oldSvc) && needsClusterIP(newSvc) {
 		if newSvc.Spec.ClusterIP == "" {
 			newSvc.Spec.ClusterIP = oldSvc.Spec.ClusterIP
@@ -501,6 +501,13 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 	// NOTE: there are other fields like `selector` which we could wipe.
 	// Historically we did not wipe them and they are not allocated from
 	// finite pools, so we are (currently) choosing to leave them alone.
+
+	// Clear the load-balancer status if it is no longer appropriate.  Although
+	// LB de-provisioning is actually asynchronous, we don't need to expose the
+	// user to that complexity.
+	if newSvc.Spec.Type != api.ServiceTypeLoadBalancer {
+		newSvc.Status.LoadBalancer = api.LoadBalancerStatus{}
+	}
 }
 
 func needsClusterIP(svc *api.Service) bool {

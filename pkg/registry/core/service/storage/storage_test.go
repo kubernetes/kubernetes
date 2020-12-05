@@ -5836,3 +5836,5 @@ func TestDeleteDryRun(t *testing.T) {
 		})
 	}
 }
+
+//FIXME: Tests for update()

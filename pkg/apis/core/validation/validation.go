@@ -45,6 +45,7 @@ import (
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -4528,6 +4529,18 @@ func validateServiceExternalTrafficFieldsValue(service *core.Service) field.Erro
 	return allErrs
 }
 
+func validateServiceExternalTrafficFieldsUpdate(before, after *api.Service) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if apiservice.NeedsHealthCheck(before) && apiservice.NeedsHealthCheck(after) {
+		if after.Spec.HealthCheckNodePort != before.Spec.HealthCheckNodePort {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "healthCheckNodePort"), "field is immutable"))
+		}
+	}
+
+	return allErrs
+}
+
 // validateServiceInternalTrafficFieldsValue validates InternalTraffic related
 // spec have legal value.
 func validateServiceInternalTrafficFieldsValue(service *core.Service) field.ErrorList {
@@ -4591,6 +4604,8 @@ func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 
 	upgradeDowngradeLoadBalancerClassErrs := validateLoadBalancerClassField(oldService, service)
 	allErrs = append(allErrs, upgradeDowngradeLoadBalancerClassErrs...)
+
+	allErrs = append(allErrs, validateServiceExternalTrafficFieldsUpdate(oldService, service)...)
 
 	return append(allErrs, ValidateService(service)...)
 }

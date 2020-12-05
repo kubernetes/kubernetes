@@ -326,15 +326,27 @@ func (r *GenericREST) beginUpdate(ctx context.Context, obj, oldObj runtime.Objec
 	newSvc := obj.(*api.Service)
 	oldSvc := oldObj.(*api.Service)
 
+	// Fix up allocated values that the client may have not specified (for
+	// idempotence).
+	svcreg.PatchAllocatedValues(newSvc, oldSvc)
+
 	// Make sure ClusterIP and ClusterIPs are in sync.  This has to happen
 	// early, before anyone looks at them.
 	// NOTE: the args are (old, new)
 	svcreg.NormalizeClusterIPs(oldSvc, newSvc)
 
+	// Allocate and initialize fields.
+	txn, err := r.alloc.allocateUpdate(newSvc, oldSvc, dryrun.IsDryRun(options.DryRun))
+	if err != nil {
+		return nil, err
+	}
+
 	// Our cleanup callback
 	finish := func(_ context.Context, success bool) {
 		if success {
+			txn.Commit()
 		} else {
+			txn.Revert()
 		}
 	}
 
