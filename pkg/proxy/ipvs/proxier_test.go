@@ -5319,10 +5319,11 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocalWithFeatureGateDisabled(t *te
 	assert.Len(t, realServers1, 1, "Expected 1 real servers")
 	assert.Equal(t, realServers1[0].String(), "10.0.1.5:80")
 
-	// externalIP should have 0 endpoints since the feature gate is disabled.
+	// externalIP should have 1 (remote) endpoint since the feature gate is disabled.
 	realServers2, rsErr2 := ipvs.GetRealServers(externalIPServer)
 	assert.Nil(t, rsErr2, "Expected no error getting real servers")
-	assert.Len(t, realServers2, 0, "Expected 0 real servers")
+	assert.Len(t, realServers2, 1, "Expected 0 real servers")
+	assert.Equal(t, realServers2[0].String(), "10.0.1.5:80")
 
 	fp.OnEndpointSliceDelete(endpointSlice)
 	fp.syncProxyRules()
