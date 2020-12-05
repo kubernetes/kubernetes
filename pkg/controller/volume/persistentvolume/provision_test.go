@@ -127,6 +127,20 @@ var storageClasses = []*storage.StorageClass{
 		MountOptions:      []string{"foo"},
 		VolumeBindingMode: &modeImmediate,
 	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "StorageClass",
+		},
+
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "csi",
+		},
+
+		Provisioner:       "mydriver.csi.k8s.io",
+		Parameters:        class1Parameters,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &modeImmediate,
+	},
 }
 
 // call to storageClass 1, returning an error
@@ -505,6 +519,30 @@ func TestProvisionSync(t *testing.T) {
 					newClaimArray("claim11-24", "uid11-24", "1Gi", "", v1.ClaimPending, &classExternalWait))),
 			[]string{"Normal ExternalProvisioning"},
 			noerrors, testSyncClaim,
+		},
+		{
+			// Provision a volume with a data source will fail
+			// for in-tree plugins
+			"11-25 - failed in-tree provision with data source",
+			novolumes,
+			novolumes,
+			claimWithDataSource("test-snap", "VolumeSnapshot", "snapshot.storage.k8s.io", newClaimArray("claim11-25", "uid11-25", "1Gi", "", v1.ClaimPending, &classGold)),
+			claimWithDataSource("test-snap", "VolumeSnapshot", "snapshot.storage.k8s.io", newClaimArray("claim11-25", "uid11-25", "1Gi", "", v1.ClaimPending, &classGold)),
+			[]string{"Warning ProvisioningFailed"}, noerrors,
+			testSyncClaim,
+		},
+		{
+			// Provision a volume with a data source will proceed
+			// for CSI plugins
+			"11-26 - csi with data source",
+			novolumes,
+			novolumes,
+			claimWithAnnotation(pvutil.AnnStorageProvisioner, "mydriver.csi.k8s.io",
+				claimWithDataSource("test-snap", "VolumeSnapshot", "snapshot.storage.k8s.io", newClaimArray("claim11-26", "uid11-26", "1Gi", "", v1.ClaimPending, &classCSI))),
+			claimWithAnnotation(pvutil.AnnStorageProvisioner, "mydriver.csi.k8s.io",
+				claimWithDataSource("test-snap", "VolumeSnapshot", "snapshot.storage.k8s.io", newClaimArray("claim11-26", "uid11-26", "1Gi", "", v1.ClaimPending, &classCSI))),
+			[]string{"Normal ExternalProvisioning"},
+			noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 	}
 	runSyncTests(t, tests, storageClasses, []*v1.Pod{})

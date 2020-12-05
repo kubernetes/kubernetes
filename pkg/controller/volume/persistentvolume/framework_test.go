@@ -443,6 +443,15 @@ func claimWithAnnotation(name, value string, claims []*v1.PersistentVolumeClaim)
 	return claims
 }
 
+func claimWithDataSource(name, kind, apiGroup string, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
+	claims[0].Spec.DataSource = &v1.TypedLocalObjectReference{
+		Name:     name,
+		Kind:     kind,
+		APIGroup: &apiGroup,
+	}
+	return claims
+}
+
 func annotateClaim(claim *v1.PersistentVolumeClaim, ann map[string]string) *v1.PersistentVolumeClaim {
 	if claim.Annotations == nil {
 		claim.Annotations = map[string]string{}
@@ -514,6 +523,7 @@ var (
 	classUnsupportedMountOptions string = "unsupported-mountoptions"
 	classLarge                   string = "large"
 	classWait                    string = "wait"
+	classCSI                     string = "csi"
 
 	modeWait = storage.VolumeBindingWaitForFirstConsumer
 )

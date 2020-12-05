@@ -1474,7 +1474,17 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	// called from provisionClaim(), in this case, plugin MUST NOT be nil
 	// NOTE: checks on plugin/storageClass has been saved
 	pluginName := plugin.GetPluginName()
+	if pluginName != "kubernetes.io/csi" && claim.Spec.DataSource != nil {
+		// Only CSI plugin can have a DataSource. Fail the operation
+		// if Datasource in Claim is not nil and it is not a CSI plugin,
+		strerr := fmt.Sprintf("plugin %q is not a CSI plugin. Only CSI plugin can provision a claim with a datasource", pluginName)
+		klog.V(2).Infof(strerr)
+		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+		return pluginName, fmt.Errorf(strerr)
+
+	}
 	provisionerName := storageClass.Provisioner
+	klog.V(4).Infof("provisionClaimOperation [%s]: plugin name: %s, provisioner name: %s", claimToClaimKey(claim), pluginName, provisionerName)
 
 	// Add provisioner annotation to be consistent with external provisioner workflow
 	newClaim, err := ctrl.setClaimProvisioner(claim, provisionerName)
