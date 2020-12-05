@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -121,75 +120,6 @@ func makeServiceWithClusterIp(clusterIP string, clusterIPs []string) *api.Servic
 			ClusterIP:  clusterIP,
 			ClusterIPs: clusterIPs,
 		},
-	}
-}
-
-// TODO: This should be done on types that are not part of our API
-func TestBeforeUpdate(t *testing.T) {
-	testCases := []struct {
-		name      string
-		tweakSvc  func(oldSvc, newSvc *api.Service) // given basic valid services, each test case can customize them
-		expectErr bool
-	}{
-		{
-			name: "no change",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				// nothing
-			},
-			expectErr: false,
-		},
-		{
-			name: "change port",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				newSvc.Spec.Ports[0].Port++
-			},
-			expectErr: false,
-		},
-		{
-			name: "bad namespace",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				newSvc.Namespace = "#$%%invalid"
-			},
-			expectErr: true,
-		},
-		{
-			name: "change name",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				newSvc.Name += "2"
-			},
-			expectErr: true,
-		},
-		{
-			name: "change ClusterIP",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
-				newSvc.Spec.ClusterIPs = []string{"4.3.2.1"}
-			},
-			expectErr: true,
-		},
-		{
-			name: "change selector",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				newSvc.Spec.Selector = map[string]string{"newkey": "newvalue"}
-			},
-			expectErr: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		strategy, _ := newStrategy("172.30.0.0/16", false)
-
-		oldSvc := makeValidService()
-		newSvc := makeValidService()
-		tc.tweakSvc(oldSvc, newSvc)
-		ctx := genericapirequest.NewDefaultContext()
-		err := rest.BeforeUpdate(strategy, ctx, runtime.Object(oldSvc), runtime.Object(newSvc))
-		if tc.expectErr && err == nil {
-			t.Errorf("unexpected non-error for %q", tc.name)
-		}
-		if !tc.expectErr && err != nil {
-			t.Errorf("unexpected error for %q: %v", tc.name, err)
-		}
 	}
 }
 

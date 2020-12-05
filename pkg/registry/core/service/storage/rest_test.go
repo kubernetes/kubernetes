@@ -133,14 +133,17 @@ func (s *serviceStorage) Create(ctx context.Context, obj runtime.Object, createV
 }
 
 func (s *serviceStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	obj, err := objInfo.UpdatedObject(ctx, nil)
+	ret, created, err := s.inner.Update(ctx, name, objInfo, createValidation, updateValidation, forceAllowCreate, options)
 	if err != nil {
-		return nil, false, err
+		return ret, created, err
 	}
-	if !dryrun.IsDryRun(options.DryRun) {
-		s.saveService(obj.(*api.Service))
+	if dryrun.IsDryRun(options.DryRun) {
+		return ret.DeepCopyObject(), created, err
 	}
-	return obj, false, nil
+	svc := ret.(*api.Service)
+	s.saveService(svc)
+
+	return s.Services[name].DeepCopy(), created, nil
 }
 
 func (s *serviceStorage) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
@@ -716,12 +719,13 @@ func TestServiceRegistryUpdateLoadBalancerService(t *testing.T) {
 	svc2 := obj.(*api.Service).DeepCopy()
 	svc2.Spec.Type = api.ServiceTypeLoadBalancer
 	svc2.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
-	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+	obj, _, err = storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	// Change port.
-	svc3 := svc2.DeepCopy()
+	svc3 := obj.(*api.Service).DeepCopy()
 	svc3.Spec.Ports[0].Port = 6504
 	if _, _, err := storage.Update(ctx, svc3.Name, rest.DefaultUpdatedObjectInfo(svc3), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -971,7 +975,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 		}
 	}
 
-	update = createdService.DeepCopy()
+	update = updatedService.DeepCopy()
 	update.Spec.Ports[0].Port = 6503
 	update.Spec.ClusterIP = testIP
 	update.Spec.ClusterIPs[0] = testIP
