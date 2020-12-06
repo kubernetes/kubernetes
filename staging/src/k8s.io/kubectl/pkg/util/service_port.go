@@ -28,12 +28,12 @@ import (
 // It returns an error when a named port can't find a match (with -1 returned), or when the service does not
 // declare such port (with the input port number returned).
 func LookupContainerPortNumberByServicePort(svc v1.Service, pod v1.Pod, port int32) (int32, error) {
+	if svc.Spec.ClusterIP == v1.ClusterIPNone {
+		return port, nil
+	}
 	for _, svcportspec := range svc.Spec.Ports {
 		if svcportspec.Port != port {
 			continue
-		}
-		if svc.Spec.ClusterIP == v1.ClusterIPNone {
-			return port, nil
 		}
 		if svcportspec.TargetPort.Type == intstr.Int {
 			if svcportspec.TargetPort.IntValue() == 0 {
