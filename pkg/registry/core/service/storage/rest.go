@@ -46,10 +46,7 @@ import (
 
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
-	strategy       rest.RESTCreateUpdateStrategy
 	services       ServiceStorage
-	endpoints      EndpointsStorage
-	alloc          RESTAllocStuff
 	proxyTransport http.RoundTripper
 	pods           rest.Getter
 }
@@ -90,25 +87,15 @@ type ServiceStorage interface {
 //   or the strategy.
 func NewREST(
 	services ServiceStorage,
-	endpoints EndpointsStorage,
-	pods rest.Getter,
 	defaultFamily api.IPFamily,
-	ipAllocs map[api.IPFamily]ipallocator.Interface,
-	portAlloc portallocator.Interface,
 	proxyTransport http.RoundTripper,
 ) (*REST, *registry.ProxyREST) {
-
-	strategy, _ := registry.StrategyForServiceCIDRs(ipAllocs[defaultFamily].CIDR(), len(ipAllocs) > 1)
 
 	klog.V(0).Infof("the default service ipfamily for this cluster is: %s", string(defaultFamily))
 
 	rest := &REST{
-		strategy:       strategy,
 		services:       services,
-		endpoints:      endpoints,
 		proxyTransport: proxyTransport,
-		pods:           pods,
-		alloc:          makeAlloc(defaultFamily, ipAllocs, portAlloc),
 	}
 
 	return rest, &registry.ProxyREST{Redirector: rest, ProxyTransport: proxyTransport}
