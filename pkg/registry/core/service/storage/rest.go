@@ -20,16 +20,11 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"net/http"
-	"net/url"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -40,15 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	netutil "k8s.io/utils/net"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
-
-// REST adapts a service registry into apiserver's RESTStorage model.
-type REST struct {
-	services       ServiceStorage
-	proxyTransport http.RoundTripper
-	pods           rest.Getter
-}
 
 // RESTAllocStuff is a temporary struct to facilitate the flattening of service
 // REST layers.  It will be cleaned up over a series of commits.
@@ -68,18 +55,6 @@ type ServiceNodePort struct {
 	NodePort int32
 }
 
-type ServiceStorage interface {
-	rest.Scoper
-	rest.Getter
-	rest.Lister
-	rest.CreaterUpdater
-	rest.GracefulDeleter
-	rest.Watcher
-	rest.StorageVersionProvider
-	rest.ResetFieldsStrategy
-	rest.Redirector
-}
-
 // This is a trasitionary function to facilitate service REST flattening.
 func makeAlloc(defaultFamily api.IPFamily, ipAllocs map[api.IPFamily]ipallocator.Interface, portAlloc portallocator.Interface) RESTAllocStuff {
 	return RESTAllocStuff{
@@ -87,55 +62,6 @@ func makeAlloc(defaultFamily api.IPFamily, ipAllocs map[api.IPFamily]ipallocator
 		serviceIPAllocatorsByFamily: ipAllocs,
 		serviceNodePorts:            portAlloc,
 	}
-}
-
-var (
-	_ ServiceStorage              = &REST{}
-	_ rest.CategoriesProvider     = &REST{}
-	_ rest.ShortNamesProvider     = &REST{}
-	_ rest.StorageVersionProvider = &REST{}
-)
-
-func (rs *REST) StorageVersion() runtime.GroupVersioner {
-	return rs.services.StorageVersion()
-}
-
-// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
-func (rs *REST) ShortNames() []string {
-	return []string{"svc"}
-}
-
-// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
-func (rs *REST) Categories() []string {
-	return []string{"all"}
-}
-
-func (rs *REST) NamespaceScoped() bool {
-	return rs.services.NamespaceScoped()
-}
-
-func (rs *REST) New() runtime.Object {
-	return rs.services.New()
-}
-
-func (rs *REST) NewList() runtime.Object {
-	return rs.services.NewList()
-}
-
-func (rs *REST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	return rs.services.Get(ctx, name, options)
-}
-
-func (rs *REST) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
-	return rs.services.List(ctx, options)
-}
-
-func (rs *REST) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
-	return rs.services.Watch(ctx, options)
-}
-
-func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
-	return rs.services.Create(ctx, obj, createValidation, options)
 }
 
 func (al *RESTAllocStuff) allocateCreate(service *api.Service, dryRun bool) (transaction, error) {
@@ -165,10 +91,6 @@ func (al *RESTAllocStuff) allocateCreate(service *api.Service, dryRun bool) (tra
 	}
 
 	return result, nil
-}
-
-func (rs *REST) Delete(ctx context.Context, id string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	return rs.services.Delete(ctx, id, deleteValidation, options)
 }
 
 func (al *RESTAllocStuff) releaseAllocatedResources(svc *api.Service) {
@@ -233,10 +155,6 @@ func (al *RESTAllocStuff) healthCheckNodePortUpdate(oldService, service *api.Ser
 		nodePortOp.ReleaseDeferred(int(oldHealthCheckNodePort))
 	}
 	return true, nil
-}
-
-func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	return rs.services.Update(ctx, name, objInfo, createValidation, updateValidation, forceAllowCreate, options)
 }
 
 func (al *RESTAllocStuff) allocateUpdate(service, oldService *api.Service, dryRun bool) (transaction, error) {
@@ -310,23 +228,6 @@ func (al *RESTAllocStuff) allocUpdateServiceNodePortsNew(service, oldService *ap
 	}
 
 	return txn, nil
-}
-
-// GetResetFields implements rest.ResetFieldsStrategy
-func (rs *REST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
-	return rs.services.GetResetFields()
-}
-
-// Implement Redirector.
-var _ = rest.Redirector(&REST{})
-
-// ResourceLocation returns a URL to which one can send traffic for the specified service.
-func (rs *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
-	return rs.services.ResourceLocation(ctx, id)
-}
-
-func (r *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
-	return r.services.ConvertToTable(ctx, object, tableOptions)
 }
 
 func (al *RESTAllocStuff) allocClusterIPs(service *api.Service, toAlloc map[api.IPFamily]string, dryRun bool) (map[api.IPFamily]string, error) {

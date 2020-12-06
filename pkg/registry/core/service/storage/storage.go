@@ -70,6 +70,14 @@ type GenericREST struct {
 	proxyTransport    http.RoundTripper
 }
 
+var (
+	_ rest.CategoriesProvider     = &GenericREST{}
+	_ rest.ShortNamesProvider     = &GenericREST{}
+	_ rest.StorageVersionProvider = &GenericREST{}
+	_ rest.ResetFieldsStrategy    = &GenericREST{}
+	_ rest.Redirector             = &GenericREST{}
+)
+
 // NewGenericREST returns a RESTStorage object that will work against services.
 func NewGenericREST(
 	optsGetter generic.RESTOptionsGetter,
@@ -370,9 +378,6 @@ func (r *GenericREST) beginUpdate(ctx context.Context, obj, oldObj runtime.Objec
 
 	return finish, nil
 }
-
-// Implement Redirector.
-var _ rest.Redirector = &GenericREST{}
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
 func (r *GenericREST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
