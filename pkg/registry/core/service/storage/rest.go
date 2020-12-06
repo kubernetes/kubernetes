@@ -37,7 +37,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
-	registry "k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	netutils "k8s.io/utils/net"
@@ -79,26 +78,6 @@ type ServiceStorage interface {
 	rest.StorageVersionProvider
 	rest.ResetFieldsStrategy
 	rest.Redirector
-}
-
-// NewREST returns a wrapper around the underlying generic storage and performs
-// allocations and deallocations of various service related resources like ports.
-// TODO: all transactional behavior should be supported from within generic storage
-//   or the strategy.
-func NewREST(
-	services ServiceStorage,
-	defaultFamily api.IPFamily,
-	proxyTransport http.RoundTripper,
-) (*REST, *registry.ProxyREST) {
-
-	klog.V(0).Infof("the default service ipfamily for this cluster is: %s", string(defaultFamily))
-
-	rest := &REST{
-		services:       services,
-		proxyTransport: proxyTransport,
-	}
-
-	return rest, &registry.ProxyREST{Redirector: rest, ProxyTransport: proxyTransport}
 }
 
 // This is a trasitionary function to facilitate service REST flattening.

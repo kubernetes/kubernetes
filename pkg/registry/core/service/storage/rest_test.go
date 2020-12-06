@@ -17,28 +17,18 @@ limitations under the License.
 package storage
 
 import (
-	"context"
-	"fmt"
 	"net"
-	"net/http"
-	"net/url"
 	"reflect"
-	"sort"
 	"testing"
 
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/apiserver/pkg/util/dryrun"
 	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	endpointstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
@@ -47,143 +37,9 @@ import (
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
-// TODO(wojtek-t): Cleanup this file.
-// It is now testing mostly the same things as other resources but
-// in a completely different way. We should unify it.
-
-type serviceStorage struct {
-	inner    *GenericREST
-	Services map[string]*api.Service
-}
-
-func (s *serviceStorage) saveService(svc *api.Service) {
-	if s.Services == nil {
-		s.Services = map[string]*api.Service{}
-	}
-	s.Services[svc.Name] = svc.DeepCopy()
-}
-
-func (s *serviceStorage) NamespaceScoped() bool {
-	return true
-}
-
-func (s *serviceStorage) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	if s.Services[name] == nil {
-		return nil, fmt.Errorf("service %q not found", name)
-	}
-	return s.Services[name].DeepCopy(), nil
-}
-
-func getService(getter rest.Getter, ctx context.Context, name string, options *metav1.GetOptions) (*api.Service, error) {
-	obj, err := getter.Get(ctx, name, options)
-	if err != nil {
-		return nil, err
-	}
-	return obj.(*api.Service), nil
-}
-
-func (s *serviceStorage) NewList() runtime.Object {
-	panic("not implemented")
-}
-
-func (s *serviceStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
-	ns, _ := genericapirequest.NamespaceFrom(ctx)
-
-	keys := make([]string, 0, len(s.Services))
-	for k := range s.Services {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	res := new(api.ServiceList)
-	for _, k := range keys {
-		svc := s.Services[k]
-		if ns == metav1.NamespaceAll || ns == svc.Namespace {
-			res.Items = append(res.Items, *svc)
-		}
-	}
-
-	return res, nil
-}
-
-func (s *serviceStorage) New() runtime.Object {
-	panic("not implemented")
-}
-
-func (s *serviceStorage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
-	ret, err := s.inner.Create(ctx, obj, createValidation, options)
-	if err != nil {
-		return ret, err
-	}
-
-	if dryrun.IsDryRun(options.DryRun) {
-		return ret.DeepCopyObject(), nil
-	}
-	svc := ret.(*api.Service)
-	s.saveService(svc)
-
-	return s.Services[svc.Name].DeepCopy(), nil
-}
-
-func (s *serviceStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	ret, created, err := s.inner.Update(ctx, name, objInfo, createValidation, updateValidation, forceAllowCreate, options)
-	if err != nil {
-		return ret, created, err
-	}
-	if dryrun.IsDryRun(options.DryRun) {
-		return ret.DeepCopyObject(), created, err
-	}
-	svc := ret.(*api.Service)
-	s.saveService(svc)
-
-	return s.Services[name].DeepCopy(), created, nil
-}
-
-func (s *serviceStorage) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	ret, del, err := s.inner.Delete(ctx, name, deleteValidation, options)
-	if err != nil {
-		return ret, del, err
-	}
-
-	if dryrun.IsDryRun(options.DryRun) {
-		return ret.DeepCopyObject(), del, nil
-	}
-	delete(s.Services, name)
-
-	return ret.DeepCopyObject(), del, err
-}
-
-func (s *serviceStorage) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
-	panic("not implemented")
-}
-
-func (s *serviceStorage) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
-	panic("not implemented")
-}
-
-func (s *serviceStorage) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
-	panic("not implemented")
-}
-
-func (s *serviceStorage) StorageVersion() runtime.GroupVersioner {
-	panic("not implemented")
-}
-
-// GetResetFields implements rest.ResetFieldsStrategy
-func (s *serviceStorage) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
-	//FIXME: should panic?
-	return nil
-}
-
-// ResourceLocation implements rest.Redirector
-func (s *serviceStorage) ResourceLocation(ctx context.Context, id string) (remoteLocation *url.URL, transport http.RoundTripper, err error) {
-	panic("not implemented")
-}
-
-func NewTestREST(t *testing.T, ipFamilies []api.IPFamily) (*REST, *etcd3testing.EtcdTestServer) {
+func NewTestREST(t *testing.T, ipFamilies []api.IPFamily) (*GenericREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 
 	var rPrimary ipallocator.Interface
@@ -228,15 +84,6 @@ func NewTestREST(t *testing.T, ipFamilies []api.IPFamily) (*REST, *etcd3testing.
 		ipAllocators[rSecondary.IPFamily()] = rSecondary
 	}
 
-	inner := newInnerREST(t, etcdStorage, ipAllocators, portAllocator)
-	rest, _ := NewREST(inner, rPrimary.IPFamily(), nil)
-
-	return rest, server
-}
-
-// This bridges to the "inner" REST implementation so tests continue to run
-// during the delayering of service REST code.
-func newInnerREST(t *testing.T, etcdStorage *storagebackend.ConfigForResource, ipAllocs map[api.IPFamily]ipallocator.Interface, portAlloc portallocator.Interface) *serviceStorage {
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage.ForResource(schema.GroupResource{Resource: "services"}),
 		Decorator:               generic.UndecoratedStorage,
@@ -249,11 +96,12 @@ func newInnerREST(t *testing.T, etcdStorage *storagebackend.ConfigForResource, i
 		ResourcePrefix: "endpoints",
 	})
 
-	inner, _, _, err := NewGenericREST(restOptions, api.IPv4Protocol, ipAllocs, portAlloc, endpoints, nil, nil)
+	rest, _, _, err := NewGenericREST(restOptions, api.IPv4Protocol, ipAllocators, portAllocator, endpoints, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
-	return &serviceStorage{inner: inner}
+
+	return rest, server
 }
 
 func makeIPNet(t *testing.T) *net.IPNet {

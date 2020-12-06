@@ -261,7 +261,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		serviceIPAllocators[secondaryServiceClusterIPAllocator.IPFamily()] = secondaryServiceClusterIPAllocator
 	}
 
-	serviceRESTStorage, serviceStatusStorage, _, err := servicestore.NewGenericREST(
+	serviceRESTStorage, serviceStatusStorage, serviceRESTProxy, err := servicestore.NewGenericREST(
 		restOptionsGetter,
 		serviceClusterIPAllocator.IPFamily(),
 		serviceIPAllocators,
@@ -272,11 +272,6 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	if err != nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
-
-	serviceRest, serviceRestProxy := servicestore.NewREST(
-		serviceRESTStorage,
-		serviceClusterIPAllocator.IPFamily(),
-		c.ProxyTransport)
 
 	restStorageMap := map[string]rest.Storage{
 		"pods":             podStorage.Pod,
@@ -294,8 +289,8 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		"replicationControllers":        controllerStorage.Controller,
 		"replicationControllers/status": controllerStorage.Status,
 
-		"services":        serviceRest,
-		"services/proxy":  serviceRestProxy,
+		"services":        serviceRESTStorage,
+		"services/proxy":  serviceRESTProxy,
 		"services/status": serviceStatusStorage,
 
 		"endpoints": endpointsStorage,
