@@ -42,7 +42,6 @@ import (
 	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	endpointstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
-	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -187,25 +186,6 @@ func (s *serviceStorage) ResourceLocation(ctx context.Context, id string) (remot
 func NewTestREST(t *testing.T, ipFamilies []api.IPFamily) (*REST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 
-	podStorage, err := podstore.NewStorage(generic.RESTOptions{
-		StorageConfig:           etcdStorage.ForResource(schema.GroupResource{Resource: "pods"}),
-		Decorator:               generic.UndecoratedStorage,
-		DeleteCollectionWorkers: 3,
-		ResourcePrefix:          "pods",
-	}, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("unexpected error from REST storage: %v", err)
-	}
-
-	endpointStorage, err := endpointstore.NewREST(generic.RESTOptions{
-		StorageConfig:  etcdStorage.ForResource(schema.GroupResource{Resource: "endpoints"}),
-		Decorator:      generic.UndecoratedStorage,
-		ResourcePrefix: "endpoints",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error from REST storage: %v", err)
-	}
-
 	var rPrimary ipallocator.Interface
 	var rSecondary ipallocator.Interface
 
@@ -214,6 +194,7 @@ func NewTestREST(t *testing.T, ipFamilies []api.IPFamily) (*REST, *etcd3testing.
 	}
 	for i, family := range ipFamilies {
 		var r ipallocator.Interface
+		var err error
 		switch family {
 		case api.IPv4Protocol:
 			r, err = ipallocator.NewInMemory(makeIPNet(t))
@@ -248,7 +229,7 @@ func NewTestREST(t *testing.T, ipFamilies []api.IPFamily) (*REST, *etcd3testing.
 	}
 
 	inner := newInnerREST(t, etcdStorage, ipAllocators, portAllocator)
-	rest, _ := NewREST(inner, endpointStorage, podStorage.Pod, rPrimary.IPFamily(), ipAllocators, portAllocator, nil)
+	rest, _ := NewREST(inner, rPrimary.IPFamily(), nil)
 
 	return rest, server
 }
