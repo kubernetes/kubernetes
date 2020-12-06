@@ -261,12 +261,14 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		serviceIPAllocators[secondaryServiceClusterIPAllocator.IPFamily()] = secondaryServiceClusterIPAllocator
 	}
 
-	serviceRESTStorage, serviceStatusStorage, err := servicestore.NewGenericREST(
+	serviceRESTStorage, serviceStatusStorage, _, err := servicestore.NewGenericREST(
 		restOptionsGetter,
 		serviceClusterIPAllocator.IPFamily(),
 		serviceIPAllocators,
 		serviceNodePortAllocator,
-		endpointsStorage)
+		endpointsStorage,
+		podStorage.Pod,
+		c.ProxyTransport)
 	if err != nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}

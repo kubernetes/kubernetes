@@ -19,17 +19,14 @@ package storage
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
-	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
@@ -84,6 +81,7 @@ type ServiceStorage interface {
 	rest.Watcher
 	rest.StorageVersionProvider
 	rest.ResetFieldsStrategy
+	rest.Redirector
 }
 
 // NewREST returns a wrapper around the underlying generic storage and performs
@@ -358,74 +356,7 @@ var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
 func (rs *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
-	// Allow ID as "svcname", "svcname:port", or "scheme:svcname:port".
-	svcScheme, svcName, portStr, valid := utilnet.SplitSchemeNamePort(id)
-	if !valid {
-		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid service request %q", id))
-	}
-
-	// If a port *number* was specified, find the corresponding service port name
-	if portNum, err := strconv.ParseInt(portStr, 10, 64); err == nil {
-		obj, err := rs.services.Get(ctx, svcName, &metav1.GetOptions{})
-		if err != nil {
-			return nil, nil, err
-		}
-		svc := obj.(*api.Service)
-		found := false
-		for _, svcPort := range svc.Spec.Ports {
-			if int64(svcPort.Port) == portNum {
-				// use the declared port's name
-				portStr = svcPort.Name
-				found = true
-				break
-			}
-		}
-		if !found {
-			return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no service port %d found for service %q", portNum, svcName))
-		}
-	}
-
-	obj, err := rs.endpoints.Get(ctx, svcName, &metav1.GetOptions{})
-	if err != nil {
-		return nil, nil, err
-	}
-	eps := obj.(*api.Endpoints)
-	if len(eps.Subsets) == 0 {
-		return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", svcName))
-	}
-	// Pick a random Subset to start searching from.
-	ssSeed := rand.Intn(len(eps.Subsets))
-	// Find a Subset that has the port.
-	for ssi := 0; ssi < len(eps.Subsets); ssi++ {
-		ss := &eps.Subsets[(ssSeed+ssi)%len(eps.Subsets)]
-		if len(ss.Addresses) == 0 {
-			continue
-		}
-		for i := range ss.Ports {
-			if ss.Ports[i].Name == portStr {
-				addrSeed := rand.Intn(len(ss.Addresses))
-				// This is a little wonky, but it's expensive to test for the presence of a Pod
-				// So we repeatedly try at random and validate it, this means that for an invalid
-				// service with a lot of endpoints we're going to potentially make a lot of calls,
-				// but in the expected case we'll only make one.
-				for try := 0; try < len(ss.Addresses); try++ {
-					addr := ss.Addresses[(addrSeed+try)%len(ss.Addresses)]
-					if err := isValidAddress(ctx, &addr, rs.pods); err != nil {
-						utilruntime.HandleError(fmt.Errorf("Address %v isn't valid (%v)", addr, err))
-						continue
-					}
-					ip := addr.IP
-					port := int(ss.Ports[i].Port)
-					return &url.URL{
-						Scheme: svcScheme,
-						Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
-					}, rs.proxyTransport, nil
-				}
-				utilruntime.HandleError(fmt.Errorf("Failed to find a valid address, skipping subset: %v", ss))
-			}
-		}
-	}
-	return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
+	return rs.services.ResourceLocation(ctx, id)
 }
 
 func (r *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
