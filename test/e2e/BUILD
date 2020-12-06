@@ -34,6 +34,7 @@ go_test(
         "//test/e2e/lifecycle:go_default_library",
         "//test/e2e/lifecycle/bootstrap:go_default_library",
         "//test/e2e/network:go_default_library",
+        "//test/e2e/network/netpol:go_default_library",
         "//test/e2e/node:go_default_library",
         "//test/e2e/scheduling:go_default_library",
         "//test/e2e/storage:go_default_library",
