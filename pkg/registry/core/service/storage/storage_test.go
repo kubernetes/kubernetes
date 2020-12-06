@@ -17,7 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"reflect"
@@ -39,9 +38,12 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	epstest "k8s.io/kubernetes/pkg/api/endpoints/testing"
 	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	endpointstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
+	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -64,16 +66,6 @@ func makePortAllocator(ports machineryutilnet.PortRange) portallocator.Interface
 	return al
 }
 
-type fakeEndpoints struct{}
-
-func (fakeEndpoints) Delete(_ context.Context, _ string, _ rest.ValidateObjectFunc, _ *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	return nil, false, nil
-}
-
-func (fakeEndpoints) Get(_ context.Context, _ string, _ *metav1.GetOptions) (runtime.Object, error) {
-	return nil, nil
-}
-
 func ipIsAllocated(t *testing.T, alloc ipallocator.Interface, ipstr string) bool {
 	t.Helper()
 	ip := netutils.ParseIPSloppy(ipstr)
@@ -94,6 +86,10 @@ func portIsAllocated(t *testing.T, alloc portallocator.Interface, port int32) bo
 }
 
 func newStorage(t *testing.T, ipFamilies []api.IPFamily) (*GenericREST, *StatusREST, *etcd3testing.EtcdTestServer) {
+	return newStorageWithPods(t, ipFamilies, nil, nil)
+}
+
+func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod, endpoints []*api.Endpoints) (*GenericREST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage.ForResource(schema.GroupResource{Resource: "services"}),
@@ -118,7 +114,45 @@ func newStorage(t *testing.T, ipFamilies []api.IPFamily) (*GenericREST, *StatusR
 
 	portAlloc := makePortAllocator(*(machineryutilnet.ParsePortRangeOrDie("30000-32767")))
 
-	serviceStorage, statusStorage, err := NewGenericREST(restOptions, ipFamilies[0], ipAllocs, portAlloc, fakeEndpoints{})
+	// Not all tests will specify pods and endpoints.
+	podStorage, err := podstore.NewStorage(generic.RESTOptions{
+		StorageConfig:           etcdStorage,
+		Decorator:               generic.UndecoratedStorage,
+		DeleteCollectionWorkers: 3,
+		ResourcePrefix:          "pods",
+	}, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	if pods != nil && len(pods) > 0 {
+		ctx := genericapirequest.NewDefaultContext()
+		for ix := range pods {
+			key, _ := podStorage.Pod.KeyFunc(ctx, pods[ix].Name)
+			if err := podStorage.Pod.Storage.Create(ctx, key, &pods[ix], nil, 0, false); err != nil {
+				t.Fatalf("Couldn't create pod: %v", err)
+			}
+		}
+	}
+
+	endpointsStorage, err := endpointstore.NewREST(generic.RESTOptions{
+		StorageConfig:  etcdStorage,
+		Decorator:      generic.UndecoratedStorage,
+		ResourcePrefix: "endpoints",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	if endpoints != nil && len(endpoints) > 0 {
+		ctx := genericapirequest.NewDefaultContext()
+		for ix := range endpoints {
+			key, _ := endpointsStorage.KeyFunc(ctx, endpoints[ix].Name)
+			if err := endpointsStorage.Store.Storage.Create(ctx, key, endpoints[ix], nil, 0, false); err != nil {
+				t.Fatalf("Couldn't create endpoint: %v", err)
+			}
+		}
+	}
+
+	serviceStorage, statusStorage, _, err := NewGenericREST(restOptions, ipFamilies[0], ipAllocs, portAlloc, endpointsStorage, podStorage.Pod, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -7229,3 +7263,137 @@ func TestFeatureExternalTrafficPolicy(t *testing.T) {
 // lbsourceranges, externalname, itp, PublishNotReadyAddresses,
 // ipfamilypolicy and list,
 // AllocateLoadBalancerNodePorts, LoadBalancerClass, status
+
+func TestServiceRegistryResourceLocation(t *testing.T) {
+	pods := []api.Pod{
+		makePod("unnamed", "1.2.3.4", "1.2.3.5"),
+		makePod("named", "1.2.3.6", "1.2.3.7"),
+		makePod("no-endpoints", "9.9.9.9"), // to prove this does not get chosen
+	}
+
+	endpoints := []*api.Endpoints{
+		epstest.MakeEndpoints("unnamed",
+			[]api.EndpointAddress{
+				epstest.MakeEndpointAddress("1.2.3.4", "unnamed"),
+			},
+			[]api.EndpointPort{
+				epstest.MakeEndpointPort("", 80),
+			}),
+		epstest.MakeEndpoints("unnamed2",
+			[]api.EndpointAddress{
+				epstest.MakeEndpointAddress("1.2.3.5", "unnamed"),
+			},
+			[]api.EndpointPort{
+				epstest.MakeEndpointPort("", 80),
+			}),
+		epstest.MakeEndpoints("named",
+			[]api.EndpointAddress{
+				epstest.MakeEndpointAddress("1.2.3.6", "named"),
+			},
+			[]api.EndpointPort{
+				epstest.MakeEndpointPort("p", 80),
+				epstest.MakeEndpointPort("q", 81),
+			}),
+		epstest.MakeEndpoints("no-endpoints", nil, nil), // to prove this does not get chosen
+	}
+
+	storage, _, server := newStorageWithPods(t, []api.IPFamily{api.IPv4Protocol}, pods, endpoints)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+
+	ctx := genericapirequest.NewDefaultContext()
+	for _, name := range []string{"unnamed", "unnamed2", "no-endpoints"} {
+		_, err := storage.Create(ctx,
+			svctest.MakeService(name,
+				svctest.SetPorts(
+					svctest.MakeServicePort("", 93, intstr.FromInt(80), api.ProtocolTCP))),
+			rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("unexpected error creating service %q: %v", name, err)
+		}
+
+	}
+	_, err := storage.Create(ctx,
+		svctest.MakeService("named",
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 93, intstr.FromInt(80), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 76, intstr.FromInt(81), api.ProtocolTCP))),
+		rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error creating service %q: %v", "named", err)
+	}
+	redirector := rest.Redirector(storage)
+
+	cases := []struct {
+		query  string
+		err    bool
+		expect string
+	}{{
+		query:  "unnamed",
+		expect: "//1.2.3.4:80",
+	}, {
+		query:  "unnamed:",
+		expect: "//1.2.3.4:80",
+	}, {
+		query:  "unnamed:93",
+		expect: "//1.2.3.4:80",
+	}, {
+		query:  "http:unnamed:",
+		expect: "http://1.2.3.4:80",
+	}, {
+		query:  "http:unnamed:93",
+		expect: "http://1.2.3.4:80",
+	}, {
+		query: "unnamed:80",
+		err:   true,
+	}, {
+		query:  "unnamed2",
+		expect: "//1.2.3.5:80",
+	}, {
+		query:  "named:p",
+		expect: "//1.2.3.6:80",
+	}, {
+		query:  "named:q",
+		expect: "//1.2.3.6:81",
+	}, {
+		query:  "named:93",
+		expect: "//1.2.3.6:80",
+	}, {
+		query:  "named:76",
+		expect: "//1.2.3.6:81",
+	}, {
+		query:  "http:named:p",
+		expect: "http://1.2.3.6:80",
+	}, {
+		query:  "http:named:q",
+		expect: "http://1.2.3.6:81",
+	}, {
+		query: "named:bad",
+		err:   true,
+	}, {
+		query: "no-endpoints",
+		err:   true,
+	}, {
+		query: "non-existent",
+		err:   true,
+	}}
+	for _, tc := range cases {
+		t.Run(tc.query, func(t *testing.T) {
+			location, _, err := redirector.ResourceLocation(ctx, tc.query)
+			if tc.err == false && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.err == true && err == nil {
+				t.Fatalf("unexpected success")
+			}
+			if !tc.err {
+				if location == nil {
+					t.Errorf("unexpected location: %v", location)
+				}
+				if e, a := tc.expect, location.String(); e != a {
+					t.Errorf("expected %q, but got %q", e, a)
+				}
+			}
+		})
+	}
+}

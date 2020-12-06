@@ -18,16 +18,24 @@ package storage
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
+	"net"
+	"net/http"
+	"net/url"
+	"strconv"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/cri-api/pkg/errors"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -48,12 +56,18 @@ type EndpointsStorage interface {
 	rest.GracefulDeleter
 }
 
+type PodStorage interface {
+	rest.Getter
+}
+
 type GenericREST struct {
 	*genericregistry.Store
 	primaryIPFamily   api.IPFamily
 	secondaryIPFamily api.IPFamily
 	alloc             RESTAllocStuff
 	endpoints         EndpointsStorage
+	pods              PodStorage
+	proxyTransport    http.RoundTripper
 }
 
 // NewGenericREST returns a RESTStorage object that will work against services.
@@ -62,7 +76,9 @@ func NewGenericREST(
 	serviceIPFamily api.IPFamily,
 	ipAllocs map[api.IPFamily]ipallocator.Interface,
 	portAlloc portallocator.Interface,
-	endpoints EndpointsStorage) (*GenericREST, *StatusREST, error) {
+	endpoints EndpointsStorage,
+	pods PodStorage,
+	proxyTransport http.RoundTripper) (*GenericREST, *StatusREST, *svcreg.ProxyREST, error) {
 
 	strategy, _ := svcreg.StrategyForServiceCIDRs(ipAllocs[serviceIPFamily].CIDR(), len(ipAllocs) > 1)
 
@@ -81,7 +97,7 @@ func NewGenericREST(
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	statusStore := *store
@@ -100,13 +116,15 @@ func NewGenericREST(
 		secondaryIPFamily: secondaryIPFamily,
 		alloc:             makeAlloc(serviceIPFamily, ipAllocs, portAlloc),
 		endpoints:         endpoints,
+		pods:              pods,
+		proxyTransport:    proxyTransport,
 	}
 	store.Decorator = genericStore.defaultOnRead
 	store.AfterDelete = genericStore.afterDelete
 	store.BeginCreate = genericStore.beginCreate
 	store.BeginUpdate = genericStore.beginUpdate
 
-	return genericStore, &StatusREST{store: &statusStore}, nil
+	return genericStore, &StatusREST{store: &statusStore}, &svcreg.ProxyREST{Redirector: genericStore, ProxyTransport: proxyTransport}, nil
 }
 
 // otherFamily returns the non-selected IPFamily.  This assumes the input is
@@ -351,4 +369,80 @@ func (r *GenericREST) beginUpdate(ctx context.Context, obj, oldObj runtime.Objec
 	}
 
 	return finish, nil
+}
+
+// Implement Redirector.
+var _ rest.Redirector = &GenericREST{}
+
+// ResourceLocation returns a URL to which one can send traffic for the specified service.
+func (r *GenericREST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
+	// Allow ID as "svcname", "svcname:port", or "scheme:svcname:port".
+	svcScheme, svcName, portStr, valid := utilnet.SplitSchemeNamePort(id)
+	if !valid {
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid service request %q", id))
+	}
+
+	// If a port *number* was specified, find the corresponding service port name
+	if portNum, err := strconv.ParseInt(portStr, 10, 64); err == nil {
+		obj, err := r.Get(ctx, svcName, &metav1.GetOptions{})
+		if err != nil {
+			return nil, nil, err
+		}
+		svc := obj.(*api.Service)
+		found := false
+		for _, svcPort := range svc.Spec.Ports {
+			if int64(svcPort.Port) == portNum {
+				// use the declared port's name
+				portStr = svcPort.Name
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no service port %d found for service %q", portNum, svcName))
+		}
+	}
+
+	obj, err := r.endpoints.Get(ctx, svcName, &metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, err
+	}
+	eps := obj.(*api.Endpoints)
+	if len(eps.Subsets) == 0 {
+		return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", svcName))
+	}
+	// Pick a random Subset to start searching from.
+	ssSeed := rand.Intn(len(eps.Subsets))
+	// Find a Subset that has the port.
+	for ssi := 0; ssi < len(eps.Subsets); ssi++ {
+		ss := &eps.Subsets[(ssSeed+ssi)%len(eps.Subsets)]
+		if len(ss.Addresses) == 0 {
+			continue
+		}
+		for i := range ss.Ports {
+			if ss.Ports[i].Name == portStr {
+				addrSeed := rand.Intn(len(ss.Addresses))
+				// This is a little wonky, but it's expensive to test for the presence of a Pod
+				// So we repeatedly try at random and validate it, this means that for an invalid
+				// service with a lot of endpoints we're going to potentially make a lot of calls,
+				// but in the expected case we'll only make one.
+				for try := 0; try < len(ss.Addresses); try++ {
+					addr := ss.Addresses[(addrSeed+try)%len(ss.Addresses)]
+					// TODO(thockin): do we really need this check?
+					if err := isValidAddress(ctx, &addr, r.pods); err != nil {
+						utilruntime.HandleError(fmt.Errorf("Address %v isn't valid (%v)", addr, err))
+						continue
+					}
+					ip := addr.IP
+					port := int(ss.Ports[i].Port)
+					return &url.URL{
+						Scheme: svcScheme,
+						Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
+					}, r.proxyTransport, nil
+				}
+				utilruntime.HandleError(fmt.Errorf("Failed to find a valid address, skipping subset: %v", ss))
+			}
+		}
+	}
+	return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
 }
