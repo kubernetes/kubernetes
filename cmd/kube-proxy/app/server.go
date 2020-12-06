@@ -88,6 +88,7 @@ import (
 )
 
 const (
+	proxyConfigArg       = "config"
 	proxyModeUserspace   = "userspace"
 	proxyModeIPTables    = "iptables"
 	proxyModeIPVS        = "ipvs"
@@ -142,7 +143,7 @@ type Options struct {
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	o.addOSFlags(fs)
 
-	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file.")
+	fs.StringVar(&o.ConfigFile, proxyConfigArg, o.ConfigFile, "The path to the kube-proxy configuration file, which adheres the the kube-proxy API configuration object.")
 	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the default configuration values to this file and exit.")
 	fs.StringVar(&o.config.ClientConnection.Kubeconfig, "kubeconfig", o.config.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization information (the master location can be overridden by the master flag).")
 	fs.StringVar(&o.config.ClusterCIDR, "cluster-cidr", o.config.ClusterCIDR, "The CIDR range of pods in the cluster. When configured, traffic sent to a Service cluster IP from outside this range will be masqueraded and traffic sent from pods to an external LoadBalancer IP will be directed to the respective cluster IP instead")
@@ -469,26 +470,25 @@ func NewProxyCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "kube-proxy",
-		Long: `The Kubernetes network proxy runs on each node. This
-reflects services as defined in the Kubernetes API on each node and can do simple
-TCP, UDP, and SCTP stream forwarding or round robin TCP, UDP, and SCTP forwarding across a set of backends.
-Service cluster IPs and ports are currently found through Docker-links-compatible
-environment variables specifying ports opened by the service proxy. There is an optional
-addon that provides cluster DNS for these cluster IPs. The user must create a service
-with the apiserver API to configure the proxy.`,
+		Long: `The Kubernetes network proxy generally should run on each node of a cluster which needs to access Service IPs. It
+reflects services (as defined in the Kubernetes API) on each node and can do simple
+TCP, UDP, and SCTP stream forwarding or round robin TCP, UDP, and SCTP forwarding to backend IP addresses, or "endpoints".
+For DNS, consult your node's DNS implementation, which usually is aware of the "kube-dns" internal service (which maps services to virtual IP addresses, which are routed via kube-proxy).
+If pods/nodes don't have access to dynamic DNS, then service IPs are redundantly defined in environment variables available in the "docker links" format (SERVICE_PORT_PROTOCOL, i.e. DB_PORT_5432_TCP) for pre-existing services.
+These variables are are injected into a pod on startup.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
 
 			if err := initForOS(opts.WindowsService); err != nil {
-				klog.Fatalf("failed OS init: %v", err)
+				klog.Fatalf("failed OS init %v, config %v", err, opts)
 			}
 
 			if err := opts.Complete(); err != nil {
-				klog.Fatalf("failed complete: %v", err)
+				klog.Fatalf("failed complete: %v, config %v", err, opts)
 			}
 			if err := opts.Validate(); err != nil {
-				klog.Fatalf("failed validate: %v", err)
+				klog.Fatalf("failed validate: %v, config %v", err, opts)
 			}
 
 			if err := opts.Run(); err != nil {
@@ -513,9 +513,11 @@ with the apiserver API to configure the proxy.`,
 
 	opts.AddFlags(cmd.Flags())
 
-	// TODO handle error
-	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
-
+	err = cmd.MarkFlagFilename(proxyConfigArg, "yaml", "yml", "json")
+	if err != nil {
+		// unlikely this will ever happen, unless configArg is out-of-sync with the flags above, so just warn
+		klog.Warningf("failed to mark config flag, %v", err)
+	}
 	return cmd
 }
 
