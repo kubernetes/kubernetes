@@ -29,11 +29,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // strategy implements behavior for Secret objects
@@ -80,14 +78,7 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	return validation.ValidateSecretUpdate(obj.(*api.Secret), old.(*api.Secret))
 }
 
-func isImmutableInUse(secret *api.Secret) bool {
-	return secret != nil && secret.Immutable != nil
-}
-
 func dropDisabledFields(secret *api.Secret, oldSecret *api.Secret) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ImmutableEphemeralVolumes) && !isImmutableInUse(oldSecret) {
-		secret.Immutable = nil
-	}
 }
 
 func (strategy) AllowUnconditionalUpdate() bool {

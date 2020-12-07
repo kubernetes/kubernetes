@@ -31,14 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -197,8 +194,6 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 }
 
 func TestImmutableSecretStopsTheReflector(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImmutableEphemeralVolumes, true)()
-
 	secret := func(rv string, immutable bool) *v1.Secret {
 		result := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{

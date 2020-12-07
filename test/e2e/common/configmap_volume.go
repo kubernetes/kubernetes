@@ -488,9 +488,16 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 
 	})
 
-	// It should be forbidden to change data for configmaps marked as immutable, but
-	// allowed to modify its metadata independently of its state.
-	ginkgo.It("should be immutable if `immutable` field is set", func() {
+	/*
+		Release: v1.21
+		Testname: ConfigMap Volume, immutability
+		Description: Create a ConfigMap. Update it's data field, the update MUST succeed.
+			Mark the ConfigMap as immutable, the update MUST succeed. Try to update its data, the update MUST fail.
+			Try to mark the ConfigMap back as not immutable, the update MUST fail.
+			Try to update the ConfigMap`s metadata (labels), the update must succeed.
+			Try to delete the ConfigMap, the deletion must succeed.
+	*/
+	framework.ConformanceIt("should be immutable if `immutable` field is set", func() {
 		name := "immutable"
 		configMap := newConfigMap(f, name)
 

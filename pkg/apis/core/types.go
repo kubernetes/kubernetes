@@ -4945,7 +4945,6 @@ type Secret struct {
 
 	// Immutable field, if set, ensures that data stored in the Secret cannot
 	// be updated (only object metadata can be modified).
-	// This is a beta field enabled by ImmutableEphemeralVolumes feature gate.
 	// +optional
 	Immutable *bool
 
@@ -5073,7 +5072,6 @@ type ConfigMap struct {
 
 	// Immutable field, if set, ensures that data stored in the ConfigMap cannot
 	// be updated (only object metadata can be modified).
-	// This is a beta field enabled by ImmutableEphemeralVolumes feature gate.
 	// +optional
 	Immutable *bool
 
