@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
@@ -37,14 +38,22 @@ import (
 )
 
 var (
+	azureNodeProviderIDRE    = regexp.MustCompile(`^azure:///subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Compute/(?:.*)`)
+	azureResourceGroupNameRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/(?:.*)`)
+)
+
+const (
+	vmListCacheKey                       = "vmListCacheKey"
 	vmCacheTTLDefaultInSeconds           = 60
 	loadBalancerCacheTTLDefaultInSeconds = 120
 	nsgCacheTTLDefaultInSeconds          = 120
 	routeTableCacheTTLDefaultInSeconds   = 120
-
-	azureNodeProviderIDRE    = regexp.MustCompile(`^azure:///subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Compute/(?:.*)`)
-	azureResourceGroupNameRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/(?:.*)`)
 )
+
+type vmEntry struct {
+	vm         *compute.VirtualMachine
+	lastUpdate time.Time
+}
 
 // checkExistsFromError inspects an error and returns a true if err is nil,
 // false if error is an autorest.Error with StatusCode=404 and will return the
@@ -64,18 +73,40 @@ func checkResourceExistsFromError(err *retry.Error) (bool, *retry.Error) {
 /// getVirtualMachine calls 'VirtualMachinesClient.Get' with a timed cache
 /// The service side has throttling control that delays responses if there are multiple requests onto certain vm
 /// resource request in short period.
-func (az *Cloud) getVirtualMachine(nodeName types.NodeName, crt azcache.AzureCacheReadType) (vm compute.VirtualMachine, err error) {
+func (az *Cloud) getVirtualMachine(nodeName types.NodeName, crt azcache.AzureCacheReadType) (compute.VirtualMachine, error) {
 	vmName := string(nodeName)
-	cachedVM, err := az.vmCache.Get(vmName, crt)
+	getter := func(vmName string, crt azcache.AzureCacheReadType) (*compute.VirtualMachine, bool, error) {
+		cachedVM, err := az.vmCache.Get(vmListCacheKey, crt)
+		if err != nil {
+			return nil, false, err
+		}
+		virtualMachines := cachedVM.(*sync.Map)
+		if vm, ok := virtualMachines.Load(vmName); ok {
+			result := vm.(*vmEntry)
+			return result.vm, true, nil
+		}
+		return nil, false, nil
+	}
+	vm, found, err := getter(vmName, crt)
 	if err != nil {
-		return vm, err
+		return compute.VirtualMachine{}, err
 	}
+	if !found {
+		klog.V(2).Infof("Couldn't find VM with name %s, refreshing the cache", vmName)
+		vm, found, err = getter(vmName, azcache.CacheReadTypeForceRefresh)
+		if err != nil {
+			return compute.VirtualMachine{}, err
+		}
 
-	if cachedVM == nil {
-		return vm, cloudprovider.InstanceNotFound
 	}
-
-	return *(cachedVM.(*compute.VirtualMachine)), nil
+	if found && vm != nil {
+		return *vm, nil
+	}
+	if !found || vm == nil {
+		klog.Errorf("getVirtualMachine(%s, %d): instance not found", nodeName, crt)
+		return compute.VirtualMachine{}, cloudprovider.InstanceNotFound
+	}
+	return *vm, nil
 }
 
 func (az *Cloud) getRouteTable(crt azcache.AzureCacheReadType) (routeTable network.RouteTable, exists bool, err error) {
@@ -184,24 +215,28 @@ func (az *Cloud) newVMCache() (*azcache.TimedCache, error) {
 			return nil, err
 		}
 
-		vm, verr := az.VirtualMachinesClient.Get(ctx, resourceGroup, key, compute.InstanceView)
-		exists, rerr := checkResourceExistsFromError(verr)
+		vmList, rerr := az.VirtualMachinesClient.List(ctx, resourceGroup)
 		if rerr != nil {
 			return nil, rerr.Error()
 		}
-
-		if !exists {
-			klog.V(2).Infof("Virtual machine %q not found", key)
-			return nil, nil
+		localCache := &sync.Map{}
+		for _, vm := range vmList {
+			vm := vm
+			if vm.Name == nil || *vm.Name == "" {
+				klog.Warning("failed to get the name of VM")
+				continue
+			}
+			if vm.VirtualMachineProperties != nil &&
+				strings.EqualFold(to.String(vm.VirtualMachineProperties.ProvisioningState), string(compute.ProvisioningStateDeleting)) {
+				klog.V(2).Infof("Virtual machine %q is under deleting", to.String(vm.Name))
+				continue
+			}
+			localCache.Store(*vm.Name, &vmEntry{
+				vm:         &vm,
+				lastUpdate: time.Now().UTC(),
+			})
 		}
-
-		if vm.VirtualMachineProperties != nil &&
-			strings.EqualFold(to.String(vm.VirtualMachineProperties.ProvisioningState), string(compute.ProvisioningStateDeleting)) {
-			klog.V(2).Infof("Virtual machine %q is under deleting", key)
-			return nil, nil
-		}
-
-		return &vm, nil
+		return localCache, nil
 	}
 
 	if az.VMCacheTTLInSeconds == 0 {

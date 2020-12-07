@@ -146,12 +146,7 @@ func TestCommonAttachDisk(t *testing.T) {
 			expectedVMs = append(expectedVMs, vm0)
 		}
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		for _, vm := range expectedVMs {
-			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
-		}
-		if len(expectedVMs) == 0 {
-			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
-		}
+		mockVMsClient.EXPECT().List(gomock.Any(), testCloud.ResourceGroup).Return(expectedVMs, nil).MaxTimes(2)
 		mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 		mockDisksClient := testCloud.DisksClient.(*mockdiskclient.MockInterface)
@@ -316,12 +311,7 @@ func TestCommonDetachDisk(t *testing.T) {
 			testCloud.SubscriptionID, testCloud.ResourceGroup)
 		expectedVMs := setTestVirtualMachines(testCloud, test.vmList, false)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		for _, vm := range expectedVMs {
-			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
-		}
-		if len(expectedVMs) == 0 {
-			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
-		}
+		mockVMsClient.EXPECT().List(gomock.Any(), testCloud.ResourceGroup).Return(expectedVMs, nil).MaxTimes(2)
 		if test.isErrorRetriable {
 			testCloud.CloudProviderBackoff = true
 			testCloud.ResourceRequestBackoff = wait.Backoff{Steps: 1}
@@ -372,9 +362,7 @@ func TestGetDiskLun(t *testing.T) {
 		}
 		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		for _, vm := range expectedVMs {
-			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
-		}
+		mockVMsClient.EXPECT().List(gomock.Any(), testCloud.ResourceGroup).Return(expectedVMs, nil)
 
 		lun, err := common.GetDiskLun(test.diskName, test.diskURI, "vm1")
 		assert.Equal(t, test.expectedLun, lun, "TestCase[%d]: %s", i, test.desc)
@@ -418,9 +406,7 @@ func TestGetNextDiskLun(t *testing.T) {
 		}
 		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, test.isDataDisksFull)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		for _, vm := range expectedVMs {
-			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
-		}
+		mockVMsClient.EXPECT().List(gomock.Any(), testCloud.ResourceGroup).Return(expectedVMs, nil)
 
 		lun, err := common.GetNextDiskLun("vm1")
 		assert.Equal(t, test.expectedLun, lun, "TestCase[%d]: %s", i, test.desc)
@@ -440,7 +426,7 @@ func TestDisksAreAttached(t *testing.T) {
 		expectedErr      bool
 	}{
 		{
-			desc:             "an error shall be returned if there's no such instance corresponding to given nodeName",
+			desc:             "no error shall be returned if there's no such instance corresponding to given nodeName",
 			diskNames:        []string{"disk1"},
 			nodeName:         "vm2",
 			expectedAttached: map[string]bool{"disk1": false},
@@ -467,9 +453,7 @@ func TestDisksAreAttached(t *testing.T) {
 		}
 		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		for _, vm := range expectedVMs {
-			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
-		}
+		mockVMsClient.EXPECT().List(gomock.Any(), testCloud.ResourceGroup).Return(expectedVMs, nil).MaxTimes(2)
 		mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, "vm2", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
 
 		attached, err := common.DisksAreAttached(test.diskNames, test.nodeName)

@@ -25,7 +25,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/loadbalancerclient/mockloadbalancerclient"
@@ -53,10 +52,6 @@ func TestGetVirtualMachineWithRetry(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			vmClientErr: &retry.Error{HTTPStatusCode: http.StatusNotFound},
-			expectedErr: cloudprovider.InstanceNotFound,
-		},
-		{
 			vmClientErr: &retry.Error{HTTPStatusCode: http.StatusInternalServerError},
 			expectedErr: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: <nil>"),
 		},
@@ -65,7 +60,7 @@ func TestGetVirtualMachineWithRetry(t *testing.T) {
 	for _, test := range tests {
 		az := GetTestCloud(ctrl)
 		mockVMClient := az.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		mockVMClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "vm", gomock.Any()).Return(compute.VirtualMachine{}, test.vmClientErr)
+		mockVMClient.EXPECT().List(gomock.Any(), az.ResourceGroup).Return([]compute.VirtualMachine{}, test.vmClientErr)
 
 		vm, err := az.GetVirtualMachineWithRetry("vm", cache.CacheReadTypeDefault)
 		assert.Empty(t, vm)
@@ -86,11 +81,6 @@ func TestGetPrivateIPsForMachine(t *testing.T) {
 			expectedPrivateIPs: []string{"1.2.3.4"},
 		},
 		{
-			vmClientErr:        &retry.Error{HTTPStatusCode: http.StatusNotFound},
-			expectedErr:        cloudprovider.InstanceNotFound,
-			expectedPrivateIPs: []string{},
-		},
-		{
 			vmClientErr:        &retry.Error{HTTPStatusCode: http.StatusInternalServerError},
 			expectedErr:        wait.ErrWaitTimeout,
 			expectedPrivateIPs: []string{},
@@ -98,6 +88,7 @@ func TestGetPrivateIPsForMachine(t *testing.T) {
 	}
 
 	expectedVM := compute.VirtualMachine{
+		Name: to.StringPtr("vm"),
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			AvailabilitySet: &compute.SubResource{ID: to.StringPtr("availability-set")},
 			NetworkProfile: &compute.NetworkProfile{
@@ -128,7 +119,7 @@ func TestGetPrivateIPsForMachine(t *testing.T) {
 	for _, test := range tests {
 		az := GetTestCloud(ctrl)
 		mockVMClient := az.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		mockVMClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "vm", gomock.Any()).Return(expectedVM, test.vmClientErr)
+		mockVMClient.EXPECT().List(gomock.Any(), az.ResourceGroup).Return([]compute.VirtualMachine{expectedVM}, test.vmClientErr)
 
 		mockInterfaceClient := az.InterfacesClient.(*mockinterfaceclient.MockInterface)
 		mockInterfaceClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "nic", gomock.Any()).Return(expectedInterface, nil).MaxTimes(1)
@@ -160,6 +151,7 @@ func TestGetIPForMachineWithRetry(t *testing.T) {
 	}
 
 	expectedVM := compute.VirtualMachine{
+		Name: to.StringPtr("vm"),
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			AvailabilitySet: &compute.SubResource{ID: to.StringPtr("availability-set")},
 			NetworkProfile: &compute.NetworkProfile{
@@ -199,7 +191,7 @@ func TestGetIPForMachineWithRetry(t *testing.T) {
 	for _, test := range tests {
 		az := GetTestCloud(ctrl)
 		mockVMClient := az.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		mockVMClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "vm", gomock.Any()).Return(expectedVM, test.clientErr)
+		mockVMClient.EXPECT().List(gomock.Any(), az.ResourceGroup).Return([]compute.VirtualMachine{expectedVM}, test.clientErr)
 
 		mockInterfaceClient := az.InterfacesClient.(*mockinterfaceclient.MockInterface)
 		mockInterfaceClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "nic", gomock.Any()).Return(expectedInterface, nil).MaxTimes(1)

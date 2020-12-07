@@ -23,9 +23,14 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
+	"k8s.io/legacy-cloud-providers/azure/clients/vmclient/mockvmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
@@ -287,5 +292,24 @@ func TestIsBackendPoolOnSameLB(t *testing.T) {
 
 		assert.Equal(t, test.expected, isSameLB)
 		assert.Equal(t, test.expectedLBName, lbName)
+	}
+}
+
+func TestVMCache(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	vmList := map[string]string{"vm000000": "PowerState/Running", "vm000001": "PowerState/Running", "vm000002": "PowerState/Running"}
+	az := GetTestCloud(ctrl)
+	expectedVMs := setTestVirtualMachines(az, vmList, false)
+	mockVMClient := az.VirtualMachinesClient.(*mockvmclient.MockInterface)
+	mockVMClient.EXPECT().List(gomock.Any(), az.ResourceGroup).Return(expectedVMs, nil)
+
+	// validate getting VM via cache.
+	for i := range expectedVMs {
+		vm := expectedVMs[i]
+		vmName := to.String(vm.Name)
+		realVM, err := az.getVirtualMachine(types.NodeName(vmName), azcache.CacheReadTypeDefault)
+		assert.NoError(t, err)
+		assert.Equal(t, vm, realVM)
 	}
 }

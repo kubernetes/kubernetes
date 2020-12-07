@@ -33,7 +33,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	cloudprovider "k8s.io/cloud-provider"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/publicipclient/mockpublicipclient"
@@ -48,6 +47,7 @@ func setTestVirtualMachines(c *Cloud, vmList map[string]string, isDataDisksFull 
 	expectedVMs := make([]compute.VirtualMachine, 0)
 
 	for nodeName, powerState := range vmList {
+		nodeName, powerState := nodeName, powerState
 		instanceID := fmt.Sprintf("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/%s", nodeName)
 		vm := compute.VirtualMachine{
 			Name:     &nodeName,
@@ -95,8 +95,6 @@ func setTestVirtualMachines(c *Cloud, vmList map[string]string, isDataDisksFull 
 func TestInstanceID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
-	cloud := GetTestCloud(ctrl)
 
 	testcases := []struct {
 		name                string
@@ -195,6 +193,7 @@ func TestInstanceID(t *testing.T) {
 	}
 
 	for _, test := range testcases {
+		cloud := GetTestCloud(ctrl)
 		if test.nilVMSet {
 			cloud.VMSet = nil
 		} else {
@@ -238,10 +237,7 @@ func TestInstanceID(t *testing.T) {
 		}
 		expectedVMs := setTestVirtualMachines(cloud, vmListWithPowerState, false)
 		mockVMsClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		for _, vm := range expectedVMs {
-			mockVMsClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
-		}
-		mockVMsClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "vm3", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		mockVMsClient.EXPECT().List(gomock.Any(), cloud.ResourceGroup).Return(expectedVMs, nil).MaxTimes(2)
 		mockVMsClient.EXPECT().Update(gomock.Any(), cloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 		instanceID, err := cloud.InstanceID(context.Background(), types.NodeName(test.nodeName))
@@ -251,6 +247,9 @@ func TestInstanceID(t *testing.T) {
 }
 
 func TestInstanceShutdownByProviderID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	testcases := []struct {
 		name           string
 		vmList         map[string]string
@@ -327,16 +326,11 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 		},
 	}
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 	for _, test := range testcases {
 		cloud := GetTestCloud(ctrl)
 		expectedVMs := setTestVirtualMachines(cloud, test.vmList, false)
 		mockVMsClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		for _, vm := range expectedVMs {
-			mockVMsClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
-		}
-		mockVMsClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "vm8", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		mockVMsClient.EXPECT().List(gomock.Any(), cloud.ResourceGroup).Return(expectedVMs, nil).MaxTimes(2)
 
 		hasShutdown, err := cloud.InstanceShutdownByProviderID(context.Background(), test.providerID)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
@@ -347,9 +341,9 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 func TestNodeAddresses(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	cloud := GetTestCloud(ctrl)
 
 	expectedVM := compute.VirtualMachine{
+		Name: to.StringPtr("vm1"),
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			NetworkProfile: &compute.NetworkProfile{
 				NetworkInterfaces: &[]compute.NetworkInterfaceReference{
@@ -519,6 +513,7 @@ func TestNodeAddresses(t *testing.T) {
 	}
 
 	for _, test := range testcases {
+		cloud := GetTestCloud(ctrl)
 		if test.nilVMSet {
 			cloud.VMSet = nil
 		} else {
@@ -558,8 +553,7 @@ func TestNodeAddresses(t *testing.T) {
 			}
 		}
 		mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "vm1", gomock.Any()).Return(expectedVM, nil).AnyTimes()
-		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "vm2", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		mockVMClient.EXPECT().List(gomock.Any(), cloud.ResourceGroup).Return([]compute.VirtualMachine{expectedVM}, nil).MaxTimes(2)
 
 		mockPublicIPAddressesClient := cloud.PublicIPAddressesClient.(*mockpublicipclient.MockInterface)
 		mockPublicIPAddressesClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "pip1", gomock.Any()).Return(expectedPIP, nil).AnyTimes()
@@ -576,7 +570,6 @@ func TestNodeAddresses(t *testing.T) {
 func TestInstanceExistsByProviderID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	cloud := GetTestCloud(ctrl)
 
 	testcases := []struct {
 		name           string
@@ -619,16 +612,14 @@ func TestInstanceExistsByProviderID(t *testing.T) {
 	}
 
 	for _, test := range testcases {
+		cloud := GetTestCloud(ctrl)
 		vmListWithPowerState := make(map[string]string)
 		for _, vm := range test.vmList {
 			vmListWithPowerState[vm] = ""
 		}
 		expectedVMs := setTestVirtualMachines(cloud, vmListWithPowerState, false)
 		mockVMsClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		for _, vm := range expectedVMs {
-			mockVMsClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
-		}
-		mockVMsClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "vm3", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		mockVMsClient.EXPECT().List(gomock.Any(), cloud.ResourceGroup).Return(expectedVMs, nil).MaxTimes(2)
 		mockVMsClient.EXPECT().Update(gomock.Any(), cloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 		exist, err := cloud.InstanceExistsByProviderID(context.Background(), test.providerID)
@@ -666,6 +657,7 @@ func TestInstanceExistsByProviderID(t *testing.T) {
 	}
 
 	for _, test := range vmssTestCases {
+		cloud := GetTestCloud(ctrl)
 		ss, err := newTestScaleSet(ctrl)
 		assert.NoError(t, err, test.name)
 		cloud.VMSet = ss

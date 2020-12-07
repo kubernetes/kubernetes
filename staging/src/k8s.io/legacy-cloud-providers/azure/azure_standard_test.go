@@ -584,7 +584,7 @@ func TestGetStandardVMPrimaryInterfaceID(t *testing.T) {
 	}{
 		{
 			name:          "GetPrimaryInterfaceID should get the only NIC ID",
-			vm:            buildDefaultTestVirtualMachine("", []string{"/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/nic"}),
+			vm:            buildDefaultTestVirtualMachine("vm1", "", []string{"/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/nic"}),
 			expectedNicID: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/nic",
 		},
 		{
@@ -851,17 +851,23 @@ func TestGetBackendPoolName(t *testing.T) {
 func TestGetStandardInstanceIDByNodeName(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	cloud := GetTestCloud(ctrl)
 
-	expectedVM := compute.VirtualMachine{
-		Name: to.StringPtr("vm1"),
-		ID:   to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm1"),
-	}
 	invalidResouceID := "/subscriptions/subscription/resourceGroups/rg/Microsoft.Compute/virtualMachines/vm4"
+	expectedVMs := []compute.VirtualMachine{
+		{
+			Name: to.StringPtr("vm1"),
+			ID:   to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm1"),
+		},
+		{
+			Name: to.StringPtr("vm4"),
+			ID:   to.StringPtr(invalidResouceID),
+		},
+	}
 	testcases := []struct {
 		name           string
 		nodeName       string
 		expectedID     string
+		clientErr      *retry.Error
 		expectedErrMsg error
 	}{
 		{
@@ -875,8 +881,12 @@ func TestGetStandardInstanceIDByNodeName(t *testing.T) {
 			expectedErrMsg: fmt.Errorf("instance not found"),
 		},
 		{
-			name:           "GetInstanceIDByNodeName should report error if Error encountered when invoke mockVMClient.Get",
-			nodeName:       "vm3",
+			name:     "GetInstanceIDByNodeName should report error if Error encountered when invoke mockVMClient.Get",
+			nodeName: "vm3",
+			clientErr: &retry.Error{
+				HTTPStatusCode: http.StatusInternalServerError,
+				RawError:       fmt.Errorf("VMGet error"),
+			},
 			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: VMGet error"),
 		},
 		{
@@ -886,17 +896,9 @@ func TestGetStandardInstanceIDByNodeName(t *testing.T) {
 		},
 	}
 	for _, test := range testcases {
+		cloud := GetTestCloud(ctrl)
 		mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "vm1", gomock.Any()).Return(expectedVM, nil).AnyTimes()
-		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "vm2", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
-		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "vm3", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{
-			HTTPStatusCode: http.StatusInternalServerError,
-			RawError:       fmt.Errorf("VMGet error"),
-		}).AnyTimes()
-		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "vm4", gomock.Any()).Return(compute.VirtualMachine{
-			Name: to.StringPtr("vm4"),
-			ID:   to.StringPtr(invalidResouceID),
-		}, nil).AnyTimes()
+		mockVMClient.EXPECT().List(gomock.Any(), cloud.ResourceGroup).Return(expectedVMs, test.clientErr).MaxTimes(2)
 
 		instanceID, err := cloud.VMSet.GetInstanceIDByNodeName(test.nodeName)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
@@ -907,24 +909,18 @@ func TestGetStandardInstanceIDByNodeName(t *testing.T) {
 func TestGetStandardVMPowerStatusByNodeName(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	cloud := GetTestCloud(ctrl)
 
 	testcases := []struct {
 		name           string
 		nodeName       string
 		vm             compute.VirtualMachine
 		expectedStatus string
-		getErr         *retry.Error
 		expectedErrMsg error
 	}{
 		{
-			name:     "GetPowerStatusByNodeName should report error if node don't exist",
-			nodeName: "vm1",
-			vm:       compute.VirtualMachine{},
-			getErr: &retry.Error{
-				HTTPStatusCode: http.StatusNotFound,
-				RawError:       cloudprovider.InstanceNotFound,
-			},
+			name:           "GetPowerStatusByNodeName should report error if node don't exist",
+			nodeName:       "vm1",
+			vm:             compute.VirtualMachine{},
 			expectedErrMsg: fmt.Errorf("instance not found"),
 		},
 		{
@@ -966,8 +962,9 @@ func TestGetStandardVMPowerStatusByNodeName(t *testing.T) {
 		},
 	}
 	for _, test := range testcases {
+		cloud := GetTestCloud(ctrl)
 		mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nodeName, gomock.Any()).Return(test.vm, test.getErr).AnyTimes()
+		mockVMClient.EXPECT().List(gomock.Any(), cloud.ResourceGroup).Return([]compute.VirtualMachine{test.vm}, nil).MaxTimes(2)
 
 		powerState, err := cloud.VMSet.GetPowerStatusByNodeName(test.nodeName)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
@@ -978,7 +975,6 @@ func TestGetStandardVMPowerStatusByNodeName(t *testing.T) {
 func TestGetStandardVMZoneByNodeName(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	cloud := GetTestCloud(ctrl)
 
 	var faultDomain int32 = 3
 	testcases := []struct {
@@ -986,17 +982,12 @@ func TestGetStandardVMZoneByNodeName(t *testing.T) {
 		nodeName       string
 		vm             compute.VirtualMachine
 		expectedZone   cloudprovider.Zone
-		getErr         *retry.Error
 		expectedErrMsg error
 	}{
 		{
-			name:     "GetZoneByNodeName should report error if node don't exist",
-			nodeName: "vm1",
-			vm:       compute.VirtualMachine{},
-			getErr: &retry.Error{
-				HTTPStatusCode: http.StatusNotFound,
-				RawError:       cloudprovider.InstanceNotFound,
-			},
+			name:           "GetZoneByNodeName should report error if node don't exist",
+			nodeName:       "vm1",
+			vm:             compute.VirtualMachine{},
 			expectedErrMsg: fmt.Errorf("instance not found"),
 		},
 		{
@@ -1051,8 +1042,9 @@ func TestGetStandardVMZoneByNodeName(t *testing.T) {
 		},
 	}
 	for _, test := range testcases {
+		cloud := GetTestCloud(ctrl)
 		mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nodeName, gomock.Any()).Return(test.vm, test.getErr).AnyTimes()
+		mockVMClient.EXPECT().List(gomock.Any(), cloud.ResourceGroup).Return([]compute.VirtualMachine{test.vm}, nil).MaxTimes(2)
 
 		zone, err := cloud.VMSet.GetZoneByNodeName(test.nodeName)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
@@ -1205,7 +1197,6 @@ func TestExtractResourceGroupByNicID(t *testing.T) {
 func TestStandardEnsureHostInPool(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	cloud := GetTestCloud(ctrl)
 
 	availabilitySetID := "/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/availabilitySets/myAvailabilitySet"
 	backendAddressPoolID := "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb1-internal/backendAddressPools/backendpool-1"
@@ -1310,6 +1301,7 @@ func TestStandardEnsureHostInPool(t *testing.T) {
 	}
 
 	for _, test := range testCases {
+		cloud := GetTestCloud(ctrl)
 		if test.isStandardLB {
 			cloud.Config.LoadBalancerSku = loadBalancerSkuStandard
 		}
@@ -1318,7 +1310,7 @@ func TestStandardEnsureHostInPool(t *testing.T) {
 			cloud.EnableMultipleStandardLoadBalancers = true
 		}
 
-		testVM := buildDefaultTestVirtualMachine(availabilitySetID, []string{test.nicID})
+		testVM := buildDefaultTestVirtualMachine(string(test.nodeName), availabilitySetID, []string{test.nicID})
 		testVM.Name = to.StringPtr(string(test.nodeName))
 		testNIC := buildDefaultTestInterface(false, []string{backendAddressPoolID})
 		testNIC.Name = to.StringPtr(test.nicName)
@@ -1326,10 +1318,11 @@ func TestStandardEnsureHostInPool(t *testing.T) {
 		testNIC.ProvisioningState = to.StringPtr(test.nicProvisionState)
 
 		mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, string(test.nodeName), gomock.Any()).Return(testVM, nil).AnyTimes()
+		mockVMClient.EXPECT().List(gomock.Any(), cloud.ResourceGroup).Return([]compute.VirtualMachine{testVM}, nil).MaxTimes(2)
 
 		mockInterfaceClient := cloud.InterfacesClient.(*mockinterfaceclient.MockInterface)
 		mockInterfaceClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nicName, gomock.Any()).Return(testNIC, nil).AnyTimes()
+		mockInterfaceClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "nic7", gomock.Any()).Return(testNIC, nil).MaxTimes(1)
 		mockInterfaceClient.EXPECT().CreateOrUpdate(gomock.Any(), cloud.ResourceGroup, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 		_, _, _, vm, err := cloud.VMSet.EnsureHostInPool(test.service, test.nodeName, test.backendPoolID, test.vmSetName, false)
@@ -1341,7 +1334,6 @@ func TestStandardEnsureHostInPool(t *testing.T) {
 func TestStandardEnsureHostsInPool(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	cloud := GetTestCloud(ctrl)
 
 	availabilitySetID := "/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/availabilitySets/myAvailabilitySet"
 	backendAddressPoolID := "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb1-internal/backendAddressPools/backendpool-1"
@@ -1452,16 +1444,17 @@ func TestStandardEnsureHostsInPool(t *testing.T) {
 	}
 
 	for _, test := range testCases {
+		cloud := GetTestCloud(ctrl)
 		cloud.Config.LoadBalancerSku = loadBalancerSkuStandard
 		cloud.Config.ExcludeMasterFromStandardLB = to.BoolPtr(true)
 
-		testVM := buildDefaultTestVirtualMachine(availabilitySetID, []string{test.nicID})
+		testVM := buildDefaultTestVirtualMachine(test.nodeName, availabilitySetID, []string{test.nicID})
 		testNIC := buildDefaultTestInterface(false, []string{backendAddressPoolID})
 		testNIC.Name = to.StringPtr(test.nicName)
 		testNIC.ID = to.StringPtr(test.nicID)
 
 		mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nodeName, gomock.Any()).Return(testVM, nil).AnyTimes()
+		mockVMClient.EXPECT().List(gomock.Any(), cloud.ResourceGroup).Return([]compute.VirtualMachine{testVM}, nil).AnyTimes()
 
 		mockInterfaceClient := cloud.InterfacesClient.(*mockinterfaceclient.MockInterface)
 		mockInterfaceClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nicName, gomock.Any()).Return(testNIC, nil).AnyTimes()
@@ -1660,7 +1653,7 @@ func TestStandardEnsureBackendPoolDeleted(t *testing.T) {
 					},
 				},
 			},
-			existingVM: buildDefaultTestVirtualMachine("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/availabilitySets/as", []string{
+			existingVM: buildDefaultTestVirtualMachine("k8s-agentpool1-00000000-1", "/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/availabilitySets/as", []string{
 				"/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool1-00000000-nic-1",
 			}),
 			existingNIC: buildDefaultTestInterface(true, []string{"/subscriptions/sub/resourceGroups/gh/providers/Microsoft.Network/loadBalancers/testCluster/backendAddressPools/testCluster"}),
@@ -1670,7 +1663,7 @@ func TestStandardEnsureBackendPoolDeleted(t *testing.T) {
 	for _, test := range tests {
 		cloud.LoadBalancerSku = test.loadBalancerSKU
 		mockVMClient := mockvmclient.NewMockInterface(ctrl)
-		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "k8s-agentpool1-00000000-1", gomock.Any()).Return(test.existingVM, nil)
+		mockVMClient.EXPECT().List(gomock.Any(), cloud.ResourceGroup).Return([]compute.VirtualMachine{test.existingVM}, nil).MaxTimes(2)
 		cloud.VirtualMachinesClient = mockVMClient
 		mockNICClient := mockinterfaceclient.NewMockInterface(ctrl)
 		mockNICClient.EXPECT().Get(gomock.Any(), "rg", "k8s-agentpool1-00000000-nic-1", gomock.Any()).Return(test.existingNIC, nil)
@@ -1705,8 +1698,9 @@ func buildDefaultTestInterface(isPrimary bool, lbBackendpoolIDs []string) networ
 	return expectedNIC
 }
 
-func buildDefaultTestVirtualMachine(asID string, nicIDs []string) compute.VirtualMachine {
+func buildDefaultTestVirtualMachine(vmName, asID string, nicIDs []string) compute.VirtualMachine {
 	expectedVM := compute.VirtualMachine{
+		Name: to.StringPtr(vmName),
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			AvailabilitySet: &compute.SubResource{
 				ID: to.StringPtr(asID),
@@ -1728,9 +1722,9 @@ func TestStandardGetNodeNameByIPConfigurationID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	cloud := GetTestCloud(ctrl)
-	expectedVM := buildDefaultTestVirtualMachine("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/availabilitySets/AGENTPOOL1-AVAILABILITYSET-00000000", []string{})
+	expectedVM := buildDefaultTestVirtualMachine("k8s-agentpool1-00000000-0", "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/availabilitySets/AGENTPOOL1-AVAILABILITYSET-00000000", []string{})
 	mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-	mockVMClient.EXPECT().Get(gomock.Any(), "rg", "k8s-agentpool1-00000000-0", gomock.Any()).Return(expectedVM, nil)
+	mockVMClient.EXPECT().List(gomock.Any(), cloud.ResourceGroup).Return([]compute.VirtualMachine{expectedVM}, nil)
 	ipConfigurationID := `/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool1-00000000-nic-0/ipConfigurations/ipconfig1`
 	nodeName, asName, err := cloud.VMSet.GetNodeNameByIPConfigurationID(ipConfigurationID)
 	assert.NoError(t, err)

@@ -208,11 +208,15 @@ func TestGetZoneByProviderID(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, cloudprovider.Zone{}, zone)
 
+	expectedVMs := []compute.VirtualMachine{
+		{
+			Name:     to.StringPtr("vm-0"),
+			Zones:    &[]string{"1"},
+			Location: to.StringPtr("eastus"),
+		},
+	}
 	mockVMClient := az.VirtualMachinesClient.(*mockvmclient.MockInterface)
-	mockVMClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "vm-0", gomock.Any()).Return(compute.VirtualMachine{
-		Zones:    &[]string{"1"},
-		Location: to.StringPtr("eastus"),
-	}, nil)
+	mockVMClient.EXPECT().List(gomock.Any(), az.ResourceGroup).Return(expectedVMs, nil)
 	zone, err = az.GetZoneByProviderID(context.Background(), testAvailabilitySetNodeProviderID)
 	assert.NoError(t, err)
 	assert.Equal(t, cloudprovider.Zone{

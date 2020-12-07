@@ -35,7 +35,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
-var (
+const (
 	fakeCacheTTL = 2 * time.Second
 )
 
@@ -82,7 +82,7 @@ func TestStandardAttachDisk(t *testing.T) {
 		vmSet := testCloud.VMSet
 		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		for _, vm := range expectedVMs {
+		for i, vm := range expectedVMs {
 			vm.StorageProfile = &compute.StorageProfile{
 				OsDisk: &compute.OSDisk{
 					Name: to.StringPtr("osdisk1"),
@@ -95,9 +95,9 @@ func TestStandardAttachDisk(t *testing.T) {
 				},
 				DataDisks: &[]compute.DataDisk{},
 			}
-			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
+			expectedVMs[i] = vm
 		}
-		mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, "vm2", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		mockVMsClient.EXPECT().List(gomock.Any(), testCloud.ResourceGroup).Return(expectedVMs, nil).MaxTimes(2)
 		if test.isAttachFail {
 			mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(&retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
 		} else {
@@ -151,10 +151,7 @@ func TestStandardDetachDisk(t *testing.T) {
 		vmSet := testCloud.VMSet
 		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		for _, vm := range expectedVMs {
-			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
-		}
-		mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, "vm2", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		mockVMsClient.EXPECT().List(gomock.Any(), testCloud.ResourceGroup).Return(expectedVMs, nil).MaxTimes(2)
 		if test.isDetachFail {
 			mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(&retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
 		} else {
@@ -227,13 +224,13 @@ func TestGetDataDisks(t *testing.T) {
 		vmSet := testCloud.VMSet
 		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
-		for _, vm := range expectedVMs {
+		for i, vm := range expectedVMs {
 			if test.isDataDiskNull {
 				vm.StorageProfile = &compute.StorageProfile{}
 			}
-			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
+			expectedVMs[i] = vm
 		}
-		mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, gomock.Not("vm1"), gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		mockVMsClient.EXPECT().List(gomock.Any(), testCloud.ResourceGroup).Return(expectedVMs, nil).MaxTimes(2)
 		mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 		dataDisks, err := vmSet.GetDataDisks(test.nodeName, test.crt)
