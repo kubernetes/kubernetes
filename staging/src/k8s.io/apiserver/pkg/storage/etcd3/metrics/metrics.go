@@ -67,6 +67,15 @@ var (
 		},
 		[]string{"resource"},
 	)
+	etcdLeaseObjectCounts = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "etcd_lease_object_counts",
+			Help:           "Number of objects attached to a single etcd lease.",
+			Buckets:        []float64{10, 50, 100, 500, 1000, 2500, 5000},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{},
+	)
 )
 
 var registerMetrics sync.Once
@@ -79,6 +88,7 @@ func Register() {
 		legacyregistry.MustRegister(objectCounts)
 		legacyregistry.MustRegister(dbTotalSize)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
+		legacyregistry.MustRegister(etcdLeaseObjectCounts)
 	})
 }
 
@@ -110,4 +120,11 @@ func sinceInSeconds(start time.Time) float64 {
 // UpdateEtcdDbSize sets the etcd_db_total_size_in_bytes metric.
 func UpdateEtcdDbSize(ep string, size int64) {
 	dbTotalSize.WithLabelValues(ep).Set(float64(size))
+}
+
+// UpdateLeaseObjectCount sets the etcd_lease_object_counts metric.
+func UpdateLeaseObjectCount(count int64) {
+	// Currently we only store one previous lease, since all the events have the same ttl.
+	// See pkg/storage/etcd3/lease_manager.go
+	etcdLeaseObjectCounts.WithLabelValues().Observe(float64(count))
 }
