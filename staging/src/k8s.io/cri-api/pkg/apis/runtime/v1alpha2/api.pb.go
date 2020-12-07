@@ -829,16 +829,6 @@ type LinuxPodSandboxConfig struct {
 	XXX_sizecache        int32             `json:"-"`
 }
 
-// WindowsSandboxConfig holds platform-specific configurations for Windows
-type WindowsSandboxConfig struct {
-	// WindowsSandboxConfig holds sandbox security attributes.
-	SecurityContext *LinuxSandboxSecurityContext `protobuf:"bytes,2,opt,name=security_context,json=securityContext,proto3" json:"security_context,omitempty"`
-	// Sysctls holds linux sysctls config for the sandbox.
-	Sysctls              map[string]string `protobuf:"bytes,3,rep,name=sysctls,proto3" json:"sysctls,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
-	XXX_sizecache        int32             `json:"-"`
-}
-
 func (m *LinuxPodSandboxConfig) Reset()      { *m = LinuxPodSandboxConfig{} }
 func (*LinuxPodSandboxConfig) ProtoMessage() {}
 func (*LinuxPodSandboxConfig) Descriptor() ([]byte, []int) {
