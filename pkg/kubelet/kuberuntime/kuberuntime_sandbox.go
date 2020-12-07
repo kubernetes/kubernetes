@@ -153,7 +153,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 	return podSandboxConfig, nil
 }
 
-// generatePodSandboxLinuxConfig is a minimal copy of generatePodSandboxWindowsConfig
+// generatePodSandboxWindowsConfig generates a windows config, a step towards decoupling from linux.  It still returns a linux sandbox config, however.
 func (m *kubeGenericRuntimeManager) generatePodSandboxWindowsConfig(pod *v1.Pod) (*runtimeapi.LinuxPodSandboxConfig, error) {
 	sysctls := make(map[string]string)
 	lc := &runtimeapi.LinuxPodSandboxConfig{
