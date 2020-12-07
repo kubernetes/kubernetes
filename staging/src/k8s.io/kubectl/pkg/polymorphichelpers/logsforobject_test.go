@@ -429,7 +429,7 @@ func TestLogsForObjectWithClient(t *testing.T) {
 			name: "two container pod with default container selected",
 			podFn: func() *corev1.Pod {
 				pod := testPodWithTwoContainers()
-				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "foo-2-c1"}
+				pod.Annotations = map[string]string{corev1.DefaultContainerAnnotationName: "foo-2-c1"}
 				return pod
 			},
 			podLogOptions:     &corev1.PodLogOptions{},
@@ -439,7 +439,7 @@ func TestLogsForObjectWithClient(t *testing.T) {
 			name: "two container pod with default container selected but also container set explicitly",
 			podFn: func() *corev1.Pod {
 				pod := testPodWithTwoContainers()
-				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "foo-2-c1"}
+				pod.Annotations = map[string]string{corev1.DefaultContainerAnnotationName: "foo-2-c1"}
 				return pod
 			},
 			podLogOptions: &corev1.PodLogOptions{
@@ -451,7 +451,7 @@ func TestLogsForObjectWithClient(t *testing.T) {
 			name: "two container pod with non-existing default container selected",
 			podFn: func() *corev1.Pod {
 				pod := testPodWithTwoContainers()
-				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "non-existing"}
+				pod.Annotations = map[string]string{corev1.DefaultContainerAnnotationName: "non-existing"}
 				return pod
 			},
 			podLogOptions: &corev1.PodLogOptions{},
@@ -461,7 +461,7 @@ func TestLogsForObjectWithClient(t *testing.T) {
 			name: "two container pod with default container set, but allContainers also set",
 			podFn: func() *corev1.Pod {
 				pod := testPodWithTwoContainers()
-				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "foo-2-c1"}
+				pod.Annotations = map[string]string{corev1.DefaultContainerAnnotationName: "foo-2-c1"}
 				return pod
 			},
 			allContainers:     true,

@@ -95,6 +95,10 @@ const (
 	// configuration of a resource for use in a three way diff by UpdateApplyAnnotation.
 	LastAppliedConfigAnnotation = kubectlPrefix + "last-applied-configuration"
 
+	// DefaultContainerAnnotationName is an annotation name that can be used to preselect the interesting container
+	// from a pod when running kubectl.
+	DefaultContainerAnnotationName = kubectlPrefix + "default-container"
+
 	// AnnotationLoadBalancerSourceRangesKey is the key of the annotation on a service to set allowed ingress ranges on their LoadBalancers
 	//
 	// It should be a comma-separated list of CIDRs, e.g. `0.0.0.0/0` to
