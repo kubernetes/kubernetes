@@ -17,7 +17,9 @@ limitations under the License.
 package prober
 
 import (
+	"k8s.io/apimachinery/pkg/util/clock"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -94,6 +96,8 @@ type manager struct {
 
 	// prober executes the probe actions.
 	prober *prober
+
+	start time.Time
 }
 
 // NewManager creates a Manager for pod probing.
@@ -113,6 +117,7 @@ func NewManager(
 		livenessManager:  livenessManager,
 		startupManager:   startupManager,
 		workers:          make(map[probeKey]*worker),
+		start:            clock.RealClock{}.Now(),
 	}
 }
 
@@ -253,8 +258,15 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 				ready = result == results.Success
 			} else {
 				// The check whether there is a probe which hasn't run yet.
-				_, exists := m.getWorker(podUID, c.Name, readiness)
-				ready = !exists
+				w, exists := m.getWorker(podUID, c.Name, readiness)
+				ready = !exists // no readinessProbe -> always ready
+				if exists {
+					// Trigger an immediate run of the readinessProbe to update ready state
+					select {
+					case w.manualTriggerCh <- struct{}{}:
+					default: // Non-blocking.
+					}
+				}
 			}
 			podStatus.ContainerStatuses[i].Ready = ready
 		}
