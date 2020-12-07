@@ -1230,6 +1230,7 @@ func (kl *Kubelet) RlimitStats() (*statsapi.RlimitStats, error) {
 // 2.  the pods directory
 // 3.  the plugins directory
 // 4.  the pod-resources directory
+// 5.  the checkpoint directory
 func (kl *Kubelet) setupDataDirs() error {
 	kl.rootDirectory = path.Clean(kl.rootDirectory)
 	pluginRegistrationDir := kl.getPluginsRegistrationDir()
@@ -1251,6 +1252,9 @@ func (kl *Kubelet) setupDataDirs() error {
 	}
 	if err := os.MkdirAll(kl.getPodResourcesDir(), 0750); err != nil {
 		return fmt.Errorf("error creating podresources directory: %v", err)
+	}
+	if err := os.MkdirAll(kl.getCheckpointsDir(), 0750); err != nil {
+		return fmt.Errorf("error creating checkpoint directory: %v", err)
 	}
 	if selinux.SELinuxEnabled() {
 		err := selinux.SetFileLabel(pluginRegistrationDir, config.KubeletPluginsDirSELinuxLabel)

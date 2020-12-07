@@ -369,6 +369,8 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 				ContainerPath:  terminationMessagePath,
 				SelinuxRelabel: selinuxRelabel,
 			})
+
+			m.containerTerminationLogPathUID[container.Name] = cid
 		}
 	}
 

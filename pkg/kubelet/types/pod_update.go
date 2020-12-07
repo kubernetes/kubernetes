@@ -123,6 +123,8 @@ const (
 	// SyncPodKill is when the pod is killed based on a trigger internal to the kubelet for eviction.
 	// If a SyncPodKill request is made to pod workers, the request is never dropped, and will always be processed.
 	SyncPodKill
+	// SyncPodCheckpoint is when the pod is checkpointed
+	SyncPodCheckpoint
 )
 
 func (sp SyncPodType) String() string {
@@ -135,6 +137,8 @@ func (sp SyncPodType) String() string {
 		return "sync"
 	case SyncPodKill:
 		return "kill"
+	case SyncPodCheckpoint:
+		return "checkpoint"
 	default:
 		return "unknown"
 	}

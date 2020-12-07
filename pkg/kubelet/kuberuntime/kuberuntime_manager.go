@@ -137,6 +137,10 @@ type kubeGenericRuntimeManager struct {
 
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
+
+	// The containerTerminationLogPath uses a random UID which is needed during checkpoint/restore.
+	// This provides a map with container name and that UID
+	containerTerminationLogPathUID map[string]string
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -179,22 +183,23 @@ func NewKubeGenericRuntimeManager(
 	runtimeClassManager *runtimeclass.Manager,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		recorder:            recorder,
-		cpuCFSQuota:         cpuCFSQuota,
-		cpuCFSQuotaPeriod:   cpuCFSQuotaPeriod,
-		seccompProfileRoot:  seccompProfileRoot,
-		livenessManager:     livenessManager,
-		startupManager:      startupManager,
-		machineInfo:         machineInfo,
-		osInterface:         osInterface,
-		runtimeHelper:       runtimeHelper,
-		runtimeService:      newInstrumentedRuntimeService(runtimeService),
-		imageService:        newInstrumentedImageManagerService(imageService),
-		internalLifecycle:   internalLifecycle,
-		legacyLogProvider:   legacyLogProvider,
-		logManager:          logManager,
-		runtimeClassManager: runtimeClassManager,
-		logReduction:        logreduction.NewLogReduction(identicalErrorDelay),
+		recorder:                       recorder,
+		cpuCFSQuota:                    cpuCFSQuota,
+		cpuCFSQuotaPeriod:              cpuCFSQuotaPeriod,
+		seccompProfileRoot:             seccompProfileRoot,
+		livenessManager:                livenessManager,
+		startupManager:                 startupManager,
+		machineInfo:                    machineInfo,
+		osInterface:                    osInterface,
+		runtimeHelper:                  runtimeHelper,
+		runtimeService:                 newInstrumentedRuntimeService(runtimeService),
+		imageService:                   newInstrumentedImageManagerService(imageService),
+		internalLifecycle:              internalLifecycle,
+		legacyLogProvider:              legacyLogProvider,
+		logManager:                     logManager,
+		runtimeClassManager:            runtimeClassManager,
+		logReduction:                   logreduction.NewLogReduction(identicalErrorDelay),
+		containerTerminationLogPathUID: make(map[string]string),
 	}
 
 	typedVersion, err := kubeRuntimeManager.getTypedVersion()
