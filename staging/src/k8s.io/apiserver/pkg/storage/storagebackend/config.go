@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/server/egressselector"
+	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/value"
 )
 
@@ -28,8 +29,7 @@ const (
 	StorageTypeUnset = ""
 	StorageTypeETCD3 = "etcd3"
 
-	DefaultCompactInterval           = 5 * time.Minute
-	DefaultLeaseReuseDurationSeconds = 60
+	DefaultCompactInterval = 5 * time.Minute
 )
 
 // TransportConfig holds all connection related info,  i.e. equal TransportConfig means equal servers we talk to.
@@ -72,16 +72,16 @@ type Config struct {
 	CompactionInterval time.Duration
 	// CountMetricPollPeriod specifies how often should count metric be updated
 	CountMetricPollPeriod time.Duration
-	// LeaseReuseDurationSeconds specifies time in seconds that each lease is reused. See pkg/storage/etcd3/lease_manager.go
-	LeaseReuseDurationSeconds int64
+
+	LeaseManagerConfig etcd3.LeaseManagerConfig
 }
 
 func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 	return &Config{
-		Paging:                    true,
-		Prefix:                    prefix,
-		Codec:                     codec,
-		CompactionInterval:        DefaultCompactInterval,
-		LeaseReuseDurationSeconds: DefaultLeaseReuseDurationSeconds,
+		Paging:             true,
+		Prefix:             prefix,
+		Codec:              codec,
+		CompactionInterval: DefaultCompactInterval,
+		LeaseManagerConfig: etcd3.NewDefaultLeaseManagerConfig(),
 	}
 }

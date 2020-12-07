@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	auditdynamic "k8s.io/apiserver/plugin/pkg/audit/dynamic"
@@ -116,6 +117,7 @@ func TestAddFlags(t *testing.T) {
 		"--request-timeout=2m",
 		"--storage-backend=etcd3",
 		"--service-cluster-ip-range=192.168.128.0/17",
+		"--lease-reuse-duration-seconds=100",
 	}
 	fs.Parse(args)
 
@@ -155,11 +157,13 @@ func TestAddFlags(t *testing.T) {
 					TrustedCAFile: "/var/run/kubernetes/etcdca.crt",
 					CertFile:      "/var/run/kubernetes/etcdce.crt",
 				},
-				Paging:                    true,
-				Prefix:                    "/registry",
-				CompactionInterval:        storagebackend.DefaultCompactInterval,
-				CountMetricPollPeriod:     time.Minute,
-				LeaseReuseDurationSeconds: storagebackend.DefaultLeaseReuseDurationSeconds,
+				Paging:                true,
+				Prefix:                "/registry",
+				CompactionInterval:    storagebackend.DefaultCompactInterval,
+				CountMetricPollPeriod: time.Minute,
+				LeaseManagerConfig: etcd3.LeaseManagerConfig{
+					ReuseDurationSeconds: 100,
+				},
 			},
 			DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
 			DeleteCollectionWorkers: 1,
