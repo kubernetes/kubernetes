@@ -374,7 +374,8 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Description: A Pod is created with startup and readiness probes. The Container is started by creating /tmp/startup after 45 seconds, delaying the ready state by this amount of time. This is similar to the "Pod readiness probe, with initial delay" test.
 	*/
 	ginkgo.It("should not be ready until startupProbe succeeds", func() {
-		cmd := []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 45; echo ok >/tmp/startup; sleep 600"}
+		sleepBeforeStarted := time.Duration(15)
+		cmd := []string{"/bin/sh", "-c", fmt.Sprintf("echo ok >/tmp/health; sleep %d; echo ok >/tmp/startup; sleep 600", sleepBeforeStarted)}
 		readinessProbe := &v1.Probe{
 			Handler: v1.Handler{
 				Exec: &v1.ExecAction{
@@ -382,6 +383,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 				},
 			},
 			InitialDelaySeconds: 0,
+			PeriodSeconds:       60,
 		}
 		startupProbe := &v1.Probe{
 			Handler: v1.Handler{
@@ -390,7 +392,8 @@ var _ = framework.KubeDescribe("Probing container", func() {
 				},
 			},
 			InitialDelaySeconds: 0,
-			FailureThreshold:    60,
+			PeriodSeconds:       1,
+			FailureThreshold:    600,
 		}
 		p := podClient.Create(startupPodSpec(startupProbe, readinessProbe, nil, cmd))
 
@@ -413,9 +416,13 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		startedTime, err := GetContainerStartedTime(p, "busybox")
 		framework.ExpectNoError(err)
 
+		startedIn := readyTime.Sub(startedTime)
 		framework.Logf("Container started at %v, pod became ready at %v", startedTime, readyTime)
-		if readyTime.Sub(startedTime) < 40*time.Second {
+		if startedIn < sleepBeforeStarted*time.Second {
 			framework.Failf("Pod became ready before startupProbe succeeded")
+		}
+		if startedIn > (sleepBeforeStarted+5)*time.Second {
+			framework.Failf("Pod became ready in %v, more than 5s after startupProbe succeeded", startedIn)
 		}
 	})
 })
