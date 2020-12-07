@@ -38,6 +38,9 @@ type worker struct {
 	// Channel for stopping the probe.
 	stopCh chan struct{}
 
+	// Channel for triggering the probe manually.
+	manualTriggerCh chan struct{}
+
 	// The pod containing this probe (read-only)
 	pod *v1.Pod
 
@@ -82,11 +85,12 @@ func newWorker(
 	container v1.Container) *worker {
 
 	w := &worker{
-		stopCh:       make(chan struct{}, 1), // Buffer so stop() can be non-blocking.
-		pod:          pod,
-		container:    container,
-		probeType:    probeType,
-		probeManager: m,
+		stopCh:          make(chan struct{}, 1), // Buffer so stop() can be non-blocking.
+		manualTriggerCh: make(chan struct{}, 1), // Buffer so prober_manager can do non-blocking calls to doProbe.
+		pod:             pod,
+		container:       container,
+		probeType:       probeType,
+		probeManager:    m,
 	}
 
 	switch probeType {
@@ -130,7 +134,10 @@ func (w *worker) run() {
 
 	// If kubelet restarted the probes could be started in rapid succession.
 	// Let the worker wait for a random portion of tickerPeriod before probing.
-	time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
+	// Do it only if the kubelet has started recently.
+	if probeTickerPeriod > time.Since(w.probeManager.start) {
+		time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
+	}
 
 	probeTicker := time.NewTicker(probeTickerPeriod)
 
@@ -154,6 +161,7 @@ probeLoop:
 		case <-w.stopCh:
 			break probeLoop
 		case <-probeTicker.C:
+		case <-w.manualTriggerCh:
 			// continue
 		}
 	}

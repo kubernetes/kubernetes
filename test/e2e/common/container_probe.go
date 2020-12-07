@@ -264,6 +264,150 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(
 			f.ClientSet, f.Namespace.Name, expectedEvent, "0.0.0.0", framework.PodEventTimeout))
 	})
+
+	/*
+		Release: v1.16
+		Testname: Pod startup probe restart
+		Description: A Pod is created with a failing startup probe. The Pod MUST be killed and restarted incrementing restart count to 1, even if liveness would succeed.
+	*/
+	ginkgo.It("should be restarted startup probe fails", func() {
+		cmd := []string{"/bin/sh", "-c", "sleep 600"}
+		livenessProbe := &v1.Probe{
+			Handler: v1.Handler{
+				Exec: &v1.ExecAction{
+					Command: []string{"/bin/true"},
+				},
+			},
+			InitialDelaySeconds: 15,
+			FailureThreshold:    1,
+		}
+		startupProbe := &v1.Probe{
+			Handler: v1.Handler{
+				Exec: &v1.ExecAction{
+					Command: []string{"/bin/false"},
+				},
+			},
+			InitialDelaySeconds: 15,
+			FailureThreshold:    3,
+		}
+		pod := startupPodSpec(startupProbe, nil, livenessProbe, cmd)
+		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Release: v1.16
+		Testname: Pod liveness probe delayed (long) by startup probe
+		Description: A Pod is created with failing liveness and startup probes. Liveness probe MUST NOT fail until startup probe expires.
+	*/
+	ginkgo.It("should *not* be restarted by liveness probe because startup probe delays it", func() {
+		cmd := []string{"/bin/sh", "-c", "sleep 600"}
+		livenessProbe := &v1.Probe{
+			Handler: v1.Handler{
+				Exec: &v1.ExecAction{
+					Command: []string{"/bin/false"},
+				},
+			},
+			InitialDelaySeconds: 15,
+			FailureThreshold:    1,
+		}
+		startupProbe := &v1.Probe{
+			Handler: v1.Handler{
+				Exec: &v1.ExecAction{
+					Command: []string{"/bin/false"},
+				},
+			},
+			InitialDelaySeconds: 15,
+			FailureThreshold:    60,
+		}
+		pod := startupPodSpec(startupProbe, nil, livenessProbe, cmd)
+		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
+	})
+
+	/*
+		Release: v1.16
+		Testname: Pod liveness probe fails after startup success
+		Description: A Pod is created with failing liveness probe and delayed startup probe that uses 'exec' command to cat /temp/health file. The Container is started by creating /tmp/startup after 10 seconds, triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing restart count to 1.
+	*/
+	ginkgo.It("should be restarted by liveness probe after startup probe enables it", func() {
+		cmd := []string{"/bin/sh", "-c", "sleep 10; echo ok >/tmp/startup; sleep 600"}
+		livenessProbe := &v1.Probe{
+			Handler: v1.Handler{
+				Exec: &v1.ExecAction{
+					Command: []string{"/bin/false"},
+				},
+			},
+			InitialDelaySeconds: 15,
+			FailureThreshold:    1,
+		}
+		startupProbe := &v1.Probe{
+			Handler: v1.Handler{
+				Exec: &v1.ExecAction{
+					Command: []string{"cat", "/tmp/startup"},
+				},
+			},
+			InitialDelaySeconds: 15,
+			FailureThreshold:    60,
+		}
+		pod := startupPodSpec(startupProbe, nil, livenessProbe, cmd)
+		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Release: v1.16
+		Testname: Pod readiness probe, delayed by startup probe
+		Description: A Pod is created with startup and readiness probes. The Container is started by creating /tmp/startup after 45 seconds, delaying the ready state by this amount of time. This is similar to the "Pod readiness probe, with initial delay" test.
+	*/
+	ginkgo.It("should not be ready until startupProbe succeeds", func() {
+		sleepBeforeStarted := time.Duration(45)
+		cmd := []string{"/bin/sh", "-c", fmt.Sprintf("echo ok >/tmp/health; sleep %d; echo ok >/tmp/startup; sleep 600", sleepBeforeStarted)}
+		readinessProbe := &v1.Probe{
+			Handler: v1.Handler{
+				Exec: &v1.ExecAction{
+					Command: []string{"cat", "/tmp/health"},
+				},
+			},
+			InitialDelaySeconds: 0,
+			PeriodSeconds:       60,
+		}
+		startupProbe := &v1.Probe{
+			Handler: v1.Handler{
+				Exec: &v1.ExecAction{
+					Command: []string{"cat", "/tmp/startup"},
+				},
+			},
+			InitialDelaySeconds: 0,
+			PeriodSeconds:       1,
+			FailureThreshold:    600,
+		}
+		p := podClient.Create(startupPodSpec(startupProbe, readinessProbe, nil, cmd))
+
+		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
+
+		p, err = podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		isReady, err := testutils.PodRunningReady(p)
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(isReady, true, "pod should be ready")
+
+		// We assume the pod became ready when the container became ready. This
+		// is true for a single container pod.
+		readyTime, err := GetTransitionTimeForReadyCondition(p)
+		framework.ExpectNoError(err)
+		startedTime, err := GetContainerStartedTime(p, "busybox")
+		framework.ExpectNoError(err)
+
+		framework.Logf("Container started at %v, pod became ready at %v", startedTime, readyTime)
+		if readyTime.Sub(startedTime) < sleepBeforeStarted*time.Second {
+			framework.Failf("Pod became ready before startupProbe succeeded")
+		}
+		if readyTime.Sub(startedTime) > (sleepBeforeStarted+20)*time.Second {
+			framework.Failf("Pod became ready more than 20s after startupProbe succeeded")
+		}
+	})
 })
 
 func GetContainerStartedTime(p *v1.Pod, containerName string) (time.Time, error) {
