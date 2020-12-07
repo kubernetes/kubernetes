@@ -305,6 +305,7 @@ items:
     - cronjobs
     - cronjobs/status
     - jobs
+    - jobs/log
     - jobs/status
     verbs:
     - get
