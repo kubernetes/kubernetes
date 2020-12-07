@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 
 	"k8s.io/component-base/logs/logreduction"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	"k8s.io/cri-api/pkg/apis/runtime/experimental"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
 	"k8s.io/kubernetes/pkg/probe/exec"
@@ -42,6 +44,9 @@ type remoteRuntimeService struct {
 	runtimeClient runtimeapi.RuntimeServiceClient
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
+	// The experimental runtime is potentially not implemented
+	// by the container engine
+	experimental experimental.RuntimeServiceClient
 }
 
 const (
@@ -69,6 +74,7 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (
 		timeout:       connectionTimeout,
 		runtimeClient: runtimeapi.NewRuntimeServiceClient(conn),
 		logReduction:  logreduction.NewLogReduction(identicalErrorDelay),
+		experimental:  experimental.NewRuntimeServiceClient(conn),
 	}, nil
 }
 
@@ -576,5 +582,32 @@ func (r *remoteRuntimeService) ReopenContainerLog(containerID string) error {
 	}
 
 	klog.V(10).Infof("[RemoteRuntimeService] ReopenContainerLog Response (containerID=%v)", containerID)
+	return nil
+}
+
+func (r *remoteRuntimeService) CheckpointPod(podSandBoxID, checkpointDir string) error {
+	klog.V(1).Infof("[RemoteRuntimeService] CheckpointPod (podID=%v, dir=%v)", podSandBoxID, checkpointDir)
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	// The CRI implementation reads the ID and checkpoints a container if the ID
+	// represents a container or it checkpoints a Pod if the ID represents a Pod.
+	_, err := r.experimental.CheckpointContainer(ctx, &experimental.CheckpointContainerRequest{
+		Id: podSandBoxID,
+		Options: &experimental.CheckpointContainerOptions{
+			CommonOptions: &experimental.CheckpointRestoreOptions{
+				// Currently the archive is not yet encrypted, but
+				// the CRI API already contains the necessary field
+				// to tell the CRI implementation which compression
+				// to use.
+				Archive: filepath.Join(checkpointDir, podSandBoxID+".tar"),
+			},
+		},
+	})
+	if err != nil {
+		klog.Errorf("CheckpointPod %q from runtime service failed: %v", podSandBoxID, err)
+	}
+	klog.V(1).Infof("[RemoteRuntimeService] CheckpointPod Response (podID=%v)", podSandBoxID)
+
 	return nil
 }
