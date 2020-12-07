@@ -23,24 +23,26 @@ import (
 
 	"go.etcd.io/etcd/clientv3"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
-	"k8s.io/klog/v2"
 )
 
 const (
 	defaultLeaseReuseDurationSeconds = 60
-	largeLeaseThreshold              = 5000
+	defaultLeaseMaxObjectCount       = 1000
 )
 
 // LeaseManagerConfig is configuration for creating a lease manager.
 type LeaseManagerConfig struct {
 	// ReuseDurationSeconds specifies time in seconds that each lease is reused
 	ReuseDurationSeconds int64
+	// MaxObjectCount specifies how many objects that a lease can attach
+	MaxObjectCount int64
 }
 
 // NewDefaultLeaseManagerConfig creates a LeaseManagerConfig with default values
 func NewDefaultLeaseManagerConfig() LeaseManagerConfig {
 	return LeaseManagerConfig{
 		ReuseDurationSeconds: defaultLeaseReuseDurationSeconds,
+		MaxObjectCount:       defaultLeaseMaxObjectCount,
 	}
 }
 
@@ -57,24 +59,29 @@ type leaseManager struct {
 	// The period of time in seconds and percent of TTL that each lease is
 	// reused. The minimum of them is used to avoid unreasonably large
 	// numbers.
-	leaseReuseDurationSeconds int64
-	leaseReuseDurationPercent float64
-	leaseAttachedObjectCount  int64
+	leaseReuseDurationSeconds   int64
+	leaseReuseDurationPercent   float64
+	leaseMaxAttachedObjectCount int64
+	leaseAttachedObjectCount    int64
 }
 
 // newDefaultLeaseManager creates a new lease manager using default setting.
 func newDefaultLeaseManager(client *clientv3.Client, config LeaseManagerConfig) *leaseManager {
-	return newLeaseManager(client, config.ReuseDurationSeconds, 0.05)
+	if config.MaxObjectCount <= 0 {
+		config.MaxObjectCount = defaultLeaseMaxObjectCount
+	}
+	return newLeaseManager(client, config.ReuseDurationSeconds, 0.05, config.MaxObjectCount)
 }
 
 // newLeaseManager creates a new lease manager with the number of buffered
 // leases, lease reuse duration in seconds and percentage. The percentage
 // value x means x*100%.
-func newLeaseManager(client *clientv3.Client, leaseReuseDurationSeconds int64, leaseReuseDurationPercent float64) *leaseManager {
+func newLeaseManager(client *clientv3.Client, leaseReuseDurationSeconds int64, leaseReuseDurationPercent float64, maxObjectCount int64) *leaseManager {
 	return &leaseManager{
-		client:                    client,
-		leaseReuseDurationSeconds: leaseReuseDurationSeconds,
-		leaseReuseDurationPercent: leaseReuseDurationPercent,
+		client:                      client,
+		leaseReuseDurationSeconds:   leaseReuseDurationSeconds,
+		leaseReuseDurationPercent:   leaseReuseDurationPercent,
+		leaseMaxAttachedObjectCount: maxObjectCount,
 	}
 }
 
@@ -93,7 +100,7 @@ func (l *leaseManager) GetLease(ctx context.Context, ttl int64) (clientv3.LeaseI
 	// Currently each GetLease call only attach 1 object
 	l.leaseAttachedObjectCount++
 
-	if valid && sufficient {
+	if valid && sufficient && l.leaseAttachedObjectCount <= l.leaseMaxAttachedObjectCount {
 		return l.prevLeaseID, nil
 	}
 
@@ -107,9 +114,6 @@ func (l *leaseManager) GetLease(ctx context.Context, ttl int64) (clientv3.LeaseI
 	l.prevLeaseID = lcr.ID
 	l.prevLeaseExpirationTime = now.Add(time.Duration(ttl) * time.Second)
 	// refresh count
-	if l.leaseAttachedObjectCount > largeLeaseThreshold {
-		klog.Infof("The object count for lease %x is large: %v", l.prevLeaseID, l.leaseAttachedObjectCount)
-	}
 	metrics.UpdateLeaseObjectCount(l.leaseAttachedObjectCount)
 	l.leaseAttachedObjectCount = 1
 	return lcr.ID, nil

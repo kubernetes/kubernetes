@@ -164,6 +164,7 @@ func TestAddFlags(t *testing.T) {
 				HealthcheckTimeout:    storagebackend.DefaultHealthcheckTimeout,
 				LeaseManagerConfig: etcd3.LeaseManagerConfig{
 					ReuseDurationSeconds: 100,
+					MaxObjectCount:       1000,
 				},
 			},
 			DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
