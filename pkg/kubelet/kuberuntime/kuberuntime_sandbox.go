@@ -138,6 +138,8 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 	// incremental change that decouples the windows codepath which
 	// can await the runtime api being updated to support windows
 	if runtime.GOOS == "windows" {
+		
+		// TODO: modify the generatePodSandboxWindowsconfig to actually return a Windows typed struct.
 		win, err := m.generatePodSandboxWindowsConfig(pod)
 		if err != nil {
 			return nil, err
@@ -153,7 +155,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 	return podSandboxConfig, nil
 }
 
-// generatePodSandboxWindowsConfig generates a windows config, a step towards decoupling from linux.  It still returns a linux sandbox config, however.
+// generatePodSandboxWindowsConfig generates a windows config, a step towards decoupling from linux.  It still returns a linux sandbox config, however.  TODO, modify the runtimeapi to explicitly allow return of windows type for sandbox config.
 func (m *kubeGenericRuntimeManager) generatePodSandboxWindowsConfig(pod *v1.Pod) (*runtimeapi.LinuxPodSandboxConfig, error) {
 	sysctls := make(map[string]string)
 	lc := &runtimeapi.LinuxPodSandboxConfig{
