@@ -93,6 +93,75 @@ func TestLabelSelectorAsSelector(t *testing.T) {
 	}
 }
 
+func TestParseToLabelSelector(t *testing.T) {
+	tests := []struct {
+		in        string
+		out       *LabelSelector
+		expectErr bool
+	}{
+		{
+			in: "app=test",
+			out: &LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "test",
+				},
+				MatchExpressions: []LabelSelectorRequirement{},
+			},
+			expectErr: false,
+		},
+		{
+			in: "app!=test",
+			out: &LabelSelector{
+				MatchLabels: map[string]string{},
+				MatchExpressions: []LabelSelectorRequirement{
+					{
+						Key:      "app",
+						Operator: "NotIn",
+						Values:   []string{"test"},
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			in: "app gt 1",
+			out: nil,
+			expectErr: true,
+		},
+		{
+			in: "app in (a, b),from!=test",
+			out: &LabelSelector{
+				MatchLabels: map[string]string{},
+				MatchExpressions: []LabelSelectorRequirement{
+					{
+						Key:      "app",
+						Operator: "In",
+						Values:   []string{"a", "b"},
+					},
+					{
+						Key:      "from",
+						Operator: "NotIn",
+						Values:   []string{"test"},
+					},
+				},
+			},
+			expectErr: false,
+		},
+	}
+	for i, tc := range tests {
+		out, err := ParseToLabelSelector(tc.in)
+		if err == nil && tc.expectErr {
+			t.Errorf("[%v]expected error but got none.", i)
+		}
+		if err != nil && !tc.expectErr {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
+		if !reflect.DeepEqual(out, tc.out) {
+			t.Errorf("[%v]expected:\n\t%#v\nbut got:\n\t%#v", i, tc.out, out)
+		}
+	}
+}
+
 func TestLabelSelectorAsMap(t *testing.T) {
 	matchLabels := map[string]string{"foo": "bar"}
 	matchExpressions := func(operator LabelSelectorOperator, values []string) []LabelSelectorRequirement {

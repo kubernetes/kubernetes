@@ -126,7 +126,7 @@ func ParseToLabelSelector(selector string) (*LabelSelector, error) {
 			continue
 		case selection.In:
 			op = LabelSelectorOpIn
-		case selection.NotIn:
+		case selection.NotIn, selection.NotEquals:
 			op = LabelSelectorOpNotIn
 		case selection.Exists:
 			op = LabelSelectorOpExists
