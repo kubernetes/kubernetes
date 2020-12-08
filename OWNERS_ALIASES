@@ -120,13 +120,13 @@ aliases:
     - alejandrox1 # SIG Technical Lead
     - hasheddan # SIG Technical Lead
     - justaugustus # SIG Chair
-    - saschagrunert # SIG Technical Lead
+    - saschagrunert # SIG Chair
     - tpepper # SIG Chair
   release-engineering-approvers:
     - alejandrox1 # SIG Technical Lead
     - hasheddan # SIG Technical Lead
     - justaugustus # SIG Chair
-    - saschagrunert # SIG Technical Lead
+    - saschagrunert # SIG Chair
     - tpepper # SIG Chair
   release-engineering-reviewers:
     - cpanato # Release Manager
@@ -134,7 +134,7 @@ aliases:
     - hasheddan # SIG Technical Lead / Release Manager
     - hoegaarden # Release Manager
     - justaugustus # SIG Chair / Release Manager
-    - saschagrunert # SIG Technical Lead / Release Manager
+    - saschagrunert # SIG Chair / Release Manager
     - tpepper # SIG Chair / Release Manager
     - xmudrii # Release Manager
   build-image-approvers:
