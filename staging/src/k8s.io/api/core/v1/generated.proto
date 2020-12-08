@@ -3012,7 +3012,8 @@ message PodAffinityTerm {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 1;
 
   // namespaces specifies which namespaces the labelSelector applies to (matches against);
-  // null or empty list means "this pod's namespace"
+  // null or empty list means "this pod's namespace";
+  // valid regular expression patterns can be used to match multiple namespaces
   // +optional
   repeated string namespaces = 2;
 

@@ -2775,7 +2775,8 @@ type PodAffinityTerm struct {
 	// +optional
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
 	// namespaces specifies which namespaces the labelSelector applies to (matches against);
-	// null or empty list means "this pod's namespace"
+	// null or empty list means "this pod's namespace";
+	// valid regular expression patterns can be used to match multiple namespaces
 	// +optional
 	Namespaces []string `json:"namespaces,omitempty" protobuf:"bytes,2,rep,name=namespaces"`
 	// This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching

@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -67,7 +67,7 @@ func TestGetNamespacesFromPodAffinityTerm(t *testing.T) {
 }
 
 func TestPodMatchesTermsNamespaceAndSelector(t *testing.T) {
-	fakeNamespaces := sets.String{metav1.NamespacePublic: sets.Empty{}, metav1.NamespaceSystem: sets.Empty{}}
+	fakeNamespaces := sets.String{"kube-*": sets.Empty{}}
 	fakeRequirement, _ := labels.NewRequirement("service", selection.In, []string{"topologies_service1", "topologies_service2"})
 	fakeSelector := labels.NewSelector().Add(*fakeRequirement)
 

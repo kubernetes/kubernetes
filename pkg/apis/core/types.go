@@ -2554,7 +2554,8 @@ type PodAffinityTerm struct {
 	// +optional
 	LabelSelector *metav1.LabelSelector
 	// namespaces specifies which namespaces the labelSelector applies to (matches against);
-	// null or empty list means "this pod's namespace"
+	// null or empty list means "this pod's namespace";
+	// valid regular expression patterns can be used to match multiple namespaces
 	// +optional
 	Namespaces []string
 	// This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching

@@ -2217,7 +2217,7 @@
           "description": "A label query over a set of resources, in this case pods."
         },
         "namespaces": {
-          "description": "namespaces specifies which namespaces the labelSelector applies to (matches against); null or empty list means \"this pod's namespace\"",
+          "description": "namespaces specifies which namespaces the labelSelector applies to (matches against); null or empty list means \"this pod's namespace\"; valid regular expression patterns can be used to match multiple namespaces",
           "items": {
             "type": "string"
           },

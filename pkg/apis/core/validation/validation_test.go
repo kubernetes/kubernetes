@@ -8152,7 +8152,7 @@ func TestValidatePod(t *testing.T) {
 				}),
 			},
 		},
-		"invalid name space in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, name space shouldbe valid": {
+		"invalid namespace in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, namespaces should be valid regexp patterns": {
 			expectedError: "spec.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.namespace",
 			spec: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -8173,7 +8173,7 @@ func TestValidatePod(t *testing.T) {
 											},
 										},
 									},
-									Namespaces:  []string{"INVALID_NAMESPACE"},
+									Namespaces:  []string{"*"},
 									TopologyKey: "region",
 								},
 							},

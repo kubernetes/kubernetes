@@ -17,7 +17,9 @@ limitations under the License.
 package util
 
 import (
-	"k8s.io/api/core/v1"
+	"regexp"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -38,7 +40,7 @@ func GetNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffini
 // PodMatchesTermsNamespaceAndSelector returns true if the given <pod>
 // matches the namespace and selector defined by <affinityPod>`s <term>.
 func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, namespaces sets.String, selector labels.Selector) bool {
-	if !namespaces.Has(pod.Namespace) {
+	if !podMatchesTermsNamespceWithRegexp(pod, namespaces) {
 		return false
 	}
 
@@ -46,6 +48,18 @@ func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, namespaces sets.String, se
 		return false
 	}
 	return true
+}
+
+func podMatchesTermsNamespceWithRegexp(pod *v1.Pod, namespaces sets.String) bool {
+	if namespaces.Has(pod.Namespace) {
+		return true
+	}
+	for ns := range namespaces {
+		if match, _ := regexp.MatchString(ns, pod.Namespace); match {
+			return true
+		}
+	}
+	return false
 }
 
 // NodesHaveSameTopologyKey checks if nodeA and nodeB have same label value with given topologyKey as label key.

@@ -3557,8 +3557,8 @@ func validatePodAffinityTerm(podAffinityTerm core.PodAffinityTerm, fldPath *fiel
 
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, fldPath.Child("matchExpressions"))...)
 	for _, name := range podAffinityTerm.Namespaces {
-		for _, msg := range ValidateNamespaceName(name, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, msg))
+		if _, msg := regexp.Compile(name); msg != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, msg.Error()))
 		}
 	}
 	if len(podAffinityTerm.TopologyKey) == 0 {
