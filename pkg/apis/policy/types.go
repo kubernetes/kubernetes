@@ -124,6 +124,19 @@ type Eviction struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Checkpoint checkpoints a pod on its node.
+// This is a subresource of Pod.  A request to cause such a checkpoint is
+// created by POSTing to .../pods/<pod name>/checkpoint.
+type Checkpoint struct {
+	metav1.TypeMeta
+
+	// ObjectMeta describes the pod that is being checkpointed.
+	// +optional
+	metav1.ObjectMeta
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // PodSecurityPolicy governs the ability to make requests that affect the SecurityContext
 // that will be applied to a pod and container.
 type PodSecurityPolicy struct {

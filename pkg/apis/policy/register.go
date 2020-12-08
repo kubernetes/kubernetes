@@ -53,6 +53,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PodSecurityPolicy{},
 		&PodSecurityPolicyList{},
 		&Eviction{},
+		&Checkpoint{},
 	)
 	return nil
 }
