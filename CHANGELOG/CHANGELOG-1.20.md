@@ -6,8 +6,6 @@
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
   - [Changelog since v1.19.0](#changelog-since-v1190)
-- [Release notes for v1.20.0-rc.0](#release-notes-for-v1200-rc0)
-- [Changelog since v1.19.0](#changelog-since-v1190-1)
   - [What's New (Major Themes)](#whats-new-major-themes)
     - [Dockershim deprecation](#dockershim-deprecation)
     - [External credential provider for client-go](#external-credential-provider-for-client-go)
@@ -227,12 +225,6 @@ filename | sha512 hash
 [kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.20.0/kubernetes-node-windows-amd64.tar.gz) | `9d4261af343cc330e6359582f80dbd6efb57d41f882747a94bbf47b4f93292d43dd19a86214d4944d268941622dfbc96847585e6fec15fddc4dbd93d17015fa8`
 
 ## Changelog since v1.19.0
-
-# Release notes for v1.20.0-rc.0
-
-[Documentation](https://docs.k8s.io/docs/home)
-
-# Changelog since v1.19.0
 
 ## What's New (Major Themes)
 
