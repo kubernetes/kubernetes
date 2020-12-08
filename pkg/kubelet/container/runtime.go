@@ -120,6 +120,9 @@ type Runtime interface {
 	// This method just proxies a new runtimeConfig with the updated
 	// CIDR value down to the runtime shim.
 	UpdatePodCIDR(podCIDR string) error
+	// CheckpointPod tells the runtime to checkpoint a Pod
+	// and store the resulting archive to checkpointDir
+	CheckpointPod(pod *v1.Pod, checkpointDir string) error
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the

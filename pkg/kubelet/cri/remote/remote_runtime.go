@@ -496,7 +496,6 @@ func (r *remoteRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.Run
 	_, err := r.runtimeClient.UpdateRuntimeConfig(ctx, &runtimeapi.UpdateRuntimeConfigRequest{
 		RuntimeConfig: runtimeConfig,
 	})
-
 	if err != nil {
 		return err
 	}
@@ -606,6 +605,7 @@ func (r *remoteRuntimeService) CheckpointPod(podSandBoxID, checkpointDir string)
 	})
 	if err != nil {
 		klog.Errorf("CheckpointPod %q from runtime service failed: %v", podSandBoxID, err)
+		return err
 	}
 	klog.V(1).Infof("[RemoteRuntimeService] CheckpointPod Response (podID=%v)", podSandBoxID)
 

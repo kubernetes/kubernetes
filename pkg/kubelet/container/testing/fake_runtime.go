@@ -364,6 +364,14 @@ func (f *FakeRuntime) DeleteContainer(containerID kubecontainer.ContainerID) err
 	return f.Err
 }
 
+func (f *FakeRuntime) CheckpointPod(pod *v1.Pod, checkpointDir string) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "CheckpointPod")
+	return f.Err
+}
+
 func (f *FakeRuntime) ImageStats() (*kubecontainer.ImageStats, error) {
 	f.Lock()
 	defer f.Unlock()

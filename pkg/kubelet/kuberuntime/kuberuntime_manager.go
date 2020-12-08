@@ -1016,3 +1016,12 @@ func (m *kubeGenericRuntimeManager) UpdatePodCIDR(podCIDR string) error {
 			},
 		})
 }
+
+func (m *kubeGenericRuntimeManager) CheckpointPod(pod *v1.Pod, checkpointDir string) error {
+	sandboxIDs, err := m.getSandboxIDByPodUID(pod.UID, nil)
+	if err != nil {
+		return err
+	}
+	klog.V(2).Infof("Calling  m.runtimeService.CheckpointPod %#v", sandboxIDs[0])
+	return m.runtimeService.CheckpointPod(sandboxIDs[0], checkpointDir)
+}
