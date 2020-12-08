@@ -43,7 +43,8 @@ func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	nodeInformer := informerFactory.Core().V1().Nodes()
-	controller := NewPodGC(kubeClient, podInformer, nodeInformer, terminatedPodThreshold)
+	jobInformer := informerFactory.Batch().V1().Jobs()
+	controller := NewPodGC(kubeClient, podInformer, nodeInformer, jobInformer, terminatedPodThreshold)
 	controller.podListerSynced = alwaysReady
 	return controller, podInformer, nodeInformer
 }

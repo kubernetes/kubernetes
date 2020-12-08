@@ -18,6 +18,9 @@ package podgc
 
 import (
 	"context"
+	batchinformers "k8s.io/client-go/informers/batch/v1"
+	batchlisters "k8s.io/client-go/listers/batch/v1"
+	jobutil "k8s.io/kubernetes/pkg/controller/job"
 	"sort"
 	"sync"
 	"time"
@@ -54,15 +57,16 @@ type PodGCController struct {
 	podListerSynced  cache.InformerSynced
 	nodeLister       corelisters.NodeLister
 	nodeListerSynced cache.InformerSynced
-
-	nodeQueue workqueue.DelayingInterface
+	jobLister        batchlisters.JobLister
+	jobListerSynced  cache.InformerSynced
+	nodeQueue        workqueue.DelayingInterface
 
 	deletePod              func(namespace, name string) error
 	terminatedPodThreshold int
 }
 
 func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
-	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int) *PodGCController {
+	nodeInformer coreinformers.NodeInformer, jobInformer batchinformers.JobInformer, terminatedPodThreshold int) *PodGCController {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
@@ -73,6 +77,8 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 		podListerSynced:        podInformer.Informer().HasSynced,
 		nodeLister:             nodeInformer.Lister(),
 		nodeListerSynced:       nodeInformer.Informer().HasSynced,
+		jobLister:              jobInformer.Lister(),
+		jobListerSynced:        jobInformer.Informer().HasSynced,
 		nodeQueue:              workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
 		deletePod: func(namespace, name string) error {
 			klog.Infof("PodGC is force deleting Pod: %v/%v", namespace, name)
@@ -90,7 +96,7 @@ func (gcc *PodGCController) Run(stop <-chan struct{}) {
 	defer gcc.nodeQueue.ShutDown()
 	defer klog.Infof("Shutting down GC controller")
 
-	if !cache.WaitForNamedCacheSync("GC", stop, gcc.podListerSynced, gcc.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSync("GC", stop, gcc.podListerSynced, gcc.nodeListerSynced, gcc.jobListerSynced) {
 		return
 	}
 
@@ -124,10 +130,29 @@ func isPodTerminated(pod *v1.Pod) bool {
 	return false
 }
 
+func (gcc *PodGCController) isJobPodShouldBeGC(pod *v1.Pod) bool {
+	controllerRef := metav1.GetControllerOf(pod)
+	if controllerRef == nil || controllerRef.Kind != "Job" {
+		return true
+	}
+	job, err := gcc.jobLister.Jobs(pod.Namespace).Get(controllerRef.Name)
+	if err != nil {
+		klog.V(2).Infof("Failed to get Job %v: %v", pod.Namespace+"/"+controllerRef.Name, err)
+		return false
+	}
+	if job.UID != controllerRef.UID {
+		return true
+	}
+	if !jobutil.IsJobFinished(job) {
+		return false
+	}
+	return true
+}
+
 func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 	terminatedPods := []*v1.Pod{}
 	for _, pod := range pods {
-		if isPodTerminated(pod) {
+		if isPodTerminated(pod) && gcc.isJobPodShouldBeGC(pod) {
 			terminatedPods = append(terminatedPods, pod)
 		}
 	}
