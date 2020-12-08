@@ -38,6 +38,7 @@ go_library(
         "//pkg/credentialprovider/plugin:go_default_library",
         "//pkg/credentialprovider/secrets:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/kubelet/checkpoint:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/events:go_default_library",

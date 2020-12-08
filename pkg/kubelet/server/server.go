@@ -67,6 +67,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	"k8s.io/kubernetes/pkg/kubelet/checkpoint"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
@@ -96,6 +97,7 @@ type Server struct {
 	metricsBuckets       sets.String
 	metricsMethodBuckets sets.String
 	resourceAnalyzer     stats.ResourceAnalyzer
+	checkpointManager    checkpoint.Manager
 }
 
 // TLSOptions holds the TLS options.
@@ -144,9 +146,10 @@ func ListenAndServeKubeletServer(
 	enableCAdvisorJSONEndpoints,
 	enableDebuggingHandlers,
 	enableContentionProfiling,
-	enableSystemLogHandler bool) {
+	enableSystemLogHandler bool,
+	checkpointManager checkpoint.Manager) {
 	klog.InfoS("Starting to listen", "address", address, "port", port)
-	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, enableSystemLogHandler)
+	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, enableSystemLogHandler, checkpointManager)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -168,7 +171,7 @@ func ListenAndServeKubeletServer(
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, enableCAdvisorJSONEndpoints bool) {
 	klog.InfoS("Starting to listen read-only", "address", address, "port", port)
-	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false)
+	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false, nil)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -223,7 +226,8 @@ func NewServer(
 	enableCAdvisorJSONEndpoints,
 	enableDebuggingHandlers,
 	enableContentionProfiling,
-	enableSystemLogHandler bool) Server {
+	enableSystemLogHandler bool,
+	checkpointManager checkpoint.Manager) Server {
 	server := Server{
 		host:                 host,
 		resourceAnalyzer:     resourceAnalyzer,
@@ -247,6 +251,7 @@ func NewServer(
 	} else {
 		server.InstallDebuggingDisabledHandlers()
 	}
+	server.checkpointManager = checkpointManager
 	return server
 }
 
@@ -401,6 +406,14 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 			Writes(cadvisorapi.MachineInfo{}))
 		s.restfulCont.Add(ws)
 	}
+
+	s.addMetricsBucketMatcher("checkpoint")
+	ws = &restful.WebService{}
+	ws.Path("/checkpoint").Produces(restful.MIME_JSON)
+	ws.Route(ws.POST("/{podNamespace}/{podName}").
+		To(s.checkpoint).
+		Operation("checkpoint"))
+	s.restfulCont.Add(ws)
 }
 
 const pprofBasePath = "/debug/pprof/"
@@ -864,6 +877,10 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 		return
 	}
 	proxyStream(response.ResponseWriter, request.Request, url)
+}
+
+func (s *Server) checkpoint(request *restful.Request, response *restful.Response) {
+	s.checkpointManager.HandleCheckpoint(request, response)
 }
 
 // getURLRootPath trims a URL path.

@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -1023,5 +1024,13 @@ func (m *kubeGenericRuntimeManager) CheckpointPod(pod *v1.Pod, checkpointDir str
 		return err
 	}
 	klog.V(2).Infof("Calling  m.runtimeService.CheckpointPod %#v", sandboxIDs[0])
-	return m.runtimeService.CheckpointPod(sandboxIDs[0], checkpointDir)
+	if err := m.runtimeService.CheckpointPod(sandboxIDs[0], checkpointDir); err != nil {
+		return err
+	}
+	// Write checkpoint metadata
+	if err := checkpoint.UpdateMetadata(pod, sandboxIDs[0], checkpointDir, m.containerTerminationLogPathUID); err != nil {
+		return err
+	}
+
+	return nil
 }

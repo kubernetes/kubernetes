@@ -66,6 +66,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
+	"k8s.io/kubernetes/pkg/kubelet/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/cloudresource"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -828,6 +829,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.shutdownManager = shutdownManager
 	klet.admitHandlers.AddPodAdmitHandler(shutdownAdmitHandler)
 
+	klet.checkpointManager = checkpoint.NewManager(klet.kubeClient, klet.podManager, klet.checkpointContainer)
+
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.
 	klet.kubeletConfiguration = *kubeCfg
@@ -1173,6 +1176,9 @@ type Kubelet struct {
 
 	// Handles node shutdown events for the Node.
 	shutdownManager *nodeshutdown.Manager
+
+	// Handles checkpoint events for the Node.
+	checkpointManager checkpoint.Manager
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -1489,6 +1495,22 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	mirrorPod := o.mirrorPod
 	podStatus := o.podStatus
 	updateType := o.updateType
+
+	// If we want to checkpoint the pod, we can finish early, so do it now.
+	// In case the user does not decide to keep the Pod running after
+	// checkpointing, checkpointing needs to happen before killing it.
+	if updateType == kubetypes.SyncPodCheckpoint {
+		// Right now we only know about checkpointing pods during drain.
+		// This means the Pod should be gone after checkpointing.
+		pod.Spec.RestartPolicy = v1.RestartPolicyNever
+
+		if err := kl.containerRuntime.CheckpointPod(pod, kl.getCheckpointsDir()); err != nil {
+			utilruntime.HandleError(err)
+			return err
+		}
+
+		return nil
+	}
 
 	// if we want to kill a pod, do it now!
 	if updateType == kubetypes.SyncPodKill {
@@ -2230,7 +2252,7 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 
 // ListenAndServe runs the kubelet HTTP server.
 func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, enableSystemLogHandler bool) {
-	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, enableSystemLogHandler)
+	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, enableSystemLogHandler, kl.checkpointManager)
 }
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
@@ -2286,6 +2308,12 @@ func (kl *Kubelet) fastStatusUpdateOnce() {
 			return
 		}
 	}
+}
+
+func (kl *Kubelet) checkpointContainer(pod *v1.Pod) {
+	start := kl.clock.Now()
+	mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
+	kl.dispatchWork(pod, kubetypes.SyncPodCheckpoint, mirrorPod, start)
 }
 
 // isSyncPodWorthy filters out events that are not worthy of pod syncing
