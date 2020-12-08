@@ -1100,3 +1100,7 @@ func (m *kubeGenericRuntimeManager) UpdatePodCIDR(podCIDR string) error {
 			},
 		})
 }
+
+func (m *kubeGenericRuntimeManager) CheckpointContainer(options *runtimeapi.CheckpointContainerRequest) error {
+	return m.runtimeService.CheckpointContainer(options)
+}
