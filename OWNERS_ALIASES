@@ -118,18 +118,20 @@ aliases:
   # SIG Release
   sig-release-approvers:
     - alejandrox1 # SIG Technical Lead
+    - hasheddan # SIG Technical Lead
     - justaugustus # SIG Chair
     - saschagrunert # SIG Technical Lead
     - tpepper # SIG Chair
   release-engineering-approvers:
     - alejandrox1 # SIG Technical Lead
+    - hasheddan # SIG Technical Lead
     - justaugustus # SIG Chair
     - saschagrunert # SIG Technical Lead
     - tpepper # SIG Chair
   release-engineering-reviewers:
     - cpanato # Release Manager
     - feiskyer # Release Manager
-    - hasheddan # Release Manager
+    - hasheddan # SIG Technical Lead / Release Manager
     - hoegaarden # Release Manager
     - justaugustus # SIG Chair / Release Manager
     - saschagrunert # SIG Technical Lead / Release Manager
