@@ -6,7 +6,7 @@
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
   - [Changelog since v1.19.0](#changelog-since-v1190)
-- [Release notes for v1.20.0-rc.0](#release-notes-for-v1200-rc0)
+- [Release notes for v1.20.0](#release-notes-for-v1200)
 - [Changelog since v1.19.0](#changelog-since-v1190-1)
   - [What's New (Major Themes)](#whats-new-major-themes)
     - [Dockershim deprecation](#dockershim-deprecation)
@@ -228,7 +228,7 @@ filename | sha512 hash
 
 ## Changelog since v1.19.0
 
-# Release notes for v1.20.0-rc.0
+# Release notes for v1.20.0
 
 [Documentation](https://docs.k8s.io/docs/home)
 
