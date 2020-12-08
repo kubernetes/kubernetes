@@ -76,6 +76,8 @@ type PodSandboxManager interface {
 	ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error)
 	// PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
 	PortForward(*runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error)
+	// CheckpointContainer checkpoints a container
+	CheckpointContainer(containerID, checkpointDir string) error
 }
 
 // ContainerStatsManager contains methods for retrieving the container
