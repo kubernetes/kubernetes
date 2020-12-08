@@ -37,8 +37,6 @@ type kubeAPIServeETCDEnv struct {
 	StorageBackend      string
 	StorageMediaType    string
 	CompactionInterval  string
-	HostPrimaryIP       string
-	ETCDListenOnHostIP  string
 }
 
 func TestServerOverride(t *testing.T) {
@@ -54,24 +52,13 @@ func TestServerOverride(t *testing.T) {
 			},
 		},
 		{
-			desc: "ETCD-SERVERS and ETCD_SERVERS_OVERRIDES are set",
+			desc: "ETCD-SERVERS and ETCD_SERVERS_OVERRIDES iare set",
 			env: kubeAPIServeETCDEnv{
 				ETCDServers:         "ETCDServers",
 				ETCDServersOverride: "ETCDServersOverrides",
 			},
 			want: []string{
 				"--etcd-servers-overrides=ETCDServersOverrides",
-			},
-		},
-		{
-			desc: "HOST_PRIMARY_IP is set and etcd is set to listen to host IP",
-			env: kubeAPIServeETCDEnv{
-				HostPrimaryIP:      "HostPrimaryIP",
-				ETCDListenOnHostIP: "true",
-			},
-			want: []string{
-				"--etcd-servers-overrides=/events#http://HostPrimaryIP:4002",
-				"--etcd-servers=http://HostPrimaryIP:2379",
 			},
 		},
 	}
