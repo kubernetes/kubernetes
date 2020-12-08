@@ -439,6 +439,8 @@ func streamParams(params url.Values, opts runtime.Object) error {
 			}
 			params.Add(api.PortHeader, strings.Join(ports, ","))
 		}
+	case *api.PodCheckpointOptions:
+		return nil
 	default:
 		return fmt.Errorf("Unknown object for streaming: %v", opts)
 	}
@@ -469,6 +471,17 @@ func ExecLocation(
 	return streamLocation(ctx, getter, connInfo, name, opts, opts.Container, "exec")
 }
 
+// CheckpointLocation returns the checkpoint URL for a pod
+func CheckpointLocation(
+	ctx context.Context,
+	getter ResourceGetter,
+	connInfo client.ConnectionInfoGetter,
+	name string,
+	opts *api.PodCheckpointOptions,
+) (*url.URL, http.RoundTripper, error) {
+	return streamLocation(ctx, getter, connInfo, name, opts, "", "checkpoint")
+}
+
 func streamLocation(
 	ctx context.Context,
 	getter ResourceGetter,
@@ -483,11 +496,16 @@ func streamLocation(
 		return nil, nil, err
 	}
 
-	// Try to figure out a container
-	// If a container was provided, it must be valid
-	container, err = validateContainer(container, pod)
-	if err != nil {
-		return nil, nil, err
+	formatString := "/%s/%s/%s"
+
+	if container != "" {
+		// Try to figure out a container
+		// If a container was provided, it must be valid
+		container, err = validateContainer(container, pod)
+		if err != nil {
+			return nil, nil, err
+		}
+		formatString += fmt.Sprintf("/%s", container)
 	}
 
 	nodeName := types.NodeName(pod.Spec.NodeName)
@@ -506,7 +524,7 @@ func streamLocation(
 	loc := &url.URL{
 		Scheme:   nodeInfo.Scheme,
 		Host:     net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
-		Path:     fmt.Sprintf("/%s/%s/%s/%s", path, pod.Namespace, pod.Name, container),
+		Path:     fmt.Sprintf(formatString, path, pod.Namespace, pod.Name),
 		RawQuery: params.Encode(),
 	}
 	return loc, nodeInfo.Transport, nil
@@ -520,31 +538,7 @@ func PortForwardLocation(
 	name string,
 	opts *api.PodPortForwardOptions,
 ) (*url.URL, http.RoundTripper, error) {
-	pod, err := getPod(ctx, getter, name)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	nodeName := types.NodeName(pod.Spec.NodeName)
-	if len(nodeName) == 0 {
-		// If pod has not been assigned a host, return an empty location
-		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
-	}
-	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
-	if err != nil {
-		return nil, nil, err
-	}
-	params := url.Values{}
-	if err := streamParams(params, opts); err != nil {
-		return nil, nil, err
-	}
-	loc := &url.URL{
-		Scheme:   nodeInfo.Scheme,
-		Host:     net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
-		Path:     fmt.Sprintf("/portForward/%s/%s", pod.Namespace, pod.Name),
-		RawQuery: params.Encode(),
-	}
-	return loc, nodeInfo.Transport, nil
+	return streamLocation(ctx, getter, connInfo, name, opts, "", "portForward")
 }
 
 // validateContainer validate container is valid for pod, return valid container
