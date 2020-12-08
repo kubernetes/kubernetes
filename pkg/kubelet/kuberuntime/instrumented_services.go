@@ -306,3 +306,12 @@ func (in instrumentedImageManagerService) ImageFsInfo() ([]*runtimeapi.Filesyste
 	recordError(operation, err)
 	return fsInfo, nil
 }
+
+func (in instrumentedRuntimeService) CheckpointPod(podID, checkpointDir string) error {
+	const operation = "checkpoint_pod"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.CheckpointPod(podID, checkpointDir)
+	recordError(operation, err)
+	return err
+}
