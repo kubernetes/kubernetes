@@ -3,8 +3,10 @@
 approvers:
   - sig-release-approvers
   - release-engineering-approvers
+  - wilsonehusin # 1.21 Release Notes Lead
 reviewers:
   - release-engineering-reviewers
+  - wilsonehusin # 1.21 Release Notes Lead
 
 labels:
   - sig/release
