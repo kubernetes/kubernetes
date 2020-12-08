@@ -79,6 +79,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PersistentVolumeClaimList{},
 		&PodAttachOptions{},
 		&PodLogOptions{},
+		&PodCheckpointOptions{},
 		&PodExecOptions{},
 		&PodPortForwardOptions{},
 		&PodProxyOptions{},
