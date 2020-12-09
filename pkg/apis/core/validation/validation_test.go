@@ -10402,6 +10402,24 @@ func TestValidateServiceCreate(t *testing.T) {
 			numErrs: 0,
 		},
 		{
+			name: "duplicate service name (same protocol)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Type = core.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 88, Protocol: "TCP", TargetPort: intstr.FromInt(88)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 8888, Protocol: "TCP", TargetPort: intstr.FromInt(8888)})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "duplicate service name (different protocols)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Type = core.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 88, Protocol: "TCP", TargetPort: intstr.FromInt(88)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 88, Protocol: "UDP", TargetPort: intstr.FromInt(88)})
+			},
+			numErrs: 0,
+		},
+		{
 			name: "valid type - cluster",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeClusterIP
