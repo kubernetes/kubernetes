@@ -132,6 +132,22 @@ type Eviction struct {
 }
 
 // +genclient
+// +genclient:noVerbs
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.22
+
+// Checkpoint checkpoints a pod on its node.
+// This is a subresource of Pod. A request to cause such a checkpoint is
+// created by POSTing to .../pods/<pod name>/checkpoint.
+type Checkpoint struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// ObjectMeta describes the pod that is being evicted.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+}
+
+// +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.10

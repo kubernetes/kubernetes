@@ -49,6 +49,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PodSecurityPolicy{},
 		&PodSecurityPolicyList{},
 		&Eviction{},
+		&Checkpoint{},
 	)
 	// Add the watch version that applies
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
