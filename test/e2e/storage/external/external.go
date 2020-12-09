@@ -295,7 +295,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *testsuites
 		// reconsidered if we eventually need to move in-tree storage tests out.
 		sc.Parameters["csi.storage.k8s.io/fstype"] = fsType
 	}
-	return testsuites.GetStorageClass(sc.Provisioner, sc.Parameters, sc.VolumeBindingMode, f.Namespace.Name, "e2e-sc")
+	return testsuites.CopyStorageClass(sc, f.Namespace.Name, "e2e-sc")
 }
 
 func (d *driverDefinition) GetTimeouts() *framework.TimeoutContext {

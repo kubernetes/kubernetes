@@ -243,9 +243,7 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern test
 			if pattern.BindingMode != "" {
 				r.Sc.VolumeBindingMode = &pattern.BindingMode
 			}
-			if pattern.AllowExpansion != false {
-				r.Sc.AllowVolumeExpansion = &pattern.AllowExpansion
-			}
+			r.Sc.AllowVolumeExpansion = &pattern.AllowExpansion
 
 			ginkgo.By("creating a StorageClass " + r.Sc.Name)
 
