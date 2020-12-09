@@ -136,7 +136,7 @@ func BenchmarkSchedulingWaitForFirstConsumerPVs(b *testing.B) {
 	}
 	basePod := makeBasePod()
 	testStrategy := testutils.NewCreatePodWithPersistentVolumeWithFirstConsumerStrategy(gceVolumeFactory, basePod)
-	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelFailureDomainBetaZone, "zone1")
+	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelTopologyZone, "zone1")
 	for _, test := range tests {
 		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
 		b.Run(name, func(b *testing.B) {

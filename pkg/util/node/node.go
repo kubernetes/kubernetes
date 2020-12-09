@@ -187,13 +187,14 @@ func GetZoneKey(node *v1.Node) string {
 		return ""
 	}
 
-	// TODO: prefer stable labels for zone in v1.18
+	// TODO: "failure-domain.beta..." names are deprecated, but will
+	// stick around a long time due to existing on old extant objects like PVs.
+	// Maybe one day we can stop considering them (see #88493).
 	zone, ok := labels[v1.LabelFailureDomainBetaZone]
 	if !ok {
 		zone, _ = labels[v1.LabelTopologyZone]
 	}
 
-	// TODO: prefer stable labels for region in v1.18
 	region, ok := labels[v1.LabelFailureDomainBetaRegion]
 	if !ok {
 		region, _ = labels[v1.LabelTopologyRegion]
