@@ -630,7 +630,6 @@ func (qs *queueSet) cancelWait(req *request) {
 			break
 		}
 	}
-	return
 }
 
 // selectQueueLocked examines the queues in round robin order and
