@@ -56,6 +56,12 @@ var _ cloudprovider.Clusters = (*Cloud)(nil)
 
 // Cloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
 type Cloud struct {
+	DisableInstances     bool
+	DisableRoutes        bool
+	DisableLoadBalancers bool
+	DisableZones         bool
+	DisableClusters      bool
+
 	Exists bool
 	Err    error
 
@@ -126,7 +132,7 @@ func (f *Cloud) Master(ctx context.Context, name string) (string, error) {
 
 // Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
 func (f *Cloud) Clusters() (cloudprovider.Clusters, bool) {
-	return f, true
+	return f, !f.DisableClusters
 }
 
 // ProviderName returns the cloud provider ID.
@@ -145,14 +151,14 @@ func (f *Cloud) HasClusterID() bool {
 // LoadBalancer returns a fake implementation of LoadBalancer.
 // Actually it just returns f itself.
 func (f *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
-	return f, true
+	return f, !f.DisableLoadBalancers
 }
 
 // Instances returns a fake implementation of Instances.
 //
 // Actually it just returns f itself.
 func (f *Cloud) Instances() (cloudprovider.Instances, bool) {
-	return f, true
+	return f, !f.DisableInstances
 }
 
 // InstancesV2 returns a fake implementation of InstancesV2.
@@ -167,12 +173,12 @@ func (f *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
 
 // Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
 func (f *Cloud) Zones() (cloudprovider.Zones, bool) {
-	return f, true
+	return f, !f.DisableZones
 }
 
 // Routes returns a routes interface along with whether the interface is supported.
 func (f *Cloud) Routes() (cloudprovider.Routes, bool) {
-	return f, true
+	return f, !f.DisableRoutes
 }
 
 // GetLoadBalancer is a stub implementation of LoadBalancer.GetLoadBalancer.
