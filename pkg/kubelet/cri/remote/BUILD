@@ -52,6 +52,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/cri/remote/fake:go_default_library",
+        "//pkg/kubelet/cri/remote/util:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/testing:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
