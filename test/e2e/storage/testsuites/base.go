@@ -236,7 +236,8 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern test
 			driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 			claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 			framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
-			framework.Logf("Using claimSize:%s, test suite supported size:%v, driver(%s) supported size:%v ", claimSize, testVolumeSizeRange, dDriver.GetDriverInfo().Name, testVolumeSizeRange)
+			framework.Logf("Using claimSize:%s, test suite supported size:%v, driver(%s) supported size:%v ",
+				claimSize, testVolumeSizeRange, dDriver.GetDriverInfo().Name, driverVolumeSizeRange)
 			r.Sc = dDriver.GetDynamicProvisionStorageClass(r.Config, pattern.FsType)
 
 			if pattern.BindingMode != "" {
