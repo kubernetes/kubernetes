@@ -103,7 +103,7 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 
 	// Create Persistent Volume
 	ginkgo.By("Creating Storage Class With Fstype")
-	pvclaim, persistentvolumes := createVolume(client, namespace, scParameters)
+	pvclaim, persistentvolumes := createVolume(client, f.Timeouts, namespace, scParameters)
 
 	// Create Pod and verify the persistent volume is accessible
 	pod := createPodAndVerifyVolumeAccessible(client, namespace, pvclaim, persistentvolumes)
@@ -122,7 +122,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 
 	// Create Persistent Volume
 	ginkgo.By("Creating Storage Class With Invalid Fstype")
-	pvclaim, persistentvolumes := createVolume(client, namespace, scParameters)
+	pvclaim, persistentvolumes := createVolume(client, f.Timeouts, namespace, scParameters)
 
 	ginkgo.By("Creating pod to attach PV to the node")
 	var pvclaims []*v1.PersistentVolumeClaim
@@ -150,7 +150,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 	framework.ExpectEqual(isFound, true, "Unable to verify MountVolume.MountDevice failure")
 }
 
-func createVolume(client clientset.Interface, namespace string, scParameters map[string]string) (*v1.PersistentVolumeClaim, []*v1.PersistentVolume) {
+func createVolume(client clientset.Interface, timeouts *framework.TimeoutContext, namespace string, scParameters map[string]string) (*v1.PersistentVolumeClaim, []*v1.PersistentVolume) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("fstype", scParameters, nil, ""), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
@@ -162,7 +162,7 @@ func createVolume(client clientset.Interface, namespace string, scParameters map
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	ginkgo.By("Waiting for claim to be in bound phase")
-	persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+	persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, timeouts.ClaimProvision)
 	framework.ExpectNoError(err)
 	return pvclaim, persistentvolumes
 }

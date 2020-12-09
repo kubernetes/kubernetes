@@ -102,7 +102,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver TestDriver, pattern te
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("fsgroupchangepolicy")
+	f := framework.NewFrameworkWithCustomTimeouts("fsgroupchangepolicy", getDriverTimeouts(driver))
 
 	init := func() {
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
@@ -244,7 +244,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver TestDriver, pattern te
 func createPodAndVerifyContentGid(f *framework.Framework, podConfig *e2epod.Config, createInitialFiles bool, expectedRootDirFileOwnership, expectedSubDirFileOwnership string) *v1.Pod {
 	podFsGroup := strconv.FormatInt(*podConfig.FsGroup, 10)
 	ginkgo.By(fmt.Sprintf("Creating Pod in namespace %s with fsgroup %s", podConfig.NS, podFsGroup))
-	pod, err := e2epod.CreateSecPodWithNodeSelection(f.ClientSet, podConfig, framework.PodStartTimeout)
+	pod, err := e2epod.CreateSecPodWithNodeSelection(f.ClientSet, podConfig, f.Timeouts.PodStart)
 	framework.ExpectNoError(err)
 	framework.Logf("Pod %s/%s started successfully", pod.Namespace, pod.Name)
 

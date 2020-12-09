@@ -102,7 +102,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("volumemode")
+	f := framework.NewFrameworkWithCustomTimeouts("volumemode", getDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}
@@ -209,7 +209,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 				l.Pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(context.TODO(), l.Pvc, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "Failed to create pvc")
 
-				framework.ExpectNoError(e2epv.WaitOnPVandPVC(l.cs, l.ns.Name, l.Pv, l.Pvc), "Failed to bind pv and pvc")
+				framework.ExpectNoError(e2epv.WaitOnPVandPVC(l.cs, f.Timeouts, l.ns.Name, l.Pv, l.Pvc), "Failed to bind pv and pvc")
 
 				ginkgo.By("Creating pod")
 				podConfig := e2epod.Config{
@@ -236,7 +236,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 				}.AsSelector().String()
 				msg := "Unable to attach or mount volumes"
 
-				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
+				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, f.Timeouts.PodStart)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				if err != nil {
 					framework.Logf("Warning: did not get event about FailedMountVolume")
@@ -273,7 +273,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 				}.AsSelector().String()
 				msg := "does not support block volume provisioning"
 
-				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.ClaimProvisionTimeout)
+				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, f.Timeouts.ClaimProvision)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				if err != nil {
 					framework.Logf("Warning: did not get event about provisioing failed")
@@ -332,7 +332,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 		} else {
 			msg = "has volumeMode Filesystem, but is specified in volumeDevices"
 		}
-		err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
+		err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, f.Timeouts.PodStart)
 		// Events are unreliable, don't depend on them. They're used only to speed up the test.
 		if err != nil {
 			framework.Logf("Warning: did not get event about mismatched volume use")

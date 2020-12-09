@@ -325,7 +325,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 
 	ginkgo.By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(KStart, c, clientPod)
-	err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, clientPod.Name, f.Namespace.Name, framework.PodDeleteTimeout)
+	err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, clientPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
 	if err != nil {
 		framework.ExpectNoError(err, "Expected pod to be not found.")
 	}
@@ -411,7 +411,7 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 
 	ginkgo.By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(KStart, c, clientPod)
-	err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, clientPod.Name, f.Namespace.Name, framework.PodDeleteTimeout)
+	err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, clientPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
 	framework.ExpectNoError(err, "Expected pod to be not found.")
 
 	if forceDelete {
@@ -446,7 +446,7 @@ func TestVolumeUnmapsFromForceDeletedPod(c clientset.Interface, f *framework.Fra
 }
 
 // RunInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
-func RunInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
+func RunInPodWithVolume(c clientset.Interface, t *framework.TimeoutContext, ns, claimName, command string) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -489,7 +489,7 @@ func RunInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 	defer func() {
 		e2epod.DeletePodOrFail(c, ns, pod.Name)
 	}()
-	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
+	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, pod.Namespace, t.PodStartSlow))
 }
 
 // StartExternalProvisioner create external provisioner pod
