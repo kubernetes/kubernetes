@@ -4831,9 +4831,9 @@ type ResourceQuotaScope string
 
 // These are valid values for resource quota spec
 const (
-	// Match all pod objects where spec.activeDeadlineSeconds
+	// Match all pod objects where spec.activeDeadlineSeconds >=0
 	ResourceQuotaScopeTerminating ResourceQuotaScope = "Terminating"
-	// Match all pod objects where !spec.activeDeadlineSeconds
+	// Match all pod objects where spec.activeDeadlineSeconds is nil
 	ResourceQuotaScopeNotTerminating ResourceQuotaScope = "NotTerminating"
 	// Match all pod objects that have best effort quality of service
 	ResourceQuotaScopeBestEffort ResourceQuotaScope = "BestEffort"
