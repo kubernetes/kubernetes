@@ -26,7 +26,7 @@ import (
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -83,13 +83,13 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 			if err := validateNodeIPFunc(nodeIP); err != nil {
 				return fmt.Errorf("failed to validate nodeIP: %v", err)
 			}
-			klog.V(2).Infof("Using node IP: %q", nodeIP.String())
+			klog.V(4).Infof("Using node IP: %q", nodeIP.String())
 		}
 		if secondaryNodeIPSpecified {
 			if err := validateNodeIPFunc(secondaryNodeIP); err != nil {
 				return fmt.Errorf("failed to validate secondaryNodeIP: %v", err)
 			}
-			klog.V(2).Infof("Using secondary node IP: %q", secondaryNodeIP.String())
+			klog.V(4).Infof("Using secondary node IP: %q", secondaryNodeIP.String())
 		}
 
 		if externalCloudProvider {

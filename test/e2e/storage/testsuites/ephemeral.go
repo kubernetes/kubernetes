@@ -106,11 +106,11 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("ephemeral")
+	f := framework.NewFrameworkWithCustomTimeouts("ephemeral", getDriverTimeouts(driver))
 
 	init := func() {
 		if pattern.VolType == testpatterns.GenericEphemeralVolume {
-			enabled, err := GenericEphemeralVolumesEnabled(f.ClientSet, f.Namespace.Name)
+			enabled, err := GenericEphemeralVolumesEnabled(f.ClientSet, f.Timeouts, f.Namespace.Name)
 			framework.ExpectNoError(err, "check GenericEphemeralVolume feature")
 			if !enabled {
 				e2eskipper.Skipf("Cluster doesn't support %q volumes -- skipping", pattern.VolType)
@@ -127,6 +127,7 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 		case testpatterns.CSIInlineVolume:
 			l.testCase = &EphemeralTest{
 				Client:     l.config.Framework.ClientSet,
+				Timeouts:   f.Timeouts,
 				Namespace:  f.Namespace.Name,
 				DriverName: eDriver.GetCSIDriverName(l.config),
 				Node:       l.config.ClientNodeSelection,
@@ -137,6 +138,7 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 		case testpatterns.GenericEphemeralVolume:
 			l.testCase = &EphemeralTest{
 				Client:    l.config.Framework.ClientSet,
+				Timeouts:  f.Timeouts,
 				Namespace: f.Namespace.Name,
 				Node:      l.config.ClientNodeSelection,
 				VolSource: l.resource.VolSource,
@@ -194,7 +196,7 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 				[]v1.VolumeSource{pod.Spec.Volumes[0].VolumeSource},
 				readOnly,
 				l.testCase.Node)
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, pod2.Name, pod2.Namespace), "waiting for second pod with inline volume")
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod2.Name, pod2.Namespace, f.Timeouts.PodStartSlow), "waiting for second pod with inline volume")
 
 			// If (and only if) we were able to mount
 			// read/write and volume data is not shared
@@ -207,7 +209,7 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 				storageutils.VerifyExecInPodSucceed(f, pod2, "[ ! -f /mnt/test-0/hello-world ]")
 			}
 
-			defer StopPodAndDependents(f.ClientSet, pod2)
+			defer StopPodAndDependents(f.ClientSet, f.Timeouts, pod2)
 			return nil
 		}
 
@@ -232,6 +234,7 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 // Not all parameters are used by all tests.
 type EphemeralTest struct {
 	Client     clientset.Interface
+	Timeouts   *framework.TimeoutContext
 	Namespace  string
 	DriverName string
 	VolSource  *v1.VolumeSource
@@ -307,9 +310,9 @@ func (t EphemeralTest) TestEphemeral() {
 	pod := StartInPodWithInlineVolume(client, t.Namespace, "inline-volume-tester", command, volumes, t.ReadOnly, t.Node)
 	defer func() {
 		// pod might be nil now.
-		StopPodAndDependents(client, pod)
+		StopPodAndDependents(client, t.Timeouts, pod)
 	}()
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(client, pod.Name, pod.Namespace), "waiting for pod with inline volume")
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(client, pod.Name, pod.Namespace, t.Timeouts.PodStartSlow), "waiting for pod with inline volume")
 	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
 	actualNodeName := runningPod.Spec.NodeName
@@ -320,7 +323,7 @@ func (t EphemeralTest) TestEphemeral() {
 		runningPodData = t.RunningPodCheck(pod)
 	}
 
-	StopPodAndDependents(client, pod)
+	StopPodAndDependents(client, t.Timeouts, pod)
 	pod = nil // Don't stop twice.
 
 	// There should be no dangling PVCs in the namespace now. There might be for
@@ -383,8 +386,8 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 
 // CSIInlineVolumesEnabled checks whether the running cluster has the CSIInlineVolumes feature gate enabled.
 // It does that by trying to create a pod that uses that feature.
-func CSIInlineVolumesEnabled(c clientset.Interface, ns string) (bool, error) {
-	return VolumeSourceEnabled(c, ns, v1.VolumeSource{
+func CSIInlineVolumesEnabled(c clientset.Interface, t *framework.TimeoutContext, ns string) (bool, error) {
+	return VolumeSourceEnabled(c, t, ns, v1.VolumeSource{
 		CSI: &v1.CSIVolumeSource{
 			Driver: "no-such-driver.example.com",
 		},
@@ -393,9 +396,9 @@ func CSIInlineVolumesEnabled(c clientset.Interface, ns string) (bool, error) {
 
 // GenericEphemeralVolumesEnabled checks whether the running cluster has the GenericEphemeralVolume feature gate enabled.
 // It does that by trying to create a pod that uses that feature.
-func GenericEphemeralVolumesEnabled(c clientset.Interface, ns string) (bool, error) {
+func GenericEphemeralVolumesEnabled(c clientset.Interface, t *framework.TimeoutContext, ns string) (bool, error) {
 	storageClassName := "no-such-storage-class"
-	return VolumeSourceEnabled(c, ns, v1.VolumeSource{
+	return VolumeSourceEnabled(c, t, ns, v1.VolumeSource{
 		Ephemeral: &v1.EphemeralVolumeSource{
 			VolumeClaimTemplate: &v1.PersistentVolumeClaimTemplate{
 				Spec: v1.PersistentVolumeClaimSpec{
@@ -414,7 +417,7 @@ func GenericEphemeralVolumesEnabled(c clientset.Interface, ns string) (bool, err
 
 // VolumeSourceEnabled checks whether a certain kind of volume source is enabled by trying
 // to create a pod that uses it.
-func VolumeSourceEnabled(c clientset.Interface, ns string, volume v1.VolumeSource) (bool, error) {
+func VolumeSourceEnabled(c clientset.Interface, t *framework.TimeoutContext, ns string, volume v1.VolumeSource) (bool, error) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -451,7 +454,7 @@ func VolumeSourceEnabled(c clientset.Interface, ns string, volume v1.VolumeSourc
 	switch {
 	case err == nil:
 		// Pod was created, feature supported.
-		StopPodAndDependents(c, pod)
+		StopPodAndDependents(c, t, pod)
 		return true, nil
 	case apierrors.IsInvalid(err):
 		// "Invalid" because it uses a feature that isn't supported.

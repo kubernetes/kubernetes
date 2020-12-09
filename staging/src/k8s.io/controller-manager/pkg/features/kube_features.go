@@ -32,6 +32,7 @@ const (
 	// beta:  v1.19
 	//
 	// Enable legacy behavior to vary cluster functionality on the node-role.kubernetes.io labels. On by default (legacy), will be turned off in 1.18.
+	// Original copy from k8s.io/kubernetes/pkg/features/kube_features.go
 	LegacyNodeRoleBehavior featuregate.Feature = "LegacyNodeRoleBehavior"
 
 	// owner @brendandburns
@@ -39,7 +40,15 @@ const (
 	// beta:  v1.19
 	//
 	// Enable nodes to exclude themselves from service load balancers
+	// Original copy from k8s.io/kubernetes/pkg/features/kube_features.go
 	ServiceNodeExclusion featuregate.Feature = "ServiceNodeExclusion"
+
+	// owner: @khenidak
+	// alpha: v1.15
+	//
+	// Enables ipv6 dual stack
+	// Original copy from k8s.io/kubernetes/pkg/features/kube_features.go
+	IPv6DualStack featuregate.Feature = "IPv6DualStack"
 )
 
 func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.MutableFeatureGate) error {
@@ -51,4 +60,5 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	LegacyNodeRoleBehavior: {Default: true, PreRelease: featuregate.Beta},
 	ServiceNodeExclusion:   {Default: true, PreRelease: featuregate.Beta},
+	IPv6DualStack:          {Default: false, PreRelease: featuregate.Alpha},
 }

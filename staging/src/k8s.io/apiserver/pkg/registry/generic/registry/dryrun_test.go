@@ -186,6 +186,9 @@ func TestDryRunUpdateDoesntUpdate(t *testing.T) {
 	}
 	out := UnstructuredOrDie(`{}`)
 	err = s.Get(context.Background(), "key", storage.GetOptions{}, out)
+	if err != nil {
+		t.Fatalf("Failed to get storage: %v", err)
+	}
 	if !reflect.DeepEqual(created, out) {
 		t.Fatalf("Returned object %q different from expected %q", created, out)
 	}

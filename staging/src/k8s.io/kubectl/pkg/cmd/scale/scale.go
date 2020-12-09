@@ -209,7 +209,7 @@ func (o *ScaleOptions) RunScale() error {
 	}
 
 	infos := []*resource.Info{}
-	err = r.Visit(func(info *resource.Info, err error) error {
+	r.Visit(func(info *resource.Info, err error) error {
 		if err == nil {
 			infos = append(infos, info)
 		}

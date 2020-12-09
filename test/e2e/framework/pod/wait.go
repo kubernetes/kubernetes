@@ -245,8 +245,8 @@ func WaitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, nam
 	})
 }
 
-// waitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
-func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
+// WaitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
+func WaitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return WaitForPodCondition(c, namespace, podName, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout, func(pod *v1.Pod) (bool, error) {
 		if pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
 			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
@@ -365,12 +365,12 @@ func WaitForPodNotPending(c clientset.Interface, ns, podName string) error {
 
 // WaitForPodSuccessInNamespace returns nil if the pod reached state success, or an error if it reached failure or until podStartupTimeout.
 func WaitForPodSuccessInNamespace(c clientset.Interface, podName string, namespace string) error {
-	return waitForPodSuccessInNamespaceTimeout(c, podName, namespace, podStartTimeout)
+	return WaitForPodSuccessInNamespaceTimeout(c, podName, namespace, podStartTimeout)
 }
 
 // WaitForPodSuccessInNamespaceSlow returns nil if the pod reached state success, or an error if it reached failure or until slowPodStartupTimeout.
 func WaitForPodSuccessInNamespaceSlow(c clientset.Interface, podName string, namespace string) error {
-	return waitForPodSuccessInNamespaceTimeout(c, podName, namespace, slowPodStartTimeout)
+	return WaitForPodSuccessInNamespaceTimeout(c, podName, namespace, slowPodStartTimeout)
 }
 
 // WaitForPodNotFoundInNamespace returns an error if it takes too long for the pod to fully terminate.

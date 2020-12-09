@@ -209,7 +209,7 @@ func (plugin *vsphereVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([
 
 // MountDevice mounts device to global mount point.
 func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	klog.Info("vsphere MountDevice", devicePath, deviceMountPath)
+	klog.Infof("vsphere MountDevice mount %s to %s", devicePath, deviceMountPath)
 	mounter := attacher.host.GetMounter(vsphereVolumePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {

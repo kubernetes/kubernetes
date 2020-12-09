@@ -135,6 +135,7 @@ func setupAPIServices(apiServices []*apiregistration.APIService) (*AvailableCond
 			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
 			"AvailableConditionController"),
 		tlsCache: &tlsTransportCache{transports: make(map[tlsCacheKey]http.RoundTripper)},
+		metrics:  newAvailabilityMetrics(),
 	}
 	for _, svc := range apiServices {
 		c.addAPIService(svc)
@@ -408,6 +409,7 @@ func TestSync(t *testing.T) {
 				serviceResolver:            &fakeServiceResolver{url: testServer.URL},
 				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
 				tlsCache:                   &tlsTransportCache{transports: make(map[tlsCacheKey]http.RoundTripper)},
+				metrics:                    newAvailabilityMetrics(),
 			}
 			c.sync(tc.apiServiceName)
 
@@ -457,13 +459,18 @@ func TestUpdateAPIServiceStatus(t *testing.T) {
 	bar := &apiregistration.APIService{Status: apiregistration.APIServiceStatus{Conditions: []apiregistration.APIServiceCondition{{Type: "bar"}}}}
 
 	fakeClient := fake.NewSimpleClientset()
-	updateAPIServiceStatus(fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter), foo, foo)
+	c := AvailableConditionController{
+		apiServiceClient: fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter),
+		metrics:          newAvailabilityMetrics(),
+	}
+
+	c.updateAPIServiceStatus(foo, foo)
 	if e, a := 0, len(fakeClient.Actions()); e != a {
 		t.Error(spew.Sdump(fakeClient.Actions()))
 	}
 
 	fakeClient.ClearActions()
-	updateAPIServiceStatus(fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter), foo, bar)
+	c.updateAPIServiceStatus(foo, bar)
 	if e, a := 1, len(fakeClient.Actions()); e != a {
 		t.Error(spew.Sdump(fakeClient.Actions()))
 	}

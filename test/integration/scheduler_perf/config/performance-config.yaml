@@ -171,7 +171,7 @@
     countParam: $initNodes
     nodeTemplatePath: config/node-default.yaml
     labelNodePrepareStrategy:
-      labelKey: "failure-domain.beta.kubernetes.io/zone"
+      labelKey: "topology.kubernetes.io/zone"
       labelValues: ["zone1"]
   - opcode: createPods
     countParam: $initPods
@@ -254,7 +254,7 @@
     countParam: $initNodes
     nodeTemplatePath: config/node-default.yaml
     labelNodePrepareStrategy:
-      labelKey: "failure-domain.beta.kubernetes.io/zone"
+      labelKey: "topology.kubernetes.io/zone"
       labelValues: ["zone1"]
   - opcode: createPods
     countParam: $initPods

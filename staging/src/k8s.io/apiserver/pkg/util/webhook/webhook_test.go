@@ -422,7 +422,6 @@ func TestRequestTimeout(t *testing.T) {
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		<-done
-		return
 	}
 
 	// Create and start a simple HTTPS server
