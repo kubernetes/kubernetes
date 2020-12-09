@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"strings"
 	"sync"
 	"testing"
@@ -34,7 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 func TestLog(t *testing.T) {
@@ -660,6 +663,51 @@ func TestDefaultConsumeRequest(t *testing.T) {
 				t.Errorf("%s: did not get expected log content. Got: %s", test.name, buf.String())
 			}
 		})
+	}
+}
+
+func TestNoResourceFoundMessage(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	ns := scheme.Codecs.WithoutConversion()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	pods, _, _ := cmdtesting.EmptyTestData()
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/namespaces/test/pods":
+				if req.URL.Query().Get("labelSelector") == "foo" {
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
+				}
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdLogs(tf, streams)
+	o := NewLogsOptions(streams, false)
+	o.Selector = "foo"
+	err := o.Complete(tf, cmd, []string{})
+
+	if err != nil {
+		t.Fatalf("Unexpected error, expected none, got %v", err)
+	}
+
+	expected := ""
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected to find:\n\t%s\nfound:\n\t%s\n", e, a)
+	}
+
+	expectedErr := "No resources found in test namespace.\n"
+	if e, a := expectedErr, errbuf.String(); e != a {
+		t.Errorf("expected to find:\n\t%s\nfound:\n\t%s\n", e, a)
 	}
 }
 
