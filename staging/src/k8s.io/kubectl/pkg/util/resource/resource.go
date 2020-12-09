@@ -108,7 +108,20 @@ func ExtractContainerResourceValue(fs *corev1.ResourceFieldSelector, container *
 	case "requests.ephemeral-storage":
 		return convertResourceEphemeralStorageToString(container.Resources.Requests.StorageEphemeral(), divisor)
 	}
-
+	// handle extended standard resources with dynamic names
+	// example: requests.hugepages-<pageSize> or limits.hugepages-<pageSize>
+	if strings.HasPrefix(fs.Resource, "requests.") {
+		resourceName := corev1.ResourceName(strings.TrimPrefix(fs.Resource, "requests."))
+		if IsHugePageResourceName(resourceName) {
+			return convertResourceHugePagesToString(container.Resources.Requests.Name(resourceName, resource.BinarySI), divisor)
+		}
+	}
+	if strings.HasPrefix(fs.Resource, "limits.") {
+		resourceName := corev1.ResourceName(strings.TrimPrefix(fs.Resource, "limits."))
+		if IsHugePageResourceName(resourceName) {
+			return convertResourceHugePagesToString(container.Resources.Limits.Name(resourceName, resource.BinarySI), divisor)
+		}
+	}
 	return "", fmt.Errorf("Unsupported container resource : %v", fs.Resource)
 }
 
@@ -123,6 +136,13 @@ func convertResourceCPUToString(cpu *resource.Quantity, divisor resource.Quantit
 // ceiling of the value.
 func convertResourceMemoryToString(memory *resource.Quantity, divisor resource.Quantity) (string, error) {
 	m := int64(math.Ceil(float64(memory.Value()) / float64(divisor.Value())))
+	return strconv.FormatInt(m, 10), nil
+}
+
+// convertResourceHugePagesToString converts hugepages value to the format of divisor and returns
+// ceiling of the value.
+func convertResourceHugePagesToString(hugePages *resource.Quantity, divisor resource.Quantity) (string, error) {
+	m := int64(math.Ceil(float64(hugePages.Value()) / float64(divisor.Value())))
 	return strconv.FormatInt(m, 10), nil
 }
 

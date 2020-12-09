@@ -4553,6 +4553,9 @@ func (c *AutoScaling) PutNotificationConfigurationRequest(input *PutNotification
 // Scaling Group Scales (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ASGettingNotifications.html)
 // in the Amazon EC2 Auto Scaling User Guide.
 //
+// If you exceed your maximum limit of SNS topics, which is 10 per Auto Scaling
+// group, the call fails.
+//
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
 // the error.
@@ -5205,6 +5208,9 @@ func (c *AutoScaling) SetInstanceProtectionRequest(input *SetInstanceProtectionI
 // For more information about preventing instances that are part of an Auto
 // Scaling group from terminating on scale in, see Instance Protection (https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-instance-termination.html#instance-protection)
 // in the Amazon EC2 Auto Scaling User Guide.
+//
+// If you exceed your maximum limit of instance IDs, which is 50 per Auto Scaling
+// group, the call fails.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -6494,6 +6500,18 @@ type CreateAutoScalingGroupInput struct {
 	// is required to launch instances into EC2-Classic.
 	AvailabilityZones []*string `min:"1" type:"list"`
 
+	// Indicates whether capacity rebalance is enabled. Otherwise, capacity rebalance
+	// is disabled.
+	//
+	// You can enable capacity rebalancing for your Auto Scaling groups when using
+	// Spot Instances. When you turn on capacity rebalancing, Amazon EC2 Auto Scaling
+	// attempts to launch a Spot Instance whenever Amazon EC2 predicts that a Spot
+	// Instance is at an elevated risk of interruption. After launching a new instance,
+	// it then terminates an old instance. For more information, see Amazon EC2
+	// Auto Scaling capacity rebalancing (https://docs.aws.amazon.com/autoscaling/ec2/userguide/capacity-rebalance.html)
+	// in the Amazon EC2 Auto Scaling User Guide.
+	CapacityRebalance *bool `type:"boolean"`
+
 	// The amount of time, in seconds, after a scaling activity completes before
 	// another scaling activity can start. The default value is 300.
 	//
@@ -6786,6 +6804,12 @@ func (s *CreateAutoScalingGroupInput) SetAvailabilityZones(v []*string) *CreateA
 	return s
 }
 
+// SetCapacityRebalance sets the CapacityRebalance field's value.
+func (s *CreateAutoScalingGroupInput) SetCapacityRebalance(v bool) *CreateAutoScalingGroupInput {
+	s.CapacityRebalance = &v
+	return s
+}
+
 // SetDefaultCooldown sets the DefaultCooldown field's value.
 func (s *CreateAutoScalingGroupInput) SetDefaultCooldown(v int64) *CreateAutoScalingGroupInput {
 	s.DefaultCooldown = &v
@@ -7014,7 +7038,7 @@ type CreateLaunchConfigurationInput struct {
 	// When detailed monitoring is enabled, Amazon CloudWatch generates metrics
 	// every minute and your account is charged a fee. When you disable detailed
 	// monitoring, CloudWatch generates metrics every 5 minutes. For more information,
-	// see Configure Monitoring for Auto Scaling Instances (https://docs.aws.amazon.com/autoscaling/latest/userguide/as-instance-monitoring.html#enable-as-instance-metrics)
+	// see Configure Monitoring for Auto Scaling Instances (https://docs.aws.amazon.com/autoscaling/latest/userguide/enable-as-instance-metrics.html)
 	// in the Amazon EC2 Auto Scaling User Guide.
 	InstanceMonitoring *InstanceMonitoring `type:"structure"`
 
@@ -7041,9 +7065,9 @@ type CreateLaunchConfigurationInput struct {
 	// LaunchConfigurationName is a required field
 	LaunchConfigurationName *string `min:"1" type:"string" required:"true"`
 
-	// The metadata options for the instances. For more information, see Instance
-	// Metadata and User Data (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html)
-	// in the Amazon EC2 User Guide for Linux Instances.
+	// The metadata options for the instances. For more information, see Configuring
+	// the Instance Metadata Options (https://docs.aws.amazon.com/autoscaling/ec2/userguide/create-launch-config.html#launch-configurations-imds)
+	// in the Amazon EC2 Auto Scaling User Guide.
 	MetadataOptions *InstanceMetadataOptions `type:"structure"`
 
 	// The tenancy of the instance. An instance with dedicated tenancy runs on isolated,
@@ -10352,6 +10376,9 @@ type Group struct {
 	// AvailabilityZones is a required field
 	AvailabilityZones []*string `min:"1" type:"list" required:"true"`
 
+	// Indicates whether capacity rebalance is enabled.
+	CapacityRebalance *bool `type:"boolean"`
+
 	// The date and time the group was created.
 	//
 	// CreatedTime is a required field
@@ -10468,6 +10495,12 @@ func (s *Group) SetAutoScalingGroupName(v string) *Group {
 // SetAvailabilityZones sets the AvailabilityZones field's value.
 func (s *Group) SetAvailabilityZones(v []*string) *Group {
 	s.AvailabilityZones = v
+	return s
+}
+
+// SetCapacityRebalance sets the CapacityRebalance field's value.
+func (s *Group) SetCapacityRebalance(v bool) *Group {
+	s.CapacityRebalance = &v
 	return s
 }
 
@@ -10848,9 +10881,9 @@ func (s *InstanceDetails) SetWeightedCapacity(v string) *InstanceDetails {
 	return s
 }
 
-// The metadata options for the instances. For more information, see Instance
-// Metadata and User Data (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html)
-// in the Amazon EC2 User Guide for Linux Instances.
+// The metadata options for the instances. For more information, see Configuring
+// the Instance Metadata Options (https://docs.aws.amazon.com/autoscaling/ec2/userguide/create-launch-config.html#launch-configurations-imds)
+// in the Amazon EC2 Auto Scaling User Guide.
 type InstanceMetadataOptions struct {
 	_ struct{} `type:"structure"`
 
@@ -11258,7 +11291,7 @@ type LaunchConfiguration struct {
 	// or basic (false) monitoring.
 	//
 	// For more information, see Configure Monitoring for Auto Scaling Instances
-	// (https://docs.aws.amazon.com/autoscaling/latest/userguide/as-instance-monitoring.html#enable-as-instance-metrics)
+	// (https://docs.aws.amazon.com/autoscaling/latest/userguide/enable-as-instance-metrics.html)
 	// in the Amazon EC2 Auto Scaling User Guide.
 	InstanceMonitoring *InstanceMonitoring `type:"structure"`
 
@@ -11288,9 +11321,9 @@ type LaunchConfiguration struct {
 	// LaunchConfigurationName is a required field
 	LaunchConfigurationName *string `min:"1" type:"string" required:"true"`
 
-	// The metadata options for the instances. For more information, see Instance
-	// Metadata and User Data (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html)
-	// in the Amazon EC2 User Guide for Linux Instances.
+	// The metadata options for the instances. For more information, see Configuring
+	// the Instance Metadata Options (https://docs.aws.amazon.com/autoscaling/ec2/userguide/create-launch-config.html#launch-configurations-imds)
+	// in the Amazon EC2 Auto Scaling User Guide.
 	MetadataOptions *InstanceMetadataOptions `type:"structure"`
 
 	// The tenancy of the instance, either default or dedicated. An instance with
@@ -12333,16 +12366,18 @@ type PredefinedMetricSpecification struct {
 	// a resource label unless the metric type is ALBRequestCountPerTarget and there
 	// is a target group attached to the Auto Scaling group.
 	//
-	// Elastic Load Balancing sends data about your load balancers to Amazon CloudWatch.
-	// CloudWatch collects the data and specifies the format to use to access the
-	// data. The format is app/load-balancer-name/load-balancer-id/targetgroup/target-group-name/target-group-id
-	// , where
+	// You create the resource label by appending the final portion of the load
+	// balancer ARN and the final portion of the target group ARN into a single
+	// value, separated by a forward slash (/). The format is app/<load-balancer-name>/<load-balancer-id>/targetgroup/<target-group-name>/<target-group-id>,
+	// where:
 	//
-	//    * app/load-balancer-name/load-balancer-id is the final portion of the
-	//    load balancer ARN, and
+	//    * app/<load-balancer-name>/<load-balancer-id> is the final portion of
+	//    the load balancer ARN
 	//
-	//    * targetgroup/target-group-name/target-group-id is the final portion of
-	//    the target group ARN.
+	//    * targetgroup/<target-group-name>/<target-group-id> is the final portion
+	//    of the target group ARN.
+	//
+	// This is an example: app/EC2Co-EcsEl-1TKLTMITMM0EO/f37c06a68c1748aa/targetgroup/EC2Co-Defau-LDNM7Q3ZH1ZN/6d4ea56ca2d6a18d.
 	//
 	// To find the ARN for an Application Load Balancer, use the DescribeLoadBalancers
 	// (https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeLoadBalancers.html)
@@ -14558,6 +14593,17 @@ type UpdateAutoScalingGroupInput struct {
 	// One or more Availability Zones for the group.
 	AvailabilityZones []*string `min:"1" type:"list"`
 
+	// Enables or disables capacity rebalance.
+	//
+	// You can enable capacity rebalancing for your Auto Scaling groups when using
+	// Spot Instances. When you turn on capacity rebalancing, Amazon EC2 Auto Scaling
+	// attempts to launch a Spot Instance whenever Amazon EC2 predicts that a Spot
+	// Instance is at an elevated risk of interruption. After launching a new instance,
+	// it then terminates an old instance. For more information, see Amazon EC2
+	// Auto Scaling capacity rebalancing (https://docs.aws.amazon.com/autoscaling/ec2/userguide/capacity-rebalance.html)
+	// in the Amazon EC2 Auto Scaling User Guide.
+	CapacityRebalance *bool `type:"boolean"`
+
 	// The amount of time, in seconds, after a scaling activity completes before
 	// another scaling activity can start. The default value is 300.
 	//
@@ -14739,6 +14785,12 @@ func (s *UpdateAutoScalingGroupInput) SetAutoScalingGroupName(v string) *UpdateA
 // SetAvailabilityZones sets the AvailabilityZones field's value.
 func (s *UpdateAutoScalingGroupInput) SetAvailabilityZones(v []*string) *UpdateAutoScalingGroupInput {
 	s.AvailabilityZones = v
+	return s
+}
+
+// SetCapacityRebalance sets the CapacityRebalance field's value.
+func (s *UpdateAutoScalingGroupInput) SetCapacityRebalance(v bool) *UpdateAutoScalingGroupInput {
+	s.CapacityRebalance = &v
 	return s
 }
 

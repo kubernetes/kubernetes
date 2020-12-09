@@ -19,7 +19,6 @@ package remote
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"k8s.io/klog/v2"
 )
@@ -79,35 +78,21 @@ func setupCNI(host, workspace string) error {
 
 // configureFirewall configures iptable firewall rules.
 func configureFirewall(host string) error {
-	klog.V(2).Infof("Configure iptables firewall rules on %q", host)
-	// TODO: consider calling bootstrap script to configure host based on OS
-	output, err := SSH(host, "iptables", "-L", "INPUT")
+	klog.V(2).Infof("Configure iptables HEYHO firewall rules on %q", host)
+
+	// Since the goal is to enable connectivity without taking into account current rule,
+	// we can just prepend the accept rules directly without any check
+	cmd := getSSHCommand("&&",
+		"iptables -I INPUT 1 -w -p tcp -j ACCEPT",
+		"iptables -I INPUT 1 -w -p udp -j ACCEPT",
+		"iptables -I INPUT 1 -w -p icmp -j ACCEPT",
+		"iptables -I FORWARD 1 -w -p tcp -j ACCEPT",
+		"iptables -I FORWARD 1 -w -p udp -j ACCEPT",
+		"iptables -I FORWARD 1 -w -p icmp -j ACCEPT",
+	)
+	output, err := SSH(host, "sh", "-c", cmd)
 	if err != nil {
-		return fmt.Errorf("failed to get iptables INPUT on %q: %v output: %q", host, err, output)
-	}
-	if strings.Contains(output, "Chain INPUT (policy DROP)") {
-		cmd := getSSHCommand("&&",
-			"(iptables -C INPUT -w -p TCP -j ACCEPT || iptables -A INPUT -w -p TCP -j ACCEPT)",
-			"(iptables -C INPUT -w -p UDP -j ACCEPT || iptables -A INPUT -w -p UDP -j ACCEPT)",
-			"(iptables -C INPUT -w -p ICMP -j ACCEPT || iptables -A INPUT -w -p ICMP -j ACCEPT)")
-		output, err := SSH(host, "sh", "-c", cmd)
-		if err != nil {
-			return fmt.Errorf("failed to configured firewall on %q: %v output: %v", host, err, output)
-		}
-	}
-	output, err = SSH(host, "iptables", "-L", "FORWARD")
-	if err != nil {
-		return fmt.Errorf("failed to get iptables FORWARD on %q: %v output: %q", host, err, output)
-	}
-	if strings.Contains(output, "Chain FORWARD (policy DROP)") {
-		cmd := getSSHCommand("&&",
-			"(iptables -C FORWARD -w -p TCP -j ACCEPT || iptables -A FORWARD -w -p TCP -j ACCEPT)",
-			"(iptables -C FORWARD -w -p UDP -j ACCEPT || iptables -A FORWARD -w -p UDP -j ACCEPT)",
-			"(iptables -C FORWARD -w -p ICMP -j ACCEPT || iptables -A FORWARD -w -p ICMP -j ACCEPT)")
-		output, err = SSH(host, "sh", "-c", cmd)
-		if err != nil {
-			return fmt.Errorf("failed to configured firewall on %q: %v output: %v", host, err, output)
-		}
+		return fmt.Errorf("failed to configured firewall on %q: %v output: %v", host, err, output)
 	}
 	return nil
 }

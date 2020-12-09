@@ -34,6 +34,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -102,7 +103,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("topology")
+	f := framework.NewFrameworkWithCustomTimeouts("topology", getDriverTimeouts(driver))
 
 	init := func() topologyTest {
 
@@ -175,7 +176,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 
 		t.createResources(cs, &l, nil)
 
-		err = e2epod.WaitForPodRunningInNamespace(cs, l.pod)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, l.pod.Name, l.pod.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying pod scheduled to correct node")
@@ -335,8 +336,9 @@ func (t *topologyTestSuite) createResources(cs clientset.Interface, l *topologyT
 	podConfig := e2epod.Config{
 		NS:            l.config.Framework.Namespace.Name,
 		PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
-		SeLinuxLabel:  e2epv.SELinuxLabel,
 		NodeSelection: e2epod.NodeSelection{Affinity: affinity},
+		SeLinuxLabel:  e2evolume.GetLinuxLabel(),
+		ImageID:       e2evolume.GetDefaultTestImageID(),
 	}
 	l.pod, err = e2epod.MakeSecPod(&podConfig)
 	framework.ExpectNoError(err)

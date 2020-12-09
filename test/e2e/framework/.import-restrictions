@@ -243,6 +243,7 @@ rules:
       - k8s.io/kubernetes/pkg/apis/authentication
       - k8s.io/kubernetes/pkg/apis/authentication/v1
       - k8s.io/kubernetes/pkg/apis/certificates/v1beta1
+      - k8s.io/kubernetes/pkg/apis/storage/v1
       - k8s.io/kubernetes/pkg/scheduler/internal/cache
   - selectorRegexp: k8s[.]io/kubernetes/test/
     allowedPrefixes:

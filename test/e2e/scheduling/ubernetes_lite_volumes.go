@@ -169,7 +169,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 		pv, err := c.CoreV1().PersistentVolumes().Get(context.TODO(), claim.Spec.VolumeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		pvZone, ok := pv.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
+		pvZone, ok := pv.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
 		framework.ExpectEqual(ok, true, "PV has no LabelZone to be found")
 		pvZones.Insert(pvZone)
 	}
@@ -231,7 +231,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 
 	ginkgo.By("Waiting for all PVCs to be bound")
 	for _, config := range configs {
-		e2epv.WaitOnPVandPVC(c, ns, config.pv, config.pvc)
+		e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, config.pv, config.pvc)
 	}
 
 	ginkgo.By("Creating pods for each static PV")

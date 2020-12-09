@@ -22,17 +22,16 @@ func (s *DevicesGroup) Name() string {
 	return "devices"
 }
 
-func (s *DevicesGroup) Apply(d *cgroupData) error {
+func (s *DevicesGroup) Apply(path string, d *cgroupData) error {
 	if d.config.SkipDevices {
 		return nil
 	}
-	_, err := d.join("devices")
-	if err != nil {
-		// We will return error even it's `not found` error, devices
-		// cgroup is hard requirement for container's security.
-		return err
+	if path == "" {
+		// Return error here, since devices cgroup
+		// is a hard requirement for container's security.
+		return errSubsystemDoesNotExist
 	}
-	return nil
+	return join(path, d.pid)
 }
 
 func loadEmulator(path string) (*devices.Emulator, error) {
@@ -104,10 +103,6 @@ func (s *DevicesGroup) Set(path string, cgroup *configs.Cgroup) error {
 		}
 	}
 	return nil
-}
-
-func (s *DevicesGroup) Remove(d *cgroupData) error {
-	return removePath(d.path("devices"))
 }
 
 func (s *DevicesGroup) GetStats(path string, stats *cgroups.Stats) error {

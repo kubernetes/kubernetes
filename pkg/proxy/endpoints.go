@@ -36,7 +36,6 @@ import (
 )
 
 var supportedEndpointSliceAddressTypes = sets.NewString(
-	string(discovery.AddressTypeIP), // IP is a deprecated address type
 	string(discovery.AddressTypeIPv4),
 	string(discovery.AddressTypeIPv6),
 )

@@ -375,6 +375,9 @@ func CreateKubeAPIServerConfig(
 			ExtendExpiration:            s.Authentication.ServiceAccounts.ExtendExpiration,
 
 			VersionedInformers: versionedInformers,
+
+			IdentityLeaseDurationSeconds:      s.IdentityLeaseDurationSeconds,
+			IdentityLeaseRenewIntervalSeconds: s.IdentityLeaseRenewIntervalSeconds,
 		},
 	}
 
@@ -583,7 +586,7 @@ func BuildAuthorizer(s *options.ServerRunOptions, EgressSelector *egressselector
 func BuildPriorityAndFairness(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) utilflowcontrol.Interface {
 	return utilflowcontrol.New(
 		versionedInformer,
-		extclient.FlowcontrolV1alpha1(),
+		extclient.FlowcontrolV1beta1(),
 		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
 		s.GenericServerRunOptions.RequestTimeout/4,
 	)
@@ -677,8 +680,17 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	}
 
 	if s.Etcd.EnableWatchCache {
+		sizes := kubeapiserver.DefaultWatchCacheSizes()
 		// Ensure that overrides parse correctly.
-		if _, err := serveroptions.ParseWatchCacheSizes(s.Etcd.WatchCacheSizes); err != nil {
+		userSpecified, err := serveroptions.ParseWatchCacheSizes(s.Etcd.WatchCacheSizes)
+		if err != nil {
+			return options, err
+		}
+		for resource, size := range userSpecified {
+			sizes[resource] = size
+		}
+		s.Etcd.WatchCacheSizes, err = serveroptions.WriteWatchCacheSizes(sizes)
+		if err != nil {
 			return options, err
 		}
 	}

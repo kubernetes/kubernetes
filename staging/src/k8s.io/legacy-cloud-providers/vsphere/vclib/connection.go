@@ -37,7 +37,7 @@ import (
 type VSphereConnection struct {
 	Client            *vim25.Client
 	Username          string
-	Password          string
+	Password          string `datapolicy:"password"`
 	Hostname          string
 	Port              string
 	CACert            string
@@ -65,6 +65,7 @@ func (connection *VSphereConnection) Connect(ctx context.Context) error {
 			klog.Errorf("Failed to create govmomi client. err: %+v", err)
 			return err
 		}
+		setVCenterInfoMetric(connection)
 		return nil
 	}
 	m := session.NewManager(connection.Client)
@@ -83,6 +84,7 @@ func (connection *VSphereConnection) Connect(ctx context.Context) error {
 		klog.Errorf("Failed to create govmomi client. err: %+v", err)
 		return err
 	}
+	setVCenterInfoMetric(connection)
 	return nil
 }
 

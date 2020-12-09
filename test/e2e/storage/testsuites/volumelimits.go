@@ -100,7 +100,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	)
 
 	// No preconditions to test. Normally they would be in a BeforeEach here.
-	f := framework.NewDefaultFramework("volumelimits")
+	f := framework.NewFrameworkWithCustomTimeouts("volumelimits", getDriverTimeouts(driver))
 
 	// This checks that CSIMaxVolumeLimitChecker works as expected.
 	// A randomly chosen node should be able to handle as many CSI volumes as
@@ -122,6 +122,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 		l.ns = f.Namespace
 		l.cs = f.ClientSet
+
 		l.config, l.testCleanup = driver.PrepareTest(f)
 		defer l.testCleanup()
 
@@ -153,7 +154,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 			framework.ExpectNoError(err, "while cleaning up resource")
 		}()
 		defer func() {
-			cleanupTest(l.cs, l.ns.Name, l.runningPod.Name, l.unschedulablePod.Name, l.pvcs, l.pvNames)
+			cleanupTest(l.cs, l.ns.Name, l.runningPod.Name, l.unschedulablePod.Name, l.pvcs, l.pvNames, testSlowMultiplier*f.Timeouts.PVDelete)
 		}()
 
 		// Create <limit> PVCs for one gigantic pod.
@@ -183,11 +184,11 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for all PVCs to get Bound")
-		l.pvNames, err = waitForAllPVCsBound(l.cs, testSlowMultiplier*e2epv.PVBindingTimeout, l.pvcs)
+		l.pvNames, err = waitForAllPVCsBound(l.cs, testSlowMultiplier*f.Timeouts.PVBound, l.pvcs)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for the pod Running")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(l.cs, l.runningPod.Name, l.ns.Name, testSlowMultiplier*framework.PodStartTimeout)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(l.cs, l.runningPod.Name, l.ns.Name, testSlowMultiplier*f.Timeouts.PodStart)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating an extra pod with one volume to exceed the limit")
@@ -203,7 +204,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		framework.ExpectNoError(err, "Failed to create an extra pod with one volume to exceed the limit")
 
 		ginkgo.By("Waiting for the pod to get unschedulable with the right message")
-		err = e2epod.WaitForPodCondition(l.cs, l.ns.Name, l.unschedulablePod.Name, "Unschedulable", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+		err = e2epod.WaitForPodCondition(l.cs, l.ns.Name, l.unschedulablePod.Name, "Unschedulable", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
 			if pod.Status.Phase == v1.PodPending {
 				reg, err := regexp.Compile(`max.+volume.+count`)
 				if err != nil {
@@ -225,7 +226,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	})
 }
 
-func cleanupTest(cs clientset.Interface, ns string, runningPodName, unschedulablePodName string, pvcs []*v1.PersistentVolumeClaim, pvNames sets.String) error {
+func cleanupTest(cs clientset.Interface, ns string, runningPodName, unschedulablePodName string, pvcs []*v1.PersistentVolumeClaim, pvNames sets.String, timeout time.Duration) error {
 	var cleanupErrors []string
 	if runningPodName != "" {
 		err := cs.CoreV1().Pods(ns).Delete(context.TODO(), runningPodName, metav1.DeleteOptions{})
@@ -248,7 +249,7 @@ func cleanupTest(cs clientset.Interface, ns string, runningPodName, unschedulabl
 	// Wait for the PVs to be deleted. It includes also pod and PVC deletion because of PVC protection.
 	// We use PVs to make sure that the test does not leave orphan PVs when a CSI driver is destroyed
 	// just after the test ends.
-	err := wait.Poll(5*time.Second, testSlowMultiplier*e2epv.PVDeletingTimeout, func() (bool, error) {
+	err := wait.Poll(5*time.Second, timeout, func() (bool, error) {
 		existing := 0
 		for _, pvName := range pvNames.UnsortedList() {
 			_, err := cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})

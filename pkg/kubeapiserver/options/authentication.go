@@ -165,7 +165,7 @@ func (o *BuiltInAuthenticationOptions) WithRequestHeader() *BuiltInAuthenticatio
 
 // WithServiceAccounts set default value for service account authentication
 func (o *BuiltInAuthenticationOptions) WithServiceAccounts() *BuiltInAuthenticationOptions {
-	o.ServiceAccounts = &ServiceAccountAuthenticationOptions{Lookup: true}
+	o.ServiceAccounts = &ServiceAccountAuthenticationOptions{Lookup: true, ExtendExpiration: true}
 	return o
 }
 
@@ -198,16 +198,21 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 			allErrors = append(allErrors, fmt.Errorf("service-account-issuer contained a ':' but was not a valid URL: %v", err))
 		}
 	}
+
 	if o.ServiceAccounts != nil && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
-		if len(o.ServiceAccounts.Issuer) == 0 {
-			allErrors = append(allErrors, errors.New("service-account-issuer is a required flag when BoundServiceAccountTokenVolume is enabled"))
-		}
-		if len(o.ServiceAccounts.KeyFiles) == 0 {
-			allErrors = append(allErrors, errors.New("service-account-key-file is a required flag when BoundServiceAccountTokenVolume is enabled"))
+		if !utilfeature.DefaultFeatureGate.Enabled(features.RootCAConfigMap) {
+			allErrors = append(allErrors, errors.New("BoundServiceAccountTokenVolume feature depends on RootCAConfigMap feature, but RootCAConfigMap features is not enabled"))
 		}
 	}
 
 	if o.ServiceAccounts != nil {
+		if len(o.ServiceAccounts.Issuer) == 0 {
+			allErrors = append(allErrors, errors.New("service-account-issuer is a required flag"))
+		}
+		if len(o.ServiceAccounts.KeyFiles) == 0 {
+			allErrors = append(allErrors, errors.New("service-account-key-file is a required flag"))
+		}
+
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
 			// Validate the JWKS URI when it is explicitly set.
 			// When unset, it is later derived from ExternalHost.

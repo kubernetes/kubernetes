@@ -742,8 +742,10 @@ func (ss *scaleSet) getAgentPoolScaleSets(nodes []*v1.Node) (*[]string, error) {
 // for loadbalancer exists then return the eligible VMSet.
 func (ss *scaleSet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (vmSetNames *[]string, err error) {
 	hasMode, isAuto, serviceVMSetNames := getServiceLoadBalancerMode(service)
-	if !hasMode {
-		// no mode specified in service annotation default to PrimaryScaleSetName.
+	useSingleSLB := ss.useStandardLoadBalancer() && !ss.EnableMultipleStandardLoadBalancers
+	if !hasMode || useSingleSLB {
+		// no mode specified in service annotation or use single SLB mode
+		// default to PrimaryScaleSetName
 		scaleSetNames := &[]string{ss.Config.PrimaryScaleSetName}
 		return scaleSetNames, nil
 	}
@@ -938,9 +940,18 @@ func (ss *scaleSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeNam
 
 	// Check scale set name:
 	// - For basic SKU load balancer, return nil if the node's scale set is mismatched with vmSetName.
-	// - For standard SKU load balancer, backend could belong to multiple VMSS, so we
+	// - For single standard SKU load balancer, backend could belong to multiple VMSS, so we
 	//   don't check vmSet for it.
-	if vmSetName != "" && !ss.useStandardLoadBalancer() && !strings.EqualFold(vmSetName, ssName) {
+	// - For multiple standard SKU load balancers, the behavior is similar to the basic load balancer
+	needCheck := false
+	if !ss.useStandardLoadBalancer() {
+		// need to check the vmSet name when using the basic LB
+		needCheck = true
+	} else if ss.EnableMultipleStandardLoadBalancers {
+		// need to check the vmSet name when using multiple standard LBs
+		needCheck = true
+	}
+	if vmSetName != "" && needCheck && !strings.EqualFold(vmSetName, ssName) {
 		klog.V(3).Infof("EnsureHostInPool skips node %s because it is not in the scaleSet %s", vmName, vmSetName)
 		return "", "", "", nil, nil
 	}
@@ -1053,8 +1064,9 @@ func (ss *scaleSet) ensureVMSSInPool(service *v1.Service, nodes []*v1.Node, back
 	klog.V(2).Infof("ensureVMSSInPool: ensuring VMSS with backendPoolID %s", backendPoolID)
 	vmssNamesMap := make(map[string]bool)
 
-	// the standard load balancer supports multiple vmss in its backend while the basic sku doesn't
-	if ss.useStandardLoadBalancer() {
+	// the single standard load balancer supports multiple vmss in its backend while
+	// multiple standard load balancers and the basic load balancer doesn't
+	if ss.useStandardLoadBalancer() && !ss.EnableMultipleStandardLoadBalancers {
 		for _, node := range nodes {
 			if ss.excludeMasterNodesFromStandardLB() && isMasterNode(node) {
 				continue
@@ -1363,12 +1375,12 @@ func (ss *scaleSet) ensureBackendPoolDeletedFromNode(nodeName, backendPoolID str
 	return nodeResourceGroup, ssName, instanceID, newVM, nil
 }
 
-// GetNodeNameByIPConfigurationID gets the node name by IP configuration ID.
-func (ss *scaleSet) GetNodeNameByIPConfigurationID(ipConfigurationID string) (string, error) {
+// GetNodeNameByIPConfigurationID gets the node name and the VMSS name by IP configuration ID.
+func (ss *scaleSet) GetNodeNameByIPConfigurationID(ipConfigurationID string) (string, string, error) {
 	matches := vmssIPConfigurationRE.FindStringSubmatch(ipConfigurationID)
 	if len(matches) != 4 {
-		klog.V(4).Infof("Can not extract scale set name from ipConfigurationID (%s), assuming it is mananaged by availability set", ipConfigurationID)
-		return "", ErrorNotVmssInstance
+		klog.V(4).Infof("Can not extract scale set name from ipConfigurationID (%s), assuming it is managed by availability set", ipConfigurationID)
+		return "", "", ErrorNotVmssInstance
 	}
 
 	resourceGroup := matches[1]
@@ -1376,20 +1388,20 @@ func (ss *scaleSet) GetNodeNameByIPConfigurationID(ipConfigurationID string) (st
 	instanceID := matches[3]
 	vm, err := ss.getVmssVMByInstanceID(resourceGroup, scaleSetName, instanceID, azcache.CacheReadTypeUnsafe)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	if vm.OsProfile != nil && vm.OsProfile.ComputerName != nil {
-		return strings.ToLower(*vm.OsProfile.ComputerName), nil
+		return strings.ToLower(*vm.OsProfile.ComputerName), scaleSetName, nil
 	}
 
-	return "", nil
+	return "", "", nil
 }
 
 func getScaleSetAndResourceGroupNameByIPConfigurationID(ipConfigurationID string) (string, string, error) {
 	matches := vmssIPConfigurationRE.FindStringSubmatch(ipConfigurationID)
 	if len(matches) != 4 {
-		klog.V(4).Infof("Can not extract scale set name from ipConfigurationID (%s), assuming it is mananaged by availability set", ipConfigurationID)
+		klog.V(4).Infof("Can not extract scale set name from ipConfigurationID (%s), assuming it is managed by availability set", ipConfigurationID)
 		return "", "", ErrorNotVmssInstance
 	}
 
@@ -1529,7 +1541,7 @@ func (ss *scaleSet) EnsureBackendPoolDeleted(service *v1.Service, backendPoolID,
 			}
 		}
 
-		nodeName, err := ss.GetNodeNameByIPConfigurationID(ipConfigurationID)
+		nodeName, _, err := ss.GetNodeNameByIPConfigurationID(ipConfigurationID)
 		if err != nil {
 			if err == ErrorNotVmssInstance { // Do nothing for the VMAS nodes.
 				continue

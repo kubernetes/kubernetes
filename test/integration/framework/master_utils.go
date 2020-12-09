@@ -198,7 +198,7 @@ func startMasterOrDie(masterConfig *controlplane.Config, incomingServer *httptes
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
 		masterConfig.GenericConfig.FlowControl = utilflowcontrol.New(
 			masterConfig.ExtraConfig.VersionedInformers,
-			clientset.FlowcontrolV1alpha1(),
+			clientset.FlowcontrolV1beta1(),
 			masterConfig.GenericConfig.MaxRequestsInFlight+masterConfig.GenericConfig.MaxMutatingRequestsInFlight,
 			masterConfig.GenericConfig.RequestTimeout/4,
 		)

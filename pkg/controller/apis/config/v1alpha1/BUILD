@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//pkg/controller/apis/config:go_default_library",
         "//pkg/controller/certificates/signer/config/v1alpha1:go_default_library",
+        "//pkg/controller/cronjob/config/v1alpha1:go_default_library",
         "//pkg/controller/daemon/config/v1alpha1:go_default_library",
         "//pkg/controller/deployment/config/v1alpha1:go_default_library",
         "//pkg/controller/endpoint/config/v1alpha1:go_default_library",
@@ -40,7 +41,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/cloud-provider/config/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/cloud-provider/service/config/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/controllers/service/config/v1alpha1:go_default_library",
         "//staging/src/k8s.io/controller-manager/config/v1alpha1:go_default_library",
         "//staging/src/k8s.io/kube-controller-manager/config/v1alpha1:go_default_library",
     ],

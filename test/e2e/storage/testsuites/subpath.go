@@ -112,7 +112,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("provisioning")
+	f := framework.NewFrameworkWithCustomTimeouts("provisioning", getDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}
@@ -443,7 +443,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		defer cleanup()
 
 		// Change volume container to busybox so we can exec later
-		l.pod.Spec.Containers[1].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+		l.pod.Spec.Containers[1].Image = e2evolume.GetDefaultTestImage()
 		l.pod.Spec.Containers[1].Command = e2evolume.GenerateScriptCmd("sleep 100000")
 		l.pod.Spec.Containers[1].Args = nil
 
@@ -457,7 +457,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		}()
 
 		// Wait for pod to be running
-		err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, l.pod)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, l.pod.Name, l.pod.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		// Exec into container that mounted the volume, delete subpath directory
@@ -541,7 +541,7 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 			InitContainers: []v1.Container{
 				{
 					Name:            fmt.Sprintf("init-volume-%s", suffix),
-					Image:           e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox)),
+					Image:           e2evolume.GetDefaultTestImage(),
 					VolumeMounts:    []v1.VolumeMount{volumeMount, probeMount},
 					SecurityContext: e2evolume.GenerateSecurityContext(privilegedSecurityContext),
 				},
@@ -610,7 +610,7 @@ func volumeFormatPod(f *framework.Framework, volumeSource *v1.VolumeSource) *v1.
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
-					Image:   e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox)),
+					Image:   e2evolume.GetDefaultTestImage(),
 					Command: e2evolume.GenerateScriptCmd("echo nothing"),
 					VolumeMounts: []v1.VolumeMount{
 						{
@@ -727,7 +727,7 @@ func waitForPodSubpathError(f *framework.Framework, pod *v1.Pod, allowContainerT
 		return fmt.Errorf("failed to find container that uses subpath")
 	}
 
-	waitErr := wait.PollImmediate(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
+	waitErr := wait.PollImmediate(framework.Poll, f.Timeouts.PodStart, func() (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -789,10 +789,10 @@ func (h *podContainerRestartHooks) FixLivenessProbe(pod *v1.Pod, probeFilePath s
 func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks *podContainerRestartHooks) {
 	pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 
-	pod.Spec.Containers[0].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[0].Image = e2evolume.GetDefaultTestImage()
 	pod.Spec.Containers[0].Command = e2evolume.GenerateScriptCmd("sleep 100000")
 	pod.Spec.Containers[0].Args = nil
-	pod.Spec.Containers[1].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[1].Image = e2evolume.GetDefaultTestImage()
 	pod.Spec.Containers[1].Command = e2evolume.GenerateScriptCmd("sleep 100000")
 	pod.Spec.Containers[1].Args = nil
 	hooks.AddLivenessProbe(pod, probeFilePath)
@@ -805,7 +805,7 @@ func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks
 	defer func() {
 		e2epod.DeletePodWithWait(f.ClientSet, pod)
 	}()
-	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for pod to be running")
 
 	ginkgo.By("Failing liveness probe")
@@ -963,10 +963,10 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 	}
 
 	// Change to busybox
-	pod.Spec.Containers[0].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[0].Image = e2evolume.GetDefaultTestImage()
 	pod.Spec.Containers[0].Command = e2evolume.GenerateScriptCmd("sleep 100000")
 	pod.Spec.Containers[0].Args = nil
-	pod.Spec.Containers[1].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[1].Image = e2evolume.GetDefaultTestImage()
 	pod.Spec.Containers[1].Command = e2evolume.GenerateScriptCmd("sleep 100000")
 	pod.Spec.Containers[1].Args = nil
 	// If grace period is too short, then there is not enough time for the volume
@@ -978,8 +978,7 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 	removeUnusedContainers(pod)
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating pod")
-
-	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for pod to be running")
 
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
@@ -1010,7 +1009,7 @@ func formatVolume(f *framework.Framework, pod *v1.Pod) {
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating volume init pod")
 
-	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+	err = e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for volume init pod to succeed")
 
 	err = e2epod.DeletePodWithWait(f.ClientSet, pod)

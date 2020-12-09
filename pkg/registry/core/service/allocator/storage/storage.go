@@ -172,6 +172,7 @@ func (e *Etcd) tryUpdate(fn func() error) error {
 			existing.Data = data
 			return existing, nil
 		}),
+		nil,
 	)
 	return storeerr.InterpretUpdateError(err, e.resource, "")
 }
@@ -207,6 +208,7 @@ func (e *Etcd) CreateOrUpdate(snapshot *api.RangeAllocation) error {
 			last = snapshot.ResourceVersion
 			return snapshot, nil
 		}),
+		nil,
 	)
 	if err != nil {
 		return storeerr.InterpretUpdateError(err, e.resource, "")

@@ -34,6 +34,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func newStrategy(cidr string, hasSecondary bool) (testStrategy Strategy, testStatusStrategy Strategy) {
@@ -326,17 +327,40 @@ func makeServiceWithIPFamilies(ipfamilies []api.IPFamily, ipFamilyPolicy *api.IP
 	}
 }
 
+func makeServiceWithConditions(conditions []metav1.Condition) *api.Service {
+	return &api.Service{
+		Status: api.ServiceStatus{
+			Conditions: conditions,
+		},
+	}
+}
+
+func makeServiceWithPorts(ports []api.PortStatus) *api.Service {
+	return &api.Service{
+		Status: api.ServiceStatus{
+			LoadBalancer: api.LoadBalancerStatus{
+				Ingress: []api.LoadBalancerIngress{
+					{
+						Ports: ports,
+					},
+				},
+			},
+		},
+	}
+}
+
 func TestDropDisabledField(t *testing.T) {
 	requireDualStack := api.IPFamilyPolicyRequireDualStack
 	preferDualStack := api.IPFamilyPolicyPreferDualStack
 	singleStack := api.IPFamilyPolicySingleStack
 
 	testCases := []struct {
-		name            string
-		enableDualStack bool
-		svc             *api.Service
-		oldSvc          *api.Service
-		compareSvc      *api.Service
+		name                string
+		enableDualStack     bool
+		enableMixedProtocol bool
+		svc                 *api.Service
+		oldSvc              *api.Service
+		compareSvc          *api.Service
 	}{
 		{
 			name:            "not dual stack, field not used",
@@ -396,12 +420,126 @@ func TestDropDisabledField(t *testing.T) {
 			oldSvc:          nil,
 			compareSvc:      makeServiceWithIPFamilies(nil, &singleStack),
 		},
-
+		/* svc.Status.Conditions */
+		{
+			name:                "mixed protocol not enabled, field not used in old, not used in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithConditions(nil),
+			oldSvc:              makeServiceWithConditions(nil),
+			compareSvc:          makeServiceWithConditions(nil),
+		},
+		{
+			name:                "mixed protocol not enabled, field used in old and in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithConditions([]metav1.Condition{}),
+			oldSvc:              makeServiceWithConditions([]metav1.Condition{}),
+			compareSvc:          makeServiceWithConditions([]metav1.Condition{}),
+		},
+		{
+			name:                "mixed protocol not enabled, field not used in old, used in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithConditions([]metav1.Condition{}),
+			oldSvc:              makeServiceWithConditions(nil),
+			compareSvc:          makeServiceWithConditions(nil),
+		},
+		{
+			name:                "mixed protocol not enabled, field used in old, not used in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithConditions(nil),
+			oldSvc:              makeServiceWithConditions([]metav1.Condition{}),
+			compareSvc:          makeServiceWithConditions(nil),
+		},
+		{
+			name:                "mixed protocol enabled, field not used in old, not used in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithConditions(nil),
+			oldSvc:              makeServiceWithConditions(nil),
+			compareSvc:          makeServiceWithConditions(nil),
+		},
+		{
+			name:                "mixed protocol enabled, field used in old and in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithConditions([]metav1.Condition{}),
+			oldSvc:              makeServiceWithConditions([]metav1.Condition{}),
+			compareSvc:          makeServiceWithConditions([]metav1.Condition{}),
+		},
+		{
+			name:                "mixed protocol enabled, field not used in old, used in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithConditions([]metav1.Condition{}),
+			oldSvc:              makeServiceWithConditions(nil),
+			compareSvc:          makeServiceWithConditions([]metav1.Condition{}),
+		},
+		{
+			name:                "mixed protocol enabled, field used in old, not used in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithConditions(nil),
+			oldSvc:              makeServiceWithConditions([]metav1.Condition{}),
+			compareSvc:          makeServiceWithConditions(nil),
+		},
+		/* svc.Status.LoadBalancer.Ingress.Ports */
+		{
+			name:                "mixed protocol not enabled, field not used in old, not used in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithPorts(nil),
+			oldSvc:              makeServiceWithPorts(nil),
+			compareSvc:          makeServiceWithPorts(nil),
+		},
+		{
+			name:                "mixed protocol not enabled, field used in old and in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithPorts([]api.PortStatus{}),
+			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
+			compareSvc:          makeServiceWithPorts([]api.PortStatus{}),
+		},
+		{
+			name:                "mixed protocol not enabled, field not used in old, used in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithPorts([]api.PortStatus{}),
+			oldSvc:              makeServiceWithPorts(nil),
+			compareSvc:          makeServiceWithPorts(nil),
+		},
+		{
+			name:                "mixed protocol not enabled, field used in old, not used in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithPorts(nil),
+			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
+			compareSvc:          makeServiceWithPorts(nil),
+		},
+		{
+			name:                "mixed protocol enabled, field not used in old, not used in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithPorts(nil),
+			oldSvc:              makeServiceWithPorts(nil),
+			compareSvc:          makeServiceWithPorts(nil),
+		},
+		{
+			name:                "mixed protocol enabled, field used in old and in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithPorts([]api.PortStatus{}),
+			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
+			compareSvc:          makeServiceWithPorts([]api.PortStatus{}),
+		},
+		{
+			name:                "mixed protocol enabled, field not used in old, used in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithPorts([]api.PortStatus{}),
+			oldSvc:              makeServiceWithPorts(nil),
+			compareSvc:          makeServiceWithPorts([]api.PortStatus{}),
+		},
+		{
+			name:                "mixed protocol enabled, field used in old, not used in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithPorts(nil),
+			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
+			compareSvc:          makeServiceWithPorts(nil),
+		},
 		/* add more tests for other dropped fields as needed */
 	}
 	for _, tc := range testCases {
 		func() {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MixedProtocolLBService, tc.enableMixedProtocol)()
 			old := tc.oldSvc.DeepCopy()
 
 			// to test against user using IPFamily not set on cluster
@@ -798,6 +936,15 @@ func TestDropTypeDependentFields(t *testing.T) {
 			}
 		}
 	}
+	setAllocateLoadBalancerNodePortsTrue := func(svc *api.Service) {
+		svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+	}
+	setAllocateLoadBalancerNodePortsFalse := func(svc *api.Service) {
+		svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
+	}
+	clearAllocateLoadBalancerNodePorts := func(svc *api.Service) {
+		svc.Spec.AllocateLoadBalancerNodePorts = nil
+	}
 
 	testCases := []struct {
 		name   string
@@ -885,6 +1032,46 @@ func TestDropTypeDependentFields(t *testing.T) {
 			svc:    makeValidServiceCustom(setTypeLoadBalancer, setHCNodePort),
 			patch:  patches(setTypeClusterIP, changeHCNodePort),
 			expect: makeValidServiceCustom(setHCNodePort, changeHCNodePort),
+		}, { // allocatedLoadBalancerNodePorts cases
+			name:   "clear allocatedLoadBalancerNodePorts true -> true",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsTrue),
+			patch:  setTypeNodePort,
+			expect: makeValidServiceCustom(setTypeNodePort),
+		}, {
+			name:   "clear allocatedLoadBalancerNodePorts false -> false",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsFalse),
+			patch:  setTypeNodePort,
+			expect: makeValidServiceCustom(setTypeNodePort),
+		}, {
+			name:   "set allocatedLoadBalancerNodePorts nil -> true",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer),
+			patch:  patches(setTypeNodePort, setAllocateLoadBalancerNodePortsTrue),
+			expect: makeValidServiceCustom(setTypeNodePort, setAllocateLoadBalancerNodePortsTrue),
+		}, {
+			name:   "set allocatedLoadBalancerNodePorts nil -> false",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer),
+			patch:  patches(setTypeNodePort, setAllocateLoadBalancerNodePortsFalse),
+			expect: makeValidServiceCustom(setTypeNodePort, setAllocateLoadBalancerNodePortsFalse),
+		}, {
+			name:   "set allocatedLoadBalancerNodePorts true -> nil",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsTrue),
+			patch:  patches(setTypeNodePort, clearAllocateLoadBalancerNodePorts),
+			expect: makeValidServiceCustom(setTypeNodePort),
+		}, {
+			name:   "set allocatedLoadBalancerNodePorts false -> nil",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsFalse),
+			patch:  patches(setTypeNodePort, clearAllocateLoadBalancerNodePorts),
+			expect: makeValidServiceCustom(setTypeNodePort),
+		}, {
+			name:   "set allocatedLoadBalancerNodePorts true -> false",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsTrue),
+			patch:  patches(setTypeNodePort, setAllocateLoadBalancerNodePortsFalse),
+			expect: makeValidServiceCustom(setTypeNodePort, setAllocateLoadBalancerNodePortsFalse),
+		}, {
+			name:   "set allocatedLoadBalancerNodePorts false -> true",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsFalse),
+			patch:  patches(setTypeNodePort, setAllocateLoadBalancerNodePortsTrue),
+			expect: makeValidServiceCustom(setTypeNodePort, setAllocateLoadBalancerNodePortsTrue),
 		}}
 
 	for _, tc := range testCases {
@@ -915,6 +1102,9 @@ func TestDropTypeDependentFields(t *testing.T) {
 			}
 			if result.Spec.HealthCheckNodePort != tc.expect.Spec.HealthCheckNodePort {
 				t.Errorf("failed %q: expected healthCheckNodePort %d, got %d", tc.name, tc.expect.Spec.HealthCheckNodePort, result.Spec.HealthCheckNodePort)
+			}
+			if !reflect.DeepEqual(result.Spec.AllocateLoadBalancerNodePorts, tc.expect.Spec.AllocateLoadBalancerNodePorts) {
+				t.Errorf("failed %q: expected AllocateLoadBalancerNodePorts %v, got %v", tc.name, tc.expect.Spec.AllocateLoadBalancerNodePorts, result.Spec.AllocateLoadBalancerNodePorts)
 			}
 		})
 	}

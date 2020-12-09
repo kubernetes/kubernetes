@@ -176,11 +176,16 @@ func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
 }
 
 func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
-	pod := newObj.(*v1.Pod)
-	if sched.skipPodUpdate(pod) {
+	oldPod, newPod := oldObj.(*v1.Pod), newObj.(*v1.Pod)
+	// Bypass update event that carries identical objects; otherwise, a duplicated
+	// Pod may go through scheduling and cause unexpected behavior (see #96071).
+	if oldPod.ResourceVersion == newPod.ResourceVersion {
 		return
 	}
-	if err := sched.SchedulingQueue.Update(oldObj.(*v1.Pod), pod); err != nil {
+	if sched.skipPodUpdate(newPod) {
+		return
+	}
+	if err := sched.SchedulingQueue.Update(oldPod, newPod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
 	}
 }
@@ -430,8 +435,7 @@ func addAllEventHandlers(
 		)
 	}
 
-	// On add and delete of PVs, it will affect equivalence cache items
-	// related to persistent volume
+	// On add and update of PVs.
 	informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
@@ -440,7 +444,7 @@ func addAllEventHandlers(
 		},
 	)
 
-	// This is for MaxPDVolumeCountPredicate: add/delete PVC will affect counts of PV when it is bound.
+	// This is for MaxPDVolumeCountPredicate: add/update PVC will affect counts of PV when it is bound.
 	informerFactory.Core().V1().PersistentVolumeClaims().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.onPvcAdd,

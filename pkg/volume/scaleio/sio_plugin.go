@@ -72,7 +72,7 @@ func (p *sioPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.ScaleIO != nil)
 }
 
-func (p *sioPlugin) RequiresRemount() bool {
+func (p *sioPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

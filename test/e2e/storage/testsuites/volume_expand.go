@@ -32,11 +32,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -113,7 +111,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("volume-expand")
+	f := framework.NewFrameworkWithCustomTimeouts("volume-expand", getDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}
@@ -177,11 +175,11 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 			podConfig := e2epod.Config{
 				NS:            f.Namespace.Name,
 				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
-				SeLinuxLabel:  e2epv.SELinuxLabel,
+				SeLinuxLabel:  e2evolume.GetLinuxLabel(),
 				NodeSelection: l.config.ClientNodeSelection,
-				ImageID:       getTestImage(),
+				ImageID:       e2evolume.GetDefaultTestImageID(),
 			}
-			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, framework.PodStartTimeout)
+			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, f.Timeouts.PodStart)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
@@ -221,9 +219,9 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 			podConfig = e2epod.Config{
 				NS:            f.Namespace.Name,
 				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
-				SeLinuxLabel:  e2epv.SELinuxLabel,
+				SeLinuxLabel:  e2evolume.GetLinuxLabel(),
 				NodeSelection: l.config.ClientNodeSelection,
-				ImageID:       getTestImage(),
+				ImageID:       e2evolume.GetDefaultTestImageID(),
 			}
 			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, resizedPodStartupTimeout)
 			defer func() {
@@ -249,11 +247,11 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 			podConfig := e2epod.Config{
 				NS:            f.Namespace.Name,
 				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
-				SeLinuxLabel:  e2epv.SELinuxLabel,
+				SeLinuxLabel:  e2evolume.GetLinuxLabel(),
 				NodeSelection: l.config.ClientNodeSelection,
-				ImageID:       getTestImage(),
+				ImageID:       e2evolume.GetDefaultTestImageID(),
 			}
-			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, framework.PodStartTimeout)
+			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, f.Timeouts.PodStart)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
@@ -425,13 +423,4 @@ func WaitForFSResize(pvc *v1.PersistentVolumeClaim, c clientset.Interface) (*v1.
 		return nil, fmt.Errorf("error waiting for pvc %q filesystem resize to finish: %v", pvc.Name, waitErr)
 	}
 	return updatedPVC, nil
-}
-
-// TODO: after issue https://github.com/kubernetes/kubernetes/issues/81245 is resolved
-// this utility can be moved to e2epod
-func getTestImage() int {
-	if framework.NodeOSDistroIs("windows") {
-		return imageutils.Agnhost
-	}
-	return imageutils.BusyBox
 }

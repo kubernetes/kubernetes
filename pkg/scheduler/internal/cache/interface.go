@@ -56,7 +56,12 @@ import (
 // - Both "Expired" and "Deleted" are valid end states. In case of some problems, e.g. network issue,
 //   a pod might have changed its state (e.g. added and deleted) without delivering notification to the cache.
 type Cache interface {
+	// NodeCount returns the number of nodes in the cache.
+	// DO NOT use outside of tests.
+	NodeCount() int
+
 	// PodCount returns the number of pods in the cache (including those from deleted nodes).
+	// DO NOT use outside of tests.
 	PodCount() (int, error)
 
 	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.

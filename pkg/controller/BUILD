@@ -119,6 +119,7 @@ filegroup(
         "//pkg/controller/resourcequota:all-srcs",
         "//pkg/controller/serviceaccount:all-srcs",
         "//pkg/controller/statefulset:all-srcs",
+        "//pkg/controller/storageversiongc:all-srcs",
         "//pkg/controller/testutil:all-srcs",
         "//pkg/controller/ttl:all-srcs",
         "//pkg/controller/ttlafterfinished:all-srcs",

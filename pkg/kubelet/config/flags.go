@@ -31,15 +31,6 @@ type ContainerRuntimeOptions struct {
 	ContainerRuntime string
 	// RuntimeCgroups that container runtime is expected to be isolated in.
 	RuntimeCgroups string
-	// RedirectContainerStreaming enables container streaming redirect.
-	// When RedirectContainerStreaming is false, kubelet will proxy container streaming data
-	// between apiserver and container runtime. This approach is more secure, but the proxy
-	// introduces some overhead.
-	// When RedirectContainerStreaming is true, kubelet will return an http redirect to apiserver,
-	// and apiserver will access container runtime directly. This approach is more performant,
-	// but less secure because the connection between apiserver and container runtime is not
-	// authenticated.
-	RedirectContainerStreaming bool
 
 	// Docker-specific options.
 
@@ -74,6 +65,20 @@ type ContainerRuntimeOptions struct {
 	// CNICacheDir is the full path of the directory in which CNI should store
 	// cache files
 	CNICacheDir string
+
+	// Image credential provider plugin options
+
+	// ImageCredentialProviderConfigFile is the path to the credential provider plugin config file.
+	// This config file is a specification for what credential providers are enabled and invokved
+	// by the kubelet. The plugin config should contain information about what plugin binary
+	// to execute and what container images the plugin should be called for.
+	// +optional
+	ImageCredentialProviderConfigFile string
+	// ImageCredentialProviderBinDir is the path to the directory where credential provider plugin
+	// binaries exist. The name of each plugin binary is expected to match the name of the plugin
+	// specified in imageCredentialProviderConfigFile.
+	// +optional
+	ImageCredentialProviderBinDir string
 }
 
 // AddFlags adds flags to the container runtime, according to ContainerRuntimeOptions.
@@ -83,8 +88,8 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	// General settings.
 	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'remote'.")
 	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
-	fs.BoolVar(&s.RedirectContainerStreaming, "redirect-container-streaming", s.RedirectContainerStreaming, "Enables container streaming redirect. If false, kubelet will proxy container streaming data between apiserver and container runtime; if true, kubelet will return an http redirect to apiserver, and apiserver will access container runtime directly. The proxy approach is more secure, but introduces some overhead. The redirect approach is more performant, but less secure because the connection between apiserver and container runtime may not be authenticated.")
-	fs.MarkDeprecated("redirect-container-streaming", "Container streaming redirection will be removed from the kubelet in v1.20, and this flag will be removed in v1.22. For more details, see http://git.k8s.io/enhancements/keps/sig-node/20191205-container-streaming-requests.md")
+	_ = fs.Bool("redirect-container-streaming", false, "[REMOVED]") // TODO: Delete in v1.22
+	fs.MarkDeprecated("redirect-container-streaming", "Container streaming redirection has been removed from the kubelet as of v1.20, and this flag will be removed in v1.22. For more details, see http://git.k8s.io/enhancements/keps/sig-node/20191205-container-streaming-requests.md")
 
 	// Docker-specific settings.
 	fs.StringVar(&s.DockershimRootDirectory, "experimental-dockershim-root-directory", s.DockershimRootDirectory, "Path to the dockershim root directory.")
@@ -99,4 +104,8 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CNIBinDir, "cni-bin-dir", s.CNIBinDir, fmt.Sprintf("A comma-separated list of full paths of directories in which to search for CNI plugin binaries. %s", dockerOnlyWarning))
 	fs.StringVar(&s.CNICacheDir, "cni-cache-dir", s.CNICacheDir, fmt.Sprintf("The full path of the directory in which CNI should store cache files. %s", dockerOnlyWarning))
 	fs.Int32Var(&s.NetworkPluginMTU, "network-plugin-mtu", s.NetworkPluginMTU, fmt.Sprintf("The MTU to be passed to the network plugin, to override the default. Set to 0 to use the default 1460 MTU. %s", dockerOnlyWarning))
+
+	// Image credential provider settings.
+	fs.StringVar(&s.ImageCredentialProviderConfigFile, "image-credential-provider-config", s.ImageCredentialProviderConfigFile, "The path to the credential provider plugin config file.")
+	fs.StringVar(&s.ImageCredentialProviderBinDir, "image-credential-provider-bin-dir", s.ImageCredentialProviderBinDir, "The path to the directory where credential provider plugin binaries are located.")
 }

@@ -23,6 +23,28 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DefaultPreemptionArgs holds arguments used to configure the
+// DefaultPreemption plugin.
+type DefaultPreemptionArgs struct {
+	metav1.TypeMeta
+
+	// MinCandidateNodesPercentage is the minimum number of candidates to
+	// shortlist when dry running preemption as a percentage of number of nodes.
+	// Must be in the range [0, 100]. Defaults to 10% of the cluster size if
+	// unspecified.
+	MinCandidateNodesPercentage int32
+	// MinCandidateNodesAbsolute is the absolute minimum number of candidates to
+	// shortlist. The likely number of candidates enumerated for dry running
+	// preemption is given by the formula:
+	// numCandidates = max(numNodes * minCandidateNodesPercentage, minCandidateNodesAbsolute)
+	// We say "likely" because there are other factors such as PDB violations
+	// that play a role in the number of candidates shortlisted. Must be at least
+	// 0 nodes. Defaults to 100 nodes if unspecified.
+	MinCandidateNodesAbsolute int32
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // InterPodAffinityArgs holds arguments used to configure the InterPodAffinity plugin.
 type InterPodAffinityArgs struct {
 	metav1.TypeMeta
@@ -180,4 +202,19 @@ type VolumeBindingArgs struct {
 	// Value must be non-negative integer. The value zero indicates no waiting.
 	// If this value is nil, the default value will be used.
 	BindTimeoutSeconds int64
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeAffinityArgs holds arguments to configure the NodeAffinity plugin.
+type NodeAffinityArgs struct {
+	metav1.TypeMeta
+
+	// AddedAffinity is applied to all Pods additionally to the NodeAffinity
+	// specified in the PodSpec. That is, Nodes need to satisfy AddedAffinity
+	// AND .spec.NodeAffinity. AddedAffinity is empty by default (all Nodes
+	// match).
+	// When AddedAffinity is used, some Pods with affinity requirements that match
+	// a specific Node (such as Daemonset Pods) might remain unschedulable.
+	AddedAffinity *v1.NodeAffinity
 }

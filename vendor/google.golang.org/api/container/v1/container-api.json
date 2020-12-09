@@ -446,7 +446,7 @@
                   ]
                 },
                 "setLocations": {
-                  "description": "Sets the locations for a specific cluster.",
+                  "description": "Sets the locations for a specific cluster.\nDeprecated. Use\n[projects.locations.clusters.update](/kubernetes-engine/docs/reference/rest/v1/projects.locations.clusters.update)\ninstead.",
                   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/clusters/{clustersId}:setLocations",
                   "httpMethod": "POST",
                   "id": "container.projects.locations.clusters.setLocations",
@@ -1488,7 +1488,7 @@
                   ]
                 },
                 "locations": {
-                  "description": "Sets the locations for a specific cluster.",
+                  "description": "Sets the locations for a specific cluster.\nDeprecated. Use\n[projects.locations.clusters.update](/kubernetes-engine/docs/reference/rest/v1/projects.locations.clusters.update)\ninstead.",
                   "flatPath": "v1/projects/{projectId}/zones/{zone}/clusters/{clusterId}/locations",
                   "httpMethod": "POST",
                   "id": "container.projects.zones.clusters.locations",
@@ -2458,7 +2458,7 @@
       }
     }
   },
-  "revision": "20191115",
+  "revision": "20200214",
   "rootUrl": "https://container.googleapis.com/",
   "schemas": {
     "AcceleratorConfig": {
@@ -2538,6 +2538,10 @@
       "description": "AutoprovisioningNodePoolDefaults contains defaults for a node pool created\nby NAP.",
       "id": "AutoprovisioningNodePoolDefaults",
       "properties": {
+        "management": {
+          "$ref": "NodeManagement",
+          "description": "Specifies the node management options for NAP created node-pools."
+        },
         "oauthScopes": {
           "description": "Scopes that are used by NAP when creating node pools. If oauth_scopes are\nspecified, service_account should be empty.",
           "items": {
@@ -2548,6 +2552,10 @@
         "serviceAccount": {
           "description": "The Google Cloud Platform Service Account to be used by the node VMs. If\nservice_account is specified, scopes should be empty.",
           "type": "string"
+        },
+        "upgradeSettings": {
+          "$ref": "UpgradeSettings",
+          "description": "Specifies the upgrade settings for NAP created node pools"
         }
       },
       "type": "object"
@@ -2824,6 +2832,10 @@
           "description": "[Output only] The IP address range of the Kubernetes services in\nthis cluster, in\n[CIDR](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing)\nnotation (e.g. `1.2.3.4/29`). Service addresses are\ntypically put in the last `/16` from the container CIDR.",
           "type": "string"
         },
+        "shieldedNodes": {
+          "$ref": "ShieldedNodes",
+          "description": "Shielded Nodes configuration."
+        },
         "status": {
           "description": "[Output only] The current status of this cluster.",
           "enum": [
@@ -2964,6 +2976,10 @@
         "desiredResourceUsageExportConfig": {
           "$ref": "ResourceUsageExportConfig",
           "description": "The desired configuration for exporting resource usage."
+        },
+        "desiredShieldedNodes": {
+          "$ref": "ShieldedNodes",
+          "description": "Configuration for Shielded Nodes."
         },
         "desiredVerticalPodAutoscaling": {
           "$ref": "VerticalPodAutoscaling",
@@ -3179,7 +3195,7 @@
       "id": "HorizontalPodAutoscaling",
       "properties": {
         "disabled": {
-          "description": "Whether the Horizontal Pod Autoscaling feature is enabled in the cluster.\nWhen enabled, it ensures that a Heapster pod is running in the cluster,\nwhich is also used by the Cloud Monitoring service.",
+          "description": "Whether the Horizontal Pod Autoscaling feature is enabled in the cluster.\nWhen enabled, it ensures that metrics are collected into Stackdriver\nMonitoring.",
           "type": "boolean"
         }
       },
@@ -3616,7 +3632,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "The metadata key/value pairs assigned to instances in the cluster.\n\nKeys must conform to the regexp [a-zA-Z0-9-_]+ and be less than 128 bytes\nin length. These are reflected as part of a URL in the metadata server.\nAdditionally, to avoid ambiguity, keys must not conflict with any other\nmetadata keys for the project or be one of the reserved keys:\n \"cluster-location\"\n \"cluster-name\"\n \"cluster-uid\"\n \"configure-sh\"\n \"containerd-configure-sh\"\n \"enable-os-login\"\n \"gci-update-strategy\"\n \"gci-ensure-gke-docker\"\n \"instance-template\"\n \"kube-env\"\n \"startup-script\"\n \"user-data\"\n \"disable-address-manager\"\n \"windows-startup-script-ps1\"\n \"common-psm1\"\n \"k8s-node-setup-psm1\"\n \"install-ssh-psm1\"\n \"user-profile-psm1\"\n \"serial-port-logging-enable\"\n\nValues are free-form strings, and only have meaning as interpreted by\nthe image running in the instance. The only restriction placed on them is\nthat each value's size must be less than or equal to 32 KB.\n\nThe total size of all keys and values must be less than 512 KB.",
+          "description": "The metadata key/value pairs assigned to instances in the cluster.\n\nKeys must conform to the regexp [a-zA-Z0-9-_]+ and be less than 128 bytes\nin length. These are reflected as part of a URL in the metadata server.\nAdditionally, to avoid ambiguity, keys must not conflict with any other\nmetadata keys for the project or be one of the reserved keys:\n \"cluster-location\"\n \"cluster-name\"\n \"cluster-uid\"\n \"configure-sh\"\n \"containerd-configure-sh\"\n \"enable-os-login\"\n \"gci-ensure-gke-docker\"\n \"gci-metrics-enabled\"\n \"gci-update-strategy\"\n \"instance-template\"\n \"kube-env\"\n \"startup-script\"\n \"user-data\"\n \"disable-address-manager\"\n \"windows-startup-script-ps1\"\n \"common-psm1\"\n \"k8s-node-setup-psm1\"\n \"install-ssh-psm1\"\n \"user-profile-psm1\"\n \"serial-port-logging-enable\"\n\nValues are free-form strings, and only have meaning as interpreted by\nthe image running in the instance. The only restriction placed on them is\nthat each value's size must be less than or equal to 32 KB.\n\nThe total size of all keys and values must be less than 512 KB.",
           "type": "object"
         },
         "minCpuPlatform": {
@@ -3634,8 +3650,16 @@
           "description": "Whether the nodes are created as preemptible VM instances. See:\nhttps://cloud.google.com/compute/docs/instances/preemptible for more\ninformation about preemptible VM instances.",
           "type": "boolean"
         },
+        "reservationAffinity": {
+          "$ref": "ReservationAffinity",
+          "description": "The optional reservation affinity. Setting this field will apply\nthe specified [Zonal Compute\nReservation](/compute/docs/instances/reserving-zonal-resources)\nto this node pool."
+        },
+        "sandboxConfig": {
+          "$ref": "SandboxConfig",
+          "description": "Sandbox configuration for this node."
+        },
         "serviceAccount": {
-          "description": "The Google Cloud Platform Service Account to be used by the node VMs. If\nno Service Account is specified, the \"default\" service account is used.",
+          "description": "The Google Cloud Platform Service Account to be used by the node VMs.\nSpecify the email address of the Service Account; otherwise, if no Service\nAccount is specified, the \"default\" service account is used.",
           "type": "string"
         },
         "shieldedInstanceConfig": {
@@ -3709,6 +3733,13 @@
           },
           "type": "array"
         },
+        "locations": {
+          "description": "The list of Google Compute Engine [zones](/compute/docs/zones#available)\nin which the NodePool's nodes should be located.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "management": {
           "$ref": "NodeManagement",
           "description": "NodeManagement configuration for this NodePool."
@@ -3755,6 +3786,10 @@
         "statusMessage": {
           "description": "[Output only] Additional information about the current status of this\nnode pool instance, if available.",
           "type": "string"
+        },
+        "upgradeSettings": {
+          "$ref": "UpgradeSettings",
+          "description": "Upgrade settings control disruption and speed of the upgrade."
         },
         "version": {
           "description": "The version of the Kubernetes of this node.",
@@ -3952,6 +3987,10 @@
           "description": "The IP range in CIDR notation to use for the hosted master network. This\nrange will be used for assigning internal IP addresses to the master or\nset of masters, as well as the ILB VIP. This range must not overlap with\nany other ranges in use within the cluster's network.",
           "type": "string"
         },
+        "peeringName": {
+          "description": "Output only. The peering name in the customer VPC used by this cluster.",
+          "type": "string"
+        },
         "privateEndpoint": {
           "description": "Output only. The internal IP address of this cluster's master endpoint.",
           "type": "string"
@@ -3974,6 +4013,40 @@
         "window": {
           "$ref": "TimeWindow",
           "description": "The window of the first recurrence."
+        }
+      },
+      "type": "object"
+    },
+    "ReservationAffinity": {
+      "description": "[ReservationAffinity](/compute/docs/instances/reserving-zonal-resources) is\nthe configuration of desired reservation which instances could take\ncapacity from.",
+      "id": "ReservationAffinity",
+      "properties": {
+        "consumeReservationType": {
+          "description": "Corresponds to the type of reservation consumption.",
+          "enum": [
+            "UNSPECIFIED",
+            "NO_RESERVATION",
+            "ANY_RESERVATION",
+            "SPECIFIC_RESERVATION"
+          ],
+          "enumDescriptions": [
+            "Default value. This should not be used.",
+            "Do not consume from any reserved capacity.",
+            "Consume any reservation available.",
+            "Must consume from a specific reservation. Must specify key value fields\nfor specifying the reservations."
+          ],
+          "type": "string"
+        },
+        "key": {
+          "description": "Corresponds to the label key of reservation resource.",
+          "type": "string"
+        },
+        "values": {
+          "description": "Corresponds to the label value(s) of reservation resource(s).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -4040,6 +4113,25 @@
         },
         "zone": {
           "description": "Required. Deprecated. The name of the Google Compute Engine\n[zone](/compute/docs/zones#available) in which the cluster\nresides.\nThis field has been deprecated and replaced by the name field.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SandboxConfig": {
+      "description": "SandboxConfig contains configurations of the sandbox to use for the node.",
+      "id": "SandboxConfig",
+      "properties": {
+        "type": {
+          "description": "Type of the sandbox to use for the node.",
+          "enum": [
+            "UNSPECIFIED",
+            "GVISOR"
+          ],
+          "enumDescriptions": [
+            "Default value. This should not be used.",
+            "Run sandbox using gvisor."
+          ],
           "type": "string"
         }
       },
@@ -4459,6 +4551,17 @@
       },
       "type": "object"
     },
+    "ShieldedNodes": {
+      "description": "Configuration of Shielded Nodes feature.",
+      "id": "ShieldedNodes",
+      "properties": {
+        "enabled": {
+          "description": "Whether Shielded Nodes features are enabled on all nodes in this cluster.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
     "StartIPRotationRequest": {
       "description": "StartIPRotationRequest creates a new IP for the cluster and then performs\na node upgrade on each node pool to point to the new IP.",
       "id": "StartIPRotationRequest",
@@ -4502,7 +4605,7 @@
           ],
           "enumDescriptions": [
             "UNKNOWN indicates a generic condition.",
-            "GCE_STOCKOUT indicates a Google Compute Engine stockout.",
+            "GCE_STOCKOUT indicates that Google Compute Engine resources are\ntemporarily unavailable.",
             "GKE_SERVICE_ACCOUNT_DELETED indicates that the user deleted their robot\nservice account.",
             "Google Compute Engine quota was exceeded.",
             "Cluster state was manually changed by an SRE due to a system logic error.",
@@ -4600,6 +4703,13 @@
           "description": "Required. The desired image type for the node pool.",
           "type": "string"
         },
+        "locations": {
+          "description": "The desired list of Google Compute Engine\n[zones](/compute/docs/zones#available) in which the node pool's nodes\nshould be located. Changing the locations for a node pool will result\nin nodes being either created or removed from the node pool, depending\non whether locations are being added or removed.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "name": {
           "description": "The name (project, location, cluster, node pool) of the node pool to\nupdate. Specified in the format\n'projects/*/locations/*/clusters/*/nodePools/*'.",
           "type": "string"
@@ -4616,9 +4726,30 @@
           "description": "Required. Deprecated. The Google Developers Console [project ID or project\nnumber](https://support.google.com/cloud/answer/6158840).\nThis field has been deprecated and replaced by the name field.",
           "type": "string"
         },
+        "upgradeSettings": {
+          "$ref": "UpgradeSettings",
+          "description": "Upgrade settings control disruption and speed of the upgrade."
+        },
         "zone": {
           "description": "Required. Deprecated. The name of the Google Compute Engine\n[zone](/compute/docs/zones#available) in which the cluster\nresides.\nThis field has been deprecated and replaced by the name field.",
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "UpgradeSettings": {
+      "description": "These upgrade settings control the level of parallelism and the level of\ndisruption caused by an upgrade.\n\nmaxUnavailable controls the number of nodes that can be simultaneously\nunavailable.\n\nmaxSurge controls the number of additional nodes that can be added to the\nnode pool temporarily for the time of the upgrade to increase the number of\navailable nodes.\n\n(maxUnavailable + maxSurge) determines the level of parallelism (how many\nnodes are being upgraded at the same time).\n\nNote: upgrades inevitably introduce some disruption since workloads need to\nbe moved from old nodes to new, upgraded ones. Even if maxUnavailable=0,\nthis holds true. (Disruption stays within the limits of\nPodDisruptionBudget, if it is configured.)\n\nConsider a hypothetical node pool with 5 nodes having maxSurge=2,\nmaxUnavailable=1. This means the upgrade process upgrades 3 nodes\nsimultaneously. It creates 2 additional (upgraded) nodes, then it brings\ndown 3 old (not yet upgraded) nodes at the same time. This ensures that\nthere are always at least 4 nodes available.",
+      "id": "UpgradeSettings",
+      "properties": {
+        "maxSurge": {
+          "description": "The maximum number of nodes that can be created beyond the current size\nof the node pool during the upgrade process.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "maxUnavailable": {
+          "description": "The maximum number of nodes that can be simultaneously unavailable during\nthe upgrade process. A node is considered available if its status is\nReady.",
+          "format": "int32",
+          "type": "integer"
         }
       },
       "type": "object"

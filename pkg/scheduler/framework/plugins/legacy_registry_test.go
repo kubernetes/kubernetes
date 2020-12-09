@@ -121,6 +121,7 @@ func TestAppendPriorityConfigs(t *testing.T) {
 					Enabled: []config.Plugin{
 						{Name: podtopologyspread.Name},
 						{Name: interpodaffinity.Name},
+						{Name: nodeaffinity.Name},
 						{Name: tainttoleration.Name},
 					},
 				},

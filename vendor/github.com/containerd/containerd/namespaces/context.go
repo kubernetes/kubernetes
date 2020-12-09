@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/identifiers"
 	"github.com/pkg/errors"
 )
 
@@ -70,7 +71,7 @@ func NamespaceRequired(ctx context.Context) (string, error) {
 	if !ok || namespace == "" {
 		return "", errors.Wrapf(errdefs.ErrFailedPrecondition, "namespace is required")
 	}
-	if err := Validate(namespace); err != nil {
+	if err := identifiers.Validate(namespace); err != nil {
 		return "", errors.Wrap(err, "namespace validation")
 	}
 	return namespace, nil

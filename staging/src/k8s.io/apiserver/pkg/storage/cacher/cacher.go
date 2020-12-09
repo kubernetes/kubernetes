@@ -158,8 +158,10 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type, done func(*cache
 // second in a bucket, and pop up them once at the timeout. To be more specific,
 // if you set fire time at X, you can get the bookmark within (X-1,X+1) period.
 type watcherBookmarkTimeBuckets struct {
-	lock              sync.Mutex
+	lock sync.Mutex
+	// the key of watcherBuckets is the number of seconds since createTime
 	watchersBuckets   map[int64][]*cacheWatcher
+	createTime        time.Time
 	startBucketID     int64
 	clock             clock.Clock
 	bookmarkFrequency time.Duration
@@ -168,7 +170,8 @@ type watcherBookmarkTimeBuckets struct {
 func newTimeBucketWatchers(clock clock.Clock, bookmarkFrequency time.Duration) *watcherBookmarkTimeBuckets {
 	return &watcherBookmarkTimeBuckets{
 		watchersBuckets:   make(map[int64][]*cacheWatcher),
-		startBucketID:     clock.Now().Unix(),
+		createTime:        clock.Now(),
+		startBucketID:     0,
 		clock:             clock,
 		bookmarkFrequency: bookmarkFrequency,
 	}
@@ -181,7 +184,7 @@ func (t *watcherBookmarkTimeBuckets) addWatcher(w *cacheWatcher) bool {
 	if !ok {
 		return false
 	}
-	bucketID := nextTime.Unix()
+	bucketID := int64(nextTime.Sub(t.createTime) / time.Second)
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if bucketID < t.startBucketID {
@@ -193,7 +196,7 @@ func (t *watcherBookmarkTimeBuckets) addWatcher(w *cacheWatcher) bool {
 }
 
 func (t *watcherBookmarkTimeBuckets) popExpiredWatchers() [][]*cacheWatcher {
-	currentBucketID := t.clock.Now().Unix()
+	currentBucketID := int64(t.clock.Since(t.createTime) / time.Second)
 	// There should be one or two elements in almost all cases
 	expiredWatchers := make([][]*cacheWatcher, 0, 2)
 	t.lock.Lock()
@@ -730,7 +733,7 @@ func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions,
 // GuaranteedUpdate implements storage.Interface.
 func (c *Cacher) GuaranteedUpdate(
 	ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
-	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, _ ...runtime.Object) error {
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, _ runtime.Object) error {
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
 	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
@@ -740,7 +743,7 @@ func (c *Cacher) GuaranteedUpdate(
 		return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
 	}
 	// If we couldn't get the object, fallback to no-suggestion.
-	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
+	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, nil)
 }
 
 // Count implements storage.Interface.

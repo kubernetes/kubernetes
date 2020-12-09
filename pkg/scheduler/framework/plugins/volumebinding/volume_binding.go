@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -53,6 +54,7 @@ type stateData struct {
 	// phase for each node
 	// it's initialized in the PreFilter phase
 	podVolumesByNode map[string]*scheduling.PodVolumes
+	sync.Mutex
 }
 
 func (d *stateData) Clone() framework.StateData {
@@ -205,9 +207,10 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 		return status
 	}
 
-	cs.Lock()
+	// multiple goroutines call `Filter` on different nodes simultaneously and the `CycleState` may be duplicated, so we must use a local lock here
+	state.Lock()
 	state.podVolumesByNode[node.Name] = podVolumes
-	cs.Unlock()
+	state.Unlock()
 	return nil
 }
 

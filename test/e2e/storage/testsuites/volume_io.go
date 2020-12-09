@@ -108,7 +108,7 @@ func (t *volumeIOTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("volumeio")
+	f := framework.NewFrameworkWithCustomTimeouts("volumeio", getDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}
@@ -141,7 +141,7 @@ func (t *volumeIOTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
-	ginkgo.It("should write files of various sizes, verify size, validate content [Slow]", func() {
+	ginkgo.It("should write files of various sizes, verify size, validate content [Slow][LinuxOnly]", func() {
 		init()
 		defer cleanup()
 
@@ -197,7 +197,7 @@ func makePodSpec(config e2evolume.TestConfig, initCmd string, volsrc v1.VolumeSo
 			InitContainers: []v1.Container{
 				{
 					Name:  config.Prefix + "-io-init",
-					Image: framework.BusyBoxImage,
+					Image: e2evolume.GetDefaultTestImage(),
 					Command: []string{
 						"/bin/sh",
 						"-c",
@@ -214,7 +214,7 @@ func makePodSpec(config e2evolume.TestConfig, initCmd string, volsrc v1.VolumeSo
 			Containers: []v1.Container{
 				{
 					Name:  config.Prefix + "-io-client",
-					Image: framework.BusyBoxImage,
+					Image: e2evolume.GetDefaultTestImage(),
 					Command: []string{
 						"/bin/sh",
 						"-c",
@@ -338,7 +338,7 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config e2evolu
 		}
 	}()
 
-	err = e2epod.WaitForPodRunningInNamespace(cs, clientPod)
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, clientPod.Name, clientPod.Namespace, f.Timeouts.PodStart)
 	if err != nil {
 		return fmt.Errorf("client pod %q not running: %v", clientPod.Name, err)
 	}

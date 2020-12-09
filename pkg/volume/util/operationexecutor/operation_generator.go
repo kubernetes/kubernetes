@@ -571,7 +571,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			DevicePath: devicePath,
 		}
 
-		if volumeDeviceMounter != nil {
+		if volumeDeviceMounter != nil && actualStateOfWorld.GetDeviceMountState(volumeToMount.VolumeName) != DeviceGloballyMounted {
 			deviceMountPath, err :=
 				volumeDeviceMounter.GetDeviceMountPath(volumeToMount.VolumeSpec)
 			if err != nil {
@@ -615,6 +615,17 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 			if resizeError != nil {
 				klog.Errorf("MountVolume.NodeExpandVolume failed with %v", resizeError)
+
+				// Resize failed. To make sure NodeExpand is re-tried again on the next attempt
+				// *before* SetUp(), mark the mounted device as uncertain.
+				markDeviceUncertainErr := actualStateOfWorld.MarkDeviceAsUncertain(
+					volumeToMount.VolumeName, devicePath, deviceMountPath)
+				if markDeviceUncertainErr != nil {
+					// just log, return the resizeError error instead
+					klog.Infof(volumeToMount.GenerateMsgDetailed(
+						"MountVolume.MountDevice failed to mark volume as uncertain",
+						markDeviceUncertainErr.Error()))
+				}
 				return volumeToMount.GenerateError("MountVolume.MountDevice failed while expanding volume", resizeError)
 			}
 		}
@@ -823,9 +834,9 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.FindDeviceMountablePluginByName failed", err)
 	}
 
-	volumeDeviceUmounter, err := deviceMountableVolumePlugin.NewDeviceUnmounter()
+	volumeDeviceUnmounter, err := deviceMountableVolumePlugin.NewDeviceUnmounter()
 	if err != nil {
-		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewDeviceUmounter failed", err)
+		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewDeviceUnmounter failed", err)
 	}
 
 	volumeDeviceMounter, err := deviceMountableVolumePlugin.NewDeviceMounter()
@@ -857,7 +868,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 			return deviceToDetach.GenerateError("GetDeviceMountRefs check failed", err)
 		}
 		// Execute unmount
-		unmountDeviceErr := volumeDeviceUmounter.UnmountDevice(deviceMountPath)
+		unmountDeviceErr := volumeDeviceUnmounter.UnmountDevice(deviceMountPath)
 		if unmountDeviceErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return deviceToDetach.GenerateError("UnmountDevice failed", unmountDeviceErr)

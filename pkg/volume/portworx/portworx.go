@@ -96,7 +96,7 @@ func (plugin *portworxVolumePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.PortworxVolume != nil)
 }
 
-func (plugin *portworxVolumePlugin) RequiresRemount() bool {
+func (plugin *portworxVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -328,7 +328,7 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterAr
 		return err
 	}
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin.GetPluginName()))
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
 	}
 	klog.Infof("Portworx Volume %s setup at %s", b.volumeID, dir)
 	return nil

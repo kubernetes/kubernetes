@@ -254,7 +254,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = grouplessGroupVersion
 		group.OptionsExternalVersion = &grouplessGroupVersion
 		group.Serializer = codecs
-		if err := (&group).InstallREST(container); err != nil {
+		if _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
@@ -266,7 +266,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = testGroupVersion
 		group.OptionsExternalVersion = &testGroupVersion
 		group.Serializer = codecs
-		if err := (&group).InstallREST(container); err != nil {
+		if _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
@@ -278,7 +278,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = newGroupVersion
 		group.OptionsExternalVersion = &newGroupVersion
 		group.Serializer = codecs
-		if err := (&group).InstallREST(container); err != nil {
+		if _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
@@ -3678,7 +3678,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		ParameterCodec: parameterCodec,
 	}
 	container := restful.NewContainer()
-	if err := group.InstallREST(container); err == nil {
+	if _, err := group.InstallREST(container); err == nil {
 		t.Fatal("expected error")
 	}
 
@@ -3710,7 +3710,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		ParameterCodec: parameterCodec,
 	}
 	container = restful.NewContainer()
-	if err := group.InstallREST(container); err != nil {
+	if _, err := group.InstallREST(container); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4566,7 +4566,7 @@ func TestXGSubresource(t *testing.T) {
 		Serializer:             codecs,
 	}
 
-	if err := (&group).InstallREST(container); err != nil {
+	if _, err := (&group).InstallREST(container); err != nil {
 		panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 	}
 

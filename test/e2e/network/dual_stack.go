@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -32,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -61,7 +63,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 			framework.ExpectEqual(len(internalIPs), 2)
 			// assert 2 ips belong to different families
-			framework.ExpectEqual(isIPv4(internalIPs[0]) != isIPv4(internalIPs[1]), true)
+			framework.ExpectEqual(netutils.IsIPv4String(internalIPs[0]) != netutils.IsIPv4String(internalIPs[1]), true)
 		}
 	})
 
@@ -75,7 +77,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			// assert podCIDR is same as podCIDRs[0]
 			framework.ExpectEqual(node.Spec.PodCIDR, node.Spec.PodCIDRs[0])
 			// assert one is ipv4 and other is ipv6
-			framework.ExpectEqual(isIPv4CIDR(node.Spec.PodCIDRs[0]) != isIPv4CIDR(node.Spec.PodCIDRs[1]), true)
+			framework.ExpectEqual(netutils.IsIPv4CIDRString(node.Spec.PodCIDRs[0]) != netutils.IsIPv4CIDRString(node.Spec.PodCIDRs[1]), true)
 		}
 	})
 
@@ -91,7 +93,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "dualstack-pod-ips",
-						Image: imageutils.GetE2EImage(imageutils.BusyBox),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					},
 				},
 			},
@@ -108,7 +110,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		// validate first ip in PodIPs is same as PodIP
 		framework.ExpectEqual(p.Status.PodIP, p.Status.PodIPs[0].IP)
 		// assert 2 pod ips belong to different families
-		framework.ExpectEqual(isIPv4(p.Status.PodIPs[0].IP) != isIPv4(p.Status.PodIPs[1].IP), true)
+		framework.ExpectEqual(netutils.IsIPv4String(p.Status.PodIPs[0].IP) != netutils.IsIPv4String(p.Status.PodIPs[1].IP), true)
 
 		ginkgo.By("deleting the pod")
 		err := podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(30))
@@ -435,6 +437,147 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 	})
 	// TODO (khenidak add slice validation logic, since endpoint controller only operates
 	// on primary ClusterIP
+
+	// Service Granular Checks as in k8s.io/kubernetes/test/e2e/network/networking.go
+	// but using the secondary IP, so we run the same tests for each ClusterIP family
+	ginkgo.Describe("Granular Checks: Services Secondary IP Family", func() {
+
+		ginkgo.It("should function for pod-Service: http", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			config.DialFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.SecondaryNodeIP, config.NodeHTTPPort))
+			config.DialFromTestContainer("http", config.SecondaryNodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
+		ginkgo.It("should function for pod-Service: udp", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
+			config.DialFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.SecondaryNodeIP, config.NodeUDPPort))
+			config.DialFromTestContainer("udp", config.SecondaryNodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
+		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
+		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.EnableSCTP)
+			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterSCTPPort))
+			config.DialFromTestContainer("sctp", config.SecondaryClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.SecondaryNodeIP, config.NodeSCTPPort))
+			config.DialFromTestContainer("sctp", config.SecondaryNodeIP, config.NodeSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
+		ginkgo.It("should function for node-Service: http", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork)
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (config.clusterIP)", config.SecondaryNodeIP, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			config.DialFromNode("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP)", config.SecondaryNodeIP, config.SecondaryNodeIP, config.NodeHTTPPort))
+			config.DialFromNode("http", config.SecondaryNodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
+		ginkgo.It("should function for node-Service: udp", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork)
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (config.clusterIP)", config.SecondaryNodeIP, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
+			config.DialFromNode("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP)", config.SecondaryNodeIP, config.SecondaryNodeIP, config.NodeUDPPort))
+			config.DialFromNode("udp", config.SecondaryNodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
+		ginkgo.It("should function for endpoint-Service: http", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			config.DialFromEndpointContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (nodeIP)", config.EndpointPods[0].Name, config.SecondaryNodeIP, config.NodeHTTPPort))
+			config.DialFromEndpointContainer("http", config.SecondaryNodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
+		ginkgo.It("should function for endpoint-Service: udp", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
+			config.DialFromEndpointContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v (endpoint) --> %v:%v (nodeIP)", config.EndpointPods[0].Name, config.SecondaryNodeIP, config.NodeUDPPort))
+			config.DialFromEndpointContainer("udp", config.SecondaryNodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
+		ginkgo.It("should update endpoints: http", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			config.DialFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			config.DeleteNetProxyPod()
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			config.DialFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, config.MaxTries, config.EndpointHostnames())
+		})
+
+		ginkgo.It("should update endpoints: udp", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
+			config.DialFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			config.DeleteNetProxyPod()
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
+			config.DialFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, config.MaxTries, config.EndpointHostnames())
+		})
+
+		// [LinuxOnly]: Windows does not support session affinity.
+		ginkgo.It("should function for client IP based session affinity: http [LinuxOnly]", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterHTTPPort))
+
+			// Check if number of endpoints returned are exactly one.
+			eps, err := config.GetEndpointsFromTestContainer("http", config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterHTTPPort, e2enetwork.SessionAffinityChecks)
+			if err != nil {
+				framework.Failf("ginkgo.Failed to get endpoints from test container, error: %v", err)
+			}
+			if len(eps) == 0 {
+				framework.Failf("Unexpected no endpoints return")
+			}
+			if len(eps) > 1 {
+				framework.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
+			}
+		})
+
+		// [LinuxOnly]: Windows does not support session affinity.
+		ginkgo.It("should function for client IP based session affinity: udp [LinuxOnly]", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterUDPPort))
+
+			// Check if number of endpoints returned are exactly one.
+			eps, err := config.GetEndpointsFromTestContainer("udp", config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterUDPPort, e2enetwork.SessionAffinityChecks)
+			if err != nil {
+				framework.Failf("ginkgo.Failed to get endpoints from test container, error: %v", err)
+			}
+			if len(eps) == 0 {
+				framework.Failf("Unexpected no endpoints return")
+			}
+			if len(eps) > 1 {
+				framework.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
+			}
+		})
+
+		ginkgo.It("should be able to handle large requests: http", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			message := strings.Repeat("42", 1000)
+			config.DialEchoFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, message)
+		})
+
+		ginkgo.It("should be able to handle large requests: udp", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
+			message := "n" + strings.Repeat("o", 1999)
+			config.DialEchoFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, message)
+		})
+	})
 })
 
 func validateNumOfServicePorts(svc *v1.Service, expectedNumOfPorts int) {
@@ -501,7 +644,7 @@ func assertNetworkConnectivity(f *framework.Framework, serverPods v1.PodList, cl
 		if pod.Status.PodIPs == nil || len(pod.Status.PodIPs) != 2 {
 			framework.Failf("PodIPs list not expected value, got %v", pod.Status.PodIPs)
 		}
-		if isIPv4(pod.Status.PodIPs[0].IP) == isIPv4(pod.Status.PodIPs[1].IP) {
+		if netutils.IsIPv4String(pod.Status.PodIPs[0].IP) == netutils.IsIPv4String(pod.Status.PodIPs[1].IP) {
 			framework.Failf("PodIPs should belong to different families, got %v", pod.Status.PodIPs)
 		}
 		serverIPs = append(serverIPs, pod.Status.PodIPs[0].IP, pod.Status.PodIPs[1].IP)
@@ -523,22 +666,6 @@ func checkNetworkConnectivity(ip, port string, timeout int) []string {
 	curl := fmt.Sprintf("curl -g --connect-timeout %v http://%s", timeout, net.JoinHostPort(ip, port))
 	cmd := []string{"/bin/sh", "-c", curl}
 	return cmd
-}
-
-// isIPv4 checks if the provided ip belongs to ipv4 family.
-// If ip belongs to ipv4 family, return true else it returns false
-// TODO (aramase) move this to https://github.com/kubernetes/utils/blob/master/net/net.go
-func isIPv4(ip string) bool {
-	return net.ParseIP(ip).To4() != nil
-}
-
-// isIPv4CIDR checks if the provided cidr block belongs to ipv4 family.
-// If cidr belongs to ipv4 family, return true else it returns false
-// TODO (aramase) move this to https://github.com/kubernetes/utils/blob/master/net/net.go
-func isIPv4CIDR(cidr string) bool {
-	ip, _, err := net.ParseCIDR(cidr)
-	framework.ExpectNoError(err)
-	return isIPv4(ip.String())
 }
 
 // createService returns a service spec with defined arguments

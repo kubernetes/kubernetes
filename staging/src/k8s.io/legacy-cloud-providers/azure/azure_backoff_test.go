@@ -227,7 +227,7 @@ func TestCreateOrUpdateSecurityGroupCanceled(t *testing.T) {
 	})
 	mockSGClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "sg", gomock.Any()).Return(network.SecurityGroup{}, nil)
 
-	err := az.CreateOrUpdateSecurityGroup(&v1.Service{}, network.SecurityGroup{Name: to.StringPtr("sg")})
+	err := az.CreateOrUpdateSecurityGroup(network.SecurityGroup{Name: to.StringPtr("sg")})
 	assert.Equal(t, fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: canceledandsupersededduetoanotheroperation"), err)
 
 	// security group should be removed from cache if the operation is canceled

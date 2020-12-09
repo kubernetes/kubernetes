@@ -30,6 +30,7 @@ const (
 
 	DefaultCompactInterval      = 5 * time.Minute
 	DefaultDBMetricPollInterval = 30 * time.Second
+	DefaultHealthcheckTimeout   = 2 * time.Second
 )
 
 // TransportConfig holds all connection related info,  i.e. equal TransportConfig means equal servers we talk to.
@@ -74,6 +75,8 @@ type Config struct {
 	CountMetricPollPeriod time.Duration
 	// DBMetricPollInterval specifies how often should storage backend metric be updated.
 	DBMetricPollInterval time.Duration
+	// HealthcheckTimeout specifies the timeout used when checking health
+	HealthcheckTimeout time.Duration
 }
 
 func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
@@ -83,5 +86,6 @@ func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 		Codec:                codec,
 		CompactionInterval:   DefaultCompactInterval,
 		DBMetricPollInterval: DefaultDBMetricPollInterval,
+		HealthcheckTimeout:   DefaultHealthcheckTimeout,
 	}
 }

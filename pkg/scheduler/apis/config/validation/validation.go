@@ -115,7 +115,7 @@ func ValidatePolicy(policy config.Policy) error {
 	priorities := make(map[string]config.PriorityPolicy, len(policy.Priorities))
 	for _, priority := range policy.Priorities {
 		if priority.Weight <= 0 || priority.Weight >= config.MaxWeight {
-			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it or it has overflown", priority.Name))
+			validationErrors = append(validationErrors, fmt.Errorf("priority %s should have a positive weight applied to it or it has overflown", priority.Name))
 		}
 		validationErrors = append(validationErrors, validateCustomPriorities(priorities, priority))
 	}
@@ -171,7 +171,7 @@ func validateExtenders(fldPath *field.Path, extenders []config.Extender) field.E
 func validateCustomPriorities(priorities map[string]config.PriorityPolicy, priority config.PriorityPolicy) error {
 	verifyRedeclaration := func(priorityType string) error {
 		if existing, alreadyDeclared := priorities[priorityType]; alreadyDeclared {
-			return fmt.Errorf("Priority %q redeclares custom priority %q, from:%q", priority.Name, priorityType, existing.Name)
+			return fmt.Errorf("priority %q redeclares custom priority %q, from: %q", priority.Name, priorityType, existing.Name)
 		}
 		priorities[priorityType] = priority
 		return nil
@@ -199,7 +199,7 @@ func validateCustomPriorities(priorities map[string]config.PriorityPolicy, prior
 				return err
 			}
 		} else {
-			return fmt.Errorf("No priority arguments set for priority %s", priority.Name)
+			return fmt.Errorf("no priority arguments set for priority %s", priority.Name)
 		}
 	}
 	return nil

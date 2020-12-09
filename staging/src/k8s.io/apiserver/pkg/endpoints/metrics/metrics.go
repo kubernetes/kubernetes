@@ -206,6 +206,16 @@ var (
 		[]string{"filter"},
 	)
 
+	// requestAbortsTotal is a number of aborted requests with http.ErrAbortHandler
+	requestAbortsTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_request_aborts_total",
+			Help:           "Number of requests which apiserver aborted possibly due to a timeout, for each group, version, verb, resource, subresource and scope",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"verb", "group", "version", "resource", "subresource", "scope"},
+	)
+
 	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 
 	metrics = []resettableCollector{
@@ -224,6 +234,7 @@ var (
 		requestTerminationsTotal,
 		apiSelfRequestCounter,
 		requestFilterDuration,
+		requestAbortsTotal,
 	}
 
 	// these are the known (e.g. whitelisted/known) content types which we will report for
@@ -315,6 +326,22 @@ func UpdateInflightRequestMetrics(phase string, nonmutating, mutating int) {
 
 func RecordFilterLatency(name string, elapsed time.Duration) {
 	requestFilterDuration.WithLabelValues(name).Observe(elapsed.Seconds())
+}
+
+// RecordRequestAbort records that the request was aborted possibly due to a timeout.
+func RecordRequestAbort(req *http.Request, requestInfo *request.RequestInfo) {
+	if requestInfo == nil {
+		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
+	}
+
+	scope := CleanScope(requestInfo)
+	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+	resource := requestInfo.Resource
+	subresource := requestInfo.Subresource
+	group := requestInfo.APIGroup
+	version := requestInfo.APIVersion
+
+	requestAbortsTotal.WithLabelValues(reportedVerb, group, version, resource, subresource, scope).Inc()
 }
 
 // RecordRequestTermination records that the request was terminated early as part of a resource

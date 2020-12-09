@@ -91,10 +91,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new pod.
 func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
-	opts := validation.PodValidationOptions{
-		// Allow multiple huge pages on pod create if feature is enabled
-		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
-	}
+	opts := podutil.GetValidationOptionsFromPodSpec(&pod.Spec, nil)
 	return validation.ValidatePodCreate(pod, opts)
 }
 
@@ -109,11 +106,10 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	oldFailsSingleHugepagesValidation := len(validation.ValidatePodSingleHugePageResources(old.(*api.Pod), field.NewPath("spec"))) > 0
-	opts := validation.PodValidationOptions{
-		// Allow multiple huge pages on pod create if feature is enabled or if the old pod already has multiple hugepages specified
-		AllowMultipleHugePageResources: oldFailsSingleHugepagesValidation || utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
-	}
+	// Allow downward api usage of hugepages on pod update if feature is enabled or if the old pod already had used them.
+	pod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	opts := podutil.GetValidationOptionsFromPodSpec(&pod.Spec, &oldPod.Spec)
 	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
 
@@ -182,7 +178,10 @@ type podEphemeralContainersStrategy struct {
 var EphemeralContainersStrategy = podEphemeralContainersStrategy{Strategy}
 
 func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidatePodEphemeralContainersUpdate(obj.(*api.Pod), old.(*api.Pod))
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	opts := podutil.GetValidationOptionsFromPodSpec(&newPod.Spec, &oldPod.Spec)
+	return validation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

@@ -29,10 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // reconciler is responsible for transforming current EndpointSlice state into
@@ -136,7 +138,8 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	numDesiredEndpoints := 0
 
 	for _, pod := range pods {
-		if !endpointutil.ShouldPodBeInEndpoints(pod, service.Spec.PublishNotReadyAddresses) {
+		includeTerminating := service.Spec.PublishNotReadyAddresses || utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition)
+		if !endpointutil.ShouldPodBeInEndpointSlice(pod, includeTerminating) {
 			continue
 		}
 

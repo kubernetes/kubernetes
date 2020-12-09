@@ -84,13 +84,15 @@ var BaseSuites = []func() TestSuite{
 	InitDisruptiveTestSuite,
 	InitVolumeLimitsTestSuite,
 	InitTopologyTestSuite,
-	InitStressTestSuite,
+	InitVolumeStressTestSuite,
+	InitFsGroupChangePolicyTestSuite,
 }
 
 // CSISuites is a list of storage test suites that work only for CSI drivers
 var CSISuites = append(BaseSuites,
 	InitEphemeralTestSuite,
 	InitSnapshottableTestSuite,
+	InitSnapshottableStressTestSuite,
 )
 
 // TestSuite represents an interface for a set of tests which works with TestDriver
@@ -150,6 +152,9 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	dInfo := driver.GetDriverInfo()
 	var isSupported bool
 
+	// 0. Check with driver specific logic
+	driver.SkipUnsupportedTest(pattern)
+
 	// 1. Check if Whether volType is supported by driver from its interface
 	switch pattern.VolType {
 	case testpatterns.InlineVolume:
@@ -178,9 +183,6 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	if pattern.FsType == "ntfs" && !framework.NodeOSDistroIs("windows") {
 		e2eskipper.Skipf("Distro %s doesn't support ntfs -- skipping", framework.TestContext.NodeOSDistro)
 	}
-
-	// 3. Check with driver specific logic
-	driver.SkipUnsupportedTest(pattern)
 }
 
 // VolumeResource is a generic implementation of TestResource that wil be able to
@@ -418,7 +420,7 @@ func createPVCPV(
 	pv, pvc, err := e2epv.CreatePVCPV(f.ClientSet, pvConfig, pvcConfig, f.Namespace.Name, false)
 	framework.ExpectNoError(err, "PVC, PV creation failed")
 
-	err = e2epv.WaitOnPVandPVC(f.ClientSet, f.Namespace.Name, pv, pvc)
+	err = e2epv.WaitOnPVandPVC(f.ClientSet, f.Timeouts, f.Namespace.Name, pv, pvc)
 	framework.ExpectNoError(err, "PVC, PV failed to bind")
 
 	return pv, pvc
@@ -451,7 +453,7 @@ func createPVCPVFromDynamicProvisionSC(
 	framework.ExpectNoError(err)
 
 	if !isDelayedBinding(sc) {
-		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, f.Timeouts.ClaimProvision)
 		framework.ExpectNoError(err)
 	}
 

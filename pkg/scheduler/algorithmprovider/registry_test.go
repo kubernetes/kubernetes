@@ -90,6 +90,7 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: interpodaffinity.Name},
 				{Name: podtopologyspread.Name},
 				{Name: tainttoleration.Name},
+				{Name: nodeaffinity.Name},
 			},
 		},
 		Score: &schedulerapi.PluginSet{
@@ -180,6 +181,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: interpodaffinity.Name},
 						{Name: podtopologyspread.Name},
 						{Name: tainttoleration.Name},
+						{Name: nodeaffinity.Name},
 					},
 				},
 				Score: &schedulerapi.PluginSet{
@@ -260,6 +262,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: interpodaffinity.Name},
 						{Name: podtopologyspread.Name},
 						{Name: tainttoleration.Name},
+						{Name: nodeaffinity.Name},
 						{Name: selectorspread.Name},
 					},
 				},

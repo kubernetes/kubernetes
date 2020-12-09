@@ -90,6 +90,14 @@ func initHostPathCSIDriver(name string, capabilities map[testsuites.Capability]b
 				Min: "1Mi",
 			},
 			Capabilities: capabilities,
+			StressTestOptions: &testsuites.StressTestOptions{
+				NumPods:     10,
+				NumRestarts: 10,
+			},
+			VolumeSnapshotStressTestOptions: &testsuites.VolumeSnapshotStressTestOptions{
+				NumPods:      10,
+				NumSnapshots: 10,
+			},
 		},
 		manifests:        manifests,
 		volumeAttributes: volumeAttributes,
@@ -245,6 +253,9 @@ type mockCSIDriver struct {
 	enableNodeExpansion bool
 	cleanupHandle       framework.CleanupActionHandle
 	javascriptHooks     map[string]string
+	tokenRequests       []storagev1.TokenRequest
+	requiresRepublish   *bool
+	fsGroupPolicy       *storagev1.FSGroupPolicy
 }
 
 // CSIMockDriverOpts defines options used for csi driver
@@ -257,11 +268,16 @@ type CSIMockDriverOpts struct {
 	EnableTopology      bool
 	EnableResizing      bool
 	EnableNodeExpansion bool
+	EnableSnapshot      bool
 	JavascriptHooks     map[string]string
+	TokenRequests       []storagev1.TokenRequest
+	RequiresRepublish   *bool
+	FSGroupPolicy       *storagev1.FSGroupPolicy
 }
 
 var _ testsuites.TestDriver = &mockCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &mockCSIDriver{}
+var _ testsuites.SnapshottableTestDriver = &mockCSIDriver{}
 
 // InitMockCSIDriver returns a mockCSIDriver that implements TestDriver interface
 func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
@@ -269,6 +285,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-snapshotter/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/mock/csi-mock-rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/mock/csi-storageclass.yaml",
 		"test/e2e/testing-manifests/storage-csi/mock/csi-mock-driver.yaml",
@@ -284,6 +301,10 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 
 	if driverOpts.EnableResizing {
 		driverManifests = append(driverManifests, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driver-resizer.yaml")
+	}
+
+	if driverOpts.EnableSnapshot {
+		driverManifests = append(driverManifests, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driver-snapshotter.yaml")
 	}
 
 	return &mockCSIDriver{
@@ -309,6 +330,9 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 		attachLimit:         driverOpts.AttachLimit,
 		enableNodeExpansion: driverOpts.EnableNodeExpansion,
 		javascriptHooks:     driverOpts.JavascriptHooks,
+		tokenRequests:       driverOpts.TokenRequests,
+		requiresRepublish:   driverOpts.RequiresRepublish,
+		fsGroupPolicy:       driverOpts.FSGroupPolicy,
 	}
 }
 
@@ -326,6 +350,15 @@ func (m *mockCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTe
 	suffix := fmt.Sprintf("%s-sc", provisioner)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (m *mockCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *unstructured.Unstructured {
+	parameters := map[string]string{}
+	snapshotter := m.driverInfo.Name + "-" + config.Framework.UniqueName
+	ns := config.Framework.Namespace.Name
+	suffix := fmt.Sprintf("%s-vsc", snapshotter)
+
+	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
 }
 
 func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
@@ -401,6 +434,9 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 			storagev1.VolumeLifecyclePersistent,
 			storagev1.VolumeLifecycleEphemeral,
 		},
+		TokenRequests:     m.tokenRequests,
+		RequiresRepublish: m.requiresRepublish,
+		FSGroupPolicy:     m.fsGroupPolicy,
 	}
 	cleanup, err := utils.CreateFromManifests(f, driverNamespace, func(item interface{}) error {
 		return utils.PatchCSIDeployment(f, o, item)
@@ -490,6 +526,14 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 			StressTestOptions: &testsuites.StressTestOptions{
 				NumPods:     10,
 				NumRestarts: 10,
+			},
+			VolumeSnapshotStressTestOptions: &testsuites.VolumeSnapshotStressTestOptions{
+				// GCE only allows for one snapshot per volume to be created at a time,
+				// which can cause test timeouts. We reduce the likelihood of test timeouts
+				// by increasing the number of pods (and volumes) and reducing the number
+				// of snapshots per volume.
+				NumPods:      20,
+				NumSnapshots: 2,
 			},
 		},
 	}

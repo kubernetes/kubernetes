@@ -172,7 +172,7 @@ type Cloud struct {
 // TODO: replace gcfg with json
 type ConfigGlobal struct {
 	TokenURL  string `gcfg:"token-url"`
-	TokenBody string `gcfg:"token-body"`
+	TokenBody string `gcfg:"token-body" datapolicy:"token"`
 	// ProjectID and NetworkProjectID can either be the numeric or string-based
 	// unique identifier that starts with [a-z].
 	ProjectID string `gcfg:"project-id"`
@@ -737,8 +737,8 @@ func (g *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 		UpdateFunc: func(prev, obj interface{}) {
 			prevNode := prev.(*v1.Node)
 			newNode := obj.(*v1.Node)
-			if newNode.Labels[v1.LabelZoneFailureDomain] ==
-				prevNode.Labels[v1.LabelZoneFailureDomain] {
+			if newNode.Labels[v1.LabelFailureDomainBetaZone] ==
+				prevNode.Labels[v1.LabelFailureDomainBetaZone] {
 				return
 			}
 			g.updateNodeZones(prevNode, newNode)
@@ -769,7 +769,7 @@ func (g *Cloud) updateNodeZones(prevNode, newNode *v1.Node) {
 	g.nodeZonesLock.Lock()
 	defer g.nodeZonesLock.Unlock()
 	if prevNode != nil {
-		prevZone, ok := prevNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
+		prevZone, ok := prevNode.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
 		if ok {
 			g.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
 			if g.nodeZones[prevZone].Len() == 0 {
@@ -778,7 +778,7 @@ func (g *Cloud) updateNodeZones(prevNode, newNode *v1.Node) {
 		}
 	}
 	if newNode != nil {
-		newZone, ok := newNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
+		newZone, ok := newNode.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
 		if ok {
 			if g.nodeZones[newZone] == nil {
 				g.nodeZones[newZone] = sets.NewString()
@@ -873,16 +873,19 @@ func getZonesForRegion(svc *compute.Service, projectID, region string) ([]string
 	// (tested in https://cloud.google.com/compute/docs/reference/latest/zones/list)
 	// listCall = listCall.Filter("region eq " + region)
 
-	res, err := listCall.Do()
+	var zones []string
+	var accumulator = func(response *compute.ZoneList) error {
+		for _, zone := range response.Items {
+			regionName := lastComponent(zone.Region)
+			if regionName == region {
+				zones = append(zones, zone.Name)
+			}
+		}
+		return nil
+	}
+	err := listCall.Pages(context.TODO(), accumulator)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected response listing zones: %v", err)
-	}
-	zones := []string{}
-	for _, zone := range res.Items {
-		regionName := lastComponent(zone.Region)
-		if regionName == region {
-			zones = append(zones, zone.Name)
-		}
 	}
 	return zones, nil
 }

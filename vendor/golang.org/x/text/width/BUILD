@@ -7,6 +7,7 @@ go_library(
         "tables10.0.0.go",
         "tables11.0.0.go",
         "tables12.0.0.go",
+        "tables13.0.0.go",
         "tables9.0.0.go",
         "transform.go",
         "trieval.go",

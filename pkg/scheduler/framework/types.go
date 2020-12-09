@@ -19,7 +19,11 @@ package framework
 import (
 	"errors"
 	"fmt"
-	"k8s.io/api/core/v1"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,9 +33,6 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 var generation int64
@@ -317,7 +318,7 @@ func (r *Resource) Add(rl v1.ResourceList) {
 				r.EphemeralStorage += rQuant.Value()
 			}
 		default:
-			if v1helper.IsScalarResourceName(rName) {
+			if schedutil.IsScalarResourceName(rName) {
 				r.AddScalar(rName, rQuant.Value())
 			}
 		}
@@ -390,11 +391,13 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 				r.MilliCPU = cpu
 			}
 		case v1.ResourceEphemeralStorage:
-			if ephemeralStorage := rQuantity.Value(); ephemeralStorage > r.EphemeralStorage {
-				r.EphemeralStorage = ephemeralStorage
+			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+				if ephemeralStorage := rQuantity.Value(); ephemeralStorage > r.EphemeralStorage {
+					r.EphemeralStorage = ephemeralStorage
+				}
 			}
 		default:
-			if v1helper.IsScalarResourceName(rName) {
+			if schedutil.IsScalarResourceName(rName) {
 				value := rQuantity.Value()
 				if value > r.ScalarResources[rName] {
 					r.SetScalar(rName, value)

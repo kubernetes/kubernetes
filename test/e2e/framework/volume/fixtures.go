@@ -362,7 +362,7 @@ func TestServerCleanup(f *framework.Framework, config TestConfig) {
 	gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
 }
 
-func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test, slow bool) (*v1.Pod, error) {
+func runVolumeTesterPod(client clientset.Interface, timeouts *framework.TimeoutContext, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test, slow bool) (*v1.Pod, error) {
 	ginkgo.By(fmt.Sprint("starting ", config.Prefix, "-", podSuffix))
 	var gracePeriod int64 = 1
 	var command string
@@ -388,7 +388,7 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 			Containers: []v1.Container{
 				{
 					Name:       config.Prefix + "-" + podSuffix,
-					Image:      GetTestImage(framework.BusyBoxImage),
+					Image:      GetDefaultTestImage(),
 					WorkingDir: "/opt",
 					// An imperative and easily debuggable container which reads/writes vol contents for
 					// us to scan in the tests or by eye.
@@ -439,13 +439,13 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 		return nil, err
 	}
 	if slow {
-		err = e2epod.WaitForPodRunningInNamespaceSlow(client, clientPod.Name, clientPod.Namespace)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(client, clientPod.Name, clientPod.Namespace, timeouts.PodStartSlow)
 	} else {
-		err = e2epod.WaitForPodRunningInNamespace(client, clientPod)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(client, clientPod.Name, clientPod.Namespace, timeouts.PodStart)
 	}
 	if err != nil {
 		e2epod.DeletePodOrFail(client, clientPod.Namespace, clientPod.Name)
-		e2epod.WaitForPodToDisappear(client, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+		e2epod.WaitForPodToDisappear(client, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 		return nil, err
 	}
 	return clientPod, nil
@@ -466,7 +466,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 		} else {
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
-			commands := generateReadFileCmd(fileName)
+			commands := GenerateReadFileCmd(fileName)
 			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 
@@ -514,13 +514,14 @@ func TestVolumeClientSlow(f *framework.Framework, config TestConfig, fsGroup *in
 }
 
 func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test, slow bool) {
-	clientPod, err := runVolumeTesterPod(f.ClientSet, config, "client", false, fsGroup, tests, slow)
+	timeouts := f.Timeouts
+	clientPod, err := runVolumeTesterPod(f.ClientSet, timeouts, config, "client", false, fsGroup, tests, slow)
 	if err != nil {
 		framework.Failf("Failed to create client pod: %v", err)
 	}
 	defer func() {
 		e2epod.DeletePodOrFail(f.ClientSet, clientPod.Namespace, clientPod.Name)
-		e2epod.WaitForPodToDisappear(f.ClientSet, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+		e2epod.WaitForPodToDisappear(f.ClientSet, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 	}()
 
 	testVolumeContent(f, clientPod, fsGroup, fsType, tests)
@@ -531,17 +532,18 @@ func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64,
 // The volume must be writable.
 func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
 	privileged := true
+	timeouts := f.Timeouts
 	if framework.NodeOSDistroIs("windows") {
 		privileged = false
 	}
-	injectorPod, err := runVolumeTesterPod(f.ClientSet, config, "injector", privileged, fsGroup, tests, false /*slow*/)
+	injectorPod, err := runVolumeTesterPod(f.ClientSet, timeouts, config, "injector", privileged, fsGroup, tests, false /*slow*/)
 	if err != nil {
 		framework.Failf("Failed to create injector pod: %v", err)
 		return
 	}
 	defer func() {
 		e2epod.DeletePodOrFail(f.ClientSet, injectorPod.Namespace, injectorPod.Name)
-		e2epod.WaitForPodToDisappear(f.ClientSet, injectorPod.Namespace, injectorPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+		e2epod.WaitForPodToDisappear(f.ClientSet, injectorPod.Namespace, injectorPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 	}()
 
 	ginkgo.By("Writing text file contents in the container.")
@@ -608,9 +610,9 @@ func generateWriteBlockCmd(content, fullPath string) []string {
 	return generateWriteCmd(content, fullPath)
 }
 
-// generateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
+// GenerateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
 // Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func generateReadFileCmd(fullPath string) []string {
+func GenerateReadFileCmd(fullPath string) []string {
 	var commands []string
 	if !framework.NodeOSDistroIs("windows") {
 		commands = []string{"cat", fullPath}
@@ -654,9 +656,45 @@ func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOption
 // GetTestImage returns the image name with the given input
 // If the Node OS is windows, currently we return Agnhost image for Windows node
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-func GetTestImage(image string) string {
+func GetTestImage(id int) string {
 	if framework.NodeOSDistroIs("windows") {
 		return imageutils.GetE2EImage(imageutils.Agnhost)
 	}
-	return image
+	return imageutils.GetE2EImage(id)
+}
+
+// GetTestImageID returns the image id with the given input
+// If the Node OS is windows, currently we return Agnhost image for Windows node
+// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
+func GetTestImageID(id int) int {
+	if framework.NodeOSDistroIs("windows") {
+		return imageutils.Agnhost
+	}
+	return id
+}
+
+// GetDefaultTestImage returns the default test image based on OS.
+// If the node OS is windows, currently we return Agnhost image for Windows node
+// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
+// If the node OS is linux, return busybox image
+func GetDefaultTestImage() string {
+	return imageutils.GetE2EImage(GetDefaultTestImageID())
+}
+
+// GetDefaultTestImageID returns the default test image id based on OS.
+// If the node OS is windows, currently we return Agnhost image for Windows node
+// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
+// If the node OS is linux, return busybox image
+func GetDefaultTestImageID() int {
+	return GetTestImageID(imageutils.BusyBox)
+}
+
+// GetLinuxLabel returns the default SELinuxLabel based on OS.
+// If the node OS is windows, it will return nil
+func GetLinuxLabel() *v1.SELinuxOptions {
+	if framework.NodeOSDistroIs("windows") {
+		return nil
+	}
+	return &v1.SELinuxOptions{
+		Level: "s0:c0,c1"}
 }

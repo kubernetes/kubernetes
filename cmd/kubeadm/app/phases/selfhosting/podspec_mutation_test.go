@@ -66,10 +66,10 @@ func TestMutatePodSpec(t *testing.T) {
 				},
 
 				NodeSelector: map[string]string{
-					kubeadmconstants.LabelNodeRoleMaster: "",
+					kubeadmconstants.LabelNodeRoleOldControlPlane: "",
 				},
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.ControlPlaneToleration,
+					kubeadmconstants.OldControlPlaneToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
@@ -80,10 +80,10 @@ func TestMutatePodSpec(t *testing.T) {
 			podSpec:   &v1.PodSpec{},
 			expected: v1.PodSpec{
 				NodeSelector: map[string]string{
-					kubeadmconstants.LabelNodeRoleMaster: "",
+					kubeadmconstants.LabelNodeRoleOldControlPlane: "",
 				},
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.ControlPlaneToleration,
+					kubeadmconstants.OldControlPlaneToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
@@ -94,10 +94,10 @@ func TestMutatePodSpec(t *testing.T) {
 			podSpec:   &v1.PodSpec{},
 			expected: v1.PodSpec{
 				NodeSelector: map[string]string{
-					kubeadmconstants.LabelNodeRoleMaster: "",
+					kubeadmconstants.LabelNodeRoleOldControlPlane: "",
 				},
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.ControlPlaneToleration,
+					kubeadmconstants.OldControlPlaneToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
@@ -126,7 +126,7 @@ func TestAddNodeSelectorToPodSpec(t *testing.T) {
 			podSpec: &v1.PodSpec{},
 			expected: v1.PodSpec{
 				NodeSelector: map[string]string{
-					kubeadmconstants.LabelNodeRoleMaster: "",
+					kubeadmconstants.LabelNodeRoleOldControlPlane: "",
 				},
 			},
 		},
@@ -139,8 +139,8 @@ func TestAddNodeSelectorToPodSpec(t *testing.T) {
 			},
 			expected: v1.PodSpec{
 				NodeSelector: map[string]string{
-					"foo":                                "bar",
-					kubeadmconstants.LabelNodeRoleMaster: "",
+					"foo": "bar",
+					kubeadmconstants.LabelNodeRoleOldControlPlane: "",
 				},
 			},
 		},
@@ -168,7 +168,7 @@ func TestSetControlPlaneTolerationOnPodSpec(t *testing.T) {
 			podSpec: &v1.PodSpec{},
 			expected: v1.PodSpec{
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.ControlPlaneToleration,
+					kubeadmconstants.OldControlPlaneToleration,
 				},
 			},
 		},
@@ -182,7 +182,7 @@ func TestSetControlPlaneTolerationOnPodSpec(t *testing.T) {
 			expected: v1.PodSpec{
 				Tolerations: []v1.Toleration{
 					{Key: "foo", Value: "bar"},
-					kubeadmconstants.ControlPlaneToleration,
+					kubeadmconstants.OldControlPlaneToleration,
 				},
 			},
 		},

@@ -18,8 +18,10 @@ package external
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"io/ioutil"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -30,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
+	klog "k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -128,6 +131,11 @@ type driverDefinition struct {
 	// Can be left empty. Most drivers should not need this and instead
 	// use topology to ensure that pods land on the right node(s).
 	ClientNodeName string
+
+	// Timeouts contains the custom timeouts used during the test execution.
+	// The values specified here will override the default values specified in
+	// the framework.TimeoutContext struct.
+	Timeouts map[string]string
 }
 
 func init() {
@@ -212,6 +220,8 @@ var _ testsuites.SnapshottableTestDriver = &driverDefinition{}
 
 // And for ephemeral volumes.
 var _ testsuites.EphemeralTestDriver = &driverDefinition{}
+
+var _ testsuites.CustomTimeoutsTestDriver = &driverDefinition{}
 
 // runtime.DecodeInto needs a runtime.Object but doesn't do any
 // deserialization of it and therefore none of the methods below need
@@ -300,6 +310,42 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *testsuites
 		sc.Parameters["csi.storage.k8s.io/fstype"] = fsType
 	}
 	return testsuites.GetStorageClass(sc.Provisioner, sc.Parameters, sc.VolumeBindingMode, f.Namespace.Name, "e2e-sc")
+}
+
+func (d *driverDefinition) GetTimeouts() *framework.TimeoutContext {
+	timeouts := framework.NewTimeoutContextWithDefaults()
+	if d.Timeouts == nil {
+		return timeouts
+	}
+
+	// Use a temporary map to hold the timeouts specified in the manifest file
+	c := make(map[string]time.Duration)
+	for k, v := range d.Timeouts {
+		duration, err := time.ParseDuration(v)
+		if err != nil {
+			// We can't use ExpectNoError() because his method can be called out of an It(),
+			// so we simply log the error and return the default timeouts.
+			klog.Errorf("Could not parse duration for key %s, will use default values: %v", k, err)
+			return timeouts
+		}
+		c[k] = duration
+	}
+
+	// Convert the temporary map holding the custom timeouts to JSON
+	t, err := json.Marshal(c)
+	if err != nil {
+		klog.Errorf("Could not marshal custom timeouts, will use default values: %v", err)
+		return timeouts
+	}
+
+	// Override the default timeouts with the custom ones
+	err = json.Unmarshal(t, &timeouts)
+	if err != nil {
+		klog.Errorf("Could not unmarshal custom timeouts, will use default values: %v", err)
+		return timeouts
+	}
+
+	return timeouts
 }
 
 func loadSnapshotClass(filename string) (*unstructured.Unstructured, error) {

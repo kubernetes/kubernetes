@@ -12,12 +12,11 @@ go_library(
     importpath = "google.golang.org/protobuf/encoding/protojson",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/google.golang.org/protobuf/internal/detectknown:go_default_library",
         "//vendor/google.golang.org/protobuf/internal/encoding/json:go_default_library",
         "//vendor/google.golang.org/protobuf/internal/encoding/messageset:go_default_library",
         "//vendor/google.golang.org/protobuf/internal/errors:go_default_library",
-        "//vendor/google.golang.org/protobuf/internal/fieldnum:go_default_library",
         "//vendor/google.golang.org/protobuf/internal/flags:go_default_library",
+        "//vendor/google.golang.org/protobuf/internal/genid:go_default_library",
         "//vendor/google.golang.org/protobuf/internal/pragma:go_default_library",
         "//vendor/google.golang.org/protobuf/internal/set:go_default_library",
         "//vendor/google.golang.org/protobuf/internal/strs:go_default_library",

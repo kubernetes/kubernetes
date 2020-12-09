@@ -204,6 +204,7 @@ aliases:
     - smarterclayton
     - soltysh
     - pwittrock
+    - eddiezane
   # emeritus:
   # - adohe
   sig-cli:
@@ -220,6 +221,7 @@ aliases:
     - soltysh
     - pwittrock
     - zhouya0
+    - eddiezane
 
   sig-testing-reviewers:
     - bentheelder
@@ -243,6 +245,7 @@ aliases:
     - vishh
     - yujuhong
     - sjenning
+    - mrunalp
   # emeretus:
   # - dashpole
   sig-node-reviewers:
@@ -262,6 +265,7 @@ aliases:
     - matthyx
     - odinuge
     - andrewsykim
+    - mrunalp
   sig-network-driver-approvers:
     - dcbw
     - freehan
@@ -374,6 +378,7 @@ aliases:
     - thockin
 
   sig-network-api-reviewers:
+    - andrewsykim
     - caseydavenport
     - cmluciano
     - danwinship
@@ -398,6 +403,7 @@ aliases:
     - liggitt
 
   api-reviewers:
+    - andrewsykim
     - erictune
     - lavalamp
     - smarterclayton
@@ -469,9 +475,9 @@ aliases:
     - nikhita
 
   sig-docs-approvers:
+    - irvifa
     - jimangel
     - kbarnard10
-    - zacharysarah
     - kbhawkey
     - onlydole
     - sftim

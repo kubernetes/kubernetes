@@ -304,6 +304,10 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 
 // GetLoadingPrecedence implements ConfigAccess
 func (rules *ClientConfigLoadingRules) GetLoadingPrecedence() []string {
+	if len(rules.ExplicitPath) > 0 {
+		return []string{rules.ExplicitPath}
+	}
+
 	return rules.Precedence
 }
 

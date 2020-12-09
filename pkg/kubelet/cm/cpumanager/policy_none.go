@@ -55,3 +55,7 @@ func (p *nonePolicy) RemoveContainer(s state.State, podUID string, containerName
 func (p *nonePolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }
+
+func (p *nonePolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	return nil
+}

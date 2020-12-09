@@ -66,10 +66,6 @@ var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
 		client = f.ClientSet
 		Bootstrap(f)
 	})
-	ginkgo.AfterEach(func() {
-		framework.Logf("Deleting all statefulset in namespace: %v", namespace)
-		e2estatefulset.DeleteAllStatefulSets(client, namespace)
-	})
 
 	ginkgo.It("vsphere statefulset testing", func() {
 		ginkgo.By("Creating StorageClass for Statefulset")
@@ -83,6 +79,7 @@ var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
 		ginkgo.By("Creating statefulset")
 
 		statefulset := e2estatefulset.CreateStatefulSet(client, manifestPath, namespace)
+		defer e2estatefulset.DeleteAllStatefulSets(client, namespace)
 		replicas := *(statefulset.Spec.Replicas)
 		// Waiting for pods status to be Ready
 		e2estatefulset.WaitForStatusReadyReplicas(client, statefulset, replicas)

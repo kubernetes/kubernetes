@@ -240,12 +240,12 @@ func TestValidatePolicy(t *testing.T) {
 		{
 			name:     "no weight defined in policy",
 			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "NoWeightPriority"}}},
-			expected: errors.New("Priority NoWeightPriority should have a positive weight applied to it or it has overflown"),
+			expected: errors.New("priority NoWeightPriority should have a positive weight applied to it or it has overflown"),
 		},
 		{
 			name:     "policy weight is not positive",
 			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "NoWeightPriority", Weight: 0}}},
-			expected: errors.New("Priority NoWeightPriority should have a positive weight applied to it or it has overflown"),
+			expected: errors.New("priority NoWeightPriority should have a positive weight applied to it or it has overflown"),
 		},
 		{
 			name:     "valid weight priority",
@@ -255,12 +255,12 @@ func TestValidatePolicy(t *testing.T) {
 		{
 			name:     "invalid negative weight policy",
 			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "WeightPriority", Weight: -2}}},
-			expected: errors.New("Priority WeightPriority should have a positive weight applied to it or it has overflown"),
+			expected: errors.New("priority WeightPriority should have a positive weight applied to it or it has overflown"),
 		},
 		{
 			name:     "policy weight exceeds maximum",
 			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "WeightPriority", Weight: config.MaxWeight}}},
-			expected: errors.New("Priority WeightPriority should have a positive weight applied to it or it has overflown"),
+			expected: errors.New("priority WeightPriority should have a positive weight applied to it or it has overflown"),
 		},
 		{
 			name:     "valid weight in policy extender config",
@@ -316,7 +316,7 @@ func TestValidatePolicy(t *testing.T) {
 					{Name: "customPriority2", Weight: 1, Argument: &config.PriorityArgument{RequestedToCapacityRatioArguments: &config.RequestedToCapacityRatioArguments{}}},
 				},
 			},
-			expected: errors.New("Priority \"customPriority2\" redeclares custom priority \"RequestedToCapacityRatio\", from:\"customPriority1\""),
+			expected: errors.New("priority \"customPriority2\" redeclares custom priority \"RequestedToCapacityRatio\", from: \"customPriority1\""),
 		},
 		{
 			name: "different weights for LabelPreference custom priority",

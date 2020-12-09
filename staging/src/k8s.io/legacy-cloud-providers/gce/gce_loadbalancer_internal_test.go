@@ -32,7 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock"
 	"google.golang.org/api/compute/v1"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -328,7 +328,7 @@ func TestEnsureInternalLoadBalancerClearPreviousResources(t *testing.T) {
 	}
 
 	gce.CreateRegionBackendService(existingBS, gce.region)
-	existingFwdRule.BackendService = existingBS.Name
+	existingFwdRule.BackendService = cloud.SelfLink(meta.VersionGA, vals.ProjectID, "backendServices", meta.RegionalKey(existingBS.Name, gce.region))
 
 	_, err = createInternalLoadBalancer(gce, svc, existingFwdRule, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
@@ -1310,6 +1310,7 @@ func TestForwardingRulesEqual(t *testing.T) {
 			Ports:               []string{"123"},
 			IPProtocol:          "TCP",
 			LoadBalancingScheme: string(cloud.SchemeInternal),
+			BackendService:      "http://www.googleapis.com/projects/test/regions/us-central1/backendServices/bs1",
 		},
 		{
 			Name:                "tcp-fwd-rule",
@@ -1317,6 +1318,7 @@ func TestForwardingRulesEqual(t *testing.T) {
 			Ports:               []string{"123"},
 			IPProtocol:          "TCP",
 			LoadBalancingScheme: string(cloud.SchemeInternal),
+			BackendService:      "http://www.googleapis.com/projects/test/regions/us-central1/backendServices/bs1",
 		},
 		{
 			Name:                "udp-fwd-rule",
@@ -1324,6 +1326,7 @@ func TestForwardingRulesEqual(t *testing.T) {
 			Ports:               []string{"123"},
 			IPProtocol:          "UDP",
 			LoadBalancingScheme: string(cloud.SchemeInternal),
+			BackendService:      "http://www.googleapis.com/projects/test/regions/us-central1/backendServices/bs1",
 		},
 		{
 			Name:                "global-access-fwd-rule",
@@ -1332,6 +1335,16 @@ func TestForwardingRulesEqual(t *testing.T) {
 			IPProtocol:          "TCP",
 			LoadBalancingScheme: string(cloud.SchemeInternal),
 			AllowGlobalAccess:   true,
+			BackendService:      "http://www.googleapis.com/projects/test/regions/us-central1/backendServices/bs1",
+		},
+		{
+			Name:                "global-access-fwd-rule",
+			IPAddress:           "10.0.0.0",
+			Ports:               []string{"123"},
+			IPProtocol:          "TCP",
+			LoadBalancingScheme: string(cloud.SchemeInternal),
+			AllowGlobalAccess:   true,
+			BackendService:      "http://compute.googleapis.com/projects/test/regions/us-central1/backendServices/bs1",
 		},
 	}
 
@@ -1365,6 +1378,12 @@ func TestForwardingRulesEqual(t *testing.T) {
 			newFwdRule: fwdRules[3],
 			expect:     true,
 		},
+		{
+			desc:       "same forwarding rule, different basepath",
+			oldFwdRule: fwdRules[3],
+			newFwdRule: fwdRules[4],
+			expect:     true,
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			got := forwardingRulesEqual(tc.oldFwdRule, tc.newFwdRule)
@@ -1381,7 +1400,6 @@ func TestEnsureInternalLoadBalancerCustomSubnet(t *testing.T) {
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
-	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{AlphaFeatureILBCustomSubnet})
 
 	nodeNames := []string{"test-node-1"}
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)

@@ -18,10 +18,15 @@ steps:
     - BASE_REF=$_PULL_BASE_REF
     - WHAT=$_WHAT
     - REGISTRY=gcr.io/k8s-staging-e2e-test-images
+    # The default cloudbuild has HOME=/builder/home and docker buildx is in /root/.docker/cli-plugins/docker-buildx
+    # We need to set the HOME to /root explicitly since we're using docker buildx
+    - HOME=/root
     args:
     - '-c'
     - |
-      docker run --rm --privileged multiarch/qemu-user-static --reset -p yes \
+      gcloud auth configure-docker \
+      && docker run --rm --privileged multiarch/qemu-user-static --reset -p yes \
+      && export DOCKER_CLI_EXPERIMENTAL=enabled \
       && docker buildx create --name img-builder --use \
       && docker buildx inspect --bootstrap \
       && make all-build-and-push

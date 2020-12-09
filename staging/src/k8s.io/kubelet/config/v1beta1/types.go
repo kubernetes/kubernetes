@@ -61,12 +61,18 @@ const (
 	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favour
 	// pods with NUMA alignment of CPU and device resources.
 	BestEffortTopologyManagerPolicy = "best-effort"
-	// NoneTopologyManager Policy is a mode in which kubelet has no knowledge
+	// NoneTopologyManagerPolicy is a mode in which kubelet has no knowledge
 	// of NUMA alignment of a pod's CPU and device resources.
 	NoneTopologyManagerPolicy = "none"
-	// SingleNumaNodeTopologyManager Policy iis a mode in which kubelet only allows
+	// SingleNumaNodeTopologyManagerPolicy is a mode in which kubelet only allows
 	// pods with a single NUMA alignment of CPU and device resources.
-	SingleNumaNodeTopologyManager = "single-numa-node"
+	SingleNumaNodeTopologyManagerPolicy = "single-numa-node"
+	// ContainerTopologyManagerScope represents that
+	// topology policy is applied on a per-container basis.
+	ContainerTopologyManagerScope = "container"
+	// PodTopologyManagerScope represents that
+	// topology policy is applied on a per-pod basis.
+	PodTopologyManagerScope = "pod"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -434,6 +440,12 @@ type KubeletConfiguration struct {
 	// Default: "none"
 	// +optional
 	TopologyManagerPolicy string `json:"topologyManagerPolicy,omitempty"`
+	// TopologyManagerScope represents the scope of topology hint generation
+	// that topology manager requests and hint providers generate.
+	// "pod" scope requires the TopologyManager feature gate to be enabled.
+	// Default: "container"
+	// +optional
+	TopologyManagerScope string `json:"topologyManagerScope,omitempty"`
 	// qosReserved is a set of resource name to percentage pairs that specify
 	// the minimum percentage of a resource reserved for exclusive use by the
 	// guaranteed QoS tier.
@@ -803,6 +815,15 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	EnableSystemLogHandler *bool `json:"enableSystemLogHandler,omitempty"`
+	// ShutdownGracePeriod specifies the total duration that the node should delay the shutdown and total grace period for pod termination during a node shutdown.
+	// Default: "30s"
+	// +optional
+	ShutdownGracePeriod metav1.Duration `json:"shutdownGracePeriod,omitempty"`
+	// ShutdownGracePeriodCriticalPods specifies the duration used to terminate critical pods during a node shutdown. This should be less than ShutdownGracePeriod.
+	// For example, if ShutdownGracePeriod=30s, and ShutdownGracePeriodCriticalPods=10s, during a node shutdown the first 20 seconds would be reserved for gracefully terminating normal pods, and the last 10 seconds would be reserved for terminating critical pods.
+	// Default: "10s"
+	// +optional
+	ShutdownGracePeriodCriticalPods metav1.Duration `json:"shutdownGracePeriodCriticalPods,omitempty"`
 }
 
 type KubeletAuthorizationMode string

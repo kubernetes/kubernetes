@@ -18,6 +18,7 @@ package network
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -45,6 +46,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -53,8 +55,9 @@ const (
 	// EndpointUDPPort is an endpoint UDP port for testing.
 	EndpointUDPPort = 8081
 	// EndpointSCTPPort is an endpoint SCTP port for testing.
-	EndpointSCTPPort      = 8082
-	testContainerHTTPPort = 8080
+	EndpointSCTPPort = 8082
+	// testContainerHTTPPort is the test container http port.
+	testContainerHTTPPort = 9080
 	// ClusterHTTPPort is a cluster HTTP port for testing.
 	ClusterHTTPPort = 80
 	// ClusterUDPPort is a cluster UDP port for testing.
@@ -89,9 +92,39 @@ const (
 // NetexecImageName is the image name for agnhost.
 var NetexecImageName = imageutils.GetE2EImage(imageutils.Agnhost)
 
+// Option is used to configure the NetworkingTest object
+type Option func(*NetworkingTestConfig)
+
+// EnableSCTP listen on SCTP ports on the endpoints
+func EnableSCTP(config *NetworkingTestConfig) {
+	config.SCTPEnabled = true
+}
+
+// EnableDualStack create Dual Stack services
+func EnableDualStack(config *NetworkingTestConfig) {
+	config.DualStackEnabled = true
+}
+
+// UseHostNetwork run the test container with HostNetwork=true.
+func UseHostNetwork(config *NetworkingTestConfig) {
+	config.HostNetwork = true
+}
+
+// EndpointsUseHostNetwork run the endpoints pods with HostNetwork=true.
+func EndpointsUseHostNetwork(config *NetworkingTestConfig) {
+	config.EndpointsHostNetwork = true
+}
+
 // NewNetworkingTestConfig creates and sets up a new test config helper.
-func NewNetworkingTestConfig(f *framework.Framework, hostNetwork, SCTPEnabled bool) *NetworkingTestConfig {
-	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork, SCTPEnabled: SCTPEnabled}
+func NewNetworkingTestConfig(f *framework.Framework, setters ...Option) *NetworkingTestConfig {
+	// default options
+	config := &NetworkingTestConfig{
+		f:         f,
+		Namespace: f.Namespace.Name,
+	}
+	for _, setter := range setters {
+		setter(config)
+	}
 	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setup(getServiceSelector())
 	return config
@@ -99,7 +132,12 @@ func NewNetworkingTestConfig(f *framework.Framework, hostNetwork, SCTPEnabled bo
 
 // NewCoreNetworkingTestConfig creates and sets up a new test config helper for Node E2E.
 func NewCoreNetworkingTestConfig(f *framework.Framework, hostNetwork bool) *NetworkingTestConfig {
-	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork}
+	// default options
+	config := &NetworkingTestConfig{
+		f:           f,
+		Namespace:   f.Namespace.Name,
+		HostNetwork: hostNetwork,
+	}
 	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setupCore(getServiceSelector())
 	return config
@@ -124,9 +162,13 @@ type NetworkingTestConfig struct {
 	HostTestContainerPod *v1.Pod
 	// if the HostTestContainerPod is running with HostNetwork=true.
 	HostNetwork bool
+	// if the endpoints Pods are running with HostNetwork=true.
+	EndpointsHostNetwork bool
 	// if the test pods are listening on sctp port. We need this as sctp tests
 	// are marked as disruptive as they may load the sctp module.
 	SCTPEnabled bool
+	// DualStackEnabled enables dual stack on services
+	DualStackEnabled bool
 	// EndpointPods are the pods belonging to the Service created by this
 	// test config. Each invocation of `setup` creates a service with
 	// 1 pod per node running the netexecImage.
@@ -139,17 +181,21 @@ type NetworkingTestConfig struct {
 	// SessionAffinityService is a Service with SessionAffinity=ClientIP
 	// spanning over all endpointPods.
 	SessionAffinityService *v1.Service
-	// ExternalAddrs is a list of external IPs of nodes in the cluster.
-	ExternalAddr string
 	// Nodes is a list of nodes in the cluster.
 	Nodes []v1.Node
 	// MaxTries is the number of retries tolerated for tests run against
 	// endpoints and services created by this config.
 	MaxTries int
-	// The ClusterIP of the Service reated by this test config.
+	// The ClusterIP of the Service created by this test config.
 	ClusterIP string
-	// External ip of first node for use in nodePort testing.
+	// The SecondaryClusterIP of the Service created by this test config.
+	SecondaryClusterIP string
+	// NodeIP it's an ExternalIP if the node has one,
+	// or an InternalIP if not, for use in nodePort testing.
 	NodeIP string
+	// SecondaryNodeIP it's an ExternalIP of the secondary IP family if the node has one,
+	// or an InternalIP if not, for usein nodePort testing.
+	SecondaryNodeIP string
 	// The http/udp/sctp nodePorts of the Service.
 	NodeHTTPPort int
 	NodeUDPPort  int
@@ -212,7 +258,11 @@ func (config *NetworkingTestConfig) diagnoseMissingEndpoints(foundEndpoints sets
 func (config *NetworkingTestConfig) EndpointHostnames() sets.String {
 	expectedEps := sets.NewString()
 	for _, p := range config.EndpointPods {
-		expectedEps.Insert(p.Name)
+		if config.EndpointsHostNetwork {
+			expectedEps.Insert(p.Spec.NodeSelector["kubernetes.io/hostname"])
+		} else {
+			expectedEps.Insert(p.Name)
+		}
 	}
 	return expectedEps
 }
@@ -573,8 +623,7 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Args: []string{
 						"netexec",
-						fmt.Sprintf("--http-port=%d", EndpointHTTPPort),
-						fmt.Sprintf("--udp-port=%d", EndpointUDPPort),
+						fmt.Sprintf("--http-port=%d", testContainerHTTPPort),
 					},
 					Ports: []v1.ContainerPort{
 						{
@@ -585,10 +634,6 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 				},
 			},
 		},
-	}
-	// we want sctp to be optional as it will load the sctp kernel module
-	if config.SCTPEnabled {
-		pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, fmt.Sprintf("--sctp-port=%d", EndpointSCTPPort))
 	}
 	return pod
 }
@@ -615,6 +660,10 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 
 	if config.SCTPEnabled {
 		res.Spec.Ports = append(res.Spec.Ports, v1.ServicePort{Port: ClusterSCTPPort, Name: "sctp", Protocol: v1.ProtocolSCTP, TargetPort: intstr.FromInt(EndpointSCTPPort)})
+	}
+	if config.DualStackEnabled {
+		requireDual := v1.IPFamilyPolicyRequireDualStack
+		res.Spec.IPFamilyPolicy = &requireDual
 	}
 	return res
 }
@@ -666,6 +715,13 @@ func (config *NetworkingTestConfig) CreateService(serviceSpec *v1.Service) *v1.S
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
 	err = WaitForService(config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
+	// If the endpoints of the service use HostNetwork: true, they are going to try to bind on the host namespace
+	// if those ports are in use by any process in the host, the endpoints pods will fail to be deployed
+	// and the service will never be ready. We can be smarter and check directly that the ports are free
+	// but by now we Skip the test if the service is not ready and we are using endpoints with host network
+	if config.EndpointsHostNetwork && err != nil {
+		e2eskipper.Skipf("Service not ready. Pods are using hostNetwork: true, please check there is no other process on the host using the same ports: %v", err)
+	}
 	framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceSpec.Name, err))
 
 	createdService, err := config.getServiceClient().Get(context.TODO(), serviceSpec.Name, metav1.GetOptions{})
@@ -700,7 +756,6 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList, err := e2enode.GetReadySchedulableNodes(config.f.ClientSet)
 	framework.ExpectNoError(err)
-	config.ExternalAddr = e2enode.FirstAddress(nodeList, v1.NodeExternalIP)
 
 	e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 	config.Nodes = nodeList.Items
@@ -721,11 +776,32 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 			continue
 		}
 	}
+
+	// obtain the ClusterIP
 	config.ClusterIP = config.NodePortService.Spec.ClusterIP
-	if config.ExternalAddr != "" {
-		config.NodeIP = config.ExternalAddr
-	} else {
-		config.NodeIP = e2enode.FirstAddress(nodeList, v1.NodeInternalIP)
+	if config.DualStackEnabled {
+		config.SecondaryClusterIP = config.NodePortService.Spec.ClusterIPs[1]
+	}
+
+	// Obtain the primary IP family of the Cluster based on the first ClusterIP
+	// TODO: Eventually we should just be getting these from Spec.IPFamilies
+	// but for now that would only if the feature gate is enabled.
+	family := v1.IPv4Protocol
+	secondaryFamily := v1.IPv6Protocol
+	if netutils.IsIPv6String(config.ClusterIP) {
+		family = v1.IPv6Protocol
+		secondaryFamily = v1.IPv4Protocol
+	}
+	// Get Node IPs from the cluster, ExternalIPs take precedence
+	config.NodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, family)
+	if config.NodeIP == "" {
+		config.NodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeInternalIP, family)
+	}
+	if config.DualStackEnabled {
+		config.SecondaryNodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, secondaryFamily)
+		if config.SecondaryNodeIP == "" {
+			config.SecondaryNodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeInternalIP, secondaryFamily)
+		}
 	}
 
 	ginkgo.By("Waiting for NodePort service to expose endpoint")
@@ -749,6 +825,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 		hostname, _ := n.Labels["kubernetes.io/hostname"]
 		pod := config.createNetShellPodSpec(podName, hostname)
 		pod.ObjectMeta.Labels = selector
+		pod.Spec.HostNetwork = config.EndpointsHostNetwork
 		createdPod := config.createPod(pod)
 		createdPods = append(createdPods, createdPod)
 	}
@@ -805,6 +882,7 @@ type HTTPPokeParams struct {
 	ExpectCode     int // default = 200
 	BodyContains   string
 	RetriableCodes []int
+	EnableHTTPS    bool
 }
 
 // HTTPPokeResult is a struct for HTTP poke result.
@@ -851,8 +929,18 @@ const (
 // The result body will be populated if the HTTP transaction was completed, even
 // if the other test params make this a failure).
 func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPokeResult {
+	// Set default params.
+	if params == nil {
+		params = &HTTPPokeParams{}
+	}
+
 	hostPort := net.JoinHostPort(host, strconv.Itoa(port))
-	url := fmt.Sprintf("http://%s%s", hostPort, path)
+	var url string
+	if params.EnableHTTPS {
+		url = fmt.Sprintf("https://%s%s", hostPort, path)
+	} else {
+		url = fmt.Sprintf("http://%s%s", hostPort, path)
+	}
 
 	ret := HTTPPokeResult{}
 
@@ -867,10 +955,6 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 		return ret
 	}
 
-	// Set default params.
-	if params == nil {
-		params = &HTTPPokeParams{}
-	}
 	if params.ExpectCode == 0 {
 		params.ExpectCode = http.StatusOK
 	}
@@ -937,6 +1021,7 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Response, error) {
 	tr := utilnet.SetTransportDefaults(&http.Transport{
 		DisableKeepAlives: true,
+		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
 	})
 	client := &http.Client{
 		Transport: tr,

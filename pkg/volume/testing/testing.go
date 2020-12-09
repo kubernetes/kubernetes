@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
 	testingexec "k8s.io/utils/exec/testing"
@@ -47,6 +48,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	cloudprovider "k8s.io/cloud-provider"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/kubernetes/pkg/volume"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -426,7 +428,7 @@ func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 		WaitForAttachHook: plugin.WaitForAttachHook,
 		UnmountDeviceHook: plugin.UnmountDeviceHook,
 	}
-	volume.VolumesAttached = make(map[string]types.NodeName)
+	volume.VolumesAttached = make(map[string]sets.String)
 	volume.DeviceMountState = make(map[string]string)
 	volume.VolumeMountState = make(map[string]string)
 	*list = append(*list, volume)
@@ -467,7 +469,7 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) RequiresRemount() bool {
+func (plugin *FakeVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return plugin.SupportsRemount
 }
 
@@ -724,8 +726,8 @@ func (f *FakeBasicVolumePlugin) NewUnmounter(volName string, podUID types.UID) (
 	return f.Plugin.NewUnmounter(volName, podUID)
 }
 
-func (f *FakeBasicVolumePlugin) RequiresRemount() bool {
-	return f.Plugin.RequiresRemount()
+func (f *FakeBasicVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
+	return f.Plugin.RequiresRemount(spec)
 }
 
 func (f *FakeBasicVolumePlugin) SupportsBulkVolumeVerification() bool {
@@ -801,7 +803,7 @@ func (plugin *FakeFileVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeFileVolumePlugin) RequiresRemount() bool {
+func (plugin *FakeFileVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -835,7 +837,7 @@ type FakeVolume struct {
 	VolName string
 	Plugin  *FakeVolumePlugin
 	MetricsNil
-	VolumesAttached  map[string]types.NodeName
+	VolumesAttached  map[string]sets.String
 	DeviceMountState map[string]string
 	VolumeMountState map[string]string
 
@@ -1154,11 +1156,12 @@ func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error
 	fv.Lock()
 	defer fv.Unlock()
 	fv.AttachCallCount++
+
 	volumeName, err := getUniqueVolumeName(spec)
 	if err != nil {
 		return "", err
 	}
-	volumeNode, exist := fv.VolumesAttached[volumeName]
+	volumeNodes, exist := fv.VolumesAttached[volumeName]
 	if exist {
 		if nodeName == UncertainAttachNode {
 			return "/dev/vdb-test", nil
@@ -1168,13 +1171,14 @@ func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error
 		if nodeName == TimeoutAttachNode {
 			return "", fmt.Errorf("Timed out to attach volume %q to node %q", volumeName, nodeName)
 		}
-		if volumeNode == nodeName || volumeNode == MultiAttachNode || nodeName == MultiAttachNode {
+		if volumeNodes.Has(string(nodeName)) || volumeNodes.Has(MultiAttachNode) || nodeName == MultiAttachNode {
+			volumeNodes.Insert(string(nodeName))
 			return "/dev/vdb-test", nil
 		}
-		return "", fmt.Errorf("volume %q trying to attach to node %q is already attached to node %q", volumeName, nodeName, volumeNode)
+		return "", fmt.Errorf("volume %q trying to attach to node %q is already attached to node %q", volumeName, nodeName, volumeNodes)
 	}
 
-	fv.VolumesAttached[volumeName] = nodeName
+	fv.VolumesAttached[volumeName] = sets.NewString(string(nodeName))
 	if nodeName == UncertainAttachNode || nodeName == TimeoutAttachNode {
 		return "", fmt.Errorf("Timed out to attach volume %q to node %q", volumeName, nodeName)
 	}
@@ -1272,10 +1276,18 @@ func (fv *FakeVolume) Detach(volumeName string, nodeName types.NodeName) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.DetachCallCount++
-	if _, exist := fv.VolumesAttached[volumeName]; !exist {
-		return fmt.Errorf("Trying to detach volume %q that is not attached to the node %q", volumeName, nodeName)
+
+	node := string(nodeName)
+	volumeNodes, exist := fv.VolumesAttached[volumeName]
+	if !exist || !volumeNodes.Has(node) {
+		return fmt.Errorf("Trying to detach volume %q that is not attached to the node %q", volumeName, node)
 	}
-	delete(fv.VolumesAttached, volumeName)
+
+	volumeNodes.Delete(node)
+	if volumeNodes.Len() == 0 {
+		delete(fv.VolumesAttached, volumeName)
+	}
+
 	return nil
 }
 

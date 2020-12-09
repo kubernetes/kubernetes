@@ -20,17 +20,12 @@ import (
 
 	"github.com/opencontainers/selinux/pkg/pwalk"
 	"github.com/pkg/errors"
+	"github.com/willf/bitset"
 	"golang.org/x/sys/unix"
 )
 
 const (
-	// Enforcing constant indicate SELinux is in enforcing mode
-	Enforcing = 1
-	// Permissive constant to indicate SELinux is in permissive mode
-	Permissive = 0
-	// Disabled constant to indicate SELinux is disabled
-	Disabled = -1
-
+	minSensLen       = 2
 	contextFile      = "/usr/share/containers/selinux/contexts"
 	selinuxDir       = "/etc/selinux/"
 	selinuxConfig    = selinuxDir + "config"
@@ -49,17 +44,27 @@ type selinuxState struct {
 	sync.Mutex
 }
 
-var (
-	// ErrMCSAlreadyExists is returned when trying to allocate a duplicate MCS.
-	ErrMCSAlreadyExists = errors.New("MCS label already exists")
-	// ErrEmptyPath is returned when an empty path has been specified.
-	ErrEmptyPath = errors.New("empty path")
-	// InvalidLabel is returned when an invalid label is specified.
-	InvalidLabel = errors.New("Invalid Label")
+type level struct {
+	sens uint
+	cats *bitset.BitSet
+}
 
-	assignRegex = regexp.MustCompile(`^([^=]+)=(.*)$`)
-	roFileLabel string
-	state       = selinuxState{
+type mlsRange struct {
+	low  *level
+	high *level
+}
+
+type levelItem byte
+
+const (
+	sensitivity levelItem = 's'
+	category    levelItem = 'c'
+)
+
+var (
+	assignRegex       = regexp.MustCompile(`^([^=]+)=(.*)$`)
+	readOnlyFileLabel string
+	state             = selinuxState{
 		mcsList: make(map[string]bool),
 	}
 
@@ -67,9 +72,6 @@ var (
 	attrPathOnce   sync.Once
 	haveThreadSelf bool
 )
-
-// Context is a representation of the SELinux label broken into 4 parts
-type Context map[string]string
 
 func (s *selinuxState) setEnable(enabled bool) bool {
 	s.Lock()
@@ -97,8 +99,8 @@ func (s *selinuxState) getEnabled() bool {
 	return s.setEnable(enabled)
 }
 
-// SetDisabled disables selinux support for the package
-func SetDisabled() {
+// setDisabled disables SELinux support for the package
+func setDisabled() {
 	state.setEnable(false)
 }
 
@@ -190,15 +192,15 @@ func (s *selinuxState) getSELinuxfs() string {
 
 // getSelinuxMountPoint returns the path to the mountpoint of an selinuxfs
 // filesystem or an empty string if no mountpoint is found.  Selinuxfs is
-// a proc-like pseudo-filesystem that exposes the selinux policy API to
+// a proc-like pseudo-filesystem that exposes the SELinux policy API to
 // processes.  The existence of an selinuxfs mount is used to determine
-// whether selinux is currently enabled or not.
+// whether SELinux is currently enabled or not.
 func getSelinuxMountPoint() string {
 	return state.getSELinuxfs()
 }
 
-// GetEnabled returns whether selinux is currently enabled.
-func GetEnabled() bool {
+// getEnabled returns whether SELinux is currently enabled.
+func getEnabled() bool {
 	return state.getEnabled()
 }
 
@@ -282,8 +284,9 @@ func readCon(fpath string) (string, error) {
 	return strings.Trim(retval, "\x00"), nil
 }
 
-// ClassIndex returns the int index for an object class in the loaded policy, or -1 and an error
-func ClassIndex(class string) (int, error) {
+// classIndex returns the int index for an object class in the loaded policy,
+// or -1 and an error
+func classIndex(class string) (int, error) {
 	permpath := fmt.Sprintf("class/%s/index", class)
 	indexpath := filepath.Join(getSelinuxMountPoint(), permpath)
 
@@ -299,8 +302,8 @@ func ClassIndex(class string) (int, error) {
 	return index, nil
 }
 
-// SetFileLabel sets the SELinux label for this path or returns an error.
-func SetFileLabel(fpath string, label string) error {
+// setFileLabel sets the SELinux label for this path or returns an error.
+func setFileLabel(fpath string, label string) error {
 	if fpath == "" {
 		return ErrEmptyPath
 	}
@@ -310,8 +313,8 @@ func SetFileLabel(fpath string, label string) error {
 	return nil
 }
 
-// FileLabel returns the SELinux label for this path or returns an error.
-func FileLabel(fpath string) (string, error) {
+// fileLabel returns the SELinux label for this path or returns an error.
+func fileLabel(fpath string) (string, error) {
 	if fpath == "" {
 		return "", ErrEmptyPath
 	}
@@ -327,37 +330,31 @@ func FileLabel(fpath string) (string, error) {
 	return string(label), nil
 }
 
-/*
-SetFSCreateLabel tells kernel the label to create all file system objects
-created by this task. Setting label="" to return to default.
-*/
-func SetFSCreateLabel(label string) error {
+// setFSCreateLabel tells kernel the label to create all file system objects
+// created by this task. Setting label="" to return to default.
+func setFSCreateLabel(label string) error {
 	return writeAttr("fscreate", label)
 }
 
-/*
-FSCreateLabel returns the default label the kernel which the kernel is using
-for file system objects created by this task. "" indicates default.
-*/
-func FSCreateLabel() (string, error) {
+// fsCreateLabel returns the default label the kernel which the kernel is using
+// for file system objects created by this task. "" indicates default.
+func fsCreateLabel() (string, error) {
 	return readAttr("fscreate")
 }
 
-// CurrentLabel returns the SELinux label of the current process thread, or an error.
-func CurrentLabel() (string, error) {
+// currentLabel returns the SELinux label of the current process thread, or an error.
+func currentLabel() (string, error) {
 	return readAttr("current")
 }
 
-// PidLabel returns the SELinux label of the given pid, or an error.
-func PidLabel(pid int) (string, error) {
+// pidLabel returns the SELinux label of the given pid, or an error.
+func pidLabel(pid int) (string, error) {
 	return readCon(fmt.Sprintf("/proc/%d/attr/current", pid))
 }
 
-/*
-ExecLabel returns the SELinux label that the kernel will use for any programs
-that are executed by the current process thread, or an error.
-*/
-func ExecLabel() (string, error) {
+// ExecLabel returns the SELinux label that the kernel will use for any programs
+// that are executed by the current process thread, or an error.
+func execLabel() (string, error) {
 	return readAttr("exec")
 }
 
@@ -366,7 +363,7 @@ func writeCon(fpath, val string) error {
 		return ErrEmptyPath
 	}
 	if val == "" {
-		if !GetEnabled() {
+		if !getEnabled() {
 			return nil
 		}
 	}
@@ -418,25 +415,233 @@ func writeAttr(attr, val string) error {
 	return writeCon(attrPath(attr), val)
 }
 
-/*
-CanonicalizeContext takes a context string and writes it to the kernel
-the function then returns the context that the kernel will use.  This function
-can be used to see if two contexts are equivalent
-*/
-func CanonicalizeContext(val string) (string, error) {
+// canonicalizeContext takes a context string and writes it to the kernel
+// the function then returns the context that the kernel will use. Use this
+// function to check if two contexts are equivalent
+func canonicalizeContext(val string) (string, error) {
 	return readWriteCon(filepath.Join(getSelinuxMountPoint(), "context"), val)
 }
 
-/*
-ComputeCreateContext requests the type transition from source to target for class  from the kernel.
-*/
-func ComputeCreateContext(source string, target string, class string) (string, error) {
-	classidx, err := ClassIndex(class)
+// computeCreateContext requests the type transition from source to target for
+// class from the kernel.
+func computeCreateContext(source string, target string, class string) (string, error) {
+	classidx, err := classIndex(class)
 	if err != nil {
 		return "", err
 	}
 
 	return readWriteCon(filepath.Join(getSelinuxMountPoint(), "create"), fmt.Sprintf("%s %s %d", source, target, classidx))
+}
+
+// catsToBitset stores categories in a bitset.
+func catsToBitset(cats string) (*bitset.BitSet, error) {
+	bitset := &bitset.BitSet{}
+
+	catlist := strings.Split(cats, ",")
+	for _, r := range catlist {
+		ranges := strings.SplitN(r, ".", 2)
+		if len(ranges) > 1 {
+			catstart, err := parseLevelItem(ranges[0], category)
+			if err != nil {
+				return nil, err
+			}
+			catend, err := parseLevelItem(ranges[1], category)
+			if err != nil {
+				return nil, err
+			}
+			for i := catstart; i <= catend; i++ {
+				bitset.Set(i)
+			}
+		} else {
+			cat, err := parseLevelItem(ranges[0], category)
+			if err != nil {
+				return nil, err
+			}
+			bitset.Set(cat)
+		}
+	}
+
+	return bitset, nil
+}
+
+// parseLevelItem parses and verifies that a sensitivity or category are valid
+func parseLevelItem(s string, sep levelItem) (uint, error) {
+	if len(s) < minSensLen || levelItem(s[0]) != sep {
+		return 0, ErrLevelSyntax
+	}
+	val, err := strconv.ParseUint(s[1:], 10, 32)
+	if err != nil {
+		return 0, err
+	}
+
+	return uint(val), nil
+}
+
+// parseLevel fills a level from a string that contains
+// a sensitivity and categories
+func (l *level) parseLevel(levelStr string) error {
+	lvl := strings.SplitN(levelStr, ":", 2)
+	sens, err := parseLevelItem(lvl[0], sensitivity)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse sensitivity")
+	}
+	l.sens = sens
+	if len(lvl) > 1 {
+		cats, err := catsToBitset(lvl[1])
+		if err != nil {
+			return errors.Wrap(err, "failed to parse categories")
+		}
+		l.cats = cats
+	}
+
+	return nil
+}
+
+// rangeStrToMLSRange marshals a string representation of a range.
+func rangeStrToMLSRange(rangeStr string) (*mlsRange, error) {
+	mlsRange := &mlsRange{}
+	levelSlice := strings.SplitN(rangeStr, "-", 2)
+
+	switch len(levelSlice) {
+	// rangeStr that has a low and a high level, e.g. s4:c0.c1023-s6:c0.c1023
+	case 2:
+		mlsRange.high = &level{}
+		if err := mlsRange.high.parseLevel(levelSlice[1]); err != nil {
+			return nil, errors.Wrapf(err, "failed to parse high level %q", levelSlice[1])
+		}
+		fallthrough
+	// rangeStr that is single level, e.g. s6:c0,c3,c5,c30.c1023
+	case 1:
+		mlsRange.low = &level{}
+		if err := mlsRange.low.parseLevel(levelSlice[0]); err != nil {
+			return nil, errors.Wrapf(err, "failed to parse low level %q", levelSlice[0])
+		}
+	}
+
+	if mlsRange.high == nil {
+		mlsRange.high = mlsRange.low
+	}
+
+	return mlsRange, nil
+}
+
+// bitsetToStr takes a category bitset and returns it in the
+// canonical selinux syntax
+func bitsetToStr(c *bitset.BitSet) string {
+	var str string
+	i, e := c.NextSet(0)
+	len := 0
+	for e {
+		if len == 0 {
+			if str != "" {
+				str += ","
+			}
+			str += "c" + strconv.Itoa(int(i))
+		}
+
+		next, e := c.NextSet(i + 1)
+		if e {
+			// consecutive cats
+			if next == i+1 {
+				len++
+				i = next
+				continue
+			}
+		}
+		if len == 1 {
+			str += ",c" + strconv.Itoa(int(i))
+		} else if len > 1 {
+			str += ".c" + strconv.Itoa(int(i))
+		}
+		if !e {
+			break
+		}
+		len = 0
+		i = next
+	}
+
+	return str
+}
+
+func (l1 *level) equal(l2 *level) bool {
+	if l2 == nil || l1 == nil {
+		return l1 == l2
+	}
+	if l1.sens != l2.sens {
+		return false
+	}
+	return l1.cats.Equal(l2.cats)
+}
+
+// String returns an mlsRange as a string.
+func (m mlsRange) String() string {
+	low := "s" + strconv.Itoa(int(m.low.sens))
+	if m.low.cats != nil && m.low.cats.Count() > 0 {
+		low += ":" + bitsetToStr(m.low.cats)
+	}
+
+	if m.low.equal(m.high) {
+		return low
+	}
+
+	high := "s" + strconv.Itoa(int(m.high.sens))
+	if m.high.cats != nil && m.high.cats.Count() > 0 {
+		high += ":" + bitsetToStr(m.high.cats)
+	}
+
+	return low + "-" + high
+}
+
+func max(a, b uint) uint {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func min(a, b uint) uint {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// calculateGlbLub computes the glb (greatest lower bound) and lub (least upper bound)
+// of a source and target range.
+// The glblub is calculated as the greater of the low sensitivities and
+// the lower of the high sensitivities and the and of each category bitset.
+func calculateGlbLub(sourceRange, targetRange string) (string, error) {
+	s, err := rangeStrToMLSRange(sourceRange)
+	if err != nil {
+		return "", err
+	}
+	t, err := rangeStrToMLSRange(targetRange)
+	if err != nil {
+		return "", err
+	}
+
+	if s.high.sens < t.low.sens || t.high.sens < s.low.sens {
+		/* these ranges have no common sensitivities */
+		return "", ErrIncomparable
+	}
+
+	outrange := &mlsRange{low: &level{}, high: &level{}}
+
+	/* take the greatest of the low */
+	outrange.low.sens = max(s.low.sens, t.low.sens)
+
+	/* take the least of the high */
+	outrange.high.sens = min(s.high.sens, t.high.sens)
+
+	/* find the intersecting categories */
+	if s.low.cats != nil && t.low.cats != nil {
+		outrange.low.cats = s.low.cats.Intersection(t.low.cats)
+	}
+	if s.high.cats != nil && t.high.cats != nil {
+		outrange.high.cats = s.high.cats.Intersection(t.high.cats)
+	}
+
+	return outrange.String(), nil
 }
 
 func readWriteCon(fpath string, val string) (string, error) {
@@ -461,41 +666,37 @@ func readWriteCon(fpath string, val string) (string, error) {
 	return strings.Trim(retval, "\x00"), nil
 }
 
-/*
-SetExecLabel sets the SELinux label that the kernel will use for any programs
-that are executed by the current process thread, or an error.
-*/
-func SetExecLabel(label string) error {
+// setExecLabel sets the SELinux label that the kernel will use for any programs
+// that are executed by the current process thread, or an error.
+func setExecLabel(label string) error {
 	return writeAttr("exec", label)
 }
 
-/*
-SetTaskLabel sets the SELinux label for the current thread, or an error.
-This requires the dyntransition permission.
-*/
-func SetTaskLabel(label string) error {
+// setTaskLabel sets the SELinux label for the current thread, or an error.
+// This requires the dyntransition permission.
+func setTaskLabel(label string) error {
 	return writeAttr("current", label)
 }
 
-// SetSocketLabel takes a process label and tells the kernel to assign the
+// setSocketLabel takes a process label and tells the kernel to assign the
 // label to the next socket that gets created
-func SetSocketLabel(label string) error {
+func setSocketLabel(label string) error {
 	return writeAttr("sockcreate", label)
 }
 
-// SocketLabel retrieves the current socket label setting
-func SocketLabel() (string, error) {
+// socketLabel retrieves the current socket label setting
+func socketLabel() (string, error) {
 	return readAttr("sockcreate")
 }
 
-// PeerLabel retrieves the label of the client on the other side of a socket
-func PeerLabel(fd uintptr) (string, error) {
+// peerLabel retrieves the label of the client on the other side of a socket
+func peerLabel(fd uintptr) (string, error) {
 	return unix.GetsockoptString(int(fd), unix.SOL_SOCKET, unix.SO_PEERSEC)
 }
 
-// SetKeyLabel takes a process label and tells the kernel to assign the
+// setKeyLabel takes a process label and tells the kernel to assign the
 // label to the next kernel keyring that gets created
-func SetKeyLabel(label string) error {
+func setKeyLabel(label string) error {
 	err := writeCon("/proc/self/attr/keycreate", label)
 	if os.IsNotExist(errors.Cause(err)) {
 		return nil
@@ -506,21 +707,21 @@ func SetKeyLabel(label string) error {
 	return err
 }
 
-// KeyLabel retrieves the current kernel keyring label setting
-func KeyLabel() (string, error) {
+// keyLabel retrieves the current kernel keyring label setting
+func keyLabel() (string, error) {
 	return readCon("/proc/self/attr/keycreate")
 }
 
-// Get returns the Context as a string
-func (c Context) Get() string {
+// get returns the Context as a string
+func (c Context) get() string {
 	if c["level"] != "" {
 		return fmt.Sprintf("%s:%s:%s:%s", c["user"], c["role"], c["type"], c["level"])
 	}
 	return fmt.Sprintf("%s:%s:%s", c["user"], c["role"], c["type"])
 }
 
-// NewContext creates a new Context struct from the specified label
-func NewContext(label string) (Context, error) {
+// newContext creates a new Context struct from the specified label
+func newContext(label string) (Context, error) {
 	c := make(Context)
 
 	if len(label) != 0 {
@@ -538,15 +739,15 @@ func NewContext(label string) (Context, error) {
 	return c, nil
 }
 
-// ClearLabels clears all reserved labels
-func ClearLabels() {
+// clearLabels clears all reserved labels
+func clearLabels() {
 	state.Lock()
 	state.mcsList = make(map[string]bool)
 	state.Unlock()
 }
 
-// ReserveLabel reserves the MLS/MCS level component of the specified label
-func ReserveLabel(label string) {
+// reserveLabel reserves the MLS/MCS level component of the specified label
+func reserveLabel(label string) {
 	if len(label) != 0 {
 		con := strings.SplitN(label, ":", 4)
 		if len(con) > 3 {
@@ -559,8 +760,8 @@ func selinuxEnforcePath() string {
 	return path.Join(getSelinuxMountPoint(), "enforce")
 }
 
-// EnforceMode returns the current SELinux mode Enforcing, Permissive, Disabled
-func EnforceMode() int {
+// enforceMode returns the current SELinux mode Enforcing, Permissive, Disabled
+func enforceMode() int {
 	var enforce int
 
 	enforceB, err := ioutil.ReadFile(selinuxEnforcePath())
@@ -574,20 +775,16 @@ func EnforceMode() int {
 	return enforce
 }
 
-/*
-SetEnforceMode sets the current SELinux mode Enforcing, Permissive.
-Disabled is not valid, since this needs to be set at boot time.
-*/
-func SetEnforceMode(mode int) error {
+// setEnforceMode sets the current SELinux mode Enforcing, Permissive.
+// Disabled is not valid, since this needs to be set at boot time.
+func setEnforceMode(mode int) error {
 	return ioutil.WriteFile(selinuxEnforcePath(), []byte(strconv.Itoa(mode)), 0644)
 }
 
-/*
-DefaultEnforceMode returns the systems default SELinux mode Enforcing,
-Permissive or Disabled. Note this is is just the default at boot time.
-EnforceMode tells you the systems current mode.
-*/
-func DefaultEnforceMode() int {
+// defaultEnforceMode returns the systems default SELinux mode Enforcing,
+// Permissive or Disabled. Note this is is just the default at boot time.
+// EnforceMode tells you the systems current mode.
+func defaultEnforceMode() int {
 	switch readConfig(selinuxTag) {
 	case "enforcing":
 		return Enforcing
@@ -667,11 +864,9 @@ func uniqMcs(catRange uint32) string {
 	return mcs
 }
 
-/*
-ReleaseLabel will unreserve the MLS/MCS Level field of the specified label.
-Allowing it to be used by another process.
-*/
-func ReleaseLabel(label string) {
+// releaseLabel un-reserves the MLS/MCS Level field of the specified label,
+// allowing it to be used by another process.
+func releaseLabel(label string) {
 	if len(label) != 0 {
 		con := strings.SplitN(label, ":", 4)
 		if len(con) > 3 {
@@ -680,9 +875,9 @@ func ReleaseLabel(label string) {
 	}
 }
 
-// ROFileLabel returns the specified SELinux readonly file label
-func ROFileLabel() string {
-	return roFileLabel
+// roFileLabel returns the specified SELinux readonly file label
+func roFileLabel() string {
+	return readOnlyFileLabel
 }
 
 func openContextFile() (*os.File, error) {
@@ -737,11 +932,9 @@ func loadLabels() map[string]string {
 	return labels
 }
 
-/*
-KVMContainerLabels returns the default processLabel and mountLabel to be used
-for kvm containers by the calling process.
-*/
-func KVMContainerLabels() (string, string) {
+// kvmContainerLabels returns the default processLabel and mountLabel to be used
+// for kvm containers by the calling process.
+func kvmContainerLabels() (string, string) {
 	processLabel := labels["kvm_process"]
 	if processLabel == "" {
 		processLabel = labels["process"]
@@ -750,11 +943,9 @@ func KVMContainerLabels() (string, string) {
 	return addMcs(processLabel, labels["file"])
 }
 
-/*
-InitContainerLabels returns the default processLabel and file labels to be
-used for containers running an init system like systemd by the calling process.
-*/
-func InitContainerLabels() (string, string) {
+// initContainerLabels returns the default processLabel and file labels to be
+// used for containers running an init system like systemd by the calling process.
+func initContainerLabels() (string, string) {
 	processLabel := labels["init_process"]
 	if processLabel == "" {
 		processLabel = labels["process"]
@@ -763,25 +954,23 @@ func InitContainerLabels() (string, string) {
 	return addMcs(processLabel, labels["file"])
 }
 
-/*
-ContainerLabels returns an allocated processLabel and fileLabel to be used for
-container labeling by the calling process.
-*/
-func ContainerLabels() (processLabel string, fileLabel string) {
-	if !GetEnabled() {
+// containerLabels returns an allocated processLabel and fileLabel to be used for
+// container labeling by the calling process.
+func containerLabels() (processLabel string, fileLabel string) {
+	if !getEnabled() {
 		return "", ""
 	}
 
 	processLabel = labels["process"]
 	fileLabel = labels["file"]
-	roFileLabel = labels["ro_file"]
+	readOnlyFileLabel = labels["ro_file"]
 
 	if processLabel == "" || fileLabel == "" {
 		return "", fileLabel
 	}
 
-	if roFileLabel == "" {
-		roFileLabel = fileLabel
+	if readOnlyFileLabel == "" {
+		readOnlyFileLabel = fileLabel
 	}
 
 	return addMcs(processLabel, fileLabel)
@@ -790,7 +979,7 @@ func ContainerLabels() (processLabel string, fileLabel string) {
 func addMcs(processLabel, fileLabel string) (string, string) {
 	scon, _ := NewContext(processLabel)
 	if scon["level"] != "" {
-		mcs := uniqMcs(1024)
+		mcs := uniqMcs(CategoryRange)
 		scon["level"] = mcs
 		processLabel = scon.Get()
 		scon, _ = NewContext(fileLabel)
@@ -800,16 +989,14 @@ func addMcs(processLabel, fileLabel string) (string, string) {
 	return processLabel, fileLabel
 }
 
-// SecurityCheckContext validates that the SELinux label is understood by the kernel
-func SecurityCheckContext(val string) error {
+// securityCheckContext validates that the SELinux label is understood by the kernel
+func securityCheckContext(val string) error {
 	return ioutil.WriteFile(path.Join(getSelinuxMountPoint(), "context"), []byte(val), 0644)
 }
 
-/*
-CopyLevel returns a label with the MLS/MCS level from src label replaced on
-the dest label.
-*/
-func CopyLevel(src, dest string) (string, error) {
+// copyLevel returns a label with the MLS/MCS level from src label replaced on
+// the dest label.
+func copyLevel(src, dest string) (string, error) {
 	if src == "" {
 		return "", nil
 	}
@@ -833,7 +1020,7 @@ func CopyLevel(src, dest string) (string, error) {
 	return tcon.Get(), nil
 }
 
-// Prevent users from relabing system files
+// Prevent users from relabeling system files
 func badPrefix(fpath string) error {
 	if fpath == "" {
 		return ErrEmptyPath
@@ -848,10 +1035,10 @@ func badPrefix(fpath string) error {
 	return nil
 }
 
-// Chcon changes the fpath file object to the SELinux label label.
-// If fpath is a directory and recurse is true, Chcon will walk the
+// chcon changes the fpath file object to the SELinux label label.
+// If fpath is a directory and recurse is true, then chcon walks the
 // directory tree setting the label.
-func Chcon(fpath string, label string, recurse bool) error {
+func chcon(fpath string, label string, recurse bool) error {
 	if fpath == "" {
 		return ErrEmptyPath
 	}
@@ -876,9 +1063,9 @@ func Chcon(fpath string, label string, recurse bool) error {
 	})
 }
 
-// DupSecOpt takes an SELinux process label and returns security options that
+// dupSecOpt takes an SELinux process label and returns security options that
 // can be used to set the SELinux Type and Level for future container processes.
-func DupSecOpt(src string) ([]string, error) {
+func dupSecOpt(src string) ([]string, error) {
 	if src == "" {
 		return nil, nil
 	}
@@ -903,8 +1090,8 @@ func DupSecOpt(src string) ([]string, error) {
 	return dup, nil
 }
 
-// DisableSecOpt returns a security opt that can be used to disable SELinux
+// disableSecOpt returns a security opt that can be used to disable SELinux
 // labeling support for future container processes.
-func DisableSecOpt() []string {
+func disableSecOpt() []string {
 	return []string{"disable"}
 }
