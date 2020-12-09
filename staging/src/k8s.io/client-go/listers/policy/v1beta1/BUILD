@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "checkpoint.go",
         "eviction.go",
         "expansion_generated.go",
         "poddisruptionbudget.go",

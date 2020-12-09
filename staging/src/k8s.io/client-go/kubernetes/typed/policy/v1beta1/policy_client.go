@@ -26,6 +26,7 @@ import (
 
 type PolicyV1beta1Interface interface {
 	RESTClient() rest.Interface
+	CheckpointsGetter
 	EvictionsGetter
 	PodDisruptionBudgetsGetter
 	PodSecurityPoliciesGetter
@@ -34,6 +35,10 @@ type PolicyV1beta1Interface interface {
 // PolicyV1beta1Client is used to interact with features provided by the policy group.
 type PolicyV1beta1Client struct {
 	restClient rest.Interface
+}
+
+func (c *PolicyV1beta1Client) Checkpoints(namespace string) CheckpointInterface {
+	return newCheckpoints(c, namespace)
 }
 
 func (c *PolicyV1beta1Client) Evictions(namespace string) EvictionInterface {

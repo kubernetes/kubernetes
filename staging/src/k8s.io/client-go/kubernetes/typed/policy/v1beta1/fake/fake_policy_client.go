@@ -28,6 +28,10 @@ type FakePolicyV1beta1 struct {
 	*testing.Fake
 }
 
+func (c *FakePolicyV1beta1) Checkpoints(namespace string) v1beta1.CheckpointInterface {
+	return &FakeCheckpoints{c, namespace}
+}
+
 func (c *FakePolicyV1beta1) Evictions(namespace string) v1beta1.EvictionInterface {
 	return &FakeEvictions{c, namespace}
 }

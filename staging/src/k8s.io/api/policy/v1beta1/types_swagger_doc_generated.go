@@ -55,6 +55,15 @@ func (AllowedHostPath) SwaggerDoc() map[string]string {
 	return map_AllowedHostPath
 }
 
+var map_Checkpoint = map[string]string{
+	"":         "Checkpoint checkpoints a pod on its node. This is a subresource of Pod. A request to cause such a checkpoint is created by POSTing to .../pods/<pod name>/checkpoint.",
+	"metadata": "ObjectMeta describes the pod that is being evicted.",
+}
+
+func (Checkpoint) SwaggerDoc() map[string]string {
+	return map_Checkpoint
+}
+
 var map_Eviction = map[string]string{
 	"":              "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/<pod name>/evictions.",
 	"metadata":      "ObjectMeta describes the pod that is being evicted.",
