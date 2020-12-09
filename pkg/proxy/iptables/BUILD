@@ -11,6 +11,7 @@ go_library(
     srcs = ["proxier.go"],
     importpath = "k8s.io/kubernetes/pkg/proxy/iptables",
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/healthcheck:go_default_library",

@@ -46,6 +46,7 @@ import (
 	toolswatch "k8s.io/client-go/tools/watch"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/metrics"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -193,13 +194,13 @@ func newProxyServer(
 
 			// Create iptables handlers for both families, one is already created
 			// Always ordered as IPv4, IPv6
-			var ipt [2]utiliptables.Interface
+			var ipt map[core.IPFamily]utiliptables.Interface
 			if iptInterface.IsIPv6() {
-				ipt[1] = iptInterface
-				ipt[0] = utiliptables.New(execer, utiliptables.ProtocolIPv4)
+				ipt[core.IPv6Protocol] = iptInterface
+				ipt[core.IPv4Protocol] = utiliptables.New(execer, utiliptables.ProtocolIPv4)
 			} else {
-				ipt[0] = iptInterface
-				ipt[1] = utiliptables.New(execer, utiliptables.ProtocolIPv6)
+				ipt[core.IPv4Protocol] = iptInterface
+				ipt[core.IPv6Protocol] = utiliptables.New(execer, utiliptables.ProtocolIPv6)
 			}
 
 			// Always ordered to match []ipt
@@ -261,13 +262,13 @@ func newProxyServer(
 
 			// Create iptables handlers for both families, one is already created
 			// Always ordered as IPv4, IPv6
-			var ipt [2]utiliptables.Interface
+			var ipt map[core.IPFamily]utiliptables.Interface
 			if iptInterface.IsIPv6() {
-				ipt[1] = iptInterface
-				ipt[0] = utiliptables.New(execer, utiliptables.ProtocolIPv4)
+				ipt[core.IPv6Protocol] = iptInterface
+				ipt[core.IPv4Protocol] = utiliptables.New(execer, utiliptables.ProtocolIPv4)
 			} else {
-				ipt[0] = iptInterface
-				ipt[1] = utiliptables.New(execer, utiliptables.ProtocolIPv6)
+				ipt[core.IPv4Protocol] = iptInterface
+				ipt[core.IPv6Protocol] = utiliptables.New(execer, utiliptables.ProtocolIPv6)
 			}
 
 			nodeIPs := nodeIPTuple(config.BindAddress)
@@ -467,7 +468,12 @@ func getLocalDetector(mode proxyconfigapi.LocalMode, config *proxyconfigapi.Kube
 	return proxyutiliptables.NewNoOpLocalDetector(), nil
 }
 
-func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxyconfigapi.KubeProxyConfiguration, ipt [2]utiliptables.Interface, nodeInfo *v1.Node) ([2]proxyutiliptables.LocalTrafficDetector, error) {
+func getDualStackLocalDetectorTuple(
+	mode proxyconfigapi.LocalMode,
+	config *proxyconfigapi.KubeProxyConfiguration,
+	ipt map[core.IPFamily]utiliptables.Interface,
+	nodeInfo *v1.Node,
+) ([2]proxyutiliptables.LocalTrafficDetector, error) {
 	var err error
 	localDetectors := [2]proxyutiliptables.LocalTrafficDetector{proxyutiliptables.NewNoOpLocalDetector(), proxyutiliptables.NewNoOpLocalDetector()}
 	switch mode {
@@ -482,7 +488,7 @@ func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxy
 		if len(strings.TrimSpace(clusterCIDRs[0])) == 0 {
 			klog.Warning("detect-local-mode set to ClusterCIDR, but no IPv4 cluster CIDR defined, defaulting to no-op detect-local for IPv4")
 		} else {
-			localDetectors[0], err = proxyutiliptables.NewDetectLocalByCIDR(clusterCIDRs[0], ipt[0])
+			localDetectors[0], err = proxyutiliptables.NewDetectLocalByCIDR(clusterCIDRs[0], ipt[core.IPv4Protocol])
 			if err != nil { // don't loose the original error
 				return localDetectors, err
 			}
@@ -491,7 +497,7 @@ func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxy
 		if len(strings.TrimSpace(clusterCIDRs[1])) == 0 {
 			klog.Warning("detect-local-mode set to ClusterCIDR, but no IPv6 cluster CIDR defined, , defaulting to no-op detect-local for IPv6")
 		} else {
-			localDetectors[1], err = proxyutiliptables.NewDetectLocalByCIDR(clusterCIDRs[1], ipt[1])
+			localDetectors[1], err = proxyutiliptables.NewDetectLocalByCIDR(clusterCIDRs[1], ipt[core.IPv6Protocol])
 		}
 		return localDetectors, err
 	case proxyconfigapi.LocalModeNodeCIDR:
@@ -502,20 +508,20 @@ func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxy
 		// localDetectors, like ipt, need to be of the order [IPv4, IPv6], but PodCIDRs is setup so that PodCIDRs[0] == PodCIDR.
 		// so have to handle the case where PodCIDR can be IPv6 and set that to localDetectors[1]
 		if utilsnet.IsIPv6CIDRString(nodeInfo.Spec.PodCIDR) {
-			localDetectors[1], err = proxyutiliptables.NewDetectLocalByCIDR(nodeInfo.Spec.PodCIDR, ipt[1])
+			localDetectors[1], err = proxyutiliptables.NewDetectLocalByCIDR(nodeInfo.Spec.PodCIDR, ipt[core.IPv6Protocol])
 			if err != nil {
 				return localDetectors, err
 			}
 			if len(nodeInfo.Spec.PodCIDRs) > 1 {
-				localDetectors[0], err = proxyutiliptables.NewDetectLocalByCIDR(nodeInfo.Spec.PodCIDRs[1], ipt[0])
+				localDetectors[0], err = proxyutiliptables.NewDetectLocalByCIDR(nodeInfo.Spec.PodCIDRs[1], ipt[core.IPv4Protocol])
 			}
 		} else {
-			localDetectors[0], err = proxyutiliptables.NewDetectLocalByCIDR(nodeInfo.Spec.PodCIDR, ipt[0])
+			localDetectors[0], err = proxyutiliptables.NewDetectLocalByCIDR(nodeInfo.Spec.PodCIDR, ipt[core.IPv4Protocol])
 			if err != nil {
 				return localDetectors, err
 			}
 			if len(nodeInfo.Spec.PodCIDRs) > 1 {
-				localDetectors[1], err = proxyutiliptables.NewDetectLocalByCIDR(nodeInfo.Spec.PodCIDRs[1], ipt[1])
+				localDetectors[1], err = proxyutiliptables.NewDetectLocalByCIDR(nodeInfo.Spec.PodCIDRs[1], ipt[core.IPv6Protocol])
 			}
 		}
 		return localDetectors, err

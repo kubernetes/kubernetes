@@ -276,6 +276,7 @@ go_test(
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:aix": [
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy/ipvs:go_default_library",
             "//pkg/proxy/util/iptables:go_default_library",
             "//pkg/util/iptables:go_default_library",
@@ -284,6 +285,7 @@ go_test(
             "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:android": [
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy/ipvs:go_default_library",
             "//pkg/proxy/util/iptables:go_default_library",
             "//pkg/util/iptables:go_default_library",
@@ -292,6 +294,7 @@ go_test(
             "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy/ipvs:go_default_library",
             "//pkg/proxy/util/iptables:go_default_library",
             "//pkg/util/iptables:go_default_library",
@@ -300,6 +303,7 @@ go_test(
             "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy/ipvs:go_default_library",
             "//pkg/proxy/util/iptables:go_default_library",
             "//pkg/util/iptables:go_default_library",
@@ -308,6 +312,7 @@ go_test(
             "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy/ipvs:go_default_library",
             "//pkg/proxy/util/iptables:go_default_library",
             "//pkg/util/iptables:go_default_library",
@@ -316,6 +321,7 @@ go_test(
             "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:illumos": [
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy/ipvs:go_default_library",
             "//pkg/proxy/util/iptables:go_default_library",
             "//pkg/util/iptables:go_default_library",
@@ -324,6 +330,7 @@ go_test(
             "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy/ipvs:go_default_library",
             "//pkg/proxy/util/iptables:go_default_library",
             "//pkg/util/iptables:go_default_library",
@@ -332,6 +339,7 @@ go_test(
             "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:js": [
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy/ipvs:go_default_library",
             "//pkg/proxy/util/iptables:go_default_library",
             "//pkg/util/iptables:go_default_library",
@@ -340,6 +348,7 @@ go_test(
             "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy/ipvs:go_default_library",
             "//pkg/proxy/util/iptables:go_default_library",
             "//pkg/util/iptables:go_default_library",
@@ -348,6 +357,7 @@ go_test(
             "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy/ipvs:go_default_library",
             "//pkg/proxy/util/iptables:go_default_library",
             "//pkg/util/iptables:go_default_library",
@@ -356,6 +366,7 @@ go_test(
             "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:netbsd": [
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy/ipvs:go_default_library",
             "//pkg/proxy/util/iptables:go_default_library",
             "//pkg/util/iptables:go_default_library",
@@ -364,6 +375,7 @@ go_test(
             "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:openbsd": [
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy/ipvs:go_default_library",
             "//pkg/proxy/util/iptables:go_default_library",
             "//pkg/util/iptables:go_default_library",
@@ -372,6 +384,7 @@ go_test(
             "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:plan9": [
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy/ipvs:go_default_library",
             "//pkg/proxy/util/iptables:go_default_library",
             "//pkg/util/iptables:go_default_library",
@@ -380,6 +393,7 @@ go_test(
             "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:solaris": [
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy/ipvs:go_default_library",
             "//pkg/proxy/util/iptables:go_default_library",
             "//pkg/util/iptables:go_default_library",

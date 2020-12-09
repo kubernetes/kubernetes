@@ -55,6 +55,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/proxy/ipvs",
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/healthcheck:go_default_library",
