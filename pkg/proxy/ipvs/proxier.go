@@ -1089,7 +1089,7 @@ func (proxier *Proxier) syncProxyRules() {
 	writeLine(proxier.filterChains, "*filter")
 	writeLine(proxier.natChains, "*nat")
 
-	proxier.createAndLinkeKubeChain()
+	proxier.createAndLinkKubeChain()
 
 	// make sure dummy interface exists in the system where ipvs Proxier will bind service address on it
 	_, err = proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
@@ -1884,8 +1884,8 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 	}
 }
 
-// createAndLinkeKubeChain create all kube chains that ipvs proxier need and write basic link.
-func (proxier *Proxier) createAndLinkeKubeChain() {
+// createAndLinkKubeChain create all kube chains that ipvs proxier need and write basic link.
+func (proxier *Proxier) createAndLinkKubeChain() {
 	existingFilterChains := proxier.getExistingChains(proxier.filterChainsData, utiliptables.TableFilter)
 	existingNATChains := proxier.getExistingChains(proxier.iptablesData, utiliptables.TableNAT)
 
@@ -1907,13 +1907,13 @@ func (proxier *Proxier) createAndLinkeKubeChain() {
 			if chain, ok := existingNATChains[ch.chain]; ok {
 				writeBytesLine(proxier.natChains, chain)
 			} else {
-				writeLine(proxier.natChains, utiliptables.MakeChainLine(kubePostroutingChain))
+				writeLine(proxier.natChains, utiliptables.MakeChainLine(ch.chain))
 			}
 		} else {
-			if chain, ok := existingFilterChains[KubeForwardChain]; ok {
+			if chain, ok := existingFilterChains[ch.chain]; ok {
 				writeBytesLine(proxier.filterChains, chain)
 			} else {
-				writeLine(proxier.filterChains, utiliptables.MakeChainLine(KubeForwardChain))
+				writeLine(proxier.filterChains, utiliptables.MakeChainLine(ch.chain))
 			}
 		}
 	}
