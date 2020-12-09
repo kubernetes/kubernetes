@@ -124,8 +124,8 @@ func TestParseToLabelSelector(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			in: "app gt 1",
-			out: nil,
+			in:        "app gt 1",
+			out:       nil,
 			expectErr: true,
 		},
 		{
