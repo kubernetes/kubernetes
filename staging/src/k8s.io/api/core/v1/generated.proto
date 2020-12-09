@@ -3081,6 +3081,16 @@ message PodAttachOptions {
   optional string container = 5;
 }
 
+// PodCheckpointOptions is the query options to a Pod's checkpoint call
+message PodCheckpointOptions {
+  // Container or Pod that should be checkpointed
+  optional string container = 1;
+
+  // The location to write the checkpoint
+  // +optional
+  optional string destination = 2;
+}
+
 // PodCondition contains details for the current condition of this pod.
 message PodCondition {
   // Type is the type of the condition.

@@ -1,0 +1,6 @@
+{
+  "kind": "PodCheckpointOptions",
+  "apiVersion": "v1",
+  "Container": "2",
+  "Destination": "3"
+}

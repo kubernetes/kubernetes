@@ -1482,6 +1482,16 @@ func (PodAttachOptions) SwaggerDoc() map[string]string {
 	return map_PodAttachOptions
 }
 
+var map_PodCheckpointOptions = map[string]string{
+	"":            "PodCheckpointOptions is the query options to a Pod's checkpoint call",
+	"Container":   "Container or Pod that should be checkpointed",
+	"Destination": "The location to write the checkpoint",
+}
+
+func (PodCheckpointOptions) SwaggerDoc() map[string]string {
+	return map_PodCheckpointOptions
+}
+
 var map_PodCondition = map[string]string{
 	"":                   "PodCondition contains details for the current condition of this pod.",
 	"type":               "Type is the type of the condition. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions",
