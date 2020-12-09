@@ -122,8 +122,13 @@ func WithPriorityAndFairness(
 			served = true
 			innerCtx := context.WithValue(ctx, priorityAndFairnessKey, classification)
 			innerReq := r.Clone(innerCtx)
+
+			// We intentionally set the UID of the flow-schema and priority-level instead of name. This is so that
+			// the names that cluster-admins choose for categorization and priority levels are not exposed, also
+			// the names might make it obvious to the users that they are rejected due to classification with low priority.
 			w.Header().Set(flowcontrol.ResponseHeaderMatchedPriorityLevelConfigurationUID, string(classification.PriorityLevelUID))
 			w.Header().Set(flowcontrol.ResponseHeaderMatchedFlowSchemaUID, string(classification.FlowSchemaUID))
+
 			handler.ServeHTTP(w, innerReq)
 		}
 		digest := utilflowcontrol.RequestDigest{RequestInfo: requestInfo, User: user}
