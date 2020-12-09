@@ -19,7 +19,6 @@ package cloud
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -162,9 +161,8 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 				Namespace: "",
 			}
 
-			c.recorder.Eventf(ref, v1.EventTypeNormal,
-				fmt.Sprintf("Deleting node %v because it does not exist in the cloud provider", node.Name),
-				"Node %s event: %s", node.Name, deleteNodeEvent)
+			c.recorder.Eventf(ref, v1.EventTypeNormal, deleteNodeEvent,
+				"Deleting node %s because it does not exist in the cloud provider", node.Name)
 
 			if err := c.kubeClient.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{}); err != nil {
 				klog.Errorf("unable to delete node %q: %v", node.Name, err)
