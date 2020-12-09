@@ -121,6 +121,10 @@ func isUpdateWithNoNewImages(attributes admission.Attributes) bool {
 		return false
 	}
 
+	return hasNewImages(pod, oldPod)
+}
+
+func hasNewImages(pod *api.Pod, oldPod *api.Pod) bool {
 	oldImages := sets.NewString()
 	pods.VisitContainersWithPath(&oldPod.Spec, field.NewPath("spec"), func(c *api.Container, _ *field.Path) bool {
 		oldImages.Insert(c.Image)
