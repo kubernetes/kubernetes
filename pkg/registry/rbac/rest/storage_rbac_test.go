@@ -17,14 +17,25 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"testing"
+	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
+	cgtesting "k8s.io/client-go/testing"
+	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
 func BenchmarkEnsureRBACPolicy(b *testing.B) {
 	for n := 0; n < b.N; n++ {
+		completedRBACSets := &completedRBACSets{
+			clusterRoleSet:        rbacregistry.NewThreadSafeSet(),
+			clusterRoleBindingSet: rbacregistry.NewThreadSafeSet(),
+			roleSet:               rbacregistry.NewThreadSafeSet(),
+			roleBindingSet:        rbacregistry.NewThreadSafeSet(),
+		}
 		var policy = &PolicyData{
 			ClusterRoles:               append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...),
 			ClusterRoleBindings:        append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...),
@@ -34,6 +45,10 @@ func BenchmarkEnsureRBACPolicy(b *testing.B) {
 			ClusterRoleBindingsToSplit: bootstrappolicy.ClusterRoleBindingsToSplit(),
 		}
 		coreClientSet := fake.NewSimpleClientset()
-		_, _ = ensureRBACPolicy(policy, coreClientSet)
+		coreClientSet.PrependReactor("*", "*", func(cgtesting.Action) (bool, runtime.Object, error) {
+			time.Sleep(50 * time.Millisecond)
+			return false, nil, nil
+		})
+		_, _ = ensureRBACPolicy(context.Background(), policy, completedRBACSets, coreClientSet)
 	}
 }

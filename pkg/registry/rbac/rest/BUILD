@@ -13,6 +13,7 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/rbac:go_default_library",
+        "//pkg/registry/rbac:go_default_library",
         "//pkg/registry/rbac/clusterrole:go_default_library",
         "//pkg/registry/rbac/clusterrole/policybased:go_default_library",
         "//pkg/registry/rbac/clusterrole/storage:go_default_library",
@@ -67,7 +68,10 @@ go_test(
     srcs = ["storage_rbac_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/registry/rbac:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/client-go/testing:go_default_library",
     ],
 )

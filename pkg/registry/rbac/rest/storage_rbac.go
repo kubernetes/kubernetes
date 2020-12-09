@@ -19,6 +19,7 @@ package rest
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -37,13 +38,14 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	rbacv1client "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-helpers/auth/rbac/reconciliation"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
 	clusterrolepolicybased "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/policybased"
 	clusterrolestore "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/storage"
@@ -67,8 +69,9 @@ type RESTStorageProvider struct {
 }
 
 var (
-	_           genericapiserver.PostStartHookProvider = RESTStorageProvider{}
-	parallelism                                        = 16
+	_ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
+
+	parallelism = 8
 )
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
@@ -165,6 +168,13 @@ type PolicyData struct {
 	ClusterRoleBindingsToSplit map[string]rbacapiv1.ClusterRoleBinding
 }
 
+type completedRBACSets struct {
+	clusterRoleSet        *rbacregistry.ThreadSafeSet
+	clusterRoleBindingSet *rbacregistry.ThreadSafeSet
+	roleSet               *rbacregistry.ThreadSafeSet
+	roleBindingSet        *rbacregistry.ThreadSafeSet
+}
+
 func isConflictOrServiceUnavailable(err error) bool {
 	return errors.IsConflict(err) || errors.IsServiceUnavailable(err)
 }
@@ -176,186 +186,22 @@ func retryOnConflictOrServiceUnavailable(backoff wait.Backoff, fn func() error) 
 func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 	return func(hookContext genericapiserver.PostStartHookContext) error {
 		ctx := context.Background()
+		completedRBACSets := &completedRBACSets{
+			clusterRoleSet:        rbacregistry.NewThreadSafeSet(),
+			clusterRoleBindingSet: rbacregistry.NewThreadSafeSet(),
+			roleSet:               rbacregistry.NewThreadSafeSet(),
+			roleBindingSet:        rbacregistry.NewThreadSafeSet(),
+		}
 
 		// initializing roles is really important.  On some e2e runs, we've seen cases where etcd is down when the server
 		// starts, the roles don't initialize, and nothing works.
 		err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
-			failedReconciliation := false
-
-			coreclientset, err := corev1client.NewForConfig(hookContext.LoopbackClientConfig)
+			client, err := clientset.NewForConfig(hookContext.LoopbackClientConfig)
 			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("unable to initialize client: %v", err))
+				utilruntime.HandleError(fmt.Errorf("unable to initialize client set: %v", err))
 				return false, nil
 			}
-
-			clientset, err := rbacv1client.NewForConfig(hookContext.LoopbackClientConfig)
-			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("unable to initialize client: %v", err))
-				return false, nil
-			}
-			// Make sure etcd is responding before we start reconciling
-			if _, err := clientset.ClusterRoles().List(context.TODO(), metav1.ListOptions{}); err != nil {
-				utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
-				return false, nil
-			}
-			if _, err := clientset.ClusterRoleBindings().List(context.TODO(), metav1.ListOptions{}); err != nil {
-				utilruntime.HandleError(fmt.Errorf("unable to initialize clusterrolebindings: %v", err))
-				return false, nil
-			}
-
-			// if the new cluster roles to aggregate do not yet exist, then we need to copy the old roles if they don't exist
-			// in new locations
-			if err := primeAggregatedClusterRoles(p.ClusterRolesToAggregate, clientset); err != nil {
-				utilruntime.HandleError(fmt.Errorf("unable to prime aggregated clusterroles: %v", err))
-				return false, nil
-			}
-
-			if err := primeSplitClusterRoleBindings(p.ClusterRoleBindingsToSplit, clientset); err != nil {
-				utilruntime.HandleError(fmt.Errorf("unable to prime split ClusterRoleBindings: %v", err))
-				return false, nil
-			}
-
-			// ensure bootstrap roles are created or reconciled
-			processClusterRoles := func(i int) {
-				clusterRole := p.ClusterRoles[i]
-				opts := reconciliation.ReconcileRoleOptions{
-					Role:    reconciliation.ClusterRoleRuleOwner{ClusterRole: &clusterRole},
-					Client:  reconciliation.ClusterRoleModifier{Client: clientset.ClusterRoles()},
-					Confirm: true,
-				}
-				// ServiceUnavailble error is returned when the API server is blocked by storage version updates
-				err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
-					result, err := opts.Run()
-					if err != nil {
-						return err
-					}
-					switch {
-					case result.Protected && result.Operation != reconciliation.ReconcileNone:
-						klog.Warningf("skipped reconcile-protected clusterrole.%s/%s with missing permissions: %v", rbac.GroupName, clusterRole.Name, result.MissingRules)
-					case result.Operation == reconciliation.ReconcileUpdate:
-						klog.V(2).Infof("updated clusterrole.%s/%s with additional permissions: %v", rbac.GroupName, clusterRole.Name, result.MissingRules)
-					case result.Operation == reconciliation.ReconcileCreate:
-						klog.V(2).Infof("created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
-					}
-					return nil
-				})
-				if err != nil {
-					// don't fail on failures, try to create as many as you can
-					utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrole.%s/%s: %v", rbac.GroupName, clusterRole.Name, err))
-					failedReconciliation = true
-				}
-			}
-			workqueue.ParallelizeUntil(ctx, parallelism, len(p.ClusterRoles), processClusterRoles)
-
-			// ensure bootstrap rolebindings are created or reconciled
-			processClusterRoleBindings := func(i int) {
-				clusterRoleBinding := p.ClusterRoleBindings[i]
-				opts := reconciliation.ReconcileRoleBindingOptions{
-					RoleBinding: reconciliation.ClusterRoleBindingAdapter{ClusterRoleBinding: &clusterRoleBinding},
-					Client:      reconciliation.ClusterRoleBindingClientAdapter{Client: clientset.ClusterRoleBindings()},
-					Confirm:     true,
-				}
-				// ServiceUnavailble error is returned when the API server is blocked by storage version updates
-				err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
-					result, err := opts.Run()
-					if err != nil {
-						return err
-					}
-					switch {
-					case result.Protected && result.Operation != reconciliation.ReconcileNone:
-						klog.Warningf("skipped reconcile-protected clusterrolebinding.%s/%s with missing subjects: %v", rbac.GroupName, clusterRoleBinding.Name, result.MissingSubjects)
-					case result.Operation == reconciliation.ReconcileUpdate:
-						klog.V(2).Infof("updated clusterrolebinding.%s/%s with additional subjects: %v", rbac.GroupName, clusterRoleBinding.Name, result.MissingSubjects)
-					case result.Operation == reconciliation.ReconcileCreate:
-						klog.V(2).Infof("created clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
-					case result.Operation == reconciliation.ReconcileRecreate:
-						klog.V(2).Infof("recreated clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
-					}
-					return nil
-				})
-				if err != nil {
-					// don't fail on failures, try to create as many as you can
-					utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrolebinding.%s/%s: %v", rbac.GroupName, clusterRoleBinding.Name, err))
-					failedReconciliation = true
-				}
-			}
-			workqueue.ParallelizeUntil(ctx, parallelism, len(p.ClusterRoleBindings), processClusterRoleBindings)
-
-			// ensure bootstrap namespaced roles are created or reconciled
-			for namespace, roles := range p.Roles {
-				processRoles := func(i int) {
-					role := roles[i]
-					opts := reconciliation.ReconcileRoleOptions{
-						Role:    reconciliation.RoleRuleOwner{Role: &role},
-						Client:  reconciliation.RoleModifier{Client: clientset, NamespaceClient: coreclientset.Namespaces()},
-						Confirm: true,
-					}
-					// ServiceUnavailble error is returned when the API server is blocked by storage version updates
-					err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
-						result, err := opts.Run()
-						if err != nil {
-							return err
-						}
-						switch {
-						case result.Protected && result.Operation != reconciliation.ReconcileNone:
-							klog.Warningf("skipped reconcile-protected role.%s/%s in %v with missing permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
-						case result.Operation == reconciliation.ReconcileUpdate:
-							klog.V(2).Infof("updated role.%s/%s in %v with additional permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
-						case result.Operation == reconciliation.ReconcileCreate:
-							klog.V(2).Infof("created role.%s/%s in %v", rbac.GroupName, role.Name, namespace)
-						}
-						return nil
-					})
-					if err != nil {
-						// don't fail on failures, try to create as many as you can
-						utilruntime.HandleError(fmt.Errorf("unable to reconcile role.%s/%s in %v: %v", rbac.GroupName, role.Name, namespace, err))
-						failedReconciliation = true
-					}
-				}
-				workqueue.ParallelizeUntil(ctx, parallelism, len(roles), processRoles)
-			}
-
-			// ensure bootstrap namespaced rolebindings are created or reconciled
-			for namespace, roleBindings := range p.RoleBindings {
-				processRoleBindings := func(i int) {
-					roleBinding := roleBindings[i]
-					opts := reconciliation.ReconcileRoleBindingOptions{
-						RoleBinding: reconciliation.RoleBindingAdapter{RoleBinding: &roleBinding},
-						Client:      reconciliation.RoleBindingClientAdapter{Client: clientset, NamespaceClient: coreclientset.Namespaces()},
-						Confirm:     true,
-					}
-					// ServiceUnavailble error is returned when the API server is blocked by storage version updates
-					err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
-						result, err := opts.Run()
-						if err != nil {
-							return err
-						}
-						switch {
-						case result.Protected && result.Operation != reconciliation.ReconcileNone:
-							klog.Warningf("skipped reconcile-protected rolebinding.%s/%s in %v with missing subjects: %v", rbac.GroupName, roleBinding.Name, namespace, result.MissingSubjects)
-						case result.Operation == reconciliation.ReconcileUpdate:
-							klog.V(2).Infof("updated rolebinding.%s/%s in %v with additional subjects: %v", rbac.GroupName, roleBinding.Name, namespace, result.MissingSubjects)
-						case result.Operation == reconciliation.ReconcileCreate:
-							klog.V(2).Infof("created rolebinding.%s/%s in %v", rbac.GroupName, roleBinding.Name, namespace)
-						case result.Operation == reconciliation.ReconcileRecreate:
-							klog.V(2).Infof("recreated rolebinding.%s/%s in %v", rbac.GroupName, roleBinding.Name, namespace)
-						}
-						return nil
-					})
-					if err != nil {
-						// don't fail on failures, try to create as many as you can
-						utilruntime.HandleError(fmt.Errorf("unable to reconcile rolebinding.%s/%s in %v: %v", rbac.GroupName, roleBinding.Name, namespace, err))
-						failedReconciliation = true
-					}
-				}
-				workqueue.ParallelizeUntil(ctx, parallelism, len(roleBindings), processRoleBindings)
-			}
-			// failed to reconcile some objects, retry
-			if failedReconciliation {
-				return false, nil
-			}
-
-			return true, nil
+			return ensureRBACPolicy(ctx, p, completedRBACSets, client)
 		})
 		// if we're never able to make it through initialization, kill the API server
 		if err != nil {
@@ -364,6 +210,196 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 
 		return nil
 	}
+}
+
+func ensureRBACPolicy(ctx context.Context, p *PolicyData, completedRBACSets *completedRBACSets, client clientset.Interface) (done bool, err error) {
+	var failedReconciliation int32
+
+	// Make sure etcd is responding before we start reconciling
+	if _, err := client.RbacV1().ClusterRoles().List(ctx, metav1.ListOptions{}); err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
+		return false, nil
+	}
+	if _, err := client.RbacV1().ClusterRoleBindings().List(ctx, metav1.ListOptions{}); err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterrolebindings: %v", err))
+		return false, nil
+	}
+
+	// if the new cluster roles to aggregate do not yet exist, then we need to copy the old roles if they don't exist
+	// in new locations
+	if err := primeAggregatedClusterRoles(p.ClusterRolesToAggregate, client.RbacV1()); err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to prime aggregated clusterroles: %v", err))
+		return false, nil
+	}
+
+	if err := primeSplitClusterRoleBindings(p.ClusterRoleBindingsToSplit, client.RbacV1()); err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to prime split ClusterRoleBindings: %v", err))
+		return false, nil
+	}
+
+	// ensure bootstrap roles are created or reconciled
+	processClusterRoles := func(i int) {
+		clusterRole := p.ClusterRoles[i]
+		if completedRBACSets.clusterRoleSet.Has(clusterRole.Name) {
+			return
+		}
+		opts := reconciliation.ReconcileRoleOptions{
+			Role:    reconciliation.ClusterRoleRuleOwner{ClusterRole: &clusterRole},
+			Client:  reconciliation.ClusterRoleModifier{Client: client.RbacV1().ClusterRoles()},
+			Confirm: true,
+		}
+		// ServiceUnavailable error is returned when the API server is blocked by storage version updates
+		err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
+			result, err := opts.Run()
+			if err != nil {
+				return err
+			}
+			switch {
+			case result.Protected && result.Operation != reconciliation.ReconcileNone:
+				klog.Warningf("skipped reconcile-protected clusterrole.%s/%s with missing permissions: %v", rbac.GroupName, clusterRole.Name, result.MissingRules)
+			case result.Operation == reconciliation.ReconcileUpdate:
+				klog.V(2).Infof("updated clusterrole.%s/%s with additional permissions: %v", rbac.GroupName, clusterRole.Name, result.MissingRules)
+			case result.Operation == reconciliation.ReconcileCreate:
+				klog.V(2).Infof("created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
+			}
+			return nil
+		})
+		if err != nil {
+			// don't fail on failures, try to create as many as you can
+			utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrole.%s/%s: %v", rbac.GroupName, clusterRole.Name, err))
+			atomic.StoreInt32(&failedReconciliation, 1)
+		} else {
+			completedRBACSets.clusterRoleSet.Insert(clusterRole.Name)
+		}
+	}
+	workqueue.ParallelizeUntil(ctx, parallelism, len(p.ClusterRoles), processClusterRoles)
+
+	// ensure bootstrap rolebindings are created or reconciled
+	processClusterRoleBindings := func(i int) {
+		clusterRoleBinding := p.ClusterRoleBindings[i]
+		if completedRBACSets.clusterRoleBindingSet.Has(clusterRoleBinding.Name) {
+			return
+		}
+		opts := reconciliation.ReconcileRoleBindingOptions{
+			RoleBinding: reconciliation.ClusterRoleBindingAdapter{ClusterRoleBinding: &clusterRoleBinding},
+			Client:      reconciliation.ClusterRoleBindingClientAdapter{Client: client.RbacV1().ClusterRoleBindings()},
+			Confirm:     true,
+		}
+		// ServiceUnavailable error is returned when the API server is blocked by storage version updates
+		err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
+			result, err := opts.Run()
+			if err != nil {
+				return err
+			}
+			switch {
+			case result.Protected && result.Operation != reconciliation.ReconcileNone:
+				klog.Warningf("skipped reconcile-protected clusterrolebinding.%s/%s with missing subjects: %v", rbac.GroupName, clusterRoleBinding.Name, result.MissingSubjects)
+			case result.Operation == reconciliation.ReconcileUpdate:
+				klog.V(2).Infof("updated clusterrolebinding.%s/%s with additional subjects: %v", rbac.GroupName, clusterRoleBinding.Name, result.MissingSubjects)
+			case result.Operation == reconciliation.ReconcileCreate:
+				klog.V(2).Infof("created clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
+			case result.Operation == reconciliation.ReconcileRecreate:
+				klog.V(2).Infof("recreated clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
+			}
+			return nil
+		})
+		if err != nil {
+			// don't fail on failures, try to create as many as you can
+			utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrolebinding.%s/%s: %v", rbac.GroupName, clusterRoleBinding.Name, err))
+			atomic.StoreInt32(&failedReconciliation, 1)
+		} else {
+			completedRBACSets.clusterRoleBindingSet.Insert(clusterRoleBinding.Name)
+		}
+	}
+	workqueue.ParallelizeUntil(ctx, parallelism, len(p.ClusterRoleBindings), processClusterRoleBindings)
+
+	// ensure bootstrap namespaced roles are created or reconciled
+	for namespace, roles := range p.Roles {
+		processRoles := func(i int) {
+			role := roles[i]
+			completedKey := role.Namespace + ":" + role.Name
+			if completedRBACSets.roleSet.Has(completedKey) {
+				return
+			}
+			opts := reconciliation.ReconcileRoleOptions{
+				Role:    reconciliation.RoleRuleOwner{Role: &role},
+				Client:  reconciliation.RoleModifier{Client: client.RbacV1(), NamespaceClient: client.CoreV1().Namespaces()},
+				Confirm: true,
+			}
+			// ServiceUnavailable error is returned when the API server is blocked by storage version updates
+			err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
+				result, err := opts.Run()
+				if err != nil {
+					return err
+				}
+				switch {
+				case result.Protected && result.Operation != reconciliation.ReconcileNone:
+					klog.Warningf("skipped reconcile-protected role.%s/%s in %v with missing permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
+				case result.Operation == reconciliation.ReconcileUpdate:
+					klog.V(2).Infof("updated role.%s/%s in %v with additional permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
+				case result.Operation == reconciliation.ReconcileCreate:
+					klog.V(2).Infof("created role.%s/%s in %v", rbac.GroupName, role.Name, namespace)
+				}
+				return nil
+			})
+			if err != nil {
+				// don't fail on failures, try to create as many as you can
+				utilruntime.HandleError(fmt.Errorf("unable to reconcile role.%s/%s in %v: %v", rbac.GroupName, role.Name, namespace, err))
+				atomic.StoreInt32(&failedReconciliation, 1)
+			} else {
+				completedRBACSets.roleSet.Insert(completedKey)
+			}
+		}
+		workqueue.ParallelizeUntil(ctx, parallelism, len(roles), processRoles)
+	}
+
+	// ensure bootstrap namespaced rolebindings are created or reconciled
+	for namespace, roleBindings := range p.RoleBindings {
+		processRoleBindings := func(i int) {
+			roleBinding := roleBindings[i]
+			completedKey := roleBinding.Namespace + ":" + roleBinding.Name
+			if completedRBACSets.roleBindingSet.Has(completedKey) {
+				return
+			}
+			opts := reconciliation.ReconcileRoleBindingOptions{
+				RoleBinding: reconciliation.RoleBindingAdapter{RoleBinding: &roleBinding},
+				Client:      reconciliation.RoleBindingClientAdapter{Client: client.RbacV1(), NamespaceClient: client.CoreV1().Namespaces()},
+				Confirm:     true,
+			}
+			// ServiceUnavailable error is returned when the API server is blocked by storage version updates
+			err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
+				result, err := opts.Run()
+				if err != nil {
+					return err
+				}
+				switch {
+				case result.Protected && result.Operation != reconciliation.ReconcileNone:
+					klog.Warningf("skipped reconcile-protected rolebinding.%s/%s in %v with missing subjects: %v", rbac.GroupName, roleBinding.Name, namespace, result.MissingSubjects)
+				case result.Operation == reconciliation.ReconcileUpdate:
+					klog.V(2).Infof("updated rolebinding.%s/%s in %v with additional subjects: %v", rbac.GroupName, roleBinding.Name, namespace, result.MissingSubjects)
+				case result.Operation == reconciliation.ReconcileCreate:
+					klog.V(2).Infof("created rolebinding.%s/%s in %v", rbac.GroupName, roleBinding.Name, namespace)
+				case result.Operation == reconciliation.ReconcileRecreate:
+					klog.V(2).Infof("recreated rolebinding.%s/%s in %v", rbac.GroupName, roleBinding.Name, namespace)
+				}
+				return nil
+			})
+			if err != nil {
+				// don't fail on failures, try to create as many as you can
+				utilruntime.HandleError(fmt.Errorf("unable to reconcile rolebinding.%s/%s in %v: %v", rbac.GroupName, roleBinding.Name, namespace, err))
+				atomic.StoreInt32(&failedReconciliation, 1)
+			} else {
+				completedRBACSets.roleBindingSet.Insert(completedKey)
+			}
+		}
+		workqueue.ParallelizeUntil(ctx, parallelism, len(roleBindings), processRoleBindings)
+	}
+	// failed to reconcile some objects, retry
+	if atomic.LoadInt32(&failedReconciliation) == 1 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (p RESTStorageProvider) GroupName() string {

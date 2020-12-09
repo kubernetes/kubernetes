@@ -18,6 +18,7 @@ package rbac
 
 import (
 	"reflect"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -47,4 +48,28 @@ func IsOnlyMutatingGCFields(obj, old runtime.Object, equalities conversion.Equal
 	copiedMeta.SetManagedFields(oldMeta.GetManagedFields())
 
 	return equalities.DeepEqual(copied, old)
+}
+
+type ThreadSafeSet struct {
+	m map[string]bool
+	sync.RWMutex
+}
+
+func NewThreadSafeSet() *ThreadSafeSet {
+	return &ThreadSafeSet{
+		m: map[string]bool{},
+	}
+}
+
+func (s *ThreadSafeSet) Insert(item string) {
+	s.Lock()
+	defer s.Unlock()
+	s.m[item] = true
+}
+
+func (s *ThreadSafeSet) Has(item string) bool {
+	s.RLock()
+	defer s.RUnlock()
+	_, ok := s.m[item]
+	return ok
 }
