@@ -112,6 +112,8 @@ const (
 	PodDeleteStatusTypeWarning = "Warning"
 	// PodDeleteStatusTypeError is "Error"
 	PodDeleteStatusTypeError = "Error"
+	// PodDeleteStatusTypeCheckpoint is "Checkpoint"
+	PodDeleteStatusTypeCheckpoint = "Checkpoint"
 )
 
 // MakePodDeleteStatusOkay is a helper method to return the corresponding PodDeleteStatus
@@ -145,6 +147,14 @@ func MakePodDeleteStatusWithError(message string) PodDeleteStatus {
 		Delete:  false,
 		Reason:  PodDeleteStatusTypeError,
 		Message: message,
+	}
+}
+
+// MakePodDeleteStatusCheckpoint is a helper method to return the corresponding PodDeleteStatus
+func MakePodDeleteStatusCheckpoint() PodDeleteStatus {
+	return PodDeleteStatus{
+		Delete: true,
+		Reason: PodDeleteStatusTypeCheckpoint,
 	}
 }
 
@@ -237,6 +247,9 @@ func (d *Helper) unreplicatedFilter(pod corev1.Pod) PodDeleteStatus {
 	controllerRef := metav1.GetControllerOf(&pod)
 	if controllerRef != nil {
 		return MakePodDeleteStatusOkay()
+	}
+	if d.Checkpoint {
+		return MakePodDeleteStatusCheckpoint()
 	}
 	if d.Force {
 		return MakePodDeleteStatusWithWarning(true, unmanagedWarning)

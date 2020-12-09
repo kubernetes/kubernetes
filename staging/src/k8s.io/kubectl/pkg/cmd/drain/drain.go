@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -162,6 +163,9 @@ func (o *DrainCmdOptions) onPodDeletedOrEvicted(pod *corev1.Pod, usingEviction b
 	} else {
 		verbStr = "deleted"
 	}
+	if o.drainer.Checkpoint && pod.Namespace != metav1.NamespaceSystem {
+		verbStr += " (checkpointed)"
+	}
 	printObj, err := o.ToPrinter(verbStr)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "error building printer: %v\n", err)
@@ -197,6 +201,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVarP(&o.drainer.PodSelector, "pod-selector", "", o.drainer.PodSelector, "Label selector to filter pods on the node")
 	cmd.Flags().BoolVar(&o.drainer.DisableEviction, "disable-eviction", o.drainer.DisableEviction, "Force drain to use delete, even if eviction is supported. This will bypass checking PodDisruptionBudgets, use with caution.")
 	cmd.Flags().IntVar(&o.drainer.SkipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", o.drainer.SkipWaitForDeleteTimeoutSeconds, "If pod DeletionTimestamp older than N seconds, skip waiting for the pod.  Seconds must be greater than 0 to skip.")
+	cmd.Flags().BoolVar(&o.drainer.Checkpoint, "checkpoint", o.drainer.Checkpoint, "Checkpoint pods locally instead of evicting or deleting pods.")
 
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd

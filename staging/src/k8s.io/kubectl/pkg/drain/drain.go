@@ -84,6 +84,9 @@ type Helper struct {
 
 	// OnPodDeletedOrEvicted is called when a pod is evicted/deleted; for printing progress output
 	OnPodDeletedOrEvicted func(pod *corev1.Pod, usingEviction bool)
+
+	// If Checkpoint is true Pods will be checkpointed on drain
+	Checkpoint bool
 }
 
 type waitForDeleteParams struct {
@@ -240,6 +243,10 @@ func (d *Helper) DeleteOrEvictPods(pods []corev1.Pod) error {
 		return d.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	}
 
+	if d.Checkpoint {
+		return d.checkpointPods(pods, getPodFn)
+	}
+
 	if !d.DisableEviction {
 		policyGroupVersion, err := CheckEvictionSupport(d.Client)
 		if err != nil {
@@ -252,6 +259,26 @@ func (d *Helper) DeleteOrEvictPods(pods []corev1.Pod) error {
 	}
 
 	return d.deletePods(pods, getPodFn)
+}
+
+func (d *Helper) checkpointPods(pods []corev1.Pod, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
+	for _, pod := range pods {
+		checkpoint := &policyv1beta1.Checkpoint{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			},
+		}
+
+		if pod.Namespace == metav1.NamespaceSystem {
+			continue
+		}
+		fmt.Fprintf(d.Out, "About to checkpoint %+v in %+v\n", pod.Name, pod.Namespace)
+		if err := d.Client.PolicyV1beta1().Checkpoints(checkpoint.Namespace).Checkpoint(context.TODO(), checkpoint); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
