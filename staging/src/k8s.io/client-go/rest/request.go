@@ -900,7 +900,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 			// Thus in case of "GET" operations, we simply retry it.
 			// We are not automatically retrying "write" operations, as
 			// they are not idempotent.
-			if r.verb != "GET" {
+			if !isRetriable(r, resp) {
 				return err
 			}
 			// For connection errors and apiserver shutdown errors retry.
@@ -950,6 +950,19 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 		if done {
 			return nil
 		}
+	}
+}
+
+func isRetriable(req *Request, resp *http.Response) bool {
+	switch {
+	case resp != nil && resp.StatusCode == http.StatusTooManyRequests:
+		return true
+	case req.verb == "GET":
+		// We are not automatically retrying "write" operations, as
+		// they are not idempotent.
+		return true
+	default:
+		return false
 	}
 }
 
