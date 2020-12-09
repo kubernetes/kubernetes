@@ -10,6 +10,7 @@ go_library(
     srcs = [
         "doc.go",
         "fake_checkpoint.go",
+        "fake_checkpoint_expansion.go",
         "fake_eviction.go",
         "fake_eviction_expansion.go",
         "fake_poddisruptionbudget.go",

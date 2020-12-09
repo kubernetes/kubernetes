@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "checkpoint.go",
+        "checkpoint_expansion.go",
         "doc.go",
         "eviction.go",
         "eviction_expansion.go",
