@@ -257,18 +257,6 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 		e2eskipper.Skipf("Driver %q does not support volume type %q - skipping", d.DriverInfo.Name, pattern.VolType)
 	}
 
-	supported = false
-	switch pattern.SnapshotType {
-	case "":
-		supported = true
-	case testpatterns.DynamicCreatedSnapshot, testpatterns.PreprovisionedCreatedSnapshot:
-		if d.SnapshotClass.FromName || d.SnapshotClass.FromFile != "" || d.SnapshotClass.FromExistingClassName != "" {
-			supported = true
-		}
-	}
-	if !supported {
-		e2eskipper.Skipf("Driver %q does not support snapshot type %q - skipping", d.DriverInfo.Name, pattern.SnapshotType)
-	}
 }
 
 func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
