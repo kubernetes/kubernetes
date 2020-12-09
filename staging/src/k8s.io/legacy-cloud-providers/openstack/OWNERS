@@ -1,6 +1,8 @@
 # See the OWNERS docs at https://go.k8s.io/owners
+# We are no longer accepting features into k8s.io/legacy-cloud-providers.
+# Any kind/feature PRs must be approved by SIG Cloud Provider going forward.
 
-approvers:
+emeritus_approvers:
 - anguslees
 - NickrenREN
 - dims
