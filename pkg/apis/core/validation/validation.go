@@ -4152,6 +4152,13 @@ var supportedServiceType = sets.NewString(string(core.ServiceTypeClusterIP), str
 var supportedServiceIPFamily = sets.NewString(string(core.IPv4Protocol), string(core.IPv6Protocol))
 var supportedServiceIPFamilyPolicy = sets.NewString(string(core.IPFamilyPolicySingleStack), string(core.IPFamilyPolicyPreferDualStack), string(core.IPFamilyPolicyRequireDualStack))
 
+type ServiceProtocolPair struct {
+	serviceName string
+	protocol    core.Protocol
+}
+
+type ServiceProtocolPairSet map[ServiceProtocolPair]struct{}
+
 // ValidateService tests if required fields/annotations of a Service are valid.
 func ValidateService(service *core.Service) field.ErrorList {
 	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName, field.NewPath("metadata"))
@@ -4203,11 +4210,11 @@ func ValidateService(service *core.Service) field.ErrorList {
 		}
 	}
 
-	allPortNames := sets.String{}
+	allServiceProtocolPairs := ServiceProtocolPairSet{}
 	portsPath := specPath.Child("ports")
 	for i := range service.Spec.Ports {
 		portPath := portsPath.Index(i)
-		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, isHeadlessService(service), &allPortNames, portPath)...)
+		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, isHeadlessService(service), allServiceProtocolPairs, portPath)...)
 	}
 
 	if service.Spec.Selector != nil {
@@ -4356,28 +4363,30 @@ func ValidateService(service *core.Service) field.ErrorList {
 	return allErrs
 }
 
-func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bool, allNames *sets.String, fldPath *field.Path) field.ErrorList {
+func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bool, allServiceProtocolPairs ServiceProtocolPairSet, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-
-	if requireName && len(sp.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
-	} else if len(sp.Name) != 0 {
-		allErrs = append(allErrs, ValidateDNS1123Label(sp.Name, fldPath.Child("name"))...)
-		if allNames.Has(sp.Name) {
-			allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), sp.Name))
-		} else {
-			allNames.Insert(sp.Name)
-		}
-	}
-
-	for _, msg := range validation.IsValidPortNum(int(sp.Port)) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), sp.Port, msg))
-	}
 
 	if len(sp.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
 	} else if !supportedPortProtocols.Has(string(sp.Protocol)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, supportedPortProtocols.List()))
+	}
+
+	if requireName && len(sp.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	} else if len(sp.Name) != 0 {
+		allErrs = append(allErrs, ValidateDNS1123Label(sp.Name, fldPath.Child("name"))...)
+		pair := ServiceProtocolPair{sp.Name, sp.Protocol}
+		_, seen := allServiceProtocolPairs[pair]
+		if seen {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), sp.Name))
+		} else {
+			allServiceProtocolPairs[pair] = struct{}{}
+		}
+	}
+
+	for _, msg := range validation.IsValidPortNum(int(sp.Port)) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), sp.Port, msg))
 	}
 
 	allErrs = append(allErrs, ValidatePortNumOrName(sp.TargetPort, fldPath.Child("targetPort"))...)
