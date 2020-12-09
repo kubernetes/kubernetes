@@ -55,6 +55,8 @@ func (expBackoff *ExponentialBackoff) SafeToRetry(operationName string) error {
 	return nil
 }
 
+// Update sets a new occurrence of an error and calculates the duration that
+// retries are not permitted.
 func (expBackoff *ExponentialBackoff) Update(err *error) {
 	if expBackoff.durationBeforeRetry == 0 {
 		expBackoff.durationBeforeRetry = initialDurationBeforeRetry
@@ -69,6 +71,8 @@ func (expBackoff *ExponentialBackoff) Update(err *error) {
 	expBackoff.lastErrorTime = time.Now()
 }
 
+// GenerateNoRetriesPermittedMsg returns a string that can be used as a message
+// if retries are not permitted.
 func (expBackoff *ExponentialBackoff) GenerateNoRetriesPermittedMsg(operationName string) string {
 	return fmt.Sprintf("Operation for %q failed. No retries permitted until %v (durationBeforeRetry %v). Error: %q",
 		operationName,
