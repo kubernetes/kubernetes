@@ -622,6 +622,7 @@ function write-pki-data {
   if [[ -n "${KUBE_PKI_READERS_GROUP:-}" ]]; then
     (umask 027; echo "${data}" | base64 --decode > "${path}")
     chgrp "${KUBE_PKI_READERS_GROUP:-}" "${path}"
+    chmod g+r "${path}"
   else
     (umask 077; echo "${data}" | base64 --decode > "${path}")
   fi
