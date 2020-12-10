@@ -67,7 +67,6 @@ func GetStorageClass(
 	parameters map[string]string,
 	bindingMode *storagev1.VolumeBindingMode,
 	ns string,
-	suffix string,
 ) *storagev1.StorageClass {
 	if bindingMode == nil {
 		defaultBindingMode := storagev1.VolumeBindingImmediate
@@ -79,8 +78,7 @@ func GetStorageClass(
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			// Name must be unique, so let's base it on namespace name and use GenerateName
-			// TODO(#96234): Remove unnecessary suffix.
-			Name: names.SimpleNameGenerator.GenerateName(ns + "-" + suffix),
+			Name: names.SimpleNameGenerator.GenerateName(ns),
 		},
 		Provisioner:       provisioner,
 		Parameters:        parameters,

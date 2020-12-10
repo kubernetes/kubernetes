@@ -154,9 +154,8 @@ func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(config *storageframe
 	provisioner := config.GetUniqueDriverName()
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-sc", provisioner)
 
-	return storageframework.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
 }
 
 func (h *hostpathCSIDriver) GetVolume(config *storageframework.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
@@ -346,9 +345,8 @@ func (m *mockCSIDriver) GetDynamicProvisionStorageClass(config *storageframework
 	provisioner := config.GetUniqueDriverName()
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-sc", provisioner)
 
-	return storageframework.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
 }
 
 func (m *mockCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig) *unstructured.Unstructured {
@@ -555,7 +553,6 @@ func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPatter
 func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	ns := config.Framework.Namespace.Name
 	provisioner := g.driverInfo.Name
-	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
 
 	parameters := map[string]string{"type": "pd-standard"}
 	if fsType != "" {
@@ -563,7 +560,7 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *storageframewor
 	}
 	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
-	return storageframework.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
+	return storageframework.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
 
 func (g *gcePDCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig) *unstructured.Unstructured {
