@@ -2192,7 +2192,7 @@ var _ = SIGDescribe("NetworkPolicy API", func() {
 		- The NetworkPolicies resource must support create, get, list, watch, update, patch, delete, and deletecollection.
 	*/
 
-	ginkgo.It("should support creating NetworkPolicy API operations", func() {
+	framework.ConformanceIt("should support creating NetworkPolicy API operations", func() {
 		// Setup
 		ns := f.Namespace.Name
 		npVersion := "v1"

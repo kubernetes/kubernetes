@@ -1642,6 +1642,16 @@
     watch, update, patch, delete, and deletecollection.'
   release: v1.19
   file: test/e2e/network/ingressclass.go
+- testname: NetworkPolicies API
+  codename: '[sig-network] NetworkPolicy API should support creating NetworkPolicy
+    API operations [Conformance]'
+  description: ' - The networking.k8s.io API group MUST exist in the /apis discovery
+    document. - The networking.k8s.io/v1 API group/version MUST exist in the /apis/networking.k8s.io
+    discovery document. - The NetworkPolicies resources MUST exist in the /apis/networking.k8s.io/v1
+    discovery document. - The NetworkPolicies resource must support create, get, list,
+    watch, update, patch, delete, and deletecollection.'
+  release: v1.20
+  file: test/e2e/network/network_policy.go
 - testname: Networking, intra pod http
   codename: '[sig-network] Networking Granular Checks: Pods should function for intra-pod
     communication: http [NodeConformance] [Conformance]'
