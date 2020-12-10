@@ -316,8 +316,15 @@ func (req *request) Finish(execFn func()) bool {
 	if !exec {
 		return idle
 	}
-	execFn()
-	return req.qs.finishRequestAndDispatchAsMuchAsPossible(req)
+	func() {
+		defer func() {
+			idle = req.qs.finishRequestAndDispatchAsMuchAsPossible(req)
+		}()
+
+		execFn()
+	}()
+
+	return idle
 }
 
 func (req *request) wait() (bool, bool) {
