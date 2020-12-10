@@ -42,6 +42,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
@@ -49,7 +50,12 @@ import (
 	"k8s.io/utils/integer"
 )
 
-const statusUpdateRetries = 3
+var statusUpdateBackoff = wait.Backoff{
+	Steps:    3,
+	Duration: 10 * time.Millisecond,
+	Factor:   5.0,
+	Jitter:   0.1,
+}
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = batch.SchemeGroupVersion.WithKind("Job")
@@ -829,18 +835,22 @@ func (jm *Controller) manageJob(activePods []*v1.Pod, succeeded int32, job *batc
 func (jm *Controller) updateJobStatus(job *batch.Job) error {
 	jobClient := jm.kubeClient.BatchV1().Jobs(job.Namespace)
 	var err error
-	for i := 0; i <= statusUpdateRetries; i = i + 1 {
+
+	err = retry.OnError(statusUpdateBackoff, func(updateError error) bool {
+		if updateError != nil {
+			return true
+		}
+		return false
+	}, func() error {
 		var newJob *batch.Job
 		newJob, err = jobClient.Get(context.TODO(), job.Name, metav1.GetOptions{})
 		if err != nil {
-			break
+			return err
 		}
 		newJob.Status = job.Status
-		if _, err = jobClient.UpdateStatus(context.TODO(), newJob, metav1.UpdateOptions{}); err == nil {
-			break
-		}
-	}
-
+		_, err = jobClient.UpdateStatus(context.TODO(), newJob, metav1.UpdateOptions{})
+		return err
+	})
 	return err
 }
 
