@@ -112,6 +112,13 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 		return err
 	}
 
+	klog.V(4).Infof("This should produce analysis failure: %v", specs)
+	for _, spec := range specs {
+		klog.V(4).Infof("This should produce analysis failure: %v", spec.TokenAuth)
+		klog.V(4).Infof("This should produce analysis failure: %v", spec.ClientCertAuth)
+		klog.V(4).Infof("This should NOT produce analysis failure: %v", spec.CACert)
+	}
+
 	for _, kubeConfigFileName := range kubeConfigFileNames {
 		// retrieves the KubeConfigSpec for given kubeConfigFileName
 		spec, exists := specs[kubeConfigFileName]
