@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -52,41 +50,8 @@ const (
 	minFeasibleNodesPercentageToFind = 5
 )
 
-// FitError describes a fit error of a pod.
-type FitError struct {
-	Pod                   *v1.Pod
-	NumAllNodes           int
-	FilteredNodesStatuses framework.NodeToStatusMap
-}
-
 // ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
 var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
-
-const (
-	// NoNodeAvailableMsg is used to format message when no nodes available.
-	NoNodeAvailableMsg = "0/%v nodes are available"
-)
-
-// Error returns detailed information of why the pod failed to fit on each node
-func (f *FitError) Error() string {
-	reasons := make(map[string]int)
-	for _, status := range f.FilteredNodesStatuses {
-		for _, reason := range status.Reasons() {
-			reasons[reason]++
-		}
-	}
-
-	sortReasonsHistogram := func() []string {
-		var reasonStrings []string
-		for k, v := range reasons {
-			reasonStrings = append(reasonStrings, fmt.Sprintf("%v %v", v, k))
-		}
-		sort.Strings(reasonStrings)
-		return reasonStrings
-	}
-	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
-	return reasonMsg
-}
 
 // ScheduleAlgorithm is an interface implemented by things that know how to schedule pods
 // onto machines.
@@ -147,7 +112,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, fwk framework.Framework
 	trace.Step("Computing predicates done")
 
 	if len(feasibleNodes) == 0 {
-		return result, &FitError{
+		return result, &framework.FitError{
 			Pod:                   pod,
 			NumAllNodes:           g.nodeInfoSnapshot.NumNodes(),
 			FilteredNodesStatuses: filteredNodesStatuses,

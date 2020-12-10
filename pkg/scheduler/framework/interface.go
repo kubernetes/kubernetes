@@ -63,7 +63,7 @@ const (
 	// scheduler skip preemption.
 	// The accompanying status message should explain why the pod is unschedulable.
 	Unschedulable
-	// UnschedulableAndUnresolvable is used when a PreFilter plugin finds a pod unschedulable and
+	// UnschedulableAndUnresolvable is used when a plugin finds a pod unschedulable and
 	// preemption would not change anything. Plugins should return Unschedulable if it is possible
 	// that the pod can get scheduled with preemption.
 	// The accompanying status message should explain why the pod is unschedulable.

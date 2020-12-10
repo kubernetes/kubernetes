@@ -19,6 +19,8 @@ package framework
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -87,6 +89,39 @@ type AffinityTerm struct {
 type WeightedAffinityTerm struct {
 	AffinityTerm
 	Weight int32
+}
+
+// FitError describes a fit error of a pod.
+type FitError struct {
+	Pod                   *v1.Pod
+	NumAllNodes           int
+	FilteredNodesStatuses NodeToStatusMap
+}
+
+const (
+	// NoNodeAvailableMsg is used to format message when no nodes available.
+	NoNodeAvailableMsg = "0/%v nodes are available"
+)
+
+// Error returns detailed information of why the pod failed to fit on each node
+func (f *FitError) Error() string {
+	reasons := make(map[string]int)
+	for _, status := range f.FilteredNodesStatuses {
+		for _, reason := range status.Reasons() {
+			reasons[reason]++
+		}
+	}
+
+	sortReasonsHistogram := func() []string {
+		var reasonStrings []string
+		for k, v := range reasons {
+			reasonStrings = append(reasonStrings, fmt.Sprintf("%v %v", v, k))
+		}
+		sort.Strings(reasonStrings)
+		return reasonStrings
+	}
+	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
+	return reasonMsg
 }
 
 func newAffinityTerm(pod *v1.Pod, term *v1.PodAffinityTerm) (*AffinityTerm, error) {

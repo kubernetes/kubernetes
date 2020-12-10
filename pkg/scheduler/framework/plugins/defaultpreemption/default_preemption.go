@@ -22,6 +22,7 @@ import (
 	"math"
 	"math/rand"
 	"sort"
+	"sync"
 	"sync/atomic"
 
 	"k8s.io/klog/v2"
@@ -93,8 +94,12 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.Cy
 
 	nnn, err := pl.preempt(ctx, state, pod, m)
 	if err != nil {
+		if _, ok := err.(*framework.FitError); ok {
+			return nil, framework.NewStatus(framework.Unschedulable, err.Error())
+		}
 		return nil, framework.AsStatus(err)
 	}
+	// This happens when the pod is not eligible for preemption or extenders filtered all candidates.
 	if nnn == "" {
 		return nil, framework.NewStatus(framework.Unschedulable)
 	}
@@ -214,8 +219,16 @@ func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framewor
 		}
 		klog.Infof("from a pool of %d nodes (offset: %d, sample %d nodes: %v), ~%d candidates will be chosen", len(potentialNodes), offset, len(sample), sample, numCandidates)
 	}
-
-	return dryRunPreemption(ctx, pl.fh, state, pod, potentialNodes, pdbs, offset, numCandidates), nil
+	candidates, nodeStatuses := dryRunPreemption(ctx, pl.fh, state, pod, potentialNodes, pdbs, offset, numCandidates)
+	// Return a FitError only when there are no candidates that fit the pod.
+	if len(candidates) == 0 {
+		return candidates, &framework.FitError{
+			Pod:                   pod,
+			NumAllNodes:           len(potentialNodes),
+			FilteredNodesStatuses: nodeStatuses,
+		}
+	}
+	return candidates, nil
 }
 
 // PodEligibleToPreemptOthers determines whether this pod should be considered
@@ -301,21 +314,22 @@ func (cl *candidateList) get() []Candidate {
 }
 
 // dryRunPreemption simulates Preemption logic on <potentialNodes> in parallel,
-// and returns preemption candidates. The number of candidates depends on the
-// constraints defined in the plugin's args. In the returned list of
+// returns preemption candidates and a map indicating filtered nodes statuses.
+// The number of candidates depends on the constraints defined in the plugin's args. In the returned list of
 // candidates, ones that do not violate PDB are preferred over ones that do.
 func dryRunPreemption(ctx context.Context, fh framework.Handle,
 	state *framework.CycleState, pod *v1.Pod, potentialNodes []*framework.NodeInfo,
-	pdbs []*policy.PodDisruptionBudget, offset int32, numCandidates int32) []Candidate {
+	pdbs []*policy.PodDisruptionBudget, offset int32, numCandidates int32) ([]Candidate, framework.NodeToStatusMap) {
 	nonViolatingCandidates := newCandidateList(numCandidates)
 	violatingCandidates := newCandidateList(numCandidates)
 	parallelCtx, cancel := context.WithCancel(ctx)
-
+	nodeStatuses := make(framework.NodeToStatusMap)
+	var statusesLock sync.Mutex
 	checkNode := func(i int) {
 		nodeInfoCopy := potentialNodes[(int(offset)+i)%len(potentialNodes)].Clone()
 		stateCopy := state.Clone()
-		pods, numPDBViolations, fits := selectVictimsOnNode(ctx, fh, stateCopy, pod, nodeInfoCopy, pdbs)
-		if fits {
+		pods, numPDBViolations, status := selectVictimsOnNode(ctx, fh, stateCopy, pod, nodeInfoCopy, pdbs)
+		if status.IsSuccess() {
 			victims := extenderv1.Victims{
 				Pods:             pods,
 				NumPDBViolations: int64(numPDBViolations),
@@ -333,10 +347,14 @@ func dryRunPreemption(ctx context.Context, fh framework.Handle,
 			if nvcSize > 0 && nvcSize+vcSize >= numCandidates {
 				cancel()
 			}
+		} else {
+			statusesLock.Lock()
+			nodeStatuses[nodeInfoCopy.Node().Name] = status
+			statusesLock.Unlock()
 		}
 	}
 	parallelize.Until(parallelCtx, len(potentialNodes), checkNode)
-	return append(nonViolatingCandidates.get(), violatingCandidates.get()...)
+	return append(nonViolatingCandidates.get(), violatingCandidates.get()...), nodeStatuses
 }
 
 // CallExtenders calls given <extenders> to select the list of feasible candidates.
@@ -578,9 +596,8 @@ func selectVictimsOnNode(
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget,
-) ([]*v1.Pod, int, bool) {
+) ([]*v1.Pod, int, *framework.Status) {
 	var potentialVictims []*v1.Pod
-
 	ph := fh.PreemptHandle()
 	removePod := func(rp *v1.Pod) error {
 		if err := nodeInfo.RemovePod(rp); err != nil {
@@ -607,14 +624,15 @@ func selectVictimsOnNode(
 		if corev1helpers.PodPriority(p.Pod) < podPriority {
 			potentialVictims = append(potentialVictims, p.Pod)
 			if err := removePod(p.Pod); err != nil {
-				return nil, 0, false
+				return nil, 0, framework.NewStatus(framework.Error, err.Error())
 			}
 		}
 	}
 
 	// No potential victims are found, and so we don't need to evaluate the node again since its state didn't change.
 	if len(potentialVictims) == 0 {
-		return nil, 0, false
+		message := fmt.Sprintf("No victims found on node %v for preemptor pod %v", nodeInfo.Node().Name, pod.Name)
+		return nil, 0, framework.NewStatus(framework.UnschedulableAndUnresolvable, message)
 	}
 
 	// If the new pod does not fit after removing all the lower priority pods,
@@ -624,11 +642,7 @@ func selectVictimsOnNode(
 	// support this case for performance reasons. Having affinity to lower
 	// priority pods is not a recommended configuration anyway.
 	if status := fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo); !status.IsSuccess() {
-		if status.Code() == framework.Error {
-			klog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, status.AsError())
-		}
-
-		return nil, 0, false
+		return nil, 0, status
 	}
 	var victims []*v1.Pod
 	numViolatingVictim := 0
@@ -654,8 +668,7 @@ func selectVictimsOnNode(
 	}
 	for _, p := range violatingVictims {
 		if fits, err := reprievePod(p); err != nil {
-			klog.Warningf("Failed to reprieve pod %q: %v", p.Name, err)
-			return nil, 0, false
+			return nil, 0, framework.NewStatus(framework.Error, err.Error())
 		} else if !fits {
 			numViolatingVictim++
 		}
@@ -663,11 +676,10 @@ func selectVictimsOnNode(
 	// Now we try to reprieve non-violating victims.
 	for _, p := range nonViolatingVictims {
 		if _, err := reprievePod(p); err != nil {
-			klog.Warningf("Failed to reprieve pod %q: %v", p.Name, err)
-			return nil, 0, false
+			return nil, 0, framework.NewStatus(framework.Error, err.Error())
 		}
 	}
-	return victims, numViolatingVictim, true
+	return victims, numViolatingVictim, framework.NewStatus(framework.Success)
 }
 
 // PrepareCandidate does some preparation work before nominating the selected candidate:
