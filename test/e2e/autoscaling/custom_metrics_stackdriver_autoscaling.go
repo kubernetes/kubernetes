@@ -233,6 +233,9 @@ func (tc *CustomMetricTestCase) Run() {
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	if err != nil {
+		framework.Failf("Failed to get an HTTP Client, %v", err)
+	}
 
 	// Hack for running tests locally, needed to authenticate in Stackdriver
 	// If this is your use case, create application default credentials:

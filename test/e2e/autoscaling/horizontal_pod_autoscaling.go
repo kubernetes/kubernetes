@@ -106,7 +106,6 @@ type HPAScaleTest struct {
 	firstScaleStasis            time.Duration
 	cpuBurst                    int
 	secondScale                 int32
-	secondScaleStasis           time.Duration
 }
 
 // run is a method which runs an HPA lifecycle, from a starting state, to an expected
