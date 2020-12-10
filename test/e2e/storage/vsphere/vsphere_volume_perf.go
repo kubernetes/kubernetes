@@ -184,7 +184,7 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 		totalpvclaims = append(totalpvclaims, pvclaims)
 	}
 	for _, pvclaims := range totalpvclaims {
-		persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+		persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, f.Timeouts.ClaimProvision)
 		framework.ExpectNoError(err)
 		totalpvs = append(totalpvs, persistentvolumes)
 	}

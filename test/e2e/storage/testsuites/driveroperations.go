@@ -54,6 +54,16 @@ func CreateVolume(driver TestDriver, config *PerTestConfig, volType testpatterns
 	return nil
 }
 
+// CopyStorageClass constructs a new StorageClass instance
+// with a unique name that is based on namespace + suffix
+// using the same storageclass setting from the parameter
+func CopyStorageClass(sc *storagev1.StorageClass, ns string, suffix string) *storagev1.StorageClass {
+	copy := sc.DeepCopy()
+	copy.ObjectMeta.Name = names.SimpleNameGenerator.GenerateName(ns + "-" + suffix)
+	copy.ResourceVersion = ""
+	return copy
+}
+
 // GetStorageClass constructs a new StorageClass instance
 // with a unique name that is based on namespace + suffix.
 func GetStorageClass(

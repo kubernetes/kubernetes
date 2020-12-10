@@ -58,3 +58,18 @@ func (lazy *lazyClientIP) String() string {
 	}
 	return "unknown"
 }
+
+// lazyAccept implements String() string and it will
+// calls http.Request Header.Get() lazily only when required.
+type lazyAccept struct {
+	req *http.Request
+}
+
+func (lazy *lazyAccept) String() string {
+	if lazy.req != nil {
+		accept := lazy.req.Header.Get("Accept")
+		return accept
+	}
+
+	return "unknown"
+}

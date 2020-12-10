@@ -163,7 +163,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			}
 			pv1, pvc1, err = e2epv.CreatePVPVC(c, pvConfig1, pvcConfig, ns, false)
 			framework.ExpectNoError(err)
-			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, ns, pv1, pvc1))
+			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv1, pvc1))
 
 			ginkgo.By("Initializing second PD with PVPVC binding")
 			pvSource2, diskName2 = createGCEVolume()
@@ -176,7 +176,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			}
 			pv2, pvc2, err = e2epv.CreatePVPVC(c, pvConfig2, pvcConfig, ns, false)
 			framework.ExpectNoError(err)
-			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, ns, pv2, pvc2))
+			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv2, pvc2))
 
 			ginkgo.By("Attaching both PVC's to a single pod")
 			clientPod, err = e2epod.CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvc1, pvc2}, true, "")
@@ -312,7 +312,7 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig e2epv.
 			e2epod.DeletePodWithWait(c, pod)
 		}
 	}()
-	err = e2epod.WaitForPodRunningInNamespace(c, pod)
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, fmt.Sprintf("Pod %q timed out waiting for phase: Running", pod.Name))
 	// Return created api objects
 	pod, err = c.CoreV1().Pods(ns).Get(context.TODO(), pod.Name, metav1.GetOptions{})

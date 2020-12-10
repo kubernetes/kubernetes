@@ -829,6 +829,10 @@ func testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod 
 	return nil
 }
 
+func testReachabilityOverExternalIP(externalIP string, sp v1.ServicePort, execPod *v1.Pod) error {
+	return testEndpointReachability(externalIP, sp.Port, sp.Protocol, execPod)
+}
+
 func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod, clusterIP string) error {
 	internalAddrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
 	externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
@@ -911,6 +915,7 @@ func testEndpointReachability(endpoint string, port int32, protocol v1.Protocol,
 func (j *TestJig) checkClusterIPServiceReachability(svc *v1.Service, pod *v1.Pod) error {
 	clusterIP := svc.Spec.ClusterIP
 	servicePorts := svc.Spec.Ports
+	externalIPs := svc.Spec.ExternalIPs
 
 	err := j.waitForAvailableEndpoint(ServiceEndpointsTimeout)
 	if err != nil {
@@ -925,6 +930,14 @@ func (j *TestJig) checkClusterIPServiceReachability(svc *v1.Service, pod *v1.Pod
 		err = testReachabilityOverClusterIP(clusterIP, servicePort, pod)
 		if err != nil {
 			return err
+		}
+		if len(externalIPs) > 0 {
+			for _, externalIP := range externalIPs {
+				err = testReachabilityOverExternalIP(externalIP, servicePort, pod)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return nil

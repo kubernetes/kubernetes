@@ -186,6 +186,7 @@ profiles:
 			{Name: "InterPodAffinity"},
 			{Name: "PodTopologySpread"},
 			{Name: "TaintToleration"},
+			{Name: "NodeAffinity"},
 		},
 		"ScorePlugin": {
 			{Name: "NodeResourcesBalancedAllocation", Weight: 1},
@@ -314,6 +315,7 @@ profiles:
 						{Name: "InterPodAffinity"},
 						{Name: "PodTopologySpread"},
 						{Name: "TaintToleration"},
+						{Name: "NodeAffinity"},
 					},
 					"ScorePlugin": {
 						{Name: "NodeResourcesBalancedAllocation", Weight: 1},

@@ -572,7 +572,7 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 			f.populated = true
 			// While there shouldn't be any queued deletions in the initial
 			// population of the queue, it's better to be on the safe side.
-			f.initialPopulationCount = len(list) + queuedDeletions
+			f.initialPopulationCount = keys.Len() + queuedDeletions
 		}
 
 		return nil
@@ -602,7 +602,7 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 
 	if !f.populated {
 		f.populated = true
-		f.initialPopulationCount = len(list) + queuedDeletions
+		f.initialPopulationCount = keys.Len() + queuedDeletions
 	}
 
 	return nil

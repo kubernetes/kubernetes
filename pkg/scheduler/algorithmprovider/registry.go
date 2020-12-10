@@ -113,6 +113,7 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				{Name: interpodaffinity.Name},
 				{Name: podtopologyspread.Name},
 				{Name: tainttoleration.Name},
+				{Name: nodeaffinity.Name},
 			},
 		},
 		Score: &schedulerapi.PluginSet{

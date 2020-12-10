@@ -83,7 +83,7 @@ var (
 		},
 	)
 	MandatoryPriorityLevelConfigurationCatchAll = newPriorityLevelConfiguration(
-		"catch-all",
+		flowcontrol.PriorityLevelConfigurationNameCatchAll,
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
@@ -126,8 +126,8 @@ var (
 	// "catch-all" priority-level only gets a minimal positive share of concurrency and won't be reaching
 	// ideally unless you intentionally deleted the suggested "global-default".
 	MandatoryFlowSchemaCatchAll = newFlowSchema(
-		"catch-all",
-		"catch-all",
+		flowcontrol.FlowSchemaNameCatchAll,
+		flowcontrol.PriorityLevelConfigurationNameCatchAll,
 		10000, // matchingPrecedence
 		flowcontrol.FlowDistinguisherMethodByUserType, // distinguisherMethodType
 		flowcontrol.PolicyRulesWithSubjects{

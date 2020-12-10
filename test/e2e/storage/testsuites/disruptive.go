@@ -82,7 +82,7 @@ func (s *disruptiveTestSuite) DefineTests(driver TestDriver, pattern testpattern
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("disruptive")
+	f := framework.NewFrameworkWithCustomTimeouts("disruptive", getDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}
@@ -169,7 +169,7 @@ func (s *disruptiveTestSuite) DefineTests(driver TestDriver, pattern testpattern
 						NodeSelection:       l.config.ClientNodeSelection,
 						ImageID:             e2evolume.GetDefaultTestImageID(),
 					}
-					l.pod, err = e2epod.CreateSecPodWithNodeSelection(l.cs, &podConfig, framework.PodStartTimeout)
+					l.pod, err = e2epod.CreateSecPodWithNodeSelection(l.cs, &podConfig, f.Timeouts.PodStart)
 					framework.ExpectNoError(err, "While creating pods for kubelet restart test")
 
 					if pattern.VolMode == v1.PersistentVolumeBlock && t.runTestBlock != nil {

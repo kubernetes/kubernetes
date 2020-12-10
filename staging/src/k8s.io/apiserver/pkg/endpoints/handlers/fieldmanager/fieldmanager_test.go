@@ -61,7 +61,6 @@ func (c *fakeObjectConvertor) Convert(in, out, context interface{}) error {
 		out, err = c.converter.Convert(typedValue, c.apiVersion)
 		return err
 	}
-	out = in
 	return nil
 }
 

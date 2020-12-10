@@ -231,7 +231,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 
 	ginkgo.By("Waiting for all PVCs to be bound")
 	for _, config := range configs {
-		e2epv.WaitOnPVandPVC(c, ns, config.pv, config.pvc)
+		e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, config.pv, config.pvc)
 	}
 
 	ginkgo.By("Creating pods for each static PV")

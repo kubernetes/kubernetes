@@ -120,7 +120,7 @@ func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("volume")
+	f := framework.NewFrameworkWithCustomTimeouts("volume", getDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}

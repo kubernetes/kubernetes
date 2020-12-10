@@ -294,10 +294,11 @@ func NewProxier(ipt utiliptables.Interface,
 		ipFamily = v1.IPv6Protocol
 	}
 
-	var incorrectAddresses []string
-	nodePortAddresses, incorrectAddresses = utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, ipFamily)
-	if len(incorrectAddresses) > 0 {
-		klog.Warningf("NodePortAddresses of wrong family; %s", incorrectAddresses)
+	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
+	nodePortAddresses = ipFamilyMap[ipFamily]
+	// Log the IPs not matching the ipFamily
+	if ips, ok := ipFamilyMap[utilproxy.OtherIPFamily(ipFamily)]; ok && len(ips) > 0 {
+		klog.Warningf("IP Family: %s, NodePortAddresses of wrong family; %s", ipFamily, strings.Join(ips, ","))
 	}
 
 	proxier := &Proxier{
@@ -367,17 +368,17 @@ func NewDualStackProxier(
 	nodePortAddresses []string,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
-	nodePortAddresses4, nodePortAddresses6 := utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, v1.IPv4Protocol)
+	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
 	ipv4Proxier, err := NewProxier(ipt[0], sysctl,
 		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
-		nodeIP[0], recorder, healthzServer, nodePortAddresses4)
+		nodeIP[0], recorder, healthzServer, ipFamilyMap[v1.IPv4Protocol])
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
 	ipv6Proxier, err := NewProxier(ipt[1], sysctl,
 		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
-		nodeIP[1], recorder, healthzServer, nodePortAddresses6)
+		nodeIP[1], recorder, healthzServer, ipFamilyMap[v1.IPv6Protocol])
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -1128,24 +1129,22 @@ func (proxier *Proxier) syncProxyRules() {
 				)
 
 				destChain := svcXlbChain
-				// We have to SNAT packets to external IPs if externalTrafficPolicy is cluster.
+				// We have to SNAT packets to external IPs if externalTrafficPolicy is cluster
+				// and the traffic is NOT Local. Local traffic coming from Pods and Nodes will
+				// be always forwarded to the corresponding Service, so no need to SNAT
+				// If we can't differentiate the local traffic we always SNAT.
 				if !svcInfo.OnlyNodeLocalEndpoints() {
 					destChain = svcChain
-					writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+					// This masquerades off-cluster traffic to a External IP.
+					if proxier.localDetector.IsImplemented() {
+						writeLine(proxier.natRules, proxier.localDetector.JumpIfNotLocal(args, string(KubeMarkMasqChain))...)
+					} else {
+						writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+					}
 				}
+				// Sent traffic bound for external IPs to the service chain.
+				writeLine(proxier.natRules, append(args, "-j", string(destChain))...)
 
-				// Allow traffic for external IPs that does not come from a bridge (i.e. not from a container)
-				// nor from a local process to be forwarded to the service.
-				// This rule roughly translates to "all traffic from off-machine".
-				// This is imperfect in the face of network plugins that might not use a bridge, but we can revisit that later.
-				externalTrafficOnlyArgs := append(args,
-					"-m", "physdev", "!", "--physdev-is-in",
-					"-m", "addrtype", "!", "--src-type", "LOCAL")
-				writeLine(proxier.natRules, append(externalTrafficOnlyArgs, "-j", string(destChain))...)
-				dstLocalOnlyArgs := append(args, "-m", "addrtype", "--dst-type", "LOCAL")
-				// Allow traffic bound for external IPs that happen to be recognized as local IPs to stay local.
-				// This covers cases like GCE load-balancers which get added to the local routing table.
-				writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", string(destChain))...)
 			} else {
 				// No endpoints.
 				writeLine(proxier.filterRules,

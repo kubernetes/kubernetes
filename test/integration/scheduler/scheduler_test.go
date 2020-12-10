@@ -132,6 +132,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"PreScorePlugin": {
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
+					{Name: "NodeAffinity"},
 					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
@@ -226,6 +227,7 @@ kind: Policy
 				"PreScorePlugin": {
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
+					{Name: "NodeAffinity"},
 					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {

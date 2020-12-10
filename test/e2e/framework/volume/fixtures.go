@@ -362,7 +362,7 @@ func TestServerCleanup(f *framework.Framework, config TestConfig) {
 	gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
 }
 
-func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test, slow bool) (*v1.Pod, error) {
+func runVolumeTesterPod(client clientset.Interface, timeouts *framework.TimeoutContext, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test, slow bool) (*v1.Pod, error) {
 	ginkgo.By(fmt.Sprint("starting ", config.Prefix, "-", podSuffix))
 	var gracePeriod int64 = 1
 	var command string
@@ -439,13 +439,13 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 		return nil, err
 	}
 	if slow {
-		err = e2epod.WaitForPodRunningInNamespaceSlow(client, clientPod.Name, clientPod.Namespace)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(client, clientPod.Name, clientPod.Namespace, timeouts.PodStartSlow)
 	} else {
-		err = e2epod.WaitForPodRunningInNamespace(client, clientPod)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(client, clientPod.Name, clientPod.Namespace, timeouts.PodStart)
 	}
 	if err != nil {
 		e2epod.DeletePodOrFail(client, clientPod.Namespace, clientPod.Name)
-		e2epod.WaitForPodToDisappear(client, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+		e2epod.WaitForPodToDisappear(client, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 		return nil, err
 	}
 	return clientPod, nil
@@ -514,13 +514,14 @@ func TestVolumeClientSlow(f *framework.Framework, config TestConfig, fsGroup *in
 }
 
 func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test, slow bool) {
-	clientPod, err := runVolumeTesterPod(f.ClientSet, config, "client", false, fsGroup, tests, slow)
+	timeouts := f.Timeouts
+	clientPod, err := runVolumeTesterPod(f.ClientSet, timeouts, config, "client", false, fsGroup, tests, slow)
 	if err != nil {
 		framework.Failf("Failed to create client pod: %v", err)
 	}
 	defer func() {
 		e2epod.DeletePodOrFail(f.ClientSet, clientPod.Namespace, clientPod.Name)
-		e2epod.WaitForPodToDisappear(f.ClientSet, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+		e2epod.WaitForPodToDisappear(f.ClientSet, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 	}()
 
 	testVolumeContent(f, clientPod, fsGroup, fsType, tests)
@@ -531,17 +532,18 @@ func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64,
 // The volume must be writable.
 func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
 	privileged := true
+	timeouts := f.Timeouts
 	if framework.NodeOSDistroIs("windows") {
 		privileged = false
 	}
-	injectorPod, err := runVolumeTesterPod(f.ClientSet, config, "injector", privileged, fsGroup, tests, false /*slow*/)
+	injectorPod, err := runVolumeTesterPod(f.ClientSet, timeouts, config, "injector", privileged, fsGroup, tests, false /*slow*/)
 	if err != nil {
 		framework.Failf("Failed to create injector pod: %v", err)
 		return
 	}
 	defer func() {
 		e2epod.DeletePodOrFail(f.ClientSet, injectorPod.Namespace, injectorPod.Name)
-		e2epod.WaitForPodToDisappear(f.ClientSet, injectorPod.Namespace, injectorPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+		e2epod.WaitForPodToDisappear(f.ClientSet, injectorPod.Namespace, injectorPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 	}()
 
 	ginkgo.By("Writing text file contents in the container.")

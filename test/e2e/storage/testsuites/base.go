@@ -236,15 +236,14 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern test
 			driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 			claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 			framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
-			framework.Logf("Using claimSize:%s, test suite supported size:%v, driver(%s) supported size:%v ", claimSize, testVolumeSizeRange, dDriver.GetDriverInfo().Name, testVolumeSizeRange)
+			framework.Logf("Using claimSize:%s, test suite supported size:%v, driver(%s) supported size:%v ",
+				claimSize, testVolumeSizeRange, dDriver.GetDriverInfo().Name, driverVolumeSizeRange)
 			r.Sc = dDriver.GetDynamicProvisionStorageClass(r.Config, pattern.FsType)
 
 			if pattern.BindingMode != "" {
 				r.Sc.VolumeBindingMode = &pattern.BindingMode
 			}
-			if pattern.AllowExpansion != false {
-				r.Sc.AllowVolumeExpansion = &pattern.AllowExpansion
-			}
+			r.Sc.AllowVolumeExpansion = &pattern.AllowExpansion
 
 			ginkgo.By("creating a StorageClass " + r.Sc.Name)
 
@@ -420,7 +419,7 @@ func createPVCPV(
 	pv, pvc, err := e2epv.CreatePVCPV(f.ClientSet, pvConfig, pvcConfig, f.Namespace.Name, false)
 	framework.ExpectNoError(err, "PVC, PV creation failed")
 
-	err = e2epv.WaitOnPVandPVC(f.ClientSet, f.Namespace.Name, pv, pvc)
+	err = e2epv.WaitOnPVandPVC(f.ClientSet, f.Timeouts, f.Namespace.Name, pv, pvc)
 	framework.ExpectNoError(err, "PVC, PV failed to bind")
 
 	return pv, pvc
@@ -453,7 +452,7 @@ func createPVCPVFromDynamicProvisionSC(
 	framework.ExpectNoError(err)
 
 	if !isDelayedBinding(sc) {
-		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, f.Timeouts.ClaimProvision)
 		framework.ExpectNoError(err)
 	}
 

@@ -1178,7 +1178,7 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 }
 
 func TestCompleteAndValidate(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
 	cmpFilter := cmp.FilterPath(func(p cmp.Path) bool {
 		switch p.String() {
@@ -1225,7 +1225,7 @@ func TestCompleteAndValidate(t *testing.T) {
 			wantOpts: &DebugOptions{
 				Args:           []string{},
 				Image:          "busybox",
-				Namespace:      "default",
+				Namespace:      "test",
 				PullPolicy:     corev1.PullPolicy("Always"),
 				ShareProcesses: true,
 				TargetNames:    []string{"mypod"},
@@ -1237,7 +1237,7 @@ func TestCompleteAndValidate(t *testing.T) {
 			wantOpts: &DebugOptions{
 				Args:           []string{},
 				Image:          "busybox",
-				Namespace:      "default",
+				Namespace:      "test",
 				ShareProcesses: true,
 				TargetNames:    []string{"mypod1", "mypod2"},
 			},
@@ -1248,7 +1248,7 @@ func TestCompleteAndValidate(t *testing.T) {
 			wantOpts: &DebugOptions{
 				Args:           []string{"echo", "1", "2"},
 				Image:          "busybox",
-				Namespace:      "default",
+				Namespace:      "test",
 				ShareProcesses: true,
 				TargetNames:    []string{"mypod1", "mypod2"},
 			},
@@ -1261,7 +1261,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				Attach:         false,
 				Image:          "busybox",
 				Interactive:    true,
-				Namespace:      "default",
+				Namespace:      "test",
 				ShareProcesses: true,
 				TargetNames:    []string{"mypod"},
 				TTY:            true,
@@ -1274,7 +1274,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				Args:           []string{},
 				Env:            []v1.EnvVar{{Name: "FOO", Value: "BAR"}},
 				Image:          "busybox",
-				Namespace:      "default",
+				Namespace:      "test",
 				ShareProcesses: true,
 				TargetNames:    []string{"mypod"},
 			},
@@ -1287,7 +1287,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				Attach:         true,
 				Image:          "busybox",
 				Interactive:    true,
-				Namespace:      "default",
+				Namespace:      "test",
 				ShareProcesses: true,
 				TargetNames:    []string{"mypod"},
 				TTY:            true,
@@ -1300,7 +1300,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				Args:           []string{},
 				Container:      "debugger",
 				Image:          "myproj/debug-tools",
-				Namespace:      "default",
+				Namespace:      "test",
 				PullPolicy:     corev1.PullPolicy("Always"),
 				ShareProcesses: true,
 				TargetNames:    []string{"mypod"},
@@ -1340,7 +1340,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				CopyTo:         "my-debugger",
 				Image:          "busybox",
 				Interactive:    true,
-				Namespace:      "default",
+				Namespace:      "test",
 				ShareProcesses: true,
 				TargetNames:    []string{"mypod"},
 				TTY:            true,
@@ -1354,7 +1354,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				Container:      "my-container",
 				CopyTo:         "my-debugger",
 				Image:          "busybox",
-				Namespace:      "default",
+				Namespace:      "test",
 				ShareProcesses: true,
 				TargetNames:    []string{"mypod"},
 			},
@@ -1367,7 +1367,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				Attach:         true,
 				CopyTo:         "my-debugger",
 				Image:          "busybox",
-				Namespace:      "default",
+				Namespace:      "test",
 				ShareProcesses: true,
 				TargetNames:    []string{"mypod"},
 			},
@@ -1380,7 +1380,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				Container:      "my-container",
 				CopyTo:         "my-debugger",
 				Image:          "busybox",
-				Namespace:      "default",
+				Namespace:      "test",
 				ShareProcesses: true,
 				TargetNames:    []string{"mypod"},
 			},
@@ -1391,7 +1391,7 @@ func TestCompleteAndValidate(t *testing.T) {
 			wantOpts: &DebugOptions{
 				Args:      []string{},
 				CopyTo:    "my-debugger",
-				Namespace: "default",
+				Namespace: "test",
 				SetImages: map[string]string{
 					"*":   "busybox",
 					"app": "app-debugger",
@@ -1409,7 +1409,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				CopyTo:      "my-debugger",
 				Image:       "debian",
 				Interactive: true,
-				Namespace:   "default",
+				Namespace:   "test",
 				SetImages: map[string]string{
 					"app":     "app:debug",
 					"sidecar": "sidecar:debug",
@@ -1428,7 +1428,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				Container:      "mycontainer",
 				CopyTo:         "my-debugger",
 				Interactive:    true,
-				Namespace:      "default",
+				Namespace:      "test",
 				ShareProcesses: true,
 				TargetNames:    []string{"mypod"},
 				TTY:            true,
@@ -1467,7 +1467,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				Attach:         true,
 				Image:          "busybox",
 				Interactive:    true,
-				Namespace:      "default",
+				Namespace:      "test",
 				ShareProcesses: true,
 				TargetNames:    []string{"node/mynode"},
 				TTY:            true,

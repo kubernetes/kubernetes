@@ -61,7 +61,7 @@ const (
 func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interface, patchTypes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
-		trace := utiltrace.New("Patch", utiltrace.Field{Key: "url", Value: req.URL.Path}, utiltrace.Field{Key: "user-agent", Value: &lazyTruncatedUserAgent{req}}, utiltrace.Field{Key: "client", Value: &lazyClientIP{req}})
+		trace := utiltrace.New("Patch", traceFields(req)...)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
@@ -337,15 +337,6 @@ func (p *jsonPatcher) createNewObject() (runtime.Object, error) {
 func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr error) {
 	switch p.patchType {
 	case types.JSONPatchType:
-		// sanity check potentially abusive patches
-		// TODO(liggitt): drop this once golang json parser limits stack depth (https://github.com/golang/go/issues/31789)
-		if len(p.patchBytes) > 1024*1024 {
-			v := []interface{}{}
-			if err := json.Unmarshal(p.patchBytes, &v); err != nil {
-				return nil, errors.NewBadRequest(fmt.Sprintf("error decoding patch: %v", err))
-			}
-		}
-
 		patchObj, err := jsonpatch.DecodePatch(p.patchBytes)
 		if err != nil {
 			return nil, errors.NewBadRequest(err.Error())
@@ -361,15 +352,6 @@ func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr
 		}
 		return patchedJS, nil
 	case types.MergePatchType:
-		// sanity check potentially abusive patches
-		// TODO(liggitt): drop this once golang json parser limits stack depth (https://github.com/golang/go/issues/31789)
-		if len(p.patchBytes) > 1024*1024 {
-			v := map[string]interface{}{}
-			if err := json.Unmarshal(p.patchBytes, &v); err != nil {
-				return nil, errors.NewBadRequest(fmt.Sprintf("error decoding patch: %v", err))
-			}
-		}
-
 		return jsonpatch.MergePatch(versionedJS, p.patchBytes)
 	default:
 		// only here as a safety net - go-restful filters content-type

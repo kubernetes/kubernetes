@@ -279,7 +279,13 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 	// Assume that migration is always possible, rely on migrateCoreDNSCorefile() to fail if not.
 	canMigrateCorefile := true
 
-	if corefileMigrationRequired {
+	if corefile == "" || migration.Default("", corefile) {
+		// If the Corefile is empty or default, the latest default Corefile will be applied
+		if err := apiclient.CreateOrUpdateConfigMap(client, coreDNSConfigMap); err != nil {
+			return err
+		}
+	} else if corefileMigrationRequired {
+		// If migration is required, try and migrate the Corefile
 		if err := migrateCoreDNSCorefile(client, coreDNSConfigMap, corefile, currentInstalledCoreDNSVersion); err != nil {
 			// Errors in Corefile Migration is verified during preflight checks. This part will be executed when a user has chosen
 			// to ignore preflight check errors.
@@ -290,7 +296,8 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 			}
 		}
 	} else {
-		if err := apiclient.CreateOrUpdateConfigMap(client, coreDNSConfigMap); err != nil {
+		// If the Corefile is modified and doesn't require any migration, it'll be retained for the benefit of the user
+		if err := apiclient.CreateOrRetainConfigMap(client, coreDNSConfigMap, kubeadmconstants.CoreDNSConfigMap); err != nil {
 			return err
 		}
 	}
@@ -370,7 +377,9 @@ func createDNSService(dnsService *v1.Service, serviceBytes []byte, client client
 // isCoreDNSConfigMapMigrationRequired checks if a migration of the CoreDNS ConfigMap is required.
 func isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersion string) (bool, error) {
 	var isMigrationRequired bool
-	if corefile == "" || migration.Default("", corefile) {
+
+	// Current installed version is expected to be empty for init
+	if currentInstalledCoreDNSVersion == "" {
 		return isMigrationRequired, nil
 	}
 	deprecated, err := migration.Deprecated(currentInstalledCoreDNSVersion, kubeadmconstants.CoreDNSVersion, corefile)
@@ -380,7 +389,7 @@ func isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersio
 
 	// Check if there are any plugins/options which needs to be removed or is a new default
 	for _, dep := range deprecated {
-		if dep.Severity == "removed" || dep.Severity == "newDefault" {
+		if dep.Severity == "removed" || dep.Severity == "newdefault" {
 			isMigrationRequired = true
 		}
 	}

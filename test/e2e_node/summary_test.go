@@ -60,6 +60,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 			pods := getSummaryTestPods(f, numRestarts, pod0, pod1)
 			f.PodClient().CreateBatch(pods)
 
+			ginkgo.By("restarting the containers to ensure container metrics are still being gathered after a container is restarted")
 			gomega.Eventually(func() error {
 				for _, pod := range pods {
 					err := verifyPodRestartCount(f, pod.Name, len(pod.Spec.Containers), numRestarts)
@@ -70,7 +71,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				return nil
 			}, time.Minute, 5*time.Second).Should(gomega.BeNil())
 
-			// Wait for cAdvisor to collect 2 stats points
+			ginkgo.By("Waiting 15 seconds for cAdvisor to collect 2 stats points")
 			time.Sleep(15 * time.Second)
 
 			// Setup expectations.
@@ -78,7 +79,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				maxStartAge = time.Hour * 24 * 365 // 1 year
 				maxStatsAge = time.Minute
 			)
-			// fetch node so we can know proper node memory bounds for unconstrained cgroups
+			ginkgo.By("Fetching node so we can match against an appropriate memory limit")
 			node := getLocalNode(f)
 			memoryCapacity := node.Status.Capacity["memory"]
 			memoryLimit := memoryCapacity.Value()
@@ -305,7 +306,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"Time":           recent(maxStatsAge),
 						"AvailableBytes": fsCapacityBounds,
 						"CapacityBytes":  fsCapacityBounds,
-						// we assume we are not running tests on machines < 10tb of disk
+						// we assume we are not running tests on machines more than 10tb of disk
 						"UsedBytes":  bounded(e2evolume.Kb, 10*e2evolume.Tb),
 						"InodesFree": bounded(1e4, 1e8),
 						"Inodes":     bounded(1e4, 1e8),
@@ -316,7 +317,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
-							// we assume we are not running tests on machines < 10tb of disk
+							// we assume we are not running tests on machines more than 10tb of disk
 							"UsedBytes":  bounded(e2evolume.Kb, 10*e2evolume.Tb),
 							"InodesFree": bounded(1e4, 1e8),
 							"Inodes":     bounded(1e4, 1e8),
@@ -360,7 +361,7 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 						Image: busyboxImage,
 						SecurityContext: &v1.SecurityContext{
 							Capabilities: &v1.Capabilities{
-								Add: []v1.Capability{"CAP_NET_RAW"},
+								Add: []v1.Capability{"NET_RAW"},
 							},
 						},
 						Command: getRestartingContainerCommand("/test-empty-dir-mnt", 0, numRestarts, "echo 'some bytes' >/outside_the_volume.txt; ping -c 1 google.com; echo 'hello world' >> /test-empty-dir-mnt/file;"),
