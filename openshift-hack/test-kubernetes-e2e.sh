@@ -74,6 +74,7 @@ SERVER="$( kubectl config view | grep server | head -n 1 | awk '{print $2}' )"
 
 # shellcheck disable=SC2086
 ginkgo \
+  --flakeAttempts=3 \
   -nodes "${NODES}" -noColor ${KUBE_E2E_TEST_ARGS} \
   "$( which k8s-e2e.test )" -- \
   -report-dir "${test_report_dir}" \
