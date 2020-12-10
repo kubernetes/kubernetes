@@ -92,8 +92,6 @@ pkg/controlplane/tunneler
 pkg/credentialprovider/plugin
 pkg/features
 pkg/kubeapiserver
-pkg/kubectl/cmd/convert
-pkg/kubelet/apis/config/v1beta1
 pkg/kubelet/cm
 pkg/kubelet/container
 pkg/kubelet/container/testing

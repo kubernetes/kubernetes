@@ -30,15 +30,19 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
+// TODO: Move these constants to k8s.io/kubelet/config/v1beta1 instead?
 const (
-	// TODO: Move these constants to k8s.io/kubelet/config/v1beta1 instead?
+	//DefaultIPTablesMasqueradeBit is default bit of IPTablesMasqueradeBit
 	DefaultIPTablesMasqueradeBit = 14
+	//DefaultIPTablesDropBit is default bit of IPTablesDropBit
 	DefaultIPTablesDropBit       = 15
+	//DefaultVolumePluginDir is default value of VolumePluginDir
 	DefaultVolumePluginDir       = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
 )
 
 var (
 	zeroDuration = metav1.Duration{}
+	// DefaultNodeAllocatableEnforcement is default node of EnforceNodeAllocatable
 	// TODO: Move these constants to k8s.io/kubelet/config/v1beta1 instead?
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	DefaultNodeAllocatableEnforcement = []string{"pods"}
@@ -48,7 +52,8 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfiguration) {
+// SetDefaultsKubeletConfiguration set default values for kubelet configuration
+func SetDefaultsKubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfiguration) {
 	if obj.EnableServer == nil {
 		obj.EnableServer = utilpointer.BoolPtr(true)
 	}
