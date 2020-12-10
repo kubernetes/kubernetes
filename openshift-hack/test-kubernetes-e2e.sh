@@ -34,7 +34,7 @@ parallel)
   DEFAULT_TEST_ARGS="-skip=\[Serial\]|${COMMON_SKIPS}"
   # Use the same number of nodes - 30 - as specified for the parallel
   # suite defined in origin.
-  NODES=30
+  NODES=${NODES:-30}
   ;;
 *)
   echo >&2 "Unsupported test suite '${TEST_SUITE}'"
