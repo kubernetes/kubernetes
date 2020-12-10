@@ -27,7 +27,7 @@ import (
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "InterPodAffinity"
+	Name = framework.IntreePluginPrefix + "InterPodAffinity"
 )
 
 var _ framework.PreFilterPlugin = &InterPodAffinity{}

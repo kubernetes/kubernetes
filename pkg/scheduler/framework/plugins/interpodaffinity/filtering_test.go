@@ -1766,7 +1766,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	p := &InterPodAffinity{}
 	cycleState := framework.NewCycleState()
 	gotStatus := p.Filter(context.Background(), cycleState, pod, nodeInfo)
-	wantStatus := framework.NewStatus(framework.Error, `error reading "PreFilterInterPodAffinity" from cycleState: not found`)
+	wantStatus := framework.NewStatus(framework.Error, `error reading "PreFilterplugin.kubescheduler.k8s.io/InterPodAffinity" from cycleState: not found`)
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
 	}

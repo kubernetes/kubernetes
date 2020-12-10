@@ -31,7 +31,7 @@ var _ framework.FilterPlugin = &NodeName{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "NodeName"
+	Name = framework.IntreePluginPrefix + "NodeName"
 
 	// ErrReason returned when node name doesn't match.
 	ErrReason = "node(s) didn't match the requested hostname"

@@ -27,7 +27,7 @@ import (
 )
 
 // Name of the plugin used in the plugin registry and configurations.
-const Name = "DefaultBinder"
+const Name = framework.IntreePluginPrefix + "DefaultBinder"
 
 // DefaultBinder binds pods to nodes using a k8s client.
 type DefaultBinder struct {

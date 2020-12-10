@@ -682,7 +682,7 @@ profiles:
 						SchedulerName: "default-scheduler",
 						PluginConfig: []kubeschedulerconfig.PluginConfig{
 							{
-								Name: "InterPodAffinity",
+								Name: "plugin.kubescheduler.k8s.io/InterPodAffinity",
 								Args: &kubeschedulerconfig.InterPodAffinityArgs{HardPodAffinityWeight: 5},
 							},
 						},

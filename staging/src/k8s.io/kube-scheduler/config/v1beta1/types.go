@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -226,7 +227,11 @@ type PluginConfig struct {
 }
 
 func (c *PluginConfig) decodeNestedObjects(d runtime.Decoder) error {
-	gvk := SchemeGroupVersion.WithKind(c.Name + "Args")
+	argSimpleName := c.Name
+	if strings.HasPrefix(c.Name, IntreePluginPrefix) {
+		argSimpleName = c.Name[len(IntreePluginPrefix):]
+	}
+	gvk := SchemeGroupVersion.WithKind(argSimpleName + "Args")
 	// dry-run to detect and skip out-of-tree plugin args.
 	if _, _, err := d.Decode(nil, &gvk, nil); runtime.IsNotRegisteredError(err) {
 		return nil

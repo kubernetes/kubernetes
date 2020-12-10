@@ -33,7 +33,7 @@ var _ framework.FilterPlugin = &NodePorts{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "NodePorts"
+	Name = framework.IntreePluginPrefix + "NodePorts"
 
 	// preFilterStateKey is the key in CycleState to NodePorts pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.

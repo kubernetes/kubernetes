@@ -42,7 +42,7 @@ type ImageLocality struct {
 var _ framework.ScorePlugin = &ImageLocality{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "ImageLocality"
+const Name = framework.IntreePluginPrefix + "ImageLocality"
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *ImageLocality) Name() string {

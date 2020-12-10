@@ -33,7 +33,7 @@ type NodeUnschedulable struct {
 var _ framework.FilterPlugin = &NodeUnschedulable{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "NodeUnschedulable"
+const Name = framework.IntreePluginPrefix + "NodeUnschedulable"
 
 const (
 	// ErrReasonUnknownCondition is used for NodeUnknownCondition predicate error.

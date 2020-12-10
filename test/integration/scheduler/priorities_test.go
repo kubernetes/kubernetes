@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -55,7 +56,7 @@ func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *tes
 	}
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t,
-		testutils.InitTestMaster(t, strings.ToLower(scorePluginName), nil),
+		testutils.InitTestMaster(t, strings.ToLower(scorePluginName[len(framework.IntreePluginPrefix):]), nil),
 		nil,
 		scheduler.WithProfiles(prof),
 	)

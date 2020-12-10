@@ -30,7 +30,7 @@ type VolumeRestrictions struct{}
 var _ framework.FilterPlugin = &VolumeRestrictions{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "VolumeRestrictions"
+const Name = framework.IntreePluginPrefix + "VolumeRestrictions"
 
 const (
 	// ErrReasonDiskConflict is used for NoDiskConflict predicate error.

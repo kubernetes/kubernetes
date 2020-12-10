@@ -38,7 +38,7 @@ type BalancedAllocation struct {
 var _ = framework.ScorePlugin(&BalancedAllocation{})
 
 // BalancedAllocationName is the name of the plugin used in the plugin registry and configurations.
-const BalancedAllocationName = "NodeResourcesBalancedAllocation"
+const BalancedAllocationName = framework.IntreePluginPrefix + "NodeResourcesBalancedAllocation"
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (ba *BalancedAllocation) Name() string {

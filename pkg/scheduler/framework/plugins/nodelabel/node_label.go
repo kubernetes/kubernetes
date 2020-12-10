@@ -29,7 +29,7 @@ import (
 )
 
 // Name of this plugin.
-const Name = "NodeLabel"
+const Name = framework.IntreePluginPrefix + "NodeLabel"
 
 const (
 	// ErrReasonPresenceViolated is used for CheckNodeLabelPresence predicate error.

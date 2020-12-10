@@ -23,7 +23,7 @@ import (
 )
 
 // Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "PrioritySort"
+const Name = framework.IntreePluginPrefix + "PrioritySort"
 
 // PrioritySort is a plugin that implements Priority based sorting.
 type PrioritySort struct{}

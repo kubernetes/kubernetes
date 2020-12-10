@@ -146,7 +146,7 @@ func TestSchedulerCreation(t *testing.T) {
 			name:         "repeated plugin name in out-of-tree plugin",
 			opts:         []Option{WithFrameworkOutOfTreeRegistry(invalidRegistry)},
 			wantProfiles: []string{"default-scheduler"},
-			wantErr:      "a plugin named DefaultBinder already exists",
+			wantErr:      "a plugin named plugin.kubescheduler.k8s.io/DefaultBinder already exists",
 		},
 		{
 			name: "multiple profiles",
@@ -287,7 +287,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			expectBind:       &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			injectBindError:  errB,
-			expectError:      fmt.Errorf(`binding rejected: %w`, fmt.Errorf("running Bind plugin %q: %w", "DefaultBinder", errors.New("binder"))),
+			expectError:      fmt.Errorf(`binding rejected: %w`, fmt.Errorf("running Bind plugin %q: %w", "plugin.kubescheduler.k8s.io/DefaultBinder", errors.New("binder"))),
 			expectErrorPod:   podWithID("foo", testNode.Name),
 			expectForgetPod:  podWithID("foo", testNode.Name),
 			eventReason:      "FailedScheduling",

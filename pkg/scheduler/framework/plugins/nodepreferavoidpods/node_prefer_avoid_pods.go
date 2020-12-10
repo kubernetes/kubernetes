@@ -36,7 +36,7 @@ type NodePreferAvoidPods struct {
 var _ framework.ScorePlugin = &NodePreferAvoidPods{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "NodePreferAvoidPods"
+const Name = framework.IntreePluginPrefix + "NodePreferAvoidPods"
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodePreferAvoidPods) Name() string {

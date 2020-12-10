@@ -36,7 +36,7 @@ type LeastAllocated struct {
 var _ = framework.ScorePlugin(&LeastAllocated{})
 
 // LeastAllocatedName is the name of the plugin used in the plugin registry and configurations.
-const LeastAllocatedName = "NodeResourcesLeastAllocated"
+const LeastAllocatedName = framework.IntreePluginPrefix + "NodeResourcesLeastAllocated"
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (la *LeastAllocated) Name() string {

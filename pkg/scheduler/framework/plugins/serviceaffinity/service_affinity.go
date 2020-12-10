@@ -31,7 +31,7 @@ import (
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "ServiceAffinity"
+	Name = framework.IntreePluginPrefix + "ServiceAffinity"
 
 	// preFilterStateKey is the key in CycleState to ServiceAffinity pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.

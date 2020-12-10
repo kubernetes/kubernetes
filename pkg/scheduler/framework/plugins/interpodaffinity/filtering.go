@@ -31,6 +31,7 @@ import (
 const (
 	// preFilterStateKey is the key in CycleState to InterPodAffinity pre-computed data for Filtering.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
+	// TODO find better key pattern with qualify prefix
 	preFilterStateKey = "PreFilter" + Name
 
 	// ErrReasonExistingAntiAffinityRulesNotMatch is used for ExistingPodsAntiAffinityRulesNotMatch predicate error.

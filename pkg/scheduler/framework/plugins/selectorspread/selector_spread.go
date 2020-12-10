@@ -44,7 +44,7 @@ var _ framework.ScorePlugin = &SelectorSpread{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "SelectorSpread"
+	Name = framework.IntreePluginPrefix + "SelectorSpread"
 	// preScoreStateKey is the key in CycleState to SelectorSpread pre-computed data for Scoring.
 	preScoreStateKey = "PreScore" + Name
 

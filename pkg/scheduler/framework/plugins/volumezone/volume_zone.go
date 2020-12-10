@@ -43,7 +43,7 @@ var _ framework.FilterPlugin = &VolumeZone{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "VolumeZone"
+	Name = framework.IntreePluginPrefix + "VolumeZone"
 
 	// ErrReasonConflict is used for NoVolumeZoneConflict predicate error.
 	ErrReasonConflict = "node(s) had no available volume zone"

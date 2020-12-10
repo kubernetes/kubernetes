@@ -59,7 +59,7 @@ type CSILimits struct {
 var _ framework.FilterPlugin = &CSILimits{}
 
 // CSIName is the name of the plugin used in the plugin registry and configurations.
-const CSIName = "NodeVolumeLimits"
+const CSIName = framework.IntreePluginPrefix + "NodeVolumeLimits"
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *CSILimits) Name() string {

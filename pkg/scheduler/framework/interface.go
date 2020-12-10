@@ -90,6 +90,9 @@ const (
 
 	// MaxTotalScore is the maximum total score.
 	MaxTotalScore int64 = math.MaxInt64
+
+	// IntreePluginPrefix is the name prefix for in-tree plugins to distinguish from out-of-tree ones
+	IntreePluginPrefix = "plugin.kubescheduler.k8s.io/"
 )
 
 // Status indicates the result of running a plugin. It consists of a code, a

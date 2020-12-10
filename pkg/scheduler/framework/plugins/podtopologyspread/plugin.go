@@ -66,7 +66,7 @@ var _ framework.ScorePlugin = &PodTopologySpread{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "PodTopologySpread"
+	Name = framework.IntreePluginPrefix + "PodTopologySpread"
 )
 
 // Name returns name of the plugin. It is used in logs, etc.

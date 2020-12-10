@@ -171,7 +171,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	p, _ := New(nil, nil)
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
-	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterNodePorts" from cycleState: %w`, fmt.Errorf("not found")))
+	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterplugin.kubescheduler.k8s.io/NodePorts" from cycleState: %w`, fmt.Errorf("not found")))
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
 	}

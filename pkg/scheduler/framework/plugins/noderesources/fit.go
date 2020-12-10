@@ -38,7 +38,7 @@ var _ framework.FilterPlugin = &Fit{}
 
 const (
 	// FitName is the name of the plugin used in the plugin registry and configurations.
-	FitName = "NodeResourcesFit"
+	FitName = framework.IntreePluginPrefix + "NodeResourcesFit"
 
 	// preFilterStateKey is the key in CycleState to NodeResourcesFit pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.

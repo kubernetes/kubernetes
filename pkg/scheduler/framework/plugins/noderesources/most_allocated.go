@@ -36,7 +36,7 @@ type MostAllocated struct {
 var _ = framework.ScorePlugin(&MostAllocated{})
 
 // MostAllocatedName is the name of the plugin used in the plugin registry and configurations.
-const MostAllocatedName = "NodeResourcesMostAllocated"
+const MostAllocatedName = framework.IntreePluginPrefix + "NodeResourcesMostAllocated"
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (ma *MostAllocated) Name() string {

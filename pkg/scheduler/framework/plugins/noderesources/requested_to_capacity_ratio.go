@@ -30,7 +30,7 @@ import (
 
 const (
 	// RequestedToCapacityRatioName is the name of this plugin.
-	RequestedToCapacityRatioName = "RequestedToCapacityRatio"
+	RequestedToCapacityRatioName = framework.IntreePluginPrefix + "RequestedToCapacityRatio"
 	minUtilization               = 0
 	maxUtilization               = 100
 )

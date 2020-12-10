@@ -38,7 +38,7 @@ var _ framework.ScorePlugin = &TaintToleration{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "TaintToleration"
+	Name = framework.IntreePluginPrefix + "TaintToleration"
 	// preScoreStateKey is the key in CycleState to TaintToleration pre-computed data for Scoring.
 	preScoreStateKey = "PreScore" + Name
 	// ErrReasonNotMatch is the Filter reason status when not matching.

@@ -49,7 +49,7 @@ import (
 
 const (
 	// Name of the plugin used in the plugin registry and configurations.
-	Name = "DefaultPreemption"
+	Name = framework.IntreePluginPrefix + "DefaultPreemption"
 )
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.

@@ -41,7 +41,7 @@ var _ framework.ScorePlugin = &NodeAffinity{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "NodeAffinity"
+	Name = framework.IntreePluginPrefix + "NodeAffinity"
 
 	// preScoreStateKey is the key in CycleState to NodeAffinity pre-computed data for Scoring.
 	preScoreStateKey = "PreScore" + Name
