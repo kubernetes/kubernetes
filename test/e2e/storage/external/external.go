@@ -357,7 +357,6 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *testsuites.PerTestConfig)
 	snapshotter := d.DriverInfo.Name
 	parameters := map[string]string{}
 	ns := e2econfig.Framework.Namespace.Name
-	suffix := "vsc"
 
 	switch {
 	case d.SnapshotClass.FromName:
@@ -390,7 +389,7 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *testsuites.PerTestConfig)
 		}
 	}
 
-	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
+	return testsuites.GetSnapshotClass(snapshotter, parameters, ns)
 }
 
 func (d *driverDefinition) GetVolume(e2econfig *testsuites.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
