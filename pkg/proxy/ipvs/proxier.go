@@ -1736,22 +1736,6 @@ func (proxier *Proxier) writeIptablesRules() {
 		}
 	}
 
-	// externalIPRules adds iptables rules applies to Service ExternalIPs
-	externalIPRules := func(args []string) {
-		// Allow traffic for external IPs that does not come from a bridge (i.e. not from a container)
-		// nor from a local process to be forwarded to the service.
-		// This rule roughly translates to "all traffic from off-machine".
-		// This is imperfect in the face of network plugins that might not use a bridge, but we can revisit that later.
-		externalTrafficOnlyArgs := append(args,
-			"-m", "physdev", "!", "--physdev-is-in",
-			"-m", "addrtype", "!", "--src-type", "LOCAL")
-		writeLine(proxier.natRules, append(externalTrafficOnlyArgs, "-j", "ACCEPT")...)
-		dstLocalOnlyArgs := append(args, "-m", "addrtype", "--dst-type", "LOCAL")
-		// Allow traffic bound for external IPs that happen to be recognized as local IPs to stay local.
-		// This covers cases like GCE load-balancers which get added to the local routing table.
-		writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", "ACCEPT")...)
-	}
-
 	if !proxier.ipsetList[kubeExternalIPSet].isEmpty() {
 		// Build masquerade rules for packets to external IPs.
 		args = append(args[:0],
@@ -1761,7 +1745,8 @@ func (proxier *Proxier) writeIptablesRules() {
 			"dst,dst",
 		)
 		writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
-		externalIPRules(args)
+		// accept all traffic destined to the ExternalIP
+		writeLine(proxier.natRules, append(args, "-j", "ACCEPT")...)
 	}
 
 	if !proxier.ipsetList[kubeExternalIPLocalSet].isEmpty() {
@@ -1771,7 +1756,8 @@ func (proxier *Proxier) writeIptablesRules() {
 			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPLocalSet].Name,
 			"dst,dst",
 		)
-		externalIPRules(args)
+		// accept all traffic destined to the ExternalIP
+		writeLine(proxier.natRules, append(args, "-j", "ACCEPT")...)
 	}
 
 	// -A KUBE-SERVICES  -m addrtype  --dst-type LOCAL -j KUBE-NODE-PORT
