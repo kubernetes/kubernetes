@@ -23,7 +23,6 @@ import (
 	"math/rand"
 	"sort"
 	"sync/atomic"
-	"time"
 
 	"k8s.io/klog/v2"
 
@@ -89,10 +88,8 @@ func New(dpArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 
 // PostFilter invoked at the postFilter extension point.
 func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, m framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
-	preemptionStartTime := time.Now()
 	defer func() {
 		metrics.PreemptionAttempts.Inc()
-		metrics.DeprecatedSchedulingAlgorithmPreemptionEvaluationDuration.Observe(metrics.SinceInSeconds(preemptionStartTime))
 	}()
 
 	nnn, err := pl.preempt(ctx, state, pod, m)

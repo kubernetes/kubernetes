@@ -421,7 +421,6 @@ func (sched *Scheduler) finishBinding(fwk framework.Framework, assumed *v1.Pod, 
 		return
 	}
 
-	metrics.DeprecatedBindingLatency.Observe(metrics.SinceInSeconds(start))
 	fwk.EventRecorder().Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
 }
 
