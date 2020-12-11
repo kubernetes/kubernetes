@@ -2042,9 +2042,14 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	}
 
 	for _, epInfo := range endpoints {
+		if !epInfo.IsReady() {
+			continue
+		}
+
 		if onlyNodeLocalEndpoints && !epInfo.GetIsLocal() {
 			continue
 		}
+
 		newEndpoints.Insert(epInfo.String())
 	}
 
