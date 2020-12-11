@@ -300,6 +300,15 @@ func CollectAddresses(nodes *v1.NodeList, addressType v1.NodeAddressType) []stri
 	return ips
 }
 
+// CollectAddressesByFamily returns a list of addresses of the given addressType and family for the given list of nodes
+func CollectAddressesByFamily(nodes *v1.NodeList, addressType v1.NodeAddressType, family v1.IPFamily) []string {
+	ips := []string{}
+	for i := range nodes.Items {
+		ips = append(ips, GetAddressesByTypeAndFamily(&nodes.Items[i], addressType, family)...)
+	}
+	return ips
+}
+
 // PickIP picks one public node IP
 func PickIP(c clientset.Interface) (string, error) {
 	publicIps, err := GetPublicIps(c)

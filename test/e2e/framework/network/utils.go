@@ -190,12 +190,12 @@ type NetworkingTestConfig struct {
 	ClusterIP string
 	// The SecondaryClusterIP of the Service created by this test config.
 	SecondaryClusterIP string
-	// NodeIP it's an ExternalIP if the node has one,
-	// or an InternalIP if not, for use in nodePort testing.
-	NodeIP string
-	// SecondaryNodeIP it's an ExternalIP of the secondary IP family if the node has one,
-	// or an InternalIP if not, for usein nodePort testing.
-	SecondaryNodeIP string
+	// NodeIPs are the ExternalIPs if the nodes have one,
+	// or the InternalIP if not, for use in nodePort testing.
+	NodeIPs []string
+	// SecondaryNodeIP are the ExternalIP of the secondary IP family if the nodes have one,
+	// or the InternalIPs if not, for use in nodePort testing.
+	SecondaryNodeIPs []string
 	// The http/udp/sctp nodePorts of the Service.
 	NodeHTTPPort int
 	NodeUDPPort  int
@@ -793,14 +793,14 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 		secondaryFamily = v1.IPv4Protocol
 	}
 	// Get Node IPs from the cluster, ExternalIPs take precedence
-	config.NodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, family)
-	if config.NodeIP == "" {
-		config.NodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeInternalIP, family)
+	config.NodeIPs = e2enode.CollectAddressesByFamily(nodeList, v1.NodeExternalIP, family)
+	if len(config.NodeIPs) < 2 {
+		config.NodeIPs = e2enode.CollectAddressesByFamily(nodeList, v1.NodeInternalIP, family)
 	}
 	if config.DualStackEnabled {
-		config.SecondaryNodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, secondaryFamily)
-		if config.SecondaryNodeIP == "" {
-			config.SecondaryNodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeInternalIP, secondaryFamily)
+		config.SecondaryNodeIPs = e2enode.CollectAddressesByFamily(nodeList, v1.NodeExternalIP, secondaryFamily)
+		if len(config.SecondaryNodeIPs) < 2 {
+			config.SecondaryNodeIPs = e2enode.CollectAddressesByFamily(nodeList, v1.NodeInternalIP, secondaryFamily)
 		}
 	}
 
