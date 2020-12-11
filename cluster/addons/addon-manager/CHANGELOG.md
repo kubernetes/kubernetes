@@ -89,6 +89,3 @@
 
 ### Version 1 (Thu May 5 2016 Mike Danese @mikedanese)
  - Run kube-addon-manager in a pod
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/addon-manager/CHANGELOG.md?pixel)]()
