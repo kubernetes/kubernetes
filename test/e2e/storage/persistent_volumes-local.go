@@ -45,6 +45,7 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -1077,7 +1078,7 @@ func testReadFileContent(f *framework.Framework, testFileDir string, testFile st
 // Execute a read or write command in a pod.
 // Fail on error
 func podRWCmdExec(f *framework.Framework, pod *v1.Pod, cmd string) string {
-	stdout, stderr, err := utils.PodExec(f, pod, cmd)
+	stdout, stderr, err := e2evolume.PodExec(f, pod, cmd)
 	framework.Logf("podRWCmdExec cmd: %q, out: %q, stderr: %q, err: %v", cmd, stdout, stderr, err)
 	framework.ExpectNoError(err)
 	return stdout

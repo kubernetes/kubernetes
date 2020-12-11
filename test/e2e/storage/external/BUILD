@@ -19,7 +19,7 @@ go_library(
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/volume:go_default_library",
-        "//test/e2e/storage/testpatterns:go_default_library",
+        "//test/e2e/storage/framework:go_default_library",
         "//test/e2e/storage/testsuites:go_default_library",
         "//test/e2e/storage/utils:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
@@ -36,7 +36,7 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//test/e2e/framework/volume:go_default_library",
-        "//test/e2e/storage/testsuites:go_default_library",
+        "//test/e2e/storage/framework:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
