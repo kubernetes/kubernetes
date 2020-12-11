@@ -28,13 +28,10 @@ import (
 const (
 	// SchedulerSubsystem - subsystem name used by scheduler
 	SchedulerSubsystem = "scheduler"
-
-	// OperationLabel - operation label name
-	OperationLabel = "operation"
 	// Below are possible values for the operation label. Each represents a substep of e2e scheduling:
 
-	// PreemptionEvaluation - preemption evaluation operation label value (occurs in case of scheduling fitError).
-	PreemptionEvaluation = "preemption_evaluation"
+	// PrioritizingExtender - prioritizing extender operation label value
+	PrioritizingExtender = "prioritizing_extender"
 	// Binding - binding operation label value
 	Binding = "binding"
 	// E2eScheduling - e2e scheduling operation label value
