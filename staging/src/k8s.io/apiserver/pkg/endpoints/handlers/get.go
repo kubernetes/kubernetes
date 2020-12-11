@@ -52,7 +52,7 @@ type getterFunc func(ctx context.Context, name string, req *http.Request, trace 
 func getResourceHandler(scope *RequestScope, getter getterFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		trace := utiltrace.New("Get", traceFields(req)...)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		defer trace.LogIfLong(getTraceLogThreshold())
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
@@ -272,7 +272,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 		}
 
 		// Log only long List requests (ignore Watch).
-		defer trace.LogIfLong(500 * time.Millisecond)
+		defer trace.LogIfLong(getTraceLogThreshold())
 		trace.Step("About to List from storage")
 		result, err := r.List(ctx, &opts)
 		if err != nil {

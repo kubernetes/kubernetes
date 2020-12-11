@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -47,7 +46,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Update", traceFields(req)...)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		defer trace.LogIfLong(getTraceLogThreshold())
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
 			scope.err(errors.NewBadRequest("the dryRun feature is disabled"), w, req)

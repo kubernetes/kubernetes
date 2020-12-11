@@ -62,7 +62,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Patch", traceFields(req)...)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		defer trace.LogIfLong(getTraceLogThreshold())
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
 			scope.err(errors.NewBadRequest("the dryRun feature is disabled"), w, req)

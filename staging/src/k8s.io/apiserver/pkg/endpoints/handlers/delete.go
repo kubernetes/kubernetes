@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -47,7 +46,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Delete", traceFields(req)...)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		defer trace.LogIfLong(getTraceLogThreshold())
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
 			scope.err(errors.NewBadRequest("the dryRun feature is disabled"), w, req)
@@ -165,7 +164,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		trace := utiltrace.New("Delete", traceFields(req)...)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		defer trace.LogIfLong(getTraceLogThreshold())
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
 			scope.err(errors.NewBadRequest("the dryRun feature is disabled"), w, req)

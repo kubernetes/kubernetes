@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -50,7 +49,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Create", traceFields(req)...)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		defer trace.LogIfLong(getTraceLogThreshold())
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
 			scope.err(errors.NewBadRequest("the dryRun feature is disabled"), w, req)

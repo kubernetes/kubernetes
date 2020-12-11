@@ -18,9 +18,30 @@ package handlers
 
 import (
 	"net/http"
+	"os"
+	"strconv"
+	"time"
 
 	utiltrace "k8s.io/utils/trace"
 )
+
+const (
+	defaultTraceLogThreshold int = 500
+	maxTraceLogThreshold     int = 1000
+	minTraceLogThreshold     int = 0
+)
+
+var traceLogThreshold time.Duration
+
+func init() {
+	threshold := os.Getenv("TRACE_LOG_THRESHOLD")
+	traceLogThreshold = time.Duration(defaultTraceLogThreshold) * time.Millisecond
+	if v, err := strconv.Atoi(threshold); err == nil {
+		if v >= minTraceLogThreshold && v <= maxTraceLogThreshold {
+			traceLogThreshold = time.Duration(v) * time.Millisecond
+		}
+	}
+}
 
 func traceFields(req *http.Request) []utiltrace.Field {
 	return []utiltrace.Field{
@@ -29,4 +50,8 @@ func traceFields(req *http.Request) []utiltrace.Field {
 		{Key: "client", Value: &lazyClientIP{req: req}},
 		{Key: "accept", Value: &lazyAccept{req: req}},
 		{Key: "protocol", Value: req.Proto}}
+}
+
+func getTraceLogThreshold() time.Duration {
+	return traceLogThreshold
 }
