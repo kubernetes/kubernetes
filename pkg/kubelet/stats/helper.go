@@ -153,6 +153,27 @@ func cadvisorInfoToContainerCPUAndMemoryStats(name string, info *cadvisorapiv2.C
 	return result
 }
 
+// cadvisorInfoToAcceleratorStats returns the statsapi.AcceleratorStats converted from
+// the container info from cadvisor.
+func cadvisorInfoToAcceleratorStats(info *cadvisorapiv2.ContainerInfo) []statsapi.AcceleratorStats {
+	cstat, found := latestContainerStats(info)
+	if !found || cstat.Accelerators == nil {
+		return nil
+	}
+	var result []statsapi.AcceleratorStats
+	for _, acc := range cstat.Accelerators {
+		result = append(result, statsapi.AcceleratorStats{
+			Make:        acc.Make,
+			Model:       acc.Model,
+			ID:          acc.ID,
+			MemoryTotal: acc.MemoryTotal,
+			MemoryUsed:  acc.MemoryUsed,
+			DutyCycle:   acc.DutyCycle,
+		})
+	}
+	return result
+}
+
 func cadvisorInfoToProcessStats(info *cadvisorapiv2.ContainerInfo) *statsapi.ProcessStats {
 	cstat, found := latestContainerStats(info)
 	if !found || cstat.Processes == nil {

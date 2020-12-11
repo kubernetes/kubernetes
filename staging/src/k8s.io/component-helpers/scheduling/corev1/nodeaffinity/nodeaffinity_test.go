@@ -17,14 +17,19 @@ limitations under the License.
 package nodeaffinity
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	apierrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+)
+
+var (
+	ignoreBadValue = cmpopts.IgnoreFields(field.Error{}, "BadValue")
 )
 
 func TestNodeSelectorMatch(t *testing.T) {
@@ -69,10 +74,18 @@ func TestNodeSelectorMatch(t *testing.T) {
 					}},
 				},
 			}},
-			wantErr: apierrors.NewAggregate([]error{
-				errors.New(`unexpected number of value (2) for node field selector operator "In"`),
-				errors.New(`invalid label key "invalid key": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`),
-			}),
+			wantErr: field.ErrorList{
+				&field.Error{
+					Type:   field.ErrorTypeInvalid,
+					Field:  "nodeSelectorTerms[0].matchFields[0].values",
+					Detail: "must have one element",
+				},
+				&field.Error{
+					Type:   field.ErrorTypeInvalid,
+					Field:  "nodeSelectorTerms[2].matchExpressions[0]",
+					Detail: `invalid label key "invalid key": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+				},
+			}.ToAggregate(),
 		},
 		{
 			name: "node matches field selector, but not labels",
@@ -136,8 +149,8 @@ func TestNodeSelectorMatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeSelector, err := NewNodeSelector(&tt.nodeSelector)
-			if !reflect.DeepEqual(err, tt.wantErr) {
-				t.Fatalf("NewNodeSelector returned error %q, want %q", err, tt.wantErr)
+			if diff := cmp.Diff(tt.wantErr, err, ignoreBadValue); diff != "" {
+				t.Fatalf("NewNodeSelector returned unexpected error (-want,+got):\n%s", diff)
 			}
 			if tt.wantErr != nil {
 				return
@@ -197,10 +210,18 @@ func TestPreferredSchedulingTermsScore(t *testing.T) {
 					},
 				},
 			},
-			wantErr: apierrors.NewAggregate([]error{
-				errors.New(`unexpected number of value (2) for node field selector operator "In"`),
-				errors.New(`invalid label key "invalid key": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`),
-			}),
+			wantErr: field.ErrorList{
+				&field.Error{
+					Type:   field.ErrorTypeInvalid,
+					Field:  "[0].matchFields[0].values",
+					Detail: "must have one element",
+				},
+				&field.Error{
+					Type:   field.ErrorTypeInvalid,
+					Field:  "[2].matchExpressions[0]",
+					Detail: `invalid label key "invalid key": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+				},
+			}.ToAggregate(),
 		},
 		{
 			name: "invalid field selector but no weight, error not reported",
@@ -259,8 +280,8 @@ func TestPreferredSchedulingTermsScore(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			prefSchedTerms, err := NewPreferredSchedulingTerms(tt.prefSchedTerms)
-			if !reflect.DeepEqual(err, tt.wantErr) {
-				t.Fatalf("NewPreferredSchedulingTerms returned error %q, want %q", err, tt.wantErr)
+			if diff := cmp.Diff(tt.wantErr, err, ignoreBadValue); diff != "" {
+				t.Fatalf("NewPreferredSchedulingTerms returned unexpected error (-want,+got):\n%s", diff)
 			}
 			if tt.wantErr != nil {
 				return
@@ -287,9 +308,9 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 		return out
 	}
 	tc := []struct {
-		in        []v1.NodeSelectorRequirement
-		out       labels.Selector
-		expectErr bool
+		in       []v1.NodeSelectorRequirement
+		out      labels.Selector
+		wantErrs field.ErrorList
 	}{
 		{in: nil, out: labels.Nothing()},
 		{in: []v1.NodeSelectorRequirement{}, out: labels.Nothing()},
@@ -303,7 +324,7 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 				Operator: v1.NodeSelectorOpExists,
 				Values:   []string{"bar", "baz"},
 			}},
-			expectErr: true,
+			wantErrs: field.ErrorList{field.Invalid(field.NewPath("root").Index(0), nil, "values set must be empty for exists and does not exist")},
 		},
 		{
 			in: []v1.NodeSelectorRequirement{{
@@ -324,12 +345,9 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 	}
 
 	for i, tc := range tc {
-		out, err := nodeSelectorRequirementsAsSelector(tc.in)
-		if err == nil && tc.expectErr {
-			t.Errorf("[%v]expected error but got none.", i)
-		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		out, err := nodeSelectorRequirementsAsSelector(tc.in, field.NewPath("root"))
+		if diff := cmp.Diff(tc.wantErrs, err, ignoreBadValue); diff != "" {
+			t.Errorf("nodeSelectorRequirementsAsSelector returned unexpected error (-want,+got):\n%s", diff)
 		}
 		if !reflect.DeepEqual(out, tc.out) {
 			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)
