@@ -1369,6 +1369,7 @@ func CreatePodWithPersistentVolume(client clientset.Interface, namespace string,
 			pv.Status.Phase = v1.VolumeBound
 
 			// bind pvc to "pv-$i"
+			pvc.Spec.VolumeName = pv.Name
 			pvc.Status.Phase = v1.ClaimBound
 		} else {
 			pv.Status.Phase = v1.VolumeAvailable
