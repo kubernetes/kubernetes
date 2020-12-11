@@ -278,6 +278,10 @@ func (ident *DockerConfigEntry) UnmarshalJSON(data []byte) error {
 	}
 
 	ident.Username, ident.Password, err = decodeDockerConfigFieldAuth(tmp.Auth)
+	klog.Infof("This should complain:", ident.Password)
+	klog.V(4).Infof("This should complain:", ident.Password)
+
+	klog.Infof("This should _NOT_ complain:", ident.Email)
 	return err
 }
 
