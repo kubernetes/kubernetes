@@ -214,6 +214,25 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					},
 				},
 				{
+					Name:           "gp3 EBS on AWS",
+					CloudProviders: []string{"aws"},
+					Timeouts:       f.Timeouts,
+					Provisioner:    "kubernetes.io/aws-ebs",
+					Parameters: map[string]string{
+						"type": "gp3",
+						"zone": getRandomClusterZone(c),
+					},
+					ClaimSize:    "1.5Gi",
+					ExpectedSize: "2Gi",
+					PvCheck: func(claim *v1.PersistentVolumeClaim) {
+						volume := testsuites.PVWriteReadSingleNodeCheck(c, f.Timeouts, claim, e2epod.NodeSelection{})
+						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
+
+						err := checkAWSEBS(volume, "gp3", false)
+						framework.ExpectNoError(err, "checkAWSEBS gp3")
+					},
+				},
+				{
 					Name:           "io1 EBS on AWS",
 					CloudProviders: []string{"aws"},
 					Timeouts:       f.Timeouts,
@@ -230,6 +249,25 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 						err := checkAWSEBS(volume, "io1", false)
 						framework.ExpectNoError(err, "checkAWSEBS io1")
+					},
+				},
+				{
+					Name:           "io2 EBS on AWS",
+					CloudProviders: []string{"aws"},
+					Timeouts:       f.Timeouts,
+					Provisioner:    "kubernetes.io/aws-ebs",
+					Parameters: map[string]string{
+						"type":      "io2",
+						"iopsPerGB": "50",
+					},
+					ClaimSize:    "3.5Gi",
+					ExpectedSize: "4Gi", // 4 GiB is minimum for io2
+					PvCheck: func(claim *v1.PersistentVolumeClaim) {
+						volume := testsuites.PVWriteReadSingleNodeCheck(c, f.Timeouts, claim, e2epod.NodeSelection{})
+						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
+
+						err := checkAWSEBS(volume, "io2", false)
+						framework.ExpectNoError(err, "checkAWSEBS io2")
 					},
 				},
 				{
