@@ -640,5 +640,25 @@ function Test-NodeUsesAuthPlugin {
   return $KubeEnv.Contains('EXEC_AUTH_PLUGIN_URL')
 }
 
+# Permanently adds a directory to the $env:PATH environment variable.
+function Add-MachineEnvironmentPath {
+  param (
+    [parameter(Mandatory=$true)] [string]$Path
+  )
+  # Verify that the $Path is not already in the $env:Path variable.
+  $pathForCompare = $Path.TrimEnd('\').ToLower()
+  foreach ($p in $env:Path.Split(";")) {
+    if ($p.TrimEnd('\').ToLower() -eq $pathForCompare) {
+        return
+    }
+  }
+
+  $newMachinePath = $Path + ";" + `
+    [System.Environment]::GetEnvironmentVariable("Path","Machine")
+  [Environment]::SetEnvironmentVariable("Path", $newMachinePath, `
+    [System.EnvironmentVariableTarget]::Machine)
+  $env:Path = $Path + ";" + $env:Path
+}
+
 # Export all public functions:
 Export-ModuleMember -Function *-*
