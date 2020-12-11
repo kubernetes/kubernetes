@@ -202,7 +202,7 @@ func (t *snapshottableStressTestSuite) DefineTests(driver TestDriver, pattern te
 				defer wg.Done()
 
 				framework.Logf("Deleting snapshot %s/%s", snapshot.Vs.GetNamespace(), snapshot.Vs.GetName())
-				err := snapshot.CleanupResource()
+				err := snapshot.CleanupResource(f.Timeouts)
 				mu.Lock()
 				defer mu.Unlock()
 				errs = append(errs, err)
@@ -275,7 +275,7 @@ func (t *snapshottableStressTestSuite) DefineTests(driver TestDriver, pattern te
 						return
 					default:
 						framework.Logf("Pod-%d [%s], Iteration %d/%d", podIndex, pod.Name, snapshotIndex, stressTest.testOptions.NumSnapshots-1)
-						snapshot := CreateSnapshotResource(snapshottableDriver, stressTest.config, pattern, volume.Pvc.GetName(), volume.Pvc.GetNamespace())
+						snapshot := CreateSnapshotResource(snapshottableDriver, stressTest.config, pattern, volume.Pvc.GetName(), volume.Pvc.GetNamespace(), f.Timeouts)
 						stressTest.snapshotsMutex.Lock()
 						defer stressTest.snapshotsMutex.Unlock()
 						stressTest.snapshots = append(stressTest.snapshots, snapshot)

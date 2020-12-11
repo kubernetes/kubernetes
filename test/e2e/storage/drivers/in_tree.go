@@ -953,7 +953,7 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *testsuites.PerTestConfig, v
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), prepPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating hostPath init pod")
 
-	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+	err = e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for hostPath init pod to succeed")
 
 	err = e2epod.DeletePodWithWait(f.ClientSet, pod)
@@ -975,7 +975,7 @@ func (v *hostPathSymlinkVolume) DeleteVolume() {
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), v.prepPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating hostPath teardown pod")
 
-	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+	err = e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for hostPath teardown pod to succeed")
 
 	err = e2epod.DeletePodWithWait(f.ClientSet, pod)

@@ -227,7 +227,7 @@ func firewall() error {
 	return printSuccess("Firewall IPTables Check %s", success)
 }
 
-// daemons checks that the required node programs are running: kubelet, kube-proxy, and docker
+// daemons checks that the required node programs are running: kubelet and kube-proxy
 func daemons() error {
 	if exec.Command("pgrep", "-f", "kubelet").Run() != nil {
 		return printError("Daemon Check %s: kubelet process not found", failed)

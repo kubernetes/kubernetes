@@ -175,6 +175,7 @@ aliases:
     - ravisantoshgudimetla
     - Huang-Wei
     - ahg-g
+    - damemi
   # emeritus:
   # - bsalamat
   sig-scheduling:
@@ -204,6 +205,7 @@ aliases:
     - smarterclayton
     - soltysh
     - pwittrock
+    - eddiezane
   # emeritus:
   # - adohe
   sig-cli:
@@ -220,6 +222,7 @@ aliases:
     - soltysh
     - pwittrock
     - zhouya0
+    - eddiezane
 
   sig-testing-reviewers:
     - bentheelder
@@ -473,9 +476,9 @@ aliases:
     - nikhita
 
   sig-docs-approvers:
+    - irvifa
     - jimangel
     - kbarnard10
-    - zacharysarah
     - kbhawkey
     - onlydole
     - sftim
@@ -504,6 +507,13 @@ aliases:
     - msau42
     - jsafrane
 
+  sig-security-approvers:
+    - IanColdwater
+    - tabbysable
+
+  sig-security-reviewers:
+    - IanColdwater
+    - tabbysable
 
   sig-windows-api-reviewers:
     - patricklang

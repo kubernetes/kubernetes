@@ -255,26 +255,64 @@ func LogAndEmitIncorrectIPVersionEvent(recorder record.EventRecorder, fieldName,
 	}
 }
 
-// FilterIncorrectIPVersion filters out the incorrect IP version case from a slice of IP strings.
-func FilterIncorrectIPVersion(ipStrings []string, ipfamily v1.IPFamily) ([]string, []string) {
-	return filterWithCondition(ipStrings, (ipfamily == v1.IPv6Protocol), utilnet.IsIPv6String)
-}
-
-// FilterIncorrectCIDRVersion filters out the incorrect IP version case from a slice of CIDR strings.
-func FilterIncorrectCIDRVersion(ipStrings []string, ipfamily v1.IPFamily) ([]string, []string) {
-	return filterWithCondition(ipStrings, (ipfamily == v1.IPv6Protocol), utilnet.IsIPv6CIDRString)
-}
-
-func filterWithCondition(strs []string, expectedCondition bool, conditionFunc func(string) bool) ([]string, []string) {
-	var corrects, incorrects []string
-	for _, str := range strs {
-		if conditionFunc(str) != expectedCondition {
-			incorrects = append(incorrects, str)
+// MapIPsByIPFamily maps a slice of IPs to their respective IP families (v4 or v6)
+func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
+	ipFamilyMap := map[v1.IPFamily][]string{}
+	for _, ip := range ipStrings {
+		// Handle only the valid IPs
+		if ipFamily, err := getIPFamilyFromIP(ip); err == nil {
+			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
-			corrects = append(corrects, str)
+			klog.Errorf("Skipping invalid IP: %s", ip)
 		}
 	}
-	return corrects, incorrects
+	return ipFamilyMap
+}
+
+// MapCIDRsByIPFamily maps a slice of IPs to their respective IP families (v4 or v6)
+func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
+	ipFamilyMap := map[v1.IPFamily][]string{}
+	for _, cidr := range cidrStrings {
+		// Handle only the valid CIDRs
+		if ipFamily, err := getIPFamilyFromCIDR(cidr); err == nil {
+			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
+		} else {
+			klog.Errorf("Skipping invalid cidr: %s", cidr)
+		}
+	}
+	return ipFamilyMap
+}
+
+func getIPFamilyFromIP(ipStr string) (v1.IPFamily, error) {
+	netIP := net.ParseIP(ipStr)
+	if netIP == nil {
+		return "", ErrAddressNotAllowed
+	}
+
+	if utilnet.IsIPv6(netIP) {
+		return v1.IPv6Protocol, nil
+	}
+	return v1.IPv4Protocol, nil
+}
+
+func getIPFamilyFromCIDR(cidrStr string) (v1.IPFamily, error) {
+	_, netCIDR, err := net.ParseCIDR(cidrStr)
+	if err != nil {
+		return "", ErrAddressNotAllowed
+	}
+	if utilnet.IsIPv6CIDR(netCIDR) {
+		return v1.IPv6Protocol, nil
+	}
+	return v1.IPv4Protocol, nil
+}
+
+// OtherIPFamily returns the other ip family
+func OtherIPFamily(ipFamily v1.IPFamily) v1.IPFamily {
+	if ipFamily == v1.IPv6Protocol {
+		return v1.IPv4Protocol
+	}
+
+	return v1.IPv6Protocol
 }
 
 // AppendPortIfNeeded appends the given port to IP address unless it is already in

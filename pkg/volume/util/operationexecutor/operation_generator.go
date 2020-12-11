@@ -834,9 +834,9 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.FindDeviceMountablePluginByName failed", err)
 	}
 
-	volumeDeviceUmounter, err := deviceMountableVolumePlugin.NewDeviceUnmounter()
+	volumeDeviceUnmounter, err := deviceMountableVolumePlugin.NewDeviceUnmounter()
 	if err != nil {
-		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewDeviceUmounter failed", err)
+		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewDeviceUnmounter failed", err)
 	}
 
 	volumeDeviceMounter, err := deviceMountableVolumePlugin.NewDeviceMounter()
@@ -868,7 +868,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 			return deviceToDetach.GenerateError("GetDeviceMountRefs check failed", err)
 		}
 		// Execute unmount
-		unmountDeviceErr := volumeDeviceUmounter.UnmountDevice(deviceMountPath)
+		unmountDeviceErr := volumeDeviceUnmounter.UnmountDevice(deviceMountPath)
 		if unmountDeviceErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return deviceToDetach.GenerateError("UnmountDevice failed", unmountDeviceErr)

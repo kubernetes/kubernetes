@@ -63,7 +63,7 @@ func TestMergoSemantics(t *testing.T) {
 		},
 	}
 	for _, data := range testDataStruct {
-		err := mergo.MergeWithOverwrite(&data.dst, &data.src)
+		err := mergo.Merge(&data.dst, &data.src, mergo.WithOverride)
 		if err != nil {
 			t.Errorf("error while merging: %s", err)
 		}
@@ -92,7 +92,7 @@ func TestMergoSemantics(t *testing.T) {
 		},
 	}
 	for _, data := range testDataMap {
-		err := mergo.MergeWithOverwrite(&data.dst, &data.src)
+		err := mergo.Merge(&data.dst, &data.src, mergo.WithOverride)
 		if err != nil {
 			t.Errorf("error while merging: %s", err)
 		}

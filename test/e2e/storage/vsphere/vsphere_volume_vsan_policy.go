@@ -269,7 +269,7 @@ func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, n
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	ginkgo.By("Waiting for claim to be in bound phase")
-	persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+	persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, f.Timeouts.ClaimProvision)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating pod to attach PV to the node")

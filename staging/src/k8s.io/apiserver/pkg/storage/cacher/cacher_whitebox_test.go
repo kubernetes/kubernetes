@@ -877,7 +877,7 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 	resourceVersion := uint64(1000)
 	err = cacher.watchCache.Add(&examplev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            fmt.Sprintf("pod-0"),
+			Name:            "pod-0",
 			Namespace:       "ns",
 			ResourceVersion: fmt.Sprintf("%v", resourceVersion),
 		}})

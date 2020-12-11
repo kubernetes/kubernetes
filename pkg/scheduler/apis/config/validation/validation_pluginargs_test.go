@@ -33,8 +33,8 @@ var (
 
 func TestValidateDefaultPreemptionArgs(t *testing.T) {
 	cases := map[string]struct {
-		args    config.DefaultPreemptionArgs
-		wantErr string
+		args     config.DefaultPreemptionArgs
+		wantErrs field.ErrorList
 	}{
 		"valid args (default)": {
 			args: config.DefaultPreemptionArgs{
@@ -47,35 +47,75 @@ func TestValidateDefaultPreemptionArgs(t *testing.T) {
 				MinCandidateNodesPercentage: -1,
 				MinCandidateNodesAbsolute:   100,
 			},
-			wantErr: "minCandidateNodesPercentage is not in the range [0, 100]",
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "minCandidateNodesPercentage",
+				},
+			},
 		},
 		"minCandidateNodesPercentage over 100": {
 			args: config.DefaultPreemptionArgs{
 				MinCandidateNodesPercentage: 900,
 				MinCandidateNodesAbsolute:   100,
 			},
-			wantErr: "minCandidateNodesPercentage is not in the range [0, 100]",
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "minCandidateNodesPercentage",
+				},
+			},
 		},
 		"negative minCandidateNodesAbsolute": {
 			args: config.DefaultPreemptionArgs{
 				MinCandidateNodesPercentage: 20,
 				MinCandidateNodesAbsolute:   -1,
 			},
-			wantErr: "minCandidateNodesAbsolute is not in the range [0, inf)",
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "minCandidateNodesAbsolute",
+				},
+			},
 		},
 		"all zero": {
 			args: config.DefaultPreemptionArgs{
 				MinCandidateNodesPercentage: 0,
 				MinCandidateNodesAbsolute:   0,
 			},
-			wantErr: "both minCandidateNodesPercentage and minCandidateNodesAbsolute cannot be zero",
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "minCandidateNodesPercentage",
+				}, &field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "minCandidateNodesAbsolute",
+				},
+			},
+		},
+		"both negative": {
+			args: config.DefaultPreemptionArgs{
+				MinCandidateNodesPercentage: -1,
+				MinCandidateNodesAbsolute:   -1,
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "minCandidateNodesPercentage",
+				}, &field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "minCandidateNodesAbsolute",
+				},
+			},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			err := ValidateDefaultPreemptionArgs(tc.args)
-			assertErr(t, tc.wantErr, err)
+			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
+				t.Fatalf("ValidateDefaultPreemptionArgs returned err (-want,+got):\n%s", diff)
+			}
 		})
 	}
 }
@@ -83,7 +123,7 @@ func TestValidateDefaultPreemptionArgs(t *testing.T) {
 func TestValidateInterPodAffinityArgs(t *testing.T) {
 	cases := map[string]struct {
 		args    config.InterPodAffinityArgs
-		wantErr string
+		wantErr error
 	}{
 		"valid args": {
 			args: config.InterPodAffinityArgs{
@@ -94,28 +134,36 @@ func TestValidateInterPodAffinityArgs(t *testing.T) {
 			args: config.InterPodAffinityArgs{
 				HardPodAffinityWeight: -1,
 			},
-			wantErr: `hardPodAffinityWeight: Invalid value: -1: not in valid range [0-100]`,
+			wantErr: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "hardPodAffinityWeight",
+			},
 		},
 		"hardPodAffinityWeight more than max": {
 			args: config.InterPodAffinityArgs{
 				HardPodAffinityWeight: 101,
 			},
-			wantErr: `hardPodAffinityWeight: Invalid value: 101: not in valid range [0-100]`,
+			wantErr: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "hardPodAffinityWeight",
+			},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			err := ValidateInterPodAffinityArgs(tc.args)
-			assertErr(t, tc.wantErr, err)
+			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
+				t.Fatalf("ValidateInterPodAffinityArgs returned err (-want,+got):\n%s", diff)
+			}
 		})
 	}
 }
 
 func TestValidateNodeLabelArgs(t *testing.T) {
 	cases := map[string]struct {
-		args    config.NodeLabelArgs
-		wantErr string
+		args     config.NodeLabelArgs
+		wantErrs field.ErrorList
 	}{
 		"valid config": {
 			args: config.NodeLabelArgs{
@@ -130,29 +178,73 @@ func TestValidateNodeLabelArgs(t *testing.T) {
 				PresentLabels: []string{"label"},
 				AbsentLabels:  []string{"label"},
 			},
-			wantErr: `detecting at least one label (e.g., "label") that exist in both the present([label]) and absent([label]) label list`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "presentLabels[0]",
+				},
+			},
+		},
+		"multiple labels conflict": {
+			args: config.NodeLabelArgs{
+				PresentLabels: []string{"label", "label3"},
+				AbsentLabels:  []string{"label", "label2", "label3"},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "presentLabels[0]",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "presentLabels[1]",
+				},
+			},
 		},
 		"labels preference conflict": {
 			args: config.NodeLabelArgs{
 				PresentLabelsPreference: []string{"label"},
 				AbsentLabelsPreference:  []string{"label"},
 			},
-			wantErr: `detecting at least one label (e.g., "label") that exist in both the present([label]) and absent([label]) label list`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "presentLabelsPreference[0]",
+				},
+			},
+		},
+		"multiple labels preference conflict": {
+			args: config.NodeLabelArgs{
+				PresentLabelsPreference: []string{"label", "label3"},
+				AbsentLabelsPreference:  []string{"label", "label2", "label3"},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "presentLabelsPreference[0]",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "presentLabelsPreference[1]",
+				},
+			},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			err := ValidateNodeLabelArgs(tc.args)
-			assertErr(t, tc.wantErr, err)
+			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
+				t.Fatalf("ValidateNodeLabelArgs returned err (-want,+got):\n%s", diff)
+			}
 		})
 	}
 }
 
 func TestValidatePodTopologySpreadArgs(t *testing.T) {
 	cases := map[string]struct {
-		args    *config.PodTopologySpreadArgs
-		wantErr string
+		args     *config.PodTopologySpreadArgs
+		wantErrs field.ErrorList
 	}{
 		"valid config": {
 			args: &config.PodTopologySpreadArgs{
@@ -182,7 +274,12 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 				},
 				DefaultingType: config.ListDefaulting,
 			},
-			wantErr: `defaultConstraints[0].maxSkew: Invalid value: -1: must be greater than zero`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "defaultConstraints[0].maxSkew",
+				},
+			},
 		},
 		"empty topology key": {
 			args: &config.PodTopologySpreadArgs{
@@ -195,7 +292,12 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 				},
 				DefaultingType: config.ListDefaulting,
 			},
-			wantErr: `defaultConstraints[0].topologyKey: Required value: can not be empty`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeRequired,
+					Field: "defaultConstraints[0].topologyKey",
+				},
+			},
 		},
 		"whenUnsatisfiable is empty": {
 			args: &config.PodTopologySpreadArgs{
@@ -208,7 +310,12 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 				},
 				DefaultingType: config.ListDefaulting,
 			},
-			wantErr: `defaultConstraints[0].whenUnsatisfiable: Required value: can not be empty`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeRequired,
+					Field: "defaultConstraints[0].whenUnsatisfiable",
+				},
+			},
 		},
 		"whenUnsatisfiable contains unsupported action": {
 			args: &config.PodTopologySpreadArgs{
@@ -221,7 +328,12 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 				},
 				DefaultingType: config.ListDefaulting,
 			},
-			wantErr: `defaultConstraints[0].whenUnsatisfiable: Unsupported value: "unknown action": supported values: "DoNotSchedule", "ScheduleAnyway"`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeNotSupported,
+					Field: "defaultConstraints[0].whenUnsatisfiable",
+				},
+			},
 		},
 		"duplicated constraints": {
 			args: &config.PodTopologySpreadArgs{
@@ -239,7 +351,12 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 				},
 				DefaultingType: config.ListDefaulting,
 			},
-			wantErr: `defaultConstraints[1]: Duplicate value: "{node, DoNotSchedule}"`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeDuplicate,
+					Field: "defaultConstraints[1]",
+				},
+			},
 		},
 		"label selector present": {
 			args: &config.PodTopologySpreadArgs{
@@ -257,7 +374,12 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 				},
 				DefaultingType: config.ListDefaulting,
 			},
-			wantErr: `defaultConstraints[0].labelSelector: Forbidden: constraint must not define a selector, as they deduced for each pod`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeForbidden,
+					Field: "defaultConstraints[0].labelSelector",
+				},
+			},
 		},
 		"list default constraints, no constraints": {
 			args: &config.PodTopologySpreadArgs{
@@ -267,6 +389,17 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 		"system default constraints": {
 			args: &config.PodTopologySpreadArgs{
 				DefaultingType: config.SystemDefaulting,
+			},
+		},
+		"wrong constraints": {
+			args: &config.PodTopologySpreadArgs{
+				DefaultingType: "unknown",
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeNotSupported,
+					Field: "defaultingType",
+				},
 			},
 		},
 		"system default constraints, but has constraints": {
@@ -280,22 +413,29 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 				},
 				DefaultingType: config.SystemDefaulting,
 			},
-			wantErr: `defaultingType: Invalid value: "System": when .defaultConstraints are not empty`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "defaultingType",
+				},
+			},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			err := ValidatePodTopologySpreadArgs(tc.args)
-			assertErr(t, tc.wantErr, err)
+			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
+				t.Fatalf("ValidatePodTopologySpreadArgs returned err (-want,+got):\n%s", diff)
+			}
 		})
 	}
 }
 
 func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 	cases := map[string]struct {
-		args    config.RequestedToCapacityRatioArgs
-		wantErr string
+		args     config.RequestedToCapacityRatioArgs
+		wantErrs field.ErrorList
 	}{
 		"valid config": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -331,7 +471,12 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `at least one point must be specified`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeRequired,
+					Field: "shape",
+				},
+			},
 		},
 		"utilization less than min": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -346,7 +491,12 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `utilization values must not be less than 0. Utilization[0]==-10`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[0].utilization",
+				},
+			},
 		},
 		"utilization greater than max": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -361,9 +511,14 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `utilization values must not be greater than 100. Utilization[1]==110`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[1].utilization",
+				},
+			},
 		},
-		"Utilization values in non-increasing order": {
+		"utilization values in non-increasing order": {
 			args: config.RequestedToCapacityRatioArgs{
 				Shape: []config.UtilizationShapePoint{
 					{
@@ -380,7 +535,12 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `utilization values must be sorted. Utilization[0]==30 >= Utilization[1]==20`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[1].utilization",
+				},
+			},
 		},
 		"duplicated utilization values": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -399,7 +559,12 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `utilization values must be sorted. Utilization[1]==20 >= Utilization[2]==20`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[2].utilization",
+				},
+			},
 		},
 		"score less than min": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -414,7 +579,12 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `score values must not be less than 0. Score[0]==-1`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[0].score",
+				},
+			},
 		},
 		"score greater than max": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -429,7 +599,12 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `score values must not be greater than 10. Score[1]==11`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[1].score",
+				},
+			},
 		},
 		"resources weight less than 1": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -446,22 +621,63 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `resource custom weight 0 must not be less than 1`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+			},
+		},
+		"multiple errors": {
+			args: config.RequestedToCapacityRatioArgs{
+				Shape: []config.UtilizationShapePoint{
+					{
+						Utilization: 20,
+						Score:       -1,
+					},
+					{
+						Utilization: 10,
+						Score:       2,
+					},
+				},
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "custom",
+						Weight: 0,
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[1].utilization",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[0].score",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+			},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			err := ValidateRequestedToCapacityRatioArgs(tc.args)
-			assertErr(t, tc.wantErr, err)
+			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
+				t.Fatalf("ValidateRequestedToCapacityRatioArgs returned err (-want,+got):\n%s", diff)
+			}
 		})
 	}
 }
 
 func TestValidateNodeResourcesLeastAllocatedArgs(t *testing.T) {
 	cases := map[string]struct {
-		args    *config.NodeResourcesLeastAllocatedArgs
-		wantErr string
+		args     *config.NodeResourcesLeastAllocatedArgs
+		wantErrs field.ErrorList
 	}{
 		"valid config": {
 			args: &config.NodeResourcesLeastAllocatedArgs{
@@ -486,7 +702,12 @@ func TestValidateNodeResourcesLeastAllocatedArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `resource Weight of cpu should be a positive value, got 0`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+			},
 		},
 		"weight more than max": {
 			args: &config.NodeResourcesLeastAllocatedArgs{
@@ -497,22 +718,53 @@ func TestValidateNodeResourcesLeastAllocatedArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `resource Weight of memory should be less than 100, got 101`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+			},
+		},
+		"multiple error": {
+			args: &config.NodeResourcesLeastAllocatedArgs{
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "memory",
+						Weight: 0,
+					},
+					{
+						Name:   "cpu",
+						Weight: 101,
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[1].weight",
+				},
+			},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			err := ValidateNodeResourcesLeastAllocatedArgs(tc.args)
-			assertErr(t, tc.wantErr, err)
+			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
+				t.Fatalf("ValidateNodeResourcesLeastAllocatedArgs returned err (-want,+got):\n%s", diff)
+			}
 		})
 	}
 }
 
 func TestValidateNodeResourcesMostAllocatedArgs(t *testing.T) {
 	cases := map[string]struct {
-		args    *config.NodeResourcesMostAllocatedArgs
-		wantErr string
+		args     *config.NodeResourcesMostAllocatedArgs
+		wantErrs field.ErrorList
 	}{
 		"valid config": {
 			args: &config.NodeResourcesMostAllocatedArgs{
@@ -537,7 +789,12 @@ func TestValidateNodeResourcesMostAllocatedArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `resource Weight of cpu should be a positive value, got -1`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+			},
 		},
 		"weight more than max": {
 			args: &config.NodeResourcesMostAllocatedArgs{
@@ -548,14 +805,45 @@ func TestValidateNodeResourcesMostAllocatedArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `resource Weight of memory should be less than 100, got 110`,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+			},
+		},
+		"multiple error": {
+			args: &config.NodeResourcesMostAllocatedArgs{
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "memory",
+						Weight: -1,
+					},
+					{
+						Name:   "cpu",
+						Weight: 110,
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[1].weight",
+				},
+			},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			err := ValidateNodeResourcesMostAllocatedArgs(tc.args)
-			assertErr(t, tc.wantErr, err)
+			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
+				t.Fatalf("ValidateNodeResourcesLeastAllocatedArgs returned err (-want,+got):\n%s", diff)
+			}
 		})
 	}
 }
@@ -637,32 +925,23 @@ func TestValidateNodeAffinityArgs(t *testing.T) {
 				},
 			},
 			wantErr: field.ErrorList{
-				field.Invalid(field.NewPath("addedAffinity", "requiredDuringSchedulingIgnoredDuringExecution"), nil, ""),
-				field.Invalid(field.NewPath("addedAffinity", "preferredDuringSchedulingIgnoredDuringExecution"), nil, ""),
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "addedAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0]",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "addedAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].matchFields[0].values",
+				},
 			}.ToAggregate(),
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := ValidateNodeAffinityArgs(&tc.args)
-			if diff := cmp.Diff(err, tc.wantErr, ignoreBadValueDetail); diff != "" {
+			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
 				t.Fatalf("ValidatedNodeAffinityArgs returned err (-want,+got):\n%s", diff)
 			}
 		})
-	}
-}
-
-func assertErr(t *testing.T, wantErr string, gotErr error) {
-	if wantErr == "" {
-		if gotErr != nil {
-			t.Fatalf("\nwant err to be:\n\tnil\ngot:\n\t%s", gotErr.Error())
-		}
-	} else {
-		if gotErr == nil {
-			t.Fatalf("\nwant err to be:\n\t%s\ngot:\n\tnil", wantErr)
-		}
-		if gotErr.Error() != wantErr {
-			t.Errorf("\nwant err to be:\n\t%s\ngot:\n\t%s", wantErr, gotErr.Error())
-		}
 	}
 }

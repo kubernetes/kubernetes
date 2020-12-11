@@ -494,7 +494,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 		pv, pvc, err := e2epv.CreatePVPVC(c, pvConfig, pvcConfig, f.Namespace.Name, false)
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Namespace.Name, pv, pvc))
+		framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, f.Namespace.Name, pv, pvc))
 
 		defer func() {
 			errs := e2epv.PVPVCCleanup(c, f.Namespace.Name, pv, pvc)

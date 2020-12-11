@@ -1504,8 +1504,7 @@ func TestValidateEntry(t *testing.T) {
 				IP:       "10.20.30.40",
 				Protocol: ProtocolTCP,
 				Port:     53,
-				// TODO: CIDR /32 may not be valid
-				Net: "10.20.30.0/24",
+				Net:      "10.20.30.0/24",
 			},
 			set: &IPSet{
 				Name: "abc",
@@ -1614,6 +1613,58 @@ func TestValidateEntry(t *testing.T) {
 			},
 			set: &IPSet{
 				Name: "negative-port-number",
+			},
+			valid: false,
+		},
+		{ // case[30]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     53,
+				Net:      "192.168.3.0/0",
+			},
+			set: &IPSet{
+				Name: "net mask boundary 0",
+			},
+			valid: true,
+		},
+		{ // case[31]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     53,
+				Net:      "192.168.3.0/32",
+			},
+			set: &IPSet{
+				Name: "net mask boundary 32",
+			},
+			valid: true,
+		},
+		{ // case[32]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     53,
+				Net:      "192.168.3.1/33",
+			},
+			set: &IPSet{
+				Name: "invalid net mask",
+			},
+			valid: false,
+		},
+		{ // case[33]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     53,
+				Net:      "192.168.3.1/-1",
+			},
+			set: &IPSet{
+				Name: "invalid net mask",
 			},
 			valid: false,
 		},

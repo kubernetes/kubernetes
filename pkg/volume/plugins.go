@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
@@ -458,11 +459,12 @@ type VolumeHost interface {
 
 // VolumePluginMgr tracks registered plugins.
 type VolumePluginMgr struct {
-	mutex         sync.Mutex
-	plugins       map[string]VolumePlugin
-	prober        DynamicPluginProber
-	probedPlugins map[string]VolumePlugin
-	Host          VolumeHost
+	mutex                     sync.Mutex
+	plugins                   map[string]VolumePlugin
+	prober                    DynamicPluginProber
+	probedPlugins             map[string]VolumePlugin
+	loggedDeprecationWarnings sets.String
+	Host                      VolumeHost
 }
 
 // Spec is an internal representation of a volume.  All API volume types translate to Spec.
@@ -593,6 +595,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPlu
 	defer pm.mutex.Unlock()
 
 	pm.Host = host
+	pm.loggedDeprecationWarnings = sets.NewString()
 
 	if prober == nil {
 		// Use a dummy prober to prevent nil deference.
@@ -689,9 +692,7 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	}
 
 	// Issue warning if the matched provider is deprecated
-	if detail, ok := deprecatedVolumeProviders[matches[0].GetPluginName()]; ok {
-		klog.Warningf("WARNING: %s built-in volume provider is now deprecated. %s", matches[0].GetPluginName(), detail)
-	}
+	pm.logDeprecation(matches[0].GetPluginName())
 	return matches[0], nil
 }
 
@@ -724,10 +725,18 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	}
 
 	// Issue warning if the matched provider is deprecated
-	if detail, ok := deprecatedVolumeProviders[matches[0].GetPluginName()]; ok {
-		klog.Warningf("WARNING: %s built-in volume provider is now deprecated. %s", matches[0].GetPluginName(), detail)
-	}
+	pm.logDeprecation(matches[0].GetPluginName())
 	return matches[0], nil
+}
+
+// logDeprecation logs warning when a deprecated plugin is used.
+func (pm *VolumePluginMgr) logDeprecation(plugin string) {
+	if detail, ok := deprecatedVolumeProviders[plugin]; ok && !pm.loggedDeprecationWarnings.Has(plugin) {
+		klog.Warningf("WARNING: %s built-in volume provider is now deprecated. %s", plugin, detail)
+		// Make sure the message is logged only once. It has Warning severity
+		// and we don't want to spam the log too much.
+		pm.loggedDeprecationWarnings.Insert(plugin)
+	}
 }
 
 // Check if probedPlugin cache update is required.

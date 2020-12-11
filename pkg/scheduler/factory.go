@@ -343,6 +343,14 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 			klog.Warningf("Pod %v/%v doesn't exist in informer cache: %v", pod.Namespace, pod.Name, err)
 			return
 		}
+
+		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
+		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
+		if len(cachedPod.Spec.NodeName) != 0 {
+			klog.Warningf("Pod %v/%v has been assigned with %v. Abort adding it back to queue.", pod.Namespace, pod.Name, cachedPod.Spec.NodeName)
+			return
+		}
+
 		// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
 		podInfo.Pod = cachedPod.DeepCopy()
 		if err := podQueue.AddUnschedulableIfNotPresent(podInfo, podQueue.SchedulingCycle()); err != nil {

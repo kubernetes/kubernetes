@@ -222,6 +222,8 @@ KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$}
 KUBELET_PORT=${KUBELET_PORT:-10250}
+# By default we use 0(close it) for it's insecure
+KUBELET_READ_ONLY_PORT=${KUBELET_READ_ONLY_PORT:-0}
 LOG_LEVEL=${LOG_LEVEL:-3}
 # Use to increase verbosity on particular files, e.g. LOG_SPEC=token_controller*=5,other_controller*=4
 LOG_SPEC=${LOG_SPEC:-""}
@@ -781,6 +783,7 @@ enableControllerAttachDetach: ${ENABLE_CONTROLLER_ATTACH_DETACH}
 evictionPressureTransitionPeriod: "${EVICTION_PRESSURE_TRANSITION_PERIOD}"
 failSwapOn: ${FAIL_SWAP_ON}
 port: ${KUBELET_PORT}
+readOnlyPort: ${KUBELET_READ_ONLY_PORT}
 rotateCertificates: true
 runtimeRequestTimeout: "${RUNTIME_REQUEST_TIMEOUT}"
 staticPodPath: "${POD_MANIFEST_PATH}"

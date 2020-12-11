@@ -38,9 +38,9 @@ const (
 type functionShape []functionShapePoint
 
 type functionShapePoint struct {
-	// Utilization is function argument.
+	// utilization is function argument.
 	utilization int64
-	// Score is function value.
+	// score is function value.
 	score int64
 }
 

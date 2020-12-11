@@ -453,6 +453,55 @@ func (_ p2pNetworkInterface) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{p2pIntf}, nil
 }
 
+// Interface with link locals and loopback interface with global addresses
+type linkLocalLoopbackNetworkInterface struct {
+}
+
+func (_ linkLocalLoopbackNetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
+	if intfName == LoopbackInterfaceName {
+		return &loopbackIntf, nil
+	}
+	return &upIntf, nil
+}
+func (_ linkLocalLoopbackNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
+	var ifat []net.Addr
+	ifat = []net.Addr{addrStruct{val: "169.254.162.166/16"}, addrStruct{val: "fe80::200/10"}}
+	if intf.Name == LoopbackInterfaceName {
+		ifat = []net.Addr{addrStruct{val: "::1/128"}, addrStruct{val: "127.0.0.1/8"},
+			// global addresses on loopback interface
+			addrStruct{val: "10.1.1.1/32"}, addrStruct{val: "fd00:1:1::1/128"}}
+	}
+	return ifat, nil
+}
+func (_ linkLocalLoopbackNetworkInterface) Interfaces() ([]net.Interface, error) {
+	return []net.Interface{upIntf, loopbackIntf}, nil
+}
+
+// Interface and loopback interface with global addresses
+type globalsNetworkInterface struct {
+}
+
+func (_ globalsNetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
+	if intfName == LoopbackInterfaceName {
+		return &loopbackIntf, nil
+	}
+	return &upIntf, nil
+}
+func (_ globalsNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
+	var ifat []net.Addr
+	ifat = []net.Addr{addrStruct{val: "169.254.162.166/16"}, addrStruct{val: "fe80::200/10"},
+		addrStruct{val: "192.168.1.1/31"}, addrStruct{val: "fd00::200/127"}}
+	if intf.Name == LoopbackInterfaceName {
+		ifat = []net.Addr{addrStruct{val: "::1/128"}, addrStruct{val: "127.0.0.1/8"},
+			// global addresses on loopback interface
+			addrStruct{val: "10.1.1.1/32"}, addrStruct{val: "fd00:1:1::1/128"}}
+	}
+	return ifat, nil
+}
+func (_ globalsNetworkInterface) Interfaces() ([]net.Interface, error) {
+	return []net.Interface{upIntf, loopbackIntf}, nil
+}
+
 // Unable to get IP addresses for interface
 type networkInterfaceFailGetAddrs struct {
 }
@@ -530,6 +579,33 @@ func TestGetIPFromInterface(t *testing.T) {
 	}
 }
 
+func TestGetIPFromLoopbackInterface(t *testing.T) {
+	testCases := []struct {
+		tcase      string
+		family     AddressFamily
+		nw         networkInterfacer
+		expected   net.IP
+		errStrFrag string
+	}{
+		{"ipv4", familyIPv4, linkLocalLoopbackNetworkInterface{}, net.ParseIP("10.1.1.1"), ""},
+		{"ipv6", familyIPv6, linkLocalLoopbackNetworkInterface{}, net.ParseIP("fd00:1:1::1"), ""},
+		{"no global ipv4", familyIPv4, loopbackNetworkInterface{}, nil, ""},
+		{"no global ipv6", familyIPv6, loopbackNetworkInterface{}, nil, ""},
+	}
+	for _, tc := range testCases {
+		ip, err := getIPFromLoopbackInterface(tc.family, tc.nw)
+		if err != nil {
+			if !strings.Contains(err.Error(), tc.errStrFrag) {
+				t.Errorf("case[%s]: Error string %q does not contain %q", tc.tcase, err, tc.errStrFrag)
+			}
+		} else if tc.errStrFrag != "" {
+			t.Errorf("case[%s]: Error %q expected, but seen %v", tc.tcase, tc.errStrFrag, err)
+		} else if !ip.Equal(tc.expected) {
+			t.Errorf("case[%v]: expected %v, got %+v .err : %v", tc.tcase, tc.expected, ip, err)
+		}
+	}
+}
+
 func TestChooseHostInterfaceFromRoute(t *testing.T) {
 	testCases := []struct {
 		tcase    string
@@ -544,6 +620,16 @@ func TestChooseHostInterfaceFromRoute(t *testing.T) {
 		{"single-stack ipv6, prefer v6", routeV6, ipv6NetworkInterface{}, preferIPv6, net.ParseIP("2001::200")},
 		{"dual stack", bothRoutes, v4v6NetworkInterface{}, preferIPv4, net.ParseIP("10.254.71.145")},
 		{"dual stack, prefer v6", bothRoutes, v4v6NetworkInterface{}, preferIPv6, net.ParseIP("2001::10")},
+		{"LLA and loopback with global, IPv4", routeV4, linkLocalLoopbackNetworkInterface{}, preferIPv4, net.ParseIP("10.1.1.1")},
+		{"LLA and loopback with global, IPv6", routeV6, linkLocalLoopbackNetworkInterface{}, preferIPv6, net.ParseIP("fd00:1:1::1")},
+		{"LLA and loopback with global, dual stack prefer IPv4", bothRoutes, linkLocalLoopbackNetworkInterface{}, preferIPv4, net.ParseIP("10.1.1.1")},
+		{"LLA and loopback with global, dual stack prefer IPv6", bothRoutes, linkLocalLoopbackNetworkInterface{}, preferIPv6, net.ParseIP("fd00:1:1::1")},
+		{"LLA and loopback with global, no routes", noRoutes, linkLocalLoopbackNetworkInterface{}, preferIPv6, nil},
+		{"interface and loopback with global, IPv4", routeV4, globalsNetworkInterface{}, preferIPv4, net.ParseIP("192.168.1.1")},
+		{"interface and loopback with global, IPv6", routeV6, globalsNetworkInterface{}, preferIPv6, net.ParseIP("fd00::200")},
+		{"interface and loopback with global, dual stack prefer IPv4", bothRoutes, globalsNetworkInterface{}, preferIPv4, net.ParseIP("192.168.1.1")},
+		{"interface and loopback with global, dual stack prefer IPv6", bothRoutes, globalsNetworkInterface{}, preferIPv6, net.ParseIP("fd00::200")},
+		{"interface and loopback with global, no routes", noRoutes, globalsNetworkInterface{}, preferIPv6, nil},
 		{"all LLA", routeV4, networkInterfaceWithOnlyLinkLocals{}, preferIPv4, nil},
 		{"no routes", noRoutes, validNetworkInterface{}, preferIPv4, nil},
 		{"fail get IP", routeV4, networkInterfaceFailGetAddrs{}, preferIPv4, nil},

@@ -18,6 +18,7 @@ go_library(
         "resource_usage_gatherer.go",
         "size.go",
         "test_context.go",
+        "timeouts.go",
         "util.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework",

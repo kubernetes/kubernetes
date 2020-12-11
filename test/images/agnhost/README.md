@@ -304,8 +304,6 @@ kubectl run logs-generator \
   -- logs-generator -t 10 -d 1s
 ```
 
-
-
 ### mounttest
 
 The `mounttest` subcommand can be used to create files with various permissions, read files,
@@ -371,7 +369,6 @@ HTTP server:
     kubectl exec test-agnhost -- curl -v -X POST localhost:8889/run/nat-closewait-server \
         -d '{"LocalAddr":"127.0.0.1:9999"}'
 ```
-
 
 ### netexec
 
@@ -569,8 +566,6 @@ Usage:
     kubectl exec test-agnhost -- /agnhost porter
 ```
 
-
-
 ### resource-consumer-controller
 
 This subcommand starts an HTTP server that spreads requests around resource consumers. The HTTP server has the same endpoints and usage as the one spawned by the ``resource-consumer`` subcommand.
@@ -609,8 +604,6 @@ Usage:
 ```console
     kubectl exec test-agnhost -- /agnhost serve-hostname [--tcp] [--udp] [--http] [--close] [--port <port>]
 ```
-
-
 
 ### test-webserver
 

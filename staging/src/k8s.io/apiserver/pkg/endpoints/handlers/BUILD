@@ -59,6 +59,7 @@ go_library(
         "patch.go",
         "response.go",
         "rest.go",
+        "trace_util.go",
         "update.go",
         "watch.go",
     ],

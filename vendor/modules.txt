@@ -521,9 +521,9 @@ github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.0 => github.com/google/btree v1.0.0
 github.com/google/btree
 # github.com/google/btree => github.com/google/btree v1.0.0
-# github.com/google/cadvisor v0.38.5 => github.com/google/cadvisor v0.38.5
+# github.com/google/cadvisor v0.38.6 => github.com/google/cadvisor v0.38.6
 ## explicit
-# github.com/google/cadvisor => github.com/google/cadvisor v0.38.5
+# github.com/google/cadvisor => github.com/google/cadvisor v0.38.6
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
 github.com/google/cadvisor/client/v2

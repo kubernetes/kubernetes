@@ -129,6 +129,19 @@ type SnapshottableTestDriver interface {
 	GetSnapshotClass(config *PerTestConfig) *unstructured.Unstructured
 }
 
+// CustomTimeoutsTestDriver represents an interface fo a TestDriver that supports custom timeouts.
+type CustomTimeoutsTestDriver interface {
+	TestDriver
+	GetTimeouts() *framework.TimeoutContext
+}
+
+func getDriverTimeouts(driver TestDriver) *framework.TimeoutContext {
+	if d, ok := driver.(CustomTimeoutsTestDriver); ok {
+		return d.GetTimeouts()
+	}
+	return framework.NewTimeoutContextWithDefaults()
+}
+
 // Capability represents a feature that a volume plugin supports
 type Capability string
 

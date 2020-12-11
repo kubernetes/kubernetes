@@ -108,7 +108,7 @@ func (t *volumeIOTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("volumeio")
+	f := framework.NewFrameworkWithCustomTimeouts("volumeio", getDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}
@@ -338,7 +338,7 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config e2evolu
 		}
 	}()
 
-	err = e2epod.WaitForPodRunningInNamespace(cs, clientPod)
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, clientPod.Name, clientPod.Namespace, f.Timeouts.PodStart)
 	if err != nil {
 		return fmt.Errorf("client pod %q not running: %v", clientPod.Name, err)
 	}
