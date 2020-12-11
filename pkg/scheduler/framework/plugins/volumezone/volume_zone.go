@@ -88,11 +88,16 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 		return framework.NewStatus(framework.Error, "node not found")
 	}
 	nodeConstraints := make(map[string]string)
+	nodeZoned := false
+	pvZoned := false
 	for k, v := range node.ObjectMeta.Labels {
 		if !volumeZoneLabels.Has(k) {
 			continue
 		}
 		nodeConstraints[k] = v
+		if k == v1.LabelZoneFailureDomain {
+			nodeZoned = true
+		}
 	}
 	if len(nodeConstraints) == 0 {
 		// The node has no zone constraints, so we're OK to schedule.
@@ -155,6 +160,9 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 			if !volumeZoneLabels.Has(k) {
 				continue
 			}
+			if k == v1.LabelZoneFailureDomain {
+				pvZoned = true
+			}
 			nodeV, _ := nodeConstraints[k]
 			volumeVSet, err := volumehelpers.LabelZonesToSet(v)
 			if err != nil {
@@ -166,6 +174,10 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 				klog.V(10).Infof("Won't schedule pod %q onto node %q due to volume %q (mismatch on %q)", pod.Name, node.Name, pvName, k)
 				return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
 			}
+		}
+		if pvZoned != nodeZoned {
+			klog.V(10).Infof("Won't schedule pod %q onto node %q due to volume %q doesn't have zone enabled)", pod.Name, node.Name, pvName)
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
 		}
 	}
 	return nil
