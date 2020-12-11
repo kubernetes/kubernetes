@@ -14,12 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package framework
 
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/onsi/ginkgo"
 
@@ -29,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -79,28 +77,6 @@ func CreateSnapshot(sDriver SnapshottableTestDriver, config *PerTestConfig, patt
 	return sclass, snapshot
 }
 
-// GetSnapshotContentFromSnapshot returns the VolumeSnapshotContent object Bound to a
-// given VolumeSnapshot
-func GetSnapshotContentFromSnapshot(dc dynamic.Interface, snapshot *unstructured.Unstructured) *unstructured.Unstructured {
-	defer ginkgo.GinkgoRecover()
-	err := utils.WaitForSnapshotReady(dc, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
-	framework.ExpectNoError(err)
-
-	vs, err := dc.Resource(utils.SnapshotGVR).Namespace(snapshot.GetNamespace()).Get(context.TODO(), snapshot.GetName(), metav1.GetOptions{})
-
-	snapshotStatus := vs.Object["status"].(map[string]interface{})
-	snapshotContentName := snapshotStatus["boundVolumeSnapshotContentName"].(string)
-	framework.Logf("received snapshotStatus %v", snapshotStatus)
-	framework.Logf("snapshotContentName %s", snapshotContentName)
-	framework.ExpectNoError(err)
-
-	vscontent, err := dc.Resource(utils.SnapshotContentGVR).Get(context.TODO(), snapshotContentName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
-
-	return vscontent
-
-}
-
 // CreateSnapshotResource creates a snapshot resource for the current test. It knows how to deal with
 // different test pattern snapshot provisioning and deletion policy
 func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, pvcName string, pvcNamespace string, timeouts *framework.TimeoutContext) *SnapshotResource {
@@ -113,7 +89,7 @@ func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConf
 
 	dc := r.Config.Framework.DynamicClient
 
-	r.Vscontent = GetSnapshotContentFromSnapshot(dc, r.Vs)
+	r.Vscontent = utils.GetSnapshotContentFromSnapshot(dc, r.Vs)
 
 	if pattern.SnapshotType == PreprovisionedCreatedSnapshot {
 		// prepare a pre-provisioned VolumeSnapshotContent with certain data
@@ -282,21 +258,6 @@ func (sr *SnapshotResource) CleanupResource(timeouts *framework.TimeoutContext) 
 		framework.ExpectNoError(err)
 	}
 	return utilerrors.NewAggregate(cleanupErrs)
-}
-
-// DeleteAndWaitSnapshot deletes a VolumeSnapshot and waits for it to be deleted or until timeout occurs, whichever comes first
-func DeleteAndWaitSnapshot(dc dynamic.Interface, ns string, snapshotName string, poll, timeout time.Duration) error {
-	var err error
-	ginkgo.By("deleting the snapshot")
-	err = dc.Resource(utils.SnapshotGVR).Namespace(ns).Delete(context.TODO(), snapshotName, metav1.DeleteOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
-
-	ginkgo.By("checking the Snapshot has been deleted")
-	err = utils.WaitForNamespacedGVRDeletion(dc, utils.SnapshotGVR, ns, snapshotName, poll, timeout)
-
-	return err
 }
 
 func getSnapshot(claimName string, ns, snapshotClassName string) *unstructured.Unstructured {

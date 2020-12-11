@@ -39,7 +39,7 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -49,16 +49,16 @@ const (
 )
 
 type volumeModeTestSuite struct {
-	tsInfo storageapi.TestSuiteInfo
+	tsInfo storageframework.TestSuiteInfo
 }
 
-var _ storageapi.TestSuite = &volumeModeTestSuite{}
+var _ storageframework.TestSuite = &volumeModeTestSuite{}
 
 // InitCustomVolumeModeTestSuite returns volumeModeTestSuite that implements TestSuite interface
 // using custom test patterns
-func InitCustomVolumeModeTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
+func InitCustomVolumeModeTestSuite(patterns []storageframework.TestPattern) storageframework.TestSuite {
 	return &volumeModeTestSuite{
-		tsInfo: storageapi.TestSuiteInfo{
+		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "volumeMode",
 			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
@@ -70,32 +70,32 @@ func InitCustomVolumeModeTestSuite(patterns []storageapi.TestPattern) storageapi
 
 // InitVolumeModeTestSuite returns volumeModeTestSuite that implements TestSuite interface
 // using testsuite default patterns
-func InitVolumeModeTestSuite() storageapi.TestSuite {
-	patterns := []storageapi.TestPattern{
-		storageapi.FsVolModePreprovisionedPV,
-		storageapi.FsVolModeDynamicPV,
-		storageapi.BlockVolModePreprovisionedPV,
-		storageapi.BlockVolModeDynamicPV,
+func InitVolumeModeTestSuite() storageframework.TestSuite {
+	patterns := []storageframework.TestPattern{
+		storageframework.FsVolModePreprovisionedPV,
+		storageframework.FsVolModeDynamicPV,
+		storageframework.BlockVolModePreprovisionedPV,
+		storageframework.BlockVolModeDynamicPV,
 	}
 	return InitCustomVolumeModeTestSuite(patterns)
 }
 
-func (t *volumeModeTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
+func (t *volumeModeTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeModeTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+func (t *volumeModeTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 }
 
-func (t *volumeModeTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *storageapi.PerTestConfig
+		config        *storageframework.PerTestConfig
 		driverCleanup func()
 
 		cs clientset.Interface
 		ns *v1.Namespace
 		// VolumeResource contains pv, pvc, sc, etc., owns cleaning that up
-		storageapi.VolumeResource
+		storageframework.VolumeResource
 
 		migrationCheck *migrationOpCheck
 	}
@@ -106,7 +106,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageapi.TestDriver, pattern 
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewFrameworkWithCustomTimeouts("volumemode", storageapi.GetDriverTimeouts(driver))
+	f := framework.NewFrameworkWithCustomTimeouts("volumemode", storageframework.GetDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}
@@ -131,22 +131,22 @@ func (t *volumeModeTestSuite) DefineTests(driver storageapi.TestDriver, pattern 
 			volumeNodeAffinity *v1.VolumeNodeAffinity
 		)
 
-		l.VolumeResource = storageapi.VolumeResource{
+		l.VolumeResource = storageframework.VolumeResource{
 			Config:  l.config,
 			Pattern: pattern,
 		}
 
 		// Create volume for pre-provisioned volume tests
-		l.Volume = storageapi.CreateVolume(driver, l.config, pattern.VolType)
+		l.Volume = storageframework.CreateVolume(driver, l.config, pattern.VolType)
 
 		switch pattern.VolType {
-		case storageapi.PreprovisionedPV:
+		case storageframework.PreprovisionedPV:
 			if pattern.VolMode == v1.PersistentVolumeBlock {
 				scName = fmt.Sprintf("%s-%s-sc-for-block", l.ns.Name, dInfo.Name)
 			} else if pattern.VolMode == v1.PersistentVolumeFilesystem {
 				scName = fmt.Sprintf("%s-%s-sc-for-file", l.ns.Name, dInfo.Name)
 			}
-			if pDriver, ok := driver.(storageapi.PreprovisionedPVTestDriver); ok {
+			if pDriver, ok := driver.(storageframework.PreprovisionedPVTestDriver); ok {
 				pvSource, volumeNodeAffinity = pDriver.GetPersistentVolumeSource(false, fsType, l.Volume)
 				if pvSource == nil {
 					e2eskipper.Skipf("Driver %q does not define PersistentVolumeSource - skipping", dInfo.Name)
@@ -157,8 +157,8 @@ func (t *volumeModeTestSuite) DefineTests(driver storageapi.TestDriver, pattern 
 				l.Pv = e2epv.MakePersistentVolume(pvConfig)
 				l.Pvc = e2epv.MakePersistentVolumeClaim(pvcConfig, l.ns.Name)
 			}
-		case storageapi.DynamicPV:
-			if dDriver, ok := driver.(storageapi.DynamicPVTestDriver); ok {
+		case storageframework.DynamicPV:
+			if dDriver, ok := driver.(storageframework.DynamicPVTestDriver); ok {
 				l.Sc = dDriver.GetDynamicProvisionStorageClass(l.config, fsType)
 				if l.Sc == nil {
 					e2eskipper.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
@@ -190,9 +190,9 @@ func (t *volumeModeTestSuite) DefineTests(driver storageapi.TestDriver, pattern 
 	}
 
 	// We register different tests depending on the drive
-	isBlockSupported := dInfo.Capabilities[storageapi.CapBlock]
+	isBlockSupported := dInfo.Capabilities[storageframework.CapBlock]
 	switch pattern.VolType {
-	case storageapi.PreprovisionedPV:
+	case storageframework.PreprovisionedPV:
 		if pattern.VolMode == v1.PersistentVolumeBlock && !isBlockSupported {
 			ginkgo.It("should fail to create pod by failing to mount volume [Slow]", func() {
 				manualInit()
@@ -253,7 +253,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageapi.TestDriver, pattern 
 			})
 		}
 
-	case storageapi.DynamicPV:
+	case storageframework.DynamicPV:
 		if pattern.VolMode == v1.PersistentVolumeBlock && !isBlockSupported {
 			ginkgo.It("should fail in binding dynamic provisioned PV to PVC [Slow][LinuxOnly]", func() {
 				manualInit()
@@ -297,7 +297,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageapi.TestDriver, pattern 
 		skipTestIfBlockNotSupported(driver)
 		init()
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
-		l.VolumeResource = *storageapi.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		l.VolumeResource = *storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		defer cleanup()
 
 		ginkgo.By("Creating pod")
@@ -354,7 +354,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageapi.TestDriver, pattern 
 		}
 		init()
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
-		l.VolumeResource = *storageapi.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		l.VolumeResource = *storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		defer cleanup()
 
 		ginkgo.By("Creating pod")

@@ -40,7 +40,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -48,22 +48,22 @@ import (
 // Test files are generated in testVolumeIO()
 // If test file generation algorithm changes, these must be recomputed.
 var md5hashes = map[int64]string{
-	storageapi.FileSizeSmall:  "5c34c2813223a7ca05a3c2f38c0d1710",
-	storageapi.FileSizeMedium: "f2fa202b1ffeedda5f3a58bd1ae81104",
-	storageapi.FileSizeLarge:  "8d763edc71bd16217664793b5a15e403",
+	storageframework.FileSizeSmall:  "5c34c2813223a7ca05a3c2f38c0d1710",
+	storageframework.FileSizeMedium: "f2fa202b1ffeedda5f3a58bd1ae81104",
+	storageframework.FileSizeLarge:  "8d763edc71bd16217664793b5a15e403",
 }
 
 const mountPath = "/opt"
 
 type volumeIOTestSuite struct {
-	tsInfo storageapi.TestSuiteInfo
+	tsInfo storageframework.TestSuiteInfo
 }
 
 // InitCustomVolumeIOTestSuite returns volumeIOTestSuite that implements TestSuite interface
 // using custom test patterns
-func InitCustomVolumeIOTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
+func InitCustomVolumeIOTestSuite(patterns []storageframework.TestPattern) storageframework.TestSuite {
 	return &volumeIOTestSuite{
-		tsInfo: storageapi.TestSuiteInfo{
+		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "volumeIO",
 			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
@@ -75,31 +75,31 @@ func InitCustomVolumeIOTestSuite(patterns []storageapi.TestPattern) storageapi.T
 
 // InitVolumeIOTestSuite returns volumeIOTestSuite that implements TestSuite interface
 // using testsuite default patterns
-func InitVolumeIOTestSuite() storageapi.TestSuite {
-	patterns := []storageapi.TestPattern{
-		storageapi.DefaultFsInlineVolume,
-		storageapi.DefaultFsPreprovisionedPV,
-		storageapi.DefaultFsDynamicPV,
+func InitVolumeIOTestSuite() storageframework.TestSuite {
+	patterns := []storageframework.TestPattern{
+		storageframework.DefaultFsInlineVolume,
+		storageframework.DefaultFsPreprovisionedPV,
+		storageframework.DefaultFsDynamicPV,
 	}
 	return InitCustomVolumeIOTestSuite(patterns)
 }
 
-func (t *volumeIOTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
+func (t *volumeIOTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeIOTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
-	skipVolTypePatterns(pattern, driver, storageapi.NewVolTypeMap(
-		storageapi.PreprovisionedPV,
-		storageapi.InlineVolume))
+func (t *volumeIOTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+	skipVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(
+		storageframework.PreprovisionedPV,
+		storageframework.InlineVolume))
 }
 
-func (t *volumeIOTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+func (t *volumeIOTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *storageapi.PerTestConfig
+		config        *storageframework.PerTestConfig
 		driverCleanup func()
 
-		resource *storageapi.VolumeResource
+		resource *storageframework.VolumeResource
 
 		migrationCheck *migrationOpCheck
 	}
@@ -110,7 +110,7 @@ func (t *volumeIOTestSuite) DefineTests(driver storageapi.TestDriver, pattern st
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewFrameworkWithCustomTimeouts("volumeio", storageapi.GetDriverTimeouts(driver))
+	f := framework.NewFrameworkWithCustomTimeouts("volumeio", storageframework.GetDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}
@@ -120,7 +120,7 @@ func (t *volumeIOTestSuite) DefineTests(driver storageapi.TestDriver, pattern st
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
 
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
-		l.resource = storageapi.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		if l.resource.VolSource == nil {
 			e2eskipper.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 		}
@@ -151,23 +151,23 @@ func (t *volumeIOTestSuite) DefineTests(driver storageapi.TestDriver, pattern st
 		fileSizes := createFileSizes(dInfo.MaxFileSize)
 		testFile := fmt.Sprintf("%s_io_test_%s", dInfo.Name, f.Namespace.Name)
 		var fsGroup *int64
-		if !framework.NodeOSDistroIs("windows") && dInfo.Capabilities[storageapi.CapFsGroup] {
+		if !framework.NodeOSDistroIs("windows") && dInfo.Capabilities[storageframework.CapFsGroup] {
 			fsGroupVal := int64(1234)
 			fsGroup = &fsGroupVal
 		}
 		podSec := v1.PodSecurityContext{
 			FSGroup: fsGroup,
 		}
-		err := testVolumeIO(f, cs, storageapi.ConvertTestConfig(l.config), *l.resource.VolSource, &podSec, testFile, fileSizes)
+		err := testVolumeIO(f, cs, storageframework.ConvertTestConfig(l.config), *l.resource.VolSource, &podSec, testFile, fileSizes)
 		framework.ExpectNoError(err)
 	})
 }
 
 func createFileSizes(maxFileSize int64) []int64 {
 	allFileSizes := []int64{
-		storageapi.FileSizeSmall,
-		storageapi.FileSizeMedium,
-		storageapi.FileSizeLarge,
+		storageframework.FileSizeSmall,
+		storageframework.FileSizeMedium,
+		storageframework.FileSizeLarge,
 	}
 	fileSizes := []int64{}
 
@@ -249,8 +249,8 @@ func makePodSpec(config e2evolume.TestConfig, initCmd string, volsrc v1.VolumeSo
 // Write `fsize` bytes to `fpath` in the pod, using dd and the `ddInput` file.
 func writeToFile(f *framework.Framework, pod *v1.Pod, fpath, ddInput string, fsize int64) error {
 	ginkgo.By(fmt.Sprintf("writing %d bytes to test file %s", fsize, fpath))
-	loopCnt := fsize / storageapi.MinFileSize
-	writeCmd := fmt.Sprintf("i=0; while [ $i -lt %d ]; do dd if=%s bs=%d >>%s 2>/dev/null; let i+=1; done", loopCnt, ddInput, storageapi.MinFileSize, fpath)
+	loopCnt := fsize / storageframework.MinFileSize
+	writeCmd := fmt.Sprintf("i=0; while [ $i -lt %d ]; do dd if=%s bs=%d >>%s 2>/dev/null; let i+=1; done", loopCnt, ddInput, storageframework.MinFileSize, fpath)
 	stdout, stderr, err := e2evolume.PodExec(f, pod, writeCmd)
 	if err != nil {
 		return fmt.Errorf("error writing to volume using %q: %s\nstdout: %s\nstderr: %s", writeCmd, err, stdout, stderr)
@@ -311,7 +311,7 @@ func deleteFile(f *framework.Framework, pod *v1.Pod, fpath string) {
 func testVolumeIO(f *framework.Framework, cs clientset.Interface, config e2evolume.TestConfig, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext, file string, fsizes []int64) (err error) {
 	ddInput := filepath.Join(mountPath, fmt.Sprintf("%s-%s-dd_if", config.Prefix, config.Namespace))
 	writeBlk := strings.Repeat("abcdefghijklmnopqrstuvwxyz123456", 32) // 1KiB value
-	loopCnt := storageapi.MinFileSize / int64(len(writeBlk))
+	loopCnt := storageframework.MinFileSize / int64(len(writeBlk))
 	// initContainer cmd to create and fill dd's input file. The initContainer is used to create
 	// the `dd` input file which is currently 1MiB. Rather than store a 1MiB go value, a loop is
 	// used to create a 1MiB file in the target directory.
@@ -348,8 +348,8 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config e2evolu
 	// create files of the passed-in file sizes and verify test file size and content
 	for _, fsize := range fsizes {
 		// file sizes must be a multiple of `MinFileSize`
-		if math.Mod(float64(fsize), float64(storageapi.MinFileSize)) != 0 {
-			fsize = fsize/storageapi.MinFileSize + storageapi.MinFileSize
+		if math.Mod(float64(fsize), float64(storageframework.MinFileSize)) != 0 {
+			fsize = fsize/storageframework.MinFileSize + storageframework.MinFileSize
 		}
 		fpath := filepath.Join(mountPath, fmt.Sprintf("%s-%d", file, fsize))
 		defer func() {

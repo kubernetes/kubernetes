@@ -33,22 +33,22 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 type snapshottableStressTestSuite struct {
-	tsInfo storageapi.TestSuiteInfo
+	tsInfo storageframework.TestSuiteInfo
 }
 
 type snapshottableStressTest struct {
-	config        *storageapi.PerTestConfig
-	testOptions   storageapi.VolumeSnapshotStressTestOptions
+	config        *storageframework.PerTestConfig
+	testOptions   storageframework.VolumeSnapshotStressTestOptions
 	driverCleanup func()
 
 	pods      []*v1.Pod
-	volumes   []*storageapi.VolumeResource
-	snapshots []*storageapi.SnapshotResource
+	volumes   []*storageframework.VolumeResource
+	snapshots []*storageframework.SnapshotResource
 	// Because we are appending snapshot resources in parallel goroutines.
 	snapshotsMutex sync.Mutex
 
@@ -60,9 +60,9 @@ type snapshottableStressTest struct {
 
 // InitCustomSnapshottableStressTestSuite returns snapshottableStressTestSuite that implements TestSuite interface
 // using custom test patterns
-func InitCustomSnapshottableStressTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
+func InitCustomSnapshottableStressTestSuite(patterns []storageframework.TestPattern) storageframework.TestSuite {
 	return &snapshottableStressTestSuite{
-		tsInfo: storageapi.TestSuiteInfo{
+		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "snapshottable-stress",
 			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
@@ -75,19 +75,19 @@ func InitCustomSnapshottableStressTestSuite(patterns []storageapi.TestPattern) s
 
 // InitSnapshottableStressTestSuite returns snapshottableStressTestSuite that implements TestSuite interface
 // using testsuite default patterns
-func InitSnapshottableStressTestSuite() storageapi.TestSuite {
-	patterns := []storageapi.TestPattern{
-		storageapi.DynamicSnapshotDelete,
-		storageapi.DynamicSnapshotRetain,
+func InitSnapshottableStressTestSuite() storageframework.TestSuite {
+	patterns := []storageframework.TestPattern{
+		storageframework.DynamicSnapshotDelete,
+		storageframework.DynamicSnapshotRetain,
 	}
 	return InitCustomSnapshottableStressTestSuite(patterns)
 }
 
-func (t *snapshottableStressTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
+func (t *snapshottableStressTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *snapshottableStressTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+func (t *snapshottableStressTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	driverInfo := driver.GetDriverInfo()
 	var ok bool
 	if driverInfo.VolumeSnapshotStressTestOptions == nil {
@@ -99,21 +99,21 @@ func (t *snapshottableStressTestSuite) SkipUnsupportedTests(driver storageapi.Te
 	if driverInfo.VolumeSnapshotStressTestOptions.NumSnapshots <= 0 {
 		framework.Failf("NumSnapshots in snapshot stress test options must be a positive integer, received: %d", driverInfo.VolumeSnapshotStressTestOptions.NumSnapshots)
 	}
-	_, ok = driver.(storageapi.SnapshottableTestDriver)
-	if !driverInfo.Capabilities[storageapi.CapSnapshotDataSource] || !ok {
+	_, ok = driver.(storageframework.SnapshottableTestDriver)
+	if !driverInfo.Capabilities[storageframework.CapSnapshotDataSource] || !ok {
 		e2eskipper.Skipf("Driver %q doesn't implement SnapshottableTestDriver - skipping", driverInfo.Name)
 	}
 
-	_, ok = driver.(storageapi.DynamicPVTestDriver)
+	_, ok = driver.(storageframework.DynamicPVTestDriver)
 	if !ok {
 		e2eskipper.Skipf("Driver %s doesn't implement DynamicPVTestDriver -- skipping", driverInfo.Name)
 	}
 }
 
-func (t *snapshottableStressTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	var (
-		driverInfo          *storageapi.DriverInfo
-		snapshottableDriver storageapi.SnapshottableTestDriver
+		driverInfo          *storageframework.DriverInfo
+		snapshottableDriver storageframework.SnapshottableTestDriver
 		cs                  clientset.Interface
 		stressTest          *snapshottableStressTest
 	)
@@ -124,7 +124,7 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageapi.TestDriver,
 
 	init := func() {
 		driverInfo = driver.GetDriverInfo()
-		snapshottableDriver, _ = driver.(storageapi.SnapshottableTestDriver)
+		snapshottableDriver, _ = driver.(storageframework.SnapshottableTestDriver)
 		cs = f.ClientSet
 		config, driverCleanup := driver.PrepareTest(f)
 		ctx, cancel := context.WithCancel(context.Background())
@@ -132,8 +132,8 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageapi.TestDriver,
 		stressTest = &snapshottableStressTest{
 			config:        config,
 			driverCleanup: driverCleanup,
-			volumes:       []*storageapi.VolumeResource{},
-			snapshots:     []*storageapi.SnapshotResource{},
+			volumes:       []*storageframework.VolumeResource{},
+			snapshots:     []*storageframework.SnapshotResource{},
 			pods:          []*v1.Pod{},
 			testOptions:   *driverInfo.VolumeSnapshotStressTestOptions,
 			ctx:           ctx,
@@ -145,7 +145,7 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageapi.TestDriver,
 		for i := 0; i < stressTest.testOptions.NumPods; i++ {
 			framework.Logf("Creating resources for pod %d/%d", i, stressTest.testOptions.NumPods-1)
 
-			volume := storageapi.CreateVolumeResource(driver, stressTest.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange)
+			volume := storageframework.CreateVolumeResource(driver, stressTest.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange)
 			stressTest.volumes = append(stressTest.volumes, volume)
 
 			podConfig := e2epod.Config{
@@ -197,7 +197,7 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageapi.TestDriver,
 		for i, snapshot := range stressTest.snapshots {
 			wg.Add(1)
 
-			go func(i int, snapshot *storageapi.SnapshotResource) {
+			go func(i int, snapshot *storageframework.SnapshotResource) {
 				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
 
@@ -229,7 +229,7 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageapi.TestDriver,
 		for i, volume := range stressTest.volumes {
 			wg.Add(1)
 
-			go func(i int, volume *storageapi.VolumeResource) {
+			go func(i int, volume *storageframework.VolumeResource) {
 				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
 
@@ -275,7 +275,7 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageapi.TestDriver,
 						return
 					default:
 						framework.Logf("Pod-%d [%s], Iteration %d/%d", podIndex, pod.Name, snapshotIndex, stressTest.testOptions.NumSnapshots-1)
-						snapshot := storageapi.CreateSnapshotResource(snapshottableDriver, stressTest.config, pattern, volume.Pvc.GetName(), volume.Pvc.GetNamespace(), f.Timeouts)
+						snapshot := storageframework.CreateSnapshotResource(snapshottableDriver, stressTest.config, pattern, volume.Pvc.GetName(), volume.Pvc.GetNamespace(), f.Timeouts)
 						stressTest.snapshotsMutex.Lock()
 						defer stressTest.snapshotsMutex.Unlock()
 						stressTest.snapshots = append(stressTest.snapshots, snapshot)

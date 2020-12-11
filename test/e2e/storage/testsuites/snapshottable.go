@@ -35,7 +35,7 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -44,19 +44,19 @@ import (
 const datapath = "/mnt/test/data"
 
 type snapshottableTestSuite struct {
-	tsInfo storageapi.TestSuiteInfo
+	tsInfo storageframework.TestSuiteInfo
 }
 
 var (
-	sDriver storageapi.SnapshottableTestDriver
-	dDriver storageapi.DynamicPVTestDriver
+	sDriver storageframework.SnapshottableTestDriver
+	dDriver storageframework.DynamicPVTestDriver
 )
 
 // InitCustomSnapshottableTestSuite returns snapshottableTestSuite that implements TestSuite interface
 // using custom test patterns
-func InitCustomSnapshottableTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
+func InitCustomSnapshottableTestSuite(patterns []storageframework.TestPattern) storageframework.TestSuite {
 	return &snapshottableTestSuite{
-		tsInfo: storageapi.TestSuiteInfo{
+		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "snapshottable",
 			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
@@ -69,35 +69,35 @@ func InitCustomSnapshottableTestSuite(patterns []storageapi.TestPattern) storage
 
 // InitSnapshottableTestSuite returns snapshottableTestSuite that implements TestSuite interface
 // using testsuite default patterns
-func InitSnapshottableTestSuite() storageapi.TestSuite {
-	patterns := []storageapi.TestPattern{
-		storageapi.DynamicSnapshotDelete,
-		storageapi.DynamicSnapshotRetain,
-		storageapi.PreprovisionedSnapshotDelete,
-		storageapi.PreprovisionedSnapshotRetain,
+func InitSnapshottableTestSuite() storageframework.TestSuite {
+	patterns := []storageframework.TestPattern{
+		storageframework.DynamicSnapshotDelete,
+		storageframework.DynamicSnapshotRetain,
+		storageframework.PreprovisionedSnapshotDelete,
+		storageframework.PreprovisionedSnapshotRetain,
 	}
 	return InitCustomSnapshottableTestSuite(patterns)
 }
 
-func (s *snapshottableTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
+func (s *snapshottableTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *snapshottableTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+func (s *snapshottableTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	// Check preconditions.
 	dInfo := driver.GetDriverInfo()
 	ok := false
-	_, ok = driver.(storageapi.SnapshottableTestDriver)
-	if !dInfo.Capabilities[storageapi.CapSnapshotDataSource] || !ok {
+	_, ok = driver.(storageframework.SnapshottableTestDriver)
+	if !dInfo.Capabilities[storageframework.CapSnapshotDataSource] || !ok {
 		e2eskipper.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
 	}
-	_, ok = driver.(storageapi.DynamicPVTestDriver)
+	_, ok = driver.(storageframework.DynamicPVTestDriver)
 	if !ok {
 		e2eskipper.Skipf("Driver %q does not support dynamic provisioning - skipping", driver.GetDriverInfo().Name)
 	}
 }
 
-func (s *snapshottableTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
@@ -106,7 +106,7 @@ func (s *snapshottableTestSuite) DefineTests(driver storageapi.TestDriver, patte
 	ginkgo.Describe("volume snapshot controller", func() {
 		var (
 			err           error
-			config        *storageapi.PerTestConfig
+			config        *storageframework.PerTestConfig
 			driverCleanup func()
 			cleanupSteps  []func()
 
@@ -118,8 +118,8 @@ func (s *snapshottableTestSuite) DefineTests(driver storageapi.TestDriver, patte
 			originalMntTestData string
 		)
 		init := func() {
-			sDriver, _ = driver.(storageapi.SnapshottableTestDriver)
-			dDriver, _ = driver.(storageapi.DynamicPVTestDriver)
+			sDriver, _ = driver.(storageframework.SnapshottableTestDriver)
+			dDriver, _ = driver.(storageframework.DynamicPVTestDriver)
 			cleanupSteps = make([]func(), 0)
 			// init snap class, create a source PV, PVC, Pod
 			cs = f.ClientSet
@@ -129,11 +129,11 @@ func (s *snapshottableTestSuite) DefineTests(driver storageapi.TestDriver, patte
 			config, driverCleanup = driver.PrepareTest(f)
 			cleanupSteps = append(cleanupSteps, driverCleanup)
 
-			var volumeResource *storageapi.VolumeResource
+			var volumeResource *storageframework.VolumeResource
 			cleanupSteps = append(cleanupSteps, func() {
 				framework.ExpectNoError(volumeResource.CleanupResource())
 			})
-			volumeResource = storageapi.CreateVolumeResource(dDriver, config, pattern, s.GetTestSuiteInfo().SupportedSizeRange)
+			volumeResource = storageframework.CreateVolumeResource(dDriver, config, pattern, s.GetTestSuiteInfo().SupportedSizeRange)
 
 			pvc = volumeResource.Pvc
 			sc = volumeResource.Sc
@@ -188,11 +188,11 @@ func (s *snapshottableTestSuite) DefineTests(driver storageapi.TestDriver, patte
 			)
 
 			ginkgo.BeforeEach(func() {
-				var sr *storageapi.SnapshotResource
+				var sr *storageframework.SnapshotResource
 				cleanupSteps = append(cleanupSteps, func() {
 					framework.ExpectNoError(sr.CleanupResource(f.Timeouts))
 				})
-				sr = storageapi.CreateSnapshotResource(sDriver, config, pattern, pvc.GetName(), pvc.GetNamespace(), f.Timeouts)
+				sr = storageframework.CreateSnapshotResource(sDriver, config, pattern, pvc.GetName(), pvc.GetNamespace(), f.Timeouts)
 				vs = sr.Vs
 				vscontent = sr.Vscontent
 				vsc = sr.Vsclass
@@ -215,7 +215,7 @@ func (s *snapshottableTestSuite) DefineTests(driver storageapi.TestDriver, patte
 				// Check SnapshotContent properties
 				ginkgo.By("checking the SnapshotContent")
 				// PreprovisionedCreatedSnapshot do not need to set volume snapshot class name
-				if pattern.SnapshotType != storageapi.PreprovisionedCreatedSnapshot {
+				if pattern.SnapshotType != storageframework.PreprovisionedCreatedSnapshot {
 					framework.ExpectEqual(snapshotContentSpec["volumeSnapshotClassName"], vsc.GetName())
 				}
 				framework.ExpectEqual(volumeSnapshotRef["name"], vs.GetName())
@@ -268,15 +268,15 @@ func (s *snapshottableTestSuite) DefineTests(driver storageapi.TestDriver, patte
 				framework.ExpectNoError(err)
 
 				ginkgo.By("should delete the VolumeSnapshotContent according to its deletion policy")
-				err = storageapi.DeleteAndWaitSnapshot(dc, vs.GetNamespace(), vs.GetName(), framework.Poll, f.Timeouts.SnapshotDelete)
+				err = storageutils.DeleteAndWaitSnapshot(dc, vs.GetNamespace(), vs.GetName(), framework.Poll, f.Timeouts.SnapshotDelete)
 				framework.ExpectNoError(err)
 
 				switch pattern.SnapshotDeletionPolicy {
-				case storageapi.DeleteSnapshot:
+				case storageframework.DeleteSnapshot:
 					ginkgo.By("checking the SnapshotContent has been deleted")
 					err = utils.WaitForGVRDeletion(dc, storageutils.SnapshotContentGVR, vscontent.GetName(), framework.Poll, f.Timeouts.SnapshotDelete)
 					framework.ExpectNoError(err)
-				case storageapi.RetainSnapshot:
+				case storageframework.RetainSnapshot:
 					ginkgo.By("checking the SnapshotContent has not been deleted")
 					err = utils.WaitForGVRDeletion(dc, storageutils.SnapshotContentGVR, vscontent.GetName(), 1*time.Second /* poll */, 30*time.Second /* timeout */)
 					framework.ExpectError(err)

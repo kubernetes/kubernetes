@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 )
 
 var migratedPlugins *string
@@ -52,7 +52,7 @@ type migrationOpCheck struct {
 }
 
 // BaseSuites is a list of storage test suites that work for in-tree and CSI drivers
-var BaseSuites = []func() storageapi.TestSuite{
+var BaseSuites = []func() storageframework.TestSuite{
 	InitVolumesTestSuite,
 	InitVolumeIOTestSuite,
 	InitVolumeModeTestSuite,
@@ -225,8 +225,8 @@ func (moc *migrationOpCheck) validateMigrationVolumeOpCounts() {
 }
 
 // Skip skipVolTypes patterns if the driver supports dynamic provisioning
-func skipVolTypePatterns(pattern storageapi.TestPattern, driver storageapi.TestDriver, skipVolTypes map[storageapi.TestVolType]bool) {
-	_, supportsProvisioning := driver.(storageapi.DynamicPVTestDriver)
+func skipVolTypePatterns(pattern storageframework.TestPattern, driver storageframework.TestDriver, skipVolTypes map[storageframework.TestVolType]bool) {
+	_, supportsProvisioning := driver.(storageframework.DynamicPVTestDriver)
 	if supportsProvisioning && skipVolTypes[pattern.VolType] {
 		e2eskipper.Skipf("Driver supports dynamic provisioning, skipping %s pattern", pattern.VolType)
 	}

@@ -34,19 +34,19 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 type ephemeralTestSuite struct {
-	tsInfo storageapi.TestSuiteInfo
+	tsInfo storageframework.TestSuiteInfo
 }
 
 // InitCustomEphemeralTestSuite returns ephemeralTestSuite that implements TestSuite interface
 // using custom test patterns
-func InitCustomEphemeralTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
+func InitCustomEphemeralTestSuite(patterns []storageframework.TestPattern) storageframework.TestSuite {
 	return &ephemeralTestSuite{
-		tsInfo: storageapi.TestSuiteInfo{
+		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "ephemeral",
 			TestPatterns: patterns,
 		},
@@ -55,17 +55,17 @@ func InitCustomEphemeralTestSuite(patterns []storageapi.TestPattern) storageapi.
 
 // InitEphemeralTestSuite returns ephemeralTestSuite that implements TestSuite interface
 // using test suite default patterns
-func InitEphemeralTestSuite() storageapi.TestSuite {
-	genericLateBinding := storageapi.DefaultFsGenericEphemeralVolume
+func InitEphemeralTestSuite() storageframework.TestSuite {
+	genericLateBinding := storageframework.DefaultFsGenericEphemeralVolume
 	genericLateBinding.Name += " (late-binding)"
 	genericLateBinding.BindingMode = storagev1.VolumeBindingWaitForFirstConsumer
 
-	genericImmediateBinding := storageapi.DefaultFsGenericEphemeralVolume
+	genericImmediateBinding := storageframework.DefaultFsGenericEphemeralVolume
 	genericImmediateBinding.Name += " (immediate-binding)"
 	genericImmediateBinding.BindingMode = storagev1.VolumeBindingImmediate
 
-	patterns := []storageapi.TestPattern{
-		storageapi.DefaultFsCSIEphemeralVolume,
+	patterns := []storageframework.TestPattern{
+		storageframework.DefaultFsCSIEphemeralVolume,
 		genericLateBinding,
 		genericImmediateBinding,
 	}
@@ -73,35 +73,35 @@ func InitEphemeralTestSuite() storageapi.TestSuite {
 	return InitCustomEphemeralTestSuite(patterns)
 }
 
-func (p *ephemeralTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
+func (p *ephemeralTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return p.tsInfo
 }
 
-func (p *ephemeralTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+func (p *ephemeralTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 }
 
-func (p *ephemeralTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *storageapi.PerTestConfig
+		config        *storageframework.PerTestConfig
 		driverCleanup func()
 
 		testCase *EphemeralTest
-		resource *storageapi.VolumeResource
+		resource *storageframework.VolumeResource
 	}
 	var (
-		eDriver storageapi.EphemeralTestDriver
+		eDriver storageframework.EphemeralTestDriver
 		l       local
 	)
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewFrameworkWithCustomTimeouts("ephemeral", storageapi.GetDriverTimeouts(driver))
+	f := framework.NewFrameworkWithCustomTimeouts("ephemeral", storageframework.GetDriverTimeouts(driver))
 
 	init := func() {
-		if pattern.VolType == storageapi.CSIInlineVolume {
-			eDriver, _ = driver.(storageapi.EphemeralTestDriver)
+		if pattern.VolType == storageframework.CSIInlineVolume {
+			eDriver, _ = driver.(storageframework.EphemeralTestDriver)
 		}
-		if pattern.VolType == storageapi.GenericEphemeralVolume {
+		if pattern.VolType == storageframework.GenericEphemeralVolume {
 			enabled, err := GenericEphemeralVolumesEnabled(f.ClientSet, f.Timeouts, f.Namespace.Name)
 			framework.ExpectNoError(err, "check GenericEphemeralVolume feature")
 			if !enabled {
@@ -113,10 +113,10 @@ func (p *ephemeralTestSuite) DefineTests(driver storageapi.TestDriver, pattern s
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.resource = storageapi.CreateVolumeResource(driver, l.config, pattern, e2evolume.SizeRange{})
+		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, e2evolume.SizeRange{})
 
 		switch pattern.VolType {
-		case storageapi.CSIInlineVolume:
+		case storageframework.CSIInlineVolume:
 			l.testCase = &EphemeralTest{
 				Client:     l.config.Framework.ClientSet,
 				Timeouts:   f.Timeouts,
@@ -127,7 +127,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageapi.TestDriver, pattern s
 					return eDriver.GetVolume(l.config, volumeNumber)
 				},
 			}
-		case storageapi.GenericEphemeralVolume:
+		case storageframework.GenericEphemeralVolume:
 			l.testCase = &EphemeralTest{
 				Client:    l.config.Framework.ClientSet,
 				Timeouts:  f.Timeouts,
@@ -210,7 +210,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageapi.TestDriver, pattern s
 
 	ginkgo.It("should support multiple inline ephemeral volumes", func() {
 		if pattern.BindingMode == storagev1.VolumeBindingImmediate &&
-			pattern.VolType == storageapi.GenericEphemeralVolume {
+			pattern.VolType == storageframework.GenericEphemeralVolume {
 			e2eskipper.Skipf("Multiple generic ephemeral volumes with immediate binding may cause pod startup failures when the volumes get created in separate topology segments.")
 		}
 

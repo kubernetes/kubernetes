@@ -51,8 +51,8 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -121,13 +121,13 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 	type mockDriverSetup struct {
 		cs           clientset.Interface
-		config       *storageapi.PerTestConfig
+		config       *storageframework.PerTestConfig
 		testCleanups []func()
 		pods         []*v1.Pod
 		pvcs         []*v1.PersistentVolumeClaim
 		sc           map[string]*storagev1.StorageClass
 		vsc          map[string]*unstructured.Unstructured
-		driver       storageapi.TestDriver
+		driver       storageframework.TestDriver
 		provisioner  string
 		tp           testParameters
 	}
@@ -189,7 +189,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	createPod := func(ephemeral bool) (class *storagev1.StorageClass, claim *v1.PersistentVolumeClaim, pod *v1.Pod) {
 		ginkgo.By("Creating pod")
 		var sc *storagev1.StorageClass
-		if dDriver, ok := m.driver.(storageapi.DynamicPVTestDriver); ok {
+		if dDriver, ok := m.driver.(storageframework.DynamicPVTestDriver); ok {
 			sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
 		}
 		scTest := testsuites.StorageClassTest{
@@ -238,7 +238,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		ginkgo.By("Creating pod with fsGroup")
 		nodeSelection := m.config.ClientNodeSelection
 		var sc *storagev1.StorageClass
-		if dDriver, ok := m.driver.(storageapi.DynamicPVTestDriver); ok {
+		if dDriver, ok := m.driver.(storageframework.DynamicPVTestDriver); ok {
 			sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
 		}
 		scTest := testsuites.StorageClassTest{
@@ -1247,7 +1247,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					enableSnapshot:  true,
 					javascriptHooks: scripts,
 				})
-				sDriver, ok := m.driver.(storageapi.SnapshottableTestDriver)
+				sDriver, ok := m.driver.(storageframework.SnapshottableTestDriver)
 				if !ok {
 					e2eskipper.Skipf("mock driver %s does not support snapshots -- skipping", m.driver.GetDriverInfo().Name)
 
@@ -1257,7 +1257,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				defer cleanup()
 
 				var sc *storagev1.StorageClass
-				if dDriver, ok := m.driver.(storageapi.DynamicPVTestDriver); ok {
+				if dDriver, ok := m.driver.(storageframework.DynamicPVTestDriver); ok {
 					sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
 				}
 				ginkgo.By("Creating storage class")
@@ -1272,7 +1272,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By("Creating snapshot")
 				// TODO: Test VolumeSnapshots with Retain policy
-				snapshotClass, snapshot := storageapi.CreateSnapshot(sDriver, m.config, storageapi.DynamicSnapshotDelete, claim.Name, claim.Namespace, f.Timeouts)
+				snapshotClass, snapshot := storageframework.CreateSnapshot(sDriver, m.config, storageframework.DynamicSnapshotDelete, claim.Name, claim.Namespace, f.Timeouts)
 				framework.ExpectNoError(err, "failed to create snapshot")
 				m.vsc[snapshotClass.GetName()] = snapshotClass
 				volumeSnapshotName := snapshot.GetName()
@@ -1306,7 +1306,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 
 				ginkgo.By(fmt.Sprintf("Get VolumeSnapshotContent bound to VolumeSnapshot %s", snapshot.GetName()))
-				snapshotContent := storageapi.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot)
+				snapshotContent := utils.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot)
 				volumeSnapshotContentName := snapshotContent.GetName()
 
 				ginkgo.By(fmt.Sprintf("Verify VolumeSnapshotContent %s contains finalizer %s", snapshot.GetName(), volumeSnapshotContentFinalizer))
@@ -1336,7 +1336,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				framework.ExpectNoError(err)
 
 				ginkgo.By("Delete VolumeSnapshot")
-				err = storageapi.DeleteAndWaitSnapshot(m.config.Framework.DynamicClient, f.Namespace.Name, volumeSnapshotName, framework.Poll, framework.SnapshotDeleteTimeout)
+				err = utils.DeleteAndWaitSnapshot(m.config.Framework.DynamicClient, f.Namespace.Name, volumeSnapshotName, framework.Poll, framework.SnapshotDeleteTimeout)
 				framework.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshot %s", volumeSnapshotName))
 
 				ginkgo.By(fmt.Sprintf("Wait for VolumeSnapshotContent %s to be deleted", volumeSnapshotContentName))

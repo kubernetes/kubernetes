@@ -35,21 +35,21 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 type topologyTestSuite struct {
-	tsInfo storageapi.TestSuiteInfo
+	tsInfo storageframework.TestSuiteInfo
 }
 
 type topologyTest struct {
-	config        *storageapi.PerTestConfig
+	config        *storageframework.PerTestConfig
 	driverCleanup func()
 
 	migrationCheck *migrationOpCheck
 
-	resource      storageapi.VolumeResource
+	resource      storageframework.VolumeResource
 	pod           *v1.Pod
 	allTopologies []topology
 }
@@ -58,9 +58,9 @@ type topology map[string]string
 
 // InitCustomTopologyTestSuite returns topologyTestSuite that implements TestSuite interface
 // using custom test patterns
-func InitCustomTopologyTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
+func InitCustomTopologyTestSuite(patterns []storageframework.TestPattern) storageframework.TestSuite {
 	return &topologyTestSuite{
-		tsInfo: storageapi.TestSuiteInfo{
+		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "topology",
 			TestPatterns: patterns,
 		},
@@ -69,51 +69,51 @@ func InitCustomTopologyTestSuite(patterns []storageapi.TestPattern) storageapi.T
 
 // InitTopologyTestSuite returns topologyTestSuite that implements TestSuite interface
 // using testsuite default patterns
-func InitTopologyTestSuite() storageapi.TestSuite {
-	patterns := []storageapi.TestPattern{
-		storageapi.TopologyImmediate,
-		storageapi.TopologyDelayed,
+func InitTopologyTestSuite() storageframework.TestSuite {
+	patterns := []storageframework.TestPattern{
+		storageframework.TopologyImmediate,
+		storageframework.TopologyDelayed,
 	}
 	return InitCustomTopologyTestSuite(patterns)
 }
 
-func (t *topologyTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
+func (t *topologyTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *topologyTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+func (t *topologyTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	dInfo := driver.GetDriverInfo()
 	var ok bool
-	_, ok = driver.(storageapi.DynamicPVTestDriver)
+	_, ok = driver.(storageframework.DynamicPVTestDriver)
 	if !ok {
 		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
 	}
 
-	if !dInfo.Capabilities[storageapi.CapTopology] {
+	if !dInfo.Capabilities[storageframework.CapTopology] {
 		e2eskipper.Skipf("Driver %q does not support topology - skipping", dInfo.Name)
 	}
 }
 
-func (t *topologyTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	var (
 		dInfo   = driver.GetDriverInfo()
-		dDriver storageapi.DynamicPVTestDriver
+		dDriver storageframework.DynamicPVTestDriver
 		cs      clientset.Interface
 		err     error
 	)
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewFrameworkWithCustomTimeouts("topology", storageapi.GetDriverTimeouts(driver))
+	f := framework.NewFrameworkWithCustomTimeouts("topology", storageframework.GetDriverTimeouts(driver))
 
 	init := func() topologyTest {
-		dDriver, _ = driver.(storageapi.DynamicPVTestDriver)
+		dDriver, _ = driver.(storageframework.DynamicPVTestDriver)
 		l := topologyTest{}
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 
-		l.resource = storageapi.VolumeResource{
+		l.resource = storageframework.VolumeResource{
 			Config:  l.config,
 			Pattern: pattern,
 		}

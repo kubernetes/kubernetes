@@ -17,8 +17,8 @@ limitations under the License.
 package storage
 
 import (
-	"k8s.io/kubernetes/test/e2e/storage/api"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
@@ -26,7 +26,7 @@ import (
 )
 
 // List of testDrivers to be executed in below loop
-var csiTestDrivers = []func() api.TestDriver{
+var csiTestDrivers = []func() storageframework.TestDriver{
 	drivers.InitHostPathCSIDriver,
 	drivers.InitGcePDCSIDriver,
 	// Don't run tests with mock driver (drivers.InitMockCSIDriver), it does not provide persistent storage.
@@ -37,8 +37,8 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 	for _, initDriver := range csiTestDrivers {
 		curDriver := initDriver()
 
-		ginkgo.Context(api.GetDriverNameWithFeatureTags(curDriver), func() {
-			api.DefineTestSuites(curDriver, testsuites.CSISuites)
+		ginkgo.Context(storageframework.GetDriverNameWithFeatureTags(curDriver), func() {
+			storageframework.DefineTestSuites(curDriver, testsuites.CSISuites)
 		})
 	}
 })

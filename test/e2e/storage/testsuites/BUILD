@@ -51,7 +51,7 @@ go_library(
         "//test/e2e/framework/pv:go_default_library",
         "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/volume:go_default_library",
-        "//test/e2e/storage/api:go_default_library",
+        "//test/e2e/storage/framework:go_default_library",
         "//test/e2e/storage/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

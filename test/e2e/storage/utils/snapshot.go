@@ -21,8 +21,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onsi/ginkgo"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -72,4 +76,67 @@ func WaitForSnapshotReady(c dynamic.Interface, ns string, snapshotName string, p
 	}
 
 	return fmt.Errorf("VolumeSnapshot %s is not ready within %v", snapshotName, timeout)
+}
+
+// GetSnapshotContentFromSnapshot returns the VolumeSnapshotContent object Bound to a
+// given VolumeSnapshot
+func GetSnapshotContentFromSnapshot(dc dynamic.Interface, snapshot *unstructured.Unstructured) *unstructured.Unstructured {
+	defer ginkgo.GinkgoRecover()
+	err := WaitForSnapshotReady(dc, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
+	framework.ExpectNoError(err)
+
+	vs, err := dc.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Get(context.TODO(), snapshot.GetName(), metav1.GetOptions{})
+
+	snapshotStatus := vs.Object["status"].(map[string]interface{})
+	snapshotContentName := snapshotStatus["boundVolumeSnapshotContentName"].(string)
+	framework.Logf("received snapshotStatus %v", snapshotStatus)
+	framework.Logf("snapshotContentName %s", snapshotContentName)
+	framework.ExpectNoError(err)
+
+	vscontent, err := dc.Resource(SnapshotContentGVR).Get(context.TODO(), snapshotContentName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+
+	return vscontent
+
+}
+
+// DeleteAndWaitSnapshot deletes a VolumeSnapshot and waits for it to be deleted or until timeout occurs, whichever comes first
+func DeleteAndWaitSnapshot(dc dynamic.Interface, ns string, snapshotName string, poll, timeout time.Duration) error {
+	var err error
+	ginkgo.By("deleting the snapshot")
+	err = dc.Resource(SnapshotGVR).Namespace(ns).Delete(context.TODO(), snapshotName, metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	ginkgo.By("checking the Snapshot has been deleted")
+	err = WaitForNamespacedGVRDeletion(dc, SnapshotGVR, ns, snapshotName, poll, timeout)
+
+	return err
+}
+
+// GenerateSnapshotClassSpec constructs a new SnapshotClass instance spec
+// with a unique name that is based on namespace + suffix.
+func GenerateSnapshotClassSpec(
+	snapshotter string,
+	parameters map[string]string,
+	ns string,
+	suffix string,
+) *unstructured.Unstructured {
+	snapshotClass := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "VolumeSnapshotClass",
+			"apiVersion": SnapshotAPIVersion,
+			"metadata": map[string]interface{}{
+				// Name must be unique, so let's base it on namespace name and use GenerateName
+				// TODO(#96234): Remove unnecessary suffix.
+				"name": names.SimpleNameGenerator.GenerateName(ns + "-" + suffix),
+			},
+			"driver":         snapshotter,
+			"parameters":     parameters,
+			"deletionPolicy": "Delete",
+		},
+	}
+
+	return snapshotClass
 }

@@ -32,37 +32,37 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 type volumeStressTestSuite struct {
-	tsInfo storageapi.TestSuiteInfo
+	tsInfo storageframework.TestSuiteInfo
 }
 
 type volumeStressTest struct {
-	config        *storageapi.PerTestConfig
+	config        *storageframework.PerTestConfig
 	driverCleanup func()
 
 	migrationCheck *migrationOpCheck
 
-	resources []*storageapi.VolumeResource
+	resources []*storageframework.VolumeResource
 	pods      []*v1.Pod
 	// stop and wait for any async routines
 	wg     sync.WaitGroup
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	testOptions storageapi.StressTestOptions
+	testOptions storageframework.StressTestOptions
 }
 
-var _ storageapi.TestSuite = &volumeStressTestSuite{}
+var _ storageframework.TestSuite = &volumeStressTestSuite{}
 
 // InitCustomVolumeStressTestSuite returns volumeStressTestSuite that implements TestSuite interface
 // using custom test patterns
-func InitCustomVolumeStressTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
+func InitCustomVolumeStressTestSuite(patterns []storageframework.TestPattern) storageframework.TestSuite {
 	return &volumeStressTestSuite{
-		tsInfo: storageapi.TestSuiteInfo{
+		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "volume-stress",
 			TestPatterns: patterns,
 		},
@@ -71,19 +71,19 @@ func InitCustomVolumeStressTestSuite(patterns []storageapi.TestPattern) storagea
 
 // InitVolumeStressTestSuite returns volumeStressTestSuite that implements TestSuite interface
 // using testsuite default patterns
-func InitVolumeStressTestSuite() storageapi.TestSuite {
-	patterns := []storageapi.TestPattern{
-		storageapi.DefaultFsDynamicPV,
-		storageapi.BlockVolModeDynamicPV,
+func InitVolumeStressTestSuite() storageframework.TestSuite {
+	patterns := []storageframework.TestPattern{
+		storageframework.DefaultFsDynamicPV,
+		storageframework.BlockVolModeDynamicPV,
 	}
 	return InitCustomVolumeStressTestSuite(patterns)
 }
 
-func (t *volumeStressTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
+func (t *volumeStressTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeStressTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+func (t *volumeStressTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	dInfo := driver.GetDriverInfo()
 	if dInfo.StressTestOptions == nil {
 		e2eskipper.Skipf("Driver %s doesn't specify stress test options -- skipping", dInfo.Name)
@@ -95,15 +95,15 @@ func (t *volumeStressTestSuite) SkipUnsupportedTests(driver storageapi.TestDrive
 		framework.Failf("NumRestarts in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumRestarts)
 	}
 
-	if _, ok := driver.(storageapi.DynamicPVTestDriver); !ok {
+	if _, ok := driver.(storageframework.DynamicPVTestDriver); !ok {
 		e2eskipper.Skipf("Driver %s doesn't implement DynamicPVTestDriver -- skipping", dInfo.Name)
 	}
-	if !driver.GetDriverInfo().Capabilities[storageapi.CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
+	if !driver.GetDriverInfo().Capabilities[storageframework.CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
 		e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", dInfo.Name)
 	}
 }
 
-func (t *volumeStressTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	var (
 		dInfo = driver.GetDriverInfo()
 		cs    clientset.Interface
@@ -112,7 +112,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageapi.TestDriver, patter
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewFrameworkWithCustomTimeouts("stress", storageapi.GetDriverTimeouts(driver))
+	f := framework.NewFrameworkWithCustomTimeouts("stress", storageframework.GetDriverTimeouts(driver))
 
 	init := func() {
 		cs = f.ClientSet
@@ -121,7 +121,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageapi.TestDriver, patter
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
-		l.resources = []*storageapi.VolumeResource{}
+		l.resources = []*storageframework.VolumeResource{}
 		l.pods = []*v1.Pod{}
 		l.testOptions = *dInfo.StressTestOptions
 		l.ctx, l.cancel = context.WithCancel(context.Background())
@@ -130,7 +130,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageapi.TestDriver, patter
 	createPodsAndVolumes := func() {
 		for i := 0; i < l.testOptions.NumPods; i++ {
 			framework.Logf("Creating resources for pod %v/%v", i, l.testOptions.NumPods-1)
-			r := storageapi.CreateVolumeResource(driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange)
+			r := storageframework.CreateVolumeResource(driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange)
 			l.resources = append(l.resources, r)
 			podConfig := e2epod.Config{
 				NS:           f.Namespace.Name,

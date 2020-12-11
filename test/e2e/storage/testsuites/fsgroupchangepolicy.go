@@ -27,7 +27,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -42,15 +42,15 @@ const (
 )
 
 type fsGroupChangePolicyTestSuite struct {
-	tsInfo storageapi.TestSuiteInfo
+	tsInfo storageframework.TestSuiteInfo
 }
 
-var _ storageapi.TestSuite = &fsGroupChangePolicyTestSuite{}
+var _ storageframework.TestSuite = &fsGroupChangePolicyTestSuite{}
 
 // InitCustomFsGroupChangePolicyTestSuite returns fsGroupChangePolicyTestSuite that implements TestSuite interface
-func InitCustomFsGroupChangePolicyTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
+func InitCustomFsGroupChangePolicyTestSuite(patterns []storageframework.TestPattern) storageframework.TestSuite {
 	return &fsGroupChangePolicyTestSuite{
-		tsInfo: storageapi.TestSuiteInfo{
+		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "fsgroupchangepolicy",
 			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
@@ -61,21 +61,21 @@ func InitCustomFsGroupChangePolicyTestSuite(patterns []storageapi.TestPattern) s
 }
 
 // InitFsGroupChangePolicyTestSuite returns fsGroupChangePolicyTestSuite that implements TestSuite interface
-func InitFsGroupChangePolicyTestSuite() storageapi.TestSuite {
-	patterns := []storageapi.TestPattern{
-		storageapi.DefaultFsDynamicPV,
+func InitFsGroupChangePolicyTestSuite() storageframework.TestSuite {
+	patterns := []storageframework.TestPattern{
+		storageframework.DefaultFsDynamicPV,
 	}
 	return InitCustomFsGroupChangePolicyTestSuite(patterns)
 }
 
-func (s *fsGroupChangePolicyTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
+func (s *fsGroupChangePolicyTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *fsGroupChangePolicyTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
-	skipVolTypePatterns(pattern, driver, storageapi.NewVolTypeMap(storageapi.CSIInlineVolume, storageapi.GenericEphemeralVolume))
+func (s *fsGroupChangePolicyTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+	skipVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(storageframework.CSIInlineVolume, storageframework.GenericEphemeralVolume))
 	dInfo := driver.GetDriverInfo()
-	if !dInfo.Capabilities[storageapi.CapFsGroup] {
+	if !dInfo.Capabilities[storageframework.CapFsGroup] {
 		e2eskipper.Skipf("Driver %q does not support FsGroup - skipping", dInfo.Name)
 	}
 
@@ -83,28 +83,28 @@ func (s *fsGroupChangePolicyTestSuite) SkipUnsupportedTests(driver storageapi.Te
 		e2eskipper.Skipf("Test does not support non-filesystem volume mode - skipping")
 	}
 
-	if pattern.VolType != storageapi.DynamicPV {
+	if pattern.VolType != storageframework.DynamicPV {
 		e2eskipper.Skipf("Suite %q does not support %v", s.tsInfo.Name, pattern.VolType)
 	}
 
-	_, ok := driver.(storageapi.DynamicPVTestDriver)
+	_, ok := driver.(storageframework.DynamicPVTestDriver)
 	if !ok {
 		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
 	}
 }
 
-func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *storageapi.PerTestConfig
+		config        *storageframework.PerTestConfig
 		driverCleanup func()
-		driver        storageapi.TestDriver
-		resource      *storageapi.VolumeResource
+		driver        storageframework.TestDriver
+		resource      *storageframework.VolumeResource
 	}
 	var l local
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewFrameworkWithCustomTimeouts("fsgroupchangepolicy", storageapi.GetDriverTimeouts(driver))
+	f := framework.NewFrameworkWithCustomTimeouts("fsgroupchangepolicy", storageframework.GetDriverTimeouts(driver))
 
 	init := func() {
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
@@ -112,7 +112,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageapi.TestDriver,
 		l.driver = driver
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
-		l.resource = storageapi.CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
+		l.resource = storageframework.CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
 	}
 
 	cleanup := func() {

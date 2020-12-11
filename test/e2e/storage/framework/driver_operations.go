@@ -14,17 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package framework
 
 import (
 	"fmt"
 
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // GetDriverNameWithFeatureTags returns driver name with feature tags
@@ -88,30 +86,4 @@ func GetStorageClass(
 		Parameters:        parameters,
 		VolumeBindingMode: bindingMode,
 	}
-}
-
-// GetSnapshotClass constructs a new SnapshotClass instance
-// with a unique name that is based on namespace + suffix.
-func GetSnapshotClass(
-	snapshotter string,
-	parameters map[string]string,
-	ns string,
-	suffix string,
-) *unstructured.Unstructured {
-	snapshotClass := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"kind":       "VolumeSnapshotClass",
-			"apiVersion": utils.SnapshotAPIVersion,
-			"metadata": map[string]interface{}{
-				// Name must be unique, so let's base it on namespace name and use GenerateName
-				// TODO(#96234): Remove unnecessary suffix.
-				"name": names.SimpleNameGenerator.GenerateName(ns + "-" + suffix),
-			},
-			"driver":         snapshotter,
-			"parameters":     parameters,
-			"deletionPolicy": "Delete",
-		},
-	}
-
-	return snapshotClass
 }
