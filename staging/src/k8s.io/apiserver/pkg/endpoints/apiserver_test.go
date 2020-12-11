@@ -356,11 +356,7 @@ type SimpleRESTStorage struct {
 	requestedResourceVersion   string
 	requestedResourceNamespace string
 
-	// The id requested, and location to return for ResourceLocation
-	requestedResourceLocationID string
-	resourceLocation            *url.URL
-	resourceLocationTransport   http.RoundTripper
-	expectedResourceNamespace   string
+	expectedResourceNamespace string
 
 	// If non-nil, called inside the WorkFunc when answering update, delete, create.
 	// obj receives the original input to the update, delete, or create call.
