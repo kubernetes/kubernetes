@@ -60,24 +60,6 @@ func WaitForStableCluster(c clientset.Interface, workerNodes sets.String) int {
 	return len(allScheduledPods)
 }
 
-// WaitForPodsToBeDeleted waits until pods that are terminating to get deleted.
-func WaitForPodsToBeDeleted(c clientset.Interface) {
-	startTime := time.Now()
-	deleting := getDeletingPods(c, metav1.NamespaceAll)
-	for len(deleting) != 0 {
-		if startTime.Add(timeout).Before(time.Now()) {
-			framework.Logf("Pods still not deleted")
-			for _, p := range deleting {
-				framework.Logf("%v/%v", p.Namespace, p.Name)
-			}
-			framework.Failf("Timed out after %v waiting for pods to be deleted", timeout)
-			break
-		}
-		time.Sleep(waitTime)
-		deleting = getDeletingPods(c, metav1.NamespaceAll)
-	}
-}
-
 // getScheduledAndUnscheduledPods lists scheduled and not scheduled pods in all namespaces, with succeeded and failed pods filtered out.
 func getScheduledAndUnscheduledPods(c clientset.Interface, workerNodes sets.String) (scheduledPods, notScheduledPods []v1.Pod) {
 	pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
@@ -92,19 +74,6 @@ func getScheduledAndUnscheduledPods(c clientset.Interface, workerNodes sets.Stri
 	}
 	pods.Items = filteredPods
 	return GetPodsScheduled(workerNodes, pods)
-}
-
-// getDeletingPods returns whether there are any pods marked for deletion.
-func getDeletingPods(c clientset.Interface, ns string) []v1.Pod {
-	pods, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err, fmt.Sprintf("listing all pods in namespace %q while waiting for pods to terminate", ns))
-	var deleting []v1.Pod
-	for _, p := range pods.Items {
-		if p.ObjectMeta.DeletionTimestamp != nil && !podTerminated(p) {
-			deleting = append(deleting, p)
-		}
-	}
-	return deleting
 }
 
 func podTerminated(p v1.Pod) bool {
