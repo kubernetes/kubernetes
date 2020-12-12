@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
@@ -132,7 +133,7 @@ func TestCommonAttachDisk(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
-			vmLockMap:             newLockMap(),
+			lockMap:               newLockMap(),
 		}
 		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/%s",
 			testCloud.SubscriptionID, testCloud.ResourceGroup, *test.existedDisk.Name)
@@ -236,7 +237,7 @@ func TestCommonAttachDiskWithVMSS(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
-			vmLockMap:             newLockMap(),
+			lockMap:               newLockMap(),
 		}
 		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/%s",
 			testCloud.SubscriptionID, testCloud.ResourceGroup, *test.existedDisk.Name)
@@ -310,7 +311,7 @@ func TestCommonDetachDisk(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
-			vmLockMap:             newLockMap(),
+			lockMap:               newLockMap(),
 		}
 		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name",
 			testCloud.SubscriptionID, testCloud.ResourceGroup)
@@ -368,7 +369,7 @@ func TestGetDiskLun(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
-			vmLockMap:             newLockMap(),
+			lockMap:               newLockMap(),
 		}
 		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
@@ -382,27 +383,43 @@ func TestGetDiskLun(t *testing.T) {
 	}
 }
 
-func TestGetNextDiskLun(t *testing.T) {
+func TestSetDiskLun(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	testCases := []struct {
 		desc            string
+		nodeName        string
+		diskURI         string
+		diskMap         map[string]*AttachDiskOptions
 		isDataDisksFull bool
 		expectedLun     int32
 		expectedErr     bool
 	}{
 		{
-			desc:            "the minimal LUN shall be returned if there's enough room for extra disks",
-			isDataDisksFull: false,
-			expectedLun:     1,
-			expectedErr:     false,
+			desc:        "the minimal LUN shall be returned if there's enough room for extra disks",
+			nodeName:    "nodeName",
+			diskURI:     "diskURI",
+			diskMap:     map[string]*AttachDiskOptions{"diskURI": {}},
+			expectedLun: 1,
+			expectedErr: false,
 		},
 		{
-			desc:            "LUN -1 and  error shall be returned if there's no available LUN",
+			desc:            "LUN -1 and error shall be returned if there's no available LUN",
+			nodeName:        "nodeName",
+			diskURI:         "diskURI",
+			diskMap:         map[string]*AttachDiskOptions{"diskURI": {}},
 			isDataDisksFull: true,
 			expectedLun:     -1,
 			expectedErr:     true,
+		},
+		{
+			desc:        "diskURI1 is not in VM data disk list nor in diskMap",
+			nodeName:    "nodeName",
+			diskURI:     "diskURI1",
+			diskMap:     map[string]*AttachDiskOptions{"diskURI2": {}},
+			expectedLun: -1,
+			expectedErr: true,
 		},
 	}
 
@@ -414,15 +431,15 @@ func TestGetNextDiskLun(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
-			vmLockMap:             newLockMap(),
+			lockMap:               newLockMap(),
 		}
-		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, test.isDataDisksFull)
+		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{test.nodeName: "PowerState/Running"}, test.isDataDisksFull)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
 		for _, vm := range expectedVMs {
 			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
 		}
 
-		lun, err := common.GetNextDiskLun("vm1")
+		lun, err := common.SetDiskLun(types.NodeName(test.nodeName), test.diskURI, test.diskMap)
 		assert.Equal(t, test.expectedLun, lun, "TestCase[%d]: %s", i, test.desc)
 		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
 	}
@@ -463,7 +480,7 @@ func TestDisksAreAttached(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
-			vmLockMap:             newLockMap(),
+			lockMap:               newLockMap(),
 		}
 		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
@@ -653,7 +670,7 @@ func TestCheckDiskExists(t *testing.T) {
 		resourceGroup:         testCloud.ResourceGroup,
 		subscriptionID:        testCloud.SubscriptionID,
 		cloud:                 testCloud,
-		vmLockMap:             newLockMap(),
+		lockMap:               newLockMap(),
 	}
 	// create a new disk before running test
 	newDiskName := "newdisk"
@@ -707,7 +724,7 @@ func TestFilterNonExistingDisks(t *testing.T) {
 		resourceGroup:         testCloud.ResourceGroup,
 		subscriptionID:        testCloud.SubscriptionID,
 		cloud:                 testCloud,
-		vmLockMap:             newLockMap(),
+		lockMap:               newLockMap(),
 	}
 	// create a new disk before running test
 	diskURIPrefix := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/",
@@ -769,7 +786,7 @@ func TestFilterNonExistingDisksWithSpecialHTTPStatusCode(t *testing.T) {
 		resourceGroup:         testCloud.ResourceGroup,
 		subscriptionID:        testCloud.SubscriptionID,
 		cloud:                 testCloud,
-		vmLockMap:             newLockMap(),
+		lockMap:               newLockMap(),
 	}
 	// create a new disk before running test
 	diskURIPrefix := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/",
@@ -820,5 +837,164 @@ func TestIsInstanceNotFoundError(t *testing.T) {
 	for i, test := range testCases {
 		result := isInstanceNotFoundError(fmt.Errorf(test.errMsg))
 		assert.Equal(t, test.expectedResult, result, "TestCase[%d]", i, result)
+	}
+}
+
+func TestAttachDiskRequestFuncs(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	testCases := []struct {
+		desc                 string
+		diskURI              string
+		nodeName             string
+		diskName             string
+		duplicateDiskRequest bool
+		diskNum              int
+		expectedErr          bool
+	}{
+		{
+			desc:        "one disk request in queue",
+			diskURI:     "diskURI",
+			nodeName:    "nodeName",
+			diskName:    "diskName",
+			diskNum:     1,
+			expectedErr: false,
+		},
+		{
+			desc:        "multiple disk requests in queue",
+			diskURI:     "diskURI",
+			nodeName:    "nodeName",
+			diskName:    "diskName",
+			diskNum:     10,
+			expectedErr: false,
+		},
+		{
+			desc:        "zero disk request in queue",
+			diskURI:     "diskURI",
+			nodeName:    "nodeName",
+			diskName:    "diskName",
+			diskNum:     0,
+			expectedErr: false,
+		},
+		{
+			desc:                 "multiple disk requests in queue",
+			diskURI:              "diskURI",
+			nodeName:             "nodeName",
+			diskName:             "diskName",
+			duplicateDiskRequest: true,
+			diskNum:              10,
+			expectedErr:          false,
+		},
+	}
+
+	for i, test := range testCases {
+		testCloud := GetTestCloud(ctrl)
+		common := &controllerCommon{
+			location:              testCloud.Location,
+			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
+			resourceGroup:         testCloud.ResourceGroup,
+			subscriptionID:        testCloud.SubscriptionID,
+			cloud:                 testCloud,
+			lockMap:               newLockMap(),
+		}
+		for i := 1; i <= test.diskNum; i++ {
+			diskURI := fmt.Sprintf("%s%d", test.diskURI, i)
+			diskName := fmt.Sprintf("%s%d", test.diskName, i)
+			attachDiskOptions := &AttachDiskOptions{diskName: diskName}
+			err := common.insertAttachDiskRequest(diskURI, test.nodeName, attachDiskOptions)
+			assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
+			if test.duplicateDiskRequest {
+				err := common.insertAttachDiskRequest(diskURI, test.nodeName, attachDiskOptions)
+				assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
+			}
+		}
+
+		diskMap, err := common.cleanAttachDiskRequests(test.nodeName)
+		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
+		assert.Equal(t, test.diskNum, len(diskMap), "TestCase[%d]: %s", i, test.desc)
+		for diskURI, opt := range diskMap {
+			assert.Equal(t, strings.Contains(diskURI, test.diskURI), true, "TestCase[%d]: %s", i, test.desc)
+			assert.Equal(t, strings.Contains(opt.diskName, test.diskName), true, "TestCase[%d]: %s", i, test.desc)
+		}
+	}
+}
+
+func TestDetachDiskRequestFuncs(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	testCases := []struct {
+		desc                 string
+		diskURI              string
+		nodeName             string
+		diskName             string
+		duplicateDiskRequest bool
+		diskNum              int
+		expectedErr          bool
+	}{
+		{
+			desc:        "one disk request in queue",
+			diskURI:     "diskURI",
+			nodeName:    "nodeName",
+			diskName:    "diskName",
+			diskNum:     1,
+			expectedErr: false,
+		},
+		{
+			desc:        "multiple disk requests in queue",
+			diskURI:     "diskURI",
+			nodeName:    "nodeName",
+			diskName:    "diskName",
+			diskNum:     10,
+			expectedErr: false,
+		},
+		{
+			desc:        "zero disk request in queue",
+			diskURI:     "diskURI",
+			nodeName:    "nodeName",
+			diskName:    "diskName",
+			diskNum:     0,
+			expectedErr: false,
+		},
+		{
+			desc:                 "multiple disk requests in queue",
+			diskURI:              "diskURI",
+			nodeName:             "nodeName",
+			diskName:             "diskName",
+			duplicateDiskRequest: true,
+			diskNum:              10,
+			expectedErr:          false,
+		},
+	}
+
+	for i, test := range testCases {
+		testCloud := GetTestCloud(ctrl)
+		common := &controllerCommon{
+			location:              testCloud.Location,
+			storageEndpointSuffix: testCloud.Environment.StorageEndpointSuffix,
+			resourceGroup:         testCloud.ResourceGroup,
+			subscriptionID:        testCloud.SubscriptionID,
+			cloud:                 testCloud,
+			lockMap:               newLockMap(),
+		}
+		for i := 1; i <= test.diskNum; i++ {
+			diskURI := fmt.Sprintf("%s%d", test.diskURI, i)
+			diskName := fmt.Sprintf("%s%d", test.diskName, i)
+			err := common.insertDetachDiskRequest(diskName, diskURI, test.nodeName)
+			assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
+			if test.duplicateDiskRequest {
+				err := common.insertDetachDiskRequest(diskName, diskURI, test.nodeName)
+				assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
+			}
+		}
+
+		diskMap, err := common.cleanDetachDiskRequests(test.nodeName)
+		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
+		assert.Equal(t, test.diskNum, len(diskMap), "TestCase[%d]: %s", i, test.desc)
+		for diskURI, diskName := range diskMap {
+			assert.Equal(t, strings.Contains(diskURI, test.diskURI), true, "TestCase[%d]: %s", i, test.desc)
+			assert.Equal(t, strings.Contains(diskName, test.diskName), true, "TestCase[%d]: %s", i, test.desc)
+		}
 	}
 }

@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mockvmsets
+package azure
 
 import (
 	reflect "reflect"
@@ -220,31 +220,31 @@ func (mr *MockVMSetMockRecorder) EnsureBackendPoolDeleted(service, backendPoolID
 }
 
 // AttachDisk mocks base method
-func (m *MockVMSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes, diskEncryptionSetID string, writeAcceleratorEnabled bool) error {
+func (m *MockVMSet) AttachDisk(nodeName types.NodeName, diskMap map[string]*AttachDiskOptions) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AttachDisk", isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode, diskEncryptionSetID, writeAcceleratorEnabled)
+	ret := m.ctrl.Call(m, "AttachDisk", nodeName, diskMap)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AttachDisk indicates an expected call of AttachDisk
-func (mr *MockVMSetMockRecorder) AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode, diskEncryptionSetID, writeAcceleratorEnabled interface{}) *gomock.Call {
+func (mr *MockVMSetMockRecorder) AttachDisk(nodeName, diskMap interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AttachDisk", reflect.TypeOf((*MockVMSet)(nil).AttachDisk), isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode, diskEncryptionSetID, writeAcceleratorEnabled)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AttachDisk", reflect.TypeOf((*MockVMSet)(nil).AttachDisk), nodeName, diskMap)
 }
 
 // DetachDisk mocks base method
-func (m *MockVMSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName) error {
+func (m *MockVMSet) DetachDisk(nodeName types.NodeName, diskMap map[string]string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DetachDisk", diskName, diskURI, nodeName)
+	ret := m.ctrl.Call(m, "DetachDisk", nodeName, diskMap)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DetachDisk indicates an expected call of DetachDisk
-func (mr *MockVMSetMockRecorder) DetachDisk(diskName, diskURI, nodeName interface{}) *gomock.Call {
+func (mr *MockVMSetMockRecorder) DetachDisk(nodeName, diskMap interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DetachDisk", reflect.TypeOf((*MockVMSet)(nil).DetachDisk), diskName, diskURI, nodeName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DetachDisk", reflect.TypeOf((*MockVMSet)(nil).DetachDisk), nodeName, diskMap)
 }
 
 // GetDataDisks mocks base method

@@ -130,7 +130,18 @@ func TestAttachDiskWithVMSS(t *testing.T) {
 		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/%s",
 			testCloud.SubscriptionID, testCloud.ResourceGroup, *test.existedDisk.Name)
 
-		err = ss.AttachDisk(test.isManagedDisk, "disk-name", diskURI, test.vmssvmName, 0, compute.CachingTypesReadWrite, "", true)
+		options := AttachDiskOptions{
+			lun:                     0,
+			isManagedDisk:           test.isManagedDisk,
+			diskName:                "disk-name",
+			cachingMode:             compute.CachingTypesReadWrite,
+			diskEncryptionSetID:     "",
+			writeAcceleratorEnabled: true,
+		}
+		diskMap := map[string]*AttachDiskOptions{
+			diskURI: &options,
+		}
+		err = ss.AttachDisk(test.vmssvmName, diskMap)
 		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s, return error: %v", i, test.desc, err)
 		assert.Equal(t, test.expectedErrMsg, err, "TestCase[%d]: %s, expected error: %v, return error: %v", i, test.desc, test.expectedErrMsg, err)
 	}
@@ -226,7 +237,10 @@ func TestDetachDiskWithVMSS(t *testing.T) {
 			mockVMSSVMClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, scaleSetName, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		}
 
-		err = ss.DetachDisk(*test.existedDisk.Name, diskName, test.vmssvmName)
+		diskMap := map[string]string{
+			diskName: *test.existedDisk.Name,
+		}
+		err = ss.DetachDisk(test.vmssvmName, diskMap)
 		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s, err: %v", i, test.desc, err)
 		assert.Equal(t, test.expectedErrMsg, err, "TestCase[%d]: %s, expected error: %v, return error: %v", i, test.desc, test.expectedErrMsg, err)
 
