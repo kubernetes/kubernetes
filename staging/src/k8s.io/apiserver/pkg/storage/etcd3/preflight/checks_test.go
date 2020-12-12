@@ -37,14 +37,18 @@ func TestParseServerURIGood(t *testing.T) {
 }
 
 func TestParseServerURIGoodUnix(t *testing.T) {
-	connURL, err := parseServerURI("unix://127.0.0.1:21002112605")
+	connURL, err := parseServerURI("unix://127.0.0.1:21002112605/etcd.socket")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	reference := "127.0.0.1:21002112605"
-	if connURL.Host != reference {
+	host := "127.0.0.1:21002112605"
+	if connURL.Host != host {
 		t.Fatalf("server uri was not parsed correctly, host %s was invalid", connURL.Host)
+	}
+	path := "/etcd.socket"
+	if connURL.Path != path {
+		t.Fatalf("server uri was not parsed correctly, path %s was invalid", connURL.Path)
 	}
 }
 

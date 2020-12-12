@@ -36,7 +36,11 @@ func (EtcdConnection) serverReachable(connURL *url.URL) bool {
 	if scheme == "http" || scheme == "https" || scheme == "tcp" {
 		scheme = "tcp"
 	}
-	if conn, err := net.DialTimeout(scheme, connURL.Host, connectionTimeout); err == nil {
+	addr := connURL.Host
+	if scheme == "unix" {
+		addr = connURL.Host + connURL.Path
+	}
+	if conn, err := net.DialTimeout(scheme, addr, connectionTimeout); err == nil {
 		defer conn.Close()
 		return true
 	}
