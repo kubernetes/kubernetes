@@ -1238,6 +1238,17 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 
+		// Capture healthCheckNodePorts
+		if hcNodePort, exists := serviceUpdateResult.HCServiceNodePorts[svcName.NamespacedName]; exists {
+			writeLine(proxier.filterRules,
+				"-A", string(fwChain),
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s healthCheckNodePort"`, svcNameString),
+				"-m", protocol, "-p", protocol,
+				"--dport", strconv.Itoa(int(hcNodePort)),
+				"-j", "ACCEPT",
+			)
+		}
+
 		// Capture nodeports.  If we had more than 2 rules it might be
 		// worthwhile to make a new per-service chain for nodeport rules, but
 		// with just 2 rules it ends up being a waste and a cognitive burden.
