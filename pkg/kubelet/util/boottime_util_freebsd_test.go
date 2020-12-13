@@ -1,7 +1,7 @@
-// +build linux
+// +build freebsd
 
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,18 +19,18 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
+	"testing"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
-// GetBootTime returns the time at which the machine was started, truncated to the nearest second
-func GetBootTime() (time.Time, error) {
-	currentTime := time.Now()
-	var info unix.Sysinfo_t
-	if err := unix.Sysinfo(&info); err != nil {
-		return time.Time{}, fmt.Errorf("error getting system uptime: %s", err)
+func TestGetBootTime(t *testing.T) {
+	boottime, err := GetBootTime()
+
+	if err != nil {
+		t.Errorf("Unable to get system uptime")
 	}
-	return currentTime.Add(-time.Duration(info.Uptime) * time.Second).Truncate(time.Second), nil
+
+	if !boottime.After(time.Time{}) {
+		t.Errorf("Invalid system uptime")
+	}
 }
