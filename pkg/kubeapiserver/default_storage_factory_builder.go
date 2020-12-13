@@ -32,6 +32,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
@@ -67,6 +68,8 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 		networking.Resource("ingressclasses").WithVersion("v1beta1"),
 		apisstorage.Resource("csidrivers").WithVersion("v1beta1"),
 		apisstorage.Resource("csistoragecapacities").WithVersion("v1alpha1"),
+		flowcontrol.Resource("flowschemas").WithVersion("v1alpha1"),
+		flowcontrol.Resource("prioritylevelconfigurations").WithVersion("v1alpha1"),
 	}
 
 	return &StorageFactoryConfig{
