@@ -4448,16 +4448,14 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 	}
 	loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, service)
 
-	if isNLB(service.Annotations) {
-		lb, err := c.describeLoadBalancerv2(loadBalancerName)
+	lb, err := c.describeLoadBalancerv2(loadBalancerName)
+
+	// Handle deletion of NLB
+	// Workaround for load balancer type annotation no longer available
+	if lb != nil {
 		if err != nil {
 			return err
 		}
-		if lb == nil {
-			klog.Info("Load balancer already deleted: ", loadBalancerName)
-			return nil
-		}
-
 		// Delete the LoadBalancer and target groups
 		//
 		// Deleting a target group while associated with a load balancer will
