@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -67,6 +68,9 @@ func (s *disruptiveTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo 
 
 func (s *disruptiveTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	skipVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(storageframework.PreprovisionedPV))
+	if pattern.VolMode == v1.PersistentVolumeBlock && !driver.GetDriverInfo().Capabilities[storageframework.CapBlock] {
+		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", driver.GetDriverInfo().Name, pattern.VolMode)
+	}
 }
 
 func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
