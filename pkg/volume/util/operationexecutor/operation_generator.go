@@ -1024,7 +1024,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			}
 
 			// From now on, the volume is mapped. Mark it as uncertain on error,
-			// so it is unmapped when corresponding pod is deleted.
+			// so it is is unmapped when corresponding pod is deleted.
 			defer func() {
 				if simpleErr != nil {
 					errText := simpleErr.Error()
