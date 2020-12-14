@@ -223,8 +223,8 @@ github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e h1:KhcknUwkWHKZ
 github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e/go.mod h1:0AA//k/eakGydO4jKRoRL2j92ZKSzTgj9tclaCrvXHk=
 github.com/google/btree v1.0.0 h1:0udJVsspx3VBr5FwtLhQQtuAsVc79tTq0ocGIPAU6qo=
 github.com/google/btree v1.0.0/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
-github.com/google/cadvisor v0.37.2 h1:z+tpt9LeIQG8qRyayPg3VU/ZYs/tpZD5cACuICtv0l0=
-github.com/google/cadvisor v0.37.2/go.mod h1:BalYQhwl2UV8lpB3oFssiaW8Uj6sqfFDxw5nEs9sBgU=
+github.com/google/cadvisor v0.37.3 h1:qsH/np74sg1/tEe+bn+e2JIPFxrw6En3gCVuQdolc74=
+github.com/google/cadvisor v0.37.3/go.mod h1:BalYQhwl2UV8lpB3oFssiaW8Uj6sqfFDxw5nEs9sBgU=
 github.com/google/go-cmp v0.4.0 h1:xsAVV57WRhGj6kEIi8ReJzQlHHqcBYCElAvkovg3B/4=
 github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/gofuzz v1.1.0 h1:Hsa8mG0dQ46ij8Sl2AYJDUv1oA9/d6Vk+3LG99Oe02g=
