@@ -301,6 +301,17 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 	return nil
 }
 
+// findStatusCondition finds the conditionType in conditions.
+func findStatusCondition(conditions []v1.PersistentVolumeClaimCondition, conditionType v1.PersistentVolumeClaimConditionType) *v1.PersistentVolumeClaimCondition {
+	for i := range conditions {
+		if conditions[i].Type == conditionType {
+			return &conditions[i]
+		}
+	}
+
+	return nil
+}
+
 // emitEventForUnboundDelayBindingClaim generates informative event for claim
 // if it's in delay binding mode and not bound yet.
 func (ctrl *PersistentVolumeController) emitEventForUnboundDelayBindingClaim(claim *v1.PersistentVolumeClaim) error {
@@ -322,8 +333,43 @@ func (ctrl *PersistentVolumeController) emitEventForUnboundDelayBindingClaim(cla
 			message = fmt.Sprintf("waiting for pod %s to be scheduled", podNames[0])
 		}
 	}
+	// we already emitted an event and we have the condition set, do nothing
+	if c := findStatusCondition(claim.Status.Conditions, v1.PersistentVolumeClaimWaitingForConsumer); c != nil && c.Status == v1.ConditionTrue {
+		return nil
+	}
+
+	// this is the first time we see waiting for consumer, set the condition and emit event
+	newClaim := claim.DeepCopy()
+	newClaim.Status.Conditions = append(newClaim.Status.Conditions, v1.PersistentVolumeClaimCondition{
+		Type:               v1.PersistentVolumeClaimWaitingForConsumer,
+		Status:             v1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "WaitingForConsumer",
+		Message:            message,
+	})
+
+	if _, err := ctrl.GetKubeClient().CoreV1().PersistentVolumeClaims(claim.GetNamespace()).Update(context.TODO(), newClaim, metav1.UpdateOptions{}); err != nil {
+		return err
+	}
 	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, reason, message)
 	return nil
+}
+
+// cleanWaitingForConsumerCondition remove the WaitingForConsumer status condition if set.
+func (ctrl *PersistentVolumeController) cleanWaitingForConsumerCondition(claim *v1.PersistentVolumeClaim) (bool, error) {
+	if c := findStatusCondition(claim.Status.Conditions, v1.PersistentVolumeClaimWaitingForConsumer); c != nil && c.Status == v1.ConditionTrue {
+		newClaim := claim.DeepCopy()
+		newClaim.Status.Conditions = []v1.PersistentVolumeClaimCondition{}
+		for _, c := range claim.Status.Conditions {
+			if c.Type == v1.PersistentVolumeClaimWaitingForConsumer {
+				continue
+			}
+			newClaim.Status.Conditions = append(newClaim.Status.Conditions, c)
+		}
+		_, err := ctrl.GetKubeClient().CoreV1().PersistentVolumeClaims(claim.GetNamespace()).Update(context.TODO(), newClaim, metav1.UpdateOptions{})
+		return true, err
+	}
+	return false, nil
 }
 
 // syncUnboundClaim is the main controller method to decide what to do with an
@@ -394,6 +440,11 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 		klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume %q requested", claimToClaimKey(claim), claim.Spec.VolumeName)
 		obj, found, err := ctrl.volumes.store.GetByKey(claim.Spec.VolumeName)
 		if err != nil {
+			return err
+		}
+		// Clean up the waiting for consumer condition as we already have VolumeName set
+		// If the condition was found and cleared, reconcile one more time to refresh the cache.
+		if foundCondition, err := ctrl.cleanWaitingForConsumerCondition(claim); foundCondition {
 			return err
 		}
 		if !found {

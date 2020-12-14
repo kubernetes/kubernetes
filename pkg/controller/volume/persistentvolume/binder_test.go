@@ -182,9 +182,9 @@ func TestSync(t *testing.T) {
 			"1-13 - delayed binding",
 			newVolumeArray("volume1-1", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classWait),
 			newVolumeArray("volume1-1", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classWait),
-			newClaimArray("claim1-1", "uid1-1", "1Gi", "", v1.ClaimPending, &classWait),
-			newClaimArray("claim1-1", "uid1-1", "1Gi", "", v1.ClaimPending, &classWait),
-			[]string{"Normal WaitForFirstConsumer"},
+			claimsWithConditions([]v1.PersistentVolumeClaimCondition{{Type: v1.PersistentVolumeClaimWaitingForConsumer, Status: "True", Reason: "WaitingForConsumer"}}, newClaimArray("claim1-1", "uid1-1", "1Gi", "", v1.ClaimPending, &classWait)),
+			claimsWithConditions([]v1.PersistentVolumeClaimCondition{{Type: v1.PersistentVolumeClaimWaitingForConsumer, Status: "True", Reason: "WaitingForConsumer"}}, newClaimArray("claim1-1", "uid1-1", "1Gi", "", v1.ClaimPending, &classWait)),
+			[]string{},
 			noerrors, testSyncClaim,
 		},
 		{

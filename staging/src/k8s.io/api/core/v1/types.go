@@ -508,6 +508,8 @@ const (
 	PersistentVolumeClaimResizing PersistentVolumeClaimConditionType = "Resizing"
 	// PersistentVolumeClaimFileSystemResizePending - controller resize is finished and a file system resize is pending on node
 	PersistentVolumeClaimFileSystemResizePending PersistentVolumeClaimConditionType = "FileSystemResizePending"
+	// PersistentVolumeClaimWaitingForConsumer - persistent volume claim is waiting for the consumer to attach it
+	PersistentVolumeClaimWaitingForConsumer PersistentVolumeClaimConditionType = "WaitingForConsumer"
 )
 
 // PersistentVolumeClaimCondition contails details about state of pvc

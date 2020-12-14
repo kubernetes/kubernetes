@@ -428,6 +428,14 @@ func newClaimArray(name, claimUID, capacity, boundToVolume string, phase v1.Pers
 	}
 }
 
+// claimsWithConditions add specified conditions into an array of claims.
+func claimsWithConditions(conditions []v1.PersistentVolumeClaimCondition, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
+	for i := range claims {
+		claims[i].Status.Conditions = conditions
+	}
+	return claims
+}
+
 // claimWithAnnotation saves given annotation into given claims. Meant to be
 // used to compose claims specified inline in a test.
 // TODO(refactor): This helper function (and other helpers related to claim
