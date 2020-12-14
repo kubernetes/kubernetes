@@ -422,7 +422,6 @@ staging/src/k8s.io/kubectl/pkg/cmd/autoscale
 staging/src/k8s.io/kubectl/pkg/cmd/certificates
 staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo
 staging/src/k8s.io/kubectl/pkg/cmd/create
-staging/src/k8s.io/kubectl/pkg/cmd/debug
 staging/src/k8s.io/kubectl/pkg/cmd/delete
 staging/src/k8s.io/kubectl/pkg/cmd/describe
 staging/src/k8s.io/kubectl/pkg/cmd/diff

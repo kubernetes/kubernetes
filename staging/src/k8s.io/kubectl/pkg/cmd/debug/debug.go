@@ -100,8 +100,8 @@ var (
 
 var nameSuffixFunc = utilrand.String
 
-// DebugOptions holds the options for an invocation of kubectl debug.
-type DebugOptions struct {
+// Options holds the options for an invocation of kubectl debug.
+type Options struct {
 	Args            []string
 	ArgsOnly        bool
 	Attach          bool
@@ -130,9 +130,9 @@ type DebugOptions struct {
 	genericclioptions.IOStreams
 }
 
-// NewDebugOptions returns a DebugOptions initialized with default values.
-func NewDebugOptions(streams genericclioptions.IOStreams) *DebugOptions {
-	return &DebugOptions{
+// NewOptions returns a Options initialized with default values.
+func NewOptions(streams genericclioptions.IOStreams) *Options {
+	return &Options{
 		Args:           []string{},
 		IOStreams:      streams,
 		TargetNames:    []string{},
@@ -142,7 +142,7 @@ func NewDebugOptions(streams genericclioptions.IOStreams) *DebugOptions {
 
 // NewCmdDebug returns a cobra command that runs kubectl debug.
 func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams, deprecatedInvocation bool) *cobra.Command {
-	o := NewDebugOptions(streams)
+	o := NewOptions(streams)
 
 	cmd := &cobra.Command{
 		Use:                   "debug (POD | TYPE[[.VERSION].GROUP]/NAME) [ -- COMMAND [args...] ]",
@@ -167,7 +167,7 @@ func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams, depreca
 	return cmd
 }
 
-func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
+func addDebugFlags(cmd *cobra.Command, opt *Options) {
 	cmd.Flags().BoolVar(&opt.ArgsOnly, "arguments-only", opt.ArgsOnly, i18n.T("If specified, everything after -- will be passed to the new container as Args instead of Command."))
 	cmd.Flags().BoolVar(&opt.Attach, "attach", opt.Attach, i18n.T("If true, wait for the container to start running, and then attach as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true."))
 	cmd.Flags().StringVarP(&opt.Container, "container", "c", opt.Container, i18n.T("Container name to use for debug container."))
@@ -185,8 +185,8 @@ func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
 	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, i18n.T("Allocate a TTY for the debugging container."))
 }
 
-// Complete finishes run-time initialization of debug.DebugOptions.
-func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+// Complete finishes run-time initialization of debug.Options.
+func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 
 	if o.deprecatedInvocation {
@@ -232,31 +232,31 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 }
 
 // Validate checks that the provided debug options are specified.
-func (o *DebugOptions) Validate(cmd *cobra.Command) error {
+func (o *Options) Validate(cmd *cobra.Command) error {
 	// Attach
 	if o.Attach && o.attachChanged && len(o.Image) == 0 && len(o.Container) == 0 {
-		return fmt.Errorf("you must specify --container or create a new container using --image in order to attach.")
+		return fmt.Errorf("You must specify --container or create a new container using --image in order to attach")
 	}
 
 	// CopyTo
 	if len(o.CopyTo) > 0 {
 		if len(o.Image) == 0 && len(o.SetImages) == 0 && len(o.Args) == 0 {
-			return fmt.Errorf("you must specify --image, --set-image or command arguments.")
+			return fmt.Errorf("You must specify --image, --set-image or command arguments")
 		}
 		if len(o.Args) > 0 && len(o.Container) == 0 && len(o.Image) == 0 {
-			return fmt.Errorf("you must specify an existing container or a new image when specifying args.")
+			return fmt.Errorf("You must specify an existing container or a new image when specifying args")
 		}
 	} else {
 		// These flags are exclusive to --copy-to
 		switch {
 		case o.Replace:
-			return fmt.Errorf("--replace may only be used with --copy-to.")
+			return fmt.Errorf("--replace may only be used with --copy-to")
 		case o.SameNode:
-			return fmt.Errorf("--same-node may only be used with --copy-to.")
+			return fmt.Errorf("--same-node may only be used with --copy-to")
 		case len(o.SetImages) > 0:
-			return fmt.Errorf("--set-image may only be used with --copy-to.")
+			return fmt.Errorf("--set-image may only be used with --copy-to")
 		case len(o.Image) == 0:
-			return fmt.Errorf("you must specify --image when not using --copy-to.")
+			return fmt.Errorf("You must specify --image when not using --copy-to")
 		}
 	}
 
@@ -287,7 +287,7 @@ func (o *DebugOptions) Validate(cmd *cobra.Command) error {
 
 	// TargetContainer
 	if len(o.TargetContainer) > 0 && len(o.CopyTo) > 0 {
-		return fmt.Errorf("--target is incompatible with --copy-to. Use --share-processes instead.")
+		return fmt.Errorf("--target is incompatible with --copy-to. Use --share-processes instead")
 	}
 
 	// TTY
@@ -299,7 +299,7 @@ func (o *DebugOptions) Validate(cmd *cobra.Command) error {
 }
 
 // Run executes a kubectl debug.
-func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *Options) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 	ctx := context.Background()
 
 	clientset, err := f.KubernetesClientSet()
@@ -372,7 +372,7 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 
 // visitNode handles debugging for node targets by creating a privileged pod running in the host namespaces.
 // Returns an already created pod and container name for subsequent attach, if applicable.
-func (o *DebugOptions) visitNode(ctx context.Context, node *corev1.Node) (*corev1.Pod, string, error) {
+func (o *Options) visitNode(ctx context.Context, node *corev1.Node) (*corev1.Pod, string, error) {
 	pods := o.podClient.Pods(o.Namespace)
 	newPod, err := pods.Create(ctx, o.generateNodeDebugPod(node.Name), metav1.CreateOptions{})
 	if err != nil {
@@ -386,7 +386,7 @@ func (o *DebugOptions) visitNode(ctx context.Context, node *corev1.Node) (*corev
 //   1. Creating an ephemeral debug container in an existing pod, OR
 //   2. Making a copy of pod with certain attributes changed
 // visitPod returns a pod and debug container name for subsequent attach, if applicable.
-func (o *DebugOptions) visitPod(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, string, error) {
+func (o *Options) visitPod(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, string, error) {
 	if len(o.CopyTo) > 0 {
 		return o.debugByCopy(ctx, pod)
 	}
@@ -394,13 +394,13 @@ func (o *DebugOptions) visitPod(ctx context.Context, pod *corev1.Pod) (*corev1.P
 }
 
 // debugByEphemeralContainer runs an EphemeralContainer in the target Pod for use as a debug container
-func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, string, error) {
+func (o *Options) debugByEphemeralContainer(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, string, error) {
 	pods := o.podClient.Pods(pod.Namespace)
 	ec, err := pods.GetEphemeralContainers(ctx, pod.Name, metav1.GetOptions{})
 	if err != nil {
 		// The pod has already been fetched at this point, so a NotFound error indicates the ephemeralcontainers subresource wasn't found.
 		if serr, ok := err.(*errors.StatusError); ok && serr.Status().Reason == metav1.StatusReasonNotFound {
-			return nil, "", fmt.Errorf("ephemeral containers are disabled for this cluster (error from server: %q).", err)
+			return nil, "", fmt.Errorf("ephemeral containers are disabled for this cluster (error from server: %q)", err)
 		}
 		return nil, "", err
 	}
@@ -418,7 +418,7 @@ func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev
 }
 
 // debugByCopy runs a copy of the target Pod with a debug container added or an original container modified
-func (o *DebugOptions) debugByCopy(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, string, error) {
+func (o *Options) debugByCopy(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, string, error) {
 	copied, dc, err := o.generatePodCopyWithDebugContainer(pod)
 	if err != nil {
 		return nil, "", err
@@ -438,7 +438,7 @@ func (o *DebugOptions) debugByCopy(ctx context.Context, pod *corev1.Pod) (*corev
 
 // generateDebugContainer returns an EphemeralContainer suitable for use as a debug container
 // in the given pod.
-func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) *corev1.EphemeralContainer {
+func (o *Options) generateDebugContainer(pod *corev1.Pod) *corev1.EphemeralContainer {
 	name := o.computeDebugContainerName(pod)
 
 	ec := &corev1.EphemeralContainer{
@@ -465,7 +465,7 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) *corev1.Ephemeral
 
 // generateNodeDebugPod generates a debugging pod that schedules on the specified node.
 // The generated pod will run in the host PID, Network & IPC namespaces, and it will have the node's filesystem mounted at /host.
-func (o *DebugOptions) generateNodeDebugPod(node string) *corev1.Pod {
+func (o *Options) generateNodeDebugPod(node string) *corev1.Pod {
 	cn := "debugger"
 	// Setting a user-specified container name doesn't make much difference when there's only one container,
 	// but the argument exists for pod debugging so it might be confusing if it didn't work here.
@@ -529,7 +529,7 @@ func (o *DebugOptions) generateNodeDebugPod(node string) *corev1.Pod {
 }
 
 // generatePodCopyWithDebugContainer takes a Pod and returns a copy and the debug container name of that copy
-func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*corev1.Pod, string, error) {
+func (o *Options) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*corev1.Pod, string, error) {
 	copied := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        o.CopyTo,
@@ -569,7 +569,7 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 				// This was a --set-image only invocation
 				return copied, "", nil
 			}
-			return nil, "", fmt.Errorf("you must specify image when creating new container")
+			return nil, "", fmt.Errorf("You must specify image when creating new container")
 		}
 
 		if len(name) == 0 {
@@ -607,7 +607,7 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 	return copied, name, nil
 }
 
-func (o *DebugOptions) computeDebugContainerName(pod *corev1.Pod) string {
+func (o *Options) computeDebugContainerName(pod *corev1.Pod) string {
 	if len(o.Container) > 0 {
 		return o.Container
 	}

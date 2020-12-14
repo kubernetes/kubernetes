@@ -44,13 +44,13 @@ func TestGenerateDebugContainer(t *testing.T) {
 
 	for _, tc := range []struct {
 		name     string
-		opts     *DebugOptions
+		opts     *Options
 		pod      *corev1.Pod
 		expected *corev1.EphemeralContainer
 	}{
 		{
 			name: "minimum fields",
-			opts: &DebugOptions{
+			opts: &Options{
 				Container:  "debugger",
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
@@ -66,7 +66,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 		},
 		{
 			name: "namespace targeting",
-			opts: &DebugOptions{
+			opts: &Options{
 				Container:       "debugger",
 				Image:           "busybox",
 				PullPolicy:      corev1.PullIfNotPresent,
@@ -84,7 +84,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 		},
 		{
 			name: "debug args as container command",
-			opts: &DebugOptions{
+			opts: &Options{
 				Args:       []string{"/bin/echo", "one", "two", "three"},
 				Container:  "debugger",
 				Image:      "busybox",
@@ -102,7 +102,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 		},
 		{
 			name: "debug args as container args",
-			opts: &DebugOptions{
+			opts: &Options{
 				ArgsOnly:   true,
 				Container:  "debugger",
 				Args:       []string{"echo", "one", "two", "three"},
@@ -121,7 +121,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 		},
 		{
 			name: "random name generation",
-			opts: &DebugOptions{
+			opts: &Options{
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
 			},
@@ -136,7 +136,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 		},
 		{
 			name: "random name collision",
-			opts: &DebugOptions{
+			opts: &Options{
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
 			},
@@ -160,7 +160,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 		},
 		{
 			name: "pod with init containers",
-			opts: &DebugOptions{
+			opts: &Options{
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
 			},
@@ -192,7 +192,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 		},
 		{
 			name: "pod with ephemeral containers",
-			opts: &DebugOptions{
+			opts: &Options{
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
 			},
@@ -251,12 +251,12 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 
 	for _, tc := range []struct {
 		name             string
-		opts             *DebugOptions
+		opts             *Options
 		havePod, wantPod *corev1.Pod
 	}{
 		{
 			name: "basic",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:     "debugger",
 				Container:  "debugger",
 				Image:      "busybox",
@@ -292,7 +292,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "same node",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:     "debugger",
 				Container:  "debugger",
 				Image:      "busybox",
@@ -330,7 +330,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "metadata stripping",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:     "debugger",
 				Container:  "debugger",
 				Image:      "busybox",
@@ -376,7 +376,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "add a debug container",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:     "debugger",
 				Container:  "debugger",
 				Image:      "busybox",
@@ -415,7 +415,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "customize envs",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:     "debugger",
 				Container:  "debugger",
 				Image:      "busybox",
@@ -462,7 +462,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "debug args as container command",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:     "debugger",
 				Container:  "debugger",
 				Args:       []string{"/bin/echo", "one", "two", "three"},
@@ -503,7 +503,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "debug args as container command",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:     "debugger",
 				Container:  "debugger",
 				Args:       []string{"one", "two", "three"},
@@ -545,7 +545,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "modify existing command to debug args",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:     "debugger",
 				Container:  "debugger",
 				Args:       []string{"sleep", "1d"},
@@ -586,7 +586,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "random name",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:     "debugger",
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
@@ -624,7 +624,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "random name collision",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:     "debugger",
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
@@ -662,7 +662,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "pod with init containers",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:     "debugger",
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
@@ -716,7 +716,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "pod with ephemeral containers",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:     "debugger",
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
@@ -766,7 +766,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "shared process namespace",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:                "debugger",
 				Container:             "debugger",
 				Image:                 "busybox",
@@ -808,7 +808,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "Change image for a named container",
-			opts: &DebugOptions{
+			opts: &Options{
 				Args:        []string{},
 				CopyTo:      "myapp-copy",
 				Container:   "app",
@@ -836,7 +836,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "Change image for a named container with set-image",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:    "myapp-copy",
 				Container: "app",
 				SetImages: map[string]string{"app": "busybox"},
@@ -866,7 +866,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "Change image for all containers with set-image",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:    "myapp-copy",
 				SetImages: map[string]string{"*": "busybox"},
 			},
@@ -895,7 +895,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "Change image for multiple containers with set-image",
-			opts: &DebugOptions{
+			opts: &Options{
 				CopyTo:    "myapp-copy",
 				SetImages: map[string]string{"*": "busybox", "app": "app-debugger"},
 			},
@@ -924,7 +924,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "Add interactive debug container minimal args",
-			opts: &DebugOptions{
+			opts: &Options{
 				Args:        []string{},
 				Attach:      true,
 				CopyTo:      "my-debugger",
@@ -961,7 +961,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 		},
 		{
 			name: "Pod copy: add container and also mutate images",
-			opts: &DebugOptions{
+			opts: &Options{
 				Args:        []string{},
 				Attach:      true,
 				CopyTo:      "my-debugger",
@@ -1028,13 +1028,13 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 
 	for _, tc := range []struct {
 		name, nodeName string
-		opts           *DebugOptions
+		opts           *Options
 		expected       *corev1.Pod
 	}{
 		{
 			name:     "minimum options",
 			nodeName: "node-XXX",
-			opts: &DebugOptions{
+			opts: &Options{
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
 			},
@@ -1076,7 +1076,7 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 		{
 			name:     "debug args as container command",
 			nodeName: "node-XXX",
-			opts: &DebugOptions{
+			opts: &Options{
 				Args:       []string{"/bin/echo", "one", "two", "three"},
 				Container:  "custom-debugger",
 				Image:      "busybox",
@@ -1121,7 +1121,7 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 		{
 			name:     "debug args as container args",
 			nodeName: "node-XXX",
-			opts: &DebugOptions{
+			opts: &Options{
 				ArgsOnly:   true,
 				Container:  "custom-debugger",
 				Args:       []string{"echo", "one", "two", "three"},
@@ -1191,7 +1191,7 @@ func TestCompleteAndValidate(t *testing.T) {
 
 	tests := []struct {
 		name, args string
-		wantOpts   *DebugOptions
+		wantOpts   *Options
 		wantError  bool
 	}{
 		{
@@ -1222,7 +1222,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Set image pull policy",
 			args: "--image=busybox --image-pull-policy=Always mypod",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Args:           []string{},
 				Image:          "busybox",
 				Namespace:      "test",
@@ -1234,7 +1234,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Multiple targets",
 			args: "--image=busybox mypod1 mypod2",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Args:           []string{},
 				Image:          "busybox",
 				Namespace:      "test",
@@ -1245,7 +1245,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Arguments with dash",
 			args: "--image=busybox mypod1 mypod2 -- echo 1 2",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Args:           []string{"echo", "1", "2"},
 				Image:          "busybox",
 				Namespace:      "test",
@@ -1256,7 +1256,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Interactive no attach",
 			args: "-ti --image=busybox --attach=false mypod",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Args:           []string{},
 				Attach:         false,
 				Image:          "busybox",
@@ -1270,7 +1270,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Set environment variables",
 			args: "--image=busybox --env=FOO=BAR mypod",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Args:           []string{},
 				Env:            []v1.EnvVar{{Name: "FOO", Value: "BAR"}},
 				Image:          "busybox",
@@ -1282,7 +1282,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Ephemeral container: interactive session minimal args",
 			args: "mypod -it --image=busybox",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Args:           []string{},
 				Attach:         true,
 				Image:          "busybox",
@@ -1296,7 +1296,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Ephemeral container: non-interactive debugger with image and name",
 			args: "--image=myproj/debug-tools --image-pull-policy=Always -c debugger mypod",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Args:           []string{},
 				Container:      "debugger",
 				Image:          "myproj/debug-tools",
@@ -1334,7 +1334,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Pod copy: interactive debug container minimal args",
 			args: "mypod -it --image=busybox --copy-to=my-debugger",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Args:           []string{},
 				Attach:         true,
 				CopyTo:         "my-debugger",
@@ -1349,7 +1349,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Pod copy: non-interactive with debug container, image name and command",
 			args: "mypod --image=busybox --container=my-container --copy-to=my-debugger -- sleep 1d",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Args:           []string{"sleep", "1d"},
 				Container:      "my-container",
 				CopyTo:         "my-debugger",
@@ -1362,7 +1362,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Pod copy: explicit attach",
 			args: "mypod --image=busybox --copy-to=my-debugger --attach -- sleep 1d",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Args:           []string{"sleep", "1d"},
 				Attach:         true,
 				CopyTo:         "my-debugger",
@@ -1375,7 +1375,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Pod copy: replace single image of existing container",
 			args: "mypod --image=busybox --container=my-container --copy-to=my-debugger",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Args:           []string{},
 				Container:      "my-container",
 				CopyTo:         "my-debugger",
@@ -1388,7 +1388,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Pod copy: mutate existing container images",
 			args: "mypod --set-image=*=busybox,app=app-debugger --copy-to=my-debugger",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Args:      []string{},
 				CopyTo:    "my-debugger",
 				Namespace: "test",
@@ -1403,7 +1403,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Pod copy: add container and also mutate images",
 			args: "mypod -it --copy-to=my-debugger --image=debian --set-image=app=app:debug,sidecar=sidecar:debug",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Args:        []string{},
 				Attach:      true,
 				CopyTo:      "my-debugger",
@@ -1422,7 +1422,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Pod copy: change command",
 			args: "mypod -it --copy-to=my-debugger --container=mycontainer -- sh",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Attach:         true,
 				Args:           []string{"sh"},
 				Container:      "mycontainer",
@@ -1462,7 +1462,7 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name: "Node: interactive session minimal args",
 			args: "node/mynode -it --image=busybox",
-			wantOpts: &DebugOptions{
+			wantOpts: &Options{
 				Args:           []string{},
 				Attach:         true,
 				Image:          "busybox",
@@ -1502,7 +1502,7 @@ func TestCompleteAndValidate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := NewDebugOptions(ioStreams)
+			opts := NewOptions(ioStreams)
 			var gotError error
 
 			cmd := &cobra.Command{
@@ -1530,7 +1530,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				t.Fatalf("CompleteAndValidate got error: '%v', wantError: %v", gotError, tc.wantError)
 			}
 
-			if diff := cmp.Diff(tc.wantOpts, opts, cmpFilter, cmpopts.IgnoreUnexported(DebugOptions{})); diff != "" {
+			if diff := cmp.Diff(tc.wantOpts, opts, cmpFilter, cmpopts.IgnoreUnexported(Options{})); diff != "" {
 				t.Error("CompleteAndValidate unexpected diff in generated object: (-want +got):\n", diff)
 			}
 		})
