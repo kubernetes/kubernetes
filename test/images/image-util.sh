@@ -36,7 +36,7 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 # Mapping of go ARCH to actual architectures shipped part of multiarch/qemu-user-static project
 declare -A QEMUARCHS=( ["amd64"]="x86_64" ["arm"]="arm" ["arm64"]="aarch64" ["ppc64le"]="ppc64le" ["s390x"]="s390x" )
 
-windows_os_versions=(1809 1903 1909 2004)
+windows_os_versions=(1809 1903 1909 2004 20H2)
 declare -A WINDOWS_OS_VERSIONS_MAP
 
 initWindowsOsVersions() {
