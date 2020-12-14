@@ -32,7 +32,10 @@ import (
 // You should first cordon the node, e.g. using RunCordonOrUncordon
 func RunNodeDrain(drainer *Helper, nodeName string) error {
 	// TODO(justinsb): Ensure we have adequate e2e coverage of this function in library consumers
-	list, errs := drainer.GetPodsForDeletion(nodeName)
+	// note: using an empty resourceVersion will result in the list of Pods being fetched
+	// from the etcd backend skipping the apiserver cache. This behavior might cause high load
+	// on etcd in larger Kubernetes clusters.
+	list, errs := drainer.GetPodsForDeletion(nodeName, "")
 	if errs != nil {
 		return utilerrors.NewAggregate(errs)
 	}

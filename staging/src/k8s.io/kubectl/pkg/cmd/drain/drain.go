@@ -328,7 +328,7 @@ func (o *DrainCmdOptions) RunDrain() error {
 }
 
 func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error {
-	list, errs := o.drainer.GetPodsForDeletion(nodeInfo.Name)
+	list, errs := o.drainer.GetPodsForDeletion(nodeInfo.Name, "")
 	if errs != nil {
 		return utilerrors.NewAggregate(errs)
 	}
@@ -343,7 +343,7 @@ func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error
 	}
 
 	if err := o.drainer.DeleteOrEvictPods(list.Pods()); err != nil {
-		pendingList, newErrs := o.drainer.GetPodsForDeletion(nodeInfo.Name)
+		pendingList, newErrs := o.drainer.GetPodsForDeletion(nodeInfo.Name, list.ResourceVersion)
 		if pendingList != nil {
 			pods := pendingList.Pods()
 			if len(pods) != 0 {

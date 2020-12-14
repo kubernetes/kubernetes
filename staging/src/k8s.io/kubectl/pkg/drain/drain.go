@@ -176,8 +176,9 @@ func (d *Helper) EvictPod(pod corev1.Pod, policyGroupVersion string) error {
 // GetPodsForDeletion receives resource info for a node, and returns those pods as PodDeleteList,
 // or error if it cannot list pods. All pods that are ready to be deleted can be obtained with .Pods(),
 // and string with all warning can be obtained with .Warnings(), and .Errors() for all errors that
-// occurred during deletion.
-func (d *Helper) GetPodsForDeletion(nodeName string) (*PodDeleteList, []error) {
+// occurred during deletion. The resourceVersion variable is used to explicitly indicate whether the Pod list
+// can be retrieved from the apiserver cache (when resourceVersion != "") or directly from the storage backend.
+func (d *Helper) GetPodsForDeletion(nodeName, resourceVersion string) (*PodDeleteList, []error) {
 	labelSelector, err := labels.Parse(d.PodSelector)
 	if err != nil {
 		return nil, []error{err}
@@ -185,7 +186,10 @@ func (d *Helper) GetPodsForDeletion(nodeName string) (*PodDeleteList, []error) {
 
 	podList, err := d.Client.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
-		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName}).String()})
+		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName}).String(),
+		// note: in case resourceVersion is "" the list operation will skip apiserver cache and hit the backend
+		ResourceVersion: resourceVersion,
+	})
 	if err != nil {
 		return nil, []error{err}
 	}
@@ -219,8 +223,7 @@ func filterPods(podList *corev1.PodList, filters []PodFilter) *PodDeleteList {
 			Status: status,
 		})
 	}
-	list := &PodDeleteList{items: pods}
-	return list
+	return &PodDeleteList{items: pods, ResourceVersion: podList.ResourceVersion}
 }
 
 // DeleteOrEvictPods deletes or evicts the pods on the api server

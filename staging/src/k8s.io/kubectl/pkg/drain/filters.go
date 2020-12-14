@@ -45,7 +45,8 @@ type PodDelete struct {
 
 // PodDeleteList is a wrapper around []PodDelete
 type PodDeleteList struct {
-	items []PodDelete
+	items           []PodDelete
+	ResourceVersion string
 }
 
 // Pods returns a list of all pods marked for deletion after filtering.
