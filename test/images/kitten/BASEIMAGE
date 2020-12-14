@@ -7,3 +7,4 @@ windows/amd64/1809=REGISTRY/agnhost:2.25-windows-amd64-1809
 windows/amd64/1903=REGISTRY/agnhost:2.25-windows-amd64-1903
 windows/amd64/1909=REGISTRY/agnhost:2.25-windows-amd64-1909
 windows/amd64/2004=REGISTRY/agnhost:2.25-windows-amd64-2004
+windows/amd64/20H2=REGISTRY/agnhost:2.25-windows-amd64-20H2
