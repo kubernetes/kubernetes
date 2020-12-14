@@ -931,7 +931,7 @@ type CountToStrategy struct {
 }
 
 type TestNodePreparer interface {
-	PrepareNodes() error
+	PrepareNodes(nextNodeIndex int) error
 	CleanupNodes() error
 }
 

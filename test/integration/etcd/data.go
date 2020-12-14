@@ -293,6 +293,22 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1
+		gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "flowschemas"): {
+			Stub:             `{"metadata": {"name": "va2"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
+			ExpectedEtcdPath: "/registry/flowschemas/va2",
+			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1alpha1", "FlowSchema"),
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1
+		gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "prioritylevelconfigurations"): {
+			Stub:             `{"metadata": {"name": "conf2"}, "spec": {"type": "Limited", "limited": {"assuredConcurrencyShares":3, "limitResponse": {"type": "Reject"}}}}`,
+			ExpectedEtcdPath: "/registry/prioritylevelconfigurations/conf2",
+			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1alpha1", "PriorityLevelConfiguration"),
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/storage/v1beta1
 		gvr("storage.k8s.io", "v1beta1", "volumeattachments"): {
 			Stub:             `{"metadata": {"name": "va2"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv2"}}}`,
@@ -320,13 +336,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("storage.k8s.io", "v1", "storageclasses"): {
 			Stub:             `{"metadata": {"name": "sc2"}, "provisioner": "aws"}`,
 			ExpectedEtcdPath: "/registry/storageclasses/sc2",
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/settings/v1alpha1
-		gvr("settings.k8s.io", "v1alpha1", "podpresets"): {
-			Stub:             `{"metadata": {"name": "podpre1"}, "spec": {"env": [{"name": "FOO"}]}}`,
-			ExpectedEtcdPath: "/registry/podpresets/" + namespace + "/podpre1",
 		},
 		// --
 
@@ -508,6 +517,23 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("node.k8s.io", "v1beta1", "runtimeclasses"): {
 			Stub:             `{"metadata": {"name": "rc2"}, "handler": "h2"}`,
 			ExpectedEtcdPath: "/registry/runtimeclasses/rc2",
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/node/v1
+		gvr("node.k8s.io", "v1", "runtimeclasses"): {
+			Stub:             `{"metadata": {"name": "rc3"}, "handler": "h3"}`,
+			ExpectedEtcdPath: "/registry/runtimeclasses/rc3",
+			// TODO (SergeyKanzhelev): in 1.21 this should be switched to v1. See https://github.com/kubernetes/kubernetes/pull/95718/files#r520967927
+			// this has to stay at v1beta1 for a release, otherwise a 1.19 API server won't be able to read the data persisted in etcd and will break during a multi-server upgrade
+			ExpectedGVK: gvkP("node.k8s.io", "v1beta1", "RuntimeClass"),
+		},
+		// --
+
+		// k8s.io/apiserver/pkg/apis/apiserverinternal/v1alpha1
+		gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"): {
+			Stub:             `{"metadata":{"name":"sv1.test"},"spec":{}}`,
+			ExpectedEtcdPath: "/registry/storageversions/sv1.test",
 		},
 		// --
 	}

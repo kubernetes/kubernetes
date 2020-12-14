@@ -394,3 +394,18 @@ func filterChains(chains map[utiliptables.Chain]string, filterChains []utiliptab
 		delete(chains, chain)
 	}
 }
+
+func getPodFullName(pod *PodPortMapping) string {
+	// Use underscore as the delimiter because it is not allowed in pod name
+	// (DNS subdomain format), while allowed in the container name format.
+	return pod.Name + "_" + pod.Namespace
+}
+
+// Join all words with spaces, terminate with newline and write to buf.
+func writeLine(buf *bytes.Buffer, words ...string) {
+	buf.WriteString(strings.Join(words, " ") + "\n")
+}
+
+func (hp *hostport) String() string {
+	return fmt.Sprintf("%s:%d", hp.protocol, hp.port)
+}

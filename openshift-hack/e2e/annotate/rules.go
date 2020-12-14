@@ -9,15 +9,14 @@ var (
 	TestMaps = map[string][]string{
 		// alpha features that are not gated
 		"[Disabled:Alpha]": {
-			// ALPHA features in 1.19, disabled by default.
-			// !!! Review their status as part of the 1.20 rebase.
+			// ALPHA features in 1.20, disabled by default.
+			// !!! Review their status as part of the 1.21 rebase.
 			`\[Feature:CSIStorageCapacity\]`,
+			`\[Feature:CSIServiceAccountToken\]`,
 			`\[Feature:IPv6DualStack.*\]`,
-			`\[Feature:ServiceAccountIssuerDiscovery\]`,
-			`\[Feature:SetHostnameAsFQDN\]`,
 			`\[Feature:TTLAfterFinished\]`,
 
-			// BETA features in 1.19, enabled by default
+			// BETA features in 1.20, enabled by default
 			// Their enablement is tracked via bz's targeted at 4.6.
 			`\[Feature:SCTPConnectivity\]`, // https://bugzilla.redhat.com/show_bug.cgi?id=1861606
 		},
@@ -59,7 +58,7 @@ var (
 			`ServiceAccounts should ensure a single API token exists`,   // We create lots of secrets
 			`unchanging, static URL paths for kubernetes api services`,  // the test needs to exclude URLs that are not part of conformance (/logs)
 			`Services should be able to up and down services`,           // we don't have wget installed on nodes
-			`Network should set TCP CLOSE_WAIT timeout`,                 // possibly some difference between ubuntu and fedora
+			`KubeProxy should set TCP CLOSE_WAIT timeout`,               // the test require communication to port 11302 in the cluster nodes
 			`\[NodeFeature:Sysctls\]`,                                   // needs SCC support
 			`should check kube-proxy urls`,                              // previously this test was skipped b/c we reported -1 as the number of nodes, now we report proper number and test fails
 			`SSH`,                                                       // TRIAGE
@@ -84,6 +83,19 @@ var (
 			// NFS umount is broken in kernels 5.7+
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1854379
 			`\[sig-storage\].*\[Driver: nfs\] \[Testpattern: Dynamic PV \(default fs\)\].*subPath should be able to unmount after the subpath directory is deleted`,
+
+			// Upstream assumes all control plane pods are in kube-system namespace and we should revert the change
+			// https://github.com/kubernetes/kubernetes/commit/176c8e219f4c7b4c15d34b92c50bfa5ba02b3aba#diff-28a3131f96324063dd53e17270d435a3b0b3bd8f806ee0e33295929570eab209R78
+			"MetricsGrabber should grab all metrics from a Kubelet",
+			"MetricsGrabber should grab all metrics from API server",
+			"MetricsGrabber should grab all metrics from a ControllerManager",
+			"MetricsGrabber should grab all metrics from a Scheduler",
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1906518
+			`\[Feature:VolumeSnapshotDataSource\]`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1906808
+			`ServiceAccounts should support OIDC discovery of service account issuer`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
@@ -168,6 +180,7 @@ var (
 			`Liveness liveness pods should be automatically restarted`,
 			`Secret should create a pod that reads a secret`,
 			`Pods should delete a collection of pods`,
+			`Pods should run through the lifecycle of Pods and PodStatus`,
 		},
 		"[sig-cluster-lifecycle]": {
 			`Feature:ClusterAutoscalerScalability`,

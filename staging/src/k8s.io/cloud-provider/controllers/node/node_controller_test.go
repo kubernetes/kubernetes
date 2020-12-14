@@ -162,7 +162,7 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 	}
 }
 
-func Test_AddCloudNode(t *testing.T) {
+func Test_syncNode(t *testing.T) {
 	tests := []struct {
 		name         string
 		fakeCloud    *fakecloud.Cloud
@@ -764,6 +764,7 @@ func Test_AddCloudNode(t *testing.T) {
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					},
+					ProviderID: "fake://12345",
 				},
 			},
 			updatedNode: &v1.Node{
@@ -842,6 +843,9 @@ func Test_AddCloudNode(t *testing.T) {
 				ExtID: map[types.NodeName]string{
 					types.NodeName("node0"): "12345",
 				},
+				ProviderID: map[types.NodeName]string{
+					types.NodeName("node0"): "fake://12345",
+				},
 				Addresses: []v1.NodeAddress{
 					{
 						Type:    v1.NodeHostName,
@@ -900,6 +904,9 @@ func Test_AddCloudNode(t *testing.T) {
 						"topology.kubernetes.io/zone":              "us-west-1a",
 					},
 				},
+				Spec: v1.NodeSpec{
+					ProviderID: "fake://12345",
+				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
 						{
@@ -924,9 +931,6 @@ func Test_AddCloudNode(t *testing.T) {
 						},
 					},
 				},
-				Spec: v1.NodeSpec{
-					ProviderID: "aws://12345",
-				},
 			},
 		},
 		{
@@ -936,6 +940,9 @@ func Test_AddCloudNode(t *testing.T) {
 				InstanceTypes:     map[types.NodeName]string{},
 				ExtID: map[types.NodeName]string{
 					types.NodeName("node0"): "12345",
+				},
+				ProviderID: map[types.NodeName]string{
+					types.NodeName("node0"): "fake://12345",
 				},
 				Addresses: []v1.NodeAddress{
 					{
@@ -991,7 +998,6 @@ func Test_AddCloudNode(t *testing.T) {
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 				Spec: v1.NodeSpec{
-					ProviderID: "fake://12345",
 					Taints: []v1.Taint{
 						{
 							Key:    "ImproveCoverageTaint",
@@ -999,6 +1005,7 @@ func Test_AddCloudNode(t *testing.T) {
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					},
+					ProviderID: "fake://12345",
 				},
 				Status: v1.NodeStatus{
 					Addresses: []v1.NodeAddress{
@@ -1279,6 +1286,69 @@ func Test_AddCloudNode(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "[instanceV2] error getting InstanceMetadata",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				InstanceTypes:     map[types.NodeName]string{},
+				Provider:          "test",
+				ExtID:             map[types.NodeName]string{},
+				ExtIDErr: map[types.NodeName]error{
+					types.NodeName("node0"): cloudprovider.NotImplemented,
+				},
+				MetadataErr: errors.New("metadata error"),
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			updatedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -1290,14 +1360,19 @@ func Test_AddCloudNode(t *testing.T) {
 			cloudNodeController := &CloudNodeController{
 				kubeClient:                clientset,
 				nodeInformer:              factory.Core().V1().Nodes(),
+				nodesLister:               factory.Core().V1().Nodes().Lister(),
 				cloud:                     test.fakeCloud,
 				recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 				nodeStatusUpdateFrequency: 1 * time.Second,
 			}
+
+			factory.Start(nil)
+			factory.WaitForCacheSync(nil)
+
 			w := eventBroadcaster.StartLogging(klog.Infof)
 			defer w.Stop()
 
-			cloudNodeController.AddCloudNode(context.TODO(), test.existingNode)
+			cloudNodeController.syncNode(context.TODO(), test.existingNode.Name)
 
 			updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), test.existingNode.Name, metav1.GetOptions{})
 			if err != nil {
@@ -1311,7 +1386,7 @@ func Test_AddCloudNode(t *testing.T) {
 	}
 }
 
-// test AddCloudNode with instanceV2, same test case with TestGCECondition.
+// test syncNode with instanceV2, same test case with TestGCECondition.
 func TestGCEConditionV2(t *testing.T) {
 	existingNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1369,14 +1444,19 @@ func TestGCEConditionV2(t *testing.T) {
 	cloudNodeController := &CloudNodeController{
 		kubeClient:                clientset,
 		nodeInformer:              factory.Core().V1().Nodes(),
+		nodesLister:               factory.Core().V1().Nodes().Lister(),
 		cloud:                     fakeCloud,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
+
+	factory.Start(nil)
+	factory.WaitForCacheSync(nil)
+
 	w := eventBroadcaster.StartLogging(klog.Infof)
 	defer w.Stop()
 
-	cloudNodeController.AddCloudNode(context.TODO(), existingNode)
+	cloudNodeController.syncNode(context.TODO(), existingNode.Name)
 
 	updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), existingNode.Name, metav1.GetOptions{})
 	if err != nil {
@@ -1452,14 +1532,19 @@ func TestGCECondition(t *testing.T) {
 	cloudNodeController := &CloudNodeController{
 		kubeClient:                clientset,
 		nodeInformer:              factory.Core().V1().Nodes(),
+		nodesLister:               factory.Core().V1().Nodes().Lister(),
 		cloud:                     fakeCloud,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
+
+	factory.Start(nil)
+	factory.WaitForCacheSync(nil)
+
 	w := eventBroadcaster.StartLogging(klog.Infof)
 	defer w.Stop()
 
-	cloudNodeController.AddCloudNode(context.TODO(), existingNode)
+	cloudNodeController.syncNode(context.TODO(), existingNode.Name)
 
 	updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), existingNode.Name, metav1.GetOptions{})
 	if err != nil {
@@ -1486,15 +1571,15 @@ func Test_reconcileNodeLabels(t *testing.T) {
 		{
 			name: "requires reconcile",
 			labels: map[string]string{
-				v1.LabelZoneFailureDomain: "foo",
-				v1.LabelZoneRegion:        "bar",
-				v1.LabelInstanceType:      "the-best-type",
+				v1.LabelFailureDomainBetaZone:   "foo",
+				v1.LabelFailureDomainBetaRegion: "bar",
+				v1.LabelInstanceType:            "the-best-type",
 			},
 			expectedLabels: map[string]string{
-				v1.LabelZoneFailureDomain:       "foo",
-				v1.LabelZoneRegion:              "bar",
-				v1.LabelZoneFailureDomainStable: "foo",
-				v1.LabelZoneRegionStable:        "bar",
+				v1.LabelFailureDomainBetaZone:   "foo",
+				v1.LabelFailureDomainBetaRegion: "bar",
+				v1.LabelTopologyZone:            "foo",
+				v1.LabelTopologyRegion:          "bar",
 				v1.LabelInstanceType:            "the-best-type",
 				v1.LabelInstanceTypeStable:      "the-best-type",
 			},
@@ -1503,18 +1588,18 @@ func Test_reconcileNodeLabels(t *testing.T) {
 		{
 			name: "doesn't require reconcile",
 			labels: map[string]string{
-				v1.LabelZoneFailureDomain:       "foo",
-				v1.LabelZoneRegion:              "bar",
-				v1.LabelZoneFailureDomainStable: "foo",
-				v1.LabelZoneRegionStable:        "bar",
+				v1.LabelFailureDomainBetaZone:   "foo",
+				v1.LabelFailureDomainBetaRegion: "bar",
+				v1.LabelTopologyZone:            "foo",
+				v1.LabelTopologyRegion:          "bar",
 				v1.LabelInstanceType:            "the-best-type",
 				v1.LabelInstanceTypeStable:      "the-best-type",
 			},
 			expectedLabels: map[string]string{
-				v1.LabelZoneFailureDomain:       "foo",
-				v1.LabelZoneRegion:              "bar",
-				v1.LabelZoneFailureDomainStable: "foo",
-				v1.LabelZoneRegionStable:        "bar",
+				v1.LabelFailureDomainBetaZone:   "foo",
+				v1.LabelFailureDomainBetaRegion: "bar",
+				v1.LabelTopologyZone:            "foo",
+				v1.LabelTopologyRegion:          "bar",
 				v1.LabelInstanceType:            "the-best-type",
 				v1.LabelInstanceTypeStable:      "the-best-type",
 			},
@@ -1523,18 +1608,18 @@ func Test_reconcileNodeLabels(t *testing.T) {
 		{
 			name: "require reconcile -- secondary labels are different from primary",
 			labels: map[string]string{
-				v1.LabelZoneFailureDomain:       "foo",
-				v1.LabelZoneRegion:              "bar",
-				v1.LabelZoneFailureDomainStable: "wrongfoo",
-				v1.LabelZoneRegionStable:        "wrongbar",
+				v1.LabelFailureDomainBetaZone:   "foo",
+				v1.LabelFailureDomainBetaRegion: "bar",
+				v1.LabelTopologyZone:            "wrongfoo",
+				v1.LabelTopologyRegion:          "wrongbar",
 				v1.LabelInstanceType:            "the-best-type",
 				v1.LabelInstanceTypeStable:      "the-wrong-type",
 			},
 			expectedLabels: map[string]string{
-				v1.LabelZoneFailureDomain:       "foo",
-				v1.LabelZoneRegion:              "bar",
-				v1.LabelZoneFailureDomainStable: "foo",
-				v1.LabelZoneRegionStable:        "bar",
+				v1.LabelFailureDomainBetaZone:   "foo",
+				v1.LabelFailureDomainBetaRegion: "bar",
+				v1.LabelTopologyZone:            "foo",
+				v1.LabelTopologyRegion:          "bar",
 				v1.LabelInstanceType:            "the-best-type",
 				v1.LabelInstanceTypeStable:      "the-best-type",
 			},
@@ -1776,7 +1861,11 @@ func TestNodeAddressesNotUpdateV2(t *testing.T) {
 		cloud:        fakeCloud,
 	}
 
-	cloudNodeController.updateNodeAddress(context.TODO(), existingNode)
+	instanceMeta, err := cloudNodeController.getInstanceNodeAddresses(context.TODO(), existingNode)
+	if err != nil {
+		t.Errorf("get instance metadata with error %v", err)
+	}
+	cloudNodeController.updateNodeAddress(context.TODO(), existingNode, instanceMeta)
 
 	updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), existingNode.Name, metav1.GetOptions{})
 	if err != nil {
@@ -1848,7 +1937,11 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 		cloud:        fakeCloud,
 	}
 
-	cloudNodeController.updateNodeAddress(context.TODO(), existingNode)
+	instanceMeta, err := cloudNodeController.getInstanceNodeAddresses(context.TODO(), existingNode)
+	if err != nil {
+		t.Errorf("get instance metadata with error %v", err)
+	}
+	cloudNodeController.updateNodeAddress(context.TODO(), existingNode, instanceMeta)
 
 	updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), existingNode.Name, metav1.GetOptions{})
 	if err != nil {
@@ -1857,5 +1950,201 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 
 	if len(updatedNode.Status.Addresses) > 0 {
 		t.Errorf("Node addresses should not be updated")
+	}
+}
+
+func TestGetProviderID(t *testing.T) {
+	tests := []struct {
+		name               string
+		fakeCloud          *fakecloud.Cloud
+		existingNode       *v1.Node
+		expectedProviderID string
+	}{
+		{
+			name: "node initialized with provider ID",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
+				InstanceTypes: map[types.NodeName]string{
+					types.NodeName("node0"): "t1.micro",
+				},
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "12345",
+				},
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeHostName,
+						Address: "node0.cloud.internal",
+					},
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				ErrByProviderID: nil,
+				Err:             nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+					ProviderID: "fake://12345",
+				},
+			},
+			expectedProviderID: "fake://12345",
+		},
+		{
+			name: "cloud implemented with Instances (without providerID)",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: false,
+				InstanceTypes: map[types.NodeName]string{
+					types.NodeName("node0"):        "t1.micro",
+					types.NodeName("fake://12345"): "t1.micro",
+				},
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "12345",
+				},
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeHostName,
+						Address: "node0.cloud.internal",
+					},
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				Err: nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+			},
+			expectedProviderID: "fake://12345",
+		},
+		{
+			name: "cloud implemented with InstancesV2 (with providerID)",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				InstanceTypes: map[types.NodeName]string{
+					types.NodeName("node0"):        "t1.micro",
+					types.NodeName("fake://12345"): "t1.micro",
+				},
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "12345",
+				},
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeHostName,
+						Address: "node0.cloud.internal",
+					},
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				Err: nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+					ProviderID: "fake://12345",
+				},
+			},
+			expectedProviderID: "fake://12345",
+		},
+		{
+			name: "cloud implemented with InstancesV2 (without providerID)",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				InstanceTypes: map[types.NodeName]string{
+					types.NodeName("node0"):        "t1.micro",
+					types.NodeName("fake://12345"): "t1.micro",
+				},
+				ExtID: map[types.NodeName]string{
+					types.NodeName("node0"): "12345",
+				},
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeHostName,
+						Address: "node0.cloud.internal",
+					},
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				Err: nil,
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			expectedProviderID: "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cloudNodeController := &CloudNodeController{
+				cloud: test.fakeCloud,
+			}
+
+			providerID, err := cloudNodeController.getProviderID(context.TODO(), test.existingNode)
+			if err != nil {
+				t.Fatalf("error getting provider ID: %v", err)
+			}
+
+			if !cmp.Equal(providerID, test.expectedProviderID) {
+				t.Errorf("unexpected providerID %s", cmp.Diff(providerID, test.expectedProviderID))
+			}
+		})
 	}
 }

@@ -10,22 +10,22 @@ spec:
     plural: netnamespaces
     singular: netnamespace
   scope: Cluster
-  additionalPrinterColumns:
-  - name: NetID
-    type: integer
-    description: The network identifier of the network namespace
-    JSONPath: .netid
-  - name: Egress IPs
-    type: string
-    description: The network egress IP addresses
-    JSONPath: .egressIPs
   version: v1
   versions:
   - name: v1
     served: true
     storage: true
-    "schema":
-      "openAPIV3Schema":
+    additionalPrinterColumns:
+    - name: NetID
+      type: integer
+      description: The network identifier of the network namespace
+      jsonPath: .netid
+    - name: Egress IPs
+      type: string
+      description: The network egress IP addresses
+      jsonPath: .egressIPs
+    schema:
+      openAPIV3Schema:
         description: NetNamespace describes a single isolated network. When using
           the redhat/openshift-ovs-multitenant plugin, every Namespace will have a
           corresponding NetNamespace object with the same name. (When using redhat/openshift-ovs-subnet,

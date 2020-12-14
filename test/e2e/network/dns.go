@@ -409,7 +409,7 @@ var _ = SIGDescribe("DNS", func() {
 		ginkgo.By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
 		testServerIP := "1.1.1.1"
 		testSearchPath := "resolv.conf.local"
-		testAgnhostPod := newAgnhostPod(f.Namespace.Name, "pause")
+		testAgnhostPod := e2epod.NewAgnhostPod(f.Namespace.Name, "test-dns-nameservers", nil, nil, nil)
 		testAgnhostPod.Spec.DNSPolicy = v1.DNSNone
 		testAgnhostPod.Spec.DNSConfig = &v1.PodDNSConfig{
 			Nameservers: []string{testServerIP},
@@ -433,7 +433,7 @@ var _ = SIGDescribe("DNS", func() {
 				Command:       cmd,
 				Namespace:     f.Namespace.Name,
 				PodName:       testAgnhostPod.Name,
-				ContainerName: "agnhost",
+				ContainerName: testAgnhostPod.Spec.Containers[0].Name,
 				CaptureStdout: true,
 				CaptureStderr: true,
 			})
@@ -493,7 +493,7 @@ var _ = SIGDescribe("DNS", func() {
 		framework.Logf("testServerIP is %s", testServerIP)
 
 		ginkgo.By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
-		testUtilsPod := generateDNSUtilsPod()
+		testUtilsPod := e2epod.NewAgnhostPod(f.Namespace.Name, "e2e-dns-utils", nil, nil, nil)
 		testUtilsPod.Spec.DNSPolicy = v1.DNSNone
 		testNdotsValue := "2"
 		testUtilsPod.Spec.DNSConfig = &v1.PodDNSConfig{
@@ -525,7 +525,7 @@ var _ = SIGDescribe("DNS", func() {
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
 			PodName:       testUtilsPod.Name,
-			ContainerName: "util",
+			ContainerName: testUtilsPod.Spec.Containers[0].Name,
 			CaptureStdout: true,
 			CaptureStderr: true,
 		})
@@ -545,7 +545,7 @@ var _ = SIGDescribe("DNS", func() {
 				Command:       cmd,
 				Namespace:     f.Namespace.Name,
 				PodName:       testUtilsPod.Name,
-				ContainerName: "util",
+				ContainerName: testUtilsPod.Spec.Containers[0].Name,
 				CaptureStdout: true,
 				CaptureStderr: true,
 			})

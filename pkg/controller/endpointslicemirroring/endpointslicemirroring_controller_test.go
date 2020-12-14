@@ -25,10 +25,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -235,13 +237,22 @@ func TestSyncEndpoints(t *testing.T) {
 
 			err := esController.syncEndpoints(fmt.Sprintf("%s/%s", namespace, endpointsName))
 			if err != nil {
-				t.Errorf("Unexpected error from syncEndpoints: %v", err)
+				t.Fatalf("Unexpected error from syncEndpoints: %v", err)
 			}
 
 			numInitialActions := len(tc.endpointSlices)
-			numExtraActions := len(client.Actions()) - numInitialActions
-			if numExtraActions != tc.expectedNumActions {
-				t.Fatalf("Expected %d additional client actions, got %d: %#v", tc.expectedNumActions, numExtraActions, client.Actions()[numInitialActions:])
+			// Wait for the expected event show up in test "Endpoints with 1001 addresses - 1 should not be mirrored"
+			err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (done bool, err error) {
+				actions := client.Actions()
+				numExtraActions := len(actions) - numInitialActions
+				if numExtraActions != tc.expectedNumActions {
+					t.Logf("Expected %d additional client actions, got %d: %#v. Will retry", tc.expectedNumActions, numExtraActions, actions[numInitialActions:])
+					return false, nil
+				}
+				return true, nil
+			})
+			if err != nil {
+				t.Fatal("Timed out waiting for expected actions")
 			}
 
 			endpointSlices := fetchEndpointSlices(t, client, namespace)

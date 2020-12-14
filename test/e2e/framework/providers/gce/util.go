@@ -36,12 +36,12 @@ func RecreateNodes(c clientset.Interface, nodes []v1.Node) error {
 	for i := range nodes {
 		node := &nodes[i]
 
-		if zone, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
+		if zone, ok := node.Labels[v1.LabelFailureDomainBetaZone]; ok {
 			nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)
 			continue
 		}
 
-		if zone, ok := node.Labels[v1.LabelZoneFailureDomainStable]; ok {
+		if zone, ok := node.Labels[v1.LabelTopologyZone]; ok {
 			nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)
 			continue
 		}

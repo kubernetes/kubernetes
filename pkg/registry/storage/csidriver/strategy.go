@@ -55,6 +55,10 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
 		csiDriver.Spec.FSGroupPolicy = nil
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
+		csiDriver.Spec.TokenRequests = nil
+		csiDriver.Spec.RequiresRepublish = nil
+	}
 }
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -93,13 +97,23 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		newCSIDriver := obj.(*storage.CSIDriver)
 		newCSIDriver.Spec.FSGroupPolicy = nil
 	}
+	if old.(*storage.CSIDriver).Spec.TokenRequests == nil &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
+		csiDriver := obj.(*storage.CSIDriver)
+		csiDriver.Spec.TokenRequests = nil
+	}
+
+	if old.(*storage.CSIDriver).Spec.RequiresRepublish == nil &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
+		csiDriver := obj.(*storage.CSIDriver)
+		csiDriver.Spec.RequiresRepublish = nil
+	}
 }
 
 func (csiDriverStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newCSIDriverObj := obj.(*storage.CSIDriver)
 	oldCSIDriverObj := old.(*storage.CSIDriver)
-	errorList := validation.ValidateCSIDriver(newCSIDriverObj)
-	return append(errorList, validation.ValidateCSIDriverUpdate(newCSIDriverObj, oldCSIDriverObj)...)
+	return validation.ValidateCSIDriverUpdate(newCSIDriverObj, oldCSIDriverObj)
 }
 
 func (csiDriverStrategy) AllowUnconditionalUpdate() bool {

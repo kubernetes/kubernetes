@@ -252,13 +252,17 @@ func TestMetrics(t *testing.T) {
 	// use a channel to ensure we don't look at the metric before it's
 	// been set.
 	ch := make(chan struct{}, 1)
+	longestCh := make(chan struct{}, 1)
 	mp.unfinished.notifyCh = ch
+	mp.longest.notifyCh = longestCh
 	c.Step(time.Millisecond)
 	<-ch
 	mp.unfinished.notifyCh = nil
 	if e, a := .001, mp.unfinished.gaugeValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+	<-longestCh
+	mp.longest.notifyCh = nil
 	if e, a := .001, mp.longest.gaugeValue(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}

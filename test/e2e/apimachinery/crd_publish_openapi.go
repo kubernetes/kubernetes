@@ -29,6 +29,7 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/onsi/ginkgo"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
+	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 
@@ -233,7 +234,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
 
 		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
-		randomCR := fmt.Sprintf(`{%s,"spec":{"b":[{"c":"d"}]}}`, meta)
+		randomCR := fmt.Sprintf(`{%s,"spec":{"a":null,"b":[{"c":"d"}]}}`, meta)
 		if _, err := framework.RunKubectlInput(f.Namespace.Name, randomCR, ns, "create", "-f", "-"); err != nil {
 			framework.Failf("failed to create random CR %s for CRD that allows unknown properties in a nested object: %v", randomCR, err)
 		}
@@ -692,10 +693,15 @@ func convertJSONSchemaProps(in []byte, out *spec.Schema) error {
 	if err := apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&external, &internal, nil); err != nil {
 		return err
 	}
-	if err := validation.ConvertJSONSchemaPropsWithPostProcess(&internal, out, validation.StripUnsupportedFormatsPostProcess); err != nil {
+	kubeOut := kubeopenapispec.Schema{}
+	if err := validation.ConvertJSONSchemaPropsWithPostProcess(&internal, &kubeOut, validation.StripUnsupportedFormatsPostProcess); err != nil {
 		return err
 	}
-	return nil
+	bs, err := json.Marshal(kubeOut)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(bs, out)
 }
 
 // dropDefaults drops properties and extension that we added to a schema

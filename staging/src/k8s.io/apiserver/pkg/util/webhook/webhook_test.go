@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -35,6 +36,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
@@ -68,7 +70,7 @@ var (
 		Name: "test-cluster",
 	}
 	groupVersions = []schema.GroupVersion{}
-	retryBackoff  = time.Duration(500) * time.Millisecond
+	retryBackoff  = DefaultRetryBackoffWithInitialDelay(time.Duration(500) * time.Millisecond)
 )
 
 // TestKubeConfigFile ensures that a kube config file, regardless of validity, is handled properly
@@ -652,4 +654,113 @@ func newTestServer(clientCert, clientKey, caCert []byte, handler func(http.Respo
 	server.StartTLS()
 
 	return server, nil
+}
+
+func TestWithExponentialBackoffContextIsAlreadyCanceled(t *testing.T) {
+	alwaysRetry := func(e error) bool {
+		return true
+	}
+
+	attemptsGot := 0
+	webhookFunc := func() error {
+		attemptsGot++
+		return nil
+	}
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	cancel()
+
+	// We don't expect the webhook function to be called since the context is already canceled.
+	retryBackoff := wait.Backoff{Steps: 5}
+	err := WithExponentialBackoff(ctx, retryBackoff, webhookFunc, alwaysRetry)
+
+	errExpected := fmt.Errorf("webhook call failed: %s", context.Canceled)
+	if errExpected.Error() != err.Error() {
+		t.Errorf("expected error: %v, but got: %v", errExpected, err)
+	}
+	if attemptsGot != 0 {
+		t.Errorf("expected %d webhook attempts, but got: %d", 0, attemptsGot)
+	}
+}
+
+func TestWithExponentialBackoffWebhookErrorIsMostImportant(t *testing.T) {
+	alwaysRetry := func(e error) bool {
+		return true
+	}
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	attemptsGot := 0
+	errExpected := errors.New("webhook not available")
+	webhookFunc := func() error {
+		attemptsGot++
+
+		// after the first attempt, the context is canceled
+		cancel()
+
+		return errExpected
+	}
+
+	// webhook err has higher priority than ctx error. we expect the webhook error to be returned.
+	retryBackoff := wait.Backoff{Steps: 5}
+	err := WithExponentialBackoff(ctx, retryBackoff, webhookFunc, alwaysRetry)
+
+	if attemptsGot != 1 {
+		t.Errorf("expected %d webhook attempts, but got: %d", 1, attemptsGot)
+	}
+	if errExpected != err {
+		t.Errorf("expected error: %v, but got: %v", errExpected, err)
+	}
+}
+
+func TestWithExponentialBackoffParametersNotSet(t *testing.T) {
+	alwaysRetry := func(e error) bool {
+		return true
+	}
+
+	attemptsGot := 0
+	webhookFunc := func() error {
+		attemptsGot++
+		return nil
+	}
+
+	err := WithExponentialBackoff(context.TODO(), wait.Backoff{}, webhookFunc, alwaysRetry)
+
+	errExpected := fmt.Errorf("webhook call failed: %s", wait.ErrWaitTimeout)
+	if errExpected.Error() != err.Error() {
+		t.Errorf("expected error: %v, but got: %v", errExpected, err)
+	}
+	if attemptsGot != 0 {
+		t.Errorf("expected %d webhook attempts, but got: %d", 0, attemptsGot)
+	}
+}
+
+func TestGenericWebhookWithExponentialBackoff(t *testing.T) {
+	attemptsPerCallExpected := 5
+	webhook := &GenericWebhook{
+		RetryBackoff: wait.Backoff{
+			Duration: time.Millisecond,
+			Factor:   1.5,
+			Jitter:   0.2,
+			Steps:    attemptsPerCallExpected,
+		},
+
+		ShouldRetry: func(e error) bool {
+			return true
+		},
+	}
+
+	attemptsGot := 0
+	webhookFunc := func() rest.Result {
+		attemptsGot++
+		return rest.Result{}
+	}
+
+	// number of retries should always be local to each call.
+	totalAttemptsExpected := attemptsPerCallExpected * 2
+	webhook.WithExponentialBackoff(context.TODO(), webhookFunc)
+	webhook.WithExponentialBackoff(context.TODO(), webhookFunc)
+
+	if totalAttemptsExpected != attemptsGot {
+		t.Errorf("expected a total of %d webhook attempts but got: %d", totalAttemptsExpected, attemptsGot)
+	}
 }

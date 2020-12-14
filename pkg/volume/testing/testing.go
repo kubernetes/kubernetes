@@ -27,9 +27,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
 	testingexec "k8s.io/utils/exec/testing"
-	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -46,6 +46,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	cloudprovider "k8s.io/cloud-provider"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/kubernetes/pkg/volume"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -118,6 +120,7 @@ type fakeVolumeHost struct {
 	informerFactory        informers.SharedInformerFactory
 	kubeletErr             error
 	mux                    sync.Mutex
+	filteredDialOptions    *proxyutil.FilteredDialOptions
 }
 
 var _ VolumeHost = &fakeVolumeHost{}
@@ -205,6 +208,10 @@ func (f *fakeVolumeHost) GetHostUtil() hostutil.HostUtils {
 
 func (f *fakeVolumeHost) GetSubpather() subpath.Interface {
 	return f.subpather
+}
+
+func (f *fakeVolumeHost) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
+	return f.filteredDialOptions
 }
 
 func (f *fakeVolumeHost) GetPluginMgr() *VolumePluginMgr {
@@ -381,6 +388,9 @@ type FakeVolumePlugin struct {
 	ProvisionDelaySeconds  int
 	SupportsRemount        bool
 
+	// default to false which means it is attachable by default
+	NonAttachable bool
+
 	// Add callbacks as needed
 	WaitForAttachHook func(spec *Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error)
 	UnmountDeviceHook func(globalMountPath string) error
@@ -444,6 +454,8 @@ func (plugin *FakeVolumePlugin) GetVolumeName(spec *Spec) (string, error) {
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.GCEPersistentDisk != nil {
 		volumeName = spec.PersistentVolume.Spec.GCEPersistentDisk.PDName
+	} else if spec.Volume != nil && spec.Volume.CSI != nil {
+		volumeName = spec.Volume.CSI.Driver
 	}
 	if volumeName == "" {
 		volumeName = spec.Name()
@@ -456,7 +468,7 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) RequiresRemount() bool {
+func (plugin *FakeVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return plugin.SupportsRemount
 }
 
@@ -604,7 +616,7 @@ func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
 }
 
 func (plugin *FakeVolumePlugin) CanAttach(spec *Spec) (bool, error) {
-	return true, nil
+	return !plugin.NonAttachable, nil
 }
 
 func (plugin *FakeVolumePlugin) CanDeviceMount(spec *Spec) (bool, error) {
@@ -713,8 +725,8 @@ func (f *FakeBasicVolumePlugin) NewUnmounter(volName string, podUID types.UID) (
 	return f.Plugin.NewUnmounter(volName, podUID)
 }
 
-func (f *FakeBasicVolumePlugin) RequiresRemount() bool {
-	return f.Plugin.RequiresRemount()
+func (f *FakeBasicVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
+	return f.Plugin.RequiresRemount(spec)
 }
 
 func (f *FakeBasicVolumePlugin) SupportsBulkVolumeVerification() bool {
@@ -790,7 +802,7 @@ func (plugin *FakeFileVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeFileVolumePlugin) RequiresRemount() bool {
+func (plugin *FakeFileVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

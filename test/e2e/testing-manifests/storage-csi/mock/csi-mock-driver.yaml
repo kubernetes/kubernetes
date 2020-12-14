@@ -48,10 +48,10 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: mock
-          image: k8s.gcr.io/sig-storage/mock-driver:v3.1.0
+          image: k8s.gcr.io/sig-storage/mock-driver:v4.0.2
           args:
             - "--name=mock.storage.k8s.io"
-            - "--permissive-target-path" # because of https://github.com/kubernetes/kubernetes/issues/75535
+            - "-v=3" # enabled the gRPC call logging
           env:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock

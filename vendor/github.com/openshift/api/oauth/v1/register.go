@@ -39,6 +39,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&OAuthClientAuthorization{},
 		&OAuthClientAuthorizationList{},
 		&OAuthRedirectReference{},
+		&UserOAuthAccessToken{},
+		&UserOAuthAccessTokenList{},
 	)
 	metav1.AddToGroupVersion(scheme, GroupVersion)
 	return nil

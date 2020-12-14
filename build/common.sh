@@ -93,8 +93,8 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
-  local debian_iptables_version=v12.1.2
-  local go_runner_version=buster-v2.0.0
+  local debian_iptables_version=buster-v1.3.0
+  local go_runner_version=buster-v2.2.2
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
   ### in build/BUILD. And kube::golang::server_image_targets
   local targets=(
@@ -422,6 +422,7 @@ function kube::build::build_image() {
   chown -R "${USER_ID}":"${GROUP_ID}" "${LOCAL_OUTPUT_BUILD_CONTEXT}"
 
   cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
+  chmod u+w "${LOCAL_OUTPUT_BUILD_CONTEXT}/localtime"
 
   cp "${KUBE_ROOT}/build/build-image/Dockerfile" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
   cp "${KUBE_ROOT}/build/build-image/rsyncd.sh" "${LOCAL_OUTPUT_BUILD_CONTEXT}/"

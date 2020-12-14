@@ -43,6 +43,12 @@ func RegisterProcessStartTime(registrationFunc func(Registerable) error) error {
 		klog.Errorf("Could not get process start time, %v", err)
 		start = float64(time.Now().Unix())
 	}
+	// processStartTime is a lazy metric which only get initialized after registered.
+	// so we have to explicitly create it before setting the label value. Otherwise
+	// it is a noop.
+	if !processStartTime.IsCreated() {
+		processStartTime.initializeMetric()
+	}
 	processStartTime.WithLabelValues().Set(start)
 	return registrationFunc(processStartTime)
 }
@@ -54,7 +60,7 @@ func getProcessStart() (float64, error) {
 		return 0, err
 	}
 
-	if stat, err := p.NewStat(); err == nil {
+	if stat, err := p.Stat(); err == nil {
 		return stat.StartTime()
 	}
 	return 0, err

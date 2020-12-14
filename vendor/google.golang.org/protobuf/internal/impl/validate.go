@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/encoding/messageset"
 	"google.golang.org/protobuf/internal/flags"
+	"google.golang.org/protobuf/internal/genid"
 	"google.golang.org/protobuf/internal/strs"
 	pref "google.golang.org/protobuf/reflect/protoreflect"
 	preg "google.golang.org/protobuf/reflect/protoregistry"
@@ -282,9 +283,9 @@ State:
 			switch {
 			case st.typ == validationTypeMap:
 				switch num {
-				case 1:
+				case genid.MapEntry_Key_field_number:
 					vi.typ = st.keyType
-				case 2:
+				case genid.MapEntry_Value_field_number:
 					vi.typ = st.valType
 					vi.mi = st.mi
 					vi.requiredBit = 1

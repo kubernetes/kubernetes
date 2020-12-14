@@ -17,15 +17,27 @@ limitations under the License.
 package create
 
 import (
+	"context"
+	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/spf13/cobra"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/generate"
-	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	utilsnet "k8s.io/utils/net"
 )
 
 // NewCmdCreateService is a macro command to create a new service
@@ -34,7 +46,7 @@ func NewCmdCreateService(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 		Use:     "service",
 		Aliases: []string{"svc"},
 		Short:   i18n.T("Create a service using specified subcommand."),
-		Long:    "Create a service using specified subcommand.",
+		Long:    i18n.T("Create a service using specified subcommand."),
 		Run:     cmdutil.DefaultSubCommandRun(ioStreams.ErrOut),
 	}
 	cmd.AddCommand(NewCmdCreateServiceClusterIP(f, ioStreams))
@@ -43,6 +55,172 @@ func NewCmdCreateService(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 	cmd.AddCommand(NewCmdCreateServiceExternalName(f, ioStreams))
 
 	return cmd
+}
+
+// ServiceOptions holds the options for 'create service' sub command
+type ServiceOptions struct {
+	PrintFlags *genericclioptions.PrintFlags
+	PrintObj   func(obj runtime.Object) error
+
+	Name         string
+	TCP          []string
+	Type         corev1.ServiceType
+	ClusterIP    string
+	NodePort     int
+	ExternalName string
+
+	FieldManager     string
+	CreateAnnotation bool
+	Namespace        string
+
+	Client         corev1client.CoreV1Interface
+	DryRunStrategy cmdutil.DryRunStrategy
+	DryRunVerifier *resource.DryRunVerifier
+	genericclioptions.IOStreams
+}
+
+// NewServiceOptions creates a ServiceOptions struct
+func NewServiceOptions(ioStreams genericclioptions.IOStreams, serviceType corev1.ServiceType) *ServiceOptions {
+	return &ServiceOptions{
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		IOStreams:  ioStreams,
+		Type:       serviceType,
+	}
+}
+
+// Complete completes all the required options
+func (o *ServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	name, err := NameFromCommandArgs(cmd, args)
+	if err != nil {
+		return err
+	}
+	o.Name = name
+
+	clientConfig, err := f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+	o.Client, err = corev1client.NewForConfig(clientConfig)
+	if err != nil {
+		return err
+	}
+
+	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
+
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+
+	o.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, o.Out)
+	}
+
+	return nil
+}
+
+// Validate if the options are valid
+func (o *ServiceOptions) Validate() error {
+	if o.ClusterIP == corev1.ClusterIPNone && o.Type != corev1.ServiceTypeClusterIP {
+		return fmt.Errorf("ClusterIP=None can only be used with ClusterIP service type")
+	}
+	if o.ClusterIP != corev1.ClusterIPNone && len(o.TCP) == 0 && o.Type != corev1.ServiceTypeExternalName {
+		return fmt.Errorf("at least one tcp port specifier must be provided")
+	}
+	if o.Type == corev1.ServiceTypeExternalName {
+		if errs := validation.IsDNS1123Subdomain(o.ExternalName); len(errs) != 0 {
+			return fmt.Errorf("invalid service external name %s", o.ExternalName)
+		}
+	}
+	return nil
+}
+
+func (o *ServiceOptions) createService() (*corev1.Service, error) {
+	ports := []corev1.ServicePort{}
+	for _, tcpString := range o.TCP {
+		port, targetPort, err := parsePorts(tcpString)
+		if err != nil {
+			return nil, err
+		}
+
+		portName := strings.Replace(tcpString, ":", "-", -1)
+		ports = append(ports, corev1.ServicePort{
+			Name:       portName,
+			Port:       port,
+			TargetPort: targetPort,
+			Protocol:   corev1.Protocol("TCP"),
+			NodePort:   int32(o.NodePort),
+		})
+	}
+
+	// setup default label and selector
+	labels := map[string]string{}
+	labels["app"] = o.Name
+	selector := map[string]string{}
+	selector["app"] = o.Name
+
+	service := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   o.Name,
+			Labels: labels,
+		},
+		Spec: corev1.ServiceSpec{
+			Type:         corev1.ServiceType(o.Type),
+			Selector:     selector,
+			Ports:        ports,
+			ExternalName: o.ExternalName,
+		},
+	}
+	if len(o.ClusterIP) > 0 {
+		service.Spec.ClusterIP = o.ClusterIP
+	}
+	return &service, nil
+}
+
+// Run the service command
+func (o *ServiceOptions) Run() error {
+	service, err := o.createService()
+	if err != nil {
+		return err
+	}
+
+	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, service, scheme.DefaultJSONEncoder()); err != nil {
+		return err
+	}
+
+	if o.DryRunStrategy != cmdutil.DryRunClient {
+		createOptions := metav1.CreateOptions{}
+		if o.FieldManager != "" {
+			createOptions.FieldManager = o.FieldManager
+		}
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
+		var err error
+		service, err = o.Client.Services(o.Namespace).Create(context.TODO(), service, createOptions)
+		if err != nil {
+			return fmt.Errorf("failed to create %s service: %v", o.Type, err)
+		}
+	}
+	return o.PrintObj(service)
 }
 
 var (
@@ -57,20 +235,9 @@ var (
     kubectl create service clusterip my-cs --clusterip="None"`))
 )
 
-func addPortFlags(cmd *cobra.Command) {
-	cmd.Flags().StringSlice("tcp", []string{}, "Port pairs can be specified as '<port>:<targetPort>'.")
-}
-
-// ServiceClusterIPOpts holds the options for 'create service clusterip' sub command
-type ServiceClusterIPOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
-}
-
 // NewCmdCreateServiceClusterIP is a command to create a ClusterIP service
 func NewCmdCreateServiceClusterIP(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	options := &ServiceClusterIPOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
-	}
+	o := NewServiceOptions(ioStreams, corev1.ServiceTypeClusterIP)
 
 	cmd := &cobra.Command{
 		Use:                   "clusterip NAME [--tcp=<port>:<targetPort>] [--dry-run=server|client|none]",
@@ -79,52 +246,22 @@ func NewCmdCreateServiceClusterIP(f cmdutil.Factory, ioStreams genericclioptions
 		Long:                  serviceClusterIPLong,
 		Example:               serviceClusterIPExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, generateversioned.ServiceClusterIPGeneratorV1Name)
-	addPortFlags(cmd)
-	cmd.Flags().String("clusterip", "", i18n.T("Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing)."))
-	cmdutil.AddFieldManagerFlagVar(cmd, &options.CreateSubcommandOptions.FieldManager, "kubectl-create")
+	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "Port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().StringVar(&o.ClusterIP, "clusterip", o.ClusterIP, i18n.T("Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing)."))
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddDryRunFlag(cmd)
+
 	return cmd
-}
-
-func errUnsupportedGenerator(cmd *cobra.Command, generatorName string) error {
-	return cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", generatorName)
-}
-
-// Complete completes all the required options
-func (o *ServiceClusterIPOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
-	if err != nil {
-		return err
-	}
-
-	var generator generate.StructuredGenerator
-	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case generateversioned.ServiceClusterIPGeneratorV1Name:
-		generator = &generateversioned.ServiceCommonGeneratorV1{
-			Name:      name,
-			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
-			Type:      v1.ServiceTypeClusterIP,
-			ClusterIP: cmdutil.GetFlagString(cmd, "clusterip"),
-		}
-	default:
-		return errUnsupportedGenerator(cmd, generatorName)
-	}
-
-	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
-}
-
-// Run calls the CreateSubcommandOptions.Run in ServiceClusterIPOpts instance
-func (o *ServiceClusterIPOpts) Run() error {
-	return o.CreateSubcommandOptions.Run()
 }
 
 var (
@@ -136,16 +273,9 @@ var (
     kubectl create service nodeport my-ns --tcp=5678:8080`))
 )
 
-// ServiceNodePortOpts holds the options for 'create service nodeport' sub command
-type ServiceNodePortOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
-}
-
 // NewCmdCreateServiceNodePort is a macro command for creating a NodePort service
 func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	options := &ServiceNodePortOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
-	}
+	o := NewServiceOptions(ioStreams, corev1.ServiceTypeNodePort)
 
 	cmd := &cobra.Command{
 		Use:                   "nodeport NAME [--tcp=port:targetPort] [--dry-run=server|client|none]",
@@ -154,49 +284,21 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericclioptions.
 		Long:                  serviceNodePortLong,
 		Example:               serviceNodePortExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, generateversioned.ServiceNodePortGeneratorV1Name)
-	cmd.Flags().Int("node-port", 0, "Port used to expose the service on each node in a cluster.")
-	cmdutil.AddFieldManagerFlagVar(cmd, &options.CreateSubcommandOptions.FieldManager, "kubectl-create")
-	addPortFlags(cmd)
+	cmd.Flags().IntVar(&o.NodePort, "node-port", o.NodePort, "Port used to expose the service on each node in a cluster.")
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "Port pairs can be specified as '<port>:<targetPort>'.")
+	cmdutil.AddDryRunFlag(cmd)
 	return cmd
-}
-
-// Complete completes all the required options
-func (o *ServiceNodePortOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
-	if err != nil {
-		return err
-	}
-
-	var generator generate.StructuredGenerator
-	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case generateversioned.ServiceNodePortGeneratorV1Name:
-		generator = &generateversioned.ServiceCommonGeneratorV1{
-			Name:      name,
-			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
-			Type:      v1.ServiceTypeNodePort,
-			ClusterIP: "",
-			NodePort:  cmdutil.GetFlagInt(cmd, "node-port"),
-		}
-	default:
-		return errUnsupportedGenerator(cmd, generatorName)
-	}
-
-	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
-}
-
-// Run calls the CreateSubcommandOptions.Run in ServiceNodePortOpts instance
-func (o *ServiceNodePortOpts) Run() error {
-	return o.CreateSubcommandOptions.Run()
 }
 
 var (
@@ -208,16 +310,9 @@ var (
     kubectl create service loadbalancer my-lbs --tcp=5678:8080`))
 )
 
-// ServiceLoadBalancerOpts holds the options for 'create service loadbalancer' sub command
-type ServiceLoadBalancerOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
-}
-
 // NewCmdCreateServiceLoadBalancer is a macro command for creating a LoadBalancer service
 func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	options := &ServiceLoadBalancerOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
-	}
+	o := NewServiceOptions(ioStreams, corev1.ServiceTypeLoadBalancer)
 
 	cmd := &cobra.Command{
 		Use:                   "loadbalancer NAME [--tcp=port:targetPort] [--dry-run=server|client|none]",
@@ -226,47 +321,20 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericcliopti
 		Long:                  serviceLoadBalancerLong,
 		Example:               serviceLoadBalancerExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, generateversioned.ServiceLoadBalancerGeneratorV1Name)
-	cmdutil.AddFieldManagerFlagVar(cmd, &options.CreateSubcommandOptions.FieldManager, "kubectl-create")
-	addPortFlags(cmd)
+	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "Port pairs can be specified as '<port>:<targetPort>'.")
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddDryRunFlag(cmd)
 	return cmd
-}
-
-// Complete completes all the required options
-func (o *ServiceLoadBalancerOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
-	if err != nil {
-		return err
-	}
-
-	var generator generate.StructuredGenerator
-	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case generateversioned.ServiceLoadBalancerGeneratorV1Name:
-		generator = &generateversioned.ServiceCommonGeneratorV1{
-			Name:      name,
-			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
-			Type:      v1.ServiceTypeLoadBalancer,
-			ClusterIP: "",
-		}
-	default:
-		return errUnsupportedGenerator(cmd, generatorName)
-	}
-
-	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
-}
-
-// Run calls the CreateSubcommandOptions.Run in ServiceLoadBalancerOpts instance
-func (o *ServiceLoadBalancerOpts) Run() error {
-	return o.CreateSubcommandOptions.Run()
 }
 
 var (
@@ -282,16 +350,9 @@ var (
 	kubectl create service externalname my-ns --external-name bar.com`))
 )
 
-// ServiceExternalNameOpts holds the options for 'create service externalname' sub command
-type ServiceExternalNameOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
-}
-
 // NewCmdCreateServiceExternalName is a macro command for creating an ExternalName service
 func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	options := &ServiceExternalNameOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
-	}
+	o := NewServiceOptions(ioStreams, corev1.ServiceTypeExternalName)
 
 	cmd := &cobra.Command{
 		Use:                   "externalname NAME --external-name external.name [--dry-run=server|client|none]",
@@ -300,47 +361,47 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericcliopti
 		Long:                  serviceExternalNameLong,
 		Example:               serviceExternalNameExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, generateversioned.ServiceExternalNameGeneratorV1Name)
-	addPortFlags(cmd)
-	cmd.Flags().String("external-name", "", i18n.T("External name of service"))
+	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "Port pairs can be specified as '<port>:<targetPort>'.")
+	cmd.Flags().StringVar(&o.ExternalName, "external-name", o.ExternalName, i18n.T("External name of service"))
 	cmd.MarkFlagRequired("external-name")
-	cmdutil.AddFieldManagerFlagVar(cmd, &options.CreateSubcommandOptions.FieldManager, "kubectl-create")
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
 
-// Complete completes all the required options
-func (o *ServiceExternalNameOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+func parsePorts(portString string) (int32, intstr.IntOrString, error) {
+	portStringSlice := strings.Split(portString, ":")
+
+	port, err := utilsnet.ParsePort(portStringSlice[0], true)
 	if err != nil {
-		return err
+		return 0, intstr.FromInt(0), err
 	}
 
-	var generator generate.StructuredGenerator
-	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case generateversioned.ServiceExternalNameGeneratorV1Name:
-		generator = &generateversioned.ServiceCommonGeneratorV1{
-			Name:         name,
-			Type:         v1.ServiceTypeExternalName,
-			ExternalName: cmdutil.GetFlagString(cmd, "external-name"),
-			ClusterIP:    "",
+	if len(portStringSlice) == 1 {
+		return int32(port), intstr.FromInt(int(port)), nil
+	}
+
+	var targetPort intstr.IntOrString
+	if portNum, err := strconv.Atoi(portStringSlice[1]); err != nil {
+		if errs := validation.IsValidPortName(portStringSlice[1]); len(errs) != 0 {
+			return 0, intstr.FromInt(0), fmt.Errorf(strings.Join(errs, ","))
 		}
-	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		targetPort = intstr.FromString(portStringSlice[1])
+	} else {
+		if errs := validation.IsValidPortNum(portNum); len(errs) != 0 {
+			return 0, intstr.FromInt(0), fmt.Errorf(strings.Join(errs, ","))
+		}
+		targetPort = intstr.FromInt(portNum)
 	}
-
-	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
-}
-
-// Run calls the CreateSubcommandOptions.Run in ServiceExternalNameOpts instance
-func (o *ServiceExternalNameOpts) Run() error {
-	return o.CreateSubcommandOptions.Run()
+	return int32(port), targetPort, nil
 }

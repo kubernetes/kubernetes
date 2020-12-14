@@ -207,9 +207,6 @@ func TestFormatQuoted(t *testing.T) {
 }
 
 func TestGetExcludedChecks(t *testing.T) {
-	type args struct {
-		r *http.Request
-	}
 	tests := []struct {
 		name string
 		r    *http.Request

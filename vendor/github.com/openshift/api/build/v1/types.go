@@ -400,7 +400,8 @@ const (
 type BuildSource struct {
 	// type of build input to accept
 	// +k8s:conversion-gen=false
-	Type BuildSourceType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=BuildSourceType"`
+	// +optional
+	Type BuildSourceType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=BuildSourceType"`
 
 	// binary builds accept a binary as their input. The binary is generally assumed to be a tar,
 	// gzipped tar, or zip file depending on the strategy. For container image builds, this is the build
@@ -603,7 +604,8 @@ type SourceControlUser struct {
 type BuildStrategy struct {
 	// type is the kind of build strategy.
 	// +k8s:conversion-gen=false
-	Type BuildStrategyType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=BuildStrategyType"`
+	// +optional
+	Type BuildStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=BuildStrategyType"`
 
 	// dockerStrategy holds the parameters to the container image build strategy.
 	DockerStrategy *DockerBuildStrategy `json:"dockerStrategy,omitempty" protobuf:"bytes,2,opt,name=dockerStrategy"`

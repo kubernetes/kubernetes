@@ -10,15 +10,15 @@ require (
 	github.com/googleapis/gnostic v0.4.1
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/pkg/errors v0.9.1
-	github.com/spf13/cobra v1.0.0
+	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.4.0
-	golang.org/x/text v0.3.3
+	github.com/stretchr/testify v1.6.1
+	golang.org/x/text v0.3.4
 	gopkg.in/yaml.v2 v2.3.0
-	k8s.io/api v0.19.2
-	k8s.io/apimachinery v0.19.2
-	k8s.io/client-go v0.19.2
-	k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
+	k8s.io/api v0.20.0
+	k8s.io/apimachinery v0.20.0
+	k8s.io/client-go v0.20.0
+	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
 	sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/yaml v1.2.0
 )
@@ -29,6 +29,10 @@ replace (
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
 	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
 	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.5.0-origin.1+incompatible
+	github.com/openshift/api => github.com/tnozicka/api v0.0.0-20201209094822-cf1cf8c29eb4
+	github.com/openshift/apiserver-library-go => github.com/tnozicka/apiserver-library-go v0.0.0-20201209150209-65251f5effdf
+	github.com/openshift/client-go => github.com/tnozicka/client-go v0.0.0-20201209101418-221f919c0429
+	github.com/openshift/library-go => github.com/tnozicka/library-go v0.0.0-20201209145728-b3d28fd59efd
 	github.com/robfig/cron => github.com/robfig/cron v1.1.0
 	go.uber.org/multierr => go.uber.org/multierr v1.1.0
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
@@ -42,9 +46,10 @@ replace (
 	k8s.io/cluster-bootstrap => ../cluster-bootstrap
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
+	k8s.io/component-helpers => ../component-helpers
+	k8s.io/controller-manager => ../controller-manager
 	k8s.io/cri-api => ../cri-api
 	k8s.io/csi-translation-lib => ../csi-translation-lib
-	k8s.io/klog/v2 => k8s.io/klog/v2 v2.2.0
 	k8s.io/kube-aggregator => ../kube-aggregator
 	k8s.io/kube-controller-manager => ../kube-controller-manager
 	k8s.io/kube-proxy => ../kube-proxy
@@ -53,6 +58,6 @@ replace (
 	k8s.io/kubelet => ../kubelet
 	k8s.io/legacy-cloud-providers => ../legacy-cloud-providers
 	k8s.io/metrics => ../metrics
+	k8s.io/mount-utils => ../mount-utils
 	k8s.io/sample-apiserver => ../sample-apiserver
-	vbom.ml/util => vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
 )

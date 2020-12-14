@@ -6,12 +6,12 @@ import (
 	"k8s.io/kubernetes/openshift-kube-apiserver/enablement"
 
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/quota/v1/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	clientgoinformers "k8s.io/client-go/informers"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 
 	"github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy"

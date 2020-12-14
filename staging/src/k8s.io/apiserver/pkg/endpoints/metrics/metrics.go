@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -185,6 +186,26 @@ var (
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "code"},
 	)
+
+	apiSelfRequestCounter = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_selfrequest_total",
+			Help:           "Counter of apiserver self-requests broken out for each verb, API resource and subresource.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"verb", "resource", "subresource"},
+	)
+
+	requestFilterDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "apiserver_request_filter_duration_seconds",
+			Help:           "Request filter latency distribution in seconds, for each filter type",
+			Buckets:        []float64{0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 5.0},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"filter"},
+	)
+
 	// requestAbortsTotal is a number of aborted requests with http.ErrAbortHandler
 	requestAbortsTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
@@ -211,6 +232,8 @@ var (
 		currentInflightRequests,
 		currentInqueueRequests,
 		requestTerminationsTotal,
+		apiSelfRequestCounter,
+		requestFilterDuration,
 		requestAbortsTotal,
 	}
 
@@ -301,6 +324,10 @@ func UpdateInflightRequestMetrics(phase string, nonmutating, mutating int) {
 	}
 }
 
+func RecordFilterLatency(name string, elapsed time.Duration) {
+	requestFilterDuration.WithLabelValues(name).Observe(elapsed.Seconds())
+}
+
 // RecordRequestAbort records that the request was aborted possibly due to a timeout.
 func RecordRequestAbort(req *http.Request, requestInfo *request.RequestInfo) {
 	if requestInfo == nil {
@@ -326,20 +353,17 @@ func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInf
 		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
 	}
 	scope := CleanScope(requestInfo)
-	// We don't use verb from <requestInfo>, as for the healthy path
-	// MonitorRequest is called from InstrumentRouteFunc which is registered
-	// in installer.go with predefined list of verbs (different than those
-	// translated to RequestInfo).
+
+	// We don't use verb from <requestInfo>, as this may be propagated from
+	// InstrumentRouteFunc which is registered in installer.go with predefined
+	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	verb := canonicalVerb(strings.ToUpper(req.Method), scope)
-	// set verbs to a bounded set of known and expected verbs
-	if !validRequestMethods.Has(verb) {
-		verb = OtherRequestMethod
-	}
+	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+
 	if requestInfo.IsResourceRequest {
-		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
+		requestTerminationsTotal.WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
 	} else {
-		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
+		requestTerminationsTotal.WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
 	}
 }
 
@@ -351,12 +375,13 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	}
 	var g compbasemetrics.GaugeMetric
 	scope := CleanScope(requestInfo)
-	// We don't use verb from <requestInfo>, as for the healthy path
-	// MonitorRequest is called from InstrumentRouteFunc which is registered
-	// in installer.go with predefined list of verbs (different than those
-	// translated to RequestInfo).
+
+	// We don't use verb from <requestInfo>, as this may be propagated from
+	// InstrumentRouteFunc which is registered in installer.go with predefined
+	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
 	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+
 	if requestInfo.IsResourceRequest {
 		g = longRunningRequestGauge.WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
 	} else {
@@ -370,11 +395,21 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 // MonitorRequest handles standard transformations for client and the reported verb and then invokes Monitor to record
 // a request. verb must be uppercase to be backwards compatible with existing monitoring tooling.
 func MonitorRequest(req *http.Request, verb, group, version, resource, subresource, scope, component string, deprecated bool, removedRelease string, contentType string, httpCode, respSize int, elapsed time.Duration) {
-	reportedVerb := cleanVerb(verb, req)
+	// We don't use verb from <requestInfo>, as this may be propagated from
+	// InstrumentRouteFunc which is registered in installer.go with predefined
+	// list of verbs (different than those translated to RequestInfo).
+	// However, we need to tweak it e.g. to differentiate GET from LIST.
+	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+
 	dryRun := cleanDryRun(req.URL)
 	elapsedSeconds := elapsed.Seconds()
 	cleanContentType := cleanContentType(contentType)
 	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, cleanContentType, codeToString(httpCode)).Inc()
+	// MonitorRequest happens after authentication, so we can trust the username given by the request
+	info, ok := request.UserFrom(req.Context())
+	if ok && info.GetName() == user.APIServerUser {
+		apiSelfRequestCounter.WithLabelValues(reportedVerb, resource, subresource).Inc()
+	}
 	if deprecated {
 		deprecatedRequestGauge.WithLabelValues(group, version, resource, subresource, removedRelease).Set(1)
 		audit.AddAuditAnnotation(req.Context(), deprecatedAnnotationKey, "true")
@@ -473,7 +508,7 @@ func CleanScope(requestInfo *request.RequestInfo) string {
 func canonicalVerb(verb string, scope string) string {
 	switch verb {
 	case "GET", "HEAD":
-		if scope != "resource" {
+		if scope != "resource" && scope != "" {
 			return "LIST"
 		}
 		return "GET"

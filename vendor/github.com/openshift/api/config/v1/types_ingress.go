@@ -31,6 +31,16 @@ type IngressSpec struct {
 	//
 	// Once set, changing domain is not currently supported.
 	Domain string `json:"domain"`
+
+	// appsDomain is an optional domain to use instead of the one specified
+	// in the domain field when a Route is created without specifying an explicit
+	// host. If appsDomain is nonempty, this value is used to generate default
+	// host values for Route. Unlike domain, appsDomain may be modified after
+	// installation.
+	// This assumes a new ingresscontroller has been setup with a wildcard
+	// certificate.
+	// +optional
+	AppsDomain string `json:"appsDomain,omitempty"`
 }
 
 type IngressStatus struct {

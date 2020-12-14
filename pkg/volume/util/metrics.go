@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"time"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -109,14 +111,24 @@ func OperationCompleteHook(plugin, operationName string) func(*error) {
 	return opComplete
 }
 
+// FSGroupCompleteHook returns a hook to call when volume recursive permission is changed
+func FSGroupCompleteHook(plugin volume.VolumePlugin, spec *volume.Spec) func(*error) {
+	return OperationCompleteHook(GetFullQualifiedPluginNameForVolume(plugin.GetPluginName(), spec), "volume_fsgroup_recursive_apply")
+}
+
 // GetFullQualifiedPluginNameForVolume returns full qualified plugin name for
 // given volume. For CSI plugin, it appends plugin driver name at the end of
 // plugin name, e.g. kubernetes.io/csi:csi-hostpath. It helps to distinguish
 // between metrics emitted for CSI volumes which may be handled by different
 // CSI plugin drivers.
 func GetFullQualifiedPluginNameForVolume(pluginName string, spec *volume.Spec) string {
-	if spec != nil && spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil {
-		return fmt.Sprintf("%s:%s", pluginName, spec.PersistentVolume.Spec.CSI.Driver)
+	if spec != nil {
+		if spec.Volume != nil && spec.Volume.CSI != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+			return fmt.Sprintf("%s:%s", pluginName, spec.Volume.CSI.Driver)
+		}
+		if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil {
+			return fmt.Sprintf("%s:%s", pluginName, spec.PersistentVolume.Spec.CSI.Driver)
+		}
 	}
 	return pluginName
 }

@@ -544,6 +544,28 @@ func TestFloatIntConversion(t *testing.T) {
 	}
 }
 
+func TestIntFloatConversion(t *testing.T) {
+	unstr := map[string]interface{}{"ch": int64(3)}
+
+	var obj C
+	if err := runtime.NewTestUnstructuredConverter(simpleEquality).FromUnstructured(unstr, &obj); err != nil {
+		t.Errorf("Unexpected error in FromUnstructured: %v", err)
+	}
+
+	data, err := json.Marshal(unstr)
+	if err != nil {
+		t.Fatalf("Error when marshaling unstructured: %v", err)
+	}
+	var unmarshalled C
+	if err := json.Unmarshal(data, &unmarshalled); err != nil {
+		t.Fatalf("Error when unmarshaling to object: %v", err)
+	}
+
+	if !reflect.DeepEqual(obj, unmarshalled) {
+		t.Errorf("Incorrect conversion, diff: %v", diff.ObjectReflectDiff(obj, unmarshalled))
+	}
+}
+
 func TestCustomToUnstructured(t *testing.T) {
 	testcases := []struct {
 		Data     string

@@ -56,6 +56,12 @@ type AuthenticationSpec struct {
 	// serviceAccountIssuer is the identifier of the bound service account token
 	// issuer.
 	// The default is https://kubernetes.default.svc
+	// WARNING: Updating this field will result in the invalidation of
+	// all bound tokens with the previous issuer value. Unless the
+	// holder of a bound token has explicit support for a change in
+	// issuer, they will not request a new bound token until pod
+	// restart or until their existing token exceeds 80% of its
+	// duration.
 	// +optional
 	ServiceAccountIssuer string `json:"serviceAccountIssuer"`
 }

@@ -21,8 +21,8 @@ import (
 	"io/ioutil"
 	"os"
 
+	"k8s.io/kubectl/pkg/cmd"
 	cmdsanity "k8s.io/kubectl/pkg/cmd/util/sanity"
-	"k8s.io/kubernetes/pkg/kubectl/cmd"
 )
 
 func main() {

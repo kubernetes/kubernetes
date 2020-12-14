@@ -205,7 +205,7 @@ const (
 
 func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs := map[int]Config{}
-	configs[Agnhost] = Config{promoterE2eRegistry, "agnhost", "2.20"}
+	configs[Agnhost] = Config{promoterE2eRegistry, "agnhost", "2.21"}
 	configs[AgnhostPrivate] = Config{PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{gcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{gcAuthenticatedRegistry, "windows-nanoserver", "v1"}
@@ -215,7 +215,7 @@ func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs[CheckMetadataConcealment] = Config{e2eRegistry, "metadata-concealment", "1.2"}
 	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{e2eRegistry, "cuda-vector-add", "2.0"}
-	configs[DebianIptables] = Config{buildImageRegistry, "debian-iptables", "v12.1.2"}
+	configs[DebianIptables] = Config{buildImageRegistry, "debian-iptables", "buster-v1.3.0"}
 	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
 	configs[Etcd] = Config{gcRegistry, "etcd", "3.4.13-0"}
 	configs[GlusterDynamicProvisioner] = Config{dockerGluster, "glusterdynamic-provisioner", "v1.0"}

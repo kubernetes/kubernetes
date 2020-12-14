@@ -393,7 +393,7 @@ Starts a HTTP(S) server on given port with the following endpoints:
   - `protocol`: The protocol which will be used when making the request. Default value: `http`.
     Acceptable values: `http`, `udp`, `sctp`.
   - `tries`: The number of times the request will be performed. Default value: `1`.
-- `/echo`: Returns the given `msg` (`/echo?msg=echoed_msg`)
+- `/echo`: Returns the given `msg` (`/echo?msg=echoed_msg`), with the optional status `code`.
 - `/exit`: Closes the server with the given code and graceful shutdown. The endpoint's parameters
 	are:
 	- `code`: The exit code for the process. Default value: 0. Allows an integer [0-127].
@@ -407,6 +407,8 @@ Starts a HTTP(S) server on given port with the following endpoints:
   it exited.
 - `/hostname`: Returns the server's hostname.
 - `/hostName`: Returns the server's hostname.
+- `/redirect`: Returns a redirect response to the given `location`, with the optional status `code`
+  (`/redirect?location=/echo%3Fmsg=foobar&code=307`).
 - `/shell`: Executes the given `shellCommand` or `cmd` (`/shell?cmd=some-command`) and
   returns a JSON containing the fields `output` (command's output) and `error` (command's
   error message). Returns `200 OK` if the command succeeded, `417 Expectation Failed` if not.
@@ -418,6 +420,9 @@ Starts a HTTP(S) server on given port with the following endpoints:
 If `--tls-cert-file` is added (ideally in conjunction with `--tls-private-key-file`, the HTTP server
 will be upgraded to HTTPS. The image has default, `localhost`-based cert/privkey files at
 `/localhost.crt` and `/localhost.key` (see: [`porter` subcommand](#porter))
+
+If `--http-override` is set, the HTTP(S) server will always serve the override path & options,
+ignoring the request URL.
 
 It will also start a UDP server on the indicated UDP port that responds to the following commands:
 

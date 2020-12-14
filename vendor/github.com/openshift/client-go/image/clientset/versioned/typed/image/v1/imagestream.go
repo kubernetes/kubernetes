@@ -8,7 +8,6 @@ import (
 
 	v1 "github.com/openshift/api/image/v1"
 	scheme "github.com/openshift/client-go/image/clientset/versioned/scheme"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -32,7 +31,7 @@ type ImageStreamInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ImageStreamList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ImageStream, err error)
-	Secrets(ctx context.Context, imageStreamName string, options metav1.GetOptions) (*corev1.SecretList, error)
+	Secrets(ctx context.Context, imageStreamName string, options metav1.GetOptions) (*v1.SecretList, error)
 	Layers(ctx context.Context, imageStreamName string, options metav1.GetOptions) (*v1.ImageStreamLayers, error)
 
 	ImageStreamExpansion
@@ -182,9 +181,9 @@ func (c *imageStreams) Patch(ctx context.Context, name string, pt types.PatchTyp
 	return
 }
 
-// Secrets takes name of the imageStream, and returns the corresponding corev1.SecretList object, and an error if there is any.
-func (c *imageStreams) Secrets(ctx context.Context, imageStreamName string, options metav1.GetOptions) (result *corev1.SecretList, err error) {
-	result = &corev1.SecretList{}
+// Secrets takes name of the imageStream, and returns the corresponding v1.SecretList object, and an error if there is any.
+func (c *imageStreams) Secrets(ctx context.Context, imageStreamName string, options metav1.GetOptions) (result *v1.SecretList, err error) {
+	result = &v1.SecretList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("imagestreams").

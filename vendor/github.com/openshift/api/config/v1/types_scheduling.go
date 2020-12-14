@@ -22,12 +22,21 @@ type Scheduler struct {
 }
 
 type SchedulerSpec struct {
+	// DEPRECATED: the scheduler Policy API has been deprecated and will be removed in a future release.
 	// policy is a reference to a ConfigMap containing scheduler policy which has
 	// user specified predicates and priorities. If this ConfigMap is not available
 	// scheduler will default to use DefaultAlgorithmProvider.
 	// The namespace for this configmap is openshift-config.
 	// +optional
-	Policy ConfigMapNameReference `json:"policy"`
+	Policy ConfigMapNameReference `json:"policy,omitempty"`
+	// profile sets which scheduling profile should be set in order to configure scheduling
+	// decisions for new pods.
+	//
+	// Valid values are "LowNodeUtilization", "HighNodeUtilization", "NoScoring"
+	// Defaults to "LowNodeUtilization"
+	// +optional
+	// +kubebuilder:default=LowNodeUtilization
+	Profile SchedulerProfile `json:"profile"`
 	// defaultNodeSelector helps set the cluster-wide default node selector to
 	// restrict pod placement to specific nodes. This is applied to the pods
 	// created in all namespaces and creates an intersection with any existing
@@ -61,6 +70,23 @@ type SchedulerSpec struct {
 	// +optional
 	MastersSchedulable bool `json:"mastersSchedulable"`
 }
+
+// +kubebuilder:validation:Enum="";LowNodeUtilization;HighNodeUtilization;NoScoring
+type SchedulerProfile string
+
+var (
+	// LowNodeUtililization is the default, and defines a scheduling profile which prefers to
+	// spread pods evenly among nodes targeting low resource consumption on each node.
+	LowNodeUtilization SchedulerProfile = "LowNodeUtilization"
+
+	// HighNodeUtilization defines a scheduling profile which packs as many pods as possible onto
+	// as few nodes as possible targeting a small node count but high resource usage on each node.
+	HighNodeUtilization SchedulerProfile = "HighNodeUtilization"
+
+	// NoScoring defines a scheduling profile which tries to provide lower-latency scheduling
+	// at the expense of potentially less optimal pod placement decisions.
+	NoScoring SchedulerProfile = "NoScoring"
+)
 
 type SchedulerStatus struct {
 }

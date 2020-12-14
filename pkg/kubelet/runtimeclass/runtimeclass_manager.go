@@ -22,13 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	nodev1beta1 "k8s.io/client-go/listers/node/v1beta1"
+	nodev1 "k8s.io/client-go/listers/node/v1"
 )
 
 // Manager caches RuntimeClass API objects, and provides accessors to the Kubelet.
 type Manager struct {
 	informerFactory informers.SharedInformerFactory
-	lister          nodev1beta1.RuntimeClassLister
+	lister          nodev1.RuntimeClassLister
 }
 
 // NewManager returns a new RuntimeClass Manager. Run must be called before the manager can be used.
@@ -36,7 +36,7 @@ func NewManager(client clientset.Interface) *Manager {
 	const resyncPeriod = 0
 
 	factory := informers.NewSharedInformerFactory(client, resyncPeriod)
-	lister := factory.Node().V1beta1().RuntimeClasses().Lister()
+	lister := factory.Node().V1().RuntimeClasses().Lister()
 
 	return &Manager{
 		informerFactory: factory,

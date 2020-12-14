@@ -27,10 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // addrTypePortMapKey is used to uniquely identify groups of endpoint ports and
@@ -137,6 +139,9 @@ func addressToEndpoint(address corev1.EndpointAddress, ready bool) *discovery.En
 	if address.NodeName != nil {
 		endpoint.Topology = map[string]string{
 			"kubernetes.io/hostname": *address.NodeName,
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName) {
+			endpoint.NodeName = address.NodeName
 		}
 	}
 	if address.Hostname != "" {
@@ -260,7 +265,7 @@ func endpointsControllerKey(endpointSlice *discovery.EndpointSlice) (string, err
 	return fmt.Sprintf("%s/%s", endpointSlice.Namespace, serviceName), nil
 }
 
-// skipMirror return true if the the LabelSkipMirror label has been set to
+// skipMirror return true if the LabelSkipMirror label has been set to
 // "true".
 func skipMirror(labels map[string]string) bool {
 	skipMirror, _ := labels[discovery.LabelSkipMirror]

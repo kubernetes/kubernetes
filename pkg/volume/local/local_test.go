@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 const (

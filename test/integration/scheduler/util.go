@@ -80,7 +80,7 @@ func initDisruptionController(t *testing.T, testCtx *testutils.TestContext) *dis
 // initTest initializes a test environment and creates master and scheduler with default
 // configuration.
 func initTest(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutils.TestContext {
-	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestMaster(t, nsPrefix, nil), true, nil, time.Second, opts...)
+	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestMaster(t, nsPrefix, nil), nil, opts...)
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
@@ -100,8 +100,8 @@ func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestCon
 		},
 	}
 	testCtx := testutils.InitTestSchedulerWithOptions(
-		t, testutils.InitTestMaster(t, nsPrefix, nil), true, nil,
-		time.Second, scheduler.WithProfiles(prof))
+		t, testutils.InitTestMaster(t, nsPrefix, nil), nil,
+		scheduler.WithProfiles(prof))
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
@@ -111,7 +111,7 @@ func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestCon
 // to see is in the store. Used to observe reflected events.
 func waitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key string,
 	passFunc func(n interface{}) bool) error {
-	nodes := []*v1.Node{}
+	var nodes []*v1.Node
 	err := wait.Poll(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
 		n, err := nodeLister.Get(key)
 
@@ -143,6 +143,9 @@ func createNode(cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
 
 // createNodes creates `numNodes` nodes. The created node names will be in the
 // form of "`prefix`-X" where X is an ordinal.
+// DEPRECATED
+// use createAndWaitForNodesInCache instead, which ensures the created nodes
+// to be present in scheduler cache.
 func createNodes(cs clientset.Interface, prefix string, wrapper *st.NodeWrapper, numNodes int) ([]*v1.Node, error) {
 	nodes := make([]*v1.Node, numNodes)
 	for i := 0; i < numNodes; i++ {
@@ -154,6 +157,29 @@ func createNodes(cs clientset.Interface, prefix string, wrapper *st.NodeWrapper,
 		nodes[i] = node
 	}
 	return nodes[:], nil
+}
+
+// createAndWaitForNodesInCache calls createNodes(), and wait for the created
+// nodes to be present in scheduler cache.
+func createAndWaitForNodesInCache(testCtx *testutils.TestContext, prefix string, wrapper *st.NodeWrapper, numNodes int) ([]*v1.Node, error) {
+	existingNodes := testCtx.Scheduler.SchedulerCache.NodeCount()
+	nodes, err := createNodes(testCtx.ClientSet, prefix, wrapper, numNodes)
+	if err != nil {
+		return nodes, fmt.Errorf("cannot create nodes: %v", err)
+	}
+	return nodes, waitForNodesInCache(testCtx.Scheduler, numNodes+existingNodes)
+}
+
+// waitForNodesInCache ensures at least <nodeCount> nodes are present in scheduler cache
+// within 30 seconds; otherwise returns false.
+func waitForNodesInCache(sched *scheduler.Scheduler, nodeCount int) error {
+	err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		return sched.SchedulerCache.NodeCount() >= nodeCount, nil
+	})
+	if err != nil {
+		return fmt.Errorf("cannot obtain available nodes in scheduler cache: %v", err)
+	}
+	return nil
 }
 
 type pausePodConfig struct {
@@ -237,13 +263,13 @@ func createPausePodWithResource(cs clientset.Interface, podName string,
 func runPausePod(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
 	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("Error creating pause pod: %v", err)
+		return nil, fmt.Errorf("failed to create pause pod: %v", err)
 	}
 	if err = testutils.WaitForPodToSchedule(cs, pod); err != nil {
 		return pod, fmt.Errorf("Pod %v/%v didn't schedule successfully. Error: %v", pod.Namespace, pod.Name, err)
 	}
 	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{}); err != nil {
-		return pod, fmt.Errorf("Error getting pod %v/%v info: %v", pod.Namespace, pod.Name, err)
+		return pod, fmt.Errorf("failed to get pod %v/%v info: %v", pod.Namespace, pod.Name, err)
 	}
 	return pod, nil
 }
@@ -274,13 +300,13 @@ func initPodWithContainers(cs clientset.Interface, conf *podWithContainersConfig
 func runPodWithContainers(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
 	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("Error creating pod-with-containers: %v", err)
+		return nil, fmt.Errorf("failed to create pod-with-containers: %v", err)
 	}
 	if err = testutils.WaitForPodToSchedule(cs, pod); err != nil {
 		return pod, fmt.Errorf("Pod %v didn't schedule successfully. Error: %v", pod.Name, err)
 	}
 	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{}); err != nil {
-		return pod, fmt.Errorf("Error getting pod %v info: %v", pod.Name, err)
+		return pod, fmt.Errorf("failed to get pod %v info: %v", pod.Name, err)
 	}
 	return pod, nil
 }

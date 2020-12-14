@@ -34,10 +34,10 @@ import (
 
 const (
 	nodesHealthCheckPath = "/healthz"
-	// NOTE: Please keep the following port in sync with ProxyHealthzPort in pkg/master/ports/ports.go
+	// NOTE: Please keep the following port in sync with ProxyHealthzPort in pkg/cluster/ports/ports.go
 	// ports.ProxyHealthzPort was not used here to avoid dependencies to k8s.io/kubernetes in the
 	// GCE cloud provider which is required as part of the out-of-tree cloud provider efforts.
-	// TODO: use a shared constant once ports in pkg/master/ports are in a common external repo.
+	// TODO: use a shared constant once ports in pkg/cluster/ports are in a common external repo.
 	lbNodesHealthCheckPort = 10256
 )
 

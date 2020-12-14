@@ -23,7 +23,7 @@ go_library(
         "//pkg/scheduler/util:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/node/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/node/v1:go_default_library",
         "//staging/src/k8s.io/api/scheduling/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -58,11 +58,11 @@ go_library(
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
+        "//vendor/github.com/google/uuid:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
-        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 

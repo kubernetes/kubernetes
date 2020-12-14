@@ -40,6 +40,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -166,6 +167,8 @@ func NewKubeGenericRuntimeManager(
 	serializeImagePulls bool,
 	imagePullQPS float32,
 	imagePullBurst int,
+	imageCredentialProviderConfigFile string,
+	imageCredentialProviderBinDir string,
 	cpuCFSQuota bool,
 	cpuCFSQuotaPeriod metav1.Duration,
 	runtimeService internalapi.RuntimeService,
@@ -187,7 +190,6 @@ func NewKubeGenericRuntimeManager(
 		runtimeHelper:       runtimeHelper,
 		runtimeService:      newInstrumentedRuntimeService(runtimeService),
 		imageService:        newInstrumentedImageManagerService(imageService),
-		keyring:             credentialprovider.NewDockerKeyring(),
 		internalLifecycle:   internalLifecycle,
 		legacyLogProvider:   legacyLogProvider,
 		logManager:          logManager,
@@ -224,6 +226,18 @@ func NewKubeGenericRuntimeManager(
 			klog.Errorf("Failed to create directory %q: %v", podLogsRootDirectory, err)
 		}
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletCredentialProviders) && (imageCredentialProviderConfigFile != "" || imageCredentialProviderBinDir != "") {
+		klog.Warningf("Flags --image-credential-provider-config or --image-credential-provider-bin-dir were set but the feature gate %s was disabled, these flags will be ignored",
+			features.KubeletCredentialProviders)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletCredentialProviders) && (imageCredentialProviderConfigFile != "" || imageCredentialProviderBinDir != "") {
+		if err := plugin.RegisterCredentialProviderPlugins(imageCredentialProviderConfigFile, imageCredentialProviderBinDir); err != nil {
+			klog.Fatalf("Failed to register CRI auth plugins: %v", err)
+		}
+	}
+	kubeRuntimeManager.keyring = credentialprovider.NewDockerKeyring()
 
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
@@ -505,19 +519,30 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 			changes.CreateSandbox = false
 			return changes
 		}
+
+		// Get the containers to start, excluding the ones that succeeded if RestartPolicy is OnFailure.
+		var containersToStart []int
+		for idx, c := range pod.Spec.Containers {
+			if pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure && containerSucceeded(&c, podStatus) {
+				continue
+			}
+			containersToStart = append(containersToStart, idx)
+		}
+		// We should not create a sandbox for a Pod if initialization is done and there is no container to start.
+		if len(containersToStart) == 0 {
+			_, _, done := findNextInitContainerToRun(pod, podStatus)
+			if done {
+				changes.CreateSandbox = false
+				return changes
+			}
+		}
+
 		if len(pod.Spec.InitContainers) != 0 {
 			// Pod has init containers, return the first one.
 			changes.NextInitContainerToStart = &pod.Spec.InitContainers[0]
 			return changes
 		}
-		// Start all containers by default but exclude the ones that succeeded if
-		// RestartPolicy is OnFailure.
-		for idx, c := range pod.Spec.Containers {
-			if containerSucceeded(&c, podStatus) && pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure {
-				continue
-			}
-			changes.ContainersToStart = append(changes.ContainersToStart, idx)
-		}
+		changes.ContainersToStart = containersToStart
 		return changes
 	}
 
@@ -578,7 +603,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		// need to restart it.
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
 			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
-				message := fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
+				message := fmt.Sprintf("Container %q of pod %q is not in the desired state and shall be started", container.Name, format.Pod(pod))
 				klog.V(3).Infof(message)
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {

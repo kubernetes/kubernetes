@@ -13,8 +13,8 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/user"
 
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
 type fakeTestAuthorizer struct {

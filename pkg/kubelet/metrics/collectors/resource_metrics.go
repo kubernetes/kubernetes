@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
-	summary "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	summary "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 )
 
@@ -54,7 +54,21 @@ var (
 		metrics.ALPHA,
 		"")
 
-	resouceScrapeResultDesc = metrics.NewDesc("scrape_error",
+	podCPUUsageDesc = metrics.NewDesc("pod_cpu_usage_seconds_total",
+		"Cumulative cpu time consumed by the pod in core-seconds",
+		[]string{"pod", "namespace"},
+		nil,
+		metrics.ALPHA,
+		"")
+
+	podMemoryUsageDesc = metrics.NewDesc("pod_memory_working_set_bytes",
+		"Current working set of the pod in bytes",
+		[]string{"pod", "namespace"},
+		nil,
+		metrics.ALPHA,
+		"")
+
+	resourceScrapeResultDesc = metrics.NewDesc("scrape_error",
 		"1 if there was an error while getting container metrics, 0 otherwise",
 		nil,
 		nil,
@@ -84,7 +98,9 @@ func (rc *resourceMetricsCollector) DescribeWithStability(ch chan<- *metrics.Des
 	ch <- nodeMemoryUsageDesc
 	ch <- containerCPUUsageDesc
 	ch <- containerMemoryUsageDesc
-	ch <- resouceScrapeResultDesc
+	ch <- podCPUUsageDesc
+	ch <- podMemoryUsageDesc
+	ch <- resourceScrapeResultDesc
 }
 
 // CollectWithStability implements metrics.StableCollector
@@ -94,7 +110,7 @@ func (rc *resourceMetricsCollector) DescribeWithStability(ch chan<- *metrics.Des
 func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
 	var errorCount float64
 	defer func() {
-		ch <- metrics.NewLazyConstMetric(resouceScrapeResultDesc, metrics.GaugeValue, errorCount)
+		ch <- metrics.NewLazyConstMetric(resourceScrapeResultDesc, metrics.GaugeValue, errorCount)
 	}()
 	statsSummary, err := rc.provider.GetCPUAndMemoryStats()
 	if err != nil {
@@ -111,6 +127,8 @@ func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metri
 			rc.collectContainerCPUMetrics(ch, pod, container)
 			rc.collectContainerMemoryMetrics(ch, pod, container)
 		}
+		rc.collectPodCPUMetrics(ch, pod)
+		rc.collectPodMemoryMetrics(ch, pod)
 	}
 }
 
@@ -150,4 +168,24 @@ func (rc *resourceMetricsCollector) collectContainerMemoryMetrics(ch chan<- metr
 	ch <- metrics.NewLazyMetricWithTimestamp(s.Memory.Time.Time,
 		metrics.NewLazyConstMetric(containerMemoryUsageDesc, metrics.GaugeValue,
 			float64(*s.Memory.WorkingSetBytes), s.Name, pod.PodRef.Name, pod.PodRef.Namespace))
+}
+
+func (rc *resourceMetricsCollector) collectPodCPUMetrics(ch chan<- metrics.Metric, pod summary.PodStats) {
+	if pod.CPU == nil {
+		return
+	}
+
+	ch <- metrics.NewLazyMetricWithTimestamp(pod.CPU.Time.Time,
+		metrics.NewLazyConstMetric(podCPUUsageDesc, metrics.CounterValue,
+			float64(*pod.CPU.UsageCoreNanoSeconds)/float64(time.Second), pod.PodRef.Name, pod.PodRef.Namespace))
+}
+
+func (rc *resourceMetricsCollector) collectPodMemoryMetrics(ch chan<- metrics.Metric, pod summary.PodStats) {
+	if pod.Memory == nil {
+		return
+	}
+
+	ch <- metrics.NewLazyMetricWithTimestamp(pod.Memory.Time.Time,
+		metrics.NewLazyConstMetric(podMemoryUsageDesc, metrics.GaugeValue,
+			float64(*pod.Memory.WorkingSetBytes), pod.PodRef.Name, pod.PodRef.Namespace))
 }

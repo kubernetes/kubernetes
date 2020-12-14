@@ -48,7 +48,6 @@ import (
 )
 
 var (
-	trEnabledFeature           = featuregate.NewFeatureGate()
 	csiNodeInfoEnabledFeature  = featuregate.NewFeatureGate()
 	csiNodeInfoDisabledFeature = featuregate.NewFeatureGate()
 )
@@ -56,15 +55,12 @@ var (
 func init() {
 	// all features need to be set on all featuregates for the tests.  We set everything and then then the if's below override it.
 	relevantFeatures := map[featuregate.Feature]featuregate.FeatureSpec{
-		features.TokenRequest:            {Default: false},
 		features.CSINodeInfo:             {Default: false},
 		features.ExpandPersistentVolumes: {Default: false},
 	}
-	utilruntime.Must(trEnabledFeature.Add(relevantFeatures))
 	utilruntime.Must(csiNodeInfoEnabledFeature.Add(relevantFeatures))
 	utilruntime.Must(csiNodeInfoDisabledFeature.Add(relevantFeatures))
 
-	utilruntime.Must(trEnabledFeature.SetFromMap(map[string]bool{string(features.TokenRequest): true}))
 	utilruntime.Must(csiNodeInfoEnabledFeature.SetFromMap(map[string]bool{string(features.CSINodeInfo): true}))
 }
 
@@ -920,7 +916,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "forbid create of my node with forbidden labels",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(setForbiddenCreateLabels(mynodeObj, ""), nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
+			attributes: admission.NewAttributesRecord(setForbiddenCreateLabels(mynodeObj, ""), nil, nodeKind, mynodeObj.Namespace, "mynode", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        `is not allowed to set the following labels: foo.node-restriction.kubernetes.io/foo, node-restriction.kubernetes.io/foo, other.k8s.io/foo, other.kubernetes.io/foo`,
 		},
 		{
@@ -1086,35 +1082,30 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "forbid create of unbound token",
 			podsGetter: noExistingPods,
-			features:   trEnabledFeature,
 			attributes: admission.NewAttributesRecord(makeTokenRequest("", ""), nil, tokenrequestKind, "ns", "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "not bound to a pod",
 		},
 		{
 			name:       "forbid create of token bound to nonexistant pod",
 			podsGetter: noExistingPods,
-			features:   trEnabledFeature,
 			attributes: admission.NewAttributesRecord(makeTokenRequest("nopod", "someuid"), nil, tokenrequestKind, "ns", "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "not found",
 		},
 		{
 			name:       "forbid create of token bound to pod without uid",
 			podsGetter: existingPods,
-			features:   trEnabledFeature,
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypod.Name, ""), nil, tokenrequestKind, "ns", "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "pod binding without a uid",
 		},
 		{
 			name:       "forbid create of token bound to pod scheduled on another node",
 			podsGetter: existingPods,
-			features:   trEnabledFeature,
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coreotherpod.Name, coreotherpod.UID), nil, tokenrequestKind, coreotherpod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "pod scheduled on a different node",
 		},
 		{
 			name:       "allow create of token bound to pod scheduled this node",
 			podsGetter: existingPods,
-			features:   trEnabledFeature,
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypod.Name, coremypod.UID), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
 		},
 
@@ -1314,8 +1305,9 @@ func Test_nodePlugin_Admit_OwnerReference(t *testing.T) {
 		expectErr   string
 	}{
 		{
-			name:   "no owner",
-			owners: nil,
+			name:      "no owner",
+			owners:    nil,
+			expectErr: "pods \"test\" is forbidden: node \"mynode\" can only create pods with an owner reference set to itself",
 		},
 		{
 			name:   "valid owner",

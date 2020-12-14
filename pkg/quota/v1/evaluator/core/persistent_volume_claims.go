@@ -25,13 +25,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	quota "k8s.io/apiserver/pkg/quota/v1"
+	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	k8sfeatures "k8s.io/kubernetes/pkg/features"
-	quota "k8s.io/kubernetes/pkg/quota/v1"
-	"k8s.io/kubernetes/pkg/quota/v1/generic"
 )
 
 // the name used for object count quota
@@ -130,7 +130,7 @@ func (p *pvcEvaluator) MatchingResources(items []corev1.ResourceName) []corev1.R
 			result = append(result, item)
 			continue
 		}
-		// match pvc resources scoped by storage class (<storage-class-name>.storage-class.kubernetes.io/<resource>)
+		// match pvc resources scoped by storage class (<storage-class-name>.storageclass.storage.k8s.io/<resource>)
 		for _, resource := range pvcResources {
 			byStorageClass := storageClassSuffix + string(resource)
 			if strings.HasSuffix(string(item), byStorageClass) {
@@ -161,6 +161,13 @@ func (p *pvcEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 
 	// charge for storage
 	if request, found := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; found {
+		roundedRequest := request.DeepCopy()
+		if !roundedRequest.RoundUp(0) {
+			// Ensure storage requests are counted as whole byte values, to pass resourcequota validation.
+			// See http://issue.k8s.io/94313
+			request = roundedRequest
+		}
+
 		result[corev1.ResourceRequestsStorage] = request
 		// charge usage to the storage class (if present)
 		if len(storageClassRef) > 0 {

@@ -99,7 +99,12 @@ var _ = SIGDescribe("ReplicationController", func() {
 		testRCReleaseControlledNotMatching(f)
 	})
 
-	ginkgo.It("[Flaky] should test the lifecycle of a ReplicationController", func() {
+	/*
+		Release: v1.20
+		Testname: Replication Controller, lifecycle
+		Description: A Replication Controller (RC) is created, read, patched, and deleted with verification.
+	*/
+	framework.ConformanceIt("should test the lifecycle of a ReplicationController", func() {
 		testRcName := "rc-test"
 		testRcNamespace := ns
 		testRcInitialReplicaCount := int32(1)
@@ -130,7 +135,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 					Spec: v1.PodSpec{
 						Containers: []v1.Container{{
 							Name:  testRcName,
-							Image: "nginx",
+							Image: imageutils.GetE2EImage(imageutils.Nginx),
 						}},
 					},
 				},
@@ -145,9 +150,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 			ginkgo.By("waiting for RC to be added")
 			eventFound := false
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
-			_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+			_, err = watchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 				if watchEvent.Type != watch.Added {
 					return false, nil
 				}
@@ -160,9 +165,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 			ginkgo.By("waiting for available Replicas")
 			eventFound = false
-			ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), 120*time.Second)
 			defer cancel()
-			_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+			_, err = watchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 				var rc *v1.ReplicationController
 				rcBytes, err := json.Marshal(watchEvent.Object)
 				if err != nil {
@@ -194,9 +199,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 			framework.ExpectEqual(testRcPatched.ObjectMeta.Labels["test-rc"], "patched", "failed to patch RC")
 			ginkgo.By("waiting for RC to be modified")
 			eventFound = false
-			ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
-			_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+			_, err = watchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 				if watchEvent.Type != watch.Modified {
 					return false, nil
 				}
@@ -222,9 +227,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 			framework.ExpectEqual(rcStatus.Status.ReadyReplicas, int32(0), "ReplicationControllerStatus's readyReplicas does not equal 0")
 			ginkgo.By("waiting for RC to be modified")
 			eventFound = false
-			ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
-			_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+			_, err = watchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 				if watchEvent.Type != watch.Modified {
 					return false, nil
 				}
@@ -236,7 +241,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
 
 			ginkgo.By("waiting for available Replicas")
-			_, err = framework.WatchUntilWithoutRetry(context.TODO(), retryWatcher, func(watchEvent watch.Event) (bool, error) {
+			_, err = watchUntilWithoutRetry(context.TODO(), retryWatcher, func(watchEvent watch.Event) (bool, error) {
 				var rc *v1.ReplicationController
 				rcBytes, err := json.Marshal(watchEvent.Object)
 				if err != nil {
@@ -276,9 +281,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 			framework.ExpectNoError(err, "Failed to patch ReplicationControllerScale")
 			ginkgo.By("waiting for RC to be modified")
 			eventFound = false
-			ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
-			_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+			_, err = watchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 				if watchEvent.Type != watch.Modified {
 					return false, nil
 				}
@@ -291,7 +296,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 			ginkgo.By("waiting for ReplicationController's scale to be the max amount")
 			eventFound = false
-			_, err = framework.WatchUntilWithoutRetry(context.TODO(), retryWatcher, func(watchEvent watch.Event) (bool, error) {
+			_, err = watchUntilWithoutRetry(context.TODO(), retryWatcher, func(watchEvent watch.Event) (bool, error) {
 				var rc *v1.ReplicationController
 				rcBytes, err := json.Marshal(watchEvent.Object)
 				if err != nil {
@@ -327,9 +332,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 			ginkgo.By("waiting for RC to be modified")
 			eventFound = false
-			ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
-			_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+			_, err = watchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 				if watchEvent.Type != watch.Modified {
 					return false, nil
 				}
@@ -364,9 +369,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 			ginkgo.By("waiting for ReplicationController to have a DELETED watchEvent")
 			eventFound = false
-			ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
-			_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+			_, err = watchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 				if watchEvent.Type != watch.Deleted {
 					return false, nil
 				}
@@ -675,4 +680,51 @@ func updateReplicationControllerWithRetries(c clientset.Interface, namespace, na
 		pollErr = fmt.Errorf("couldn't apply the provided updated to rc %q: %v", name, updateErr)
 	}
 	return rc, pollErr
+}
+
+// watchUntilWithoutRetry ...
+// reads items from the watch until each provided condition succeeds, and then returns the last watch
+// encountered. The first condition that returns an error terminates the watch (and the event is also returned).
+// If no event has been received, the returned event will be nil.
+// Conditions are satisfied sequentially so as to provide a useful primitive for higher level composition.
+// Waits until context deadline or until context is canceled.
+//
+// the same as watchtools.UntilWithoutRetry, just without the closing of the watch - as for the purpose of being paired with WatchEventSequenceVerifier, the watch is needed for continual watch event collection
+func watchUntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions ...watchtools.ConditionFunc) (*watch.Event, error) {
+	ch := watcher.ResultChan()
+	var lastEvent *watch.Event
+	for _, condition := range conditions {
+		// check the next condition against the previous event and short circuit waiting for the next watch
+		if lastEvent != nil {
+			done, err := condition(*lastEvent)
+			if err != nil {
+				return lastEvent, err
+			}
+			if done {
+				continue
+			}
+		}
+	ConditionSucceeded:
+		for {
+			select {
+			case event, ok := <-ch:
+				if !ok {
+					return lastEvent, watchtools.ErrWatchClosed
+				}
+				lastEvent = &event
+
+				done, err := condition(event)
+				if err != nil {
+					return lastEvent, err
+				}
+				if done {
+					break ConditionSucceeded
+				}
+
+			case <-ctx.Done():
+				return lastEvent, wait.ErrWaitTimeout
+			}
+		}
+	}
+	return lastEvent, nil
 }

@@ -8,11 +8,16 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["exec.go"],
+    srcs = [
+        "errors.go",
+        "exec.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/probe/exec",
     deps = [
+        "//pkg/features:go_default_library",
         "//pkg/kubelet/util/ioutils:go_default_library",
         "//pkg/probe:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],

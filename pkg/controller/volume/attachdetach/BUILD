@@ -19,6 +19,7 @@ go_library(
         "//pkg/controller/volume/attachdetach/util:go_default_library",
         "//pkg/controller/volume/common:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/proxy/util:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/csimigration:go_default_library",
         "//pkg/volume/util:go_default_library",
@@ -45,9 +46,9 @@ go_library(
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib:go_default_library",
+        "//staging/src/k8s.io/mount-utils:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
-        "//vendor/k8s.io/utils/mount:go_default_library",
     ],
 )
 

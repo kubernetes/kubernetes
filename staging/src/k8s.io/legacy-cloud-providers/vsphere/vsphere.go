@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
 	"net"
 	"net/url"
 	"os"
@@ -48,6 +49,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
 	nodehelpers "k8s.io/cloud-provider/node/helpers"
+	volerr "k8s.io/cloud-provider/volume/errors"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog/v2"
 
@@ -95,6 +97,7 @@ type VSphere struct {
 	hostName string
 	// Maps the VSphere IP address to VSphereInstance
 	vsphereInstanceMap map[string]*VSphereInstance
+	vsphereVolumeMap   *VsphereVolumeMap
 	// Responsible for managing discovery of k8s node, their location etc.
 	nodeManager          *NodeManager
 	vmUUID               string
@@ -113,7 +116,7 @@ type VirtualCenterConfig struct {
 	// vCenter username.
 	User string `gcfg:"user"`
 	// vCenter password in clear text.
-	Password string `gcfg:"password"`
+	Password string `gcfg:"password" datapolicy:"password"`
 	// vCenter port.
 	VCenterPort string `gcfg:"port"`
 	// Datacenter in which VMs are located.
@@ -137,7 +140,7 @@ type VSphereConfig struct {
 		// vCenter username.
 		User string `gcfg:"user"`
 		// vCenter password in clear text.
-		Password string `gcfg:"password"`
+		Password string `gcfg:"password" datapolicy:"password"`
 		// Deprecated. Use VirtualCenter to specify multiple vCenter Servers.
 		// vCenter IP.
 		VCenterIP string `gcfg:"server"`
@@ -542,6 +545,7 @@ func buildVSphereFromConfig(cfg VSphereConfig) (*VSphere, error) {
 			nodeInfoMap:        make(map[string]*NodeInfo),
 			registeredNodes:    make(map[string]*v1.Node),
 		},
+		vsphereVolumeMap:     NewVsphereVolumeMap(),
 		isSecretInfoProvided: isSecretInfoProvided,
 		isSecretManaged:      !cfg.Global.SecretNotManaged,
 		cfg:                  &cfg,
@@ -762,11 +766,14 @@ func (vs *VSphere) InstanceExistsByProviderID(ctx context.Context, providerID st
 		return false, err
 	}
 	_, err = vs.InstanceID(ctx, convertToK8sType(nodeName))
-	if err == nil {
-		return true, nil
+	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			return false, nil
+		}
+		return false, err
 	}
 
-	return false, err
+	return true, nil
 }
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
@@ -828,15 +835,17 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 			klog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
 			return "", err
 		}
-		isActive, err := vm.IsActive(ctx)
+
+		exists, err := vm.Exists(ctx)
 		if err != nil {
-			klog.Errorf("Failed to check whether node %q is active. err: %+v.", convertToString(nodeName), err)
+			klog.Errorf("Failed to check whether node %q still exists. err: %+v.", convertToString(nodeName), err)
 			return "", err
 		}
-		if isActive {
+		if exists {
 			return vs.vmUUID, nil
 		}
-		klog.Warningf("The VM: %s is not in %s state", convertToString(nodeName), vclib.ActivePowerState)
+
+		klog.Warningf("The VM: %s doesn't exist", convertToString(nodeName))
 		return "", cloudprovider.InstanceNotFound
 	}
 
@@ -951,6 +960,20 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyName string, nodeN
 		}
 	}
 	klog.V(4).Infof("AttachDisk executed for node %s and volume %s with diskUUID %s. Err: %s", convertToString(nodeName), vmDiskPath, diskUUID, err)
+	if err != nil {
+		// if attach failed, we should check if disk is attached somewhere else. This can happen for several reasons
+		// and throwing a dangling volume error here will allow attach-detach controller to detach disk from a node
+		// where it is not needed.
+		existingNode, ok := vs.vsphereVolumeMap.CheckForVolume(vmDiskPath)
+		if ok {
+			attached, newVolumePath, diskAttachedError := vs.DiskIsAttached(vmDiskPath, existingNode)
+			// if disk is attached somewhere else then we can throw a dangling error
+			if diskAttachedError == nil && attached && (nodeName != existingNode) {
+				klog.V(3).Infof("found dangling volume %s to node %s", vmDiskPath, existingNode)
+				return "", volerr.NewDanglingError(err.Error(), existingNode, newVolumePath)
+			}
+		}
+	}
 	vclib.RecordvSphereMetric(vclib.OperationAttachVolume, requestTime, err)
 	return diskUUID, err
 }
@@ -1084,6 +1107,7 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 // 5b. If VMs are removed from vSphere inventory they are ignored.
 func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) (map[k8stypes.NodeName]map[string]bool, error) {
 	disksAreAttachedInternal := func(nodeVolumes map[k8stypes.NodeName][]string) (map[k8stypes.NodeName]map[string]bool, error) {
+		vs.vsphereVolumeMap.StartDiskVerification()
 
 		// disksAreAttach checks whether disks are attached to the nodes.
 		// Returns nodes that need to be retried if retry is true
@@ -1195,7 +1219,10 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 			for nodeName, volPaths := range attached {
 				disksAttached[convertToK8sType(nodeName)] = volPaths
 			}
+
 		}
+		// any volume which we could not verify will be removed from the map.
+		vs.vsphereVolumeMap.RemoveUnverified()
 		klog.V(4).Infof("DisksAreAttach successfully executed. result: %+v", attached)
 		return disksAttached, nil
 	}
@@ -1735,8 +1762,8 @@ func (vs *VSphere) GetVolumeLabels(volumePath string) (map[string]string, error)
 	// FIXME: For now, pick the first zone of datastore as the zone of volume
 	labels := make(map[string]string)
 	if len(dsZones) > 0 {
-		labels[v1.LabelZoneRegion] = dsZones[0].Region
-		labels[v1.LabelZoneFailureDomain] = dsZones[0].FailureDomain
+		labels[v1.LabelFailureDomainBetaRegion] = dsZones[0].Region
+		labels[v1.LabelFailureDomainBetaZone] = dsZones[0].FailureDomain
 	}
 	return labels, nil
 }

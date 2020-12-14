@@ -75,10 +75,18 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	}
 	allErrs = append(allErrs, validateHostPort(config.MetricsBindAddress, newPath.Child("MetricsBindAddress"))...)
 
+	dualStackEnabled := effectiveFeatures.Enabled(kubefeatures.IPv6DualStack)
+	endpointSliceEnabled := effectiveFeatures.Enabled(kubefeatures.EndpointSlice)
+
+	// dual stack has strong dependency on endpoint slice since
+	// endpoint slice controller is the only capabable of producing
+	// slices for *all* clusterIPs
+	if dualStackEnabled && !endpointSliceEnabled {
+		allErrs = append(allErrs, field.Invalid(newPath.Child("FeatureGates"), config.FeatureGates, "EndpointSlice feature flag must be turned on when turning on DualStack"))
+	}
+
 	if config.ClusterCIDR != "" {
 		cidrs := strings.Split(config.ClusterCIDR, ",")
-		dualStackEnabled := effectiveFeatures.Enabled(kubefeatures.IPv6DualStack)
-
 		switch {
 		// if DualStack only valid one cidr or two cidrs with one of each IP family
 		case dualStackEnabled && len(cidrs) > 2:
@@ -276,8 +284,7 @@ func validateKubeProxyNodePortAddress(nodePortAddresses []string, fldPath *field
 
 	for i := range nodePortAddresses {
 		if _, _, err := net.ParseCIDR(nodePortAddresses[i]); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, nodePortAddresses, "must be a valid IP block"))
-			break
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), nodePortAddresses[i], "must be a valid CIDR"))
 		}
 	}
 
@@ -307,7 +314,7 @@ func validateIPVSExcludeCIDRs(excludeCIDRs []string, fldPath *field.Path) field.
 
 	for i := range excludeCIDRs {
 		if _, _, err := net.ParseCIDR(excludeCIDRs[i]); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, excludeCIDRs, "must be a valid IP block"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), excludeCIDRs[i], "must be a valid CIDR"))
 		}
 	}
 	return allErrs

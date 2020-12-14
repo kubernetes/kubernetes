@@ -65,12 +65,12 @@ type Config struct {
 
 	// Server requires Basic authentication
 	Username string
-	Password string
+	Password string `datapolicy:"password"`
 
 	// Server requires Bearer authentication. This client will not attempt to use
 	// refresh tokens for an OAuth2 flow.
 	// TODO: demonstrate an OAuth2 compatible client.
-	BearerToken string
+	BearerToken string `datapolicy:"token"`
 
 	// Path to a file containing a BearerToken.
 	// If set, the contents are periodically read.
@@ -125,6 +125,7 @@ type Config struct {
 
 	// WarningHandler handles warnings in server responses.
 	// If not set, the default warning handler is used.
+	// See documentation for SetDefaultWarningHandler() for details.
 	WarningHandler WarningHandler
 
 	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
@@ -133,7 +134,7 @@ type Config struct {
 	// Dial specifies the dial function for creating unencrypted TCP connections.
 	Dial func(ctx context.Context, network, address string) (net.Conn, error)
 
-	// Proxy is the the proxy func to be used for all requests made by this
+	// Proxy is the proxy func to be used for all requests made by this
 	// transport. If Proxy is nil, http.ProxyFromEnvironment is used. If Proxy
 	// returns a nil *URL, no proxy is used.
 	//
@@ -159,6 +160,15 @@ func (sanitizedAuthConfigPersister) String() string {
 	return "rest.AuthProviderConfigPersister(--- REDACTED ---)"
 }
 
+type sanitizedObject struct{ runtime.Object }
+
+func (sanitizedObject) GoString() string {
+	return "runtime.Object(--- REDACTED ---)"
+}
+func (sanitizedObject) String() string {
+	return "runtime.Object(--- REDACTED ---)"
+}
+
 // GoString implements fmt.GoStringer and sanitizes sensitive fields of Config
 // to prevent accidental leaking via logs.
 func (c *Config) GoString() string {
@@ -182,7 +192,9 @@ func (c *Config) String() string {
 	if cc.AuthConfigPersister != nil {
 		cc.AuthConfigPersister = sanitizedAuthConfigPersister{cc.AuthConfigPersister}
 	}
-
+	if cc.ExecProvider != nil && cc.ExecProvider.Config != nil {
+		cc.ExecProvider.Config = sanitizedObject{Object: cc.ExecProvider.Config}
+	}
 	return fmt.Sprintf("%#v", cc)
 }
 
@@ -203,7 +215,7 @@ type TLSClientConfig struct {
 	// Server should be accessed without verifying the TLS certificate. For testing only.
 	Insecure bool
 	// ServerName is passed to the server for SNI and is used in the client to check server
-	// ceritificates against. If ServerName is empty, the hostname used to contact the
+	// certificates against. If ServerName is empty, the hostname used to contact the
 	// server is used.
 	ServerName string
 
@@ -219,7 +231,7 @@ type TLSClientConfig struct {
 	CertData []byte
 	// KeyData holds PEM-encoded bytes (typically read from a client certificate key file).
 	// KeyData takes precedence over KeyFile
-	KeyData []byte
+	KeyData []byte `datapolicy:"security-key"`
 	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
 	// CAData takes precedence over CAFile
 	CAData []byte
@@ -587,7 +599,7 @@ func AnonymousClientConfig(config *Config) *Config {
 
 // CopyConfig returns a copy of the given config
 func CopyConfig(config *Config) *Config {
-	return &Config{
+	c := &Config{
 		Host:            config.Host,
 		APIPath:         config.APIPath,
 		ContentConfig:   config.ContentConfig,
@@ -626,4 +638,8 @@ func CopyConfig(config *Config) *Config {
 		Dial:               config.Dial,
 		Proxy:              config.Proxy,
 	}
+	if config.ExecProvider != nil && config.ExecProvider.Config != nil {
+		c.ExecProvider.Config = config.ExecProvider.Config.DeepCopyObject()
+	}
+	return c
 }

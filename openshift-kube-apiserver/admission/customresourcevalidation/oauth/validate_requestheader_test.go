@@ -57,7 +57,7 @@ func TestValidateRequestHeaderIdentityProvider(t *testing.T) {
 			want: field.ErrorList{
 				field.Required(field.NewPath("ca", "name"), ""),
 				field.Required(field.NewPath("headers"), ""),
-				{Type: field.ErrorTypeRequired, Field: "", BadValue: "", Detail: "at least one of challengeURL or loginURL must be specified"},
+				{Type: field.ErrorTypeRequired, Field: "<nil>", BadValue: "", Detail: "at least one of challengeURL or loginURL must be specified"},
 			},
 		},
 		{

@@ -53,7 +53,7 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(pod *v1.Pod, attempt uint32
 	}
 
 	runtimeHandler := ""
-	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && m.runtimeClassManager != nil {
+	if m.runtimeClassManager != nil {
 		runtimeHandler, err = m.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
 		if err != nil {
 			message := fmt.Sprintf("CreatePodSandbox for pod %q failed: %v", format.Pod(pod), err)
@@ -154,9 +154,14 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
 			Privileged: kubecontainer.HasPrivilegedContainer(pod),
 
+			// TODO: Deprecated, remove after we switch to Seccomp field
 			// Forcing sandbox to run as `runtime/default` allow users to
 			// use least privileged seccomp profiles at pod level. Issue #84623
 			SeccompProfilePath: v1.SeccompProfileRuntimeDefault,
+
+			Seccomp: &runtimeapi.SecurityProfile{
+				ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+			},
 		},
 	}
 
@@ -307,4 +312,16 @@ func (m *kubeGenericRuntimeManager) GetPortForward(podName, podNamespace string,
 		return nil, err
 	}
 	return url.Parse(resp.Url)
+}
+
+// DeleteSandbox removes the sandbox by sandboxID.
+func (m *kubeGenericRuntimeManager) DeleteSandbox(sandboxID string) error {
+	klog.V(4).Infof("Removing sandbox %q", sandboxID)
+	// stop sandbox is called as part of kill pod function but the error is ignored. So,
+	// we have to call stop sandbox again to make sure that all the resources like network
+	// are cleaned by runtime.
+	if err := m.runtimeService.StopPodSandbox(sandboxID); err != nil {
+		return err
+	}
+	return m.runtimeService.RemovePodSandbox(sandboxID)
 }

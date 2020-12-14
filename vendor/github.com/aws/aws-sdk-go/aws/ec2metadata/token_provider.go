@@ -46,7 +46,7 @@ func (t *tokenProvider) fetchTokenHandler(r *request.Request) {
 		return
 	}
 
-	output, err := t.client.getToken(t.configuredTTL)
+	output, err := t.client.getToken(r.Context(), t.configuredTTL)
 
 	if err != nil {
 
@@ -87,6 +87,7 @@ func (t *tokenProvider) enableTokenProviderHandler(r *request.Request) {
 	// If the error code status is 401, we enable the token provider
 	if e, ok := r.Error.(awserr.RequestFailure); ok && e != nil &&
 		e.StatusCode() == http.StatusUnauthorized {
+		t.token.Store(ec2Token{})
 		atomic.StoreUint32(&t.disabled, 0)
 	}
 }

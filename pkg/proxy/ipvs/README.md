@@ -334,28 +334,19 @@ export KUBE_PROXY_MODE=ipvs
 
 ### Cluster Created by Kubeadm
 
-If you are using kubeadm with a [configuration file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file), you have to add `mode: ipvs` and also add `SupportIPVSProxyMode: true` below the `kubeProxy` field as part of the kubeadm configuration.
+If you are using kubeadm with a [configuration file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file), you have to add `mode: ipvs` below the `kubeProxy` field as part of the kubeadm configuration.
 
 ```yaml
 ...
 kubeProxy:
   config:
-    featureGates:
-      SupportIPVSProxyMode: true
     mode: ipvs
 ...
 ```
-Note that in Kubernetes 1.11 and later, `SupportIPVSProxyMode` is set to `true` by default.
 
 before running
 
 `kube init --config <path_to_configuration_file>`
-
-If you are using Kubernetes v1.8, you can also add the flag `--feature-gates=SupportIPVSProxyMode=true` (deprecated since v1.9) in `kubeadm init` command
-
-```
-kubeadm init --feature-gates=SupportIPVSProxyMode=true
-```
 
 to specify the ipvs mode before deploying the cluster.
 
@@ -412,14 +403,10 @@ UDP  10.0.0.10:53 rr
 
 Use the following check list to help you solve the problems:
 
-**1. Enable IPVS feature gateway**
-
-For Kubernetes v1.10 and later, feature gate `SupportIPVSProxyMode` is set to `true` by default. However, you need to enable `--feature-gates=SupportIPVSProxyMode=true` explicitly for Kubernetes before v1.10.
-
-**2. Specify proxy-mode=ipvs**
+**1. Specify proxy-mode=ipvs**
 
 Check whether the kube-proxy mode has been set to `ipvs`.
 
-**3. Install required kernel modules and packages**
+**2. Install required kernel modules and packages**
 
 Check whether the IPVS required kernel modules have been compiled into the kernel and packages installed. (see Prerequisite)

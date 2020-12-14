@@ -86,8 +86,8 @@ type Endpoint struct {
 	// hostname of this endpoint. This field may be used by consumers of
 	// endpoints to distinguish endpoints from each other (e.g. in DNS names).
 	// Multiple endpoints which use the same hostname should be considered
-	// fungible (e.g. multiple A values in DNS). Must pass DNS Label (RFC 1123)
-	// validation.
+	// fungible (e.g. multiple A values in DNS). Must be lowercase and pass
+	// DNS label (RFC 1123) validation.
 	// +optional
 	Hostname *string `json:"hostname,omitempty" protobuf:"bytes,3,opt,name=hostname"`
 	// targetRef is a reference to a Kubernetes object that represents this
@@ -106,8 +106,14 @@ type Endpoint struct {
 	//   endpoint is located. This should match the corresponding node label.
 	// * topology.kubernetes.io/region: the value indicates the region where the
 	//   endpoint is located. This should match the corresponding node label.
+	// This field is deprecated and will be removed in future api versions.
 	// +optional
 	Topology map[string]string `json:"topology,omitempty" protobuf:"bytes,5,opt,name=topology"`
+	// nodeName represents the name of the Node hosting this endpoint. This can
+	// be used to determine endpoints local to a Node. This field can be enabled
+	// with the EndpointSliceNodeName feature gate.
+	// +optional
+	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,6,opt,name=nodeName"`
 }
 
 // EndpointConditions represents the current condition of an endpoint.
@@ -115,9 +121,25 @@ type EndpointConditions struct {
 	// ready indicates that this endpoint is prepared to receive traffic,
 	// according to whatever system is managing the endpoint. A nil value
 	// indicates an unknown state. In most cases consumers should interpret this
-	// unknown state as ready.
+	// unknown state as ready. For compatibility reasons, ready should never be
+	// "true" for terminating endpoints.
 	// +optional
 	Ready *bool `json:"ready,omitempty" protobuf:"bytes,1,name=ready"`
+
+	// serving is identical to ready except that it is set regardless of the
+	// terminating state of endpoints. This condition should be set to true for
+	// a ready endpoint that is terminating. If nil, consumers should defer to
+	// the ready condition. This field can be enabled with the
+	// EndpointSliceTerminatingCondition feature gate.
+	// +optional
+	Serving *bool `json:"serving,omitempty" protobuf:"bytes,2,name=serving"`
+
+	// terminating indicates that this endpoint is terminating. A nil value
+	// indicates an unknown state. Consumers should interpret this unknown state
+	// to mean that the endpoint is not terminating. This field can be enabled
+	// with the EndpointSliceTerminatingCondition feature gate.
+	// +optional
+	Terminating *bool `json:"terminating,omitempty" protobuf:"bytes,3,name=terminating"`
 }
 
 // EndpointPort represents a Port used by an EndpointSlice

@@ -3,8 +3,8 @@ package admissionenablement
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
 	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
-	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
 
 	"github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy"
 	imagepolicyapiv1 "github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy/apis/imagepolicy/v1"

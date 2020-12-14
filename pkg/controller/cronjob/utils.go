@@ -25,9 +25,10 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
@@ -45,7 +46,9 @@ func deleteFromActiveList(cj *batchv1beta1.CronJob, uid types.UID) {
 	if cj == nil {
 		return
 	}
-	newActive := []v1.ObjectReference{}
+	// TODO: @alpatel the memory footprint can may be reduced here by
+	//  cj.Status.Active = append(cj.Status.Active[:indexToRemove], cj.Status.Active[indexToRemove:]...)
+	newActive := []corev1.ObjectReference{}
 	for _, j := range cj.Status.Active {
 		if j.UID != uid {
 			newActive = append(newActive, j)
@@ -147,6 +150,71 @@ func getRecentUnmetScheduleTimes(cj batchv1beta1.CronJob, now time.Time) ([]time
 	return starts, nil
 }
 
+// getUnmetScheduleTimes gets the slice of all the missed times from the time a job
+// last was scheduled to up `now`.
+//
+// If there are too many (>100) unstarted times, it will raise a warning and but still return
+// the list of missed times.
+func getUnmetScheduleTimes(cj batchv1beta1.CronJob, now time.Time, schedule cron.Schedule, recorder record.EventRecorder) []time.Time {
+	starts := []time.Time{}
+
+	var earliestTime time.Time
+	if cj.Status.LastScheduleTime != nil {
+		earliestTime = cj.Status.LastScheduleTime.Time
+	} else {
+		// If none found, then this is either a recently created cronJob,
+		// or the active/completed info was somehow lost (contract for status
+		// in kubernetes says it may need to be recreated), or that we have
+		// started a job, but have not noticed it yet (distributed systems can
+		// have arbitrary delays).  In any case, use the creation time of the
+		// CronJob as last known start time.
+		earliestTime = cj.ObjectMeta.CreationTimestamp.Time
+	}
+	if cj.Spec.StartingDeadlineSeconds != nil {
+		// Controller is not going to schedule anything below this point
+		schedulingDeadline := now.Add(-time.Second * time.Duration(*cj.Spec.StartingDeadlineSeconds))
+
+		if schedulingDeadline.After(earliestTime) {
+			earliestTime = schedulingDeadline
+		}
+	}
+	if earliestTime.After(now) {
+		return []time.Time{}
+	}
+
+	// t := schedule.Next(earliestTime)
+	// t1 := schedule.Next(t)
+	// delta := t1 - t
+	// missed := now - earliestTime/delta
+	// last missed = earliestTime + delta * (missed - 1)
+	// TODO: @alpatel, convert the following for loop into above logic and add test cases
+	for t := schedule.Next(earliestTime); !t.After(now); t = schedule.Next(t) {
+		starts = append(starts, t)
+	}
+	if len(starts) > 100 {
+		// An object might miss several starts. For example, if
+		// controller gets wedged on friday at 5:01pm when everyone has
+		// gone home, and someone comes in on tuesday AM and discovers
+		// the problem and restarts the controller, then all the hourly
+		// jobs, more than 80 of them for one hourly cronJob, should
+		// all start running with no further intervention (if the cronJob
+		// allows concurrency and late starts).
+		//
+		// However, if there is a bug somewhere, or incorrect clock
+		// on controller's server or apiservers (for setting creationTimestamp)
+		// then there could be so many missed start times (it could be off
+		// by decades or more), that it would eat up all the CPU and memory
+		// of this controller. In that case, we want to not try to list
+		// all the missed start times.
+		//
+		// I've somewhat arbitrarily picked 100, as more than 80,
+		// but less than "lots".
+		recorder.Eventf(&cj, corev1.EventTypeWarning, "TooManyMissedTimes", "too many missed start times: %d. Set or decrease .spec.startingDeadlineSeconds or check clock skew", len(starts))
+		klog.InfoS("too many missed times", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "missed times", len(starts))
+	}
+	return starts
+}
+
 // getJobFromTemplate makes a Job from a CronJob
 func getJobFromTemplate(cj *batchv1beta1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
 	labels := copyLabels(&cj.Spec.JobTemplate)
@@ -171,9 +239,35 @@ func getTimeHash(scheduledTime time.Time) int64 {
 	return scheduledTime.Unix()
 }
 
+// getJobFromTemplate2 makes a Job from a CronJob. It converts the unix time into minutes from
+// epoch time and concatenates that to the job name, because the cronjob_controller v2 has the lowest
+// granularity of 1 minute for scheduling job.
+func getJobFromTemplate2(cj *batchv1beta1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
+	labels := copyLabels(&cj.Spec.JobTemplate)
+	annotations := copyAnnotations(&cj.Spec.JobTemplate)
+	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
+	name := getJobName(cj, scheduledTime)
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:          labels,
+			Annotations:     annotations,
+			Name:            name,
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(cj, controllerKind)},
+		},
+	}
+	cj.Spec.JobTemplate.Spec.DeepCopyInto(&job.Spec)
+	return job, nil
+}
+
+// getTimeHash returns Unix Epoch Time in minutes
+func getTimeHashInMinutes(scheduledTime time.Time) int64 {
+	return scheduledTime.Unix() / 60
+}
+
 func getFinishedStatus(j *batchv1.Job) (bool, batchv1.JobConditionType) {
 	for _, c := range j.Status.Conditions {
-		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == v1.ConditionTrue {
+		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == corev1.ConditionTrue {
 			return true, c.Type
 		}
 	}
@@ -193,6 +287,25 @@ func (o byJobStartTime) Len() int      { return len(o) }
 func (o byJobStartTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
 func (o byJobStartTime) Less(i, j int) bool {
+	if o[i].Status.StartTime == nil && o[j].Status.StartTime != nil {
+		return false
+	}
+	if o[i].Status.StartTime != nil && o[j].Status.StartTime == nil {
+		return true
+	}
+	if o[i].Status.StartTime.Equal(o[j].Status.StartTime) {
+		return o[i].Name < o[j].Name
+	}
+	return o[i].Status.StartTime.Before(o[j].Status.StartTime)
+}
+
+// byJobStartTimeStar sorts a list of jobs by start timestamp, using their names as a tie breaker.
+type byJobStartTimeStar []*batchv1.Job
+
+func (o byJobStartTimeStar) Len() int      { return len(o) }
+func (o byJobStartTimeStar) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+
+func (o byJobStartTimeStar) Less(i, j int) bool {
 	if o[i].Status.StartTime == nil && o[j].Status.StartTime != nil {
 		return false
 	}

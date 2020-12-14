@@ -158,8 +158,10 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type, done func(*cache
 // second in a bucket, and pop up them once at the timeout. To be more specific,
 // if you set fire time at X, you can get the bookmark within (X-1,X+1) period.
 type watcherBookmarkTimeBuckets struct {
-	lock              sync.Mutex
+	lock sync.Mutex
+	// the key of watcherBuckets is the number of seconds since createTime
 	watchersBuckets   map[int64][]*cacheWatcher
+	createTime        time.Time
 	startBucketID     int64
 	clock             clock.Clock
 	bookmarkFrequency time.Duration
@@ -168,7 +170,8 @@ type watcherBookmarkTimeBuckets struct {
 func newTimeBucketWatchers(clock clock.Clock, bookmarkFrequency time.Duration) *watcherBookmarkTimeBuckets {
 	return &watcherBookmarkTimeBuckets{
 		watchersBuckets:   make(map[int64][]*cacheWatcher),
-		startBucketID:     clock.Now().Unix(),
+		createTime:        clock.Now(),
+		startBucketID:     0,
 		clock:             clock,
 		bookmarkFrequency: bookmarkFrequency,
 	}
@@ -181,7 +184,7 @@ func (t *watcherBookmarkTimeBuckets) addWatcher(w *cacheWatcher) bool {
 	if !ok {
 		return false
 	}
-	bucketID := nextTime.Unix()
+	bucketID := int64(nextTime.Sub(t.createTime) / time.Second)
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if bucketID < t.startBucketID {
@@ -193,7 +196,7 @@ func (t *watcherBookmarkTimeBuckets) addWatcher(w *cacheWatcher) bool {
 }
 
 func (t *watcherBookmarkTimeBuckets) popExpiredWatchers() [][]*cacheWatcher {
-	currentBucketID := t.clock.Now().Unix()
+	currentBucketID := int64(t.clock.Since(t.createTime) / time.Second)
 	// There should be one or two elements in almost all cases
 	expiredWatchers := make([][]*cacheWatcher, 0, 2)
 	t.lock.Lock()
@@ -263,7 +266,7 @@ type Cacher struct {
 
 	// Defines a time budget that can be spend on waiting for not-ready watchers
 	// while dispatching event before shutting them down.
-	dispatchTimeoutBudget *timeBudget
+	dispatchTimeoutBudget timeBudget
 
 	// Handling graceful termination.
 	stopLock sync.RWMutex
@@ -730,7 +733,7 @@ func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions,
 // GuaranteedUpdate implements storage.Interface.
 func (c *Cacher) GuaranteedUpdate(
 	ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
-	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, _ ...runtime.Object) error {
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, _ runtime.Object) error {
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
 	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
@@ -740,7 +743,7 @@ func (c *Cacher) GuaranteedUpdate(
 		return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
 	}
 	// If we couldn't get the object, fallback to no-suggestion.
-	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
+	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, nil)
 }
 
 // Count implements storage.Interface.
@@ -793,7 +796,19 @@ func (c *Cacher) dispatchEvents() {
 			if !ok {
 				return
 			}
-			c.dispatchEvent(&event)
+			// Don't dispatch bookmarks coming from the storage layer.
+			// They can be very frequent (even to the level of subseconds)
+			// to allow efficient watch resumption on kube-apiserver restarts,
+			// and propagating them down may overload the whole system.
+			//
+			// TODO: If at some point we decide the performance and scalability
+			// footprint is acceptable, this is the place to hook them in.
+			// However, we then need to check if this was called as a result
+			// of a bookmark event or regular Add/Update/Delete operation by
+			// checking if resourceVersion here has changed.
+			if event.Type != watch.Bookmark {
+				c.dispatchEvent(&event)
+			}
 			lastProcessedResourceVersion = event.ResourceVersion
 		case <-bookmarkTimer.C():
 			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
@@ -1098,7 +1113,14 @@ func (lw *cacherListerWatcher) List(options metav1.ListOptions) (runtime.Object,
 
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) Watch(options metav1.ListOptions) (watch.Interface, error) {
-	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, storage.ListOptions{ResourceVersion: options.ResourceVersion, Predicate: storage.Everything})
+	opts := storage.ListOptions{
+		ResourceVersion: options.ResourceVersion,
+		Predicate:       storage.Everything,
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EfficientWatchResumption) {
+		opts.ProgressNotify = true
+	}
+	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, opts)
 }
 
 // errWatcher implements watch.Interface to return a single error

@@ -14,7 +14,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/auth",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/master/ports:go_default_library",
+        "//pkg/cluster/ports:go_default_library",
         "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
         "//pkg/security/podsecuritypolicy/util:go_default_library",
         "//plugin/pkg/admission/serviceaccount:go_default_library",

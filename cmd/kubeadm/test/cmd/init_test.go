@@ -212,11 +212,11 @@ func TestCmdInitCertPhaseCSR(t *testing.T) {
 	}{
 		{
 			name:     "generate CSR",
-			baseName: certs.KubeadmCertKubeletClient.BaseName,
+			baseName: certs.KubeadmCertKubeletClient().BaseName,
 		},
 		{
 			name:          "fails on CSR",
-			baseName:      certs.KubeadmCertRootCA.BaseName,
+			baseName:      certs.KubeadmCertRootCA().BaseName,
 			expectedError: "unknown flag: --csr-only",
 		},
 		{
@@ -229,7 +229,7 @@ func TestCmdInitCertPhaseCSR(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			csrDir := testutil.SetupTempDir(t)
-			cert := &certs.KubeadmCertKubeletClient
+			cert := certs.KubeadmCertKubeletClient()
 			kubeadmPath := getKubeadmPath()
 			_, stderr, _, err := RunCmd(kubeadmPath,
 				"init",

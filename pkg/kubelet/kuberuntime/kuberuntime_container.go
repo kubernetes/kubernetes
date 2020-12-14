@@ -474,6 +474,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 				cStatus.Message += tMessage
 			}
 		}
+		cStatus.PodSandboxID = c.PodSandboxId
 		statuses[i] = cStatus
 	}
 
@@ -658,6 +659,7 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, ru
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
 			if err := m.killContainer(pod, container.ID, container.Name, "", gracePeriodOverride); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
+				klog.Errorf("killContainer %q(id=%q) for pod %q failed: %v", container.Name, container.ID, format.Pod(pod), err)
 			}
 			containerResults <- killContainerResult
 		}(container)

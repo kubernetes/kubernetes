@@ -33,6 +33,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -68,14 +69,18 @@ const (
 
 // PodExec runs f.ExecCommandInContainerWithFullOutput to execute a shell cmd in target pod
 func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, string, error) {
-	stdout, stderr, err := f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
-	return stdout, stderr, err
+	if framework.NodeOSDistroIs("windows") {
+		return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "powershell", "/c", shExec)
+	}
+	return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
+
 }
 
 // VerifyExecInPodSucceed verifies shell cmd in target pod succeed
 func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) {
 	stdout, stderr, err := PodExec(f, pod, shExec)
 	if err != nil {
+
 		if exiterr, ok := err.(uexec.CodeExitError); ok {
 			exitCode := exiterr.ExitStatus()
 			framework.ExpectNoError(err,
@@ -87,6 +92,17 @@ func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) 
 				shExec, err, stdout, stderr)
 		}
 	}
+}
+
+// VerifyFSGroupInPod verifies that the passed in filePath contains the expectedFSGroup
+func VerifyFSGroupInPod(f *framework.Framework, filePath, expectedFSGroup string, pod *v1.Pod) {
+	cmd := fmt.Sprintf("ls -l %s", filePath)
+	stdout, stderr, err := PodExec(f, pod, cmd)
+	framework.ExpectNoError(err)
+	framework.Logf("pod %s/%s exec for cmd %s, stdout: %s, stderr: %s", pod.Namespace, pod.Name, cmd, stdout, stderr)
+	fsGroupResult := strings.Fields(stdout)[3]
+	framework.ExpectEqual(expectedFSGroup, fsGroupResult,
+		"Expected fsGroup of %s, got %s", expectedFSGroup, fsGroupResult)
 }
 
 // VerifyExecInPodFail verifies shell cmd in target pod fail with certain exit code
@@ -635,11 +651,17 @@ func CheckReadWriteToPath(f *framework.Framework, pod *v1.Pod, volMode v1.Persis
 		// text -> file1 (write to file)
 		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path))
 		// grep file1 (read from file and check contents)
-		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("grep 'Hello world.' %s/file1.txt", path))
-
+		VerifyExecInPodSucceed(f, pod, readFile("Hello word.", path))
 		// Check that writing to directory as block volume fails
 		VerifyExecInPodFail(f, pod, fmt.Sprintf("dd if=/dev/urandom of=%s bs=64 count=1", path), 1)
 	}
+}
+
+func readFile(content, path string) string {
+	if framework.NodeOSDistroIs("windows") {
+		return fmt.Sprintf("Select-String '%s' %s/file1.txt", content, path)
+	}
+	return fmt.Sprintf("grep 'Hello world.' %s/file1.txt", path)
 }
 
 // genBinDataFromSeed generate binData with random seed
@@ -748,7 +770,7 @@ func CreateDriverNamespace(f *framework.Framework) *v1.Namespace {
 	return namespace
 }
 
-// WaitForGVRDeletion waits until an object has been deleted
+// WaitForGVRDeletion waits until a non-namespaced object has been deleted
 func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, objectName string, poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
 
@@ -758,7 +780,7 @@ func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ob
 			framework.Logf("%s %v is not found and has been deleted", gvr.Resource, objectName)
 			return true
 		} else if err != nil {
-			framework.Logf("Get $s %v returned an error: %v", objectName, err.Error())
+			framework.Logf("Get %s returned an error: %v", objectName, err.Error())
 		} else {
 			framework.Logf("%s %v has been found and is not deleted", gvr.Resource, objectName)
 		}
@@ -769,6 +791,29 @@ func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ob
 	}
 
 	return fmt.Errorf("%s %s is not deleted within %v", gvr.Resource, objectName, timeout)
+}
+
+// WaitForNamespacedGVRDeletion waits until a namespaced object has been deleted
+func WaitForNamespacedGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ns, objectName string, poll, timeout time.Duration) error {
+	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
+
+	if successful := WaitUntil(poll, timeout, func() bool {
+		_, err := c.Resource(gvr).Namespace(ns).Get(context.TODO(), objectName, metav1.GetOptions{})
+		if err != nil && apierrors.IsNotFound(err) {
+			framework.Logf("%s %s is not found in namespace %s and has been deleted", gvr.Resource, objectName, ns)
+			return true
+		} else if err != nil {
+			framework.Logf("Get %s in namespace %s returned an error: %v", objectName, ns, err.Error())
+		} else {
+			framework.Logf("%s %s has been found in namespace %s and is not deleted", gvr.Resource, objectName, ns)
+		}
+
+		return false
+	}); successful {
+		return nil
+	}
+
+	return fmt.Errorf("%s %s in namespace %s is not deleted within %v", gvr.Resource, objectName, ns, timeout)
 }
 
 // WaitUntil runs checkDone until a timeout is reached
@@ -782,4 +827,57 @@ func WaitUntil(poll, timeout time.Duration, checkDone func() bool) bool {
 
 	framework.Logf("WaitUntil failed after reaching the timeout %v", timeout)
 	return false
+}
+
+// WaitForGVRFinalizer waits until a object from a given GVR contains a finalizer
+// If namespace is empty, assume it is a non-namespaced object
+func WaitForGVRFinalizer(ctx context.Context, c dynamic.Interface, gvr schema.GroupVersionResource, objectName, objectNamespace, finalizer string, poll, timeout time.Duration) error {
+	framework.Logf("Waiting up to %v for object %s %s of resource %s to contain finalizer %s", timeout, objectNamespace, objectName, gvr.Resource, finalizer)
+	var (
+		err      error
+		resource *unstructured.Unstructured
+	)
+	if successful := WaitUntil(poll, timeout, func() bool {
+		switch objectNamespace {
+		case "":
+			resource, err = c.Resource(gvr).Get(ctx, objectName, metav1.GetOptions{})
+		default:
+			resource, err = c.Resource(gvr).Namespace(objectNamespace).Get(ctx, objectName, metav1.GetOptions{})
+		}
+		if err != nil {
+			framework.Logf("Failed to get object %s %s with err: %v. Will retry in %v", objectNamespace, objectName, err, timeout)
+			return false
+		}
+		for _, f := range resource.GetFinalizers() {
+			if f == finalizer {
+				return true
+			}
+		}
+		return false
+	}); successful {
+		return nil
+	}
+	if err == nil {
+		err = fmt.Errorf("finalizer %s not added to object %s %s of resource %s", finalizer, objectNamespace, objectName, gvr)
+	}
+	return err
+}
+
+// VerifyFilePathGidInPod verfies expected GID of the target filepath
+func VerifyFilePathGidInPod(f *framework.Framework, filePath, expectedGid string, pod *v1.Pod) {
+	cmd := fmt.Sprintf("ls -l %s", filePath)
+	stdout, stderr, err := PodExec(f, pod, cmd)
+	framework.ExpectNoError(err)
+	framework.Logf("pod %s/%s exec for cmd %s, stdout: %s, stderr: %s", pod.Namespace, pod.Name, cmd, stdout, stderr)
+	ll := strings.Fields(stdout)
+	framework.Logf("stdout split: %v, expected gid: %v", ll, expectedGid)
+	framework.ExpectEqual(ll[3], expectedGid)
+}
+
+// ChangeFilePathGidInPod changes the GID of the target filepath.
+func ChangeFilePathGidInPod(f *framework.Framework, filePath, targetGid string, pod *v1.Pod) {
+	cmd := fmt.Sprintf("chgrp %s %s", targetGid, filePath)
+	_, _, err := PodExec(f, pod, cmd)
+	framework.ExpectNoError(err)
+	VerifyFilePathGidInPod(f, filePath, targetGid, pod)
 }

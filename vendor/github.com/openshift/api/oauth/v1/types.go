@@ -252,3 +252,22 @@ type RedirectReference struct {
 	// The name of the target that is being referred to. e.g. name of the Route.
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 }
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// UserOAuthAccessToken is a virtual resource to mirror OAuthAccessTokens to
+// the user the access token was issued for
+type UserOAuthAccessToken OAuthAccessToken
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// UserOAuthAccessTokenList is a collection of access tokens issued on behalf of
+// the requesting user
+type UserOAuthAccessTokenList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	Items []UserOAuthAccessToken `json:"items" protobuf:"bytes,2,rep,name=items"`
+}

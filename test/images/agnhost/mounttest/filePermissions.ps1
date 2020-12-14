@@ -28,59 +28,41 @@ $EXECUTE_PERMISSIONS = 0x0001 -bor 0x0020
 
 
 function GetFilePermissions($path) {
-    $objPath = "Win32_LogicalFileSecuritySetting='$path'"
-    $output = Invoke-WmiMethod -Namespace root/cimv2 -Path $objPath -Name GetSecurityDescriptor
-
-    if ($output.ReturnValue -ne 0) {
-        $retVal = $output.ReturnValue
-        Write-Error "GetSecurityDescriptor invocation failed with code: $retVal"
-        exit 1
-    }
-
-    $fileSD = $output.Descriptor
-    $fileOwnerGroup = $fileSD.Group
-    $fileOwner = $fileSD.Owner
-
-    if ($fileOwnerGroup.Name -eq $null -and $fileOwnerGroup.Domain -eq $null) {
-        # the file owner's group is not recognized. Check if the Owner itself is
-        # a group, and if so, default the group to it.
-        net user $fileOwner.Name > $null 2> $null
-        if (-not $?) {
-            $fileOwnerGroup = $fileOwner
-        }
-
-    }
+    $fileAcl = Get-Acl -Path $path
+    $fileOwner = $fileAcl.Owner
+    $fileGroup = $fileAcl.Group
 
     $userMask = 0
     $groupMask = 0
     $otherMask = 0
 
-    foreach ($ace in $fileSD.DACL) {
-        $mask = 0
-        if ($ace.AceType -ne 0) {
-            # not an Allow ACE, skip.
+    foreach ($rule in $fileAcl.Access) {
+        if ($rule.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow) {
+            # not an allow rule, skipping.
             continue
         }
 
+        $mask = 0
+        $rights = $rule.FileSystemRights.value__
         # convert mask.
-        if ( ($ace.AccessMask -band $READ_PERMISSIONS) -eq $READ_PERMISSIONS ) {
+        if ( ($rights -band $READ_PERMISSIONS) -eq $READ_PERMISSIONS ) {
             $mask = $mask -bor 4
         }
-        if ( ($ace.AccessMask -band $WRITE_PERMISSIONS) -eq $WRITE_PERMISSIONS ) {
+        if ( ($rights -band $WRITE_PERMISSIONS) -eq $WRITE_PERMISSIONS ) {
             $mask = $mask -bor 2
         }
-        if ( ($ace.AccessMask -band $EXECUTE_PERMISSIONS) -eq $EXECUTE_PERMISSIONS ) {
+        if ( ($rights -band $EXECUTE_PERMISSIONS) -eq $EXECUTE_PERMISSIONS ) {
             $mask = $mask -bor 1
         }
 
         # detect mask type.
-        if ($ace.Trustee.Equals($fileOwner)) {
+        if ($rule.IdentityReference.Value.Equals($fileOwner)) {
             $userMask = $mask
         }
-        if ($ace.Trustee.Equals($fileOwnerGroup)) {
+        if ($rule.IdentityReference.Value.Equals($fileGroup)) {
             $groupMask = $mask
         }
-        if ($ace.Trustee.Name.ToLower() -eq "users") {
+        if ($rule.IdentityReference.Value.ToLower().Contains("users")) {
             $otherMask = $mask
         }
     }

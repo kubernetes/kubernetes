@@ -49,6 +49,7 @@ import (
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/component-base/version"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -1136,9 +1137,11 @@ func TestRegisterWithApiServer(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testKubeletHostname,
 				Labels: map[string]string{
-					v1.LabelHostname:   testKubeletHostname,
-					v1.LabelOSStable:   goruntime.GOOS,
-					v1.LabelArchStable: goruntime.GOARCH,
+					v1.LabelHostname:      testKubeletHostname,
+					v1.LabelOSStable:      goruntime.GOOS,
+					v1.LabelArchStable:    goruntime.GOARCH,
+					kubeletapis.LabelOS:   goruntime.GOOS,
+					kubeletapis.LabelArch: goruntime.GOARCH,
 				},
 			},
 		}, nil
@@ -1181,9 +1184,11 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		node := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					v1.LabelHostname:   testKubeletHostname,
-					v1.LabelOSStable:   goruntime.GOOS,
-					v1.LabelArchStable: goruntime.GOARCH,
+					v1.LabelHostname:      testKubeletHostname,
+					v1.LabelOSStable:      goruntime.GOOS,
+					v1.LabelArchStable:    goruntime.GOARCH,
+					kubeletapis.LabelOS:   goruntime.GOOS,
+					kubeletapis.LabelArch: goruntime.GOARCH,
 				},
 			},
 		}
@@ -1412,10 +1417,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						v1.LabelHostname:                "new-hostname",
-						v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:        "new-zone-region",
-						v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-						v1.LabelZoneRegion:              "new-zone-region",
+						v1.LabelTopologyZone:            "new-zone-failure-domain",
+						v1.LabelTopologyRegion:          "new-zone-region",
+						v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+						v1.LabelFailureDomainBetaRegion: "new-zone-region",
 						v1.LabelInstanceTypeStable:      "new-instance-type",
 						v1.LabelInstanceType:            "new-instance-type",
 						v1.LabelOSStable:                "new-os",
@@ -1431,10 +1436,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			needsUpdate: true,
 			finalLabels: map[string]string{
 				v1.LabelHostname:                "new-hostname",
-				v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-				v1.LabelZoneRegionStable:        "new-zone-region",
-				v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-				v1.LabelZoneRegion:              "new-zone-region",
+				v1.LabelTopologyZone:            "new-zone-failure-domain",
+				v1.LabelTopologyRegion:          "new-zone-region",
+				v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+				v1.LabelFailureDomainBetaRegion: "new-zone-region",
 				v1.LabelInstanceTypeStable:      "new-instance-type",
 				v1.LabelInstanceType:            "new-instance-type",
 				v1.LabelOSStable:                "new-os",
@@ -1447,10 +1452,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						v1.LabelHostname:                "new-hostname",
-						v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:        "new-zone-region",
-						v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-						v1.LabelZoneRegion:              "new-zone-region",
+						v1.LabelTopologyZone:            "new-zone-failure-domain",
+						v1.LabelTopologyRegion:          "new-zone-region",
+						v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+						v1.LabelFailureDomainBetaRegion: "new-zone-region",
 						v1.LabelInstanceTypeStable:      "new-instance-type",
 						v1.LabelInstanceType:            "new-instance-type",
 						v1.LabelOSStable:                "new-os",
@@ -1462,10 +1467,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						v1.LabelHostname:                "old-hostname",
-						v1.LabelZoneFailureDomainStable: "old-zone-failure-domain",
-						v1.LabelZoneRegionStable:        "old-zone-region",
-						v1.LabelZoneFailureDomain:       "old-zone-failure-domain",
-						v1.LabelZoneRegion:              "old-zone-region",
+						v1.LabelTopologyZone:            "old-zone-failure-domain",
+						v1.LabelTopologyRegion:          "old-zone-region",
+						v1.LabelFailureDomainBetaZone:   "old-zone-failure-domain",
+						v1.LabelFailureDomainBetaRegion: "old-zone-region",
 						v1.LabelInstanceTypeStable:      "old-instance-type",
 						v1.LabelInstanceType:            "old-instance-type",
 						v1.LabelOSStable:                "old-os",
@@ -1476,10 +1481,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			needsUpdate: true,
 			finalLabels: map[string]string{
 				v1.LabelHostname:                "new-hostname",
-				v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-				v1.LabelZoneRegionStable:        "new-zone-region",
-				v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-				v1.LabelZoneRegion:              "new-zone-region",
+				v1.LabelTopologyZone:            "new-zone-failure-domain",
+				v1.LabelTopologyRegion:          "new-zone-region",
+				v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+				v1.LabelFailureDomainBetaRegion: "new-zone-region",
 				v1.LabelInstanceTypeStable:      "new-instance-type",
 				v1.LabelInstanceType:            "new-instance-type",
 				v1.LabelOSStable:                "new-os",
@@ -1492,10 +1497,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						v1.LabelHostname:                "new-hostname",
-						v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:        "new-zone-region",
-						v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-						v1.LabelZoneRegion:              "new-zone-region",
+						v1.LabelTopologyZone:            "new-zone-failure-domain",
+						v1.LabelTopologyRegion:          "new-zone-region",
+						v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+						v1.LabelFailureDomainBetaRegion: "new-zone-region",
 						v1.LabelInstanceTypeStable:      "new-instance-type",
 						v1.LabelInstanceType:            "new-instance-type",
 						v1.LabelOSStable:                "new-os",
@@ -1507,10 +1512,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						v1.LabelHostname:                "new-hostname",
-						v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:        "new-zone-region",
-						v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-						v1.LabelZoneRegion:              "new-zone-region",
+						v1.LabelTopologyZone:            "new-zone-failure-domain",
+						v1.LabelTopologyRegion:          "new-zone-region",
+						v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+						v1.LabelFailureDomainBetaRegion: "new-zone-region",
 						v1.LabelInstanceTypeStable:      "new-instance-type",
 						v1.LabelInstanceType:            "new-instance-type",
 						v1.LabelOSStable:                "new-os",
@@ -1522,10 +1527,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			needsUpdate: false,
 			finalLabels: map[string]string{
 				v1.LabelHostname:                "new-hostname",
-				v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-				v1.LabelZoneRegionStable:        "new-zone-region",
-				v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-				v1.LabelZoneRegion:              "new-zone-region",
+				v1.LabelTopologyZone:            "new-zone-failure-domain",
+				v1.LabelTopologyRegion:          "new-zone-region",
+				v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+				v1.LabelFailureDomainBetaRegion: "new-zone-region",
 				v1.LabelInstanceTypeStable:      "new-instance-type",
 				v1.LabelInstanceType:            "new-instance-type",
 				v1.LabelOSStable:                "new-os",
@@ -1544,10 +1549,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						v1.LabelHostname:                "new-hostname",
-						v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:        "new-zone-region",
-						v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-						v1.LabelZoneRegion:              "new-zone-region",
+						v1.LabelTopologyZone:            "new-zone-failure-domain",
+						v1.LabelTopologyRegion:          "new-zone-region",
+						v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+						v1.LabelFailureDomainBetaRegion: "new-zone-region",
 						v1.LabelInstanceTypeStable:      "new-instance-type",
 						v1.LabelInstanceType:            "new-instance-type",
 						v1.LabelOSStable:                "new-os",
@@ -1559,10 +1564,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			needsUpdate: false,
 			finalLabels: map[string]string{
 				v1.LabelHostname:                "new-hostname",
-				v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-				v1.LabelZoneRegionStable:        "new-zone-region",
-				v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-				v1.LabelZoneRegion:              "new-zone-region",
+				v1.LabelTopologyZone:            "new-zone-failure-domain",
+				v1.LabelTopologyRegion:          "new-zone-region",
+				v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+				v1.LabelFailureDomainBetaRegion: "new-zone-region",
 				v1.LabelInstanceTypeStable:      "new-instance-type",
 				v1.LabelInstanceType:            "new-instance-type",
 				v1.LabelOSStable:                "new-os",
@@ -1576,10 +1581,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						v1.LabelHostname:                "new-hostname",
-						v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:        "new-zone-region",
-						v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-						v1.LabelZoneRegion:              "new-zone-region",
+						v1.LabelTopologyZone:            "new-zone-failure-domain",
+						v1.LabelTopologyRegion:          "new-zone-region",
+						v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+						v1.LabelFailureDomainBetaRegion: "new-zone-region",
 						v1.LabelInstanceTypeStable:      "new-instance-type",
 						v1.LabelInstanceType:            "new-instance-type",
 						v1.LabelOSStable:                "new-os",
@@ -1591,10 +1596,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						v1.LabelHostname:                "new-hostname",
-						v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:        "new-zone-region",
-						v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-						v1.LabelZoneRegion:              "new-zone-region",
+						v1.LabelTopologyZone:            "new-zone-failure-domain",
+						v1.LabelTopologyRegion:          "new-zone-region",
+						v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+						v1.LabelFailureDomainBetaRegion: "new-zone-region",
 						v1.LabelInstanceTypeStable:      "new-instance-type",
 						v1.LabelInstanceType:            "new-instance-type",
 						v1.LabelOSStable:                "new-os",
@@ -1605,10 +1610,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			needsUpdate: false,
 			finalLabels: map[string]string{
 				v1.LabelHostname:                "new-hostname",
-				v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-				v1.LabelZoneRegionStable:        "new-zone-region",
-				v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-				v1.LabelZoneRegion:              "new-zone-region",
+				v1.LabelTopologyZone:            "new-zone-failure-domain",
+				v1.LabelTopologyRegion:          "new-zone-region",
+				v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+				v1.LabelFailureDomainBetaRegion: "new-zone-region",
 				v1.LabelInstanceTypeStable:      "new-instance-type",
 				v1.LabelInstanceType:            "new-instance-type",
 				v1.LabelOSStable:                "new-os",
@@ -1621,10 +1626,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						v1.LabelHostname:                "new-hostname",
-						v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:        "new-zone-region",
-						v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-						v1.LabelZoneRegion:              "new-zone-region",
+						v1.LabelTopologyZone:            "new-zone-failure-domain",
+						v1.LabelTopologyRegion:          "new-zone-region",
+						v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+						v1.LabelFailureDomainBetaRegion: "new-zone-region",
 						v1.LabelInstanceTypeStable:      "new-instance-type",
 						v1.LabelInstanceType:            "new-instance-type",
 						v1.LabelOSStable:                "new-os",
@@ -1638,10 +1643,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			needsUpdate: true,
 			finalLabels: map[string]string{
 				v1.LabelHostname:                "new-hostname",
-				v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-				v1.LabelZoneRegionStable:        "new-zone-region",
-				v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-				v1.LabelZoneRegion:              "new-zone-region",
+				v1.LabelTopologyZone:            "new-zone-failure-domain",
+				v1.LabelTopologyRegion:          "new-zone-region",
+				v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+				v1.LabelFailureDomainBetaRegion: "new-zone-region",
 				v1.LabelInstanceTypeStable:      "new-instance-type",
 				v1.LabelInstanceType:            "new-instance-type",
 				v1.LabelOSStable:                "new-os",
@@ -1654,10 +1659,10 @@ func TestUpdateDefaultLabels(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						v1.LabelHostname:                "new-hostname",
-						v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:        "new-zone-region",
-						v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-						v1.LabelZoneRegion:              "new-zone-region",
+						v1.LabelTopologyZone:            "new-zone-failure-domain",
+						v1.LabelTopologyRegion:          "new-zone-region",
+						v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+						v1.LabelFailureDomainBetaRegion: "new-zone-region",
 						v1.LabelInstanceTypeStable:      "new-instance-type",
 						v1.LabelInstanceType:            "new-instance-type",
 						v1.LabelOSStable:                "new-os",
@@ -1668,20 +1673,20 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			existingNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						v1.LabelHostname:          "new-hostname",
-						v1.LabelZoneFailureDomain: "new-zone-failure-domain",
-						v1.LabelZoneRegion:        "new-zone-region",
-						v1.LabelInstanceType:      "new-instance-type",
+						v1.LabelHostname:                "new-hostname",
+						v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+						v1.LabelFailureDomainBetaRegion: "new-zone-region",
+						v1.LabelInstanceType:            "new-instance-type",
 					},
 				},
 			},
 			needsUpdate: true,
 			finalLabels: map[string]string{
 				v1.LabelHostname:                "new-hostname",
-				v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
-				v1.LabelZoneRegionStable:        "new-zone-region",
-				v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
-				v1.LabelZoneRegion:              "new-zone-region",
+				v1.LabelTopologyZone:            "new-zone-failure-domain",
+				v1.LabelTopologyRegion:          "new-zone-region",
+				v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+				v1.LabelFailureDomainBetaRegion: "new-zone-region",
 				v1.LabelInstanceTypeStable:      "new-instance-type",
 				v1.LabelInstanceType:            "new-instance-type",
 				v1.LabelOSStable:                "new-os",
@@ -1954,6 +1959,7 @@ func TestReconcileExtendedResource(t *testing.T) {
 	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	testKubelet.kubelet.containerManager = cm.NewStubContainerManagerWithExtendedResource(true /* shouldResetExtendedResourceCapacity*/)
 	testKubeletNoReset := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubeletNoReset.Cleanup()
 	extendedResourceName1 := v1.ResourceName("test.com/resource1")
 	extendedResourceName2 := v1.ResourceName("test.com/resource2")
 

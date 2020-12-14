@@ -34,7 +34,7 @@ parallel)
   DEFAULT_TEST_ARGS="-skip=\[Serial\]|${COMMON_SKIPS}"
   # Use the same number of nodes - 30 - as specified for the parallel
   # suite defined in origin.
-  NODES=30
+  NODES=${NODES:-30}
   ;;
 *)
   echo >&2 "Unsupported test suite '${TEST_SUITE}'"
@@ -74,6 +74,7 @@ SERVER="$( kubectl config view | grep server | head -n 1 | awk '{print $2}' )"
 
 # shellcheck disable=SC2086
 ginkgo \
+  --flakeAttempts=3 \
   -nodes "${NODES}" -noColor ${KUBE_E2E_TEST_ARGS} \
   "$( which k8s-e2e.test )" -- \
   -report-dir "${test_report_dir}" \

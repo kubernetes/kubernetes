@@ -16,6 +16,8 @@ type Interface interface {
 	OAuthClients() OAuthClientInformer
 	// OAuthClientAuthorizations returns a OAuthClientAuthorizationInformer.
 	OAuthClientAuthorizations() OAuthClientAuthorizationInformer
+	// UserOAuthAccessTokens returns a UserOAuthAccessTokenInformer.
+	UserOAuthAccessTokens() UserOAuthAccessTokenInformer
 }
 
 type version struct {
@@ -47,4 +49,9 @@ func (v *version) OAuthClients() OAuthClientInformer {
 // OAuthClientAuthorizations returns a OAuthClientAuthorizationInformer.
 func (v *version) OAuthClientAuthorizations() OAuthClientAuthorizationInformer {
 	return &oAuthClientAuthorizationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// UserOAuthAccessTokens returns a UserOAuthAccessTokenInformer.
+func (v *version) UserOAuthAccessTokens() UserOAuthAccessTokenInformer {
+	return &userOAuthAccessTokenInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

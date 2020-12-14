@@ -60,21 +60,21 @@ type DecodableSpec struct {
 func (d *testDecodable) GetObjectKind() schema.ObjectKind                { return d }
 func (d *testDecodable) SetGroupVersionKind(gvk schema.GroupVersionKind) { d.gvk = gvk }
 func (d *testDecodable) GroupVersionKind() schema.GroupVersionKind       { return d.gvk }
-func (in *testDecodable) DeepCopyObject() runtime.Object {
-	if in == nil {
+func (d *testDecodable) DeepCopyObject() runtime.Object {
+	if d == nil {
 		return nil
 	}
 	out := new(testDecodable)
-	in.DeepCopyInto(out)
+	d.DeepCopyInto(out)
 	return out
 }
-func (in *testDecodable) DeepCopyInto(out *testDecodable) {
-	*out = *in
-	out.Other = in.Other
-	out.Value = in.Value
-	out.Spec = in.Spec
-	out.Interface = in.Interface
-	out.gvk = in.gvk
+func (d *testDecodable) DeepCopyInto(out *testDecodable) {
+	*out = *d
+	out.Other = d.Other
+	out.Value = d.Value
+	out.Spec = d.Spec
+	out.Interface = d.Interface
+	out.gvk = d.gvk
 	return
 }
 

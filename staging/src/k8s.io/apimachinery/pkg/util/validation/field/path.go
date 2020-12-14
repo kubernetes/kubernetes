@@ -67,6 +67,9 @@ func (p *Path) Key(key string) *Path {
 
 // String produces a string representation of the Path.
 func (p *Path) String() string {
+	if p == nil {
+		return "<nil>"
+	}
 	// make a slice to iterate
 	elems := []*Path{}
 	for ; p != nil; p = p.parent {

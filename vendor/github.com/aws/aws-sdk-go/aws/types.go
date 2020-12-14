@@ -239,3 +239,26 @@ func (es errors) Error() string {
 
 	return strings.Join(parts, "\n")
 }
+
+// CopySeekableBody copies the seekable body to an io.Writer
+func CopySeekableBody(dst io.Writer, src io.ReadSeeker) (int64, error) {
+	curPos, err := src.Seek(0, sdkio.SeekCurrent)
+	if err != nil {
+		return 0, err
+	}
+
+	// copy errors may be assumed to be from the body.
+	n, err := io.Copy(dst, src)
+	if err != nil {
+		return n, err
+	}
+
+	// seek back to the first position after reading to reset
+	// the body for transmission.
+	_, err = src.Seek(curPos, sdkio.SeekStart)
+	if err != nil {
+		return n, err
+	}
+
+	return n, nil
+}

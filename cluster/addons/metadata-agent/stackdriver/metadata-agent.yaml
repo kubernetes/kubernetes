@@ -24,9 +24,10 @@ spec:
     metadata:
       labels:
         app: metadata-agent
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccountName: metadata-agent
       priorityClassName: system-node-critical
       nodeSelector:
@@ -88,9 +89,10 @@ spec:
     metadata:
       labels:
         app: metadata-agent-cluster-level
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccountName: metadata-agent
       priorityClassName: system-cluster-critical
       nodeSelector:

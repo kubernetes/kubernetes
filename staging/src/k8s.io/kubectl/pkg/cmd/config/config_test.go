@@ -266,7 +266,7 @@ func TestAdditionalAuth(t *testing.T) {
 }
 
 func TestEmbedClientCert(t *testing.T) {
-	fakeCertFile, _ := ioutil.TempFile("", "")
+	fakeCertFile, _ := ioutil.TempFile(os.TempDir(), "")
 	defer os.Remove(fakeCertFile.Name())
 	fakeData := []byte("fake-data")
 	ioutil.WriteFile(fakeCertFile.Name(), fakeData, 0600)
@@ -285,7 +285,7 @@ func TestEmbedClientCert(t *testing.T) {
 }
 
 func TestEmbedClientKey(t *testing.T) {
-	fakeKeyFile, _ := ioutil.TempFile("", "")
+	fakeKeyFile, _ := ioutil.TempFile(os.TempDir(), "")
 	defer os.Remove(fakeKeyFile.Name())
 	fakeData := []byte("fake-data")
 	ioutil.WriteFile(fakeKeyFile.Name(), fakeData, 0600)
@@ -331,7 +331,7 @@ func TestEmbedNoKeyOrCertDisallowed(t *testing.T) {
 }
 
 func TestEmptyTokenAndCertAllowed(t *testing.T) {
-	fakeCertFile, _ := ioutil.TempFile("", "cert-file")
+	fakeCertFile, _ := ioutil.TempFile(os.TempDir(), "cert-file")
 	defer os.Remove(fakeCertFile.Name())
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
@@ -574,7 +574,7 @@ func TestUnsetBytes(t *testing.T) {
 }
 
 func TestCAClearsInsecure(t *testing.T) {
-	fakeCAFile, _ := ioutil.TempFile("", "ca-file")
+	fakeCAFile, _ := ioutil.TempFile(os.TempDir(), "ca-file")
 	defer os.Remove(fakeCAFile.Name())
 	clusterInfoWithInsecure := clientcmdapi.NewCluster()
 	clusterInfoWithInsecure.InsecureSkipTLSVerify = true
@@ -643,7 +643,7 @@ func TestInsecureClearsCA(t *testing.T) {
 }
 
 func TestCADataClearsCA(t *testing.T) {
-	fakeCAFile, _ := ioutil.TempFile("", "")
+	fakeCAFile, _ := ioutil.TempFile(os.TempDir(), "")
 	defer os.Remove(fakeCAFile.Name())
 	fakeData := []byte("cadata")
 	ioutil.WriteFile(fakeCAFile.Name(), fakeData, 0600)
@@ -857,7 +857,7 @@ func TestToBool(t *testing.T) {
 }
 
 func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *testing.T) (string, clientcmdapi.Config) {
-	fakeKubeFile, _ := ioutil.TempFile("", "")
+	fakeKubeFile, _ := ioutil.TempFile(os.TempDir(), "")
 	defer os.Remove(fakeKubeFile.Name())
 	err := clientcmd.WriteToFile(startingConfig, fakeKubeFile.Name())
 	if err != nil {

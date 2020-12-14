@@ -9,18 +9,20 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
+	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
+	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/client-go/informers"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
-	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
-	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 
 	quotatypedclient "github.com/openshift/client-go/quota/clientset/versioned/typed/quota/v1"
 	quotainformer "github.com/openshift/client-go/quota/informers/externalversions/quota/v1"
@@ -84,8 +86,19 @@ func (q *clusterQuotaAdmission) Validate(ctx context.Context, a admission.Attrib
 	if len(a.GetSubresource()) != 0 {
 		return nil
 	}
-	// ignore cluster level resources
-	if len(a.GetNamespace()) == 0 {
+
+	// Ignore cluster level resources.
+	// We can't get the namespace for the request because attributes namespace means "what namesapce is this scoped to",
+	// not "is this cluster scoped resource". This makes a different for namespaces that have attributes namespace set
+	// to its name. Namespaces are cluster level object that shouldn't go into this plugin or it get blocked listing
+	// the namespace that is just being created.
+	obj := a.GetObject()
+	objMeta, ok := obj.(metav1.ObjectMetaAccessor)
+	if !ok {
+		klog.Warningf("ClusterQuotaAdmission received non-meta object %T", obj)
+		return nil
+	}
+	if len(objMeta.GetObjectMeta().GetNamespace()) == 0 {
 		return nil
 	}
 

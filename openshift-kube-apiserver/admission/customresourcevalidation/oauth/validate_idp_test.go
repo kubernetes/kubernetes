@@ -12,7 +12,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 )
 
-const wrongConfigMapSecretErrMsg string = "a DNS-1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"
+const wrongConfigMapSecretErrMsg string = "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"
 
 func htpasswdIDP() configv1.IdentityProviderConfig {
 	return configv1.IdentityProviderConfig{

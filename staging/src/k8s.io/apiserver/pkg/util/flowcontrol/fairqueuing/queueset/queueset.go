@@ -645,6 +645,7 @@ func (qs *queueSet) selectQueueLocked() *queue {
 		qs.robinIndex = (qs.robinIndex + 1) % nq
 		queue := qs.queues[qs.robinIndex]
 		if len(queue.requests) != 0 {
+
 			currentVirtualFinish := queue.GetVirtualFinish(0, qs.estimatedServiceTime)
 			if currentVirtualFinish < minVirtualFinish {
 				minVirtualFinish = currentVirtualFinish
@@ -657,6 +658,23 @@ func (qs *queueSet) selectQueueLocked() *queue {
 	// for the next round.  This way the non-selected queues
 	// win in the case that the virtual finish times are the same
 	qs.robinIndex = minIndex
+	// according to the original FQ formula:
+	//
+	//   Si = MAX(R(t), Fi-1)
+	//
+	// the virtual start (excluding the estimated cost) of the chose
+	// queue should always be greater or equal to the global virtual
+	// time.
+	//
+	// hence we're refreshing the per-queue virtual time for the chosen
+	// queue here. if the last virtual start time (excluded estimated cost)
+	// falls behind the global virtual time, we update the latest virtual
+	// start by: <latest global virtual time> + <previously estimated cost>
+	previouslyEstimatedServiceTime := float64(minQueue.requestsExecuting) * qs.estimatedServiceTime
+	if qs.virtualTime > minQueue.virtualStart-previouslyEstimatedServiceTime {
+		// per-queue virtual time should not fall behind the global
+		minQueue.virtualStart = qs.virtualTime + previouslyEstimatedServiceTime
+	}
 	return minQueue
 }
 

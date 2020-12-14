@@ -34,16 +34,16 @@ function get-master-size {
   if [[ "$(get-num-nodes)" -gt "10" ]]; then
     suggested_master_size=4
   fi
-  if [[ "$(get-num-nodes)" -gt "100" ]]; then
+  if [[ "$(get-num-nodes)" -gt "50" ]]; then
     suggested_master_size=8
   fi
-  if [[ "$(get-num-nodes)" -gt "250" ]]; then
+  if [[ "$(get-num-nodes)" -gt "100" ]]; then
     suggested_master_size=16
   fi
   if [[ "$(get-num-nodes)" -gt "500" ]]; then
     suggested_master_size=32
   fi
-  if [[ "$(get-num-nodes)" -gt "3000" ]]; then
+  if [[ "$(get-num-nodes)" -gt "2000" ]]; then
     suggested_master_size=64
   fi
   echo "${suggested_master_size}"
@@ -162,4 +162,4 @@ export WINDOWS_INFRA_CONTAINER="gcr.io/gke-release/pause-win:1.2.1"
 # Storage Path for csi-proxy. csi-proxy only needs to be installed for Windows.
 export CSI_PROXY_STORAGE_PATH="https://storage.googleapis.com/gke-release/csi-proxy"
 # Version for csi-proxy
-export CSI_PROXY_VERSION="v0.1.0-gke.1"
+export CSI_PROXY_VERSION="v0.2.2-gke.0"

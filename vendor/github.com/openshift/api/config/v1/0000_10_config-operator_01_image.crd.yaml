@@ -3,7 +3,9 @@ kind: CustomResourceDefinition
 metadata:
   name: images.config.openshift.io
   annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
 spec:
   group: config.openshift.io
   scope: Cluster
@@ -116,6 +118,19 @@ spec:
                   type: array
                   items:
                     type: string
+                containerRuntimeSearchRegistries:
+                  description: 'containerRuntimeSearchRegistries are registries that
+                    will be searched when pulling images that do not have fully qualified
+                    domains in their pull specs. Registries will be searched in the
+                    order provided in the list. Note: this search list only works
+                    with the container runtime, i.e CRI-O. Will NOT work with builds
+                    or imagestream imports.'
+                  type: array
+                  format: hostname
+                  minItems: 1
+                  items:
+                    type: string
+                  x-kubernetes-list-type: set
                 insecureRegistries:
                   description: insecureRegistries are registries which do not have
                     a valid TLS certificates or only support HTTP connections.

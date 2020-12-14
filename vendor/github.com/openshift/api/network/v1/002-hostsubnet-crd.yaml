@@ -10,36 +10,36 @@ spec:
     plural: hostsubnets
     singular: hostsubnet
   scope: Cluster
-  additionalPrinterColumns:
-  - name: Host
-    type: string
-    description: The name of the node
-    JSONPath: .host
-  - name: Host IP
-    type: string
-    description: The IP address to be used as a VTEP by other nodes in the overlay
-      network
-    JSONPath: .hostIP
-  - name: Subnet
-    type: string
-    description: The CIDR range of the overlay network assigned to the node for its
-      pods
-    JSONPath: .subnet
-  - name: Egress CIDRs
-    type: string
-    description: The network egress CIDRs
-    JSONPath: .egressCIDRs
-  - name: Egress IPs
-    type: string
-    description: The network egress IP addresses
-    JSONPath: .egressIPs
   version: v1
   versions:
   - name: v1
     served: true
     storage: true
-    "schema":
-      "openAPIV3Schema":
+    additionalPrinterColumns:
+    - name: Host
+      type: string
+      description: The name of the node
+      jsonPath: .host
+    - name: Host IP
+      type: string
+      description: The IP address to be used as a VTEP by other nodes in the overlay
+        network
+      jsonPath: .hostIP
+    - name: Subnet
+      type: string
+      description: The CIDR range of the overlay network assigned to the node for
+        its pods
+      jsonPath: .subnet
+    - name: Egress CIDRs
+      type: string
+      description: The network egress CIDRs
+      jsonPath: .egressCIDRs
+    - name: Egress IPs
+      type: string
+      description: The network egress IP addresses
+      jsonPath: .egressIPs
+    schema:
+      openAPIV3Schema:
         description: HostSubnet describes the container subnet network on a node.
           The HostSubnet object must have the same name as the Node object it corresponds
           to.

@@ -4,6 +4,7 @@ metadata:
   name: clusteroperators.config.openshift.io
   annotations:
     include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
 spec:
   additionalPrinterColumns:
   - JSONPath: .status.versions[?(@.name=="operator")].version

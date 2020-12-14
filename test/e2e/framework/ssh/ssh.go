@@ -111,8 +111,8 @@ func makePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
 	return signer, err
 }
 
-// NodeSSHHosts returns SSH-able host names for all schedulable nodes - this
-// excludes master node. If it can't find any external IPs, it falls back to
+// NodeSSHHosts returns SSH-able host names for all schedulable nodes.
+// If it can't find any external IPs, it falls back to
 // looking for internal IPs. If it can't find an internal IP for every node it
 // returns an error, though it still returns all hosts that it found in that
 // case.

@@ -45,6 +45,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Oauth().V1().OAuthClients().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("oauthclientauthorizations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Oauth().V1().OAuthClientAuthorizations().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("useroauthaccesstokens"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Oauth().V1().UserOAuthAccessTokens().Informer()}, nil
 
 	}
 

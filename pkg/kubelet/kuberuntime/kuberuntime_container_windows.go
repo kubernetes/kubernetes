@@ -125,31 +125,6 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	// setup security context
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 
-	// Strip down all the unnecessary options on the Windows
-	if effectiveSc.SELinuxOptions != nil {
-		effectiveSc.SELinuxOptions = nil
-	}
-
-	if effectiveSc.AllowPrivilegeEscalation != nil {
-		effectiveSc.AllowPrivilegeEscalation = nil
-	}
-
-	if effectiveSc.Capabilities != nil {
-		effectiveSc.Capabilities = nil
-	}
-
-	if effectiveSc.Privileged != nil {
-		effectiveSc.Privileged = nil
-	}
-
-	if effectiveSc.ProcMount != nil {
-		effectiveSc.ProcMount = nil
-	}
-
-	// RunAsUser only supports int64 from Kubernetes API, but Windows containers only support username.
-	if effectiveSc.RunAsUser != nil {
-		effectiveSc.RunAsUser = nil
-	}
 	if username != "" {
 		wc.SecurityContext.RunAsUsername = username
 	}

@@ -90,7 +90,7 @@ type User struct {
 	// GID is the group id.
 	GID uint32 `json:"gid" platform:"linux,solaris"`
 	// Umask is the umask for the init process.
-	Umask uint32 `json:"umask,omitempty" platform:"linux,solaris"`
+	Umask *uint32 `json:"umask,omitempty" platform:"linux,solaris"`
 	// AdditionalGids are additional group ids set for the container's process.
 	AdditionalGids []uint32 `json:"additionalGids,omitempty" platform:"linux,solaris"`
 	// Username is the user name.
@@ -635,12 +635,13 @@ type LinuxSeccompAction string
 
 // Define actions for Seccomp rules
 const (
-	ActKill  LinuxSeccompAction = "SCMP_ACT_KILL"
-	ActTrap  LinuxSeccompAction = "SCMP_ACT_TRAP"
-	ActErrno LinuxSeccompAction = "SCMP_ACT_ERRNO"
-	ActTrace LinuxSeccompAction = "SCMP_ACT_TRACE"
-	ActAllow LinuxSeccompAction = "SCMP_ACT_ALLOW"
-	ActLog   LinuxSeccompAction = "SCMP_ACT_LOG"
+	ActKill        LinuxSeccompAction = "SCMP_ACT_KILL"
+	ActKillProcess LinuxSeccompAction = "SCMP_ACT_KILL_PROCESS"
+	ActTrap        LinuxSeccompAction = "SCMP_ACT_TRAP"
+	ActErrno       LinuxSeccompAction = "SCMP_ACT_ERRNO"
+	ActTrace       LinuxSeccompAction = "SCMP_ACT_TRACE"
+	ActAllow       LinuxSeccompAction = "SCMP_ACT_ALLOW"
+	ActLog         LinuxSeccompAction = "SCMP_ACT_LOG"
 )
 
 // LinuxSeccompOperator used to match syscall arguments in Seccomp

@@ -1,65 +1,66 @@
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: projects.config.openshift.io
   annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
 spec:
   group: config.openshift.io
   scope: Cluster
-  preserveUnknownFields: false
-  versions:
-  - name: v1
-    served: true
-    storage: true
   names:
     kind: Project
     listKind: ProjectList
     plural: projects
     singular: project
-  subresources:
-    status: {}
-  "validation":
-    "openAPIV3Schema":
-      description: Project holds cluster-wide information about Project.  The canonical
-        name is `cluster`
-      type: object
-      required:
-      - spec
-      properties:
-        apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-          type: string
-        kind:
-          description: 'Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-          type: string
-        metadata:
-          type: object
-        spec:
-          description: spec holds user settable values for configuration
-          type: object
-          properties:
-            projectRequestMessage:
-              description: projectRequestMessage is the string presented to a user
-                if they are unable to request a project via the projectrequest api
-                endpoint
-              type: string
-            projectRequestTemplate:
-              description: projectRequestTemplate is the template to use for creating
-                projects in response to projectrequest. This must point to a template
-                in 'openshift-config' namespace. It is optional. If it is not specified,
-                a default template is used.
-              type: object
-              properties:
-                name:
-                  description: name is the metadata.name of the referenced project
-                    request template
-                  type: string
-        status:
-          description: status holds observed values from the cluster. They may not
-            be overridden.
-          type: object
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    schema:
+      openAPIV3Schema:
+        description: Project holds cluster-wide information about Project.  The canonical
+          name is `cluster`
+        type: object
+        required:
+        - spec
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec holds user settable values for configuration
+            type: object
+            properties:
+              projectRequestMessage:
+                description: projectRequestMessage is the string presented to a user
+                  if they are unable to request a project via the projectrequest api
+                  endpoint
+                type: string
+              projectRequestTemplate:
+                description: projectRequestTemplate is the template to use for creating
+                  projects in response to projectrequest. This must point to a template
+                  in 'openshift-config' namespace. It is optional. If it is not specified,
+                  a default template is used.
+                type: object
+                properties:
+                  name:
+                    description: name is the metadata.name of the referenced project
+                      request template
+                    type: string
+          status:
+            description: status holds observed values from the cluster. They may not
+              be overridden.
+            type: object

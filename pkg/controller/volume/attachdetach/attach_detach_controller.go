@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/features"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -117,21 +118,23 @@ func NewAttachDetachController(
 	prober volume.DynamicPluginProber,
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
-	timerConfig TimerConfig) (AttachDetachController, error) {
+	timerConfig TimerConfig,
+	filteredDialOptions *proxyutil.FilteredDialOptions) (AttachDetachController, error) {
 
 	adc := &attachDetachController{
-		kubeClient:  kubeClient,
-		pvcLister:   pvcInformer.Lister(),
-		pvcsSynced:  pvcInformer.Informer().HasSynced,
-		pvLister:    pvInformer.Lister(),
-		pvsSynced:   pvInformer.Informer().HasSynced,
-		podLister:   podInformer.Lister(),
-		podsSynced:  podInformer.Informer().HasSynced,
-		podIndexer:  podInformer.Informer().GetIndexer(),
-		nodeLister:  nodeInformer.Lister(),
-		nodesSynced: nodeInformer.Informer().HasSynced,
-		cloud:       cloud,
-		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+		kubeClient:          kubeClient,
+		pvcLister:           pvcInformer.Lister(),
+		pvcsSynced:          pvcInformer.Informer().HasSynced,
+		pvLister:            pvInformer.Lister(),
+		pvsSynced:           pvInformer.Informer().HasSynced,
+		podLister:           podInformer.Lister(),
+		podsSynced:          podInformer.Informer().HasSynced,
+		podIndexer:          podInformer.Informer().GetIndexer(),
+		nodeLister:          nodeInformer.Lister(),
+		nodesSynced:         nodeInformer.Informer().HasSynced,
+		cloud:               cloud,
+		pvcQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+		filteredDialOptions: filteredDialOptions,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
@@ -313,6 +316,9 @@ type attachDetachController struct {
 
 	// intreeToCSITranslator translates from in-tree volume specs to CSI
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
+
+	// filteredDialOptions configures any dialing done by the controller.
+	filteredDialOptions *proxyutil.FilteredDialOptions
 }
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
@@ -811,6 +817,10 @@ func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
 func (adc *attachDetachController) GetSubpather() subpath.Interface {
 	// Subpaths not needed in attachdetach controller
 	return nil
+}
+
+func (adc *attachDetachController) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
+	return adc.filteredDialOptions
 }
 
 func (adc *attachDetachController) GetCSIDriverLister() storagelistersv1.CSIDriverLister {

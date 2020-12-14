@@ -102,7 +102,7 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 		Use:                   "cp <file-spec-src> <file-spec-dest>",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Copy files and directories to and from containers."),
-		Long:                  "Copy files and directories to and from containers.",
+		Long:                  i18n.T("Copy files and directories to and from containers."),
 		Example:               cpExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
@@ -203,10 +203,7 @@ func (o *CopyOptions) Run(args []string) error {
 	}
 
 	if len(srcSpec.PodName) != 0 && len(destSpec.PodName) != 0 {
-		if _, err := os.Stat(args[0]); err == nil {
-			return o.copyToPod(fileSpec{File: args[0]}, destSpec, &exec.ExecOptions{})
-		}
-		return fmt.Errorf("src doesn't exist in local filesystem")
+		return fmt.Errorf("one of src or dest must be a local file specification")
 	}
 
 	if len(srcSpec.PodName) != 0 {
@@ -244,6 +241,9 @@ func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
 func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) error {
 	if len(src.File) == 0 || len(dest.File) == 0 {
 		return errFileCannotBeEmpty
+	}
+	if _, err := os.Stat(src.File); err != nil {
+		return fmt.Errorf("%s doesn't exist in local filesystem", src.File)
 	}
 	reader, writer := io.Pipe()
 

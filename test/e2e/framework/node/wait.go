@@ -39,8 +39,7 @@ var requiredPerNodePods = []*regexp.Regexp{
 }
 
 // WaitForReadyNodes waits up to timeout for cluster to has desired size and
-// there is no not-ready nodes in it. By cluster size we mean number of Nodes
-// excluding Master Node.
+// there is no not-ready nodes in it. By cluster size we mean number of schedulable Nodes.
 func WaitForReadyNodes(c clientset.Interface, size int, timeout time.Duration) error {
 	_, err := CheckReady(c, size, timeout)
 	return err
@@ -145,8 +144,7 @@ func WaitForNodeToBeReady(c clientset.Interface, name string, timeout time.Durat
 }
 
 // CheckReady waits up to timeout for cluster to has desired size and
-// there is no not-ready nodes in it. By cluster size we mean number of Nodes
-// excluding Master Node.
+// there is no not-ready nodes in it. By cluster size we mean number of schedulable Nodes.
 func CheckReady(c clientset.Interface, size int, timeout time.Duration) ([]v1.Node, error) {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(sleepTime) {
 		nodes, err := waitListSchedulableNodes(c)
@@ -200,27 +198,25 @@ func checkWaitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) 
 	return nodes, nil
 }
 
-// CheckReadyForTests returns a method usable in polling methods which will check that the nodes are
-// in a testable state based on schedulability.
+// CheckReadyForTests returns a function which will return 'true' once the number of ready nodes is above the allowedNotReadyNodes threshold (i.e. to be used as a global gate for starting the tests).
 func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowedNotReadyNodes, largeClusterThreshold int) func() (bool, error) {
 	attempt := 0
-	var notSchedulable []*v1.Node
 	return func() (bool, error) {
 		attempt++
-		notSchedulable = nil
+		var nodesNotReadyYet []v1.Node
 		opts := metav1.ListOptions{
 			ResourceVersion: "0",
-			FieldSelector:   fields.Set{"spec.unschedulable": "false"}.AsSelector().String(),
+			// remove uncordoned nodes from our calculation, TODO refactor if node v2 API removes that semantic.
+			FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector().String(),
 		}
-		nodes, err := c.CoreV1().Nodes().List(context.TODO(), opts)
+		allNodes, err := c.CoreV1().Nodes().List(context.TODO(), opts)
 		if err != nil {
 			e2elog.Logf("Unexpected error listing nodes: %v", err)
 			return false, err
 		}
-		for i := range nodes.Items {
-			node := &nodes.Items[i]
-			if !readyForTests(node, nonblockingTaints) {
-				notSchedulable = append(notSchedulable, node)
+		for _, node := range allNodes.Items {
+			if !readyForTests(&node, nonblockingTaints) {
+				nodesNotReadyYet = append(nodesNotReadyYet, node)
 			}
 		}
 		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
@@ -229,25 +225,29 @@ func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowed
 		// provisioned correctly at startup will never become ready (e.g. when something
 		// won't install correctly), so we can't expect them to be ready at any point.
 		//
-		// However, we only allow non-ready nodes with some specific reasons.
-		if len(notSchedulable) > 0 {
+		// We log the *reason* why nodes are not schedulable, specifically, its usually the network not being available.
+		if len(nodesNotReadyYet) > 0 {
 			// In large clusters, log them only every 10th pass.
-			if len(nodes.Items) < largeClusterThreshold || attempt%10 == 0 {
-				e2elog.Logf("Unschedulable nodes:")
-				for i := range notSchedulable {
-					e2elog.Logf("-> %s Ready=%t Network=%t Taints=%v NonblockingTaints:%v",
-						notSchedulable[i].Name,
-						IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeReady, true),
-						IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeNetworkUnavailable, false),
-						notSchedulable[i].Spec.Taints,
+			if len(nodesNotReadyYet) < largeClusterThreshold || attempt%10 == 0 {
+				e2elog.Logf("Unschedulable nodes= %v, maximum value for starting tests= %v", len(nodesNotReadyYet), allowedNotReadyNodes)
+				for _, node := range nodesNotReadyYet {
+					e2elog.Logf("	-> Node %s [[[ Ready=%t, Network(available)=%t, Taints=%v, NonblockingTaints=%v ]]]",
+						node.Name,
+						IsConditionSetAsExpectedSilent(&node, v1.NodeReady, true),
+						IsConditionSetAsExpectedSilent(&node, v1.NodeNetworkUnavailable, false),
+						node.Spec.Taints,
 						nonblockingTaints,
 					)
 
 				}
-				e2elog.Logf("================================")
+				if len(nodesNotReadyYet) > allowedNotReadyNodes {
+					ready := len(allNodes.Items) - len(nodesNotReadyYet)
+					remaining := len(nodesNotReadyYet) - allowedNotReadyNodes
+					e2elog.Logf("==== node wait: %v out of %v nodes are ready, max notReady allowed %v.  Need %v more before starting.", ready, len(allNodes.Items), allowedNotReadyNodes, remaining)
+				}
 			}
 		}
-		return len(notSchedulable) <= allowedNotReadyNodes, nil
+		return len(nodesNotReadyYet) <= allowedNotReadyNodes, nil
 	}
 }
 

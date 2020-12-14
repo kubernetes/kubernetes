@@ -84,7 +84,7 @@ func (e shortcutExpander) getShortcutMappings() ([]*metav1.APIResourceList, []re
 	res := []resourceShortcuts{}
 	// get server resources
 	// This can return an error *and* the results it was able to find.  We don't need to fail on the error.
-	apiResList, err := e.discoveryClient.ServerResources()
+	_, apiResList, err := e.discoveryClient.ServerGroupsAndResources()
 	if err != nil {
 		klog.V(1).Infof("Error loading discovery information: %v", err)
 	}

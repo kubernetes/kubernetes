@@ -14,6 +14,7 @@ type OauthV1Interface interface {
 	OAuthAuthorizeTokensGetter
 	OAuthClientsGetter
 	OAuthClientAuthorizationsGetter
+	UserOAuthAccessTokensGetter
 }
 
 // OauthV1Client is used to interact with features provided by the oauth.openshift.io group.
@@ -35,6 +36,10 @@ func (c *OauthV1Client) OAuthClients() OAuthClientInterface {
 
 func (c *OauthV1Client) OAuthClientAuthorizations() OAuthClientAuthorizationInterface {
 	return newOAuthClientAuthorizations(c)
+}
+
+func (c *OauthV1Client) UserOAuthAccessTokens() UserOAuthAccessTokenInterface {
+	return newUserOAuthAccessTokens(c)
 }
 
 // NewForConfig creates a new OauthV1Client for the given config.

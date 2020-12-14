@@ -1,9 +1,0 @@
-# See the OWNERS docs at https://go.k8s.io/owners
-
-reviewers:
-  - sig-scalability-reviewers
-approvers:
-  - sig-scalability-approvers
-labels:
-- sig/scalability
-- sig/testing

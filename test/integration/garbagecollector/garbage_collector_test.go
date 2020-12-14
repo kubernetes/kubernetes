@@ -45,11 +45,12 @@ import (
 	"k8s.io/client-go/metadata/metadatainformer"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/controller-manager/pkg/informerfactory"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/pointer"
 )
 
 func getForegroundOptions() metav1.DeleteOptions {
@@ -246,10 +247,11 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	gc, err := garbagecollector.NewGarbageCollector(
+		clientSet,
 		metadataClient,
 		restMapper,
 		garbagecollector.DefaultIgnoredResources(),
-		controller.NewInformerFactory(sharedInformers, metadataInformers),
+		informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
 		alwaysStarted,
 	)
 	if err != nil {
@@ -311,6 +313,143 @@ func deleteNamespaceOrDie(name string, c clientset.Interface, t *testing.T) {
 	err := c.CoreV1().Namespaces().Delete(context.TODO(), name, metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		t.Fatalf("failed to delete namespace %q: %v", name, err)
+	}
+}
+
+func TestCrossNamespaceReferencesWithWatchCache(t *testing.T) {
+	testCrossNamespaceReferences(t, true)
+}
+func TestCrossNamespaceReferencesWithoutWatchCache(t *testing.T) {
+	testCrossNamespaceReferences(t, false)
+}
+
+func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
+	var (
+		workers            = 5
+		validChildrenCount = 10
+		namespaceB         = "b"
+		namespaceA         = "a"
+	)
+
+	// Start the server
+	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{fmt.Sprintf("--watch-cache=%v", watchCache)}, framework.SharedEtcd())
+	defer func() {
+		if testServer != nil {
+			testServer.TearDownFn()
+		}
+	}()
+	clientSet, err := clientset.NewForConfig(testServer.ClientConfig)
+	if err != nil {
+		t.Fatalf("error creating clientset: %v", err)
+	}
+
+	createNamespaceOrDie(namespaceB, clientSet, t)
+	parent, err := clientSet.CoreV1().ConfigMaps(namespaceB).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "parent"}}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < validChildrenCount; i++ {
+		_, err := clientSet.CoreV1().Secrets(namespaceB).Create(context.TODO(), &v1.Secret{ObjectMeta: metav1.ObjectMeta{GenerateName: "child-", OwnerReferences: []metav1.OwnerReference{
+			{Name: "parent", Kind: "ConfigMap", APIVersion: "v1", UID: parent.UID, Controller: pointer.BoolPtr(false)},
+		}}}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	createNamespaceOrDie(namespaceA, clientSet, t)
+
+	// Construct invalid owner references:
+	invalidOwnerReferences := []metav1.OwnerReference{}
+	for i := 0; i < 25; i++ {
+		invalidOwnerReferences = append(invalidOwnerReferences, metav1.OwnerReference{Name: "invalid", UID: types.UID(fmt.Sprintf("invalid-%d", i)), APIVersion: "test/v1", Kind: fmt.Sprintf("invalid%d", i)})
+	}
+	invalidOwnerReferences = append(invalidOwnerReferences, metav1.OwnerReference{Name: "invalid", UID: parent.UID, APIVersion: "v1", Kind: "Pod", Controller: pointer.BoolPtr(false)})
+
+	invalidUIDs := []types.UID{}
+	for i := 0; i < workers; i++ {
+		invalidChildType1, err := clientSet.CoreV1().ConfigMaps(namespaceA).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{GenerateName: "invalid-child-", OwnerReferences: invalidOwnerReferences}}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		invalidChildType2, err := clientSet.CoreV1().Secrets(namespaceA).Create(context.TODO(), &v1.Secret{ObjectMeta: metav1.ObjectMeta{GenerateName: "invalid-child-a-", OwnerReferences: invalidOwnerReferences}}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		invalidChildType3, err := clientSet.CoreV1().Secrets(namespaceA).Create(context.TODO(), &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels:          map[string]string{"single-bad-reference": "true"},
+				GenerateName:    "invalid-child-b-",
+				OwnerReferences: []metav1.OwnerReference{{Name: "invalid", UID: parent.UID, APIVersion: "v1", Kind: "Pod", Controller: pointer.BoolPtr(false)}},
+			},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		invalidUIDs = append(invalidUIDs, invalidChildType1.UID, invalidChildType2.UID, invalidChildType3.UID)
+	}
+
+	// start GC with existing objects in place to simulate controller-manager restart
+	ctx := setupWithServer(t, testServer, workers)
+	defer ctx.tearDown()
+	testServer = nil
+
+	// Wait for the invalid children to be garbage collected
+	if err := wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
+		children, err := clientSet.CoreV1().Secrets(namespaceA).List(context.TODO(), metav1.ListOptions{LabelSelector: "single-bad-reference=true"})
+		if err != nil {
+			return false, err
+		}
+		if len(children.Items) > 0 {
+			t.Logf("expected 0 invalid children, got %d, will wait and relist", len(children.Items))
+			return false, nil
+		}
+		return true, nil
+	}); err != nil && err != wait.ErrWaitTimeout {
+		t.Error(err)
+	}
+
+	// Wait for a little while to make sure they didn't trigger deletion of the valid children
+	if err := wait.Poll(time.Second, 5*time.Second, func() (bool, error) {
+		children, err := clientSet.CoreV1().Secrets(namespaceB).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		if len(children.Items) != validChildrenCount {
+			return false, fmt.Errorf("expected %d valid children, got %d", validChildrenCount, len(children.Items))
+		}
+		return false, nil
+	}); err != nil && err != wait.ErrWaitTimeout {
+		t.Error(err)
+	}
+
+	if !ctx.gc.GraphHasUID(parent.UID) {
+		t.Errorf("valid parent UID no longer exists in the graph")
+	}
+
+	// Now that our graph has correct data in it, add a new invalid child and see if it gets deleted
+	invalidChild, err := clientSet.CoreV1().Secrets(namespaceA).Create(context.TODO(), &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName:    "invalid-child-c-",
+			OwnerReferences: []metav1.OwnerReference{{Name: "invalid", UID: parent.UID, APIVersion: "v1", Kind: "Pod", Controller: pointer.BoolPtr(false)}},
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Wait for the invalid child to be garbage collected
+	if err := wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
+		_, err := clientSet.CoreV1().Secrets(namespaceA).Get(context.TODO(), invalidChild.Name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		t.Logf("%s remains, waiting for deletion", invalidChild.Name)
+		return false, nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 }
 

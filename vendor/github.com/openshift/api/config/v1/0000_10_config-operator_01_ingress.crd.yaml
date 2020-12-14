@@ -3,7 +3,9 @@ kind: CustomResourceDefinition
 metadata:
   name: ingresses.config.openshift.io
   annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
 spec:
   group: config.openshift.io
   names:
@@ -43,6 +45,14 @@ spec:
           description: spec holds user settable values for configuration
           type: object
           properties:
+            appsDomain:
+              description: appsDomain is an optional domain to use instead of the
+                one specified in the domain field when a Route is created without
+                specifying an explicit host. If appsDomain is nonempty, this value
+                is used to generate default host values for Route. Unlike domain,
+                appsDomain may be modified after installation. This assumes a new
+                ingresscontroller has been setup with a wildcard certificate.
+              type: string
             domain:
               description: "domain is used to generate a default host name for a route
                 when the route's host name is empty. The generated host name will

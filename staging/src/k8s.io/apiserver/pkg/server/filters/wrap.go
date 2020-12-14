@@ -28,7 +28,7 @@ import (
 )
 
 // WithPanicRecovery wraps an http Handler to recover and log panics (except in the special case of http.ErrAbortHandler panics, which suppress logging).
-func WithPanicRecovery(handler http.Handler, isTerminating func() bool, resolver request.RequestInfoResolver) http.Handler {
+func WithPanicRecovery(handler http.Handler, resolver request.RequestInfoResolver, isTerminating func() bool) http.Handler {
 	return withPanicRecovery(handler, func(w http.ResponseWriter, req *http.Request, err interface{}) {
 		if err == http.ErrAbortHandler {
 			// Honor the http.ErrAbortHandler sentinel panic value

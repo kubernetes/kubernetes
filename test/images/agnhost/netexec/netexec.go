@@ -40,13 +40,14 @@ import (
 )
 
 var (
-	httpPort    = 8080
-	udpPort     = 8081
-	sctpPort    = -1
-	shellPath   = "/bin/sh"
-	serverReady = &atomicBool{0}
-	certFile    = ""
-	privKeyFile = ""
+	httpPort     = 8080
+	udpPort      = 8081
+	sctpPort     = -1
+	shellPath    = "/bin/sh"
+	serverReady  = &atomicBool{0}
+	certFile     = ""
+	privKeyFile  = ""
+	httpOverride = ""
 )
 
 // CmdNetexec is used by agnhost Cobra.
@@ -69,7 +70,7 @@ var CmdNetexec = &cobra.Command{
   - "protocol": The protocol which will be used when making the request. Default value: "http".
     Acceptable values: "http", "udp", "sctp".
   - "tries": The number of times the request will be performed. Default value: "1".
-- "/echo": Returns the given "msg" ("/echo?msg=echoed_msg")
+- "/echo": Returns the given "msg" ("/echo?msg=echoed_msg"), with the optional status "code".
 - "/exit": Closes the server with the given code and graceful shutdown. The endpoint's parameters
 	are:
 	- "code": The exit code for the process. Default value: 0. Allows an integer [0-127].
@@ -83,6 +84,8 @@ var CmdNetexec = &cobra.Command{
   it exited.
 - "/hostname": Returns the server's hostname.
 - "/hostName": Returns the server's hostname.
+- "/redirect": Returns a redirect response to the given "location", with the optional status "code"
+  ("/redirect?location=/echo%3Fmsg=foobar&code=307").
 - "/shell": Executes the given "shellCommand" or "cmd" ("/shell?cmd=some-command") and
   returns a JSON containing the fields "output" (command's output) and "error" (command's
   error message). Returns "200 OK" if the command succeeded, "417 Expectation Failed" if not.
@@ -90,6 +93,13 @@ var CmdNetexec = &cobra.Command{
 - "/upload": Accepts a file to be uploaded, writing it in the "/uploads" folder on the host.
   Returns a JSON with the fields "output" (containing the file's name on the server) and
   "error" containing any potential server side errors.
+
+If "--tls-cert-file" is added (ideally in conjunction with "--tls-private-key-file", the HTTP server
+will be upgraded to HTTPS. The image has default, "localhost"-based cert/privkey files at
+"/localhost.crt" and "/localhost.key" (see: "porter" subcommand)
+
+If "--http-override" is set, the HTTP(S) server will always serve the override path & options,
+ignoring the request URL.
 
 It will also start a UDP server on the indicated UDP port that responds to the following commands:
 
@@ -112,6 +122,7 @@ func init() {
 		"File containing an x509 private key matching --tls-cert-file")
 	CmdNetexec.Flags().IntVar(&udpPort, "udp-port", 8081, "UDP Listen Port")
 	CmdNetexec.Flags().IntVar(&sctpPort, "sctp-port", -1, "SCTP Listen Port")
+	CmdNetexec.Flags().StringVar(&httpOverride, "http-override", "", "Override the HTTP handler to always respond as if it were a GET with this path & params")
 }
 
 // atomicBool uses load/store operations on an int32 to simulate an atomic boolean.
@@ -135,7 +146,21 @@ func (a *atomicBool) get() bool {
 
 func main(cmd *cobra.Command, args []string) {
 	exitCh := make(chan shutdownRequest)
-	addRoutes(exitCh)
+	if httpOverride != "" {
+		mux := http.NewServeMux()
+		addRoutes(mux, exitCh)
+
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			overrideReq, err := http.NewRequestWithContext(r.Context(), "GET", httpOverride, nil)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("override request failed: %v", err), http.StatusInternalServerError)
+				return
+			}
+			mux.ServeHTTP(w, overrideReq)
+		})
+	} else {
+		addRoutes(http.DefaultServeMux, exitCh)
+	}
 
 	go startUDPServer(udpPort)
 	if sctpPort != -1 {
@@ -150,22 +175,24 @@ func main(cmd *cobra.Command, args []string) {
 	}
 }
 
-func addRoutes(exitCh chan shutdownRequest) {
-	http.HandleFunc("/", rootHandler)
-	http.HandleFunc("/clientip", clientIPHandler)
-	http.HandleFunc("/echo", echoHandler)
-	http.HandleFunc("/exit", func(w http.ResponseWriter, req *http.Request) { exitHandler(w, req, exitCh) })
-	http.HandleFunc("/hostname", hostnameHandler)
-	http.HandleFunc("/shell", shellHandler)
-	http.HandleFunc("/upload", uploadHandler)
-	http.HandleFunc("/dial", dialHandler)
-	http.HandleFunc("/healthz", healthzHandler)
+func addRoutes(mux *http.ServeMux, exitCh chan shutdownRequest) {
+	mux.HandleFunc("/", rootHandler)
+	mux.HandleFunc("/clientip", clientIPHandler)
+	mux.HandleFunc("/dial", dialHandler)
+	mux.HandleFunc("/echo", echoHandler)
+	mux.HandleFunc("/exit", func(w http.ResponseWriter, req *http.Request) { exitHandler(w, req, exitCh) })
+	mux.HandleFunc("/healthz", healthzHandler)
+	mux.HandleFunc("/hostname", hostnameHandler)
+	mux.HandleFunc("/redirect", redirectHandler)
+	mux.HandleFunc("/shell", shellHandler)
+	mux.HandleFunc("/upload", uploadHandler)
 	// older handlers
-	http.HandleFunc("/hostName", hostNameHandler)
-	http.HandleFunc("/shutdown", shutdownHandler)
+	mux.HandleFunc("/hostName", hostNameHandler)
+	mux.HandleFunc("/shutdown", shutdownHandler)
 }
 
 func startServer(server *http.Server, exitCh chan shutdownRequest, fn func() error) {
+	log.Printf("Started HTTP server on port %d", httpPort)
 	go func() {
 		re := <-exitCh
 		ctx, cancelFn := context.WithTimeout(context.Background(), re.timeout)
@@ -190,8 +217,18 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func echoHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("GET /echo?msg=%s", r.FormValue("msg"))
-	fmt.Fprintf(w, "%s", r.FormValue("msg"))
+	msg := r.FormValue("msg")
+	codeString := r.FormValue("code")
+	log.Printf("GET /echo?msg=%s&code=%s", msg, codeString)
+	if codeString != "" {
+		code, err := strconv.Atoi(codeString)
+		if err != nil && codeString != "" {
+			fmt.Fprintf(w, "argument 'code' must be an integer or empty, got %q\n", codeString)
+			return
+		}
+		w.WriteHeader(code)
+	}
+	fmt.Fprintf(w, "%s", msg)
 }
 
 func clientIPHandler(w http.ResponseWriter, r *http.Request) {
@@ -488,6 +525,22 @@ func hostNameHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, getHostName())
 }
 
+func redirectHandler(w http.ResponseWriter, r *http.Request) {
+	location := r.FormValue("location")
+	codeString := r.FormValue("code")
+	log.Printf("%s /redirect?msg=%s&code=%s", r.Method, location, codeString)
+	code := http.StatusFound
+	if codeString != "" {
+		var err error
+		code, err = strconv.Atoi(codeString)
+		if err != nil && codeString != "" {
+			fmt.Fprintf(w, "argument 'code' must be an integer or empty, got %q\n", codeString)
+			return
+		}
+	}
+	http.Redirect(w, r, location, code)
+}
+
 // udp server supports the hostName, echo and clientIP commands.
 func startUDPServer(udpPort int) {
 	serverAddress, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", udpPort))
@@ -497,7 +550,7 @@ func startUDPServer(udpPort int) {
 	defer serverConn.Close()
 	buf := make([]byte, 2048)
 
-	log.Printf("Started UDP server")
+	log.Printf("Started UDP server on port %d", udpPort)
 	// Start responding to readiness probes.
 	serverReady.set(true)
 	defer func() {

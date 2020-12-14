@@ -666,8 +666,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 					},
 				},
 			},
-			expected: withVendorExtensions(new(spec.Schema), "x-kubernetes-preserve-unknown-fields", true).
-				Typed("object", ""),
+			expected: withVendorExtensions(new(spec.Schema), "x-kubernetes-preserve-unknown-fields", true),
 		},
 	}
 

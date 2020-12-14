@@ -22,27 +22,24 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
-
-	lru "github.com/hashicorp/golang-lru"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
+	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
-	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 )
 
 func getResourceList(cpu, memory string) api.ResourceList {
@@ -95,44 +92,25 @@ func validPersistentVolumeClaim(name string, resources api.ResourceRequirements)
 	}
 }
 
-func TestPrettyPrint(t *testing.T) {
-	toResourceList := func(resources map[corev1.ResourceName]string) corev1.ResourceList {
-		resourceList := corev1.ResourceList{}
-		for key, value := range resources {
-			resourceList[key] = resource.MustParse(value)
-		}
-		return resourceList
+func createHandler(kubeClient kubernetes.Interface, informerFactory informers.SharedInformerFactory, stopCh chan struct{}) (*resourcequota.QuotaAdmission, error) {
+	return createHandlerWithConfig(kubeClient, informerFactory, nil, stopCh)
+}
+
+func createHandlerWithConfig(kubeClient kubernetes.Interface, informerFactory informers.SharedInformerFactory, config *resourcequotaapi.Configuration, stopCh chan struct{}) (*resourcequota.QuotaAdmission, error) {
+	if config == nil {
+		config = &resourcequotaapi.Configuration{}
 	}
-	testCases := []struct {
-		input    corev1.ResourceList
-		expected string
-	}{
-		{
-			input: toResourceList(map[corev1.ResourceName]string{
-				corev1.ResourceCPU: "100m",
-			}),
-			expected: "cpu=100m",
-		},
-		{
-			input: toResourceList(map[corev1.ResourceName]string{
-				corev1.ResourcePods:                   "10",
-				corev1.ResourceServices:               "10",
-				corev1.ResourceReplicationControllers: "10",
-				corev1.ResourceServicesNodePorts:      "10",
-				corev1.ResourceRequestsCPU:            "100m",
-				corev1.ResourceRequestsMemory:         "100Mi",
-				corev1.ResourceLimitsCPU:              "100m",
-				corev1.ResourceLimitsMemory:           "100Mi",
-			}),
-			expected: "limits.cpu=100m,limits.memory=100Mi,pods=10,replicationcontrollers=10,requests.cpu=100m,requests.memory=100Mi,services=10,services.nodeports=10",
-		},
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+
+	handler, err := resourcequota.NewResourceQuota(config, 5, stopCh)
+	if err != nil {
+		return nil, err
 	}
-	for i, testCase := range testCases {
-		result := prettyPrint(testCase.input)
-		if result != testCase.expected {
-			t.Errorf("Pretty print did not give stable sorted output[%d], expected %v, but got %v", i, testCase.expected, result)
-		}
-	}
+	handler.SetExternalKubeClientSet(kubeClient)
+	handler.SetExternalKubeInformerFactory(informerFactory)
+	handler.SetQuotaConfiguration(quotaConfiguration)
+
+	return handler, nil
 }
 
 // TestAdmissionIgnoresDelete verifies that the admission controller ignores delete operations
@@ -141,20 +119,15 @@ func TestAdmissionIgnoresDelete(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset()
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	namespace := "default"
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(nil, nil, api.Kind("Pod").WithVersion("version"), namespace, "name", corev1.Resource("pods").WithVersion("version"), "", admission.Delete, &metav1.DeleteOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(nil, nil, api.Kind("Pod").WithVersion("version"), namespace, "name", corev1.Resource("pods").WithVersion("version"), "", admission.Delete, &metav1.DeleteOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("ResourceQuota should admit all deletes: %v", err)
 	}
@@ -177,21 +150,16 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset()
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("123", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Errorf("Expected an error because the pod exceeded allowed quota")
 	}
@@ -222,21 +190,16 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -304,22 +267,17 @@ func TestAdmitDryRun(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, true, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, true, nil), nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -359,18 +317,13 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	// old service was a load balancer, but updated version is a node port.
@@ -385,7 +338,7 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 			Ports: []api.ServicePort{{Port: 1234}},
 		},
 	}
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -458,18 +411,13 @@ func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	oldPVC := &api.PersistentVolumeClaim{
@@ -486,7 +434,7 @@ func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
 		},
 	}
 
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -517,18 +465,13 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	oldPVC := &api.PersistentVolumeClaim{
@@ -545,7 +488,7 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 		},
 	}
 
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -616,18 +559,13 @@ func TestAdmitHandlesCreatingUpdates(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	// old service didn't exist, so this update is actually a create
@@ -642,7 +580,7 @@ func TestAdmitHandlesCreatingUpdates(t *testing.T) {
 			Ports: []api.ServicePort{{Port: 1234}},
 		},
 	}
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newService, oldService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newService, oldService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -711,21 +649,16 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Errorf("Expected an error exceeding quota")
 	}
@@ -756,22 +689,17 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	// verify all values are specified as required on the quota
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("200m", "")))
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Errorf("Expected an error because the pod does not specify a memory limit")
 	}
@@ -796,35 +724,24 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 			},
 		},
 	}
-	liveLookupCache, err := lru.New(100)
-	if err != nil {
-		t.Fatal(err)
-	}
+
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	quotaAccessor.liveLookupCache = liveLookupCache
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	// Add to the index
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
-	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("200m", "")))
-	// Add to the lru cache so we do not do a live client lookup
-	liveLookupCache.Add(newPod.Namespace, liveLookupEntry{expiry: time.Now().Add(time.Duration(30 * time.Second)), items: []*corev1.ResourceQuota{}})
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("200m", "")))
 	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
-		t.Errorf("Did not expect an error because the pod is in a different namespace than the quota")
+		t.Errorf("Did not expect an error because the pod is in a different namespace than the quota: %v", err)
 	}
 }
 
@@ -872,18 +789,13 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset(resourceQuotaTerminating, resourceQuotaNonTerminating)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaNonTerminating)
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaTerminating)
 
@@ -891,7 +803,7 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
 	activeDeadlineSeconds := int64(30)
 	newPod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -978,24 +890,19 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset(resourceQuotaBestEffort, resourceQuotaNotBestEffort)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaBestEffort)
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaNotBestEffort)
 
 	// create a pod that is best effort because it does not make a request for anything
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")))
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1071,21 +978,16 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")))
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1093,66 +995,6 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 	decimatedActions := removeListWatch(kubeClient.Actions())
 	if len(decimatedActions) != 0 {
 		t.Errorf("Expected no client actions because the incoming pod did not match best effort quota: %v", kubeClient.Actions())
-	}
-}
-
-func TestHasUsageStats(t *testing.T) {
-	testCases := map[string]struct {
-		a        corev1.ResourceQuota
-		relevant []corev1.ResourceName
-		expected bool
-	}{
-		"empty": {
-			a:        corev1.ResourceQuota{Status: corev1.ResourceQuotaStatus{Hard: corev1.ResourceList{}}},
-			relevant: []corev1.ResourceName{corev1.ResourceMemory},
-			expected: true,
-		},
-		"hard-only": {
-			a: corev1.ResourceQuota{
-				Status: corev1.ResourceQuotaStatus{
-					Hard: corev1.ResourceList{
-						corev1.ResourceMemory: resource.MustParse("1Gi"),
-					},
-					Used: corev1.ResourceList{},
-				},
-			},
-			relevant: []corev1.ResourceName{corev1.ResourceMemory},
-			expected: false,
-		},
-		"hard-used": {
-			a: corev1.ResourceQuota{
-				Status: corev1.ResourceQuotaStatus{
-					Hard: corev1.ResourceList{
-						corev1.ResourceMemory: resource.MustParse("1Gi"),
-					},
-					Used: corev1.ResourceList{
-						corev1.ResourceMemory: resource.MustParse("500Mi"),
-					},
-				},
-			},
-			relevant: []corev1.ResourceName{corev1.ResourceMemory},
-			expected: true,
-		},
-		"hard-used-relevant": {
-			a: corev1.ResourceQuota{
-				Status: corev1.ResourceQuotaStatus{
-					Hard: corev1.ResourceList{
-						corev1.ResourceMemory: resource.MustParse("1Gi"),
-						corev1.ResourcePods:   resource.MustParse("1"),
-					},
-					Used: corev1.ResourceList{
-						corev1.ResourceMemory: resource.MustParse("500Mi"),
-					},
-				},
-			},
-			relevant: []corev1.ResourceName{corev1.ResourceMemory},
-			expected: true,
-		},
-	}
-	for testName, testCase := range testCases {
-		if result := hasUsageStats(&testCase.a, testCase.relevant); result != testCase.expected {
-			t.Errorf("%s expected: %v, actual: %v", testName, testCase.expected, result)
-		}
 	}
 }
 
@@ -1176,25 +1018,20 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	newPod := validPod("pod-without-namespace", 1, getResourceRequirements(getResourceList("1", "2Gi"), getResourceList("", "")))
 
 	// unset the namespace
 	newPod.ObjectMeta.Namespace = ""
 
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("Got unexpected error: %v", err)
 	}
@@ -1222,22 +1059,17 @@ func TestAdmitRejectsNegativeUsage(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 	// verify quota rejects negative pvc storage requests
 	newPvc := validPersistentVolumeClaim("not-allowed-pvc", getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("-1Gi")}, api.ResourceList{}))
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPvc, nil, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPvc.Namespace, newPvc.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPvc, nil, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPvc.Namespace, newPvc.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Errorf("Expected an error because the pvc has negative storage usage")
 	}
@@ -1269,23 +1101,18 @@ func TestAdmitWhenUnrelatedResourceExceedsQuota(t *testing.T) {
 	defer close(stopCh)
 
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
-	config := &resourcequotaapi.Configuration{}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
 	// create a pod that should pass existing quota
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")))
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1297,10 +1124,7 @@ func TestAdmitLimitedResourceNoQuota(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
 	// disable consumption of cpu unless there is a covering quota.
 	config := &resourcequotaapi.Configuration{
@@ -1311,15 +1135,14 @@ func TestAdmitLimitedResourceNoQuota(t *testing.T) {
 			},
 		},
 	}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandlerWithConfig(kubeClient, informerFactory, config, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Errorf("Expected an error for consuming a limited resource without quota.")
 	}
@@ -1331,10 +1154,7 @@ func TestAdmitLimitedResourceNoQuotaIgnoresNonMatchingResources(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
 	// disable consumption of cpu unless there is a covering quota.
 	config := &resourcequotaapi.Configuration{
@@ -1345,15 +1165,14 @@ func TestAdmitLimitedResourceNoQuotaIgnoresNonMatchingResources(t *testing.T) {
 			},
 		},
 	}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandlerWithConfig(kubeClient, informerFactory, config, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -1377,10 +1196,7 @@ func TestAdmitLimitedResourceWithQuota(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
 	// disable consumption of cpu unless there is a covering quota.
 	// disable consumption of cpu unless there is a covering quota.
@@ -1392,16 +1208,15 @@ func TestAdmitLimitedResourceWithQuota(t *testing.T) {
 			},
 		},
 	}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandlerWithConfig(kubeClient, informerFactory, config, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	indexer.Add(resourceQuota)
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1436,10 +1251,7 @@ func TestAdmitLimitedResourceWithMultipleQuota(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
 	// disable consumption of cpu unless there is a covering quota.
 	// disable consumption of cpu unless there is a covering quota.
@@ -1451,17 +1263,16 @@ func TestAdmitLimitedResourceWithMultipleQuota(t *testing.T) {
 			},
 		},
 	}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandlerWithConfig(kubeClient, informerFactory, config, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	indexer.Add(resourceQuota1)
 	indexer.Add(resourceQuota2)
 	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1485,10 +1296,7 @@ func TestAdmitLimitedResourceWithQuotaThatDoesNotCover(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
 	// disable consumption of cpu unless there is a covering quota.
 	// disable consumption of cpu unless there is a covering quota.
@@ -1500,16 +1308,15 @@ func TestAdmitLimitedResourceWithQuotaThatDoesNotCover(t *testing.T) {
 			},
 		},
 	}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandlerWithConfig(kubeClient, informerFactory, config, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
+
 	indexer.Add(resourceQuota)
 	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Fatalf("Expected an error since the quota did not cover cpu")
 	}
@@ -2154,23 +1961,18 @@ func TestAdmitLimitedScopeWithCoverQuota(t *testing.T) {
 		stopCh := make(chan struct{})
 		defer close(stopCh)
 
-		informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-		quotaAccessor, _ := newQuotaAccessor()
-		quotaAccessor.client = kubeClient
-		quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
+		informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
-		quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-		evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
-
-		handler := &QuotaAdmission{
-			Handler:   admission.NewHandler(admission.Create, admission.Update),
-			evaluator: evaluator,
+		handler, err := createHandlerWithConfig(kubeClient, informerFactory, config, stopCh)
+		if err != nil {
+			t.Errorf("Error occurred while creating admission plugin: %v", err)
 		}
+
 		indexer.Add(resourceQuota)
 		if testCase.anotherQuota != nil {
 			indexer.Add(testCase.anotherQuota)
 		}
-		err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+		err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 		if testCase.expErr == "" {
 			if err != nil {
 				t.Fatalf("Testcase, %v, failed with unexpected error: %v. ExpErr: %v", testCase.description, err, testCase.expErr)
@@ -2191,10 +1993,7 @@ func TestAdmitZeroDeltaUsageWithoutCoveringQuota(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
 	// disable services unless there is a covering quota.
 	config := &resourcequotaapi.Configuration{
@@ -2205,12 +2004,10 @@ func TestAdmitZeroDeltaUsageWithoutCoveringQuota(t *testing.T) {
 			},
 		},
 	}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandlerWithConfig(kubeClient, informerFactory, config, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
 
 	existingService := &api.Service{
@@ -2222,7 +2019,7 @@ func TestAdmitZeroDeltaUsageWithoutCoveringQuota(t *testing.T) {
 		Spec:       api.ServiceSpec{Type: api.ServiceTypeLoadBalancer},
 	}
 
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2234,10 +2031,7 @@ func TestAdmitRejectIncreaseUsageWithoutCoveringQuota(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
 	// disable services unless there is a covering quota.
 	config := &resourcequotaapi.Configuration{
@@ -2248,12 +2042,10 @@ func TestAdmitRejectIncreaseUsageWithoutCoveringQuota(t *testing.T) {
 			},
 		},
 	}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandlerWithConfig(kubeClient, informerFactory, config, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
 
 	existingService := &api.Service{
@@ -2268,7 +2060,7 @@ func TestAdmitRejectIncreaseUsageWithoutCoveringQuota(t *testing.T) {
 		Spec:       api.ServiceSpec{Type: api.ServiceTypeLoadBalancer},
 	}
 
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Errorf("Expected an error for consuming a limited resource without quota.")
 	}
@@ -2280,10 +2072,7 @@ func TestAdmitAllowDecreaseUsageWithoutCoveringQuota(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-	quotaAccessor, _ := newQuotaAccessor()
-	quotaAccessor.client = kubeClient
-	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
 	// disable services unless there is a covering quota.
 	config := &resourcequotaapi.Configuration{
@@ -2294,12 +2083,10 @@ func TestAdmitAllowDecreaseUsageWithoutCoveringQuota(t *testing.T) {
 			},
 		},
 	}
-	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
-	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
 
-	handler := &QuotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+	handler, err := createHandlerWithConfig(kubeClient, informerFactory, config, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
 	}
 
 	existingService := &api.Service{
@@ -2314,7 +2101,8 @@ func TestAdmitAllowDecreaseUsageWithoutCoveringQuota(t *testing.T) {
 		},
 	}
 
-	err := handler.Validate(context.TODO(), admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
+
 	if err != nil {
 		t.Errorf("Expected no error for decreasing a limited resource without quota, got %v", err)
 	}

@@ -3,7 +3,9 @@ kind: CustomResourceDefinition
 metadata:
   name: infrastructures.config.openshift.io
   annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
 spec:
   group: config.openshift.io
   names:
@@ -172,7 +174,9 @@ spec:
               type: string
             etcdDiscoveryDomain:
               description: 'etcdDiscoveryDomain is the domain used to fetch the SRV
-                records for discovering etcd servers and clients. For more info: https://github.com/etcd-io/etcd/blob/329be66e8b3f9e2e6af83c123ff89297e49ebd15/Documentation/op-guide/clustering.md#dns-discovery'
+                records for discovering etcd servers and clients. For more info: https://github.com/etcd-io/etcd/blob/329be66e8b3f9e2e6af83c123ff89297e49ebd15/Documentation/op-guide/clustering.md#dns-discovery
+                deprecated: as of 4.7, this field is no longer set or honored.  It
+                will be removed in a future release.'
               type: string
             infrastructureName:
               description: infrastructureName uniquely identifies a cluster with a

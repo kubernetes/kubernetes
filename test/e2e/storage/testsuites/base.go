@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
@@ -83,13 +84,15 @@ var BaseSuites = []func() TestSuite{
 	InitDisruptiveTestSuite,
 	InitVolumeLimitsTestSuite,
 	InitTopologyTestSuite,
-	InitStressTestSuite,
+	InitVolumeStressTestSuite,
+	InitFsGroupChangePolicyTestSuite,
 }
 
 // CSISuites is a list of storage test suites that work only for CSI drivers
 var CSISuites = append(BaseSuites,
 	InitEphemeralTestSuite,
 	InitSnapshottableTestSuite,
+	InitSnapshottableStressTestSuite,
 )
 
 // TestSuite represents an interface for a set of tests which works with TestDriver
@@ -174,7 +177,7 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	if !dInfo.SupportedFsType.Has(pattern.FsType) {
 		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.FsType)
 	}
-	if pattern.FsType == "xfs" && framework.NodeOSDistroIs("gci", "cos", "windows") {
+	if pattern.FsType == "xfs" && framework.NodeOSDistroIs("windows") {
 		e2eskipper.Skipf("Distro doesn't support xfs -- skipping")
 	}
 	if pattern.FsType == "ntfs" && !framework.NodeOSDistroIs("windows") {
@@ -570,6 +573,57 @@ func getSnapshot(claimName string, ns, snapshotClassName string) *unstructured.U
 	}
 
 	return snapshot
+}
+func getPreProvisionedSnapshot(snapName, ns, snapshotContentName string) *unstructured.Unstructured {
+	snapshot := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "VolumeSnapshot",
+			"apiVersion": snapshotAPIVersion,
+			"metadata": map[string]interface{}{
+				"name":      snapName,
+				"namespace": ns,
+			},
+			"spec": map[string]interface{}{
+				"source": map[string]interface{}{
+					"volumeSnapshotContentName": snapshotContentName,
+				},
+			},
+		},
+	}
+
+	return snapshot
+}
+func getPreProvisionedSnapshotContent(snapcontentName, snapshotName, snapshotNamespace, snapshotHandle, deletionPolicy, csiDriverName string) *unstructured.Unstructured {
+	snapshotContent := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "VolumeSnapshotContent",
+			"apiVersion": snapshotAPIVersion,
+			"metadata": map[string]interface{}{
+				"name": snapcontentName,
+			},
+			"spec": map[string]interface{}{
+				"source": map[string]interface{}{
+					"snapshotHandle": snapshotHandle,
+				},
+				"volumeSnapshotRef": map[string]interface{}{
+					"name":      snapshotName,
+					"namespace": snapshotNamespace,
+				},
+				"driver":         csiDriverName,
+				"deletionPolicy": deletionPolicy,
+			},
+		},
+	}
+
+	return snapshotContent
+}
+
+func getPreProvisionedSnapshotContentName(uuid types.UID) string {
+	return fmt.Sprintf("pre-provisioned-snapcontent-%s", string(uuid))
+}
+
+func getPreProvisionedSnapshotName(uuid types.UID) string {
+	return fmt.Sprintf("pre-provisioned-snapshot-%s", string(uuid))
 }
 
 // StartPodLogs begins capturing log output and events from current

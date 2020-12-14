@@ -25,4 +25,7 @@ filters:
   "^vendor/.*":
     labels:
     - "vendor-update"
+  "^staging/.*":
+    labels:
+    - "vendor-update"
 component: kube-apiserver

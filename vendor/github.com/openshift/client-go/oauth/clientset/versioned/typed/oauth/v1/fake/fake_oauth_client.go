@@ -28,6 +28,10 @@ func (c *FakeOauthV1) OAuthClientAuthorizations() v1.OAuthClientAuthorizationInt
 	return &FakeOAuthClientAuthorizations{c}
 }
 
+func (c *FakeOauthV1) UserOAuthAccessTokens() v1.UserOAuthAccessTokenInterface {
+	return &FakeUserOAuthAccessTokens{c}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeOauthV1) RESTClient() rest.Interface {

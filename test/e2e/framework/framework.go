@@ -473,6 +473,38 @@ func (f *Framework) AfterEach() {
 	}
 }
 
+// DeleteNamespace can be used to delete a namespace. Additionally it can be used to
+// dump namespace information so as it can be used as an alternative of framework
+// deleting the namespace towards the end.
+func (f *Framework) DeleteNamespace(name string) {
+	defer func() {
+		err := f.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), name, metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			Logf("error deleting namespace %s: %v", name, err)
+			return
+		}
+		err = WaitForNamespacesDeleted(f.ClientSet, []string{name}, DefaultNamespaceDeletionTimeout)
+		if err != nil {
+			Logf("error deleting namespace %s: %v", name, err)
+			return
+		}
+		// remove deleted namespace from namespacesToDelete map
+		for i, ns := range f.namespacesToDelete {
+			if ns == nil {
+				continue
+			}
+			if ns.Name == name {
+				f.namespacesToDelete = append(f.namespacesToDelete[:i], f.namespacesToDelete[i+1:]...)
+			}
+		}
+	}()
+	// if current test failed then we should dump namespace information
+	if !f.SkipNamespaceCreation && ginkgo.CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
+		DumpAllNamespaceInfo(f.ClientSet, name)
+	}
+
+}
+
 // CreateNamespace creates a namespace for e2e testing.
 func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (*v1.Namespace, error) {
 	createTestingNS := TestContext.CreateTestingNS
@@ -537,8 +569,8 @@ type KubeUser struct {
 	Name string `yaml:"name"`
 	User struct {
 		Username string `yaml:"username"`
-		Password string `yaml:"password"`
-		Token    string `yaml:"token"`
+		Password string `yaml:"password" datapolicy:"password"`
+		Token    string `yaml:"token" datapolicy:"token"`
 	} `yaml:"user"`
 }
 

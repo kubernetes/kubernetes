@@ -24,6 +24,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
+// SetDefaults_FlunderSpec sets defaults for Flunder spec
 func SetDefaults_FlunderSpec(obj *FlunderSpec) {
 	if (obj.ReferenceType == nil || len(*obj.ReferenceType) == 0) && len(obj.Reference) != 0 {
 		t := FlunderReferenceType

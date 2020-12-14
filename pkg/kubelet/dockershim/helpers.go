@@ -289,15 +289,15 @@ func recoverFromCreationConflictIfNeeded(client libdocker.Interface, createConfi
 
 	id := matches[1]
 	klog.Warningf("Unable to create pod sandbox due to conflict. Attempting to remove sandbox %q", id)
-	if rmErr := client.RemoveContainer(id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true}); rmErr == nil {
+	rmErr := client.RemoveContainer(id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
+	if rmErr == nil {
 		klog.V(2).Infof("Successfully removed conflicting container %q", id)
 		return nil, err
-	} else {
-		klog.Errorf("Failed to remove the conflicting container %q: %v", id, rmErr)
-		// Return if the error is not container not found error.
-		if !libdocker.IsContainerNotFoundError(rmErr) {
-			return nil, err
-		}
+	}
+	klog.Errorf("Failed to remove the conflicting container %q: %v", id, rmErr)
+	// Return if the error is not container not found error.
+	if !libdocker.IsContainerNotFoundError(rmErr) {
+		return nil, err
 	}
 
 	// randomize the name to avoid conflict.

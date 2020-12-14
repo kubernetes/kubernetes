@@ -130,7 +130,7 @@ func TestValidateGitHubIdentityProvider(t *testing.T) {
 				mappingMethod: "",
 			},
 			errors: field.ErrorList{
-				{Type: field.ErrorTypeInvalid, Field: "ca.name", BadValue: "ca&config-map", Detail: "a DNS-1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"},
+				{Type: field.ErrorTypeInvalid, Field: "ca.name", BadValue: "ca&config-map", Detail: "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"},
 				{Type: field.ErrorTypeInvalid, Field: "ca", BadValue: configv1.ConfigMapNameReference{Name: "ca&config-map"}, Detail: "cannot be specified when hostname is empty"},
 			},
 		},
@@ -180,7 +180,7 @@ func TestValidateGitHubIdentityProvider(t *testing.T) {
 				mappingMethod: "",
 			},
 			errors: field.ErrorList{
-				{Type: field.ErrorTypeInvalid, Field: "", BadValue: nil, Detail: "one of organizations or teams must be specified unless hostname is set or lookup is used"},
+				{Type: field.ErrorTypeInvalid, Field: "<nil>", BadValue: nil, Detail: "one of organizations or teams must be specified unless hostname is set or lookup is used"},
 			},
 		},
 		{

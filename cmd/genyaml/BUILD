@@ -17,7 +17,7 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/genyaml",
     deps = [
         "//cmd/genutils:go_default_library",
-        "//pkg/kubectl/cmd:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",

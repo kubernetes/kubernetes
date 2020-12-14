@@ -232,16 +232,20 @@ func (s *CidrSet) Release(cidr *net.IPNet) error {
 	s.Lock()
 	defer s.Unlock()
 	for i := begin; i <= end; i++ {
-		s.used.SetBit(&s.used, i, 0)
-		s.allocatedCIDRs--
-		cidrSetReleases.WithLabelValues(s.label).Inc()
+		// Only change the counters if we change the bit to prevent
+		// double counting.
+		if s.used.Bit(i) != 0 {
+			s.used.SetBit(&s.used, i, 0)
+			s.allocatedCIDRs--
+			cidrSetReleases.WithLabelValues(s.label).Inc()
+		}
 	}
 
 	cidrSetUsage.WithLabelValues(s.label).Set(float64(s.allocatedCIDRs) / float64(s.maxCIDRs))
 	return nil
 }
 
-// Occupy marks the given CIDR range as used. Occupy does not check if the CIDR
+// Occupy marks the given CIDR range as used. Occupy succeeds even if the CIDR
 // range was previously used.
 func (s *CidrSet) Occupy(cidr *net.IPNet) (err error) {
 	begin, end, err := s.getBeginingAndEndIndices(cidr)
@@ -251,9 +255,13 @@ func (s *CidrSet) Occupy(cidr *net.IPNet) (err error) {
 	s.Lock()
 	defer s.Unlock()
 	for i := begin; i <= end; i++ {
-		s.used.SetBit(&s.used, i, 1)
-		s.allocatedCIDRs++
-		cidrSetAllocations.WithLabelValues(s.label).Inc()
+		// Only change the counters if we change the bit to prevent
+		// double counting.
+		if s.used.Bit(i) == 0 {
+			s.used.SetBit(&s.used, i, 1)
+			s.allocatedCIDRs++
+			cidrSetAllocations.WithLabelValues(s.label).Inc()
+		}
 	}
 
 	cidrSetUsage.WithLabelValues(s.label).Set(float64(s.allocatedCIDRs) / float64(s.maxCIDRs))

@@ -72,6 +72,9 @@ type Config struct {
 
 	// Called whenever the ListAndWatch drops the connection with an error.
 	WatchErrorHandler WatchErrorHandler
+
+	// WatchListPageSize is the requested chunk size of initial and relist watch lists.
+	WatchListPageSize int64
 }
 
 // ShouldResyncFunc is a type of function that indicates if a reflector should perform a
@@ -134,6 +137,7 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 		c.config.FullResyncPeriod,
 	)
 	r.ShouldResync = c.config.ShouldResync
+	r.WatchListPageSize = c.config.WatchListPageSize
 	r.clock = c.clock
 	if c.config.WatchErrorHandler != nil {
 		r.watchErrorHandler = c.config.WatchErrorHandler

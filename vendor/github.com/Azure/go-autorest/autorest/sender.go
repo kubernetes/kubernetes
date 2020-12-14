@@ -257,6 +257,12 @@ func DoRetryForAttempts(attempts int, backoff time.Duration) SendDecorator {
 	}
 }
 
+// Count429AsRetry indicates that a 429 response should be included as a retry attempt.
+var Count429AsRetry = true
+
+// Max429Delay is the maximum duration to wait between retries on a 429 if no Retry-After header was received.
+var Max429Delay time.Duration
+
 // DoRetryForStatusCodes returns a SendDecorator that retries for specified statusCodes for up to the specified
 // number of attempts, exponentially backing off between requests using the supplied backoff
 // time.Duration (which may be zero). Retrying may be canceled by cancelling the context on the http.Request.
@@ -264,7 +270,7 @@ func DoRetryForAttempts(attempts int, backoff time.Duration) SendDecorator {
 func DoRetryForStatusCodes(attempts int, backoff time.Duration, codes ...int) SendDecorator {
 	return func(s Sender) Sender {
 		return SenderFunc(func(r *http.Request) (*http.Response, error) {
-			return doRetryForStatusCodesImpl(s, r, false, attempts, backoff, 0, codes...)
+			return doRetryForStatusCodesImpl(s, r, Count429AsRetry, attempts, backoff, 0, codes...)
 		})
 	}
 }
@@ -276,7 +282,7 @@ func DoRetryForStatusCodes(attempts int, backoff time.Duration, codes ...int) Se
 func DoRetryForStatusCodesWithCap(attempts int, backoff, cap time.Duration, codes ...int) SendDecorator {
 	return func(s Sender) Sender {
 		return SenderFunc(func(r *http.Request) (*http.Response, error) {
-			return doRetryForStatusCodesImpl(s, r, true, attempts, backoff, cap, codes...)
+			return doRetryForStatusCodesImpl(s, r, Count429AsRetry, attempts, backoff, cap, codes...)
 		})
 	}
 }
@@ -297,11 +303,10 @@ func doRetryForStatusCodesImpl(s Sender, r *http.Request, count429 bool, attempt
 			return resp, err
 		}
 		delayed := DelayWithRetryAfter(resp, r.Context().Done())
-		// enforce a 2 minute cap between requests when 429 status codes are
-		// not going to be counted as an attempt and when the cap is 0.
-		// this should only happen in the absence of a retry-after header.
-		if !count429 && cap == 0 {
-			cap = 2 * time.Minute
+		// if this was a 429 set the delay cap as specified.
+		// applicable only in the absence of a retry-after header.
+		if resp != nil && resp.StatusCode == http.StatusTooManyRequests {
+			cap = Max429Delay
 		}
 		if !delayed && !DelayForBackoffWithCap(backoff, cap, delayCount, r.Context().Done()) {
 			return resp, r.Context().Err()

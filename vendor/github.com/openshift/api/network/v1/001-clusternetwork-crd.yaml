@@ -10,26 +10,26 @@ spec:
     plural: clusternetworks
     singular: clusternetwork
   scope: Cluster
-  additionalPrinterColumns:
-  - name: Cluster Network
-    type: string
-    description: The primary cluster network CIDR
-    JSONPath: .network
-  - name: Service Network
-    type: string
-    description: The service network CIDR
-    JSONPath: .serviceNetwork
-  - name: Plugin Name
-    type: string
-    description: The OpenShift SDN network plug-in in use
-    JSONPath: .pluginName
   version: v1
   versions:
   - name: v1
     served: true
     storage: true
-    "schema":
-      "openAPIV3Schema":
+    additionalPrinterColumns:
+    - name: Cluster Network
+      type: string
+      description: The primary cluster network CIDR
+      jsonPath: .network
+    - name: Service Network
+      type: string
+      description: The service network CIDR
+      jsonPath: .serviceNetwork
+    - name: Plugin Name
+      type: string
+      description: The OpenShift SDN network plug-in in use
+      jsonPath: .pluginName
+    schema:
+      openAPIV3Schema:
         description: ClusterNetwork describes the cluster network. There is normally
           only one object of this type, named "default", which is created by the SDN
           network plugin based on the master configuration when the cluster is brought

@@ -112,4 +112,12 @@ type RegistrySources struct {
 	// Only one of BlockedRegistries or AllowedRegistries may be set.
 	// +optional
 	AllowedRegistries []string `json:"allowedRegistries,omitempty"`
+	// containerRuntimeSearchRegistries are registries that will be searched when pulling images that do not have fully qualified
+	// domains in their pull specs. Registries will be searched in the order provided in the list.
+	// Note: this search list only works with the container runtime, i.e CRI-O. Will NOT work with builds or imagestream imports.
+	// +optional
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:Format=hostname
+	// +listType=set
+	ContainerRuntimeSearchRegistries []string `json:"containerRuntimeSearchRegistries,omitempty"`
 }

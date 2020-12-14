@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -45,6 +45,7 @@ func TestSchedulerDefaults(t *testing.T) {
 			name:   "empty config",
 			config: &v1beta1.KubeSchedulerConfiguration{},
 			expected: &v1beta1.KubeSchedulerConfiguration{
+				Parallelism:        pointer.Int32Ptr(16),
 				HealthzBindAddress: pointer.StringPtr("0.0.0.0:10251"),
 				MetricsBindAddress: pointer.StringPtr("0.0.0.0:10251"),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -56,7 +57,7 @@ func TestSchedulerDefaults(t *testing.T) {
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "endpointsleases",
+					ResourceLock:      "leases",
 					ResourceNamespace: "kube-system",
 					ResourceName:      "kube-scheduler",
 				},
@@ -85,6 +86,7 @@ func TestSchedulerDefaults(t *testing.T) {
 				},
 			},
 			expected: &v1beta1.KubeSchedulerConfiguration{
+				Parallelism:        pointer.Int32Ptr(16),
 				HealthzBindAddress: pointer.StringPtr("0.0.0.0:10251"),
 				MetricsBindAddress: pointer.StringPtr("0.0.0.0:10251"),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -96,7 +98,7 @@ func TestSchedulerDefaults(t *testing.T) {
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "endpointsleases",
+					ResourceLock:      "leases",
 					ResourceNamespace: "kube-system",
 					ResourceName:      "kube-scheduler",
 				},
@@ -121,6 +123,7 @@ func TestSchedulerDefaults(t *testing.T) {
 		{
 			name: "two profiles",
 			config: &v1beta1.KubeSchedulerConfiguration{
+				Parallelism: pointer.Int32Ptr(16),
 				Profiles: []v1beta1.KubeSchedulerProfile{
 					{
 						PluginConfig: []v1beta1.PluginConfig{
@@ -140,6 +143,7 @@ func TestSchedulerDefaults(t *testing.T) {
 				},
 			},
 			expected: &v1beta1.KubeSchedulerConfiguration{
+				Parallelism:        pointer.Int32Ptr(16),
 				HealthzBindAddress: pointer.StringPtr("0.0.0.0:10251"),
 				MetricsBindAddress: pointer.StringPtr("0.0.0.0:10251"),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -151,7 +155,7 @@ func TestSchedulerDefaults(t *testing.T) {
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "endpointsleases",
+					ResourceLock:      "leases",
 					ResourceNamespace: "kube-system",
 					ResourceName:      "kube-scheduler",
 				},
@@ -185,10 +189,12 @@ func TestSchedulerDefaults(t *testing.T) {
 		{
 			name: "metrics and healthz address with no port",
 			config: &v1beta1.KubeSchedulerConfiguration{
+				Parallelism:        pointer.Int32Ptr(16),
 				MetricsBindAddress: pointer.StringPtr("1.2.3.4"),
 				HealthzBindAddress: pointer.StringPtr("1.2.3.4"),
 			},
 			expected: &v1beta1.KubeSchedulerConfiguration{
+				Parallelism:        pointer.Int32Ptr(16),
 				HealthzBindAddress: pointer.StringPtr("1.2.3.4:10251"),
 				MetricsBindAddress: pointer.StringPtr("1.2.3.4:10251"),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -200,7 +206,7 @@ func TestSchedulerDefaults(t *testing.T) {
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "endpointsleases",
+					ResourceLock:      "leases",
 					ResourceNamespace: "kube-system",
 					ResourceName:      "kube-scheduler",
 				},
@@ -224,6 +230,7 @@ func TestSchedulerDefaults(t *testing.T) {
 				HealthzBindAddress: pointer.StringPtr(":12345"),
 			},
 			expected: &v1beta1.KubeSchedulerConfiguration{
+				Parallelism:        pointer.Int32Ptr(16),
 				HealthzBindAddress: pointer.StringPtr("0.0.0.0:12345"),
 				MetricsBindAddress: pointer.StringPtr("0.0.0.0:12345"),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -235,7 +242,42 @@ func TestSchedulerDefaults(t *testing.T) {
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "endpointsleases",
+					ResourceLock:      "leases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				PercentageOfNodesToScore: pointer.Int32Ptr(0),
+				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
+				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
+				Profiles: []v1beta1.KubeSchedulerProfile{
+					{SchedulerName: pointer.StringPtr("default-scheduler")},
+				},
+			},
+		},
+		{
+			name: "set non default parallelism",
+			config: &v1beta1.KubeSchedulerConfiguration{
+				Parallelism: pointer.Int32Ptr(8),
+			},
+			expected: &v1beta1.KubeSchedulerConfiguration{
+				Parallelism:        pointer.Int32Ptr(8),
+				HealthzBindAddress: pointer.StringPtr("0.0.0.0:10251"),
+				MetricsBindAddress: pointer.StringPtr("0.0.0.0:10251"),
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           &enable,
+					EnableContentionProfiling: &enable,
+				},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       pointer.BoolPtr(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "leases",
 					ResourceNamespace: "kube-system",
 					ResourceName:      "kube-scheduler",
 				},
@@ -265,11 +307,29 @@ func TestSchedulerDefaults(t *testing.T) {
 
 func TestPluginArgsDefaults(t *testing.T) {
 	tests := []struct {
-		name    string
-		feature featuregate.Feature
-		in      runtime.Object
-		want    runtime.Object
+		name     string
+		features map[featuregate.Feature]bool
+		in       runtime.Object
+		want     runtime.Object
 	}{
+		{
+			name: "DefaultPreemptionArgs empty",
+			in:   &v1beta1.DefaultPreemptionArgs{},
+			want: &v1beta1.DefaultPreemptionArgs{
+				MinCandidateNodesPercentage: pointer.Int32Ptr(10),
+				MinCandidateNodesAbsolute:   pointer.Int32Ptr(100),
+			},
+		},
+		{
+			name: "DefaultPreemptionArgs with value",
+			in: &v1beta1.DefaultPreemptionArgs{
+				MinCandidateNodesPercentage: pointer.Int32Ptr(50),
+			},
+			want: &v1beta1.DefaultPreemptionArgs{
+				MinCandidateNodesPercentage: pointer.Int32Ptr(50),
+				MinCandidateNodesAbsolute:   pointer.Int32Ptr(100),
+			},
+		},
 		{
 			name: "InterPodAffinityArgs empty",
 			in:   &v1beta1.InterPodAffinityArgs{},
@@ -367,7 +427,9 @@ func TestPluginArgsDefaults(t *testing.T) {
 		{
 			name: "PodTopologySpreadArgs resources empty",
 			in:   &v1beta1.PodTopologySpreadArgs{},
-			want: &v1beta1.PodTopologySpreadArgs{},
+			want: &v1beta1.PodTopologySpreadArgs{
+				DefaultingType: v1beta1.SystemDefaulting,
+			},
 		},
 		{
 			name: "PodTopologySpreadArgs resources with value",
@@ -388,25 +450,18 @@ func TestPluginArgsDefaults(t *testing.T) {
 						MaxSkew:           2,
 					},
 				},
+				// TODO(#94008): Make SystemDefaulting in v1beta2.
+				DefaultingType: v1beta1.ListDefaulting,
 			},
 		},
 		{
-			name:    "PodTopologySpreadArgs resources empty, NewPodTopologySpread feature enabled",
-			feature: features.DefaultPodTopologySpread,
-			in:      &v1beta1.PodTopologySpreadArgs{},
+			name: "PodTopologySpreadArgs empty, DefaultPodTopologySpread feature disabled",
+			features: map[featuregate.Feature]bool{
+				features.DefaultPodTopologySpread: false,
+			},
+			in: &v1beta1.PodTopologySpreadArgs{},
 			want: &v1beta1.PodTopologySpreadArgs{
-				DefaultConstraints: []v1.TopologySpreadConstraint{
-					{
-						TopologyKey:       v1.LabelHostname,
-						WhenUnsatisfiable: v1.ScheduleAnyway,
-						MaxSkew:           3,
-					},
-					{
-						TopologyKey:       v1.LabelZoneFailureDomainStable,
-						WhenUnsatisfiable: v1.ScheduleAnyway,
-						MaxSkew:           5,
-					},
-				},
+				DefaultingType: v1beta1.ListDefaulting,
 			},
 		},
 	}
@@ -414,8 +469,8 @@ func TestPluginArgsDefaults(t *testing.T) {
 		scheme := runtime.NewScheme()
 		utilruntime.Must(AddToScheme(scheme))
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.feature != "" {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tc.feature, true)()
+			for k, v := range tc.features {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
 			}
 			scheme.Default(tc.in)
 			if diff := cmp.Diff(tc.in, tc.want); diff != "" {

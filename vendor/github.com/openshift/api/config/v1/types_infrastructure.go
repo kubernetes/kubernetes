@@ -64,6 +64,7 @@ type InfrastructureStatus struct {
 	// etcdDiscoveryDomain is the domain used to fetch the SRV records for discovering
 	// etcd servers and clients.
 	// For more info: https://github.com/etcd-io/etcd/blob/329be66e8b3f9e2e6af83c123ff89297e49ebd15/Documentation/op-guide/clustering.md#dns-discovery
+	// deprecated: as of 4.7, this field is no longer set or honored.  It will be removed in a future release.
 	EtcdDiscoveryDomain string `json:"etcdDiscoveryDomain"`
 
 	// apiServerURL is a valid URI with scheme 'https', address and

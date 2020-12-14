@@ -880,8 +880,8 @@ func getPortURL(client clientset.Interface, ns, name string, svcPort int) (strin
 	if err != nil {
 		return "", err
 	}
-	// This list of nodes must not include the master, which is marked
-	// unschedulable, since the master doesn't run kube-proxy. Without
+	// This list of nodes must not include the any control plane nodes, which are marked
+	// unschedulable, since control plane nodes don't run kube-proxy. Without
 	// kube-proxy NodePorts won't work.
 	var nodes *v1.NodeList
 	if wait.PollImmediate(poll, framework.SingleCallTimeout, func() (bool, error) {

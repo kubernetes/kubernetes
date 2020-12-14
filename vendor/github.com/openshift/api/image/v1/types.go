@@ -162,7 +162,7 @@ type ImageStreamList struct {
 }
 
 // +genclient
-// +genclient:method=Secrets,verb=get,subresource=secrets,result=k8s.io/api/core/v1.SecretList
+// +genclient:method=Secrets,verb=get,subresource=secrets,result=github.com/openshift/api/image/v1.SecretList
 // +genclient:method=Layers,verb=get,subresource=layers,result=github.com/openshift/api/image/v1.ImageStreamLayers
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -632,3 +632,8 @@ type ImageImportStatus struct {
 	// Tag is the tag this image was located under, if any
 	Tag string `json:"tag,omitempty" protobuf:"bytes,3,opt,name=tag"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// SecretList is a list of Secret.
+type SecretList corev1.SecretList

@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -86,17 +86,17 @@ func (pl *SelectorSpread) Score(ctx context.Context, state *framework.CycleState
 
 	c, err := state.Read(preScoreStateKey)
 	if err != nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("Error reading %q from cycleState: %v", preScoreStateKey, err))
+		return 0, framework.AsStatus(fmt.Errorf("reading %q from cycleState: %w", preScoreStateKey, err))
 	}
 
 	s, ok := c.(*preScoreState)
 	if !ok {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("%+v convert to tainttoleration.preScoreState error", c))
+		return 0, framework.AsStatus(fmt.Errorf("cannot convert saved state to tainttoleration.preScoreState"))
 	}
 
 	nodeInfo, err := pl.sharedLister.NodeInfos().Get(nodeName)
 	if err != nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
 	count := countMatchingPods(pod.Namespace, s.selector, nodeInfo)
@@ -197,7 +197,7 @@ func (pl *SelectorSpread) PreScore(ctx context.Context, cycleState *framework.Cy
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	sharedLister := handle.SnapshotSharedLister()
 	if sharedLister == nil {
 		return nil, fmt.Errorf("SnapshotSharedLister is nil")

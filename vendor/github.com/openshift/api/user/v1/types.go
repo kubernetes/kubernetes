@@ -24,7 +24,8 @@ type User struct {
 	FullName string `json:"fullName,omitempty" protobuf:"bytes,2,opt,name=fullName"`
 
 	// Identities are the identities associated with this user
-	Identities []string `json:"identities" protobuf:"bytes,3,rep,name=identities"`
+	// +optional
+	Identities []string `json:"identities,omitempty" protobuf:"bytes,3,rep,name=identities"`
 
 	// Groups specifies group names this user is a member of.
 	// This field is deprecated and will be removed in a future release.

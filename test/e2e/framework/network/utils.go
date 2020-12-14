@@ -18,6 +18,7 @@ package network
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -45,6 +46,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -53,8 +55,9 @@ const (
 	// EndpointUDPPort is an endpoint UDP port for testing.
 	EndpointUDPPort = 8081
 	// EndpointSCTPPort is an endpoint SCTP port for testing.
-	EndpointSCTPPort      = 8082
-	testContainerHTTPPort = 8080
+	EndpointSCTPPort = 8082
+	// testContainerHTTPPort is the test container http port.
+	testContainerHTTPPort = 9080
 	// ClusterHTTPPort is a cluster HTTP port for testing.
 	ClusterHTTPPort = 80
 	// ClusterUDPPort is a cluster UDP port for testing.
@@ -89,9 +92,39 @@ const (
 // NetexecImageName is the image name for agnhost.
 var NetexecImageName = imageutils.GetE2EImage(imageutils.Agnhost)
 
+// Option is used to configure the NetworkingTest object
+type Option func(*NetworkingTestConfig)
+
+// EnableSCTP listen on SCTP ports on the endpoints
+func EnableSCTP(config *NetworkingTestConfig) {
+	config.SCTPEnabled = true
+}
+
+// EnableDualStack create Dual Stack services
+func EnableDualStack(config *NetworkingTestConfig) {
+	config.DualStackEnabled = true
+}
+
+// UseHostNetwork run the test container with HostNetwork=true.
+func UseHostNetwork(config *NetworkingTestConfig) {
+	config.HostNetwork = true
+}
+
+// EndpointsUseHostNetwork run the endpoints pods with HostNetwork=true.
+func EndpointsUseHostNetwork(config *NetworkingTestConfig) {
+	config.EndpointsHostNetwork = true
+}
+
 // NewNetworkingTestConfig creates and sets up a new test config helper.
-func NewNetworkingTestConfig(f *framework.Framework, hostNetwork, SCTPEnabled bool) *NetworkingTestConfig {
-	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork, SCTPEnabled: SCTPEnabled}
+func NewNetworkingTestConfig(f *framework.Framework, setters ...Option) *NetworkingTestConfig {
+	// default options
+	config := &NetworkingTestConfig{
+		f:         f,
+		Namespace: f.Namespace.Name,
+	}
+	for _, setter := range setters {
+		setter(config)
+	}
 	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setup(getServiceSelector())
 	return config
@@ -99,7 +132,12 @@ func NewNetworkingTestConfig(f *framework.Framework, hostNetwork, SCTPEnabled bo
 
 // NewCoreNetworkingTestConfig creates and sets up a new test config helper for Node E2E.
 func NewCoreNetworkingTestConfig(f *framework.Framework, hostNetwork bool) *NetworkingTestConfig {
-	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork}
+	// default options
+	config := &NetworkingTestConfig{
+		f:           f,
+		Namespace:   f.Namespace.Name,
+		HostNetwork: hostNetwork,
+	}
 	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setupCore(getServiceSelector())
 	return config
@@ -124,9 +162,13 @@ type NetworkingTestConfig struct {
 	HostTestContainerPod *v1.Pod
 	// if the HostTestContainerPod is running with HostNetwork=true.
 	HostNetwork bool
+	// if the endpoints Pods are running with HostNetwork=true.
+	EndpointsHostNetwork bool
 	// if the test pods are listening on sctp port. We need this as sctp tests
 	// are marked as disruptive as they may load the sctp module.
 	SCTPEnabled bool
+	// DualStackEnabled enables dual stack on services
+	DualStackEnabled bool
 	// EndpointPods are the pods belonging to the Service created by this
 	// test config. Each invocation of `setup` creates a service with
 	// 1 pod per node running the netexecImage.
@@ -139,17 +181,21 @@ type NetworkingTestConfig struct {
 	// SessionAffinityService is a Service with SessionAffinity=ClientIP
 	// spanning over all endpointPods.
 	SessionAffinityService *v1.Service
-	// ExternalAddrs is a list of external IPs of nodes in the cluster.
-	ExternalAddr string
 	// Nodes is a list of nodes in the cluster.
 	Nodes []v1.Node
 	// MaxTries is the number of retries tolerated for tests run against
 	// endpoints and services created by this config.
 	MaxTries int
-	// The ClusterIP of the Service reated by this test config.
+	// The ClusterIP of the Service created by this test config.
 	ClusterIP string
-	// External ip of first node for use in nodePort testing.
+	// The SecondaryClusterIP of the Service created by this test config.
+	SecondaryClusterIP string
+	// NodeIP it's an ExternalIP if the node has one,
+	// or an InternalIP if not, for use in nodePort testing.
 	NodeIP string
+	// SecondaryNodeIP it's an ExternalIP of the secondary IP family if the node has one,
+	// or an InternalIP if not, for usein nodePort testing.
+	SecondaryNodeIP string
 	// The http/udp/sctp nodePorts of the Service.
 	NodeHTTPPort int
 	NodeUDPPort  int
@@ -165,18 +211,18 @@ type NetexecDialResponse struct {
 	Errors    []string `json:"errors"`
 }
 
-// DialFromEndpointContainer executes a curl via kubectl exec in an endpoint container.
-func (config *NetworkingTestConfig) DialFromEndpointContainer(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) {
-	config.DialFromContainer(protocol, echoHostname, config.EndpointPods[0].Status.PodIP, targetIP, EndpointHTTPPort, targetPort, maxTries, minTries, expectedEps)
+// DialFromEndpointContainer executes a curl via kubectl exec in an endpoint container.   Returns an error to be handled by the caller.
+func (config *NetworkingTestConfig) DialFromEndpointContainer(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
+	return config.DialFromContainer(protocol, echoHostname, config.EndpointPods[0].Status.PodIP, targetIP, EndpointHTTPPort, targetPort, maxTries, minTries, expectedEps)
 }
 
-// DialFromTestContainer executes a curl via kubectl exec in a test container.
-func (config *NetworkingTestConfig) DialFromTestContainer(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) {
-	config.DialFromContainer(protocol, echoHostname, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, maxTries, minTries, expectedEps)
+// DialFromTestContainer executes a curl via kubectl exec in a test container. Returns an error to be handled by the caller.
+func (config *NetworkingTestConfig) DialFromTestContainer(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
+	return config.DialFromContainer(protocol, echoHostname, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, maxTries, minTries, expectedEps)
 }
 
-// DialEchoFromTestContainer executes a curl via kubectl exec in a test container. The response is expected to match the echoMessage.
-func (config *NetworkingTestConfig) DialEchoFromTestContainer(protocol, targetIP string, targetPort, maxTries, minTries int, echoMessage string) {
+// DialEchoFromTestContainer executes a curl via kubectl exec in a test container. The response is expected to match the echoMessage,  Returns an error to be handled by the caller.
+func (config *NetworkingTestConfig) DialEchoFromTestContainer(protocol, targetIP string, targetPort, maxTries, minTries int, echoMessage string) error {
 	expectedResponse := sets.NewString()
 	expectedResponse.Insert(echoMessage)
 	var dialCommand string
@@ -190,7 +236,7 @@ func (config *NetworkingTestConfig) DialEchoFromTestContainer(protocol, targetIP
 	} else {
 		dialCommand = fmt.Sprintf("echo%%20%s", echoMessage)
 	}
-	config.DialFromContainer(protocol, dialCommand, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, maxTries, minTries, expectedResponse)
+	return config.DialFromContainer(protocol, dialCommand, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, maxTries, minTries, expectedResponse)
 }
 
 // diagnoseMissingEndpoints prints debug information about the endpoints that
@@ -212,7 +258,11 @@ func (config *NetworkingTestConfig) diagnoseMissingEndpoints(foundEndpoints sets
 func (config *NetworkingTestConfig) EndpointHostnames() sets.String {
 	expectedEps := sets.NewString()
 	for _, p := range config.EndpointPods {
-		expectedEps.Insert(p.Name)
+		if config.EndpointsHostNetwork {
+			expectedEps.Insert(p.Spec.NodeSelector["kubernetes.io/hostname"])
+		} else {
+			expectedEps.Insert(p.Name)
+		}
 	}
 	return expectedEps
 }
@@ -247,7 +297,8 @@ func makeCURLDialCommand(ipPort, dialCmd, protocol, targetIP string, targetPort 
 // maxTries == minTries will confirm that we see the expected endpoints and no
 // more for maxTries. Use this if you want to eg: fail a readiness check on a
 // pod and confirm it doesn't show up as an endpoint.
-func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, containerIP, targetIP string, containerHTTPPort, targetPort, maxTries, minTries int, expectedResponses sets.String) {
+// Returns nil if no error, or error message if failed after trying maxTries.
+func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, containerIP, targetIP string, containerHTTPPort, targetPort, maxTries, minTries int, expectedResponses sets.String) error {
 	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
 	cmd := makeCURLDialCommand(ipPort, dialCommand, protocol, targetIP, targetPort)
 
@@ -272,16 +323,19 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, con
 
 		// Check against i+1 so we exit if minTries == maxTries.
 		if (responses.Equal(expectedResponses) || responses.Len() == 0 && expectedResponses.Len() == 0) && i+1 >= minTries {
-			return
+			framework.Logf("reached %v after %v/%v tries", targetIP, i, maxTries)
+			return nil
 		}
 		// TODO: get rid of this delay #36281
 		time.Sleep(hitEndpointRetryDelay)
 	}
-
 	if dialCommand == echoHostname {
 		config.diagnoseMissingEndpoints(responses)
 	}
-	framework.Failf("Failed to find expected responses:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, responses, expectedResponses)
+	returnMsg := fmt.Errorf("did not find expected responses... \nTries %d\nCommand %v\nretrieved %v\nexpected %v", maxTries, cmd, responses, expectedResponses)
+	framework.Logf("encountered error during dial (%v)", returnMsg)
+	return returnMsg
+
 }
 
 // GetEndpointsFromTestContainer executes a curl via kubectl exec in a test container.
@@ -308,7 +362,9 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 			// we confirm unreachability.
 			framework.Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
 		} else {
-			framework.Logf("Tries: %d, in try: %d, stdout: %v, stderr: %v, command run in: %#v", tries, i, stdout, stderr, config.TestContainerPod)
+			podInfo := fmt.Sprintf("name: %v, namespace: %v, hostIp: %v, podIp: %v, conditions: %v", config.TestContainerPod.Name, config.TestContainerPod.Namespace, config.TestContainerPod.Status.HostIP, config.TestContainerPod.Status.PodIP, config.TestContainerPod.Status.Conditions)
+			framework.Logf("Tries: %d, in try: %d, stdout: %v, stderr: %v, command run in Pod { %#v }", tries, i, stdout, stderr, podInfo)
+
 			var output NetexecDialResponse
 			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
 				framework.Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
@@ -373,17 +429,20 @@ func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(path, targetIP 
 	return code, nil
 }
 
-// DialFromNode executes a tcp or udp request based on protocol via kubectl exec
+// DialFromNode executes a tcp/udp curl/nc request based on protocol via kubectl exec
 // in a test container running with host networking.
-// - minTries is the minimum number of curl attempts required before declaring
-//   success. Set to 0 if you'd like to return as soon as all endpoints respond
-//   at least once.
-// - maxTries is the maximum number of curl attempts. If this many attempts pass
-//   and we don't see all expected endpoints, the test fails.
-// maxTries == minTries will confirm that we see the expected endpoints and no
-// more for maxTries. Use this if you want to eg: fail a readiness check on a
-// pod and confirm it doesn't show up as an endpoint.
-func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) {
+// - minTries is the minimum number of curl/nc attempts required before declaring
+//   success. If 0, then we return as soon as all endpoints succeed.
+// - There is no logical change to test results if faillures happen AFTER endpoints have succeeded,
+//   hence over-padding minTries will NOT reverse a successful result and is thus not very useful yet
+//   (See the TODO about checking probability, which isnt implemented yet).
+// - maxTries is the maximum number of curl/echo attempts before an error is returned.  The
+//   smaller this number is, the less 'slack' there is for declaring success.
+// - if maxTries < expectedEps, this test is guaranteed to return an error, because all endpoints wont be hit.
+// - maxTries == minTries will return as soon as all endpoints succeed (or fail once maxTries is reached without
+//   success on all endpoints).
+//   In general its prudent to have a high enough level of minTries to guarantee that all pods get a fair chance at receiving traffic.
+func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
 	var cmd string
 	if protocol == "udp" {
 		cmd = fmt.Sprintf("echo hostName | nc -w 1 -u %s %d", targetIP, targetPort)
@@ -401,6 +460,7 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 	eps := sets.NewString()
 
 	filterCmd := fmt.Sprintf("%s | grep -v '^\\s*$'", cmd)
+	framework.Logf("Going to poll %v on port %v at least %v times, with a maximum of %v tries before failing", targetIP, targetPort, minTries, maxTries)
 	for i := 0; i < maxTries; i++ {
 		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.HostTestContainerPod.Name, filterCmd)
 		if err != nil || len(stderr) > 0 {
@@ -417,8 +477,8 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 
 		// Check against i+1 so we exit if minTries == maxTries.
 		if eps.Equal(expectedEps) && i+1 >= minTries {
-			framework.Logf("Found all expected endpoints: %+v", eps.List())
-			return
+			framework.Logf("Found all %d expected endpoints: %+v", eps.Len(), eps.List())
+			return nil
 		}
 
 		framework.Logf("Waiting for %+v endpoints (expected=%+v, actual=%+v)", expectedEps.Difference(eps).List(), expectedEps.List(), eps.List())
@@ -428,7 +488,7 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 	}
 
 	config.diagnoseMissingEndpoints(eps)
-	framework.Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, eps, expectedEps)
+	return fmt.Errorf("failed to find expected endpoints, \ntries %d\nCommand %v\nretrieved %v\nexpected %v", maxTries, cmd, eps, expectedEps)
 }
 
 // GetSelfURL executes a curl against the given path via kubectl exec into a
@@ -563,8 +623,7 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Args: []string{
 						"netexec",
-						fmt.Sprintf("--http-port=%d", EndpointHTTPPort),
-						fmt.Sprintf("--udp-port=%d", EndpointUDPPort),
+						fmt.Sprintf("--http-port=%d", testContainerHTTPPort),
 					},
 					Ports: []v1.ContainerPort{
 						{
@@ -575,10 +634,6 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 				},
 			},
 		},
-	}
-	// we want sctp to be optional as it will load the sctp kernel module
-	if config.SCTPEnabled {
-		pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, fmt.Sprintf("--sctp-port=%d", EndpointSCTPPort))
 	}
 	return pod
 }
@@ -606,15 +661,19 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 	if config.SCTPEnabled {
 		res.Spec.Ports = append(res.Spec.Ports, v1.ServicePort{Port: ClusterSCTPPort, Name: "sctp", Protocol: v1.ProtocolSCTP, TargetPort: intstr.FromInt(EndpointSCTPPort)})
 	}
+	if config.DualStackEnabled {
+		requireDual := v1.IPFamilyPolicyRequireDualStack
+		res.Spec.IPFamilyPolicy = &requireDual
+	}
 	return res
 }
 
 func (config *NetworkingTestConfig) createNodePortService(selector map[string]string) {
-	config.NodePortService = config.createService(config.createNodePortServiceSpec(nodePortServiceName, selector, false))
+	config.NodePortService = config.CreateService(config.createNodePortServiceSpec(nodePortServiceName, selector, false))
 }
 
 func (config *NetworkingTestConfig) createSessionAffinityService(selector map[string]string) {
-	config.SessionAffinityService = config.createService(config.createNodePortServiceSpec(sessionAffinityServiceName, selector, true))
+	config.SessionAffinityService = config.CreateService(config.createNodePortServiceSpec(sessionAffinityServiceName, selector, true))
 }
 
 // DeleteNodePortService deletes NodePort service.
@@ -650,11 +709,19 @@ func (config *NetworkingTestConfig) createTestPods() {
 	}
 }
 
-func (config *NetworkingTestConfig) createService(serviceSpec *v1.Service) *v1.Service {
+// CreateService creates the provided service in config.Namespace and returns created service
+func (config *NetworkingTestConfig) CreateService(serviceSpec *v1.Service) *v1.Service {
 	_, err := config.getServiceClient().Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
 	err = WaitForService(config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
+	// If the endpoints of the service use HostNetwork: true, they are going to try to bind on the host namespace
+	// if those ports are in use by any process in the host, the endpoints pods will fail to be deployed
+	// and the service will never be ready. We can be smarter and check directly that the ports are free
+	// but by now we Skip the test if the service is not ready and we are using endpoints with host network
+	if config.EndpointsHostNetwork && err != nil {
+		e2eskipper.Skipf("Service not ready. Pods are using hostNetwork: true, please check there is no other process on the host using the same ports: %v", err)
+	}
 	framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceSpec.Name, err))
 
 	createdService, err := config.getServiceClient().Get(context.TODO(), serviceSpec.Name, metav1.GetOptions{})
@@ -674,7 +741,11 @@ func (config *NetworkingTestConfig) setupCore(selector map[string]string) {
 	config.createTestPods()
 
 	epCount := len(config.EndpointPods)
+
+	// Note that this is not O(n^2) in practice, because epCount SHOULD be < 10.  In cases that epCount is > 10, this would be prohibitively large.
+	// Check maxNetProxyPodsCount for details.
 	config.MaxTries = epCount*epCount + testTries
+	framework.Logf("Setting MaxTries for pod polling to %v for networking test based on endpoint count %v", config.MaxTries, epCount)
 }
 
 // setup includes setupCore and also sets up services
@@ -685,7 +756,6 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList, err := e2enode.GetReadySchedulableNodes(config.f.ClientSet)
 	framework.ExpectNoError(err)
-	config.ExternalAddr = e2enode.FirstAddress(nodeList, v1.NodeExternalIP)
 
 	e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 	config.Nodes = nodeList.Items
@@ -706,11 +776,32 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 			continue
 		}
 	}
+
+	// obtain the ClusterIP
 	config.ClusterIP = config.NodePortService.Spec.ClusterIP
-	if config.ExternalAddr != "" {
-		config.NodeIP = config.ExternalAddr
-	} else {
-		config.NodeIP = e2enode.FirstAddress(nodeList, v1.NodeInternalIP)
+	if config.DualStackEnabled {
+		config.SecondaryClusterIP = config.NodePortService.Spec.ClusterIPs[1]
+	}
+
+	// Obtain the primary IP family of the Cluster based on the first ClusterIP
+	// TODO: Eventually we should just be getting these from Spec.IPFamilies
+	// but for now that would only if the feature gate is enabled.
+	family := v1.IPv4Protocol
+	secondaryFamily := v1.IPv6Protocol
+	if netutils.IsIPv6String(config.ClusterIP) {
+		family = v1.IPv6Protocol
+		secondaryFamily = v1.IPv4Protocol
+	}
+	// Get Node IPs from the cluster, ExternalIPs take precedence
+	config.NodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, family)
+	if config.NodeIP == "" {
+		config.NodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeInternalIP, family)
+	}
+	if config.DualStackEnabled {
+		config.SecondaryNodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, secondaryFamily)
+		if config.SecondaryNodeIP == "" {
+			config.SecondaryNodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeInternalIP, secondaryFamily)
+		}
 	}
 
 	ginkgo.By("Waiting for NodePort service to expose endpoint")
@@ -734,6 +825,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 		hostname, _ := n.Labels["kubernetes.io/hostname"]
 		pod := config.createNetShellPodSpec(podName, hostname)
 		pod.ObjectMeta.Labels = selector
+		pod.Spec.HostNetwork = config.EndpointsHostNetwork
 		createdPod := config.createPod(pod)
 		createdPods = append(createdPods, createdPod)
 	}
@@ -790,6 +882,7 @@ type HTTPPokeParams struct {
 	ExpectCode     int // default = 200
 	BodyContains   string
 	RetriableCodes []int
+	EnableHTTPS    bool
 }
 
 // HTTPPokeResult is a struct for HTTP poke result.
@@ -836,8 +929,18 @@ const (
 // The result body will be populated if the HTTP transaction was completed, even
 // if the other test params make this a failure).
 func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPokeResult {
+	// Set default params.
+	if params == nil {
+		params = &HTTPPokeParams{}
+	}
+
 	hostPort := net.JoinHostPort(host, strconv.Itoa(port))
-	url := fmt.Sprintf("http://%s%s", hostPort, path)
+	var url string
+	if params.EnableHTTPS {
+		url = fmt.Sprintf("https://%s%s", hostPort, path)
+	} else {
+		url = fmt.Sprintf("http://%s%s", hostPort, path)
+	}
 
 	ret := HTTPPokeResult{}
 
@@ -852,10 +955,6 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 		return ret
 	}
 
-	// Set default params.
-	if params == nil {
-		params = &HTTPPokeParams{}
-	}
 	if params.ExpectCode == 0 {
 		params.ExpectCode = http.StatusOK
 	}
@@ -921,6 +1020,7 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Response, error) {
 	tr := utilnet.SetTransportDefaults(&http.Transport{
 		DisableKeepAlives: true,
+		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
 	})
 	client := &http.Client{
 		Transport: tr,
@@ -939,16 +1039,16 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 	if err != nil {
 		framework.Failf("Error getting node external ip : %v", err)
 	}
-	masterAddresses := framework.GetAllMasterAddresses(c)
-	ginkgo.By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
+	controlPlaneAddresses := framework.GetControlPlaneAddresses(c)
+	ginkgo.By(fmt.Sprintf("block network traffic from node %s to the control plane", node.Name))
 	defer func() {
 		// This code will execute even if setting the iptables rule failed.
 		// It is on purpose because we may have an error even if the new rule
 		// had been inserted. (yes, we could look at the error code and ssh error
 		// separately, but I prefer to stay on the safe side).
-		ginkgo.By(fmt.Sprintf("Unblock network traffic from node %s to the master", node.Name))
-		for _, masterAddress := range masterAddresses {
-			UnblockNetwork(host, masterAddress)
+		ginkgo.By(fmt.Sprintf("Unblock network traffic from node %s to the control plane", node.Name))
+		for _, instanceAddress := range controlPlaneAddresses {
+			UnblockNetwork(host, instanceAddress)
 		}
 	}()
 
@@ -956,8 +1056,8 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 	if !e2enode.WaitConditionToBe(c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
 		framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 	}
-	for _, masterAddress := range masterAddresses {
-		BlockNetwork(host, masterAddress)
+	for _, instanceAddress := range controlPlaneAddresses {
+		BlockNetwork(host, instanceAddress)
 	}
 
 	framework.Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)

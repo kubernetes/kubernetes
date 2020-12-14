@@ -9,3 +9,5 @@ type OAuthAuthorizeTokenExpansion interface{}
 type OAuthClientExpansion interface{}
 
 type OAuthClientAuthorizationExpansion interface{}
+
+type UserOAuthAccessTokenExpansion interface{}
