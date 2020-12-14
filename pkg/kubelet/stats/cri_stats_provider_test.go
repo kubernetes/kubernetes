@@ -192,7 +192,7 @@ func TestCRIListPodStats(t *testing.T) {
 		PersistentVolumes: persistentVolumes,
 	}
 
-	fakeLogStats := map[string]*volume.Metrics{
+	fakeStats := map[string]*volume.Metrics{
 		kuberuntime.BuildContainerLogsDirectory("sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid"), cName0):               containerLogStats0,
 		kuberuntime.BuildContainerLogsDirectory("sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid"), cName1):               containerLogStats1,
 		kuberuntime.BuildContainerLogsDirectory("sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid"), cName2):               containerLogStats2,
@@ -202,7 +202,6 @@ func TestCRIListPodStats(t *testing.T) {
 		filepath.Join(kuberuntime.BuildPodLogsDirectory("sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")), podLogName0): podLogStats0,
 		filepath.Join(kuberuntime.BuildPodLogsDirectory("sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid")), podLogName1): podLogStats1,
 	}
-	fakeLogStatsProvider := NewFakeLogMetricsService(fakeLogStats)
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -231,8 +230,7 @@ func TestCRIListPodStats(t *testing.T) {
 		mockRuntimeCache,
 		fakeRuntimeService,
 		fakeImageService,
-		fakeLogStatsProvider,
-		fakeOS,
+		NewFakeHostStatsProviderWithData(fakeStats, fakeOS),
 	)
 
 	stats, err := provider.ListPodStats()
@@ -427,8 +425,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		mockRuntimeCache,
 		fakeRuntimeService,
 		nil,
-		nil,
-		&kubecontainertest.FakeOS{},
+		NewFakeHostStatsProvider(),
 	)
 
 	stats, err := provider.ListPodCPUAndMemoryStats()
@@ -536,13 +533,12 @@ func TestCRIImagesFsStats(t *testing.T) {
 		imageFsUsage      = makeFakeImageFsUsage(imageFsMountpoint)
 	)
 	var (
-		mockCadvisor         = new(cadvisortest.Mock)
-		mockRuntimeCache     = new(kubecontainertest.MockRuntimeCache)
-		mockPodManager       = new(kubepodtest.MockManager)
-		resourceAnalyzer     = new(fakeResourceAnalyzer)
-		fakeRuntimeService   = critest.NewFakeRuntimeService()
-		fakeImageService     = critest.NewFakeImageService()
-		fakeLogStatsProvider = NewFakeLogMetricsService(nil)
+		mockCadvisor       = new(cadvisortest.Mock)
+		mockRuntimeCache   = new(kubecontainertest.MockRuntimeCache)
+		mockPodManager     = new(kubepodtest.MockManager)
+		resourceAnalyzer   = new(fakeResourceAnalyzer)
+		fakeRuntimeService = critest.NewFakeRuntimeService()
+		fakeImageService   = critest.NewFakeImageService()
 	)
 
 	mockCadvisor.On("GetDirFsInfo", imageFsMountpoint).Return(imageFsInfo, nil)
@@ -557,8 +553,7 @@ func TestCRIImagesFsStats(t *testing.T) {
 		mockRuntimeCache,
 		fakeRuntimeService,
 		fakeImageService,
-		fakeLogStatsProvider,
-		&kubecontainertest.FakeOS{},
+		NewFakeHostStatsProvider(),
 	)
 
 	stats, err := provider.ImageFsStats()
