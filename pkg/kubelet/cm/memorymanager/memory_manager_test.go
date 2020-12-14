@@ -152,7 +152,7 @@ func TestValidateReservedMemory(t *testing.T) {
 			{Id: 1},
 		},
 	}
-	const msgNotEqual = "the total amount of memory of type \"%s\" is not equal to the value determined by Node Allocatable feature"
+	const msgNotEqual = "the total amount %q of type %q is not equal to the value %q determined by Node Allocatable feature"
 	testCases := []struct {
 		description                string
 		nodeAllocatableReservation v1.ResourceList
@@ -193,14 +193,14 @@ func TestValidateReservedMemory(t *testing.T) {
 					},
 				},
 			},
-			fmt.Sprintf(msgNotEqual, v1.ResourceMemory),
+			fmt.Sprintf(msgNotEqual, "12", v1.ResourceMemory, "0"),
 		},
 		{
 			"Node Allocatable set, reserved not set",
 			v1.ResourceList{hugepages2M: *resource.NewQuantity(5, resource.DecimalSI)},
 			machineInfo,
 			[]kubeletconfig.MemoryReservation{},
-			fmt.Sprintf(msgNotEqual, hugepages2M),
+			fmt.Sprintf(msgNotEqual, "0", hugepages2M, "5"),
 		},
 		{
 			"Reserved not equal to Node Allocatable",
@@ -214,7 +214,7 @@ func TestValidateReservedMemory(t *testing.T) {
 					},
 				},
 			},
-			fmt.Sprintf(msgNotEqual, v1.ResourceMemory),
+			fmt.Sprintf(msgNotEqual, "12", v1.ResourceMemory, "5"),
 		},
 		{
 			"Reserved contains the NUMA node that does not exist under the machine",
@@ -234,7 +234,7 @@ func TestValidateReservedMemory(t *testing.T) {
 					},
 				},
 			},
-			fmt.Sprintf(msgNotEqual, v1.ResourceMemory),
+			"the reserved memory configuration references a NUMA node 2 that does not exist on this machine",
 		},
 		{
 			"Reserved total equal to Node Allocatable",
@@ -285,7 +285,7 @@ func TestValidateReservedMemory(t *testing.T) {
 				},
 			},
 
-			fmt.Sprintf(msgNotEqual, hugepages2M),
+			fmt.Sprintf(msgNotEqual, "77", hugepages2M, "14"),
 		},
 	}
 
@@ -404,7 +404,7 @@ func TestGetSystemReservedMemory(t *testing.T) {
 			machineInfo:   machineInfo,
 		},
 		{
-			description:                "Should return error when Allocatable reservation is not equal pre reserved memory",
+			description:                "Should return error when Allocatable reservation is not equal to the reserved memory",
 			nodeAllocatableReservation: v1.ResourceList{},
 			systemReservedMemory: []kubeletconfig.MemoryReservation{
 				{
@@ -415,7 +415,7 @@ func TestGetSystemReservedMemory(t *testing.T) {
 				},
 			},
 			expectedReserved: nil,
-			expectedError:    fmt.Errorf("the total amount of memory of type \"memory\" is not equal to the value determined by Node Allocatable feature"),
+			expectedError:    fmt.Errorf("the total amount \"1Gi\" of type \"memory\" is not equal to the value \"0\" determined by Node Allocatable feature"),
 			machineInfo:      machineInfo,
 		},
 		{
@@ -2171,7 +2171,7 @@ func TestNewManager(t *testing.T) {
 				},
 			},
 			affinity:         topologymanager.NewFakeManager(),
-			expectedError:    fmt.Errorf("the total amount of memory of type %q is not equal to the value determined by Node Allocatable feature", v1.ResourceMemory),
+			expectedError:    fmt.Errorf("the total amount \"3Gi\" of type %q is not equal to the value \"2Gi\" determined by Node Allocatable feature", v1.ResourceMemory),
 			expectedReserved: expectedReserved,
 		},
 		{

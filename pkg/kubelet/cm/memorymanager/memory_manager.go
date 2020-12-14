@@ -321,7 +321,7 @@ func (m *manager) policyRemoveContainerByRef(podUID string, containerName string
 	return err
 }
 
-func getTotalMemoryTypeReserved(machineInfo *cadvisorapi.MachineInfo, reservedMemory []kubeletconfig.MemoryReservation) map[v1.ResourceName]resource.Quantity {
+func getTotalMemoryTypeReserved(machineInfo *cadvisorapi.MachineInfo, reservedMemory []kubeletconfig.MemoryReservation) (map[v1.ResourceName]resource.Quantity, error) {
 	totalMemoryType := map[v1.ResourceName]resource.Quantity{}
 
 	numaNodes := map[int]bool{}
@@ -331,8 +331,7 @@ func getTotalMemoryTypeReserved(machineInfo *cadvisorapi.MachineInfo, reservedMe
 
 	for _, reservation := range reservedMemory {
 		if !numaNodes[int(reservation.NumaNode)] {
-			klog.Warningf("The NUMA node %d specified under --reserved-memory does not exist on the machine", reservation.NumaNode)
-			continue
+			return nil, fmt.Errorf("the reserved memory configuration references a NUMA node %d that does not exist on this machine", reservation.NumaNode)
 		}
 
 		for resourceName, q := range reservation.Limits {
@@ -343,19 +342,20 @@ func getTotalMemoryTypeReserved(machineInfo *cadvisorapi.MachineInfo, reservedMe
 		}
 	}
 
-	return totalMemoryType
+	return totalMemoryType, nil
 }
 
 func validateReservedMemory(machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory []kubeletconfig.MemoryReservation) error {
-	totalMemoryType := getTotalMemoryTypeReserved(machineInfo, reservedMemory)
+	totalMemoryType, err := getTotalMemoryTypeReserved(machineInfo, reservedMemory)
+	if err != nil {
+		return err
+	}
 
 	commonMemoryTypeSet := make(map[v1.ResourceName]bool)
 	for resourceType := range totalMemoryType {
-		if !(corev1helper.IsHugePageResourceName(resourceType) || resourceType == v1.ResourceMemory) {
-			continue
-		}
 		commonMemoryTypeSet[resourceType] = true
 	}
+
 	for resourceType := range nodeAllocatableReservation {
 		if !(corev1helper.IsHugePageResourceName(resourceType) || resourceType == v1.ResourceMemory) {
 			continue
@@ -375,7 +375,7 @@ func validateReservedMemory(machineInfo *cadvisorapi.MachineInfo, nodeAllocatabl
 		}
 
 		if !(*nodeAllocatableMemory).Equal(*reservedMemory) {
-			return fmt.Errorf("the total amount of memory of type \"%s\" is not equal to the value determined by Node Allocatable feature", resourceType)
+			return fmt.Errorf("the total amount %q of type %q is not equal to the value %q determined by Node Allocatable feature", reservedMemory.String(), resourceType, nodeAllocatableMemory.String())
 		}
 	}
 
