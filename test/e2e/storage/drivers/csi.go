@@ -57,8 +57,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
-	"k8s.io/kubernetes/test/e2e/storage/testsuites"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -71,18 +70,18 @@ const (
 
 // hostpathCSI
 type hostpathCSIDriver struct {
-	driverInfo       testsuites.DriverInfo
+	driverInfo       storageframework.DriverInfo
 	manifests        []string
 	cleanupHandle    framework.CleanupActionHandle
 	volumeAttributes []map[string]string
 }
 
-func initHostPathCSIDriver(name string, capabilities map[testsuites.Capability]bool, volumeAttributes []map[string]string, manifests ...string) testsuites.TestDriver {
+func initHostPathCSIDriver(name string, capabilities map[storageframework.Capability]bool, volumeAttributes []map[string]string, manifests ...string) storageframework.TestDriver {
 	return &hostpathCSIDriver{
-		driverInfo: testsuites.DriverInfo{
+		driverInfo: storageframework.DriverInfo{
 			Name:        name,
 			FeatureTag:  "",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			MaxFileSize: storageframework.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -90,11 +89,11 @@ func initHostPathCSIDriver(name string, capabilities map[testsuites.Capability]b
 				Min: "1Mi",
 			},
 			Capabilities: capabilities,
-			StressTestOptions: &testsuites.StressTestOptions{
+			StressTestOptions: &storageframework.StressTestOptions{
 				NumPods:     10,
 				NumRestarts: 10,
 			},
-			VolumeSnapshotStressTestOptions: &testsuites.VolumeSnapshotStressTestOptions{
+			VolumeSnapshotStressTestOptions: &storageframework.VolumeSnapshotStressTestOptions{
 				NumPods:      10,
 				NumSnapshots: 10,
 			},
@@ -104,22 +103,22 @@ func initHostPathCSIDriver(name string, capabilities map[testsuites.Capability]b
 	}
 }
 
-var _ testsuites.TestDriver = &hostpathCSIDriver{}
-var _ testsuites.DynamicPVTestDriver = &hostpathCSIDriver{}
-var _ testsuites.SnapshottableTestDriver = &hostpathCSIDriver{}
-var _ testsuites.EphemeralTestDriver = &hostpathCSIDriver{}
+var _ storageframework.TestDriver = &hostpathCSIDriver{}
+var _ storageframework.DynamicPVTestDriver = &hostpathCSIDriver{}
+var _ storageframework.SnapshottableTestDriver = &hostpathCSIDriver{}
+var _ storageframework.EphemeralTestDriver = &hostpathCSIDriver{}
 
 // InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
-func InitHostPathCSIDriver() testsuites.TestDriver {
-	capabilities := map[testsuites.Capability]bool{
-		testsuites.CapPersistence:         true,
-		testsuites.CapSnapshotDataSource:  true,
-		testsuites.CapMultiPODs:           true,
-		testsuites.CapBlock:               true,
-		testsuites.CapPVCDataSource:       true,
-		testsuites.CapControllerExpansion: true,
-		testsuites.CapSingleNodeVolume:    true,
-		testsuites.CapVolumeLimits:        true,
+func InitHostPathCSIDriver() storageframework.TestDriver {
+	capabilities := map[storageframework.Capability]bool{
+		storageframework.CapPersistence:         true,
+		storageframework.CapSnapshotDataSource:  true,
+		storageframework.CapMultiPODs:           true,
+		storageframework.CapBlock:               true,
+		storageframework.CapPVCDataSource:       true,
+		storageframework.CapControllerExpansion: true,
+		storageframework.CapSingleNodeVolume:    true,
+		storageframework.CapVolumeLimits:        true,
 	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,
@@ -141,56 +140,56 @@ func InitHostPathCSIDriver() testsuites.TestDriver {
 	)
 }
 
-func (h *hostpathCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
+func (h *hostpathCSIDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &h.driverInfo
 }
 
-func (h *hostpathCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	if pattern.VolType == testpatterns.CSIInlineVolume && len(h.volumeAttributes) == 0 {
+func (h *hostpathCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+	if pattern.VolType == storageframework.CSIInlineVolume && len(h.volumeAttributes) == 0 {
 		e2eskipper.Skipf("%s has no volume attributes defined, doesn't support ephemeral inline volumes", h.driverInfo.Name)
 	}
 }
 
-func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := config.GetUniqueDriverName()
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", provisioner)
 
-	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return storageframework.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (h *hostpathCSIDriver) GetVolume(config *testsuites.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
+func (h *hostpathCSIDriver) GetVolume(config *storageframework.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
 	return h.volumeAttributes[volumeNumber%len(h.volumeAttributes)], false /* not shared */, false /* read-write */
 }
 
-func (h *hostpathCSIDriver) GetCSIDriverName(config *testsuites.PerTestConfig) string {
+func (h *hostpathCSIDriver) GetCSIDriverName(config *storageframework.PerTestConfig) string {
 	return config.GetUniqueDriverName()
 }
 
-func (h *hostpathCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *unstructured.Unstructured {
+func (h *hostpathCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig) *unstructured.Unstructured {
 	snapshotter := config.GetUniqueDriverName()
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-vsc", snapshotter)
 
-	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
+	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns, suffix)
 }
 
-func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
 	// Create secondary namespace which will be used for creating driver
 	driverNamespace := utils.CreateDriverNamespace(f)
 	ns2 := driverNamespace.Name
 	ns1 := f.Namespace.Name
 
 	ginkgo.By(fmt.Sprintf("deploying %s driver", h.driverInfo.Name))
-	cancelLogging := testsuites.StartPodLogs(f, driverNamespace)
+	cancelLogging := utils.StartPodLogs(f, driverNamespace)
 	cs := f.ClientSet
 
 	// The hostpath CSI driver only works when everything runs on the same node.
 	node, err := e2enode.GetRandomReadySchedulableNode(cs)
 	framework.ExpectNoError(err)
-	config := &testsuites.PerTestConfig{
+	config := &storageframework.PerTestConfig{
 		Driver:              h,
 		Prefix:              "hostpath",
 		Framework:           f,
@@ -243,7 +242,7 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 
 // mockCSI
 type mockCSIDriver struct {
-	driverInfo          testsuites.DriverInfo
+	driverInfo          storageframework.DriverInfo
 	manifests           []string
 	podInfo             *bool
 	storageCapacity     *bool
@@ -275,12 +274,12 @@ type CSIMockDriverOpts struct {
 	FSGroupPolicy       *storagev1.FSGroupPolicy
 }
 
-var _ testsuites.TestDriver = &mockCSIDriver{}
-var _ testsuites.DynamicPVTestDriver = &mockCSIDriver{}
-var _ testsuites.SnapshottableTestDriver = &mockCSIDriver{}
+var _ storageframework.TestDriver = &mockCSIDriver{}
+var _ storageframework.DynamicPVTestDriver = &mockCSIDriver{}
+var _ storageframework.SnapshottableTestDriver = &mockCSIDriver{}
 
 // InitMockCSIDriver returns a mockCSIDriver that implements TestDriver interface
-func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
+func InitMockCSIDriver(driverOpts CSIMockDriverOpts) storageframework.TestDriver {
 	driverManifests := []string{
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
@@ -308,18 +307,18 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 	}
 
 	return &mockCSIDriver{
-		driverInfo: testsuites.DriverInfo{
+		driverInfo: storageframework.DriverInfo{
 			Name:        "csi-mock",
 			FeatureTag:  "",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			MaxFileSize: storageframework.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			Capabilities: map[testsuites.Capability]bool{
-				testsuites.CapPersistence:  false,
-				testsuites.CapFsGroup:      false,
-				testsuites.CapExec:         false,
-				testsuites.CapVolumeLimits: true,
+			Capabilities: map[storageframework.Capability]bool{
+				storageframework.CapPersistence:  false,
+				storageframework.CapFsGroup:      false,
+				storageframework.CapExec:         false,
+				storageframework.CapVolumeLimits: true,
 			},
 		},
 		manifests:           driverManifests,
@@ -336,45 +335,45 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 	}
 }
 
-func (m *mockCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
+func (m *mockCSIDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &m.driverInfo
 }
 
-func (m *mockCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
+func (m *mockCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 }
 
-func (m *mockCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (m *mockCSIDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := config.GetUniqueDriverName()
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", provisioner)
 
-	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return storageframework.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (m *mockCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *unstructured.Unstructured {
+func (m *mockCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig) *unstructured.Unstructured {
 	parameters := map[string]string{}
 	snapshotter := m.driverInfo.Name + "-" + config.Framework.UniqueName
 	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-vsc", snapshotter)
 
-	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
+	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns, suffix)
 }
 
-func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
 	// Create secondary namespace which will be used for creating driver
 	driverNamespace := utils.CreateDriverNamespace(f)
 	ns2 := driverNamespace.Name
 	ns1 := f.Namespace.Name
 
 	ginkgo.By("deploying csi mock driver")
-	cancelLogging := testsuites.StartPodLogs(f, driverNamespace)
+	cancelLogging := utils.StartPodLogs(f, driverNamespace)
 	cs := f.ClientSet
 
 	// pods should be scheduled on the node
 	node, err := e2enode.GetRandomReadySchedulableNode(cs)
 	framework.ExpectNoError(err)
-	config := &testsuites.PerTestConfig{
+	config := &storageframework.PerTestConfig{
 		Driver:              m,
 		Prefix:              "mock",
 		Framework:           f,
@@ -481,21 +480,21 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 
 // gce-pd
 type gcePDCSIDriver struct {
-	driverInfo    testsuites.DriverInfo
+	driverInfo    storageframework.DriverInfo
 	cleanupHandle framework.CleanupActionHandle
 }
 
-var _ testsuites.TestDriver = &gcePDCSIDriver{}
-var _ testsuites.DynamicPVTestDriver = &gcePDCSIDriver{}
-var _ testsuites.SnapshottableTestDriver = &gcePDCSIDriver{}
+var _ storageframework.TestDriver = &gcePDCSIDriver{}
+var _ storageframework.DynamicPVTestDriver = &gcePDCSIDriver{}
+var _ storageframework.SnapshottableTestDriver = &gcePDCSIDriver{}
 
 // InitGcePDCSIDriver returns gcePDCSIDriver that implements TestDriver interface
-func InitGcePDCSIDriver() testsuites.TestDriver {
+func InitGcePDCSIDriver() storageframework.TestDriver {
 	return &gcePDCSIDriver{
-		driverInfo: testsuites.DriverInfo{
+		driverInfo: storageframework.DriverInfo{
 			Name:        GCEPDCSIDriverName,
 			FeatureTag:  "[Serial]",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			MaxFileSize: storageframework.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
 			},
@@ -507,27 +506,27 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 				"xfs",
 			),
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
-			Capabilities: map[testsuites.Capability]bool{
-				testsuites.CapPersistence: true,
-				testsuites.CapBlock:       true,
-				testsuites.CapFsGroup:     true,
-				testsuites.CapExec:        true,
-				testsuites.CapMultiPODs:   true,
+			Capabilities: map[storageframework.Capability]bool{
+				storageframework.CapPersistence: true,
+				storageframework.CapBlock:       true,
+				storageframework.CapFsGroup:     true,
+				storageframework.CapExec:        true,
+				storageframework.CapMultiPODs:   true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				testsuites.CapVolumeLimits:        false,
-				testsuites.CapTopology:            true,
-				testsuites.CapControllerExpansion: true,
-				testsuites.CapNodeExpansion:       true,
-				testsuites.CapSnapshotDataSource:  true,
+				storageframework.CapVolumeLimits:        false,
+				storageframework.CapTopology:            true,
+				storageframework.CapControllerExpansion: true,
+				storageframework.CapNodeExpansion:       true,
+				storageframework.CapSnapshotDataSource:  true,
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
-			StressTestOptions: &testsuites.StressTestOptions{
+			StressTestOptions: &storageframework.StressTestOptions{
 				NumPods:     10,
 				NumRestarts: 10,
 			},
-			VolumeSnapshotStressTestOptions: &testsuites.VolumeSnapshotStressTestOptions{
+			VolumeSnapshotStressTestOptions: &storageframework.VolumeSnapshotStressTestOptions{
 				// GCE only allows for one snapshot per volume to be created at a time,
 				// which can cause test timeouts. We reduce the likelihood of test timeouts
 				// by increasing the number of pods (and volumes) and reducing the number
@@ -539,11 +538,11 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 	}
 }
 
-func (g *gcePDCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
+func (g *gcePDCSIDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &g.driverInfo
 }
 
-func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
+func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 	e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	if pattern.FsType == "xfs" {
 		e2eskipper.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
@@ -553,7 +552,7 @@ func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	}
 }
 
-func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	ns := config.Framework.Namespace.Name
 	provisioner := g.driverInfo.Name
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
@@ -564,26 +563,26 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerT
 	}
 	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
-	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
+	return storageframework.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
 }
 
-func (g *gcePDCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *unstructured.Unstructured {
+func (g *gcePDCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig) *unstructured.Unstructured {
 	parameters := map[string]string{}
 	snapshotter := g.driverInfo.Name
 	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-vsc", snapshotter)
 
-	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
+	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns, suffix)
 }
 
-func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
 	ginkgo.By("deploying csi gce-pd driver")
 	// Create secondary namespace which will be used for creating driver
 	driverNamespace := utils.CreateDriverNamespace(f)
 	ns2 := driverNamespace.Name
 	ns1 := f.Namespace.Name
 
-	cancelLogging := testsuites.StartPodLogs(f, driverNamespace)
+	cancelLogging := utils.StartPodLogs(f, driverNamespace)
 	// It would be safer to rename the gcePD driver, but that
 	// hasn't been done before either and attempts to do so now led to
 	// errors during driver registration, therefore it is disabled
@@ -592,7 +591,7 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 	// These are the options which would have to be used:
 	// o := utils.PatchCSIOptions{
 	// 	OldDriverName:            g.driverInfo.Name,
-	// 	NewDriverName:            testsuites.GetUniqueDriverName(g),
+	// 	NewDriverName:            storageframework.GetUniqueDriverName(g),
 	// 	DriverContainerName:      "gce-driver",
 	// 	ProvisionerContainerName: "csi-external-provisioner",
 	// }
@@ -638,7 +637,7 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 	}
 	g.cleanupHandle = framework.AddCleanupAction(cleanupFunc)
 
-	return &testsuites.PerTestConfig{
+	return &storageframework.PerTestConfig{
 		Driver:          g,
 		Prefix:          "gcepd",
 		Framework:       f,

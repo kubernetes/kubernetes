@@ -195,7 +195,7 @@ func BufferFmtPolicyRulesWithSubjectsSlim(buf *bytes.Buffer, rule flowcontrol.Po
 			buf.WriteString(fmt.Sprintf(", Group: &%#+v", *subj.Group))
 		}
 		if subj.ServiceAccount != nil {
-			buf.WriteString(fmt.Sprintf(", ServiceAcount: &%#+v", *subj.ServiceAccount))
+			buf.WriteString(fmt.Sprintf(", ServiceAccount: &%#+v", *subj.ServiceAccount))
 		}
 		buf.WriteString("}")
 	}

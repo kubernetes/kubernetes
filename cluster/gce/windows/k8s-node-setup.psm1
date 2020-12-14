@@ -273,6 +273,7 @@ function Set-EnvironmentVars {
     "LOGS_DIR" = ${kube_env}['LOGS_DIR']
     "MANIFESTS_DIR" = ${kube_env}['MANIFESTS_DIR']
     "INFRA_CONTAINER" = ${kube_env}['WINDOWS_INFRA_CONTAINER']
+    "WINDOWS_ENABLE_PIGZ" = ${kube_env}['WINDOWS_ENABLE_PIGZ']
 
     "Path" = ${env:Path} + ";" + ${kube_env}['NODE_DIR']
     "KUBE_NETWORK" = "l2bridge".ToLower()
@@ -1309,6 +1310,7 @@ function Pull-InfraContainer {
 # Setup the container runtime on the node. It supports both
 # Docker and containerd.
 function Setup-ContainerRuntime {
+  Install-Pigz
   if (${env:CONTAINER_RUNTIME} -eq "containerd") {
     Install_Containerd
     Configure_Containerd
@@ -1529,6 +1531,40 @@ function Start_Containerd {
   Log-Output "Starting containerd service"
   Start-Service containerd
 }
+
+# Pigz Resources
+$PIGZ_ROOT = 'C:\pigz'
+$PIGZ_VERSION = '2.3.1'
+$PIGZ_TAR_URL = 'https://storage.googleapis.com/gke-release/winnode/pigz/prod/gke_windows/pigz/release/5/20201104-134221/pigz-$PIGZ_VERSION.zip'
+$PIGZ_TAR_HASH = '5a6f8f5530acc85ea51797f58c1409e5af6b69e55da243ffc608784cf14fec0cd16f74cc61c564d69e1a267750aecfc1e4c53b5219ff5f893b42a7576306f34c'
+
+# Install Pigz (https://github.com/madler/pigz) into Windows for improved image
+# extraction performance.
+function Install-Pigz {
+  if ("${env:WINDOWS_ENABLE_PIGZ}" -eq "true") {
+    if (-not (Test-Path $PIGZ_ROOT)) {
+      Log-Output "Installing Pigz $PIGZ_VERSION"
+      New-Item -Path $PIGZ_ROOT -ItemType Directory
+      MustDownload-File `
+        -Url $PIGZ_TAR_URL `
+        -OutFile "$PIGZ_ROOT\pigz-$PIGZ_VERSION.zip" `
+        -Hash $PIGZ_TAR_HASH `
+        -Algorithm SHA512
+      Expand-Archive -Path "$PIGZ_ROOT\pigz-$PIGZ_VERSION.zip" `
+        -DestinationPath $PIGZ_ROOT
+      Remove-Item -Path "$PIGZ_ROOT\pigz-$PIGZ_VERSION.zip"
+      # Docker and Containerd search for unpigz.exe on the first container image
+      # pull request after the service is started. If unpigz.exe is in the
+      # Windows path it'll use it instead of the default unzipper.
+      # See: https://github.com/containerd/containerd/issues/1896
+      Add-MachineEnvironmentPath -Path $PIGZ_ROOT
+      Log-Output "Installed Pigz $PIGZ_VERSION"
+    } else {
+      Log-Output "Pigz already installed."
+    }
+  }
+}
+
 # TODO(pjh): move the logging agent code below into a separate
 # module; it was put here temporarily to avoid disrupting the file layout in
 # the K8s release machinery.

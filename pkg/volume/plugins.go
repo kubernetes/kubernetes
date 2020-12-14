@@ -459,7 +459,7 @@ type VolumeHost interface {
 
 // VolumePluginMgr tracks registered plugins.
 type VolumePluginMgr struct {
-	mutex                     sync.Mutex
+	mutex                     sync.RWMutex
 	plugins                   map[string]VolumePlugin
 	prober                    DynamicPluginProber
 	probedPlugins             map[string]VolumePlugin
@@ -659,8 +659,8 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 // specification.  If no plugins can support or more than one plugin can
 // support it, return error.
 func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
-	pm.mutex.Lock()
-	defer pm.mutex.Unlock()
+	pm.mutex.RLock()
+	defer pm.mutex.RUnlock()
 
 	if spec == nil {
 		return nil, fmt.Errorf("Could not find plugin because volume spec is nil")
@@ -699,8 +699,8 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 // FindPluginByName fetches a plugin by name or by legacy name.  If no plugin
 // is found, returns error.
 func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
-	pm.mutex.Lock()
-	defer pm.mutex.Unlock()
+	pm.mutex.RLock()
+	defer pm.mutex.RUnlock()
 
 	// Once we can get rid of legacy names we can reduce this to a map lookup.
 	matches := []VolumePlugin{}
@@ -768,6 +768,9 @@ func (pm *VolumePluginMgr) refreshProbedPlugins() {
 
 // ListVolumePluginWithLimits returns plugins that have volume limits on nodes
 func (pm *VolumePluginMgr) ListVolumePluginWithLimits() []VolumePluginWithAttachLimits {
+	pm.mutex.RLock()
+	defer pm.mutex.RUnlock()
+
 	matchedPlugins := []VolumePluginWithAttachLimits{}
 	for _, v := range pm.plugins {
 		if plugin, ok := v.(VolumePluginWithAttachLimits); ok {

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testsuites
+package utils
 
 import (
 	"testing"
@@ -41,7 +41,7 @@ import (
 // -----------------------------------------------------------------
 // |min=?,max=?|    #13     |     #14    |     #15    |    #16     |
 // |---------------------------------------------------------------|
-func Test_getSizeRangesIntersection(t *testing.T) {
+func Test_GetSizeRangesIntersection(t *testing.T) {
 	type args struct {
 		first  e2evolume.SizeRange
 		second e2evolume.SizeRange
@@ -463,13 +463,13 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		got, err := getSizeRangesIntersection(tt.args.first, tt.args.second)
+		got, err := GetSizeRangesIntersection(tt.args.first, tt.args.second)
 		if (err != nil) != tt.wantErr {
-			t.Errorf("%q. getSizeRangesIntersection() error = %v, wantErr %v", tt.name, err, tt.wantErr)
+			t.Errorf("%q. GetSizeRangesIntersection() error = %v, wantErr %v", tt.name, err, tt.wantErr)
 			continue
 		}
 		if got != tt.want {
-			t.Errorf("%q. getSizeRangesIntersection() = %v, want %v", tt.name, got, tt.want)
+			t.Errorf("%q. GetSizeRangesIntersection() = %v, want %v", tt.name, got, tt.want)
 		}
 	}
 }

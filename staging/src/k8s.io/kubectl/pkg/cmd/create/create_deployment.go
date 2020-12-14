@@ -79,6 +79,7 @@ type CreateDeploymentOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewCreateDeploymentOptions returns an initialized CreateDeploymentOptions instance
 func NewCreateDeploymentOptions(ioStreams genericclioptions.IOStreams) *CreateDeploymentOptions {
 	return &CreateDeploymentOptions{
 		Port:       -1,
@@ -173,6 +174,7 @@ func (o *CreateDeploymentOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 	return nil
 }
 
+// Validate makes sure there is no discrepency in provided option values
 func (o *CreateDeploymentOptions) Validate() error {
 	if len(o.Images) > 1 && len(o.Command) > 0 {
 		return fmt.Errorf("cannot specify multiple --image options and command")

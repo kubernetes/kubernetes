@@ -45,7 +45,7 @@ var (
 		  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1`))
 )
 
-// RoleBindingOpts holds the options for 'create rolebinding' sub command
+// RoleBindingOptions holds the options for 'create rolebinding' sub command
 type RoleBindingOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	PrintObj   func(obj runtime.Object) error
