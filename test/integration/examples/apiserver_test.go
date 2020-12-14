@@ -90,7 +90,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 			"--kubeconfig", wardleToKASKubeConfigFile,
 		})
 		if err := wardleCmd.Execute(); err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 	}()
 	directWardleClientConfig, err := waitForWardleRunning(t, kubeClientConfig, wardleCertDir, wardlePort)
@@ -131,7 +131,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 	// wait for the unavailable API service to be processed with updated status
 	err = wait.Poll(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
-		_, err = kubeClient.Discovery().ServerResources()
+		_, _, err = kubeClient.Discovery().ServerGroupsAndResources()
 		hasExpectedError := checkWardleUnavailableDiscoveryError(t, err)
 		return hasExpectedError, nil
 	})
