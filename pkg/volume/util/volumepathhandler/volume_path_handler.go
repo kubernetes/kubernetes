@@ -30,9 +30,11 @@ import (
 )
 
 const (
-	losetupPath           = "losetup"
-	statPath              = "stat"
-	ErrDeviceNotFound     = "device not found"
+	losetupPath = "losetup"
+	statPath    = "stat"
+	// ErrDeviceNotFound is the err of device not found
+	ErrDeviceNotFound = "device not found"
+	// ErrDeviceNotSupported is the err of device not supported
 	ErrDeviceNotSupported = "device not supported"
 )
 
