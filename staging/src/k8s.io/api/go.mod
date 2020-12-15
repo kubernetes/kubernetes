@@ -16,10 +16,6 @@ replace (
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
 	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
 	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.5.0-origin.1+incompatible
-	github.com/openshift/api => github.com/tnozicka/api v0.0.0-20201209094822-cf1cf8c29eb4
-	github.com/openshift/apiserver-library-go => github.com/tnozicka/apiserver-library-go v0.0.0-20201209150209-65251f5effdf
-	github.com/openshift/client-go => github.com/tnozicka/client-go v0.0.0-20201209101418-221f919c0429
-	github.com/openshift/library-go => github.com/tnozicka/library-go v0.0.0-20201209145728-b3d28fd59efd
 	github.com/robfig/cron => github.com/robfig/cron v1.1.0
 	go.uber.org/multierr => go.uber.org/multierr v1.1.0
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8

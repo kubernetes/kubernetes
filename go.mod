@@ -74,10 +74,10 @@ require (
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/runc v1.0.0-rc92
 	github.com/opencontainers/selinux v1.6.0
-	github.com/openshift/api v0.0.0-20201209094822-cf1cf8c29eb4
-	github.com/openshift/apiserver-library-go v0.0.0-20201209150209-65251f5effdf
-	github.com/openshift/client-go v0.0.0-20201209101418-221f919c0429
-	github.com/openshift/library-go v0.0.0-20201209145728-b3d28fd59efd
+	github.com/openshift/api v0.0.0-20201214114959-164a2fb63b5f
+	github.com/openshift/apiserver-library-go v0.0.0-20201214145556-6f1013f42f98
+	github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49
+	github.com/openshift/library-go v0.0.0-20201214135256-d265f469e75b
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.7.1
@@ -401,11 +401,11 @@ replace (
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc92
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6
 	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.6.0
-	github.com/openshift/api => github.com/tnozicka/api v0.0.0-20201209094822-cf1cf8c29eb4
-	github.com/openshift/apiserver-library-go => github.com/tnozicka/apiserver-library-go v0.0.0-20201209150209-65251f5effdf
+	github.com/openshift/api => github.com/openshift/api v0.0.0-20201214114959-164a2fb63b5f
+	github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20201214145556-6f1013f42f98
 	github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20200917070002-f171684f77ab
-	github.com/openshift/client-go => github.com/tnozicka/client-go v0.0.0-20201209101418-221f919c0429
-	github.com/openshift/library-go => github.com/tnozicka/library-go v0.0.0-20201209145728-b3d28fd59efd
+	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49
+	github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20201214135256-d265f469e75b
 	github.com/pascaldekloe/goe => github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c
 	github.com/pelletier/go-toml => github.com/pelletier/go-toml v1.2.0
 	github.com/peterbourgon/diskv => github.com/peterbourgon/diskv v2.0.1+incompatible
