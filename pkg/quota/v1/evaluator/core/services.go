@@ -128,9 +128,12 @@ func (p *serviceEvaluator) Usage(item runtime.Object) (corev1.ResourceList, erro
 		value := resource.NewQuantity(int64(ports), resource.DecimalSI)
 		result[corev1.ResourceServicesNodePorts] = *value
 	case corev1.ServiceTypeLoadBalancer:
-		// load balancer services need to count node ports and load balancers
-		value := resource.NewQuantity(int64(ports), resource.DecimalSI)
-		result[corev1.ResourceServicesNodePorts] = *value
+		// load balancer services need to count node ports unless creation of node ports
+		// is suspressed.
+		if svc.Spec.AllocateLoadBalancerNodePorts == nil || *svc.Spec.AllocateLoadBalancerNodePorts == true {
+			value := resource.NewQuantity(int64(ports), resource.DecimalSI)
+			result[corev1.ResourceServicesNodePorts] = *value
+		}
 		result[corev1.ResourceServicesLoadBalancers] = *(resource.NewQuantity(1, resource.DecimalSI))
 	}
 	return result, nil

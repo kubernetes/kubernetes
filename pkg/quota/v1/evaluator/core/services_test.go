@@ -25,6 +25,7 @@ import (
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestServiceEvaluatorMatchesResources(t *testing.T) {
@@ -135,6 +136,50 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				corev1.ResourceServices:              resource.MustParse("1"),
 				corev1.ResourceServicesNodePorts:     resource.MustParse("2"),
 				corev1.ResourceServicesLoadBalancers: resource.MustParse("0"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
+			},
+		},
+		"nodeports-disabled": {
+			service: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{
+						{
+							Port: 27443,
+						},
+						{
+							Port: 27444,
+						},
+					},
+					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(false),
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("1"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("0"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
+			},
+		},
+		"nodeports-explicitly-enabled": {
+			service: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{
+						{
+							Port: 27443,
+						},
+						{
+							Port: 27444,
+						},
+					},
+					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(true),
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("1"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("2"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
 		},

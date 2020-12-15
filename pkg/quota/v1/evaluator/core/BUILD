@@ -54,6 +54,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/quota/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/quota/v1/generic:go_default_library",
+        "//staging/src/k8s.io/utils/pointer:go_default_library",
     ],
 )
 
