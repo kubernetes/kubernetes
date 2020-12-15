@@ -50,11 +50,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// ObjectFunc is a function to act on a given object. An error may be returned
-// if the hook cannot be completed. An ObjectFunc may transform the provided
-// object.
-type ObjectFunc func(obj runtime.Object) error
-
 // FinishFunc is a function returned by Begin hooks to complete an operation.
 type FinishFunc func(ctx context.Context, success bool)
 
