@@ -45,8 +45,13 @@ func ValidateStatefulSetName(name string, prefix bool) []string {
 	return apimachineryvalidation.NameIsDNSSubdomain(name, prefix)
 }
 
-// ValidatePodTemplateSpecForStatefulSet validates the given template and ensures that it is in accordance with the desired selector.
-func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, selector labels.Selector, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+// ValidatePodTemplateSpecForStatefulSet validates the PodTemplateSpec generated with
+// template and volumeClaimTemplates of StatefulSet spec, and ensures that it is in
+// accordance with the desired selector.
+func ValidatePodTemplateSpecForStatefulSet(
+	template *api.PodTemplateSpec, volumeClaimTemplates []api.PersistentVolumeClaim,
+	selector labels.Selector, fldPath *field.Path, opts apivalidation.PodValidationOptions,
+) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if template == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
@@ -58,13 +63,28 @@ func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, select
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.Labels, "`selector` does not match template `labels`"))
 			}
 		}
-		// TODO: Add validation for PodSpec, currently this will check volumes, which we know will
-		// fail. We should really check that the union of the given volumes and volumeClaims match
-		// volume mounts in the containers.
-		// allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath)...)
-		allErrs = append(allErrs, unversionedvalidation.ValidateLabels(template.Labels, fldPath.Child("labels"))...)
-		allErrs = append(allErrs, apivalidation.ValidateAnnotations(template.Annotations, fldPath.Child("annotations"))...)
-		allErrs = append(allErrs, apivalidation.ValidatePodSpecificAnnotations(template.Annotations, &template.Spec, fldPath.Child("annotations"), opts)...)
+
+		// Generate newTemplate with template and volumeClaimTemplates.
+		volumesMap := make(map[string]api.Volume)
+		for i := range template.Spec.Volumes {
+			volume := template.Spec.Volumes[i]
+			volumesMap[volume.Name] = volume
+		}
+		for i := range volumeClaimTemplates {
+			claim := volumeClaimTemplates[i]
+			volumesMap[claim.Name] = api.Volume{
+				Name:         claim.Name,
+				VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: claim.Name}},
+			}
+		}
+		newVolumes := make([]api.Volume, 0, len(volumesMap))
+		for _, v := range volumesMap {
+			newVolumes = append(newVolumes, v)
+		}
+		newTemplate := template.DeepCopy()
+		newTemplate.Spec.Volumes = newVolumes
+
+		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(newTemplate, fldPath, opts)...)
 	}
 	return allErrs
 }
@@ -122,7 +142,8 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, ""))
 	} else {
-		allErrs = append(allErrs, ValidatePodTemplateSpecForStatefulSet(&spec.Template, selector, fldPath.Child("template"), opts)...)
+		allErrs = append(allErrs, ValidatePodTemplateSpecForStatefulSet(
+			&spec.Template, spec.VolumeClaimTemplates, selector, fldPath.Child("template"), opts)...)
 	}
 
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {

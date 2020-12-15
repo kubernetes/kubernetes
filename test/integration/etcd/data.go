@@ -111,7 +111,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 			ExpectedEtcdPath: "/registry/deployments/" + namespace + "/deployment4",
 		},
 		gvr("apps", "v1", "statefulsets"): {
-			Stub:             `{"metadata": {"name": "ss3"}, "spec": {"selector": {"matchLabels": {"a": "b"}}, "template": {"metadata": {"labels": {"a": "b"}}}}}`,
+			Stub:             `{"metadata": {"name": "ss3"}, "spec": {"selector": {"matchLabels": {"a": "b"}}, "template": {"metadata": {"labels": {"a": "b"}}, "spec": {"containers": [{"image": "` + image + `", "name": "container4"}]}}}}`,
 			ExpectedEtcdPath: "/registry/statefulsets/" + namespace + "/ss3",
 		},
 		gvr("apps", "v1", "replicasets"): {
