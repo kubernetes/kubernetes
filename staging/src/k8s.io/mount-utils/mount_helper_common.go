@@ -30,7 +30,7 @@ import (
 // but properly handles bind mounts within the same fs.
 func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool) error {
 	pathExists, pathErr := PathExists(mountPath)
-	if !pathExists {
+	if !pathExists && pathErr == nil {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
 		return nil
 	}
@@ -43,7 +43,7 @@ func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointC
 
 func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, extensiveMountPointCheck bool, umountTimeout time.Duration) error {
 	pathExists, pathErr := PathExists(mountPath)
-	if !pathExists {
+	if !pathExists && pathErr == nil {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
 		return nil
 	}
@@ -54,8 +54,10 @@ func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, exte
 	var notMnt bool
 	var err error
 	if !corruptedMnt {
-		_, err = removePathIfNotMountPoint(mountPath, mounter, extensiveMountPointCheck)
-		if err != nil {
+		notMnt, err = removePathIfNotMountPoint(mountPath, mounter, extensiveMountPointCheck)
+		// if mountPath was not a mount point - we would have attempted to remove mountPath
+		// and hence return errors if any.
+		if err != nil || notMnt {
 			return err
 		}
 	}
@@ -85,8 +87,10 @@ func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPoin
 	var notMnt bool
 	var err error
 	if !corruptedMnt {
-		_, err = removePathIfNotMountPoint(mountPath, mounter, extensiveMountPointCheck)
-		if err != nil {
+		notMnt, err = removePathIfNotMountPoint(mountPath, mounter, extensiveMountPointCheck)
+		// if mountPath was not a mount point - we would have attempted to remove mountPath
+		// and hence return errors if any.
+		if err != nil || notMnt {
 			return err
 		}
 	}
