@@ -165,7 +165,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			framework.Logf("Created pod: %v", pods[i].Name)
 		}
 		if len(pods) < 2 {
-			framework.Failf("We need at least two pods to be created but" +
+			framework.Failf("We need at least two pods to be created but " +
 				"all nodes are already heavily utilized, so preemption tests cannot be run")
 		}
 		ginkgo.By("Wait for pods to be scheduled.")
@@ -251,7 +251,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			framework.Logf("Created pod: %v", pods[i].Name)
 		}
 		if len(pods) < 2 {
-			framework.Failf("We need at least two pods to be created but" +
+			framework.Failf("We need at least two pods to be created but " +
 				"all nodes are already heavily utilized, so preemption tests cannot be run")
 		}
 		ginkgo.By("Wait for pods to be scheduled.")
