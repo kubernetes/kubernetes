@@ -267,6 +267,7 @@ aliases:
     - odinuge
     - andrewsykim
     - mrunalp
+    - SergeyKanzhelev
   sig-network-driver-approvers:
     - dcbw
     - freehan
