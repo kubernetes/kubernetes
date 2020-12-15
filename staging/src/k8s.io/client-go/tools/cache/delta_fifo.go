@@ -118,7 +118,7 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 	return f
 }
 
-// DeltaFIFO is like FIFO, but differs in two ways.  One is that the
+// DeltaFIFO is like FIFO, but differs in three ways.  One is that the
 // accumulator associated with a given object's key is not that object
 // but rather a Deltas, which is a slice of Delta values for that
 // object.  Applying an object to a Deltas means to append a Delta
@@ -128,8 +128,12 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 // Deleted if the older Deleted's object is a
 // DeletedFinalStateUnknown.
 //
-// The other difference is that DeltaFIFO has an additional way that
-// an object can be applied to an accumulator, called Sync.
+// The second difference is that DeltaFIFO has an additional way that
+// an object can be applied to an accumulator, called Replaced.  However,
+// if EmitDeltaTypeReplaced is not set to true, Sync will be used in
+// replace events for backwards compatibility.
+//
+// The last difference is that Sync is used for periodic resync events.
 //
 // DeltaFIFO is a producer-consumer queue, where a Reflector is
 // intended to be the producer, and the consumer is whatever calls
