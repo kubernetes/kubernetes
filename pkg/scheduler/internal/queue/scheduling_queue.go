@@ -308,7 +308,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 	if _, exists, _ := p.podBackoffQ.Get(pInfo); exists {
 		return fmt.Errorf("pod %v is already present in the backoff queue", nsNameForPod(pod))
 	}
-	
+
 	// Refresh the timestamp since the pod is re-added.
 	pInfo.Timestamp = p.clock.Now()
 
