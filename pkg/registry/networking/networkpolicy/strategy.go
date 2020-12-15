@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,7 +49,9 @@ func (networkPolicyStrategy) NamespaceScoped() bool {
 func (networkPolicyStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	networkPolicy := obj.(*networking.NetworkPolicy)
 	networkPolicy.Generation = 1
-	dropNetworkPolicyDisabledFields(networkPolicy, nil)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.NetworkPolicyEndPort) {
+		dropNetworkPolicyEndPort(networkPolicy)
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -57,7 +59,10 @@ func (networkPolicyStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	newNetworkPolicy := obj.(*networking.NetworkPolicy)
 	oldNetworkPolicy := old.(*networking.NetworkPolicy)
 
-	dropNetworkPolicyDisabledFields(newNetworkPolicy, oldNetworkPolicy)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.NetworkPolicyEndPort) && !hasNetworkPolicyEndPort(oldNetworkPolicy) {
+		dropNetworkPolicyEndPort(newNetworkPolicy)
+	}
+
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
 	// See metav1.ObjectMeta description for more information on Generation.
@@ -92,24 +97,42 @@ func (networkPolicyStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// Drops Network Policy Disabled fields if Feature Gate is also disabled.
+// Drops Network Policy EndPort fields if Feature Gate is also disabled.
 // This should be used in future Network Policy evolutions
-func dropNetworkPolicyDisabledFields(newNetPol *networking.NetworkPolicy, oldNetPol *networking.NetworkPolicy) {
-	// Clear NetworkPolicyPort EndPort if NetworkPolicyEndPort is not enabled
-	for idx, ingressSpec := range oldNetPol.Spec.Ingress {
+func dropNetworkPolicyEndPort(netPol *networking.NetworkPolicy) {
+	for idx, ingressSpec := range netPol.Spec.Ingress {
 		for idxPort, port := range ingressSpec.Ports {
-			if port.EndPort != nil && !utilfeature.DefaultFeatureGate.Enabled(features.NetworkPolicyEndPort) {
-				newNetPol.Spec.Ingress[idx].Ports[idxPort].EndPort = nil
+			if port.EndPort != nil {
+				netPol.Spec.Ingress[idx].Ports[idxPort].EndPort = nil
 			}
 		}
 	}
 
-	for idx, egressSpec := range oldNetPol.Spec.Egress {
+	for idx, egressSpec := range netPol.Spec.Egress {
 		for idxPort, port := range egressSpec.Ports {
-			if port.EndPort != nil && !utilfeature.DefaultFeatureGate.Enabled(features.NetworkPolicyEndPort) {
-				newNetPol.Spec.Egress[idx].Ports[idxPort].EndPort = nil
+			if port.EndPort != nil {
+				netPol.Spec.Egress[idx].Ports[idxPort].EndPort = nil
+			}
+		}
+	}
+}
+
+// Verifies if a Network Policy has endPort defined before dropping it
+func hasNetworkPolicyEndPort(netPol *networking.NetworkPolicy) bool {
+	for _, ingressSpec := range netPol.Spec.Ingress {
+		for _, port := range ingressSpec.Ports {
+			if port.EndPort != nil {
+				return true
 			}
 		}
 	}
 
+	for _, egressSpec := range netPol.Spec.Egress {
+		for _, port := range egressSpec.Ports {
+			if port.EndPort != nil {
+				return true
+			}
+		}
+	}
+	return false
 }

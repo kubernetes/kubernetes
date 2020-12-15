@@ -38,7 +38,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	protocolUDP := api.ProtocolUDP
 	protocolICMP := api.Protocol("ICMP")
 	protocolSCTP := api.ProtocolSCTP
-
+	endPort := int32(32768)
 	successCases := []networking.NetworkPolicy{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
@@ -375,6 +375,78 @@ func TestValidateNetworkPolicy(t *testing.T) {
 					},
 				},
 				PolicyTypes: []networking.PolicyType{networking.PolicyTypeIngress, networking.PolicyTypeEgress},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						Ports: []networking.NetworkPolicyPort{
+							{
+								Protocol: nil,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32000},
+								EndPort:  &endPort,
+							},
+							{
+								Protocol: &protocolUDP,
+								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+						Ports: []networking.NetworkPolicyPort{
+							{
+								Protocol: nil,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 30000},
+								EndPort:  &endPort,
+							},
+							{
+								Protocol: nil,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32000},
+								EndPort:  &endPort,
+							},
+						},
+					},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								PodSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"e": "f"},
+								},
+							},
+						},
+						Ports: []networking.NetworkPolicyPort{
+							{
+								Protocol: &protocolTCP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32768},
+								EndPort:  &endPort,
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -796,6 +868,154 @@ func TestValidateNetworkPolicy(t *testing.T) {
 					},
 				},
 				PolicyTypes: []networking.PolicyType{"foo", "bar", "baz"},
+			},
+		},
+		"multiple ports defined, one port range is invalid": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+						Ports: []networking.NetworkPolicyPort{
+							{
+								Protocol: &protocolUDP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 35000},
+								EndPort:  &endPort,
+							},
+							{
+								Protocol: nil,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32000},
+								EndPort:  &endPort,
+							},
+						},
+					},
+				},
+			},
+		},
+		"endPort defined with named/string port": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+						Ports: []networking.NetworkPolicyPort{
+							{
+								Protocol: &protocolUDP,
+								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
+								EndPort:  &endPort,
+							},
+							{
+								Protocol: nil,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32000},
+								EndPort:  &endPort,
+							},
+						},
+					},
+				},
+			},
+		},
+		"endPort defined without port defined": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+						Ports: []networking.NetworkPolicyPort{
+							{
+								Protocol: &protocolTCP,
+								EndPort:  &endPort,
+							},
+						},
+					},
+				},
+			},
+		},
+		"port is greater than endPort": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+						Ports: []networking.NetworkPolicyPort{
+							{
+								Protocol: &protocolSCTP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 33000},
+								EndPort:  &endPort,
+							},
+						},
+					},
+				},
+			},
+		},
+		"multiple invalid port ranges defined": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+						Ports: []networking.NetworkPolicyPort{
+							{
+								Protocol: &protocolUDP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 35000},
+								EndPort:  &endPort,
+							},
+							{
+								Protocol: &protocolTCP,
+								EndPort:  &endPort,
+							},
+							{
+								Protocol: &protocolTCP,
+								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "https"},
+								EndPort:  &endPort,
+							},
+						},
+					},
+				},
 			},
 		},
 	}
