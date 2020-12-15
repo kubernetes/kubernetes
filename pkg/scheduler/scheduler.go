@@ -540,8 +540,8 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	go func() {
 		bindingCycleCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		metrics.SchedulerGoroutines.WithLabelValues("binding").Inc()
-		defer metrics.SchedulerGoroutines.WithLabelValues("binding").Dec()
+		metrics.SchedulerGoroutines.WithLabelValues(metrics.Binding).Inc()
+		defer metrics.SchedulerGoroutines.WithLabelValues(metrics.Binding).Dec()
 
 		waitOnPermitStatus := fwk.WaitOnPermit(bindingCycleCtx, assumedPod)
 		if !waitOnPermitStatus.IsSuccess() {
