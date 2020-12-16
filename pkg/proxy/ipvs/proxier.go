@@ -803,13 +803,9 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 }
 
 // CleanupLeftovers clean up all ipvs and iptables rules created by ipvs Proxier.
-func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset utilipset.Interface, cleanupIPVS bool) (encounteredError bool) {
-	if cleanupIPVS {
-		// Return immediately when ipvs interface is nil - Probably initialization failed in somewhere.
-		if ipvs == nil {
-			return true
-		}
-		encounteredError = false
+func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset utilipset.Interface) (encounteredError bool) {
+	// Clear all ipvs rules
+	if ipvs != nil {
 		err := ipvs.Flush()
 		if err != nil {
 			klog.Errorf("Error flushing IPVS rules: %v", err)
