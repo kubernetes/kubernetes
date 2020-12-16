@@ -183,6 +183,30 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
 		},
+		"nodeports-disabled-but-specified": {
+			service: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{
+						{
+							Port:     27443,
+							NodePort: 32001,
+						},
+						{
+							Port:     27444,
+							NodePort: 32002,
+						},
+					},
+					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(false),
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceServices:              resource.MustParse("1"),
+				corev1.ResourceServicesNodePorts:     resource.MustParse("2"),
+				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
+			},
+		},
 	}
 	for testName, testCase := range testCases {
 		actual, err := evaluator.Usage(testCase.service)

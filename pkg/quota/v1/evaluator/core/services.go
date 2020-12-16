@@ -128,15 +128,27 @@ func (p *serviceEvaluator) Usage(item runtime.Object) (corev1.ResourceList, erro
 		value := resource.NewQuantity(int64(ports), resource.DecimalSI)
 		result[corev1.ResourceServicesNodePorts] = *value
 	case corev1.ServiceTypeLoadBalancer:
-		// load balancer services need to count node ports unless creation of node ports
-		// is suspressed.
+		// load balancer services need to count node ports. If creation of node ports
+		// is suspressed only ports with explicit NodePort values are counted.
 		if svc.Spec.AllocateLoadBalancerNodePorts == nil || *svc.Spec.AllocateLoadBalancerNodePorts == true {
 			value := resource.NewQuantity(int64(ports), resource.DecimalSI)
 			result[corev1.ResourceServicesNodePorts] = *value
+		} else {
+			result[corev1.ResourceServicesNodePorts] = *portsWithNodePorts(svc)
 		}
 		result[corev1.ResourceServicesLoadBalancers] = *(resource.NewQuantity(1, resource.DecimalSI))
 	}
 	return result, nil
+}
+
+func portsWithNodePorts(svc *corev1.Service) *resource.Quantity {
+	count := 0
+	for _, p := range svc.Spec.Ports {
+		if p.NodePort != 0 {
+			count++
+		}
+	}
+	return resource.NewQuantity(int64(count), resource.DecimalSI)
 }
 
 // UsageStats calculates aggregate usage for the object.
