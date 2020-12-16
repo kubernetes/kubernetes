@@ -420,6 +420,66 @@ func TestNewCreateOptionsFromUpdateOptions(t *testing.T) {
 	}
 }
 
+func TestNewDeleteOptionsFromUpdateOptions(t *testing.T) {
+	f := fuzz.New().NilChance(0.0).NumElements(1, 1)
+
+	// The goal here is to trigger when any changes are made to either
+	// DeleteOptions or UpdateOptions types, so we can update the converter.
+	for i := 0; i < 20; i++ {
+		in := &metav1.UpdateOptions{}
+		f.Fuzz(in)
+		in.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("DeleteOptions"))
+
+		out := newDeleteOptionsFromUpdateOptions(in)
+
+		// This sequence is intending to elide type information, but produce an
+		// intermediate structure (map) that can be manually patched up to make
+		// the comparison work as needed.
+
+		// Convert both structs to maps of primitives.
+		inBytes, err := json.Marshal(in)
+		if err != nil {
+			t.Fatalf("failed to json.Marshal(in): %v", err)
+		}
+		outBytes, err := json.Marshal(out)
+		if err != nil {
+			t.Fatalf("failed to json.Marshal(out): %v", err)
+		}
+		inMap := map[string]interface{}{}
+		if err := json.Unmarshal(inBytes, &inMap); err != nil {
+			t.Fatalf("failed to json.Unmarshal(in): %v", err)
+		}
+		outMap := map[string]interface{}{}
+		if err := json.Unmarshal(outBytes, &outMap); err != nil {
+			t.Fatalf("failed to json.Unmarshal(out): %v", err)
+		}
+
+		// Patch the maps to handle any expected differences before we compare.
+
+		// DeleteOptions does not have these fields.
+		delete(inMap, "fieldManager")
+
+		// UpdateOptions does not have these fields.
+		delete(outMap, "gracePeriodSeconds")
+		delete(outMap, "preconditions")
+		delete(outMap, "orphanDependents")
+		delete(outMap, "propagationPolicy")
+
+		// Compare the results.
+		inBytes, err = json.Marshal(inMap)
+		if err != nil {
+			t.Fatalf("failed to json.Marshal(in): %v", err)
+		}
+		outBytes, err = json.Marshal(outMap)
+		if err != nil {
+			t.Fatalf("failed to json.Marshal(out): %v", err)
+		}
+		if i, o := string(inBytes), string(outBytes); i != o {
+			t.Fatalf("output != input:\n  want: %s\n   got: %s", i, o)
+		}
+	}
+}
+
 func TestStoreCreateHooks(t *testing.T) {
 	// To track which hooks were called in what order.  Not all hooks can
 	// mutate the object.
@@ -1231,10 +1291,18 @@ func TestStoreDelete(t *testing.T) {
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
+	afterWasCalled := false
+	registry.AfterDelete = func(obj runtime.Object, options *metav1.DeleteOptions) {
+		afterWasCalled = true
+	}
+
 	// test failure condition
 	_, _, err := registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, nil)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
+	}
+	if afterWasCalled {
+		t.Errorf("Unexpected call to AfterDelete")
 	}
 
 	// create pod
@@ -1250,6 +1318,9 @@ func TestStoreDelete(t *testing.T) {
 	}
 	if !wasDeleted {
 		t.Errorf("unexpected, pod %s should have been deleted immediately", podA.Name)
+	}
+	if !afterWasCalled {
+		t.Errorf("Expected call to AfterDelete, but got none")
 	}
 
 	// try to get a item which should be deleted
@@ -1366,10 +1437,17 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
 	defer destroyFunc()
 
+	afterWasCalled := false
+	registry.AfterDelete = func(obj runtime.Object, options *metav1.DeleteOptions) {
+		afterWasCalled = true
+	}
+
 	gcStates := []bool{true, false}
 	for _, gcEnabled := range gcStates {
 		t.Logf("garbage collection enabled: %t", gcEnabled)
 		registry.EnableGarbageCollection = gcEnabled
+
+		afterWasCalled = false // reset
 
 		// create pod
 		_, err := registry.Create(testContext, podWithFinalizer, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -1385,6 +1463,9 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 		if wasDeleted {
 			t.Errorf("unexpected, pod %s should not have been deleted immediately", podWithFinalizer.Name)
 		}
+		if afterWasCalled {
+			t.Errorf("unexpected, AfterDelete() was called")
+		}
 		_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
@@ -1397,6 +1478,9 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 		_, _, err = registry.Update(testContext, updatedPodWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(updatedPodWithFinalizer), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
+		}
+		if afterWasCalled {
+			t.Errorf("unexpected, AfterDelete() was called")
 		}
 
 		// the object should still exist, because it still has a finalizer
@@ -1412,6 +1496,9 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 		_, _, err = registry.Update(testContext, podWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
+		}
+		if !afterWasCalled {
+			t.Errorf("unexpected, AfterDelete() was not called")
 		}
 		// the pod should be removed, because its finalizer is removed
 		_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
@@ -1430,12 +1517,19 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
-
 	defer destroyFunc()
+
+	afterWasCalled := false
+	registry.AfterDelete = func(obj runtime.Object, options *metav1.DeleteOptions) {
+		afterWasCalled = true
+	}
+
 	gcStates := []bool{true, false}
 	for _, gcEnabled := range gcStates {
 		t.Logf("garbage collection enabled: %t", gcEnabled)
 		registry.EnableGarbageCollection = gcEnabled
+
+		afterWasCalled = false // reset
 
 		// create pod
 		_, err := registry.Create(testContext, podWithFinalizer, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -1450,6 +1544,9 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 		}
 		if wasDeleted {
 			t.Errorf("unexpected, pod %s should not have been deleted immediately", podWithFinalizer.Name)
+		}
+		if afterWasCalled {
+			t.Errorf("unexpected, AfterDelete() was called")
 		}
 
 		// the object should still exist
@@ -1479,6 +1576,9 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
+		if afterWasCalled {
+			t.Errorf("unexpected, AfterDelete() was called")
+		}
 
 		// the object should still exist, because it still has a finalizer
 		obj, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
@@ -1497,6 +1597,9 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 		_, _, err = registry.Update(testContext, podWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
+		}
+		if !afterWasCalled {
+			t.Errorf("unexpected, AfterDelete() was not called")
 		}
 		// the pod should be removed, because its finalizer is removed
 		_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
@@ -2248,7 +2351,7 @@ func TestFinalizeDelete(t *testing.T) {
 	obj := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "random-uid"},
 	}
-	result, err := s.finalizeDelete(genericapirequest.NewContext(), obj, false)
+	result, err := s.finalizeDelete(genericapirequest.NewContext(), obj, false, &metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("unexpected err: %s", err)
 	}
