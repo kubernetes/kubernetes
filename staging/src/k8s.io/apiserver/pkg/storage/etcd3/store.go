@@ -285,7 +285,7 @@ func (s *store) conditionalDelete(
 // GuaranteedUpdate implements storage.Interface.GuaranteedUpdate.
 func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, out runtime.Object, ignoreNotFound bool,
-	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion runtime.Object) error {
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
 	trace := utiltrace.New("GuaranteedUpdate etcd3", utiltrace.Field{"type", getTypeName(out)})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
@@ -306,12 +306,12 @@ func (s *store) GuaranteedUpdate(
 	}
 
 	var origState *objState
-	var mustCheckData bool
-	if suggestion != nil {
-		origState, err = s.getStateFromObject(suggestion)
-		mustCheckData = true
+	var origStateIsCurrent bool
+	if cachedExistingObject != nil {
+		origState, err = s.getStateFromObject(cachedExistingObject)
 	} else {
 		origState, err = getCurrentState()
+		origStateIsCurrent = true
 	}
 	if err != nil {
 		return err
@@ -322,7 +322,7 @@ func (s *store) GuaranteedUpdate(
 	for {
 		if err := preconditions.Check(key, origState.obj); err != nil {
 			// If our data is already up to date, return the error
-			if !mustCheckData {
+			if origStateIsCurrent {
 				return err
 			}
 
@@ -332,7 +332,7 @@ func (s *store) GuaranteedUpdate(
 			if err != nil {
 				return err
 			}
-			mustCheckData = false
+			origStateIsCurrent = true
 			// Retry
 			continue
 		}
@@ -340,7 +340,7 @@ func (s *store) GuaranteedUpdate(
 		ret, ttl, err := s.updateState(origState, tryUpdate)
 		if err != nil {
 			// If our data is already up to date, return the error
-			if !mustCheckData {
+			if origStateIsCurrent {
 				return err
 			}
 
@@ -350,7 +350,7 @@ func (s *store) GuaranteedUpdate(
 			if err != nil {
 				return err
 			}
-			mustCheckData = false
+			origStateIsCurrent = true
 			// Retry
 			continue
 		}
@@ -363,12 +363,12 @@ func (s *store) GuaranteedUpdate(
 			// if we skipped the original Get in this loop, we must refresh from
 			// etcd in order to be sure the data in the store is equivalent to
 			// our desired serialization
-			if mustCheckData {
+			if !origStateIsCurrent {
 				origState, err = getCurrentState()
 				if err != nil {
 					return err
 				}
-				mustCheckData = false
+				origStateIsCurrent = true
 				if !bytes.Equal(data, origState.data) {
 					// original data changed, restart loop
 					continue
@@ -412,7 +412,7 @@ func (s *store) GuaranteedUpdate(
 				return err
 			}
 			trace.Step("Retry value restored")
-			mustCheckData = false
+			origStateIsCurrent = true
 			continue
 		}
 		putResp := txnResp.Responses[0].GetResponsePut()
