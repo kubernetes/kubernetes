@@ -3848,6 +3848,7 @@ func TestStoreScaleEvents(t *testing.T) {
 }
 
 func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
+	now := time.Now()
 	type TestCase struct {
 		name                                string
 		key                                 string
@@ -3868,22 +3869,22 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			prenormalizedDesiredReplicas: 5,
 			expectedStabilizedReplicas:   5,
 			expectedRecommendations: []timestampedRecommendation{
-				{5, time.Now()},
+				{5, now},
 			},
 		},
 		{
 			name: "simple scale down stabilization",
 			key:  "",
 			recommendations: []timestampedRecommendation{
-				{4, time.Now().Add(-2 * time.Minute)},
-				{5, time.Now().Add(-1 * time.Minute)}},
+				{4, now.Add(-2 * time.Minute)},
+				{5, now.Add(-1 * time.Minute)}},
 			currentReplicas:              100,
 			prenormalizedDesiredReplicas: 3,
 			expectedStabilizedReplicas:   5,
 			expectedRecommendations: []timestampedRecommendation{
-				{4, time.Now()},
-				{5, time.Now()},
-				{3, time.Now()},
+				{4, now},
+				{5, now},
+				{3, now},
 			},
 			scaleDownStabilizationWindowSeconds: 60 * 3,
 		},
@@ -3891,15 +3892,15 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			name: "simple scale up stabilization",
 			key:  "",
 			recommendations: []timestampedRecommendation{
-				{4, time.Now().Add(-2 * time.Minute)},
-				{5, time.Now().Add(-1 * time.Minute)}},
+				{4, now.Add(-2 * time.Minute)},
+				{5, now.Add(-1 * time.Minute)}},
 			currentReplicas:              1,
 			prenormalizedDesiredReplicas: 7,
 			expectedStabilizedReplicas:   4,
 			expectedRecommendations: []timestampedRecommendation{
-				{4, time.Now()},
-				{5, time.Now()},
-				{7, time.Now()},
+				{4, now},
+				{5, now},
+				{7, now},
 			},
 			scaleUpStabilizationWindowSeconds: 60 * 5,
 		},
@@ -3907,15 +3908,15 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			name: "no scale down stabilization",
 			key:  "",
 			recommendations: []timestampedRecommendation{
-				{1, time.Now().Add(-2 * time.Minute)},
-				{2, time.Now().Add(-1 * time.Minute)}},
+				{1, now.Add(-2 * time.Minute)},
+				{2, now.Add(-1 * time.Minute)}},
 			currentReplicas:              100, // to apply scaleDown delay we should have current > desired
 			prenormalizedDesiredReplicas: 3,
 			expectedStabilizedReplicas:   3,
 			expectedRecommendations: []timestampedRecommendation{
-				{1, time.Now()},
-				{2, time.Now()},
-				{3, time.Now()},
+				{1, now},
+				{2, now},
+				{3, now},
 			},
 			scaleUpStabilizationWindowSeconds: 60 * 5,
 		},
@@ -3923,15 +3924,15 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			name: "no scale up stabilization",
 			key:  "",
 			recommendations: []timestampedRecommendation{
-				{4, time.Now().Add(-2 * time.Minute)},
-				{5, time.Now().Add(-1 * time.Minute)}},
+				{4, now.Add(-2 * time.Minute)},
+				{5, now.Add(-1 * time.Minute)}},
 			currentReplicas:              1, // to apply scaleDown delay we should have current > desired
 			prenormalizedDesiredReplicas: 3,
 			expectedStabilizedReplicas:   3,
 			expectedRecommendations: []timestampedRecommendation{
-				{4, time.Now()},
-				{5, time.Now()},
-				{3, time.Now()},
+				{4, now},
+				{5, now},
+				{3, now},
 			},
 			scaleDownStabilizationWindowSeconds: 60 * 5,
 		},
@@ -3939,46 +3940,46 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			name: "no scale down stabilization, reuse recommendation element",
 			key:  "",
 			recommendations: []timestampedRecommendation{
-				{10, time.Now().Add(-10 * time.Minute)},
-				{9, time.Now().Add(-9 * time.Minute)}},
+				{10, now.Add(-10 * time.Minute)},
+				{9, now.Add(-9 * time.Minute)}},
 			currentReplicas:              100, // to apply scaleDown delay we should have current > desired
 			prenormalizedDesiredReplicas: 3,
 			expectedStabilizedReplicas:   3,
 			expectedRecommendations: []timestampedRecommendation{
-				{10, time.Now()},
-				{3, time.Now()},
+				{10, now},
+				{3, now},
 			},
 		},
 		{
 			name: "no scale up stabilization, reuse recommendation element",
 			key:  "",
 			recommendations: []timestampedRecommendation{
-				{10, time.Now().Add(-10 * time.Minute)},
-				{9, time.Now().Add(-9 * time.Minute)}},
+				{10, now.Add(-10 * time.Minute)},
+				{9, now.Add(-9 * time.Minute)}},
 			currentReplicas:              1,
 			prenormalizedDesiredReplicas: 100,
 			expectedStabilizedReplicas:   100,
 			expectedRecommendations: []timestampedRecommendation{
-				{10, time.Now()},
-				{100, time.Now()},
+				{10, now},
+				{100, now},
 			},
 		},
 		{
 			name: "scale down stabilization, reuse one of obsolete recommendation element",
 			key:  "",
 			recommendations: []timestampedRecommendation{
-				{10, time.Now().Add(-10 * time.Minute)},
-				{4, time.Now().Add(-1 * time.Minute)},
-				{5, time.Now().Add(-2 * time.Minute)},
-				{9, time.Now().Add(-9 * time.Minute)}},
+				{10, now.Add(-10 * time.Minute)},
+				{4, now.Add(-1 * time.Minute)},
+				{5, now.Add(-2 * time.Minute)},
+				{9, now.Add(-9 * time.Minute)}},
 			currentReplicas:              100,
 			prenormalizedDesiredReplicas: 3,
 			expectedStabilizedReplicas:   5,
 			expectedRecommendations: []timestampedRecommendation{
-				{10, time.Now()},
-				{4, time.Now()},
-				{5, time.Now()},
-				{3, time.Now()},
+				{10, now},
+				{4, now},
+				{5, now},
+				{3, now},
 			},
 			scaleDownStabilizationWindowSeconds: 3 * 60,
 		},
@@ -3989,20 +3990,44 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			name: "scale up stabilization, reuse one of obsolete recommendation element",
 			key:  "",
 			recommendations: []timestampedRecommendation{
-				{10, time.Now().Add(-100 * time.Minute)},
-				{6, time.Now().Add(-1 * time.Minute)},
-				{5, time.Now().Add(-2 * time.Minute)},
-				{9, time.Now().Add(-3 * time.Minute)}},
+				{10, now.Add(-100 * time.Minute)},
+				{6, now.Add(-1 * time.Minute)},
+				{5, now.Add(-2 * time.Minute)},
+				{9, now.Add(-3 * time.Minute)}},
 			currentReplicas:              1,
 			prenormalizedDesiredReplicas: 100,
 			expectedStabilizedReplicas:   5,
 			expectedRecommendations: []timestampedRecommendation{
-				{100, time.Now()},
-				{6, time.Now()},
-				{5, time.Now()},
-				{9, time.Now()},
+				{100, now},
+				{6, now},
+				{5, now},
+				{9, now},
 			},
 			scaleUpStabilizationWindowSeconds: 300,
+		}, {
+			name: "scale up and down stabilization, do not scale up when prenormalized rec goes down",
+			key:  "",
+			recommendations: []timestampedRecommendation{
+				{2, now.Add(-100 * time.Minute)},
+				{3, now.Add(-3 * time.Minute)},
+			},
+			currentReplicas:                     2,
+			prenormalizedDesiredReplicas:        1,
+			expectedStabilizedReplicas:          2,
+			scaleUpStabilizationWindowSeconds:   300,
+			scaleDownStabilizationWindowSeconds: 300,
+		}, {
+			name: "scale up and down stabilization, do not scale down when prenormalized rec goes up",
+			key:  "",
+			recommendations: []timestampedRecommendation{
+				{2, now.Add(-100 * time.Minute)},
+				{1, now.Add(-3 * time.Minute)},
+			},
+			currentReplicas:                     2,
+			prenormalizedDesiredReplicas:        3,
+			expectedStabilizedReplicas:          2,
+			scaleUpStabilizationWindowSeconds:   300,
+			scaleDownStabilizationWindowSeconds: 300,
 		},
 	}
 	for _, tc := range tests {
@@ -4025,12 +4050,14 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			}
 			r, _, _ := hc.stabilizeRecommendationWithBehaviors(arg)
 			assert.Equal(t, tc.expectedStabilizedReplicas, r, "expected replicas do not match")
-			if !assert.Len(t, hc.recommendations[tc.key], len(tc.expectedRecommendations), "stored recommendations differ in length") {
-				return
-			}
-			for i, r := range hc.recommendations[tc.key] {
-				expectedRecommendation := tc.expectedRecommendations[i]
-				assert.Equal(t, expectedRecommendation.recommendation, r.recommendation, "stored recommendation differs at position %d", i)
+			if tc.expectedRecommendations != nil {
+				if !assert.Len(t, hc.recommendations[tc.key], len(tc.expectedRecommendations), "stored recommendations differ in length") {
+					return
+				}
+				for i, r := range hc.recommendations[tc.key] {
+					expectedRecommendation := tc.expectedRecommendations[i]
+					assert.Equal(t, expectedRecommendation.recommendation, r.recommendation, "stored recommendation differs at position %d", i)
+				}
 			}
 		})
 	}
