@@ -127,7 +127,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 
 // reconcileHugePageResource will update huge page capacity for each page size and remove huge page sizes no longer supported
 func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node) bool {
-	requiresUpdate := false
+	requiresUpdate := updateDefaultResources(initialNode, existingNode)
 	supportedHugePageResources := sets.String{}
 
 	for resourceName := range initialNode.Status.Capacity {
@@ -174,7 +174,7 @@ func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node)
 
 // Zeros out extended resource capacity during reconciliation.
 func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
-	requiresUpdate := false
+	requiresUpdate := updateDefaultResources(initialNode, node)
 	// Check with the device manager to see if node has been recreated, in which case extended resources should be zeroed until they are available
 	if kl.containerManager.ShouldResetExtendedResourceCapacity() {
 		for k := range node.Status.Capacity {
@@ -184,6 +184,29 @@ func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 				node.Status.Allocatable[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 				requiresUpdate = true
 			}
+		}
+	}
+	return requiresUpdate
+}
+
+// updateDefaultResources will set the default resources on the existing node according to the initial node
+func updateDefaultResources(initialNode, existingNode *v1.Node) bool {
+	requiresUpdate := false
+	if existingNode.Status.Capacity == nil {
+		if initialNode.Status.Capacity != nil {
+			existingNode.Status.Capacity = initialNode.Status.Capacity.DeepCopy()
+			requiresUpdate = true
+		} else {
+			existingNode.Status.Capacity = make(map[v1.ResourceName]resource.Quantity)
+		}
+	}
+
+	if existingNode.Status.Allocatable == nil {
+		if initialNode.Status.Allocatable != nil {
+			existingNode.Status.Allocatable = initialNode.Status.Allocatable.DeepCopy()
+			requiresUpdate = true
+		} else {
+			existingNode.Status.Allocatable = make(map[v1.ResourceName]resource.Quantity)
 		}
 	}
 	return requiresUpdate
