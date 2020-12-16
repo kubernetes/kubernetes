@@ -230,14 +230,14 @@ func TestConfigConsumer(t *testing.T) {
 				heldRequestsMap: map[string][]heldRequest{},
 				queues:          map[string]*ctlrTestQueueSet{},
 			}
-			ctlr := newTestableController(
-				informerFactory,
-				flowcontrolClient,
-				100,         // server concurrency limit
-				time.Minute, // request wait limit
-				metrics.PriorityLevelConcurrencyObserverPairGenerator,
-				cts,
-			)
+			ctlr := newTestableController(TestableConfig{
+				InformerFactory:        informerFactory,
+				FlowcontrolClient:      flowcontrolClient,
+				ServerConcurrencyLimit: 100,
+				RequestWaitLimit:       time.Minute,
+				ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
+				QueueSetFactory:        cts,
+			})
 			cts.cfgCtlr = ctlr
 			persistingPLNames := sets.NewString()
 			trialStep := fmt.Sprintf("trial%d-0", i)
