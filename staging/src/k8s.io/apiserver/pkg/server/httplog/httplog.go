@@ -135,6 +135,15 @@ func Unlogged(req *http.Request, w http.ResponseWriter) http.ResponseWriter {
 	return w
 }
 
+// DisableStackTraceForRequest stops putting a stacktrace into the log.
+func DisableStackTraceForRequest(req *http.Request) {
+	rl := respLoggerFromContext(req)
+	if rl == nil {
+		return
+	}
+	rl.StacktraceWhen(func(int) bool { return false })
+}
+
 // StacktraceWhen sets the stacktrace logging predicate, which decides when to log a stacktrace.
 // There's a default, so you don't need to call this unless you don't like the default.
 func (rl *respLogger) StacktraceWhen(pred StacktracePred) *respLogger {
