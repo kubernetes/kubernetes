@@ -56,6 +56,12 @@ type FinishFunc func(ctx context.Context, success bool)
 // AfterDeleteFunc is the type used for the Store.AfterDelete hook.
 type AfterDeleteFunc func(obj runtime.Object, options *metav1.DeleteOptions)
 
+// AfterCreateFunc is the type used for the Store.AfterCreate hook.
+type AfterCreateFunc func(obj runtime.Object, options *metav1.CreateOptions)
+
+// AfterUpdateFunc is the type used for the Store.AfterUpdate hook.
+type AfterUpdateFunc func(obj runtime.Object, options *metav1.UpdateOptions)
+
 // GenericStore interface can be used for type assertions when we need to access the underlying strategies.
 type GenericStore interface {
 	GetCreateStrategy() rest.RESTCreateStrategy
@@ -159,7 +165,7 @@ type Store struct {
 	BeginCreate func(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) (FinishFunc, error)
 	// AfterCreate implements a further operation to run after a resource is
 	// created and before it is decorated, optional.
-	AfterCreate func(runtime.Object)
+	AfterCreate AfterCreateFunc
 
 	// UpdateStrategy implements resource-specific behavior during updates.
 	UpdateStrategy rest.RESTUpdateStrategy
@@ -171,7 +177,7 @@ type Store struct {
 	BeginUpdate func(ctx context.Context, obj, old runtime.Object, options *metav1.UpdateOptions) (FinishFunc, error)
 	// AfterUpdate implements a further operation to run after a resource is
 	// updated and before it is decorated, optional.
-	AfterUpdate func(runtime.Object)
+	AfterUpdate AfterUpdateFunc
 
 	// DeleteStrategy implements resource-specific behavior during deletion.
 	DeleteStrategy rest.RESTDeleteStrategy
@@ -419,7 +425,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 	fn(ctx, true)
 
 	if e.AfterCreate != nil {
-		e.AfterCreate(out)
+		e.AfterCreate(out, options)
 	}
 	if e.Decorator != nil {
 		e.Decorator(out)
@@ -659,11 +665,11 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 
 	if creating {
 		if e.AfterCreate != nil {
-			e.AfterCreate(out)
+			e.AfterCreate(out, newCreateOptionsFromUpdateOptions(options))
 		}
 	} else {
 		if e.AfterUpdate != nil {
-			e.AfterUpdate(out)
+			e.AfterUpdate(out, options)
 		}
 	}
 	if e.Decorator != nil {
