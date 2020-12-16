@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/klog/v2"
 )
 
@@ -140,10 +141,11 @@ func InstallReadyzHandler(mux mux, checks ...HealthChecker) {
 	InstallPathHandler(mux, "/readyz", checks...)
 }
 
-// InstallReadyzHandlerWithHealthyFunc is like InstallReadyzHandler, but in addition call firstTimeReady
-// the first time /readyz succeeds.
+// InstallReadyzHandlerWithHealthyFunc is like InstallReadyzHandler but allows for small customization
+// - calls firstTimeHealthy the first time /readyz succeeds.
+// - disables putting a stacktrace for httplog so that it doesn't log stack trace when HTTP 500 response is returned
 func InstallReadyzHandlerWithHealthyFunc(mux mux, firstTimeReady func(), checks ...HealthChecker) {
-	InstallPathHandlerWithHealthyFunc(mux, "/readyz", firstTimeReady, checks...)
+	InstallPathHandlerWithHealthyFunc(mux, "/readyz", firstTimeReady, true, checks...)
 }
 
 // InstallLivezHandler registers handlers for liveness checking on the path
@@ -160,12 +162,13 @@ func InstallLivezHandler(mux mux, checks ...HealthChecker) {
 // InstallPathHandler more than once for the same path and mux will
 // result in a panic.
 func InstallPathHandler(mux mux, path string, checks ...HealthChecker) {
-	InstallPathHandlerWithHealthyFunc(mux, path, nil, checks...)
+	InstallPathHandlerWithHealthyFunc(mux, path, nil, false, checks...)
 }
 
-// InstallPathHandlerWithHealthyFunc is like InstallPathHandler, but calls firstTimeHealthy exactly once
-// when the handler succeeds for the first time.
-func InstallPathHandlerWithHealthyFunc(mux mux, path string, firstTimeHealthy func(), checks ...HealthChecker) {
+// InstallPathHandlerWithHealthyFunc is like InstallPathHandler but:
+// - calls firstTimeHealthy exactly once when the handler succeeds for the first time
+// - allows for disabling putting a stacktrace for httplog for the current request so that the output is condensed
+func InstallPathHandlerWithHealthyFunc(mux mux, path string, firstTimeHealthy func(), disableStacktraceForHttpLog bool, checks ...HealthChecker) {
 	if len(checks) == 0 {
 		klog.V(5).Info("No default health checks specified. Installing the ping handler.")
 		checks = []HealthChecker{PingHealthz}
@@ -184,9 +187,9 @@ func InstallPathHandlerWithHealthyFunc(mux mux, path string, firstTimeHealthy fu
 			/* component = */ "",
 			/* deprecated */ false,
 			/* removedRelease */ "",
-			handleRootHealth(name, firstTimeHealthy, checks...)))
+			handleRootHealth(name, firstTimeHealthy, disableStacktraceForHttpLog, checks...)))
 	for _, check := range checks {
-		mux.Handle(fmt.Sprintf("%s/%v", path, check.Name()), adaptCheckToHandler(check.Check))
+		mux.Handle(fmt.Sprintf("%s/%v", path, check.Name()), adaptCheckToHandler(check.Check, disableStacktraceForHttpLog))
 	}
 }
 
@@ -221,7 +224,7 @@ func getExcludedChecks(r *http.Request) sets.String {
 }
 
 // handleRootHealth returns an http.HandlerFunc that serves the provided checks.
-func handleRootHealth(name string, firstTimeHealthy func(), checks ...HealthChecker) http.HandlerFunc {
+func handleRootHealth(name string, firstTimeHealthy func(), disableStacktraceForHttpLog bool, checks ...HealthChecker) http.HandlerFunc {
 	var notifyOnce sync.Once
 	return func(w http.ResponseWriter, r *http.Request) {
 		excluded := getExcludedChecks(r)
@@ -254,6 +257,12 @@ func handleRootHealth(name string, firstTimeHealthy func(), checks ...HealthChec
 		}
 		// always be verbose on failure
 		if len(failedChecks) > 0 {
+			// update the stacktrace predicate so that httplog's output is condensed
+			// this handler is used for health checking on the paths like /healthz or /readyz
+			// for some (/readyz) the StatusInternalServerError is considered as a "normal" response code to signal the other end
+			if disableStacktraceForHttpLog {
+				httplog.DisableStackTraceForRequest(r)
+			}
 			klog.V(2).Infof("%s check failed: %s\n%v", strings.Join(failedChecks, ","), name, failedVerboseLogOutput.String())
 			http.Error(responsewriter.GetOriginal(w), fmt.Sprintf("%s%s check failed", individualCheckOutput.String(), name), http.StatusInternalServerError)
 			return
@@ -277,10 +286,13 @@ func handleRootHealth(name string, firstTimeHealthy func(), checks ...HealthChec
 }
 
 // adaptCheckToHandler returns an http.HandlerFunc that serves the provided checks.
-func adaptCheckToHandler(c func(r *http.Request) error) http.HandlerFunc {
+func adaptCheckToHandler(c func(r *http.Request) error, disableStacktraceForHttpLog bool) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		err := c(r)
 		if err != nil {
+			if disableStacktraceForHttpLog {
+				httplog.DisableStackTraceForRequest(r)
+			}
 			http.Error(w, fmt.Sprintf("internal server error: %v", err), http.StatusInternalServerError)
 		} else {
 			fmt.Fprint(w, "ok")
