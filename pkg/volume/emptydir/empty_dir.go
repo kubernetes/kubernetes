@@ -208,11 +208,21 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// storage medium is the default, then the volume is ready.  If the
 	// medium is memory, and a mountpoint is present, then the volume is
 	// ready.
-	if volumeutil.IsReady(ed.getMetaDir()) {
+	readyDir := ed.getMetaDir()
+	if volumeutil.IsReady(readyDir) {
 		if ed.medium == v1.StorageMediumMemory && !notMnt {
 			return nil
 		} else if ed.medium == v1.StorageMediumDefault {
-			return nil
+			// Further check dir exists
+			if _, err := os.Stat(dir); err == nil {
+				return nil
+			}
+			// This situation should not happen unless user manually delete volume dir.
+			// In this case, delete ready file and print a warning for it.
+			klog.Warningf("volume ready file dir %s exist, but volume dir %s does not. Remove ready dir", readyDir, dir)
+			if err := os.RemoveAll(readyDir); err != nil && !os.IsNotExist(err) {
+				klog.Warningf("failed to remove ready dir [%s]: %v", readyDir, err)
+			}
 		}
 	}
 
@@ -421,6 +431,12 @@ func (ed *emptyDir) TearDown() error {
 
 // TearDownAt simply discards everything in the directory.
 func (ed *emptyDir) TearDownAt(dir string) error {
+	// First remove ready dir which created in SetUp func
+	readyDir := ed.getMetaDir()
+	if removeErr := os.RemoveAll(readyDir); removeErr != nil && !os.IsNotExist(removeErr) {
+		return fmt.Errorf("failed to remove ready dir [%s]: %v", readyDir, removeErr)
+	}
+
 	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
