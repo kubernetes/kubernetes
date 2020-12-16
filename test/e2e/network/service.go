@@ -1210,8 +1210,7 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 	})
 
-	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
-	ginkgo.It("should be able to change the type and ports of a service [Slow] [DisabledForLargeClusters]", func() {
+	ginkgo.It("should be able to change the type and ports of a service [Slow]", func() {
 		// requires cloud load-balancer support
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 
@@ -3194,8 +3193,7 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		}
 	})
 
-	// TODO(#56138): Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
-	ginkgo.It("should handle updates to ExternalTrafficPolicy field [DisabledForLargeClusters]", func() {
+	ginkgo.It("should handle updates to ExternalTrafficPolicy field", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-update"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
