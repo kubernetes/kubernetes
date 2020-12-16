@@ -499,7 +499,7 @@ func TestStoreCreateHooks(t *testing.T) {
 	testCases := []struct {
 		name        string
 		decorator   func(runtime.Object)
-		beginCreate func(context.Context, runtime.Object, *metav1.CreateOptions) (FinishFunc, error)
+		beginCreate BeginCreateFunc
 		afterCreate AfterCreateFunc
 		// the TTLFunc is an easy hook to force a failure
 		ttl              func(obj runtime.Object, existing uint64, update bool) (uint64, error)
@@ -798,9 +798,9 @@ func TestStoreUpdateHooks(t *testing.T) {
 		name      string
 		decorator func(runtime.Object)
 		// create-on-update is tested elsewhere, but this proves non-use here
-		beginCreate      func(context.Context, runtime.Object, *metav1.CreateOptions) (FinishFunc, error)
+		beginCreate      BeginCreateFunc
 		afterCreate      AfterCreateFunc
-		beginUpdate      func(context.Context, runtime.Object, runtime.Object, *metav1.UpdateOptions) (FinishFunc, error)
+		beginUpdate      BeginUpdateFunc
 		afterUpdate      AfterUpdateFunc
 		expectError      bool
 		expectAnnotation string   // to test object mutations
@@ -927,9 +927,9 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 	testCases := []struct {
 		name        string
 		decorator   func(runtime.Object)
-		beginCreate func(context.Context, runtime.Object, *metav1.CreateOptions) (FinishFunc, error)
+		beginCreate BeginCreateFunc
 		afterCreate AfterCreateFunc
-		beginUpdate func(context.Context, runtime.Object, runtime.Object, *metav1.UpdateOptions) (FinishFunc, error)
+		beginUpdate BeginUpdateFunc
 		afterUpdate AfterUpdateFunc
 		// the TTLFunc is an easy hook to force a failure
 		ttl              func(obj runtime.Object, existing uint64, update bool) (uint64, error)

@@ -56,8 +56,14 @@ type FinishFunc func(ctx context.Context, success bool)
 // AfterDeleteFunc is the type used for the Store.AfterDelete hook.
 type AfterDeleteFunc func(obj runtime.Object, options *metav1.DeleteOptions)
 
+// BeginCreateFunc is the type used for the Store.BeginCreate hook.
+type BeginCreateFunc func(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) (FinishFunc, error)
+
 // AfterCreateFunc is the type used for the Store.AfterCreate hook.
 type AfterCreateFunc func(obj runtime.Object, options *metav1.CreateOptions)
+
+// BeginUpdateFunc is the type used for the Store.BeginUpdate hook.
+type BeginUpdateFunc func(ctx context.Context, obj, old runtime.Object, options *metav1.UpdateOptions) (FinishFunc, error)
 
 // AfterUpdateFunc is the type used for the Store.AfterUpdate hook.
 type AfterUpdateFunc func(obj runtime.Object, options *metav1.UpdateOptions)
@@ -162,7 +168,7 @@ type Store struct {
 	// but before AfterCreate and Decorator, indicating via the argument
 	// whether the operation succeeded.  If this returns an error, the function
 	// is not called.  Almost nobody should use this hook.
-	BeginCreate func(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) (FinishFunc, error)
+	BeginCreate BeginCreateFunc
 	// AfterCreate implements a further operation to run after a resource is
 	// created and before it is decorated, optional.
 	AfterCreate AfterCreateFunc
@@ -174,7 +180,7 @@ type Store struct {
 	// but before AfterUpdate and Decorator, indicating via the argument
 	// whether the operation succeeded.  If this returns an error, the function
 	// is not called.  Almost nobody should use this hook.
-	BeginUpdate func(ctx context.Context, obj, old runtime.Object, options *metav1.UpdateOptions) (FinishFunc, error)
+	BeginUpdate BeginUpdateFunc
 	// AfterUpdate implements a further operation to run after a resource is
 	// updated and before it is decorated, optional.
 	AfterUpdate AfterUpdateFunc
