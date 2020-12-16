@@ -46,6 +46,7 @@ import (
 )
 
 // fakeVolumeHost is useful for testing volume plugins.
+// TODO: Extract fields specific to fakeKubeletVolumeHost and fakeAttachDetachVolumeHost.
 type fakeVolumeHost struct {
 	rootDir                string
 	kubeClient             clientset.Interface
@@ -66,8 +67,6 @@ type fakeVolumeHost struct {
 }
 
 var _ VolumeHost = &fakeVolumeHost{}
-var _ AttachDetachVolumeHost = &fakeVolumeHost{}
-var _ KubeletVolumeHost = &fakeVolumeHost{}
 
 func NewFakeVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
 	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, "", nil, nil)
@@ -77,18 +76,8 @@ func NewFakeVolumeHostWithCloudProvider(t *testing.T, rootDir string, kubeClient
 	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, cloud, nil, "", nil, nil)
 }
 
-func NewFakeVolumeHostWithNodeLabels(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, labels map[string]string) *fakeVolumeHost {
-	volHost := newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, "", nil, nil)
-	volHost.nodeLabels = labels
-	return volHost
-}
-
 func NewFakeVolumeHostWithCSINodeName(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) *fakeVolumeHost {
 	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, nodeName, driverLister, volumeAttachLister)
-}
-
-func NewFakeVolumeHostWithMounterFSType(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType) *fakeVolumeHost {
-	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, pathToTypeMap, "", nil, nil)
 }
 
 func newFakeVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) *fakeVolumeHost {
@@ -143,10 +132,6 @@ func (f *fakeVolumeHost) GetCloudProvider() cloudprovider.Interface {
 
 func (f *fakeVolumeHost) GetMounter(pluginName string) mount.Interface {
 	return f.mounter
-}
-
-func (f *fakeVolumeHost) GetHostUtil() hostutil.HostUtils {
-	return f.hostUtil
 }
 
 func (f *fakeVolumeHost) GetSubpather() subpath.Interface {
@@ -246,47 +231,115 @@ func (f *fakeVolumeHost) ScriptCommands(scripts []CommandScript) {
 	ScriptCommands(f.exec, scripts)
 }
 
-func (f *fakeVolumeHost) CSIDriverLister() storagelistersv1.CSIDriverLister {
-	return f.csiDriverLister
-}
-
-func (f *fakeVolumeHost) VolumeAttachmentLister() storagelistersv1.VolumeAttachmentLister {
-	return f.volumeAttachmentLister
-}
-
-func (f *fakeVolumeHost) CSIDriversSynced() cache.InformerSynced {
-	// not needed for testing
-	return nil
-}
-
-func (f *fakeVolumeHost) CSINodeLister() storagelistersv1.CSINodeLister {
-	// not needed for testing
-	return nil
-}
-
-func (f *fakeVolumeHost) GetInformerFactory() informers.SharedInformerFactory {
-	return f.informerFactory
-}
-
-func (f *fakeVolumeHost) IsAttachDetachController() bool {
-	return true
-}
-
-func (f *fakeVolumeHost) SetKubeletError(err error) {
-	f.mux.Lock()
-	defer f.mux.Unlock()
-	f.kubeletErr = err
-	return
-}
-
-func (f *fakeVolumeHost) WaitForCacheSync() error {
-	return nil
-}
-
 func (f *fakeVolumeHost) WaitForKubeletErrNil() error {
 	return wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (bool, error) {
 		f.mux.Lock()
 		defer f.mux.Unlock()
 		return f.kubeletErr == nil, nil
 	})
+}
+
+type fakeAttachDetachVolumeHost struct {
+	fakeVolumeHost
+}
+
+var _ AttachDetachVolumeHost = &fakeAttachDetachVolumeHost{}
+
+// TODO: Create constructors for AttachDetachVolumeHost once it's consumed in tests.
+
+func (f *fakeAttachDetachVolumeHost) CSINodeLister() storagelistersv1.CSINodeLister {
+	// not needed for testing
+	return nil
+}
+
+func (f *fakeAttachDetachVolumeHost) CSIDriverLister() storagelistersv1.CSIDriverLister {
+	return f.csiDriverLister
+}
+
+func (f *fakeAttachDetachVolumeHost) VolumeAttachmentLister() storagelistersv1.VolumeAttachmentLister {
+	return f.volumeAttachmentLister
+}
+
+func (f *fakeAttachDetachVolumeHost) IsAttachDetachController() bool {
+	return true
+}
+
+type fakeKubeletVolumeHost struct {
+	fakeVolumeHost
+}
+
+var _ KubeletVolumeHost = &fakeKubeletVolumeHost{}
+
+func NewFakeKubeletVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeKubeletVolumeHost {
+	return newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, "", nil, nil)
+}
+
+func NewFakeKubeletVolumeHostWithCloudProvider(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeKubeletVolumeHost {
+	return newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, cloud, nil, "", nil, nil)
+}
+
+func NewFakeKubeletVolumeHostWithNodeLabels(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, labels map[string]string) *fakeKubeletVolumeHost {
+	volHost := newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, "", nil, nil)
+	volHost.nodeLabels = labels
+	return volHost
+}
+
+func NewFakeKubeletVolumeHostWithCSINodeName(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) *fakeKubeletVolumeHost {
+	return newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, nodeName, driverLister, volumeAttachLister)
+}
+
+func NewFakeKubeletVolumeHostWithMounterFSType(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType) *fakeKubeletVolumeHost {
+	return newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, nil, pathToTypeMap, "", nil, nil)
+}
+
+func newFakeKubeletVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) *fakeKubeletVolumeHost {
+	host := &fakeKubeletVolumeHost{}
+	host.rootDir = rootDir
+	host.kubeClient = kubeClient
+	host.cloud = cloud
+	host.nodeName = nodeName
+	host.csiDriverLister = driverLister
+	host.volumeAttachmentLister = volumeAttachLister
+	host.mounter = mount.NewFakeMounter(nil)
+	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
+	host.exec = &testingexec.FakeExec{DisableScripts: true}
+	host.pluginMgr = &VolumePluginMgr{}
+	if err := host.pluginMgr.InitPlugins(plugins, nil /* prober */, host); err != nil {
+		t.Fatalf("Failed to init plugins while creating fake volume host: %v", err)
+	}
+	host.subpather = &subpath.FakeSubpath{}
+	host.informerFactory = informers.NewSharedInformerFactory(kubeClient, time.Minute)
+	// Wait until the InitPlugins setup is finished before returning from this setup func
+	if err := host.WaitForKubeletErrNil(); err != nil {
+		t.Fatalf("Failed to wait for kubelet err to be nil while creating fake volume host: %v", err)
+	}
+	return host
+}
+
+func (f *fakeKubeletVolumeHost) SetKubeletError(err error) {
+	f.mux.Lock()
+	defer f.mux.Unlock()
+	f.kubeletErr = err
+	return
+}
+
+func (f *fakeKubeletVolumeHost) GetInformerFactory() informers.SharedInformerFactory {
+	return f.informerFactory
+}
+
+func (f *fakeKubeletVolumeHost) CSIDriverLister() storagelistersv1.CSIDriverLister {
+	return f.csiDriverLister
+}
+
+func (f *fakeKubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
+	// not needed for testing
+	return nil
+}
+
+func (f *fakeKubeletVolumeHost) WaitForCacheSync() error {
+	return nil
+}
+
+func (f *fakeKubeletVolumeHost) GetHostUtil() hostutil.HostUtils {
+	return f.hostUtil
 }

@@ -53,7 +53,7 @@ func newPluginMgr(t *testing.T, apiObject runtime.Object) (*volume.VolumePluginM
 	}
 
 	fakeClient := fakeclient.NewSimpleClientset(apiObject)
-	host := volumetest.NewFakeVolumeHostWithNodeLabels(t,
+	host := volumetest.NewFakeKubeletVolumeHostWithNodeLabels(t,
 		tmpDir,
 		fakeClient,
 		ProbeVolumePlugins(),

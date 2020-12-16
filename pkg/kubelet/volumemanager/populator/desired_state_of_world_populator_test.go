@@ -395,7 +395,7 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 		},
 	}
 
-	fakeVolumePluginMgr, fakeVolumePlugin := volumetesting.GetTestVolumePluginMgr(t)
+	fakeVolumePluginMgr, fakeVolumePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	dswp, fakePodManager, fakesDSW := createDswpWithVolumeWithCustomPluginMgr(t, pv, pvc, fakeVolumePluginMgr)
 
 	// create pod
@@ -1077,7 +1077,7 @@ func createPodWithVolume(pod, pv, pvc string, containers []v1.Container) *v1.Pod
 }
 
 func createDswpWithVolume(t *testing.T, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) (*desiredStateOfWorldPopulator, kubepod.Manager, cache.DesiredStateOfWorld) {
-	fakeVolumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	fakeVolumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	dswp, fakePodManager, fakesDSW := createDswpWithVolumeWithCustomPluginMgr(t, pv, pvc, fakeVolumePluginMgr)
 	return dswp, fakePodManager, fakesDSW
 }

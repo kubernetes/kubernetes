@@ -1606,10 +1606,20 @@ func VerifyGetMapPodDeviceCallCount(
 
 // GetTestVolumePluginMgr creates, initializes, and returns a test volume plugin
 // manager and fake volume plugin using a fake volume host.
-func GetTestVolumePluginMgr(
-	t *testing.T) (*VolumePluginMgr, *FakeVolumePlugin) {
+func GetTestVolumePluginMgr(t *testing.T) (*VolumePluginMgr, *FakeVolumePlugin) {
 	plugins := ProbeVolumePlugins(VolumeConfig{})
 	v := NewFakeVolumeHost(
+		t,
+		"",      /* rootDir */
+		nil,     /* kubeClient */
+		plugins, /* plugins */
+	)
+	return v.pluginMgr, plugins[0].(*FakeVolumePlugin)
+}
+
+func GetTestKubeletVolumePluginMgr(t *testing.T) (*VolumePluginMgr, *FakeVolumePlugin) {
+	plugins := ProbeVolumePlugins(VolumeConfig{})
+	v := NewFakeKubeletVolumeHost(
 		t,
 		"",      /* rootDir */
 		nil,     /* kubeClient */
