@@ -3070,6 +3070,49 @@ func TestApplyOnScaleDeployment(t *testing.T) {
 	}
 
 	assertReplicasOwnership(t, (*deployment).GetManagedFields(), "replace_test")
+
+	// Run "Apply" with a scale object with a different number of replicas. It should generate a conflict.
+	_, err = client.CoreV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		SubResource("scale").
+		Name("deployment").
+		Param("fieldManager", "apply_scale").
+		Body([]byte(`{"kind":"Scale","apiVersion":"autoscaling/v1","metadata":{"name":"deployment","namespace":"default"},"spec":{"replicas":17}}`)).
+		Do(context.TODO()).
+		Get()
+	if !apierrors.IsConflict(err) {
+		t.Fatalf("Expected conflict error but got: %v", err)
+	}
+
+	// Same as before but force
+	_, err = client.CoreV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		SubResource("scale").
+		Name("deployment").
+		Param("fieldManager", "apply_scale").
+		Param("force", "true").
+		Body([]byte(`{"kind":"Scale","apiVersion":"autoscaling/v1","metadata":{"name":"deployment","namespace":"default"},"spec":{"replicas":17}}`)).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Error updating deployment: %v ", err)
+	}
+
+	deployment, err = client.AppsV1().Deployments("default").Get(context.TODO(), "deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+
+	if *deployment.Spec.Replicas != 17 {
+		t.Fatalf("Expected to replicas to be 17, but got: %d", *deployment.Spec.Replicas)
+	}
+	assertReplicasOwnership(t, (*deployment).GetManagedFields(), "apply_scale")
 }
 
 func assertReplicasOwnership(t *testing.T, managedFields []metav1.ManagedFieldsEntry, fieldManager string) {
