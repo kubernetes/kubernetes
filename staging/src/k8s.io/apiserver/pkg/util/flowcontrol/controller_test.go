@@ -384,12 +384,18 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 		queues:          map[string]*ctlrTestQueueSet{},
 	}
 	controller := newTestableController(TestableConfig{
-		informerFactory,
-		flowcontrolClient,
-		100,
-		time.Minute,
-		metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		cts,
+
+		Name:                       "Controller",
+		Clock:                      clock.RealClock{},
+		FinishHandlingNotification: enqueueEverything,
+		AsFieldManager:             ConfigConsumerAsFieldManager,
+		FoundToDangling:            func(found bool) bool { return !found },
+		InformerFactory:            informerFactory,
+		FlowcontrolClient:          flowcontrolClient,
+		ServerConcurrencyLimit:     100,
+		RequestWaitLimit:           time.Minute,
+		ObsPairGenerator:           metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		QueueSetFactory:            cts,
 	})
 
 	stopCh, controllerCompletedCh := make(chan struct{}), make(chan struct{})

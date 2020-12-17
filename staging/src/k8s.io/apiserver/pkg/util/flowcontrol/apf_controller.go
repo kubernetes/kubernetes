@@ -237,6 +237,21 @@ func newTestableController(config TestableConfig) *configController {
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newFS := newObj.(*flowcontrol.FlowSchema)
 			oldFS := oldObj.(*flowcontrol.FlowSchema)
+			// Changes to either Spec or Status are relevant.  The
+			// concern is that we might, in some future release, want
+			// different behavior than is implemented now. One of the
+			// hardest questions is how does an operator roll out the
+			// new release in a cluster with multiple kube-apiservers
+			// --- in a way that works no matter what servers crash
+			// and restart when. If this handler reacts only to
+			// changes in Spec then we have a scenario in which the
+			// rollout leaves the old Status in place. The scenario
+			// ends with this subsequence: deploy the last new server
+			// before deleting the last old server, and in between
+			// those two operations the last old server crashes and
+			// recovers. The chosen solution is making this controller
+			// insist on maintaining the particular state that it
+			// establishes.
 			if !(apiequality.Semantic.DeepEqual(oldFS.Spec, newFS.Spec) &&
 				apiequality.Semantic.DeepEqual(oldFS.Status, newFS.Status)) {
 				klog.V(7).Infof("Triggered API priority and fairness config reloading due to spec and/or status update of FS %s", newFS.Name)
@@ -300,7 +315,7 @@ func (cfgCtlr *configController) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-// this func is the logic of the one and only worker goroutine.  We
+// runWorker is the logic of the one and only worker goroutine.  We
 // limit the number to one in order to obviate explicit
 // synchronization around access to `cfgCtlr.mostRecentUpdates`.
 func (cfgCtlr *configController) runWorker() {
@@ -308,7 +323,8 @@ func (cfgCtlr *configController) runWorker() {
 	}
 }
 
-// only invoke this in the one and only worker goroutine
+// processNextWorkItem works on one entry from the work queue.
+// Only invoke this in the one and only worker goroutine.
 func (cfgCtlr *configController) processNextWorkItem() bool {
 	obj, shutdown := cfgCtlr.configQueue.Get()
 	if shutdown {
@@ -359,9 +375,6 @@ func (cfgCtlr *configController) SyncOne(flowSchemaRVs map[string]string) SyncRe
 		return SyncReport{NeedRetry: true}
 	}
 	suggestedDelay, err := cfgCtlr.digestConfigObjects(newPLs, newFSs, flowSchemaRVs)
-	//if suggestedDelay > 0 {
-	//	cfgCtlr.configQueue.AddAfter(0, suggestedDelay)
-	//}
 	if err == nil {
 		return SyncReport{NeededSpecificWait: suggestedDelay}
 	}
@@ -825,7 +838,9 @@ func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDig
 	return selectedFlowSchema, plState.pl, false, req, startWaitingTime
 }
 
-// Call this after getting a clue that the given priority level is undesired and idle
+// maybeReap will remove the last internal traces of the named
+// priority level if it has no more use.  Call this after getting a
+// clue that the given priority level is undesired and idle.
 func (cfgCtlr *configController) maybeReap(plName string) {
 	cfgCtlr.lock.Lock()
 	defer cfgCtlr.lock.Unlock()
@@ -845,8 +860,11 @@ func (cfgCtlr *configController) maybeReap(plName string) {
 	cfgCtlr.configQueue.Add(0)
 }
 
-// Call this if both (1) plState.queues is non-nil and reported being
-// idle, and (2) cfgCtlr's lock has not been released since then.
+// maybeReapLocked requires the cfgCtlr's lock to already be held and
+// will remove the last internal traces of the named priority level if
+// it has no more use.  Call this if both (1) plState.queues is
+// non-nil and reported being idle, and (2) cfgCtlr's lock has not
+// been released since then.
 func (cfgCtlr *configController) maybeReapLocked(plName string, plState *priorityLevelState) {
 	if !(plState.quiescing && plState.numPending == 0) {
 		return
