@@ -413,12 +413,12 @@ func (pt *pollingTrackerBase) updateRawBody() error {
 		if err != nil {
 			return autorest.NewErrorWithError(err, "pollingTrackerBase", "updateRawBody", nil, "failed to read response body")
 		}
+		// put the body back so it's available to other callers
+		pt.resp.Body = ioutil.NopCloser(bytes.NewReader(b))
 		// observed in 204 responses over HTTP/2.0; the content length is -1 but body is empty
 		if len(b) == 0 {
 			return nil
 		}
-		// put the body back so it's available to other callers
-		pt.resp.Body = ioutil.NopCloser(bytes.NewReader(b))
 		if err = json.Unmarshal(b, &pt.rawBody); err != nil {
 			return autorest.NewErrorWithError(err, "pollingTrackerBase", "updateRawBody", nil, "failed to unmarshal response body")
 		}
@@ -466,7 +466,12 @@ func (pt *pollingTrackerBase) updateErrorFromResponse() {
 		re := respErr{}
 		defer pt.resp.Body.Close()
 		var b []byte
-		if b, err = ioutil.ReadAll(pt.resp.Body); err != nil || len(b) == 0 {
+		if b, err = ioutil.ReadAll(pt.resp.Body); err != nil {
+			goto Default
+		}
+		// put the body back so it's available to other callers
+		pt.resp.Body = ioutil.NopCloser(bytes.NewReader(b))
+		if len(b) == 0 {
 			goto Default
 		}
 		if err = json.Unmarshal(b, &re); err != nil {
