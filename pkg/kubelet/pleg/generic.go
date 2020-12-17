@@ -57,6 +57,8 @@ type GenericPLEG struct {
 	podRecords podRecords
 	// Time of the last relisting.
 	relistTime atomic.Value
+	// Time of the previous relisting
+	prevRelistTime atomic.Value
 	// Cache for storing the runtime states required for syncing pods.
 	cache kubecontainer.Cache
 	// For testability.
@@ -134,7 +136,7 @@ func (g *GenericPLEG) Start() {
 // Healthy check if PLEG work properly.
 // relistThreshold is the maximum interval between two relist.
 func (g *GenericPLEG) Healthy() (bool, error) {
-	relistTime := g.getRelistTime()
+	relistTime, preRelistTime := g.getRelistTime()
 	if relistTime.IsZero() {
 		return false, fmt.Errorf("pleg has yet to be successful")
 	}
@@ -142,6 +144,10 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 	metrics.PLEGLastSeen.Set(float64(relistTime.Unix()))
 	elapsed := g.clock.Since(relistTime)
 	if elapsed > relistThreshold {
+		return false, fmt.Errorf("pleg was last seen active %v ago; threshold is %v", elapsed, relistThreshold)
+	}
+	subM := relistTime.Sub(preRelistTime)
+	if subM > relistThreshold {
 		return false, fmt.Errorf("pleg was last seen active %v ago; threshold is %v", elapsed, relistThreshold)
 	}
 	return true, nil
@@ -173,15 +179,30 @@ func generateEvents(podID types.UID, cid string, oldState, newState plegContaine
 	}
 }
 
-func (g *GenericPLEG) getRelistTime() time.Time {
+func (g *GenericPLEG) getRelistTime() (time.Time, time.Time) {
+	var valTime, preValTime time.Time
 	val := g.relistTime.Load()
+	preVal := g.prevRelistTime.Load()
 	if val == nil {
-		return time.Time{}
+		valTime = time.Time{}
+	} else {
+		valTime = val.(time.Time)
 	}
-	return val.(time.Time)
+	if preVal == nil {
+		preValTime = time.Time{}
+	} else {
+		preValTime = preVal.(time.Time)
+	}
+	return valTime, preValTime
 }
 
 func (g *GenericPLEG) updateRelistTime(timestamp time.Time) {
+	val := g.relistTime.Load()
+	if val == nil {
+		g.prevRelistTime.Store(time.Time{})
+	} else {
+		g.prevRelistTime.Store(val.(time.Time))
+	}
 	g.relistTime.Store(timestamp)
 }
 
@@ -190,7 +211,7 @@ func (g *GenericPLEG) updateRelistTime(timestamp time.Time) {
 func (g *GenericPLEG) relist() {
 	klog.V(5).Infof("GenericPLEG: Relisting")
 
-	if lastRelistTime := g.getRelistTime(); !lastRelistTime.IsZero() {
+	if lastRelistTime, _ := g.getRelistTime(); !lastRelistTime.IsZero() {
 		metrics.PLEGRelistInterval.Observe(metrics.SinceInSeconds(lastRelistTime))
 	}
 

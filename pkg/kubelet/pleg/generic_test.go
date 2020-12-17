@@ -429,6 +429,13 @@ func TestHealthy(t *testing.T) {
 	ok, _ = pleg.Healthy()
 	assert.False(t, ok, "pleg should be unhealthy")
 
+	// Relist and than advance the time by 1 minute. pleg should be unhealthy
+	// because pre pleg healthy is not ok.
+	pleg.relist()
+	clock.Step(time.Minute * 1)
+	ok, _ = pleg.Healthy()
+	assert.False(t, ok, "pleg should be unhealthy")
+
 	// Relist and than advance the time by 1 minute. pleg should be healthy
 	// because this is within the allowed limit.
 	pleg.relist()
