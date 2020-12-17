@@ -3842,6 +3842,7 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 		podName := "hostport"
 		ports := []v1.ContainerPort{{Protocol: v1.ProtocolSCTP, ContainerPort: 5060, HostPort: 5060}}
 		podSpec := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, ports)
+		podSpec.Spec.NodeName = node.Name
 
 		ginkgo.By(fmt.Sprintf("Launching the pod on node %v", node.Name))
 		f.PodClient().CreateSync(podSpec)
