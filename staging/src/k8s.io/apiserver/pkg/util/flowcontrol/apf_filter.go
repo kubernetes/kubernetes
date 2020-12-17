@@ -34,6 +34,10 @@ import (
 	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
 )
 
+// ConfigConsumerAsFieldManager is how the config consuminng
+// controller appears in an ObjectMeta ManagedFieldsEntry.Manager
+const ConfigConsumerAsFieldManager = "api-priority-and-fairness-config-consumer-v1"
+
 // Interface defines how the API Priority and Fairness filter interacts with the underlying system.
 type Interface interface {
 	// Handle takes care of queuing and dispatching a request
@@ -74,26 +78,40 @@ func New(
 	requestWaitLimit time.Duration,
 ) Interface {
 	grc := counter.NoOp{}
-	return NewTestable(
-		informerFactory,
-		flowcontrolClient,
-		serverConcurrencyLimit,
-		requestWaitLimit,
-		metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		fqs.NewQueueSetFactory(&clock.RealClock{}, grc),
-	)
+	return NewTestable(TestableConfig{
+		InformerFactory:        informerFactory,
+		FlowcontrolClient:      flowcontrolClient,
+		ServerConcurrencyLimit: serverConcurrencyLimit,
+		RequestWaitLimit:       requestWaitLimit,
+		ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		QueueSetFactory:        fqs.NewQueueSetFactory(&clock.RealClock{}, grc),
+	})
+}
+
+// TestableConfig carries the parameters to an implementation that is testable
+type TestableConfig struct {
+	// InformerFactory to use in building the controller
+	InformerFactory kubeinformers.SharedInformerFactory
+
+	// FlowcontrolClient to use for manipulating config objects
+	FlowcontrolClient flowcontrolclient.FlowcontrolV1beta1Interface
+
+	// ServerConcurrencyLimit for the controller to enforce
+	ServerConcurrencyLimit int
+
+	// RequestWaitLimit configured on the server
+	RequestWaitLimit time.Duration
+
+	// ObsPairGenerator for metrics
+	ObsPairGenerator metrics.TimedObserverPairGenerator
+
+	// QueueSetFactory for the queuing implementation
+	QueueSetFactory fq.QueueSetFactory
 }
 
 // NewTestable is extra flexible to facilitate testing
-func NewTestable(
-	informerFactory kubeinformers.SharedInformerFactory,
-	flowcontrolClient flowcontrolclient.FlowcontrolV1beta1Interface,
-	serverConcurrencyLimit int,
-	requestWaitLimit time.Duration,
-	obsPairGenerator metrics.TimedObserverPairGenerator,
-	queueSetFactory fq.QueueSetFactory,
-) Interface {
-	return newTestableController(informerFactory, flowcontrolClient, serverConcurrencyLimit, requestWaitLimit, obsPairGenerator, queueSetFactory)
+func NewTestable(config TestableConfig) Interface {
+	return newTestableController(config)
 }
 
 func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest RequestDigest,
