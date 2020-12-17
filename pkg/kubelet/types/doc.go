@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Common types in the Kubelet.
+// Package types contains common types in the Kubelet.
 package types // import "k8s.io/kubernetes/pkg/kubelet/types"
