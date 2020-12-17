@@ -1004,6 +1004,7 @@ spec:
           volumePath: "101"
   updateStrategy:
     rollingUpdate:
+      maxSurge: 3
       maxUnavailable: 2
     type: 翘ǼZ熝Ʊ宷泐ɻvŰ`Ǧɝ憑ǖ菐u
 status:
