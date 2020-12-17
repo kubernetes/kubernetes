@@ -243,7 +243,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, flowDist
 	if qs.qCfg.DesiredNumQueues < 1 {
 		if qs.totRequestsExecuting >= qs.dCfg.ConcurrencyLimit {
 			klog.V(5).Infof("QS(%s): rejecting request %q %#+v %#+v because %d are executing and the limit is %d", qs.qCfg.Name, fsName, descr1, descr2, qs.totRequestsExecuting, qs.dCfg.ConcurrencyLimit)
-			metrics.AddReject(qs.qCfg.Name, fsName, "concurrency-limit")
+			metrics.AddReject(ctx, qs.qCfg.Name, fsName, "concurrency-limit")
 			return nil, qs.isIdleLocked()
 		}
 		req = qs.dispatchSansQueueLocked(ctx, flowDistinguisher, fsName, descr1, descr2)
@@ -262,7 +262,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, flowDist
 	// concurrency shares and at max queue length already
 	if req == nil {
 		klog.V(5).Infof("QS(%s): rejecting request %q %#+v %#+v due to queue full", qs.qCfg.Name, fsName, descr1, descr2)
-		metrics.AddReject(qs.qCfg.Name, fsName, "queue-full")
+		metrics.AddReject(ctx, qs.qCfg.Name, fsName, "queue-full")
 		return nil, qs.isIdleLocked()
 	}
 
@@ -351,7 +351,7 @@ func (req *request) wait() (bool, bool) {
 	switch decision {
 	case decisionReject:
 		klog.V(5).Infof("QS(%s): request %#+v %#+v timed out after being enqueued\n", qs.qCfg.Name, req.descr1, req.descr2)
-		metrics.AddReject(qs.qCfg.Name, req.fsName, "time-out")
+		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "time-out")
 		return false, qs.isIdleLocked()
 	case decisionCancel:
 		// TODO(aaron-prindle) add metrics for this case
@@ -448,7 +448,7 @@ func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Conte
 	if ok := qs.rejectOrEnqueueLocked(req); !ok {
 		return nil
 	}
-	metrics.ObserveQueueLength(qs.qCfg.Name, fsName, len(queue.requests))
+	metrics.ObserveQueueLength(ctx, qs.qCfg.Name, fsName, len(queue.requests))
 	return req
 }
 
@@ -486,7 +486,7 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueLocked(queue *queue, fsName s
 			req.decision.SetLocked(decisionReject)
 			// get index for timed out requests
 			timeoutIdx = i
-			metrics.AddRequestsInQueues(qs.qCfg.Name, req.fsName, -1)
+			metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
 			req.NoteQueued(false)
 		} else {
 			break
@@ -534,7 +534,7 @@ func (qs *queueSet) enqueueLocked(request *request) {
 	}
 	queue.Enqueue(request)
 	qs.totRequestsWaiting++
-	metrics.AddRequestsInQueues(qs.qCfg.Name, request.fsName, 1)
+	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, 1)
 	request.NoteQueued(true)
 	qs.obsPair.RequestsWaiting.Add(1)
 }
@@ -569,7 +569,7 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, flowDistinguish
 	}
 	req.decision.SetLocked(decisionExecute)
 	qs.totRequestsExecuting++
-	metrics.AddRequestsExecuting(qs.qCfg.Name, fsName, 1)
+	metrics.AddRequestsExecuting(ctx, qs.qCfg.Name, fsName, 1)
 	qs.obsPair.RequestsExecuting.Add(1)
 	if klog.V(5).Enabled() {
 		klog.Infof("QS(%s) at r=%s v=%.9fs: immediate dispatch of request %q %#+v %#+v, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, fsName, descr1, descr2, qs.totRequestsExecuting)
@@ -599,9 +599,9 @@ func (qs *queueSet) dispatchLocked() bool {
 	qs.totRequestsWaiting--
 	qs.totRequestsExecuting++
 	queue.requestsExecuting++
-	metrics.AddRequestsInQueues(qs.qCfg.Name, request.fsName, -1)
+	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, -1)
 	request.NoteQueued(false)
-	metrics.AddRequestsExecuting(qs.qCfg.Name, request.fsName, 1)
+	metrics.AddRequestsExecuting(request.ctx, qs.qCfg.Name, request.fsName, 1)
 	qs.obsPair.RequestsWaiting.Add(-1)
 	qs.obsPair.RequestsExecuting.Add(1)
 	if klog.V(6).Enabled() {
@@ -631,7 +631,7 @@ func (qs *queueSet) cancelWait(req *request) {
 			// remove the request
 			queue.requests = append(queue.requests[:i], queue.requests[i+1:]...)
 			qs.totRequestsWaiting--
-			metrics.AddRequestsInQueues(qs.qCfg.Name, req.fsName, -1)
+			metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
 			req.NoteQueued(false)
 			qs.obsPair.RequestsWaiting.Add(-1)
 			break
@@ -704,7 +704,7 @@ func (qs *queueSet) finishRequestAndDispatchAsMuchAsPossible(req *request) bool 
 func (qs *queueSet) finishRequestLocked(r *request) {
 	now := qs.clock.Now()
 	qs.totRequestsExecuting--
-	metrics.AddRequestsExecuting(qs.qCfg.Name, r.fsName, -1)
+	metrics.AddRequestsExecuting(r.ctx, qs.qCfg.Name, r.fsName, -1)
 	qs.obsPair.RequestsExecuting.Add(-1)
 
 	if r.queue == nil {
