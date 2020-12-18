@@ -284,14 +284,14 @@ func ValidateNodeAffinityArgs(args *config.NodeAffinityArgs) error {
 	path := field.NewPath("addedAffinity")
 	var errs []error
 	if ns := affinity.RequiredDuringSchedulingIgnoredDuringExecution; ns != nil {
-		_, err := nodeaffinity.NewNodeSelector(ns, nodeaffinity.WithPath(path.Child("requiredDuringSchedulingIgnoredDuringExecution")))
+		_, err := nodeaffinity.NewNodeSelector(ns, field.WithPath(path.Child("requiredDuringSchedulingIgnoredDuringExecution")))
 		if err != nil {
 			errs = append(errs, err)
 		}
 	}
 	// TODO: Add validation for requiredDuringSchedulingRequiredDuringExecution when it gets added to the API.
 	if terms := affinity.PreferredDuringSchedulingIgnoredDuringExecution; len(terms) != 0 {
-		_, err := nodeaffinity.NewPreferredSchedulingTerms(terms, nodeaffinity.WithPath(path.Child("preferredDuringSchedulingIgnoredDuringExecution")))
+		_, err := nodeaffinity.NewPreferredSchedulingTerms(terms, field.WithPath(path.Child("preferredDuringSchedulingIgnoredDuringExecution")))
 		if err != nil {
 			errs = append(errs, err)
 		}

@@ -114,7 +114,7 @@ func TestValidateDefaultPreemptionArgs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			err := ValidateDefaultPreemptionArgs(tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
-				t.Fatalf("ValidateDefaultPreemptionArgs returned err (-want,+got):\n%s", diff)
+				t.Errorf("ValidateDefaultPreemptionArgs returned err (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -154,7 +154,7 @@ func TestValidateInterPodAffinityArgs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			err := ValidateInterPodAffinityArgs(tc.args)
 			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
-				t.Fatalf("ValidateInterPodAffinityArgs returned err (-want,+got):\n%s", diff)
+				t.Errorf("ValidateInterPodAffinityArgs returned err (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -235,7 +235,7 @@ func TestValidateNodeLabelArgs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			err := ValidateNodeLabelArgs(tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
-				t.Fatalf("ValidateNodeLabelArgs returned err (-want,+got):\n%s", diff)
+				t.Errorf("ValidateNodeLabelArgs returned err (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -426,7 +426,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			err := ValidatePodTopologySpreadArgs(tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
-				t.Fatalf("ValidatePodTopologySpreadArgs returned err (-want,+got):\n%s", diff)
+				t.Errorf("ValidatePodTopologySpreadArgs returned err (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -668,7 +668,7 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			err := ValidateRequestedToCapacityRatioArgs(tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
-				t.Fatalf("ValidateRequestedToCapacityRatioArgs returned err (-want,+got):\n%s", diff)
+				t.Errorf("ValidateRequestedToCapacityRatioArgs returned err (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -755,7 +755,7 @@ func TestValidateNodeResourcesLeastAllocatedArgs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			err := ValidateNodeResourcesLeastAllocatedArgs(tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
-				t.Fatalf("ValidateNodeResourcesLeastAllocatedArgs returned err (-want,+got):\n%s", diff)
+				t.Errorf("ValidateNodeResourcesLeastAllocatedArgs returned err (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -842,7 +842,7 @@ func TestValidateNodeResourcesMostAllocatedArgs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			err := ValidateNodeResourcesMostAllocatedArgs(tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
-				t.Fatalf("ValidateNodeResourcesLeastAllocatedArgs returned err (-want,+got):\n%s", diff)
+				t.Errorf("ValidateNodeResourcesLeastAllocatedArgs returned err (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -927,7 +927,7 @@ func TestValidateNodeAffinityArgs(t *testing.T) {
 			wantErr: field.ErrorList{
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
-					Field: "addedAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0]",
+					Field: "addedAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key",
 				},
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
@@ -940,7 +940,7 @@ func TestValidateNodeAffinityArgs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			err := ValidateNodeAffinityArgs(&tc.args)
 			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
-				t.Fatalf("ValidatedNodeAffinityArgs returned err (-want,+got):\n%s", diff)
+				t.Errorf("ValidatedNodeAffinityArgs returned err (-want,+got):\n%s", diff)
 			}
 		})
 	}

@@ -807,7 +807,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.UnschedulableAndUnresolvable,
-				"invalid label value",
+				`Invalid value: "{{.bad-value.}}"`,
 			),
 		},
 		{
@@ -844,7 +844,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.UnschedulableAndUnresolvable,
-				"invalid label value",
+				`Invalid value: "{{.bad-value.}}"`,
 			),
 		},
 	}
