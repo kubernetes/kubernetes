@@ -195,6 +195,7 @@ func NewServer(filebase string, apiProxyPrefix string, staticPrefix string, filt
 	proxy := proxy.NewUpgradeAwareHandler(target, transport, false, false, responder)
 	proxy.UpgradeTransport = upgradeTransport
 	proxy.UseRequestLocation = true
+	proxy.UseLocationHost = true
 
 	proxyServer := http.Handler(proxy)
 	if filter != nil {
