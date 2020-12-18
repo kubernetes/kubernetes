@@ -26,6 +26,7 @@ filegroup(
         "//plugin/pkg/admission/namespace/autoprovision:all-srcs",
         "//plugin/pkg/admission/namespace/exists:all-srcs",
         "//plugin/pkg/admission/network/defaultingressclass:all-srcs",
+        "//plugin/pkg/admission/network/denyserviceexternalips:all-srcs",
         "//plugin/pkg/admission/noderestriction:all-srcs",
         "//plugin/pkg/admission/nodetaint:all-srcs",
         "//plugin/pkg/admission/podnodeselector:all-srcs",

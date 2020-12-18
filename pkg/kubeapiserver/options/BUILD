@@ -36,6 +36,7 @@ go_library(
         "//plugin/pkg/admission/namespace/autoprovision:go_default_library",
         "//plugin/pkg/admission/namespace/exists:go_default_library",
         "//plugin/pkg/admission/network/defaultingressclass:go_default_library",
+        "//plugin/pkg/admission/network/denyserviceexternalips:go_default_library",
         "//plugin/pkg/admission/noderestriction:go_default_library",
         "//plugin/pkg/admission/nodetaint:go_default_library",
         "//plugin/pkg/admission/podnodeselector:go_default_library",
