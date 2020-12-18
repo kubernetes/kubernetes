@@ -184,6 +184,7 @@ message PodDisruptionBudgetStatus {
 
 // PodSecurityPolicy governs the ability to make requests that affect the Security Context
 // that will be applied to a pod and container.
+// Deprecated in 1.21.
 message PodSecurityPolicy {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
