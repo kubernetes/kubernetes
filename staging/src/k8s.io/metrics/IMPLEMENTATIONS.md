@@ -32,3 +32,10 @@ They are listed here for convenience.***
 - [Kube Metrics Adapter](https://github.com/zalando-incubator/kube-metrics-adapter). A general purpose metrics adapter for Kubernetes that can collect and serve custom and external metrics for Horizontal Pod Autoscaling.
   Provides the ability to scrape pods directly or from Prometheus through user defined queries.
   Also capable of serving external metrics from a number of sources including AWS' SQS and [ZMON monitoring](https://github.com/zalando/zmon).
+
+## External Metrics API
+
+***NB: None of the below implementations are officially part of Kubernetes.
+  They are listed here for convenience.***
+
+ - [KEDA](https://github.com/kedacore/keda). A Kubernetes-based Event Driven Autoscaling component. It provides event driven scale for any container running in Kubernetes.
