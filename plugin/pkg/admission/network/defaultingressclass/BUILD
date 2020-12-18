@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["admission.go"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/defaultingressclass",
+    importpath = "k8s.io/kubernetes/plugin/pkg/admission/network/defaultingressclass",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/networking:go_default_library",
