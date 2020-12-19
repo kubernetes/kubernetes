@@ -42,7 +42,6 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -191,7 +190,7 @@ func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framewor
 		return nil, err
 	}
 	if len(allNodes) == 0 {
-		return nil, core.ErrNoNodesAvailable
+		return nil, fmt.Errorf("no nodes available")
 	}
 
 	potentialNodes := nodesWherePreemptionMightHelp(allNodes, m)
@@ -219,7 +218,7 @@ func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framewor
 		klog.Infof("from a pool of %d nodes (offset: %d, sample %d nodes: %v), ~%d candidates will be chosen", len(potentialNodes), offset, len(sample), sample, numCandidates)
 	}
 
-	return dryRunPreemption(ctx, pl.fh.PreemptHandle(), state, pod, potentialNodes, pdbs, offset, numCandidates), nil
+	return dryRunPreemption(ctx, pl.fh, state, pod, potentialNodes, pdbs, offset, numCandidates), nil
 }
 
 // PodEligibleToPreemptOthers determines whether this pod should be considered
@@ -308,7 +307,7 @@ func (cl *candidateList) get() []Candidate {
 // and returns preemption candidates. The number of candidates depends on the
 // constraints defined in the plugin's args. In the returned list of
 // candidates, ones that do not violate PDB are preferred over ones that do.
-func dryRunPreemption(ctx context.Context, fh framework.PreemptHandle,
+func dryRunPreemption(ctx context.Context, fh framework.Handle,
 	state *framework.CycleState, pod *v1.Pod, potentialNodes []*framework.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget, offset int32, numCandidates int32) []Candidate {
 	nonViolatingCandidates := newCandidateList(numCandidates)
@@ -577,7 +576,7 @@ func pickOneNodeForPreemption(nodesToVictims map[string]*extenderv1.Victims) str
 // these predicates can be satisfied by removing more pods from the node.
 func selectVictimsOnNode(
 	ctx context.Context,
-	ph framework.PreemptHandle,
+	fh framework.Handle,
 	state *framework.CycleState,
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo,
@@ -585,6 +584,7 @@ func selectVictimsOnNode(
 ) ([]*v1.Pod, int, bool) {
 	var potentialVictims []*v1.Pod
 
+	ph := fh.PreemptHandle()
 	removePod := func(rp *v1.Pod) error {
 		if err := nodeInfo.RemovePod(rp); err != nil {
 			return err
@@ -626,9 +626,9 @@ func selectVictimsOnNode(
 	// inter-pod affinity to one or more victims, but we have decided not to
 	// support this case for performance reasons. Having affinity to lower
 	// priority pods is not a recommended configuration anyway.
-	if fits, _, err := core.PodPassesFiltersOnNode(ctx, ph, state, pod, nodeInfo); !fits {
-		if err != nil {
-			klog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
+	if status := fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo); !status.IsSuccess() {
+		if status.Code() == framework.Error {
+			klog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, status.AsError())
 		}
 
 		return nil, 0, false
@@ -644,7 +644,8 @@ func selectVictimsOnNode(
 		if err := addPod(p); err != nil {
 			return false, err
 		}
-		fits, _, _ := core.PodPassesFiltersOnNode(ctx, ph, state, pod, nodeInfo)
+		status := fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
+		fits := status.IsSuccess()
 		if !fits {
 			if err := removePod(p); err != nil {
 				return false, err

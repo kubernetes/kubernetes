@@ -28,12 +28,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -51,6 +53,7 @@ const (
 	bindPlugin                        = "bind-plugin"
 
 	testProfileName = "test-profile"
+	nodeName        = "testNode"
 )
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
@@ -341,6 +344,20 @@ var state = &framework.CycleState{}
 
 // Pod is only used for logging errors.
 var pod = &v1.Pod{}
+var node = &v1.Node{
+	ObjectMeta: metav1.ObjectMeta{
+		Name: nodeName,
+	},
+}
+var lowPriority, highPriority = int32(0), int32(1000)
+var lowPriorityPod = &v1.Pod{
+	ObjectMeta: metav1.ObjectMeta{UID: "low"},
+	Spec:       v1.PodSpec{Priority: &lowPriority},
+}
+var highPriorityPod = &v1.Pod{
+	ObjectMeta: metav1.ObjectMeta{UID: "high"},
+	Spec:       v1.PodSpec{Priority: &highPriority},
+}
 var nodes = []*v1.Node{
 	{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
 	{ObjectMeta: metav1.ObjectMeta{Name: "node2"}},
@@ -1137,6 +1154,154 @@ func TestPostFilterPlugins(t *testing.T) {
 				t.Fatalf("fail to create framework: %s", err)
 			}
 			_, gotStatus := f.RunPostFilterPlugins(context.TODO(), nil, pod, nil)
+			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
+				t.Errorf("Unexpected status. got: %v, want: %v", gotStatus, tt.wantStatus)
+			}
+		})
+	}
+}
+
+func TestFilterPluginsWithNominatedPods(t *testing.T) {
+	tests := []struct {
+		name            string
+		preFilterPlugin *TestPlugin
+		filterPlugin    *TestPlugin
+		pod             *v1.Pod
+		nominatedPod    *v1.Pod
+		node            *v1.Node
+		nodeInfo        *framework.NodeInfo
+		wantStatus      *framework.Status
+	}{
+		{
+			name:            "node has no nominated pod",
+			preFilterPlugin: nil,
+			filterPlugin:    nil,
+			pod:             lowPriorityPod,
+			nominatedPod:    nil,
+			node:            node,
+			nodeInfo:        framework.NewNodeInfo(pod),
+			wantStatus:      nil,
+		},
+		{
+			name: "node has a high-priority nominated pod and all filters succeed",
+			preFilterPlugin: &TestPlugin{
+				name: "TestPlugin1",
+				inj: injectedResult{
+					PreFilterAddPodStatus: int(framework.Success),
+				},
+			},
+			filterPlugin: &TestPlugin{
+				name: "TestPlugin2",
+				inj: injectedResult{
+					FilterStatus: int(framework.Success),
+				},
+			},
+			pod:          lowPriorityPod,
+			nominatedPod: highPriorityPod,
+			node:         node,
+			nodeInfo:     framework.NewNodeInfo(pod),
+			wantStatus:   nil,
+		},
+		{
+			name: "node has a high-priority nominated pod and pre filters fail",
+			preFilterPlugin: &TestPlugin{
+				name: "TestPlugin1",
+				inj: injectedResult{
+					PreFilterAddPodStatus: int(framework.Error),
+				},
+			},
+			filterPlugin: nil,
+			pod:          lowPriorityPod,
+			nominatedPod: highPriorityPod,
+			node:         node,
+			nodeInfo:     framework.NewNodeInfo(pod),
+			wantStatus:   framework.NewStatus(framework.Error, `running AddPod on PreFilter plugin "TestPlugin1": injected status`),
+		},
+		{
+			name: "node has a high-priority nominated pod and filters fail",
+			preFilterPlugin: &TestPlugin{
+				name: "TestPlugin1",
+				inj: injectedResult{
+					PreFilterAddPodStatus: int(framework.Success),
+				},
+			},
+			filterPlugin: &TestPlugin{
+				name: "TestPlugin2",
+				inj: injectedResult{
+					FilterStatus: int(framework.Error),
+				},
+			},
+			pod:          lowPriorityPod,
+			nominatedPod: highPriorityPod,
+			node:         node,
+			nodeInfo:     framework.NewNodeInfo(pod),
+			wantStatus:   framework.NewStatus(framework.Error, `running "TestPlugin2" filter plugin for pod "": injected filter status`),
+		},
+		{
+			name: "node has a low-priority nominated pod and pre filters return unschedulable",
+			preFilterPlugin: &TestPlugin{
+				name: "TestPlugin1",
+				inj: injectedResult{
+					PreFilterAddPodStatus: int(framework.Unschedulable),
+				},
+			},
+			filterPlugin: &TestPlugin{
+				name: "TestPlugin2",
+				inj: injectedResult{
+					FilterStatus: int(framework.Success),
+				},
+			},
+			pod:          highPriorityPod,
+			nominatedPod: lowPriorityPod,
+			node:         node,
+			nodeInfo:     framework.NewNodeInfo(pod),
+			wantStatus:   nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry := Registry{}
+			cfgPls := &config.Plugins{
+				PreFilter: &config.PluginSet{},
+				Filter:    &config.PluginSet{},
+			}
+
+			if tt.preFilterPlugin != nil {
+				if err := registry.Register(tt.preFilterPlugin.name,
+					func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+						return tt.preFilterPlugin, nil
+					}); err != nil {
+					t.Fatalf("fail to register preFilter plugin (%s)", tt.preFilterPlugin.name)
+				}
+				cfgPls.PreFilter.Enabled = append(
+					cfgPls.PreFilter.Enabled,
+					config.Plugin{Name: tt.preFilterPlugin.name},
+				)
+			}
+			if tt.filterPlugin != nil {
+				if err := registry.Register(tt.filterPlugin.name,
+					func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+						return tt.filterPlugin, nil
+					}); err != nil {
+					t.Fatalf("fail to register filter plugin (%s)", tt.filterPlugin.name)
+				}
+				cfgPls.Filter.Enabled = append(
+					cfgPls.Filter.Enabled,
+					config.Plugin{Name: tt.filterPlugin.name},
+				)
+			}
+
+			podNominator := internalqueue.NewPodNominator()
+			if tt.nominatedPod != nil {
+				podNominator.AddNominatedPod(tt.nominatedPod, nodeName)
+			}
+			f, err := newFrameworkWithQueueSortAndBind(registry, cfgPls, emptyArgs, WithPodNominator(podNominator))
+			if err != nil {
+				t.Fatalf("fail to create framework: %s", err)
+			}
+			tt.nodeInfo.SetNode(tt.node)
+			gotStatus := f.RunFilterPluginsWithNominatedPods(context.TODO(), nil, tt.pod, tt.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
 				t.Errorf("Unexpected status. got: %v, want: %v", gotStatus, tt.wantStatus)
 			}
