@@ -2936,6 +2936,14 @@ type PodSpec struct {
 	InitContainers []Container `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,20,rep,name=initContainers"`
 	// List of containers belonging to the pod.
 	// Containers cannot currently be added or removed.
+	// Containers are started in parallel and are restarted individually as defined by the restart
+	// policy of the pod. In a pod with policy RestartNever, the first failing container will cause
+	// the pod to exit with phase Failed. All containers will be terminated before the pod is considered
+	// completed and removed.
+	// The resource requirements of a pod for scheduling and execution are defined as the sum of
+	// all resources requested by containers or the maximum of any individual init container, whichever
+	// is highest by resource. The resource limits of a pod are the sum of container limits or the
+	// maximum of any individual init container, whichever is highest by resource.
 	// There must be at least one container in a Pod.
 	// Cannot be updated.
 	// +patchMergeKey=name
