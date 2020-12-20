@@ -188,10 +188,9 @@ func getProxyMode(proxyMode string, kcompat winkernel.KernelCompatTester) string
 			fmt.Errorf("Can't determine whether to use windows kernel proxy %v (using proxy mode: %v)", err, proxyModeActual)
 		}
 		return proxyModeActual
-	} else {
-		klog.V(1).Infof("Using userspace proxy, unknown proxy input %v", proxyMode)
-		return proxyModeUserspace
 	}
+	klog.V(1).Infof("Using userspace proxy, unknown proxy input %v", proxyMode)
+	return proxyModeUserspace
 }
 
 // tryWinKernelSpaceProxy attempts to use the kernelspace proxy, based on the version (because HNS needs to be working properly for kernel proxying to work)
