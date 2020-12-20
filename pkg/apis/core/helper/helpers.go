@@ -17,7 +17,6 @@ limitations under the License.
 package helper
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
