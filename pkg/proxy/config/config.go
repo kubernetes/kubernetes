@@ -107,8 +107,6 @@ type EndpointsConfig struct {
 
 // NewEndpointsConfig creates a new EndpointsConfig.
 func NewEndpointsConfig(endpointsInformer coreinformers.EndpointsInformer, resyncPeriod time.Duration) *EndpointsConfig {
-	klog.Infof("creating new endpoints config with resync period of %v", resyncPeriod)
-
 	result := &EndpointsConfig{
 		listerSynced: endpointsInformer.Informer().HasSynced,
 	}
