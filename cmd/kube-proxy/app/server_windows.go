@@ -190,7 +190,7 @@ func getProxyMode(proxyMode string, kcompat winkernel.KernelCompatTester) string
 		}
 		return proxyModeActual
 	}
-	klog.V(1).Infof("Using userspace proxy, unknown proxy input %v", proxyMode)
+	klog.V(1).Infof("Unkown proxy mode %v, using userspace proxy", proxyMode)
 	return proxyModeUserspace
 }
 
