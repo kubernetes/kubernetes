@@ -180,6 +180,7 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 	if strings.ToLower(condition) == "delete" {
 		return IsDeleted, nil
 	}
+	conditions := make(map[string]string)
 	if strings.HasPrefix(condition, "condition=") {
 		conditionName := condition[len("condition="):]
 		conditionValue := "true"
@@ -188,10 +189,28 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 			conditionName = conditionName[0:equalsIndex]
 		}
 
+		conditions[conditionName] = conditionValue
 		return ConditionalWait{
-			conditionName:   conditionName,
-			conditionStatus: conditionValue,
-			errOut:          errOut,
+			conditions: conditions,
+			errOut:     errOut,
+		}.IsConditionMet, nil
+	}
+
+	if strings.HasPrefix(condition, "conditions=") {
+		conditionNames := condition[len("conditions="):]
+		unparsedConditions := strings.Split(conditionNames, "||")
+		conditionName := ""
+		conditionValue := ""
+		for _, condition := range unparsedConditions {
+			if equalsIndex := strings.Index(condition, "="); equalsIndex != -1 {
+				conditionValue = condition[equalsIndex+1:]
+				conditionName = condition[0:equalsIndex]
+				conditions[conditionName] = conditionValue
+			}
+		}
+		return ConditionalWait{
+			conditions: conditions,
+			errOut:     errOut,
 		}.IsConditionMet, nil
 	}
 
@@ -352,8 +371,9 @@ func (w Wait) IsDeleted(event watch.Event) (bool, error) {
 
 // ConditionalWait hold information to check an API status condition
 type ConditionalWait struct {
-	conditionName   string
-	conditionStatus string
+	// conditionName   string
+	// conditionStatus string
+	conditions map[string]string
 	// errOut is written to if an error occurs
 	errOut io.Writer
 }
@@ -380,7 +400,7 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 			resourceVersion = gottenObjList.GetResourceVersion()
 		default:
 			gottenObj = &gottenObjList.Items[0]
-			conditionMet, err := w.checkCondition(gottenObj)
+			conditionMet, err := w.checkConditions(gottenObj)
 			if conditionMet {
 				return gottenObj, true, nil
 			}
@@ -424,7 +444,8 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 	}
 }
 
-func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, error) {
+func (w ConditionalWait) checkConditions(obj *unstructured.Unstructured) (bool, error) {
+	results := make([]bool, 0)
 	conditions, found, err := unstructured.NestedSlice(obj.Object, "status", "conditions")
 	if err != nil {
 		return false, err
@@ -433,19 +454,25 @@ func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, e
 		return false, nil
 	}
 	for _, conditionUncast := range conditions {
-		condition := conditionUncast.(map[string]interface{})
-		name, found, err := unstructured.NestedString(condition, "type")
-		if !found || err != nil || !strings.EqualFold(name, w.conditionName) {
-			continue
-		}
-		status, found, err := unstructured.NestedString(condition, "status")
-		if !found || err != nil {
-			continue
-		}
-		return strings.EqualFold(status, w.conditionStatus), nil
-	}
+		for nameFromWait, statusFromWait := range w.conditions {
+			condition := conditionUncast.(map[string]interface{})
+			name, found, err := unstructured.NestedString(condition, "type")
+			if !found || err != nil || !strings.EqualFold(name, nameFromWait) {
+				continue
+			}
+			status, found, err := unstructured.NestedString(condition, "status")
+			if !found || err != nil {
+				continue
+			}
 
-	return false, nil
+			results = append(results, strings.EqualFold(status, statusFromWait))
+		}
+	}
+	final := false
+	for _, v := range results {
+		final = final || v
+	}
+	return final, nil
 }
 
 func (w ConditionalWait) isConditionMet(event watch.Event) (bool, error) {
@@ -461,7 +488,7 @@ func (w ConditionalWait) isConditionMet(event watch.Event) (bool, error) {
 		return false, nil
 	}
 	obj := event.Object.(*unstructured.Unstructured)
-	return w.checkCondition(obj)
+	return w.checkConditions(obj)
 }
 
 func extendErrWaitTimeout(err error, info *resource.Info) error {
