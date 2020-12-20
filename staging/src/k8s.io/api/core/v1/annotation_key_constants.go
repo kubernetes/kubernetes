@@ -29,14 +29,6 @@ const (
 	// MirrorAnnotationKey represents the annotation key set by kubelets when creating mirror pods
 	MirrorPodAnnotationKey string = "kubernetes.io/config.mirror"
 
-	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
-	// in the Annotations of a Pod.
-	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
-
-	// TaintsAnnotationKey represents the key of taints data (json serialized)
-	// in the Annotations of a Node.
-	TaintsAnnotationKey string = "scheduler.alpha.kubernetes.io/taints"
-
 	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
 	// to all containers of a pod.
 	// Deprecated: set a pod security context `seccompProfile` field.

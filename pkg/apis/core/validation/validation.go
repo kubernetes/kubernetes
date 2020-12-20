@@ -139,29 +139,8 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *core.Po
 		}
 	}
 
-	if annotations[core.TolerationsAnnotationKey] != "" {
-		allErrs = append(allErrs, ValidateTolerationsInPodAnnotations(annotations, fldPath)...)
-	}
-
 	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
 	allErrs = append(allErrs, ValidateAppArmorPodAnnotations(annotations, spec, fldPath)...)
-
-	return allErrs
-}
-
-// ValidateTolerationsInPodAnnotations tests that the serialized tolerations in Pod.Annotations has valid data
-func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	tolerations, err := helper.GetTolerationsFromPodAnnotations(annotations)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, core.TolerationsAnnotationKey, err.Error()))
-		return allErrs
-	}
-
-	if len(tolerations) > 0 {
-		allErrs = append(allErrs, ValidateTolerations(tolerations, fldPath.Child(core.TolerationsAnnotationKey))...)
-	}
 
 	return allErrs
 }
@@ -4598,23 +4577,6 @@ func ValidateReadOnlyPersistentDisks(volumes []core.Volume, fldPath *field.Path)
 	return allErrs
 }
 
-// ValidateTaintsInNodeAnnotations tests that the serialized taints in Node.Annotations has valid data
-func ValidateTaintsInNodeAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	taints, err := helper.GetTaintsFromNodeAnnotations(annotations)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, core.TaintsAnnotationKey, err.Error()))
-		return allErrs
-	}
-
-	if len(taints) > 0 {
-		allErrs = append(allErrs, validateNodeTaints(taints, fldPath.Child(core.TaintsAnnotationKey))...)
-	}
-
-	return allErrs
-}
-
 // validateNodeTaints tests if given taints have valid data.
 func validateNodeTaints(taints []core.Taint, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
@@ -4651,10 +4613,6 @@ func validateNodeTaints(taints []core.Taint, fldPath *field.Path) field.ErrorLis
 
 func ValidateNodeSpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-
-	if annotations[core.TaintsAnnotationKey] != "" {
-		allErrs = append(allErrs, ValidateTaintsInNodeAnnotations(annotations, fldPath)...)
-	}
 
 	if annotations[core.PreferAvoidPodsAnnotationKey] != "" {
 		allErrs = append(allErrs, ValidateAvoidPodsInNodeAnnotations(annotations, fldPath)...)

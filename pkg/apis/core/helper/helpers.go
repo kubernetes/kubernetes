@@ -405,19 +405,6 @@ func NodeSelectorRequirementsAsFieldSelector(nsm []core.NodeSelectorRequirement)
 	return fields.AndSelectors(selectors...), nil
 }
 
-// GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
-// and converts it to the []Toleration type in core.
-func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]core.Toleration, error) {
-	var tolerations []core.Toleration
-	if len(annotations) > 0 && annotations[core.TolerationsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[core.TolerationsAnnotationKey]), &tolerations)
-		if err != nil {
-			return tolerations, err
-		}
-	}
-	return tolerations, nil
-}
-
 // AddOrUpdateTolerationInPod tries to add a toleration to the pod's toleration list.
 // Returns true if something was updated, false otherwise.
 func AddOrUpdateTolerationInPod(pod *core.Pod, toleration *core.Toleration) bool {
@@ -444,19 +431,6 @@ func AddOrUpdateTolerationInPod(pod *core.Pod, toleration *core.Toleration) bool
 
 	pod.Spec.Tolerations = newTolerations
 	return true
-}
-
-// GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
-// and converts it to the []Taint type in core.
-func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]core.Taint, error) {
-	var taints []core.Taint
-	if len(annotations) > 0 && annotations[core.TaintsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[core.TaintsAnnotationKey]), &taints)
-		if err != nil {
-			return []core.Taint{}, err
-		}
-	}
-	return taints, nil
 }
 
 // GetPersistentVolumeClass returns StorageClassName.
