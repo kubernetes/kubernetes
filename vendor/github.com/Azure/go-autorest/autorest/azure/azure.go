@@ -17,6 +17,7 @@ package azure
 //  limitations under the License.
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -143,7 +144,7 @@ type RequestError struct {
 	autorest.DetailedError
 
 	// The error returned by the Azure service.
-	ServiceError *ServiceError `json:"error"`
+	ServiceError *ServiceError `json:"error" xml:"Error"`
 
 	// The request id (from the x-ms-request-id-header) of the request.
 	RequestID string
@@ -168,6 +169,11 @@ type Resource struct {
 	Provider       string
 	ResourceType   string
 	ResourceName   string
+}
+
+// String function returns a string in form of azureResourceID
+func (r Resource) String() string {
+	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/%s/%s/%s", r.SubscriptionID, r.ResourceGroup, r.Provider, r.ResourceType, r.ResourceName)
 }
 
 // ParseResourceID parses a resource ID into a ResourceDetails struct.
@@ -285,26 +291,34 @@ func WithErrorUnlessStatusCode(codes ...int) autorest.RespondDecorator {
 				var e RequestError
 				defer resp.Body.Close()
 
+				encodedAs := autorest.EncodedAsJSON
+				if strings.Contains(resp.Header.Get("Content-Type"), "xml") {
+					encodedAs = autorest.EncodedAsXML
+				}
+
 				// Copy and replace the Body in case it does not contain an error object.
 				// This will leave the Body available to the caller.
-				b, decodeErr := autorest.CopyAndDecode(autorest.EncodedAsJSON, resp.Body, &e)
+				b, decodeErr := autorest.CopyAndDecode(encodedAs, resp.Body, &e)
 				resp.Body = ioutil.NopCloser(&b)
 				if decodeErr != nil {
 					return fmt.Errorf("autorest/azure: error response cannot be parsed: %q error: %v", b.String(), decodeErr)
 				}
 				if e.ServiceError == nil {
 					// Check if error is unwrapped ServiceError
-					if err := json.Unmarshal(b.Bytes(), &e.ServiceError); err != nil {
+					decoder := autorest.NewDecoder(encodedAs, bytes.NewReader(b.Bytes()))
+					if err := decoder.Decode(&e.ServiceError); err != nil {
 						return err
 					}
 				}
 				if e.ServiceError.Message == "" {
 					// if we're here it means the returned error wasn't OData v4 compliant.
-					// try to unmarshal the body as raw JSON in hopes of getting something.
+					// try to unmarshal the body in hopes of getting something.
 					rawBody := map[string]interface{}{}
-					if err := json.Unmarshal(b.Bytes(), &rawBody); err != nil {
+					decoder := autorest.NewDecoder(encodedAs, bytes.NewReader(b.Bytes()))
+					if err := decoder.Decode(&rawBody); err != nil {
 						return err
 					}
+
 					e.ServiceError = &ServiceError{
 						Code:    "Unknown",
 						Message: "Unknown service error",
