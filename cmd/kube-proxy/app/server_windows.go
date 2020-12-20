@@ -178,14 +178,15 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 	}, nil
 }
 
-// getProxyMode attempts to use the kernel proxy (if requested), but will fall back to user space if necessary.  In cases where an unknown proxy is sent, userspace proxy is also used.
+// getProxyMode attempts to use the kernel proxy (if possible), otherwise will fall back to userspace in default or kernel space unsupported scenarios.
 func getProxyMode(proxyMode string, kcompat winkernel.KernelCompatTester) string {
+	// assume userspace is possible if they ask for it
 	if proxyMode == proxyModeUserspace {
 		return proxyModeUserspace
 	} else if proxyMode == proxyModeKernelspace {
 		proxyModeActual, err := tryWinKernelSpaceProxy(kcompat)
 		if err != nil {
-			fmt.Errorf("Can't determine whether to use windows kernel proxy %v (using proxy mode: %v)", err, proxyModeActual)
+			klog.Warningf("Can't determine whether to use windows kernel proxy %v, (using proxy mode: %v)", err, proxyModeActual)
 		}
 		return proxyModeActual
 	}
