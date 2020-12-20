@@ -302,13 +302,15 @@ func (o *Options) Validate() error {
 	return nil
 }
 
-// Run runs the specified ProxyServer.
+// Run is the OS-neutral entrypoint to kube-proxy, it runs a new ProxyServer.  The implementation of ProxyServer is Compiled into the binary.  Depending
+// on what OS you compiled against, a different implementation will be called.
 func (o *Options) Run() error {
 	defer close(o.errCh)
 	if len(o.WriteConfigTo) > 0 {
 		return o.writeConfigFile()
 	}
 
+	// see the server_* +build information in the server_* files
 	proxyServer, err := NewProxyServer(o)
 	if err != nil {
 		return err
