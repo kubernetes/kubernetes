@@ -171,6 +171,11 @@ type Resource struct {
 	ResourceName   string
 }
 
+// String function returns a string in form of azureResourceID
+func (r Resource) String() string {
+	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/%s/%s/%s", r.SubscriptionID, r.ResourceGroup, r.Provider, r.ResourceType, r.ResourceName)
+}
+
 // ParseResourceID parses a resource ID into a ResourceDetails struct.
 // See https://docs.microsoft.com/en-us/azure/azure-resource-manager/resource-group-template-functions-resource#return-value-4.
 func ParseResourceID(resourceID string) (Resource, error) {
