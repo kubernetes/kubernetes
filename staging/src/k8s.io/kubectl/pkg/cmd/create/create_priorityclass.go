@@ -71,6 +71,7 @@ type PriorityClassOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewPriorityClassOptions returns an initialized PriorityClassOptions instance
 func NewPriorityClassOptions(ioStreams genericclioptions.IOStreams) *PriorityClassOptions {
 	return &PriorityClassOptions{
 		Value:            0,

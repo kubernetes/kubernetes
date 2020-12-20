@@ -73,6 +73,3 @@ $ make build ARCH=ppc64le
 ```
 
 If you don't want to push the images, run `make` or `make build` instead
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/images/etcd/README.md?pixel)]()

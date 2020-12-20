@@ -52,6 +52,8 @@ type cadvisorStatsProvider struct {
 	imageService kubecontainer.ImageService
 	// statusProvider is used to get pod metadata
 	statusProvider status.PodStatusProvider
+	// hostStatsProvider is used to get pod host stat usage.
+	hostStatsProvider HostStatsProvider
 }
 
 // newCadvisorStatsProvider returns a containerStatsProvider that provides
@@ -61,12 +63,14 @@ func newCadvisorStatsProvider(
 	resourceAnalyzer stats.ResourceAnalyzer,
 	imageService kubecontainer.ImageService,
 	statusProvider status.PodStatusProvider,
+	hostStatsProvider HostStatsProvider,
 ) containerStatsProvider {
 	return &cadvisorStatsProvider{
-		cadvisor:         cadvisor,
-		resourceAnalyzer: resourceAnalyzer,
-		imageService:     imageService,
-		statusProvider:   statusProvider,
+		cadvisor:          cadvisor,
+		resourceAnalyzer:  resourceAnalyzer,
+		imageService:      imageService,
+		statusProvider:    statusProvider,
+		hostStatsProvider: hostStatsProvider,
 	}
 }
 
@@ -137,7 +141,17 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			copy(ephemeralStats, vstats.EphemeralVolumes)
 			podStats.VolumeStats = append(append([]statsapi.VolumeStats{}, vstats.EphemeralVolumes...), vstats.PersistentVolumes...)
 		}
-		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo, nil, false)
+
+		logStats, err := p.hostStatsProvider.getPodLogStats(podStats.PodRef.Namespace, podStats.PodRef.Name, podUID, &rootFsInfo)
+		if err != nil {
+			klog.Errorf("Unable to fetch pod log stats: %v", err)
+		}
+		etcHostsStats, err := p.hostStatsProvider.getPodEtcHostsStats(podUID, &rootFsInfo)
+		if err != nil {
+			klog.Errorf("unable to fetch pod etc hosts stats: %v", err)
+		}
+
+		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo, logStats, etcHostsStats, false)
 		// Lookup the pod-level cgroup's CPU and memory stats
 		podInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
 		if podInfo != nil {

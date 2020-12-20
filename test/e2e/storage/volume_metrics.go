@@ -223,7 +223,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			kubeletmetrics.VolumeStatsUsedBytesKey,
 			kubeletmetrics.VolumeStatsCapacityBytesKey,
 			kubeletmetrics.VolumeStatsAvailableBytesKey,
-			kubeletmetrics.VolumeStatsUsedBytesKey,
+			kubeletmetrics.VolumeStatsInodesKey,
 			kubeletmetrics.VolumeStatsInodesFreeKey,
 			kubeletmetrics.VolumeStatsInodesUsedKey,
 		}

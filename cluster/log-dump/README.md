@@ -6,7 +6,7 @@ If you require changes to this script, please consider migrating your jobs to us
 log dumping mechanism first.
 
 Currently, `log-dump.sh` file is added to every newly released `kubekins-e2e` image.
-In order to leverage that script, add `USE_KUBEKINS_LOG_DUMPING` environment variable
+In order to leverage that script, add `USE_TEST_INFRA_LOG_DUMPING` environment variable
 to your test job and set its value to `true`.
 
 ## Migration steps

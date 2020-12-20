@@ -52,7 +52,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -121,13 +121,13 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 	type mockDriverSetup struct {
 		cs           clientset.Interface
-		config       *testsuites.PerTestConfig
+		config       *storageframework.PerTestConfig
 		testCleanups []func()
 		pods         []*v1.Pod
 		pvcs         []*v1.PersistentVolumeClaim
 		sc           map[string]*storagev1.StorageClass
 		vsc          map[string]*unstructured.Unstructured
-		driver       testsuites.TestDriver
+		driver       storageframework.TestDriver
 		provisioner  string
 		tp           testParameters
 	}
@@ -189,7 +189,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	createPod := func(ephemeral bool) (class *storagev1.StorageClass, claim *v1.PersistentVolumeClaim, pod *v1.Pod) {
 		ginkgo.By("Creating pod")
 		var sc *storagev1.StorageClass
-		if dDriver, ok := m.driver.(testsuites.DynamicPVTestDriver); ok {
+		if dDriver, ok := m.driver.(storageframework.DynamicPVTestDriver); ok {
 			sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
 		}
 		scTest := testsuites.StorageClassTest{
@@ -238,7 +238,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		ginkgo.By("Creating pod with fsGroup")
 		nodeSelection := m.config.ClientNodeSelection
 		var sc *storagev1.StorageClass
-		if dDriver, ok := m.driver.(testsuites.DynamicPVTestDriver); ok {
+		if dDriver, ok := m.driver.(storageframework.DynamicPVTestDriver); ok {
 			sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
 		}
 		scTest := testsuites.StorageClassTest{
@@ -296,7 +296,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 		for _, vsc := range m.vsc {
 			ginkgo.By(fmt.Sprintf("Deleting volumesnapshotclass %s", vsc.GetName()))
-			m.config.Framework.DynamicClient.Resource(testsuites.SnapshotClassGVR).Delete(context.TODO(), vsc.GetName(), metav1.DeleteOptions{})
+			m.config.Framework.DynamicClient.Resource(utils.SnapshotClassGVR).Delete(context.TODO(), vsc.GetName(), metav1.DeleteOptions{})
 		}
 		ginkgo.By("Cleaning up resources")
 		for _, cleanupFunc := range m.testCleanups {
@@ -1247,7 +1247,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					enableSnapshot:  true,
 					javascriptHooks: scripts,
 				})
-				sDriver, ok := m.driver.(testsuites.SnapshottableTestDriver)
+				sDriver, ok := m.driver.(storageframework.SnapshottableTestDriver)
 				if !ok {
 					e2eskipper.Skipf("mock driver %s does not support snapshots -- skipping", m.driver.GetDriverInfo().Name)
 
@@ -1257,7 +1257,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				defer cleanup()
 
 				var sc *storagev1.StorageClass
-				if dDriver, ok := m.driver.(testsuites.DynamicPVTestDriver); ok {
+				if dDriver, ok := m.driver.(storageframework.DynamicPVTestDriver); ok {
 					sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
 				}
 				ginkgo.By("Creating storage class")
@@ -1272,7 +1272,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By("Creating snapshot")
 				// TODO: Test VolumeSnapshots with Retain policy
-				snapshotClass, snapshot := testsuites.CreateSnapshot(sDriver, m.config, testpatterns.DynamicSnapshotDelete, claim.Name, claim.Namespace, f.Timeouts)
+				snapshotClass, snapshot := storageframework.CreateSnapshot(sDriver, m.config, storageframework.DynamicSnapshotDelete, claim.Name, claim.Namespace, f.Timeouts)
 				framework.ExpectNoError(err, "failed to create snapshot")
 				m.vsc[snapshotClass.GetName()] = snapshotClass
 				volumeSnapshotName := snapshot.GetName()
@@ -1306,19 +1306,19 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 
 				ginkgo.By(fmt.Sprintf("Get VolumeSnapshotContent bound to VolumeSnapshot %s", snapshot.GetName()))
-				snapshotContent := testsuites.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot)
+				snapshotContent := utils.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot)
 				volumeSnapshotContentName := snapshotContent.GetName()
 
 				ginkgo.By(fmt.Sprintf("Verify VolumeSnapshotContent %s contains finalizer %s", snapshot.GetName(), volumeSnapshotContentFinalizer))
-				err = utils.WaitForGVRFinalizer(ctx, m.config.Framework.DynamicClient, testsuites.SnapshotContentGVR, volumeSnapshotContentName, "", volumeSnapshotContentFinalizer, 1*time.Millisecond, 1*time.Minute)
+				err = utils.WaitForGVRFinalizer(ctx, m.config.Framework.DynamicClient, utils.SnapshotContentGVR, volumeSnapshotContentName, "", volumeSnapshotContentFinalizer, 1*time.Millisecond, 1*time.Minute)
 				framework.ExpectNoError(err)
 
 				ginkgo.By(fmt.Sprintf("Delete VolumeSnapshotContent %s", snapshotContent.GetName()))
-				err = m.config.Framework.DynamicClient.Resource(testsuites.SnapshotContentGVR).Delete(ctx, snapshotContent.GetName(), metav1.DeleteOptions{})
+				err = m.config.Framework.DynamicClient.Resource(utils.SnapshotContentGVR).Delete(ctx, snapshotContent.GetName(), metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "Failed to delete snapshotcontent: %v", err)
 
 				ginkgo.By("Get VolumeSnapshotContent from API server and verify deletion timestamp is set")
-				snapshotContent, err = m.config.Framework.DynamicClient.Resource(testsuites.SnapshotContentGVR).Get(context.TODO(), snapshotContent.GetName(), metav1.GetOptions{})
+				snapshotContent, err = m.config.Framework.DynamicClient.Resource(utils.SnapshotContentGVR).Get(context.TODO(), snapshotContent.GetName(), metav1.GetOptions{})
 				framework.ExpectNoError(err)
 
 				if snapshotContent.GetDeletionTimestamp() == nil {
@@ -1332,15 +1332,15 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 
 				ginkgo.By(fmt.Sprintf("Verify VolumeSnapshot %s contains finalizer %s", snapshot.GetName(), volumeSnapshotBoundFinalizer))
-				err = utils.WaitForGVRFinalizer(ctx, m.config.Framework.DynamicClient, testsuites.SnapshotGVR, volumeSnapshotName, f.Namespace.Name, volumeSnapshotBoundFinalizer, 1*time.Millisecond, 1*time.Minute)
+				err = utils.WaitForGVRFinalizer(ctx, m.config.Framework.DynamicClient, utils.SnapshotGVR, volumeSnapshotName, f.Namespace.Name, volumeSnapshotBoundFinalizer, 1*time.Millisecond, 1*time.Minute)
 				framework.ExpectNoError(err)
 
 				ginkgo.By("Delete VolumeSnapshot")
-				err = testsuites.DeleteAndWaitSnapshot(m.config.Framework.DynamicClient, f.Namespace.Name, volumeSnapshotName, framework.Poll, framework.SnapshotDeleteTimeout)
+				err = utils.DeleteAndWaitSnapshot(m.config.Framework.DynamicClient, f.Namespace.Name, volumeSnapshotName, framework.Poll, framework.SnapshotDeleteTimeout)
 				framework.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshot %s", volumeSnapshotName))
 
 				ginkgo.By(fmt.Sprintf("Wait for VolumeSnapshotContent %s to be deleted", volumeSnapshotContentName))
-				err = utils.WaitForGVRDeletion(m.config.Framework.DynamicClient, testsuites.SnapshotContentGVR, volumeSnapshotContentName, framework.Poll, framework.SnapshotDeleteTimeout)
+				err = utils.WaitForGVRDeletion(m.config.Framework.DynamicClient, utils.SnapshotContentGVR, volumeSnapshotContentName, framework.Poll, framework.SnapshotDeleteTimeout)
 				framework.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshotContent %s", volumeSnapshotContentName))
 			})
 		}
@@ -1462,19 +1462,19 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				// Create the subdirectory to ensure that fsGroup propagates
 				createDirectory := fmt.Sprintf("mkdir %s", dirName)
-				_, _, err = utils.PodExec(f, pod, createDirectory)
+				_, _, err = e2evolume.PodExec(f, pod, createDirectory)
 				framework.ExpectNoError(err, "failed: creating the directory: %s", err)
 
 				// Inject the contents onto the mount
 				createFile := fmt.Sprintf("echo '%s' > '%s'; sync", "filecontents", fileName)
-				_, _, err = utils.PodExec(f, pod, createFile)
+				_, _, err = e2evolume.PodExec(f, pod, createFile)
 				framework.ExpectNoError(err, "failed: writing the contents: %s", err)
 
 				// Delete the created file. This step is mandatory, as the mock driver
 				// won't clean up the contents automatically.
 				defer func() {
 					delete := fmt.Sprintf("rm -fr %s", dirName)
-					_, _, err = utils.PodExec(f, pod, delete)
+					_, _, err = e2evolume.PodExec(f, pod, delete)
 					framework.ExpectNoError(err, "failed: deleting the directory: %s", err)
 				}()
 

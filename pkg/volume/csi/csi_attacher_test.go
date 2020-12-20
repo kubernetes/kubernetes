@@ -1609,7 +1609,7 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset, setupInf
 		}
 	}
 
-	host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
+	host := volumetest.NewFakeKubeletVolumeHostWithCSINodeName(t,
 		tmpDir,
 		fakeClient,
 		ProbeVolumePlugins(),

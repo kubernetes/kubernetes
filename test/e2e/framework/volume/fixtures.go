@@ -52,10 +52,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
+	clientexec "k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	uexec "k8s.io/utils/exec"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -462,7 +463,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
 
 			// Check that it's a real block device
-			utils.CheckVolumeModeOfPath(f, pod, test.Mode, deviceName)
+			CheckVolumeModeOfPath(f, pod, test.Mode, deviceName)
 		} else {
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
@@ -472,7 +473,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 
 			// Check that a directory has been mounted
 			dirName := filepath.Dir(fileName)
-			utils.CheckVolumeModeOfPath(f, pod, test.Mode, dirName)
+			CheckVolumeModeOfPath(f, pod, test.Mode, dirName)
 
 			if !framework.NodeOSDistroIs("windows") {
 				// Filesystem: check fsgroup
@@ -697,4 +698,72 @@ func GetLinuxLabel() *v1.SELinuxOptions {
 	}
 	return &v1.SELinuxOptions{
 		Level: "s0:c0,c1"}
+}
+
+// CheckVolumeModeOfPath check mode of volume
+func CheckVolumeModeOfPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
+	if volMode == v1.PersistentVolumeBlock {
+		// Check if block exists
+		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("test -b %s", path))
+
+		// Double check that it's not directory
+		VerifyExecInPodFail(f, pod, fmt.Sprintf("test -d %s", path), 1)
+	} else {
+		// Check if directory exists
+		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("test -d %s", path))
+
+		// Double check that it's not block
+		VerifyExecInPodFail(f, pod, fmt.Sprintf("test -b %s", path), 1)
+	}
+}
+
+// PodExec runs f.ExecCommandInContainerWithFullOutput to execute a shell cmd in target pod
+// TODO: put this under e2epod once https://github.com/kubernetes/kubernetes/issues/81245
+// is resolved. Otherwise there will be dependency issue.
+func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, string, error) {
+	if framework.NodeOSDistroIs("windows") {
+		return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "powershell", "/c", shExec)
+	}
+	return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
+
+}
+
+// VerifyExecInPodSucceed verifies shell cmd in target pod succeed
+// TODO: put this under e2epod once https://github.com/kubernetes/kubernetes/issues/81245
+// is resolved. Otherwise there will be dependency issue.
+func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) {
+	stdout, stderr, err := PodExec(f, pod, shExec)
+	if err != nil {
+
+		if exiterr, ok := err.(uexec.CodeExitError); ok {
+			exitCode := exiterr.ExitStatus()
+			framework.ExpectNoError(err,
+				"%q should succeed, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, exiterr, stdout, stderr)
+		} else {
+			framework.ExpectNoError(err,
+				"%q should succeed, but failed with error message %q\nstdout: %s\nstderr: %s",
+				shExec, err, stdout, stderr)
+		}
+	}
+}
+
+// VerifyExecInPodFail verifies shell cmd in target pod fail with certain exit code
+// TODO: put this under e2epod once https://github.com/kubernetes/kubernetes/issues/81245
+// is resolved. Otherwise there will be dependency issue.
+func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, shExec string, exitCode int) {
+	stdout, stderr, err := PodExec(f, pod, shExec)
+	if err != nil {
+		if exiterr, ok := err.(clientexec.ExitError); ok {
+			actualExitCode := exiterr.ExitStatus()
+			framework.ExpectEqual(actualExitCode, exitCode,
+				"%q should fail with exit code %d, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, actualExitCode, exiterr, stdout, stderr)
+		} else {
+			framework.ExpectNoError(err,
+				"%q should fail with exit code %d, but failed with error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, err, stdout, stderr)
+		}
+	}
+	framework.ExpectError(err, "%q should fail with exit code %d, but exit without error", shExec, exitCode)
 }

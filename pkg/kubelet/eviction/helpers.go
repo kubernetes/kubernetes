@@ -18,7 +18,6 @@ package eviction
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,7 +31,6 @@ import (
 	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	volumeutils "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -406,44 +404,6 @@ func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsSt
 		podLocalVolumeUsageList := podLocalVolumeUsage(volumeNames, podStats)
 		disk.Add(podLocalVolumeUsageList[v1.ResourceEphemeralStorage])
 		inodes.Add(podLocalVolumeUsageList[resourceInodes])
-	}
-	return v1.ResourceList{
-		v1.ResourceEphemeralStorage: disk,
-		resourceInodes:              inodes,
-	}, nil
-}
-
-// localEphemeralVolumeNames returns the set of ephemeral volumes for the pod that are local
-func localEphemeralVolumeNames(pod *v1.Pod) []string {
-	result := []string{}
-	for _, volume := range pod.Spec.Volumes {
-		if volumeutils.IsLocalEphemeralVolume(volume) {
-			result = append(result, volume.Name)
-		}
-	}
-	return result
-}
-
-// podLocalEphemeralStorageUsage aggregates pod local ephemeral storage usage and inode consumption for the specified stats to measure.
-func podLocalEphemeralStorageUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType, etcHostsPath string) (v1.ResourceList, error) {
-	disk := resource.Quantity{Format: resource.BinarySI}
-	inodes := resource.Quantity{Format: resource.DecimalSI}
-
-	containerUsageList := containerUsage(podStats, statsToMeasure)
-	disk.Add(containerUsageList[v1.ResourceEphemeralStorage])
-	inodes.Add(containerUsageList[resourceInodes])
-
-	if hasFsStatsType(statsToMeasure, fsStatsLocalVolumeSource) {
-		volumeNames := localEphemeralVolumeNames(pod)
-		podLocalVolumeUsageList := podLocalVolumeUsage(volumeNames, podStats)
-		disk.Add(podLocalVolumeUsageList[v1.ResourceEphemeralStorage])
-		inodes.Add(podLocalVolumeUsageList[resourceInodes])
-	}
-	if len(etcHostsPath) > 0 {
-		if stat, err := os.Stat(etcHostsPath); err == nil {
-			disk.Add(*resource.NewQuantity(int64(stat.Size()), resource.BinarySI))
-			inodes.Add(*resource.NewQuantity(int64(1), resource.DecimalSI))
-		}
 	}
 	return v1.ResourceList{
 		v1.ResourceEphemeralStorage: disk,

@@ -79,5 +79,3 @@ Docker image of Resource Consumer can be found in Google Container Registry as g
 1. Create consuming pod and start consuming appropriate amount of resources
 2. Observed that limits has been increased
 
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/resource-consumer/README.md?pixel)]()

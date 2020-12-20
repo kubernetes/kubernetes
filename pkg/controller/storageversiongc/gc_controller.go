@@ -28,6 +28,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/storageversion"
 	apiserverinternalinformers "k8s.io/client-go/informers/apiserverinternal/v1alpha1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
 	"k8s.io/client-go/kubernetes"
@@ -265,32 +266,13 @@ func (c *Controller) enqueueLease(obj *coordinationv1.Lease) {
 	c.leaseQueue.Add(obj.Name)
 }
 
-func setCommonEncodingVersion(sv *apiserverinternalv1alpha1.StorageVersion) {
-	if len(sv.Status.StorageVersions) == 0 {
-		return
-	}
-	firstVersion := sv.Status.StorageVersions[0].EncodingVersion
-	agreed := true
-	for _, ssv := range sv.Status.StorageVersions {
-		if ssv.EncodingVersion != firstVersion {
-			agreed = false
-			break
-		}
-	}
-	if agreed {
-		sv.Status.CommonEncodingVersion = &firstVersion
-	} else {
-		sv.Status.CommonEncodingVersion = nil
-	}
-}
-
 func (c *Controller) updateOrDeleteStorageVersion(sv *apiserverinternalv1alpha1.StorageVersion, serverStorageVersions []apiserverinternalv1alpha1.ServerStorageVersion) error {
 	if len(serverStorageVersions) == 0 {
 		return c.kubeclientset.InternalV1alpha1().StorageVersions().Delete(
 			context.TODO(), sv.Name, metav1.DeleteOptions{})
 	}
 	sv.Status.StorageVersions = serverStorageVersions
-	setCommonEncodingVersion(sv)
+	storageversion.SetCommonEncodingVersion(sv)
 	_, err := c.kubeclientset.InternalV1alpha1().StorageVersions().UpdateStatus(
 		context.TODO(), sv, metav1.UpdateOptions{})
 	return err

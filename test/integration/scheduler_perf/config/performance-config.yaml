@@ -396,6 +396,31 @@
       initPods: 20000
       measurePods: 5000
 
+- name: PreemptionPVs
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: config/pod-low-priority.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/pod-high-priority.yaml
+    persistentVolumeTemplatePath: config/pv-aws.yaml
+    persistentVolumeClaimTemplatePath: config/pvc.yaml
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    params:
+      initNodes: 500
+      initPods: 2000
+      measurePods: 500
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPods: 20000
+      measurePods: 5000
+
 - name: Unschedulable
   workloadTemplate:
   - opcode: createNodes

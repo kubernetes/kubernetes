@@ -18,11 +18,17 @@ limitations under the License.
 
 package fake
 
+import (
+	"fmt"
+	"k8s.io/apimachinery/pkg/util/rand"
+)
+
 const (
-	defaultUnixEndpoint = "unix:///tmp/kubelet_remote.sock"
+	defaultUnixEndpoint = "unix:///tmp/kubelet_remote_%v.sock"
 )
 
 // GenerateEndpoint generates a new unix socket server of grpc server.
 func GenerateEndpoint() (string, error) {
-	return defaultUnixEndpoint, nil
+	// use random int be a part fo file name
+	return fmt.Sprintf(defaultUnixEndpoint, rand.Int()), nil
 }

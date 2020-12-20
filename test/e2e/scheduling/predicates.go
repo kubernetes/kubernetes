@@ -1094,11 +1094,11 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 				{
 					Name:  "agnhost",
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"netexec", "--http-port=80", "--udp-port=80"},
+					Args:  []string{"netexec", "--http-port=8080", "--udp-port=8080"},
 					Ports: []v1.ContainerPort{
 						{
 							HostPort:      port,
-							ContainerPort: 80,
+							ContainerPort: 8080,
 							Protocol:      protocol,
 							HostIP:        hostIP,
 						},
@@ -1108,7 +1108,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 							HTTPGet: &v1.HTTPGetAction{
 								Path: "/hostname",
 								Port: intstr.IntOrString{
-									IntVal: int32(80),
+									IntVal: int32(8080),
 								},
 								Scheme: v1.URISchemeHTTP,
 							},

@@ -23,19 +23,19 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testsuites"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 )
 
 func TestDriverParameter(t *testing.T) {
 	expected := &driverDefinition{
-		DriverInfo: testsuites.DriverInfo{
+		DriverInfo: storageframework.DriverInfo{
 			Name: "foo.example.com",
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-		},
-		SupportedSizeRange: e2evolume.SizeRange{
-			Min: "5Gi",
+			SupportedSizeRange: e2evolume.SizeRange{
+				Min: "10Gi",
+			},
 		},
 	}
 	testcases := []struct {

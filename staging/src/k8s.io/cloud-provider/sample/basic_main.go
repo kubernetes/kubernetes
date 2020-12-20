@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+
 	"k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/options"
@@ -45,8 +46,6 @@ const (
 
 	// sampleCloudProviderName shows an sample of using hard coded parameter for CloudProviderName
 	sampleCloudProviderName = "SampleCloudProviderName"
-	// sampleCloudProviderConfigFile shows an sample of using hard coded parameter for CloudProviderConfigFile
-	sampleCloudProviderConfigFile = "sampleCloudProviderConfigFile"
 )
 
 func main() {
@@ -63,7 +62,7 @@ func main() {
 	}
 
 	// initialize cloud provider with the cloud provider name and config file provided
-	cloud, err := cloudprovider.InitCloudProvider(sampleCloudProviderName, sampleCloudProviderConfigFile)
+	cloud, err := cloudprovider.InitCloudProvider(sampleCloudProviderName, c.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile)
 	if err != nil {
 		klog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}

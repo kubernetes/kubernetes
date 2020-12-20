@@ -35,10 +35,11 @@ import (
 	klog "k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
@@ -54,7 +55,7 @@ type driverDefinition struct {
 	// for details. The only field with a non-zero default is the list of
 	// supported file systems (SupportedFsType): it is set so that tests using
 	// the default file system are enabled.
-	DriverInfo testsuites.DriverInfo
+	DriverInfo storageframework.DriverInfo
 
 	// StorageClass must be set to enable dynamic provisioning tests.
 	// The default is to not run those tests.
@@ -123,10 +124,6 @@ type driverDefinition struct {
 		ReadOnly bool
 	}
 
-	// SupportedSizeRange defines the desired size of dynamically
-	// provisioned volumes.
-	SupportedSizeRange e2evolume.SizeRange
-
 	// ClientNodeName selects a specific node for scheduling test pods.
 	// Can be left empty. Most drivers should not need this and instead
 	// use topology to ensure that pods land on the right node(s).
@@ -166,6 +163,7 @@ func (t testDriverParameter) Set(filename string) error {
 // to define the tests.
 func AddDriverDefinition(filename string) error {
 	driver, err := loadDriverDefinition(filename)
+	e2elog.Logf("Driver loaded from path [%s]: %+v", filename, driver)
 	if err != nil {
 		return err
 	}
@@ -173,9 +171,9 @@ func AddDriverDefinition(filename string) error {
 		return errors.Errorf("%q: DriverInfo.Name not set", filename)
 	}
 
-	description := "External Storage " + testsuites.GetDriverNameWithFeatureTags(driver)
+	description := "External Storage " + storageframework.GetDriverNameWithFeatureTags(driver)
 	ginkgo.Describe(description, func() {
-		testsuites.DefineTestSuite(driver, testsuites.CSISuites)
+		storageframework.DefineTestSuites(driver, testsuites.CSISuites)
 	})
 
 	return nil
@@ -191,13 +189,13 @@ func loadDriverDefinition(filename string) (*driverDefinition, error) {
 	}
 	// Some reasonable defaults follow.
 	driver := &driverDefinition{
-		DriverInfo: testsuites.DriverInfo{
+		DriverInfo: storageframework.DriverInfo{
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-		},
-		SupportedSizeRange: e2evolume.SizeRange{
-			Min: "5Gi",
+			SupportedSizeRange: e2evolume.SizeRange{
+				Min: "5Gi",
+			},
 		},
 	}
 	// TODO: strict checking of the file content once https://github.com/kubernetes/kubernetes/pull/71589
@@ -208,20 +206,20 @@ func loadDriverDefinition(filename string) (*driverDefinition, error) {
 	return driver, nil
 }
 
-var _ testsuites.TestDriver = &driverDefinition{}
+var _ storageframework.TestDriver = &driverDefinition{}
 
 // We have to implement the interface because dynamic PV may or may
 // not be supported. driverDefinition.SkipUnsupportedTest checks that
 // based on the actual driver definition.
-var _ testsuites.DynamicPVTestDriver = &driverDefinition{}
+var _ storageframework.DynamicPVTestDriver = &driverDefinition{}
 
 // Same for snapshotting.
-var _ testsuites.SnapshottableTestDriver = &driverDefinition{}
+var _ storageframework.SnapshottableTestDriver = &driverDefinition{}
 
 // And for ephemeral volumes.
-var _ testsuites.EphemeralTestDriver = &driverDefinition{}
+var _ storageframework.EphemeralTestDriver = &driverDefinition{}
 
-var _ testsuites.CustomTimeoutsTestDriver = &driverDefinition{}
+var _ storageframework.CustomTimeoutsTestDriver = &driverDefinition{}
 
 // runtime.DecodeInto needs a runtime.Object but doesn't do any
 // deserialization of it and therefore none of the methods below need
@@ -236,42 +234,30 @@ func (d *driverDefinition) GetObjectKind() schema.ObjectKind {
 	return nil
 }
 
-func (d *driverDefinition) GetDriverInfo() *testsuites.DriverInfo {
+func (d *driverDefinition) GetDriverInfo() *storageframework.DriverInfo {
 	return &d.DriverInfo
 }
 
-func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
+func (d *driverDefinition) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 	supported := false
 	// TODO (?): add support for more volume types
 	switch pattern.VolType {
 	case "":
 		supported = true
-	case testpatterns.DynamicPV:
+	case storageframework.DynamicPV:
 		if d.StorageClass.FromName || d.StorageClass.FromFile != "" || d.StorageClass.FromExistingClassName != "" {
 			supported = true
 		}
-	case testpatterns.CSIInlineVolume:
+	case storageframework.CSIInlineVolume:
 		supported = len(d.InlineVolumes) != 0
 	}
 	if !supported {
 		e2eskipper.Skipf("Driver %q does not support volume type %q - skipping", d.DriverInfo.Name, pattern.VolType)
 	}
 
-	supported = false
-	switch pattern.SnapshotType {
-	case "":
-		supported = true
-	case testpatterns.DynamicCreatedSnapshot, testpatterns.PreprovisionedCreatedSnapshot:
-		if d.SnapshotClass.FromName || d.SnapshotClass.FromFile != "" || d.SnapshotClass.FromExistingClassName != "" {
-			supported = true
-		}
-	}
-	if !supported {
-		e2eskipper.Skipf("Driver %q does not support snapshot type %q - skipping", d.DriverInfo.Name, pattern.SnapshotType)
-	}
 }
 
-func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	var (
 		sc  *storagev1.StorageClass
 		err error
@@ -309,7 +295,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *testsuites
 		// reconsidered if we eventually need to move in-tree storage tests out.
 		sc.Parameters["csi.storage.k8s.io/fstype"] = fsType
 	}
-	return testsuites.GetStorageClass(sc.Provisioner, sc.Parameters, sc.VolumeBindingMode, f.Namespace.Name, "e2e-sc")
+	return storageframework.CopyStorageClass(sc, f.Namespace.Name, "e2e-sc")
 }
 
 func (d *driverDefinition) GetTimeouts() *framework.TimeoutContext {
@@ -362,7 +348,7 @@ func loadSnapshotClass(filename string) (*unstructured.Unstructured, error) {
 	return snapshotClass, nil
 }
 
-func (d *driverDefinition) GetSnapshotClass(e2econfig *testsuites.PerTestConfig) *unstructured.Unstructured {
+func (d *driverDefinition) GetSnapshotClass(e2econfig *storageframework.PerTestConfig) *unstructured.Unstructured {
 	if !d.SnapshotClass.FromName && d.SnapshotClass.FromFile == "" && d.SnapshotClass.FromExistingClassName == "" {
 		e2eskipper.Skipf("Driver %q does not support snapshotting - skipping", d.DriverInfo.Name)
 	}
@@ -377,7 +363,7 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *testsuites.PerTestConfig)
 	case d.SnapshotClass.FromName:
 		// Do nothing (just use empty parameters)
 	case d.SnapshotClass.FromExistingClassName != "":
-		snapshotClass, err := f.DynamicClient.Resource(testsuites.SnapshotClassGVR).Get(context.TODO(), d.SnapshotClass.FromExistingClassName, metav1.GetOptions{})
+		snapshotClass, err := f.DynamicClient.Resource(utils.SnapshotClassGVR).Get(context.TODO(), d.SnapshotClass.FromExistingClassName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "getting snapshot class %s", d.SnapshotClass.FromExistingClassName)
 
 		if params, ok := snapshotClass.Object["parameters"].(map[string]interface{}); ok {
@@ -404,10 +390,10 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *testsuites.PerTestConfig)
 		}
 	}
 
-	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
+	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns, suffix)
 }
 
-func (d *driverDefinition) GetVolume(e2econfig *testsuites.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
+func (d *driverDefinition) GetVolume(e2econfig *storageframework.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
 	if len(d.InlineVolumes) == 0 {
 		e2eskipper.Skipf("%s does not have any InlineVolumeAttributes defined", d.DriverInfo.Name)
 	}
@@ -415,12 +401,12 @@ func (d *driverDefinition) GetVolume(e2econfig *testsuites.PerTestConfig, volume
 	return e2evolume.Attributes, e2evolume.Shared, e2evolume.ReadOnly
 }
 
-func (d *driverDefinition) GetCSIDriverName(e2econfig *testsuites.PerTestConfig) string {
+func (d *driverDefinition) GetCSIDriverName(e2econfig *storageframework.PerTestConfig) string {
 	return d.DriverInfo.Name
 }
 
-func (d *driverDefinition) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
-	e2econfig := &testsuites.PerTestConfig{
+func (d *driverDefinition) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+	e2econfig := &storageframework.PerTestConfig{
 		Driver:              d,
 		Prefix:              "external",
 		Framework:           f,

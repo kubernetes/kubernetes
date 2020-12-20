@@ -152,7 +152,7 @@ func addDummyInsecureFlags(fs *pflag.FlagSet) {
 
 	for _, name := range []string{"insecure-bind-address", "address"} {
 		fs.IPVar(&bindAddr, name, bindAddr, ""+
-			"The IP address on which to serve the insecure port (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
+			"The IP address on which to serve the insecure port (set to 0.0.0.0 or :: for listening in all interfaces and IP families).")
 		fs.MarkDeprecated(name, "This flag has no effect now and will be removed in v1.24.")
 	}
 

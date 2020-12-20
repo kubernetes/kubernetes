@@ -178,7 +178,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			framework.ExpectNoError(err)
 
 			for _, e := range events.Items {
-				if e.InvolvedObject.Kind == "Pod" && e.Reason == "NotTriggerScaleUp" && strings.Contains(e.Message, "it wouldn't fit if a new node is added") {
+				if e.InvolvedObject.Kind == "Pod" && e.Reason == "NotTriggerScaleUp" {
 					ginkgo.By("NotTriggerScaleUp event found")
 					eventFound = true
 					break EventsLoop

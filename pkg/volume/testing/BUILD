@@ -10,6 +10,7 @@ go_library(
     srcs = [
         "mock_volume.go",
         "testing.go",
+        "volume_host.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/testing",
     deps = [

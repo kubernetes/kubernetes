@@ -560,7 +560,7 @@ func TestExpose(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -570,11 +570,11 @@ func TestExpose(t *testing.T) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					t.Logf("path: %v, method: %v", req.URL.Path, req.Method)
 					switch p, m := req.URL.Path, req.Method; {
-					case m == "POST" && p == "/namespaces/default/pods":
+					case m == "POST" && p == "/namespaces/test/pods":
 						pod := &corev1.Pod{}
 						body := cmdtesting.ObjBody(codec, pod)
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
-					case m == "POST" && p == "/namespaces/default/services":
+					case m == "POST" && p == "/namespaces/test/services":
 						data, err := ioutil.ReadAll(req.Body)
 						if err != nil {
 							t.Fatalf("unexpected error: %v", err)
