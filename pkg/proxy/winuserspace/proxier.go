@@ -262,7 +262,7 @@ func (proxier *Proxier) addServiceOnPortPortal(servicePortPortalName ServicePort
 	return si, nil
 }
 
-// closeServicePortPortal
+// closeServicePortPortal closes the "portal" created for a given service, this involves changing netsh routing rules.
 func (proxier *Proxier) closeServicePortPortal(servicePortPortalName ServicePortPortalName, info *ServiceInfo) error {
 	// turn off the proxy
 	if err := proxier.stopProxy(servicePortPortalName, info); err != nil {
