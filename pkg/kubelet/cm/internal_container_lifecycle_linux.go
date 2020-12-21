@@ -29,7 +29,7 @@ import (
 
 func (i *internalContainerLifecycleImpl) PreCreateContainer(pod *v1.Pod, container *v1.Container, containerConfig *runtimeapi.ContainerConfig) error {
 	if i.cpuManager != nil {
-		allocatedCPUs := i.cpuManager.GetCPUs(string(pod.UID), container.Name)
+		allocatedCPUs := i.cpuManager.GetCPUAffinity(string(pod.UID), container.Name)
 		if !allocatedCPUs.IsEmpty() {
 			containerConfig.Linux.Resources.CpusetCpus = allocatedCPUs.String()
 		}
