@@ -752,6 +752,8 @@ func (c *Cacher) GuaranteedUpdate(
 	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
 		klog.Errorf("GetByKey returned error: %v", err)
 	} else if exists {
+		// DeepCopy the object since we modify resource version when serializing the
+		// current object.
 		currObj := elem.(*storeElement).Object.DeepCopyObject()
 		return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
 	}
