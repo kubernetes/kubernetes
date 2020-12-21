@@ -438,6 +438,14 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
 	}
 
+	// exclude scale objects
+	scaleGVK := schema.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}
+	if p.kind == scaleGVK {
+		// TODO: return early if it is a scale object
+		// var scale autoscaling.Scale
+		// err := runtime.DefaultUnstructuredConverter.FromUnstructured(patchObj.UnstructuredContent(), &scale)
+		// return &scale, err
+	}
 	return p.fieldManager.Apply(obj, patchObj, p.options.FieldManager, force)
 }
 

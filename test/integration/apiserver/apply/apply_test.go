@@ -3086,6 +3086,25 @@ func TestApplyOnScaleDeployment(t *testing.T) {
 	if !apierrors.IsConflict(err) {
 		t.Fatalf("Expected conflict error but got: %v", err)
 	}
+	if !strings.Contains(err.Error(), "replace_test") {
+		t.Fatalf("Expected conflict with `replace_test` manager but got: %v", err)
+	}
+
+	// Run "Apply" with a scale object with the same number of replicas. It should NOT genereate a conflict
+	_, err = client.CoreV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		SubResource("scale").
+		Name("deployment").
+		Param("fieldManager", "apply_scale").
+		Body([]byte(`{"kind":"Scale","apiVersion":"autoscaling/v1","metadata":{"name":"deployment","namespace":"default"},"spec":{"replicas":7}}`)).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Error updating deployment: %v ", err)
+	}
 
 	// Same as before but force
 	_, err = client.CoreV1().RESTClient().
