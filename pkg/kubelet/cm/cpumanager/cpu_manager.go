@@ -88,6 +88,10 @@ type Manager interface {
 
 	// GetAllocatableCPUs returns the assignable (not allocated) CPUs
 	GetAllocatableCPUs() cpuset.CPUSet
+
+	// GetCPUsetOrDefault returns cpuset which includes cpus from shared pools
+	// as well as exclusively allocated cpus
+	GetCPUsetOrDefault(podUID, containerName string) cpuset.CPUSet
 }
 
 type manager struct {
@@ -507,6 +511,14 @@ func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) 
 }
 
 func (m *manager) GetCPUs(podUID, containerName string) cpuset.CPUSet {
+	if result, ok := m.state.GetCPUSet(string(podUID), containerName); ok {
+		return result
+	}
+
+	return cpuset.CPUSet{}
+}
+
+func (m *manager) GetCPUsetOrDefault(podUID, containerName string) cpuset.CPUSet {
 	return m.state.GetCPUSetOrDefault(podUID, containerName)
 }
 
