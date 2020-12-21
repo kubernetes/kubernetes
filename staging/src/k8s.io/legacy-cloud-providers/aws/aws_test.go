@@ -20,6 +20,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -805,6 +806,356 @@ func constructRouteTable(subnetID string, public bool) *ec2.RouteTable {
 			DestinationCidrBlock: aws.String("0.0.0.0/0"),
 			GatewayId:            aws.String(gatewayID),
 		}},
+	}
+}
+
+func Test_findELBSubnets(t *testing.T) {
+	awsServices := newMockedFakeAWSServices(TestClusterID)
+	c, err := newAWSCloud(CloudConfig{}, awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+	subnetA0000001 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2a"),
+		SubnetId:         aws.String("subnet-a0000001"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(TagNameSubnetPublicELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetA0000002 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2a"),
+		SubnetId:         aws.String("subnet-a0000002"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(TagNameSubnetPublicELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetA0000003 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2a"),
+		SubnetId:         aws.String("subnet-a0000003"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(c.tagging.clusterTagKey()),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetInternalELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetB0000001 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2b"),
+		SubnetId:         aws.String("subnet-b0000001"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(c.tagging.clusterTagKey()),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetPublicELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetB0000002 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2b"),
+		SubnetId:         aws.String("subnet-b0000002"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(c.tagging.clusterTagKey()),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetInternalELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetC0000001 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2c"),
+		SubnetId:         aws.String("subnet-c0000001"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(c.tagging.clusterTagKey()),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetInternalELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetOther := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2c"),
+		SubnetId:         aws.String("subnet-other"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(TagNameKubernetesClusterPrefix + "clusterid.other"),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetInternalELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetNoTag := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2c"),
+		SubnetId:         aws.String("subnet-notag"),
+	}
+
+	tests := []struct {
+		name        string
+		subnets     []*ec2.Subnet
+		routeTables map[string]bool
+		internal    bool
+		want        []string
+	}{
+		{
+			name: "no subnets",
+		},
+		{
+			name: "single tagged subnet",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+			},
+			internal: false,
+			want:     []string{"subnet-a0000001"},
+		},
+		{
+			name: "no matching public subnet",
+			subnets: []*ec2.Subnet{
+				subnetA0000002,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000002": false,
+			},
+			want: nil,
+		},
+		{
+			name: "prefer role over cluster tag",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+				subnetA0000003,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+				"subnet-a0000003": true,
+			},
+			want: []string{"subnet-a0000001"},
+		},
+		{
+			name: "prefer cluster tag",
+			subnets: []*ec2.Subnet{
+				subnetC0000001,
+				subnetNoTag,
+			},
+			want: []string{"subnet-c0000001"},
+		},
+		{
+			name: "include untagged",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+				subnetNoTag,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+				"subnet-notag":    true,
+			},
+			want: []string{"subnet-a0000001", "subnet-notag"},
+		},
+		{
+			name: "ignore some other cluster owned subnet",
+			subnets: []*ec2.Subnet{
+				subnetB0000001,
+				subnetOther,
+			},
+			routeTables: map[string]bool{
+				"subnet-b0000001": true,
+				"subnet-other":    true,
+			},
+			want: []string{"subnet-b0000001"},
+		},
+		{
+			name: "prefer matching role",
+			subnets: []*ec2.Subnet{
+				subnetB0000001,
+				subnetB0000002,
+			},
+			routeTables: map[string]bool{
+				"subnet-b0000001": false,
+				"subnet-b0000002": false,
+			},
+			want:     []string{"subnet-b0000002"},
+			internal: true,
+		},
+		{
+			name: "choose lexicographic order",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+				subnetA0000002,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+				"subnet-a0000002": true,
+			},
+			want: []string{"subnet-a0000001"},
+		},
+		{
+			name: "everything",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+				subnetA0000002,
+				subnetB0000001,
+				subnetB0000002,
+				subnetC0000001,
+				subnetNoTag,
+				subnetOther,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+				"subnet-a0000002": true,
+				"subnet-b0000001": true,
+				"subnet-b0000002": true,
+				"subnet-c0000001": true,
+				"subnet-notag":    true,
+				"subnet-other":    true,
+			},
+			want: []string{"subnet-a0000001", "subnet-b0000001", "subnet-c0000001"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			awsServices.ec2.RemoveSubnets()
+			awsServices.ec2.RemoveRouteTables()
+			for _, subnet := range tt.subnets {
+				awsServices.ec2.CreateSubnet(subnet)
+			}
+			routeTables := constructRouteTables(tt.routeTables)
+			for _, rt := range routeTables {
+				awsServices.ec2.CreateRouteTable(rt)
+			}
+			got, _ := c.findELBSubnets(tt.internal)
+			sort.Strings(tt.want)
+			sort.Strings(got)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_getLoadBalancerSubnets(t *testing.T) {
+	awsServices := newMockedFakeAWSServices(TestClusterID)
+	c, err := newAWSCloud(CloudConfig{}, awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+	tests := []struct {
+		name        string
+		service     *v1.Service
+		subnets     []*ec2.Subnet
+		internalELB bool
+		want        []string
+		wantErr     error
+	}{
+		{
+			name:    "no annotation",
+			service: &v1.Service{},
+		},
+		{
+			name: "annotation with no subnets",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"service.beta.kubernetes.io/aws-load-balancer-subnets": "\t",
+					},
+				},
+			},
+			wantErr: errors.New("unable to resolve empty subnet slice"),
+		},
+		{
+			name: "subnet ids",
+			subnets: []*ec2.Subnet{
+				{
+					AvailabilityZone: aws.String("us-west-2c"),
+					SubnetId:         aws.String("subnet-a000001"),
+				},
+				{
+					AvailabilityZone: aws.String("us-west-2b"),
+					SubnetId:         aws.String("subnet-a000002"),
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"service.beta.kubernetes.io/aws-load-balancer-subnets": "subnet-a000001, subnet-a000002",
+					},
+				},
+			},
+			want: []string{"subnet-a000001", "subnet-a000002"},
+		},
+		{
+			name: "subnet names",
+			subnets: []*ec2.Subnet{
+				{
+					AvailabilityZone: aws.String("us-west-2c"),
+					SubnetId:         aws.String("subnet-a000001"),
+				},
+				{
+					AvailabilityZone: aws.String("us-west-2b"),
+					SubnetId:         aws.String("subnet-a000002"),
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"service.beta.kubernetes.io/aws-load-balancer-subnets": "My Subnet 1, My Subnet 2 ",
+					},
+				},
+			},
+			want: []string{"subnet-a000001", "subnet-a000002"},
+		},
+		{
+			name: "unable to find all subnets",
+			subnets: []*ec2.Subnet{
+				{
+					AvailabilityZone: aws.String("us-west-2c"),
+					SubnetId:         aws.String("subnet-a000001"),
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"service.beta.kubernetes.io/aws-load-balancer-subnets": "My Subnet 1, My Subnet 2, Test Subnet ",
+					},
+				},
+			},
+			wantErr: errors.New("expected to find 3, but found 1 subnets"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			awsServices.ec2.RemoveSubnets()
+			for _, subnet := range tt.subnets {
+				awsServices.ec2.CreateSubnet(subnet)
+			}
+			got, err := c.getLoadBalancerSubnets(tt.service, tt.internalELB)
+			if tt.wantErr != nil {
+				assert.EqualError(t, err, tt.wantErr.Error())
+			} else {
+				assert.Equal(t, tt.want, got)
+			}
+		})
 	}
 }
 
@@ -3061,6 +3412,57 @@ func TestCloud_buildNLBHealthCheckConfiguration(t *testing.T) {
 			} else {
 				assert.NotNil(t, err)
 			}
+		})
+	}
+}
+
+func Test_parseStringSliceAnnotation(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotation  string
+		annotations map[string]string
+		want        []string
+		wantExist   bool
+	}{
+		{
+			name:       "empty annotation",
+			annotation: "test.annotation",
+			wantExist:  false,
+		},
+		{
+			name:       "empty value",
+			annotation: "a1",
+			annotations: map[string]string{
+				"a1": "\t, ,,",
+			},
+			want:      nil,
+			wantExist: true,
+		},
+		{
+			name:       "single value",
+			annotation: "a1",
+			annotations: map[string]string{
+				"a1": "   value 1 ",
+			},
+			want:      []string{"value 1"},
+			wantExist: true,
+		},
+		{
+			name:       "multiple values",
+			annotation: "a1",
+			annotations: map[string]string{
+				"a1": "subnet-1, subnet-2, My Subnet ",
+			},
+			want:      []string{"subnet-1", "subnet-2", "My Subnet"},
+			wantExist: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotValue []string
+			gotExist := parseStringSliceAnnotation(tt.annotations, tt.annotation, &gotValue)
+			assert.Equal(t, tt.wantExist, gotExist)
+			assert.Equal(t, tt.want, gotValue)
 		})
 	}
 }

@@ -23,6 +23,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFilterTags(t *testing.T) {
@@ -180,5 +181,54 @@ func TestHasClusterTag(t *testing.T) {
 		if result != g.Expected {
 			t.Errorf("Unexpected result for tags %v: %t", g.Tags, result)
 		}
+	}
+}
+
+func TestHasNoClusterPrefixTag(t *testing.T) {
+	awsServices := NewFakeAWSServices(TestClusterID)
+	c, err := newAWSCloud(CloudConfig{}, awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+	tests := []struct {
+		name string
+		tags []*ec2.Tag
+		want bool
+	}{
+		{
+			name: "no tags",
+			want: true,
+		},
+		{
+			name: "no cluster tags",
+			tags: []*ec2.Tag{
+				{
+					Key:   aws.String("not a cluster tag"),
+					Value: aws.String("true"),
+				},
+			},
+			want: true,
+		},
+		{
+			name: "contains cluster tags",
+			tags: []*ec2.Tag{
+				{
+					Key:   aws.String("tag1"),
+					Value: aws.String("value1"),
+				},
+				{
+					Key:   aws.String("kubernetes.io/cluster/test.cluster"),
+					Value: aws.String("owned"),
+				},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, c.tagging.hasNoClusterPrefixTag(tt.tags))
+		})
 	}
 }
