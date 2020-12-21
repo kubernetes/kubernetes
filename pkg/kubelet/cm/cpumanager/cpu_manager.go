@@ -402,6 +402,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				continue
 			}
 
+			m.Lock()
 			if cstatus.State.Terminated != nil {
 				// The container is terminated but we can't call m.RemoveContainer()
 				// here because it could remove the allocated cpuset for the container
@@ -412,6 +413,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				if err == nil {
 					klog.Warningf("[cpumanager] reconcileState: ignoring terminated container (pod: %s, container id: %s)", pod.Name, containerID)
 				}
+				m.Unlock()
 				continue
 			}
 
@@ -419,6 +421,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 			// Idempotently add it to the containerMap incase it is missing.
 			// This can happen after a kubelet restart, for example.
 			m.containerMap.Add(string(pod.UID), container.Name, containerID)
+			m.Unlock()
 
 			cset := m.state.GetCPUSetOrDefault(string(pod.UID), container.Name)
 			if cset.IsEmpty() {
