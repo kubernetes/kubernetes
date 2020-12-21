@@ -135,6 +135,8 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 				if err := syscall.Rmdir(volumePath); err != nil {
 					orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but failed to rmdir() volume at path %v: %v", uid, volumePath, err))
 					allVolumesCleanedUp = false
+				} else {
+					klog.Warningf("Cleaned up orphaned volume from pod %q at %s", uid, volumePath)
 				}
 			}
 		}
@@ -150,6 +152,8 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 				if err := syscall.Rmdir(subpathVolumePath); err != nil {
 					orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but failed to rmdir() subpath at path %v: %v", uid, subpathVolumePath, err))
 					allVolumesCleanedUp = false
+				} else {
+					klog.Warningf("Cleaned up orphaned volume subpath from pod %q at %s", uid, subpathVolumePath)
 				}
 			}
 		}
