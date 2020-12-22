@@ -84,7 +84,7 @@ function print-deprecation-note() {
 function setup() {
   KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
   if [[ -z "${use_custom_instance_list}" ]]; then
-    : "${KUBE_CONFIG_FILE:='config-test.sh'}"
+    : "${KUBE_CONFIG_FILE:=config-test.sh}"
     echo 'Sourcing kube-util.sh'
     source "${KUBE_ROOT}/cluster/kube-util.sh"
     echo 'Detecting project'
