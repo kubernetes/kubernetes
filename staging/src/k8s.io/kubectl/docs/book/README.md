@@ -63,7 +63,7 @@ Kubectl supports debugging by providing commands for:
 ## Cluster Management
 
 On occasion, users may need to perform operations to the Nodes of cluster.  Kubectl supports
-commands to drain Workloads from a Node so that it can be decommission or debugged.
+commands to drain Workloads from a worker node or master(s) so that it can be decommission or debugged.
 
 ## Porcelain
 
