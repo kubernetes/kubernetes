@@ -54,24 +54,31 @@ to build the image and push it to your own registry first, and run some tests th
 For these steps, see the sections below.
 
 After the desired changes have been made, the affected images will have to be built and published,
-and then tested. After the pull request with those changes has been approved, the new images will be
-built and published to the `gcr.io/kubernetes-e2e-test-images` registry as well.
-
-Currently, the image building process has been automated with the Image Promoter, but *only* for the
-Conformance images (`agnhost`, `jessie-dnsutils`, `kitten`, `nautilus`, `nonewprivs`, `resource-consumer`,
-`sample-apiserver`).  After the pull request merges, a postsubmit job will be started with the new changes,
-which can be tracked [here](https://testgrid.k8s.io/sig-testing-images#post-kubernetes-push-images).
-After it passes successfully, the new image will reside in the `gcr.io/k8s-staging-e2e-test-images/${IMAGE_NAME}:${VERSION}`
-registry, from which it will have to be promoted by adding a line for it
-[here](https://github.com/kubernetes/k8s.io/blob/master/k8s.gcr.io/images/k8s-staging-e2e-test-images/images.yaml).
-For this, you will need the image manifest list's digest, which can be obtained by running:
+and then tested. After the pull request with those changes has been approved and merged, a postsubmit
+job will then be triggered which will build the images that were changed (for example, if a change was
+made in `test/images/agnhost`, then the job [post-kubernetes-push-e2e-agnhost-test-images](
+https://testgrid.k8s.io/sig-testing-images#post-kubernetes-push-e2e-agnhost-test-images)
+ will be triggered). The image will then be pushed to the `gcr.io/k8s-staging-e2e-test-images` registry,
+from which it can then promoted to the `k8s.gcr.io/e2e-test-images` registry by adding a line in
+[kubernetes/k8s.io](https://github.com/kubernetes/k8s.io/blob/master/k8s.gcr.io/images/k8s-staging-e2e-test-images/images.yaml). For this, you will need the image manifest list's digest, which can be obtained by running:
 
 ```bash
 manifest-tool inspect --raw gcr.io/k8s-staging-e2e-test-images/${IMAGE_NAME}:${VERSION} | jq '.[0].Digest'
 ```
 
+All the postsubmit jobs and their logs for all the images can be seen in
+[testgrid](https://testgrid.k8s.io/sig-testing-images).
+
 The images are built through `make`. Since some images (e.g.: `busybox`) are used as a base for
 other images, it is recommended to build them first, if needed.
+
+
+### Creating and promoting new images
+
+If you intend to add an entirely different image and have it automatically built by the Image Builder
+and used in E2E tests, you will also have to define the postsubmit prow job for it. This can easily
+be done by running [this script](https://github.com/kubernetes/test-infra/blob/master/config/jobs/image-pushing/k8s-staging-e2e-test-images.sh)
+in `kubernetes/test-infra`.
 
 
 ### Windows test images considerations
@@ -104,6 +111,17 @@ limitations when it comes to the Windows images:
   You can determine what dependencies are missing by running `procmon.exe` on the container's host
   (make sure that process isolation is used, not Hyper-V isolation).
   [This](https://stefanscherer.github.io/find-dependencies-in-windows-containers/) is a useful guide on how to use `procmon.exe`.
+
+Because of the docker buildx limitations regarding the `RUN` commands mentioned above, we need to use a
+Windows helper image in order to properly build the Windows images without requiring any Windows nodes in
+the regular image building process. This helper image can be found in at `e2eteam/powershell-helper:6.2.7`.
+It can be used by anyone, but if you need to build your own, you can read more about it [here](windows/README.md).
+
+For Windows, in order to spawn process-isolated containers, the container OS version should closely match
+the host OS version. For this reason, we build test images for different Windows OS Versions: 1809, 1903,
+1909, 2004, 20H2. In order add support for a new Windows OS version, a new entry for that OS version will have
+to be first added to the `windows-servercore-cache` and `busybox` images, followed by the rest of the images.
+These images are then used by the rest of the E2E test images as a cache / base image.
 
 
 ## Building images
@@ -138,6 +156,9 @@ REGISTRY=gcr.io/kubernetes-e2e-test-images make all-push WHAT=agnhost
 REGISTRY=gcr.io/k8s-authenticated-test make all-push WHAT=agnhost
 ```
 
+Additionally, `WHAT=all-conformance` can be used to build / push the images most commonly used in E2E
+Conformance tests.
+
 
 ## Testing the new image
 
@@ -155,6 +176,7 @@ to pull the images from. Sample file:
 ```yaml
 dockerLibraryRegistry: your-awesome-registry
 e2eRegistry: your-awesome-registry
+promoterE2eRegistry: your-awesome-registry
 gcRegistry: your-awesome-registry
 sampleRegistry: your-awesome-registry
 ```
