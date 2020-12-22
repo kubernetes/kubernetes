@@ -1673,7 +1673,10 @@ func TestStandardEnsureBackendPoolDeleted(t *testing.T) {
 		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "k8s-agentpool1-00000000-1", gomock.Any()).Return(test.existingVM, nil)
 		cloud.VirtualMachinesClient = mockVMClient
 		mockNICClient := mockinterfaceclient.NewMockInterface(ctrl)
-		mockNICClient.EXPECT().Get(gomock.Any(), "rg", "k8s-agentpool1-00000000-nic-1", gomock.Any()).Return(test.existingNIC, nil)
+		test.existingNIC.VirtualMachine = &network.SubResource{
+			ID: to.StringPtr("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/k8s-agentpool1-00000000-1"),
+		}
+		mockNICClient.EXPECT().Get(gomock.Any(), "rg", "k8s-agentpool1-00000000-nic-1", gomock.Any()).Return(test.existingNIC, nil).Times(2)
 		mockNICClient.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 		cloud.InterfacesClient = mockNICClient
 
@@ -1729,11 +1732,18 @@ func TestStandardGetNodeNameByIPConfigurationID(t *testing.T) {
 	defer ctrl.Finish()
 	cloud := GetTestCloud(ctrl)
 	expectedVM := buildDefaultTestVirtualMachine("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/availabilitySets/AGENTPOOL1-AVAILABILITYSET-00000000", []string{})
+	expectedVM.Name = to.StringPtr("name")
 	mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
 	mockVMClient.EXPECT().Get(gomock.Any(), "rg", "k8s-agentpool1-00000000-0", gomock.Any()).Return(expectedVM, nil)
+	expectedNIC := buildDefaultTestInterface(true, []string{})
+	expectedNIC.VirtualMachine = &network.SubResource{
+		ID: to.StringPtr("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/k8s-agentpool1-00000000-0"),
+	}
+	mockNICClient := cloud.InterfacesClient.(*mockinterfaceclient.MockInterface)
+	mockNICClient.EXPECT().Get(gomock.Any(), "rg", "k8s-agentpool1-00000000-nic-0", gomock.Any()).Return(expectedNIC, nil)
 	ipConfigurationID := `/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool1-00000000-nic-0/ipConfigurations/ipconfig1`
 	nodeName, asName, err := cloud.VMSet.GetNodeNameByIPConfigurationID(ipConfigurationID)
 	assert.NoError(t, err)
-	assert.Equal(t, nodeName, "k8s-agentpool1-00000000-0")
-	assert.Equal(t, asName, "agentpool1-availabilityset-00000000")
+	assert.Equal(t, "k8s-agentpool1-00000000-0", nodeName)
+	assert.Equal(t, "agentpool1-availabilityset-00000000", asName)
 }
