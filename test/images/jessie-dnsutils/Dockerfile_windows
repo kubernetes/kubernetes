@@ -20,11 +20,9 @@ FROM --platform=linux/amd64 alpine:3.6 as prep
 ADD https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_windows_amd64.tgz /coredns.tgz
 RUN tar -xzvf /coredns.tgz
 
-FROM e2eteam/busybox-helper:1.29.0 as busybox-helper
 FROM $BASEIMAGE
 
 COPY --from=prep /coredns.exe /coredns.exe
-COPY --from=busybox-helper /dig /dig
 
 # NOTE(claudiub): docker buildx sets the PATH env variable to a Linux-like PATH, which is not desirable.
 ENV PATH="C:\dig\;C:\bin;C:\curl;C:\Windows\System32;C:\Windows;C:\Program Files\PowerShell;"
