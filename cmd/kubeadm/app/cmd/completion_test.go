@@ -39,7 +39,7 @@ func TestNewCmdCompletion(t *testing.T) {
 	cmd := newCmdCompletion(&out, "")
 	parentCmd.AddCommand(cmd)
 	if err := parentCmd.Execute(); err != nil {
-		t.Errorf("Cannot exectute newCmdCompletion: %v", err)
+		t.Errorf("cannot exectute newCmdCompletion: %v", err)
 	}
 }
 
@@ -90,7 +90,7 @@ func TestRunCompletion(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := RunCompletion(&out, "", cmd, tc.args); (err != nil) != tc.expectedError {
-				t.Errorf("Test case %q: TestRunCompletion expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
+				t.Errorf("test case %q: TestRunCompletion expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
 			}
 		})
 	}
