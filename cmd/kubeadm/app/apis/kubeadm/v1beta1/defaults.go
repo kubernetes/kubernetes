@@ -47,10 +47,6 @@ const (
 
 	// DefaultEtcdDataDir defines default location of etcd where static pods will save data to
 	DefaultEtcdDataDir = "/var/lib/etcd"
-	// DefaultProxyBindAddressv4 is the default bind address when the advertise address is v4
-	DefaultProxyBindAddressv4 = "0.0.0.0"
-	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
-	DefaultProxyBindAddressv6 = "::"
 	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the JoinConfiguration)
 	DefaultDiscoveryTimeout = 5 * time.Minute
 )
