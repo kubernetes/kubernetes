@@ -27,7 +27,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/kubernetes/test/e2e/network"
 
 	"github.com/onsi/ginkgo"
 	utilnet "k8s.io/utils/net"
@@ -108,7 +107,13 @@ and what is happening in practice:
 		z/b	.	.	.	.	.	.	.	.	.
 		z/c	.	.	.	.	.	.	.	.	.
 */
-var _ = network.SIGDescribe("Netpol [LinuxOnly]", func() {
+
+// SIGDescribeCopy function SIGDescribe is COPIED from test/e2e/network/framework.go , so that we can avoid a cyclic dependency while we incubate these new tests.
+func SIGDescribeCopy(text string, body func()) bool {
+	return ginkgo.Describe("[sig-network] "+text, body)
+}
+
+var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("netpol")
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {
