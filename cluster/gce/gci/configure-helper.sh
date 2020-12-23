@@ -1453,6 +1453,14 @@ function create-master-etcd-apiserver-auth {
    fi
 }
 
+function docker-installed {
+    if systemctl cat docker.service &> /dev/null ; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 function assemble-docker-flags {
   echo "Assemble docker command line flags"
   local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
@@ -3077,8 +3085,13 @@ function main() {
   if [[ "${container_runtime}" == "docker" ]]; then
     assemble-docker-flags
   elif [[ "${container_runtime}" == "containerd" ]]; then
-    # stop docker if it is present as we want to use just containerd
-    systemctl stop docker || echo "unable to stop docker"
+    if docker-installed; then
+      # We still need to configure docker so it wouldn't reserver the 172.17.0/16 subnet
+      # And if somebody will start docker to build or pull something, logging will also be set up
+      assemble-docker-flags
+      # stop docker if it is present as we want to use just containerd
+      systemctl stop docker || echo "unable to stop docker"
+    fi
     setup-containerd
   fi
 
