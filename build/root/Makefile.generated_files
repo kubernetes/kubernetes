@@ -64,18 +64,18 @@ $(META_DIR)/$(GO_PKGDEPS_FILE): FORCE
 	    echo "DBG: calculating Go dependencies";  \
 	fi
 	hack/run-in-gopath.sh go install ./hack/make-rules/helpers/go2make
-	hack/run-in-gopath.sh go2make                     \
-	    k8s.io/kubernetes/...                         \
-	    --prune  k8s.io/kubernetes/staging            \
-	    --prune  k8s.io/kubernetes/vendor             \
-	    k8s.io/kubernetes/vendor/k8s.io/...           \
+	hack/run-in-gopath.sh go2make                       \
+	    k8s.io/kubernetes/...                           \
+	    --prune  k8s.io/kubernetes/staging              \
+	    --prune  k8s.io/kubernetes/vendor               \
+	    k8s.io/kubernetes/vendor/k8s.io/...             \
 	    github.com/go-bindata/go-bindata/go-bindata/... \
 	    > $@.tmp
-	if ! cmp -s $@.tmp $@; then                       \
-	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then          \
-	        echo "DBG: $(GO_PKGDEPS_FILE) changed";   \
-	    fi;                                           \
-	    cat $@.tmp > $@;                              \
+	if ! cmp -s $@.tmp $@; then                         \
+	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then            \
+	        echo "DBG: $(GO_PKGDEPS_FILE) changed";     \
+	    fi;                                             \
+	    cat $@.tmp > $@;                                \
 	fi
 	rm -f $@.tmp
 
@@ -123,10 +123,10 @@ ALL_K8S_TAG_FILES := $(shell                             \
 PRERELEASE_LIFECYCLE_BASENAME := $(GENERATED_FILE_PREFIX)prerelease-lifecycle
 PRERELEASE_LIFECYCLE_FILENAME := $(PRERELEASE_LIFECYCLE_BASENAME).go
 
-# The tool used to generate deep copies.
+# The tool used to generate prerelease-lifecycle code.
 PRERELEASE_LIFECYCLE_GEN := $(BIN_DIR)/prerelease-lifecycle-gen
 
-# Find all the directories that request deep-copy generation.
+# Find all the directories that request prerelease-lifecycle generation.
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all +k8s:prerelease-lifecycle-gen tags)
 endif
@@ -171,8 +171,8 @@ $(foreach dir, $(PRERELEASE_LIFECYCLE_DIRS), $(eval                     \
     $(dir)/$(PRERELEASE_LIFECYCLE_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
 ))
 
-# How to regenerate deep-copy code.  This is a little slow to run, so we batch
-# it up and trigger the batch from the 'generated_files' target.
+# How to regenerate prerelease-lifecycle code.  This is a little slow to run,
+# so we batch it up and trigger the batch from the 'generated_files' target.
 $(META_DIR)/$(PRERELEASE_LIFECYCLE_GEN).todo: $(PRERELEASE_LIFECYCLE_FILES)
 
 $(PRERELEASE_LIFECYCLE_FILES): $(PRERELEASE_LIFECYCLE_GEN)
