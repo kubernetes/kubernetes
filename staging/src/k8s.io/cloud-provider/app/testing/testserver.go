@@ -116,7 +116,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	cloudConfig := config.Complete().ComponentConfig.KubeCloudShared.CloudProvider
 	cloud, err := cloudprovider.InitCloudProvider(cloudConfig.Name, cloudConfig.CloudConfigFile)
 	if err != nil {
-		return result, fmt.Errorf("Cloud provider could not be initialized: %v", err)
+		return result, fmt.Errorf("cloud provider could not be initialized: %v", err)
 	}
 	if cloud == nil {
 		return result, fmt.Errorf("cloud provider is nil")
