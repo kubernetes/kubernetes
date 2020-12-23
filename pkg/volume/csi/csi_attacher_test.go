@@ -216,8 +216,10 @@ func TestAttacherAttach(t *testing.T) {
 
 			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 
-			// FIXME: We need to ensure this goroutine exits in the test.
+			var wg sync.WaitGroup
+			wg.Add(1)
 			go func(spec *volume.Spec, nodename string, fail bool) {
+				defer wg.Done()
 				attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
 				if !fail && err != nil {
 					t.Errorf("expecting no failure, but got err: %v", err)
@@ -242,6 +244,7 @@ func TestAttacherAttach(t *testing.T) {
 				status.Attached = true
 			}
 			markVolumeAttached(t, csiAttacher.k8s, fakeWatcher, tc.attachID, status)
+			wg.Wait()
 		})
 	}
 }
@@ -303,8 +306,10 @@ func TestAttacherAttachWithInline(t *testing.T) {
 			}
 			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 
-			// FIXME: We need to ensure this goroutine exits in the test.
+			var wg sync.WaitGroup
+			wg.Add(1)
 			go func(spec *volume.Spec, nodename string, fail bool) {
+				defer wg.Done()
 				attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
 				if fail != (err != nil) {
 					t.Errorf("expecting no failure, but got err: %v", err)
@@ -324,6 +329,7 @@ func TestAttacherAttachWithInline(t *testing.T) {
 				status.Attached = true
 			}
 			markVolumeAttached(t, csiAttacher.k8s, fakeWatcher, tc.attachID, status)
+			wg.Wait()
 		})
 	}
 }
@@ -744,9 +750,12 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 			trigerWatchEventTime := tc.trigerWatchEventTime
 			finalAttached := tc.finalAttached
 			finalAttachErr := tc.finalAttachErr
+			var wg sync.WaitGroup
 			// after timeout, fakeWatcher will be closed by csiAttacher.waitForVolumeAttachment
 			if tc.trigerWatchEventTime > 0 && tc.trigerWatchEventTime < tc.timeout {
+				wg.Add(1)
 				go func() {
+					defer wg.Done()
 					time.Sleep(trigerWatchEventTime)
 					attachment := makeTestAttachment(attachID, nodeName, pvName)
 					attachment.Status.Attached = finalAttached
@@ -767,6 +776,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 			if err == nil && retID != attachID {
 				t.Errorf("attacher.WaitForAttach not returning attachment ID")
 			}
+			wg.Wait()
 		})
 	}
 }
@@ -1006,7 +1016,10 @@ func TestAttacherDetach(t *testing.T) {
 				t.Errorf("test case %s failed: %v", tc.name, err)
 			}
 			watchError := tc.watcherError
+			var wg sync.WaitGroup
+			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				if watchError {
 					errStatus := apierrors.NewInternalError(fmt.Errorf("we got an error")).Status()
 					fakeWatcher.Error(&errStatus)
@@ -1031,6 +1044,7 @@ func TestAttacherDetach(t *testing.T) {
 					t.Errorf("expecting attachment not to be nil, but it is")
 				}
 			}
+			wg.Wait()
 		})
 	}
 }
@@ -1222,6 +1236,7 @@ func TestAttacherMountDevice(t *testing.T) {
 
 			nodeName := string(csiAttacher.plugin.host.GetNodeName())
 			attachID := getAttachmentName(tc.volName, testDriver, nodeName)
+			var wg sync.WaitGroup
 
 			if tc.createAttachment {
 				// Set up volume attachment
@@ -1230,7 +1245,9 @@ func TestAttacherMountDevice(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to attach: %v", err)
 				}
+				wg.Add(1)
 				go func() {
+					defer wg.Done()
 					fakeWatcher.Delete(attachment)
 				}()
 			}
@@ -1288,6 +1305,8 @@ func TestAttacherMountDevice(t *testing.T) {
 					}
 				}
 			}
+
+			wg.Wait()
 		})
 	}
 }
@@ -1396,7 +1415,12 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to attach: %v", err)
 			}
+
+			var wg sync.WaitGroup
+			wg.Add(1)
+
 			go func() {
+				defer wg.Done()
 				fakeWatcher.Delete(attachment)
 			}()
 
@@ -1434,6 +1458,8 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 					t.Errorf("expected mount path: %s. got: %s", tc.deviceMountPath, vol.Path)
 				}
 			}
+
+			wg.Wait()
 		})
 	}
 }
