@@ -54,7 +54,9 @@ func TestDecoder(t *testing.T) {
 		go func() {
 			data, err := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expect)
 			if err != nil {
-				t.Fatalf("Unexpected error %v", err)
+				t.Errorf("Unexpected error %v", err)
+				in.Close()
+				return
 			}
 			event := metav1.WatchEvent{
 				Type:   string(eType),
@@ -70,7 +72,9 @@ func TestDecoder(t *testing.T) {
 		go func() {
 			action, got, err := decoder.Decode()
 			if err != nil {
-				t.Fatalf("Unexpected error %v", err)
+				t.Errorf("Unexpected error %v", err)
+				close(done)
+				return
 			}
 			if e, a := eType, action; e != a {
 				t.Errorf("Expected %v, got %v", e, a)

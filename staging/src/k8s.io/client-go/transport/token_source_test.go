@@ -145,7 +145,7 @@ func TestCachingTokenSourceRace(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				if _, err := ts.Token(); err != nil {
-					t.Fatalf("err: %v", err)
+					t.Errorf("err: %v", err)
 				}
 			}()
 		}
