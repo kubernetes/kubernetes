@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	appslisters "k8s.io/client-go/listers/apps/v1"
@@ -34,6 +35,8 @@ var _ corelisters.ServiceLister = &ServiceLister{}
 
 // ServiceLister implements ServiceLister on []v1.Service for test purposes.
 type ServiceLister []*v1.Service
+
+const NodeNameWithoutCSINode string = "node-without-csi"
 
 // Services returns nil.
 func (f ServiceLister) Services(namespace string) corelisters.ServiceNamespaceLister {
@@ -270,6 +273,9 @@ type CSINodeLister storagev1.CSINode
 
 // Get returns a fake CSINode object.
 func (n CSINodeLister) Get(name string) (*storagev1.CSINode, error) {
+	if name == NodeNameWithoutCSINode {
+		return nil, errors.NewNotFound(v1.Resource("csinode"), name)
+	}
 	csiNode := storagev1.CSINode(n)
 	return &csiNode, nil
 }
