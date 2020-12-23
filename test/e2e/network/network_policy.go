@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,10 +37,11 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+
+	// synthetic import of netpol suite, until these tests are replaced entirely, so that its included properly
+	_ "k8s.io/kubernetes/test/e2e/network/netpol"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilnet "k8s.io/utils/net"
-
-	"github.com/onsi/ginkgo"
 )
 
 /*
