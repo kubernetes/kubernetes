@@ -31,6 +31,7 @@ import (
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -246,6 +247,14 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 	if kl.kubeClient != nil {
 		if n, err := kl.nodeLister.Get(string(kl.nodeName)); err == nil {
+			return n, nil
+		}
+		// nodeLister cache may not be fully synced
+		// Use kubeClient to get node which is the rare case.
+		// For case that is used for pod predicate,
+		// it means kubelet got pod notification and
+		// the connection to apiserver is good now.
+		if n, err := kl.kubeClient.CoreV1().Nodes().Get(context.TODO(), string(kl.nodeName), metav1.GetOptions{}); err == nil {
 			return n, nil
 		}
 	}
