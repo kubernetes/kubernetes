@@ -461,8 +461,8 @@ func TestApplyTo(t *testing.T) {
 	expected := &kubecontrollerconfig.Config{
 		ComponentConfig: kubectrlmgrconfig.KubeControllerManagerConfiguration{
 			Generic: cmconfig.GenericControllerManagerConfiguration{
-				Port:            10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
-				Address:         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+				Port:            10000,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+				Address:         "192.168.4.10", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				MinResyncPeriod: metav1.Duration{Duration: 8 * time.Hour},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					ContentType: "application/json",
