@@ -28,7 +28,7 @@ func TestNewCmdVersion(t *testing.T) {
 	var buf bytes.Buffer
 	cmd := newCmdVersion(&buf)
 	if err := cmd.Execute(); err != nil {
-		t.Errorf("Cannot execute version command: %v", err)
+		t.Errorf("cannot execute version command: %v", err)
 	}
 }
 
@@ -91,7 +91,7 @@ func TestRunVersion(t *testing.T) {
 			}
 		error:
 			if (err != nil) != tc.expectedError {
-				t.Errorf("Test case %q: RunVersion expected error: %v, saw: %v; %v", tc.name, tc.expectedError, err != nil, err)
+				t.Errorf("test case %q: RunVersion expected error: %v, saw: %v; %v", tc.name, tc.expectedError, err != nil, err)
 			}
 		})
 	}
