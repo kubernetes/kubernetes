@@ -15281,7 +15281,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		"with CAP_SYS_ADMIN and allowPrivilegeEscalation false": {
 			sc:          capSysAdminWithoutEscalation,
 			errorType:   "FieldValueInvalid",
-			errorDetail: "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN",
+			errorDetail: "cannot set `allowPrivilegeEscalation` to false when `capabilities.add` contains `CAP_SYS_ADMIN`",
 		},
 		"with privileged and allowPrivilegeEscalation false": {
 			sc:           privWithoutEscalation,

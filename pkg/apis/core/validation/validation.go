@@ -452,7 +452,7 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 	if source.EmptyDir != nil {
 		numVolumes++
 		if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) < 0 {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "sizeLimit field must be a valid resource quantity"))
 		}
 	}
 	if source.HostPath != nil {
@@ -975,7 +975,7 @@ func validateGlusterfsPersistentVolumeSource(glusterfs *core.GlusterfsPersistent
 	if glusterfs.EndpointsNamespace != nil {
 		endpointNs := glusterfs.EndpointsNamespace
 		if *endpointNs == "" {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("endpointsNamespace"), *endpointNs, "if the endpointnamespace is set, it must be a valid namespace name"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("endpointsNamespace"), *endpointNs, "if the endpointNamespace is set, it must be a valid namespace name"))
 		} else {
 			for _, msg := range ValidateNamespaceName(*endpointNs, false) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("endpointsNamespace"), *endpointNs, msg))
@@ -3802,7 +3802,7 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 			}
 		}
 		if securityContext.ShareProcessNamespace != nil && securityContext.HostPID && *securityContext.ShareProcessNamespace {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("shareProcessNamespace"), *securityContext.ShareProcessNamespace, "ShareProcessNamespace and HostPID cannot both be enabled"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("shareProcessNamespace"), *securityContext.ShareProcessNamespace, "shareProcessNamespace and hostPID cannot both be enabled"))
 		}
 
 		if len(securityContext.Sysctls) != 0 {
@@ -4693,7 +4693,7 @@ func ValidateNode(node *core.Node) field.ErrorList {
 		if len(node.Spec.PodCIDRs) > 1 {
 			dualStack, err := netutils.IsDualStackCIDRStrings(node.Spec.PodCIDRs)
 			if err != nil {
-				allErrs = append(allErrs, field.InternalError(podCIDRsField, fmt.Errorf("invalid PodCIDRs. failed to check with dual stack with error:%v", err)))
+				allErrs = append(allErrs, field.InternalError(podCIDRsField, fmt.Errorf("invalid podCIDRs. failed to check with dual stack with error:%v", err)))
 			}
 			if !dualStack || len(node.Spec.PodCIDRs) > 2 {
 				allErrs = append(allErrs, field.Invalid(podCIDRsField, node.Spec.PodCIDRs, "may specify no more than one CIDR for each IP family"))
@@ -5427,7 +5427,7 @@ func validateScopedResourceSelectorRequirement(resourceQuotaSpec *core.ResourceQ
 		case core.ResourceQuotaScopeBestEffort, core.ResourceQuotaScopeNotBestEffort, core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating:
 			if req.Operator != core.ScopeSelectorOpExists {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), req.Operator,
-					"must be 'Exist' only operator when scope is any of ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeBestEffort and ResourceQuotaScopeNotBestEffort"))
+					"must be 'Exist' only operator when scope is any of 'Terminating', 'Terminating', 'BestEffort' and 'NotBestEffort'"))
 			}
 		}
 
@@ -5797,7 +5797,7 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 		if sc.Capabilities != nil {
 			for _, cap := range sc.Capabilities.Add {
 				if string(cap) == "CAP_SYS_ADMIN" {
-					allErrs = append(allErrs, field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN"))
+					allErrs = append(allErrs, field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false when `capabilities.add` contains `CAP_SYS_ADMIN`"))
 				}
 			}
 		}
