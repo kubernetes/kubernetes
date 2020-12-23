@@ -17,10 +17,11 @@ limitations under the License.
 package reconciler
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -772,6 +773,143 @@ func Test_ReportMultiAttachError(t *testing.T) {
 		for i := index; i < len(test.expectedEvents); i++ {
 			t.Errorf("Test %q: event %d: expected %q, got none", test.name, i, test.expectedEvents[i])
 		}
+	}
+}
+
+func Test_syncStates_checkTimesForVerifyVolumesAreAttached(t *testing.T) {
+	// Arrange
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
+	t.Logf("volumePluginMgr: %+v", volumePluginMgr)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(volumePluginMgr)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	fakeRecorder := &record.FakeRecorder{}
+	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		fakeKubeClient,
+		volumePluginMgr,
+		fakeRecorder,
+		false, /* checkNodeCapabilitiesBeforeMount */
+		fakeHandler))
+	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	reconciler := NewReconciler(
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, time.Second, false, dsw, asw, ad, nsu, fakeRecorder)
+	testNodeNumber := 10
+	for nNode := 1; nNode <= testNodeNumber; nNode++ {
+		nodeName := k8stypes.NodeName("node-name-" + strconv.Itoa(nNode))
+		dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
+		podName := "pod-uid-" + strconv.Itoa(nNode)
+		podObj := controllervolumetesting.NewPod(podName, podName)
+
+		testVolumeNumber := 10
+		for i := 1; i <= testVolumeNumber; i++ {
+			volumeName := v1.UniqueVolumeName("volume-name-" + strconv.Itoa(nNode) + strconv.Itoa(i))
+			volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+
+			volumeExists := dsw.VolumeExists(volumeName, nodeName)
+			if volumeExists {
+				t.Fatalf(
+					"Volume %q/node %q should not exist, but it does.",
+					volumeName,
+					nodeName)
+			}
+
+			_, podAddErr := dsw.AddPod(types.UniquePodName(podName), podObj, volumeSpec, nodeName)
+			if podAddErr != nil {
+				t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
+			}
+		}
+	}
+
+	// Act
+	ch := make(chan struct{})
+	go reconciler.Run(ch)
+	defer close(ch)
+
+	// Assert
+	waitSynced(t, time.Now(), time.Second)
+	waitForVolumesAreAttachedCallCount(t, testNodeNumber /* expectedVolumesAreAttachedCallCount */, fakePlugin)
+	verifyVolumesAreAttachedCallCount(t, testNodeNumber /* expectVolumesAreAttachedCallCount */, fakePlugin)
+}
+
+func waitSynced(t *testing.T, timeOfLastSync time.Time, syncDuration time.Duration) {
+	err := retryWithExponentialBackOff(
+		time.Duration(time.Second),
+		func() (bool, error) {
+			if time.Since(timeOfLastSync) > syncDuration {
+				return true, nil
+			}
+			t.Logf("Warning: Need time to wait: %v.", syncDuration-time.Since(timeOfLastSync))
+			return false, nil
+		},
+	)
+
+	if err != nil {
+		t.Fatal("Timed out waiting for synced")
+	}
+}
+
+func waitForVolumesAreAttachedCallCount(
+	t *testing.T,
+	expectedVolumesAreAttachedCallCount int,
+	fakePlugin *volumetesting.FakeVolumePlugin) {
+	if len(fakePlugin.GetAttachers()) == 0 && expectedVolumesAreAttachedCallCount == 0 {
+		return
+	}
+
+	err := retryWithExponentialBackOff(
+		time.Duration(5*time.Millisecond),
+		func() (bool, error) {
+			for i, attacher := range fakePlugin.GetAttachers() {
+				actualCallCount := attacher.GetVolumesAreAttachedCallCount()
+				if actualCallCount >= expectedVolumesAreAttachedCallCount {
+					t.Logf(
+						"Warning: Wrong attacher[%v].GetVolumesAreAttachedCallCount(). Expected: <%v> Actual: <%v>. OK.",
+						i,
+						expectedVolumesAreAttachedCallCount,
+						actualCallCount)
+					return true, nil
+				}
+				if i > 0 {
+					t.Logf(
+						"Warning: Wrong attacher[%v].GetVolumesAreAttachedCallCount(). Expected: <%v> Actual: <%v>. Will try next attacher.",
+						i,
+						expectedVolumesAreAttachedCallCount,
+						actualCallCount)
+				}
+			}
+
+			t.Logf(
+				"Warning: No attachers have expected GetVolumesAreAttachedCallCount. Expected: <%v>. Will retry.",
+				expectedVolumesAreAttachedCallCount)
+			return false, nil
+		},
+	)
+
+	if err != nil {
+		t.Fatalf(
+			"No attachers have expected GetVolumesAreAttachedCallCount. Expected: <%v>",
+			expectedVolumesAreAttachedCallCount)
+	}
+}
+
+func verifyVolumesAreAttachedCallCount(
+	t *testing.T,
+	expectVolumesAreAttachedCallCount int,
+	fakePlugin *volumetesting.FakeVolumePlugin) {
+
+	time.Sleep(5 * time.Millisecond)
+	attachers := fakePlugin.GetAttachers()
+	if len(attachers) != 1 {
+		t.Fatalf(
+			"Wrong attacher number. Expected: 1 Actual: <%v>",
+			len(attachers))
+	}
+	actualCallCount := attachers[0].GetVolumesAreAttachedCallCount()
+	if actualCallCount != expectVolumesAreAttachedCallCount {
+		t.Fatalf(
+			"Wrong VolumesAreAttachedCallCount. Expected: <%v> Actual: <%v>",
+			expectVolumesAreAttachedCallCount, actualCallCount)
 	}
 }
 

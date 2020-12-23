@@ -645,6 +645,7 @@ type FakeVolume struct {
 	UnmapPodDeviceCallCount     int
 	GlobalMapPathCallCount      int
 	PodDeviceMapPathCallCount   int
+	VolumesAreAttachedCallCount int
 }
 
 func getUniqueVolumeName(spec *Spec) (string, error) {
@@ -1080,7 +1081,14 @@ func (fv *FakeVolume) Detach(volumeName string, nodeName types.NodeName) error {
 func (fv *FakeVolume) VolumesAreAttached(spec []*Spec, nodeName types.NodeName) (map[*Spec]bool, error) {
 	fv.Lock()
 	defer fv.Unlock()
+	fv.VolumesAreAttachedCallCount = fv.VolumesAreAttachedCallCount + 1
 	return nil, nil
+}
+
+func (fv *FakeVolume) GetVolumesAreAttachedCallCount() int {
+	fv.RLock()
+	defer fv.RUnlock()
+	return fv.VolumesAreAttachedCallCount
 }
 
 func (fv *FakeVolume) GetDetachCallCount() int {
