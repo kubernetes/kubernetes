@@ -313,7 +313,7 @@ func (az *Cloud) cleanBackendpoolForPrimarySLB(primarySLB *network.LoadBalancer,
 						return nil, err
 					}
 					primaryVMSetName := az.VMSet.GetPrimaryVMSetName()
-					if !strings.EqualFold(primaryVMSetName, vmSetName) {
+					if !strings.EqualFold(primaryVMSetName, vmSetName) && vmSetName != "" {
 						klog.V(2).Infof("cleanBackendpoolForPrimarySLB: found unwanted vmSet %s, decouple it from the LB", vmSetName)
 						// construct a backendPool that only contains the IP config of the node to be deleted
 						interfaceIPConfigToBeDeleted := network.InterfaceIPConfiguration{
