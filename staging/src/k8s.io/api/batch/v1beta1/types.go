@@ -101,7 +101,7 @@ type CronJobList struct {
 // CronJobSpec describes how the job execution will look like and when it will actually run.
 type CronJobSpec struct {
 
-	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+	// The schedule in Cron format, see https://docs.k8s.io/concepts/workloads/controllers/cron-jobs/#cron-schedule-syntax
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
 
 	// The time zone for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
