@@ -160,6 +160,7 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 
 		ginkgo.It("should support a 'default-deny-all' policy [Feature:NetworkPolicy]", func() {
 			np := &networkingv1.NetworkPolicy{}
+			// Example 1: One way to write these tests is as json snippets, for exactly reproducing specific Netpol scenarios that are submitted...
 			policy := `
 			{
 				"kind": "NetworkPolicy",
@@ -206,6 +207,7 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 					"pod": "b",
 				},
 			}
+			// Example 2: We also have a "DSL" for making tests....
 			policy := GetAllowIngressByPod("x-a-allows-x-b", map[string]string{"pod": "a"}, &allowedPods)
 			nsX, _, _, model, k8s := getK8SModel(f)
 			CreatePolicy(k8s, policy, nsX)
@@ -853,6 +855,140 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 			reachability := NewReachability(model.AllPods(), true)
 			reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
 			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachability})
+		})
+
+		// This policy came up in https://github.com/kubernetes/kubernetes/issues/96341.   Its a good test case b/c it confirms that 0.0.0.0/0 works properly.
+		ginkgo.It("should support egress to the outside world while blocking internal pods [Feature:NetworkPolicy]", func() {
+			np := &networkingv1.NetworkPolicy{}
+
+			nsX, _, _, model, k8s := getK8SModel(f)
+			// grab a pods IP address so we can block everything in its subnet...
+			podList, err := f.ClientSet.CoreV1().Pods(nsX).List(context.TODO(), metav1.ListOptions{LabelSelector: "pod=a"})
+			framework.ExpectNoError(err, "Failing to find pod x/a")
+			podA := podList.Items[0]
+
+			// Exclude podServer's IP with an Except clause
+			hostMask := 24
+			allowAll := "0.0.0.0/0"
+			if utilnet.IsIPv6String(podA.Status.PodIP) {
+				hostMask = hostMask * 4
+				allowAll = "::/0"
+			}
+			podServerCIDR := fmt.Sprintf("%s/%d", podA.Status.PodIP, hostMask)
+
+			policy := fmt.Sprintf(`
+			{
+				"kind": "NetworkPolicy",
+				"apiVersion": "networking.k8s.io/v1",
+				"metadata": {
+				"name": "test-netpol"
+				},
+				"spec": {
+				"egress": [
+					{
+						"to": [
+							{
+								"podSelector": {}
+							},
+							{
+								"ipBlock": {
+									"cidr": "%v",
+									"except": [ "%v" ]
+								}
+							}
+						]
+					}
+				],
+				"ingress": [
+					{
+						"from": [
+							{
+								"ipBlock": { "cidr": "%v" }
+							}
+						]
+					}
+				],
+				"podSelector": {},
+				"policyTypes": ["Ingress", "Egress"]
+				}
+		 }
+		 `, allowAll, podServerCIDR, allowAll)
+
+			err = json.Unmarshal([]byte(policy), np)
+			framework.ExpectNoError(err, "unmarshal network policy")
+
+			CreatePolicy(k8s, np, nsX)
+
+			reachability := NewReachability(model.AllPods(), true)
+			reachability.ExpectAllEgress(NewPodString(nsX, "a"), false)
+			reachability.ExpectAllEgress(NewPodString(nsX, "b"), false)
+			reachability.ExpectAllEgress(NewPodString(nsX, "c"), false)
+			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+		})
+
+		ginkgo.It("Deny all ingress should work the same way, in several different syntaxes (ingress empty, ingress null, ingress.From peer empty) [Feature:NetworkPolicy]", func() {
+			np := &networkingv1.NetworkPolicy{}
+			nsX, _, _, model, k8s := getK8SModel(f)
+			// isolated because the policy peer doesnt define ANY from filters
+			policy1 := fmt.Sprintf(`
+			{
+				"kind": "NetworkPolicy",
+				"apiVersion": "networking.k8s.io/v1",
+				"metadata": {
+					"name": "isolated-from-empty-array"
+				},
+				"spec": {
+					"podSelector": {}
+				},
+				"ingress": [{
+					"from": []
+				}]
+			}`)
+
+			// still isolated, because there are NO ingress rules.
+			policy2 := fmt.Sprintf(`
+			{
+				"kind": "NetworkPolicy",
+				"apiVersion": "networking.k8s.io/v1",
+				"metadata": {
+					"name": "isolated-from-empty-array"
+				},
+				"spec": {
+					"podSelector": {}
+				},
+				"ingress": []
+			}`)
+
+			// still isolated, because there are NO ingress rules.
+			policy3 := fmt.Sprintf(`
+			{
+				"kind": "NetworkPolicy",
+				"apiVersion": "networking.k8s.io/v1",
+				"metadata": {
+					"name": "isolated-from-empty-array"
+				},
+				"spec": {
+					"podSelector": {}
+				},
+				"ingress": null
+			}`)
+
+			for i, denyAllIngressPolicy := range []string{policy1, policy2, policy3} {
+				// make sure first policy is deny all ingress...
+				ginkgo.By(fmt.Sprintf("By testing method %v for denyAllIngressPolicies", i))
+				err := json.Unmarshal([]byte(denyAllIngressPolicy), np)
+				framework.ExpectNoError(err, "unmarshal network policy")
+
+				CreatePolicy(k8s, np, nsX)
+				reachability := NewReachability(model.AllPods(), true)
+				reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
+				reachability.ExpectAllIngress(NewPodString(nsX, "b"), false)
+				reachability.ExpectAllIngress(NewPodString(nsX, "c"), false)
+				ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+
+				k8s.CleanNetworkPolicies(model.NamespaceNames)
+			}
+
 		})
 	})
 })
