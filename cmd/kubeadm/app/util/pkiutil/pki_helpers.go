@@ -17,6 +17,7 @@ limitations under the License.
 package pkiutil
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -79,14 +80,33 @@ func NewCertificateAuthority(config *CertConfig) (*x509.Certificate, crypto.Sign
 	return cert, key, nil
 }
 
+// NewIntermediateCertificateAuthority creates new certificate and private key for an intermediate certificate authority
+func NewIntermediateCertificateAuthority(parentCert *x509.Certificate, parentKey crypto.Signer, config *CertConfig) (*x509.Certificate, crypto.Signer, error) {
+	key, err := NewPrivateKey(config.PublicKeyAlgorithm)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "unable to create private key while generating intermediate CA certificate")
+	}
+
+	cert, err := NewSignedCert(config, key, parentCert, parentKey, true)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "unable to sign intermediate CA certificate")
+	}
+
+	return cert, key, nil
+}
+
 // NewCertAndKey creates new certificate and key by passing the certificate authority certificate and key
 func NewCertAndKey(caCert *x509.Certificate, caKey crypto.Signer, config *CertConfig) (*x509.Certificate, crypto.Signer, error) {
+	if len(config.Usages) == 0 {
+		return nil, nil, errors.New("must specify at least one ExtKeyUsage")
+	}
+
 	key, err := NewPrivateKey(config.PublicKeyAlgorithm)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create private key")
 	}
 
-	cert, err := NewSignedCert(config, key, caCert, caKey)
+	cert, err := NewSignedCert(config, key, caCert, caKey, false)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to sign certificate")
 	}
@@ -137,6 +157,26 @@ func WriteCert(pkiPath, name string, cert *x509.Certificate) error {
 	certificatePath := pathForCert(pkiPath, name)
 	if err := certutil.WriteCert(certificatePath, EncodeCertPEM(cert)); err != nil {
 		return errors.Wrapf(err, "unable to write certificate to file %s", certificatePath)
+	}
+
+	return nil
+}
+
+// WriteCertBundle stores the given certificate bundle at the given location
+func WriteCertBundle(pkiPath, name string, certs []*x509.Certificate) error {
+	for i, cert := range certs {
+		if cert == nil {
+			return errors.Errorf("found nil certificate at position %d when writing bundle to file", i)
+		}
+	}
+
+	certificatePath := pathForCert(pkiPath, name)
+	encoded, err := EncodeCertBundlePEM(certs)
+	if err != nil {
+		return errors.Wrapf(err, "unable to marshal certificate bundle to PEM")
+	}
+	if err := certutil.WriteCert(certificatePath, encoded); err != nil {
+		return errors.Wrapf(err, "unable to write certificate bundle to file %s", certificatePath)
 	}
 
 	return nil
@@ -548,6 +588,24 @@ func EncodeCertPEM(cert *x509.Certificate) []byte {
 	return pem.EncodeToMemory(&block)
 }
 
+// EncodeCertBundlePEM returns PEM-endcoded certificate bundle
+func EncodeCertBundlePEM(certs []*x509.Certificate) ([]byte, error) {
+	buf := bytes.Buffer{}
+
+	block := pem.Block{
+		Type: CertificateBlockType,
+	}
+
+	for _, cert := range certs {
+		block.Bytes = cert.Raw
+		if err := pem.Encode(&buf, &block); err != nil {
+			return nil, err
+		}
+	}
+
+	return buf.Bytes(), nil
+}
+
 // EncodePublicKeyPEM returns PEM-encoded public data
 func EncodePublicKeyPEM(key crypto.PublicKey) ([]byte, error) {
 	der, err := x509.MarshalPKIXPublicKey(key)
@@ -571,7 +629,7 @@ func NewPrivateKey(keyType x509.PublicKeyAlgorithm) (crypto.Signer, error) {
 }
 
 // NewSignedCert creates a signed certificate using the given CA certificate and key
-func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate, caKey crypto.Signer) (*x509.Certificate, error) {
+func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate, caKey crypto.Signer, isCA bool) (*x509.Certificate, error) {
 	serial, err := cryptorand.Int(cryptorand.Reader, new(big.Int).SetInt64(math.MaxInt64))
 	if err != nil {
 		return nil, err
@@ -579,8 +637,10 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 	if len(cfg.CommonName) == 0 {
 		return nil, errors.New("must specify a CommonName")
 	}
-	if len(cfg.Usages) == 0 {
-		return nil, errors.New("must specify at least one ExtKeyUsage")
+
+	keyUsage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
+	if isCA {
+		keyUsage |= x509.KeyUsageCertSign
 	}
 
 	RemoveDuplicateAltNames(&cfg.AltNames)
@@ -590,13 +650,15 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 			CommonName:   cfg.CommonName,
 			Organization: cfg.Organization,
 		},
-		DNSNames:     cfg.AltNames.DNSNames,
-		IPAddresses:  cfg.AltNames.IPs,
-		SerialNumber: serial,
-		NotBefore:    caCert.NotBefore,
-		NotAfter:     time.Now().Add(kubeadmconstants.CertificateValidity).UTC(),
-		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  cfg.Usages,
+		DNSNames:              cfg.AltNames.DNSNames,
+		IPAddresses:           cfg.AltNames.IPs,
+		SerialNumber:          serial,
+		NotBefore:             caCert.NotBefore,
+		NotAfter:              time.Now().Add(kubeadmconstants.CertificateValidity).UTC(),
+		KeyUsage:              keyUsage,
+		ExtKeyUsage:           cfg.Usages,
+		BasicConstraintsValid: true,
+		IsCA:                  isCA,
 	}
 	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &certTmpl, caCert, key.Public(), caKey)
 	if err != nil {
