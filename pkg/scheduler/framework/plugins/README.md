@@ -5,7 +5,7 @@
 Read [the docs](https://kubernetes.io/docs/concepts/scheduling-eviction/scheduling-framework/)
 to understand the different extension points within the scheduling framework.
 
-TODO(#95156): flesh this out a bit more.
+TODO([#95156](https://github.com/kubernetes/kubernetes/issues/95156)): flesh this out a bit more.
 
 ## Adding plugin configuration parameters through `KubeSchedulerConfiguration`
 
