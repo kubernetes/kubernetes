@@ -51,7 +51,7 @@ type DeltaFIFOOptions struct {
 	EmitDeltaTypeReplaced bool
 }
 
-// DeltaFIFO is like FIFO, but differs in three ways.  One is that the
+// DeltaFIFO is like FIFO, but differs in two ways.  One is that the
 // accumulator associated with a given object's key is not that object
 // but rather a Deltas, which is a slice of Delta values for that
 // object.  Applying an object to a Deltas means to append a Delta
@@ -61,12 +61,11 @@ type DeltaFIFOOptions struct {
 // Deleted if the older Deleted's object is a
 // DeletedFinalStateUnknown.
 //
-// The second difference is that DeltaFIFO has an additional way that
-// an object can be applied to an accumulator, called Replaced.  However,
-// if EmitDeltaTypeReplaced is not set to true, Sync will be used in
-// replace events for backwards compatibility.
-//
-// The last difference is that Sync is used for periodic resync events.
+// The other difference is that DeltaFIFO has two additional ways that
+// an object can be applied to an accumulator: Replaced and Sync.
+// If EmitDeltaTypeReplaced is not set to true, Sync will be used in
+// replace events for backwards compatibility.  Sync is used for periodic
+// resync events.
 //
 // DeltaFIFO is a producer-consumer queue, where a Reflector is
 // intended to be the producer, and the consumer is whatever calls
@@ -149,8 +148,9 @@ const (
 	Sync DeltaType = "Sync"
 )
 
-// Delta is the type stored by a DeltaFIFO. It tells you what change
-// happened, and the object's state after* that change.
+// Delta is a member of Deltas (a list of Delta objects) which
+// in its turn is the type stored by a DeltaFIFO. It tells you what
+// change happened, and the object's state after* that change.
 //
 // [*] Unless the change is a deletion, and then you'll get the final
 //     state of the object before it was deleted.
