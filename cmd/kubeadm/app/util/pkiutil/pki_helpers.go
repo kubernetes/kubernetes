@@ -256,6 +256,21 @@ func TryLoadCertFromDisk(pkiPath, name string) (*x509.Certificate, error) {
 	return cert, nil
 }
 
+// TryLoadCertChainFromDisk tries to load the cert chain from the disk
+func TryLoadCertChainFromDisk(pkiPath, name string) (*x509.Certificate, []*x509.Certificate, error) {
+	certificatePath := pathForCert(pkiPath, name)
+
+	certs, err := certutil.CertsFromFile(certificatePath)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "couldn't load the certificate file %s", certificatePath)
+	}
+
+	cert := certs[0]
+	intermediates := certs[1:]
+
+	return cert, intermediates, nil
+}
+
 // TryLoadKeyFromDisk tries to load the key from the disk and validates that it is valid
 func TryLoadKeyFromDisk(pkiPath, name string) (crypto.Signer, error) {
 	privateKeyPath := pathForKey(pkiPath, name)
@@ -622,5 +637,29 @@ func ValidateCertPeriod(cert *x509.Certificate, offset time.Duration) error {
 	if now.After(cert.NotAfter) {
 		return errors.Errorf("the certificate has expired: %s", period)
 	}
+	return nil
+}
+
+// VerifyCertChain verifies that a certificate has a valid chain of
+// intermediate CAs back to the root CA
+func VerifyCertChain(cert *x509.Certificate, intermediates []*x509.Certificate, root *x509.Certificate) error {
+	rootPool := x509.NewCertPool()
+	rootPool.AddCert(root)
+
+	intermediatePool := x509.NewCertPool()
+	for _, c := range intermediates {
+		intermediatePool.AddCert(c)
+	}
+
+	verifyOptions := x509.VerifyOptions{
+		Roots:         rootPool,
+		Intermediates: intermediatePool,
+		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+	}
+
+	if _, err := cert.Verify(verifyOptions); err != nil {
+		return err
+	}
+
 	return nil
 }
