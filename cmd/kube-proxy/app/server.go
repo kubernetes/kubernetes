@@ -389,10 +389,10 @@ func addressFromDeprecatedFlags(addr string, port int32) string {
 func newLenientSchemeAndCodecs() (*runtime.Scheme, *serializer.CodecFactory, error) {
 	lenientScheme := runtime.NewScheme()
 	if err := kubeproxyconfig.AddToScheme(lenientScheme); err != nil {
-		return nil, nil, fmt.Errorf("failed to add kube-proxy config API to lenient scheme: %v", err)
+		return nil, nil, fmt.Errorf("failed to add kube-proxy config API to lenient scheme: %w", err)
 	}
 	if err := kubeproxyconfigv1alpha1.AddToScheme(lenientScheme); err != nil {
-		return nil, nil, fmt.Errorf("failed to add kube-proxy config v1alpha1 API to lenient scheme: %v", err)
+		return nil, nil, fmt.Errorf("failed to add kube-proxy config v1alpha1 API to lenient scheme: %w", err)
 	}
 	lenientCodecs := serializer.NewCodecFactory(lenientScheme, serializer.DisableStrict)
 	return lenientScheme, &lenientCodecs, nil
@@ -430,7 +430,7 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 		if lenientErr != nil {
 			// Lenient decoding failed with the current version, return the
 			// original strict error.
-			return nil, fmt.Errorf("failed lenient decoding: %v", err)
+			return nil, fmt.Errorf("failed lenient decoding: %w", err)
 		}
 
 		// Continue with the v1alpha1 object that was decoded leniently, but emit a warning.
@@ -685,7 +685,7 @@ func (s *ProxyServer) Run() error {
 		if max > 0 {
 			err := s.Conntracker.SetMax(max)
 			if err != nil {
-				if err != errReadOnlySysFS {
+				if errors.Is(err, errReadOnlySysFS) {
 					return err
 				}
 				// errReadOnlySysFS is caused by a known docker issue (https://github.com/docker/docker/issues/24000),
