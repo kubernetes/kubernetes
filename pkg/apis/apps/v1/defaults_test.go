@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +38,7 @@ import (
 func TestSetDefaultDaemonSetSpec(t *testing.T) {
 	defaultLabels := map[string]string{"foo": "bar"}
 	maxUnavailable := intstr.FromInt(1)
+	maxSurge := intstr.FromInt(0)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
@@ -80,6 +81,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
+							MaxSurge:       &maxSurge,
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
@@ -110,6 +112,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
+							MaxSurge:       &maxSurge,
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(1),
@@ -146,6 +149,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
+							MaxSurge:       &maxSurge,
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),

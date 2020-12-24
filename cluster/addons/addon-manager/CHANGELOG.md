@@ -1,3 +1,6 @@
+### Version 9.1.3 (Mon November 30 2020 Spencer Peterson <spencerjp@google.com>)
+ - Update kubectl to v1.19.3.
+
 ### Version 9.1.2 (Thu August 6 2020 Spencer Peterson <spencerjp@google.com>)
  - Fix `start_addon` overwriting resources with `addonmanager.kubernetes.io/mode=EnsureExists`.
 
@@ -86,6 +89,3 @@
 
 ### Version 1 (Thu May 5 2016 Mike Danese @mikedanese)
  - Run kube-addon-manager in a pod
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/addon-manager/CHANGELOG.md?pixel)]()

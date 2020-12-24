@@ -116,7 +116,7 @@ func diskTearDown(manager diskManager, c rbdUnmounter, volPath string, mounter m
 
 	// Unmount the bind-mount inside this pod.
 	if err := mounter.Unmount(volPath); err != nil {
-		klog.Errorf("failed to umount %s", volPath)
+		klog.Errorf("failed to unmount %s", volPath)
 		return err
 	}
 

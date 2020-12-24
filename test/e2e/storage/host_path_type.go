@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -263,7 +264,7 @@ var _ = utils.SIGDescribe("HostPathType Character Device [Slow]", func() {
 		targetCharDev = path.Join(hostBaseDir, "achardev")
 		ginkgo.By("Create a character device for further testing")
 		cmd := fmt.Sprintf("mknod %s c 89 1", path.Join(mountBaseDir, "achardev"))
-		stdout, stderr, err := utils.PodExec(f, basePod, cmd)
+		stdout, stderr, err := e2evolume.PodExec(f, basePod, cmd)
 		framework.ExpectNoError(err, "command: %q, stdout: %s\nstderr: %s", cmd, stdout, stderr)
 	})
 
@@ -332,7 +333,7 @@ var _ = utils.SIGDescribe("HostPathType Block Device [Slow]", func() {
 		targetBlockDev = path.Join(hostBaseDir, "ablkdev")
 		ginkgo.By("Create a block device for further testing")
 		cmd := fmt.Sprintf("mknod %s b 89 1", path.Join(mountBaseDir, "ablkdev"))
-		stdout, stderr, err := utils.PodExec(f, basePod, cmd)
+		stdout, stderr, err := e2evolume.PodExec(f, basePod, cmd)
 		framework.ExpectNoError(err, "command %q: stdout: %s\nstderr: %s", cmd, stdout, stderr)
 	})
 
@@ -462,7 +463,7 @@ func verifyPodHostPathTypeFailure(f *framework.Framework, nodeSelector map[strin
 	}.AsSelector().String()
 	msg := "hostPath type check failed"
 
-	err = e2eevents.WaitTimeoutForEvent(f.ClientSet, f.Namespace.Name, eventSelector, msg, framework.PodStartTimeout)
+	err = e2eevents.WaitTimeoutForEvent(f.ClientSet, f.Namespace.Name, eventSelector, msg, f.Timeouts.PodStart)
 	// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 	if err != nil {
 		framework.Logf("Warning: did not get event about FailedMountVolume")
@@ -480,7 +481,7 @@ func verifyPodHostPathType(f *framework.Framework, nodeSelector map[string]strin
 	newPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(),
 		newHostPathTypeTestPod(nodeSelector, hostDir, "/mnt/test", hostPathType), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, newPod.Name, newPod.Namespace, framework.PodStartShortTimeout))
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, newPod.Name, newPod.Namespace, f.Timeouts.PodStartShort))
 
 	f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), newPod.Name, *metav1.NewDeleteOptions(0))
 }

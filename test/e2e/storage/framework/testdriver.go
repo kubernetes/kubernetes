@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testsuites
+package framework
 
 import (
 	v1 "k8s.io/api/core/v1"
@@ -22,9 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
 // TestDriver represents an interface for a driver to be tested in TestSuite.
@@ -44,7 +42,7 @@ type TestDriver interface {
 	// expensive resources like framework.Framework. Tests that
 	// depend on a connection to the cluster can be done in
 	// PrepareTest once the framework is ready.
-	SkipUnsupportedTest(testpatterns.TestPattern)
+	SkipUnsupportedTest(TestPattern)
 
 	// PrepareTest is called at test execution time each time a new test case is about to start.
 	// It sets up all necessary resources and returns the per-test configuration
@@ -63,7 +61,7 @@ type TestVolume interface {
 type PreprovisionedVolumeTestDriver interface {
 	TestDriver
 	// CreateVolume creates a pre-provisioned volume of the desired volume type.
-	CreateVolume(config *PerTestConfig, volumeType testpatterns.TestVolType) TestVolume
+	CreateVolume(config *PerTestConfig, volumeType TestVolType) TestVolume
 }
 
 // InlineVolumeTestDriver represents an interface for a TestDriver that supports InlineVolume
@@ -127,6 +125,20 @@ type SnapshottableTestDriver interface {
 	// GetSnapshotClass returns a SnapshotClass to create snapshot.
 	// It will return nil, if the TestDriver doesn't support it.
 	GetSnapshotClass(config *PerTestConfig) *unstructured.Unstructured
+}
+
+// CustomTimeoutsTestDriver represents an interface fo a TestDriver that supports custom timeouts.
+type CustomTimeoutsTestDriver interface {
+	TestDriver
+	GetTimeouts() *framework.TimeoutContext
+}
+
+// GetDriverTimeouts returns the timeout of the driver operation
+func GetDriverTimeouts(driver TestDriver) *framework.TimeoutContext {
+	if d, ok := driver.(CustomTimeoutsTestDriver); ok {
+		return d.GetTimeouts()
+	}
+	return framework.NewTimeoutContextWithDefaults()
 }
 
 // Capability represents a feature that a volume plugin supports
@@ -211,39 +223,4 @@ type VolumeSnapshotStressTestOptions struct {
 	NumPods int
 	// Number of snapshots to create for each volume.
 	NumSnapshots int
-}
-
-// PerTestConfig represents parameters that control test execution.
-// One instance gets allocated for each test and is then passed
-// via pointer to functions involved in the test.
-type PerTestConfig struct {
-	// The test driver for the test.
-	Driver TestDriver
-
-	// Some short word that gets inserted into dynamically
-	// generated entities (pods, paths) as first part of the name
-	// to make debugging easier. Can be the same for different
-	// tests inside the test suite.
-	Prefix string
-
-	// The framework instance allocated for the current test.
-	Framework *framework.Framework
-
-	// If non-empty, Pods using a volume will be scheduled
-	// according to the NodeSelection. Otherwise Kubernetes will
-	// pick a node.
-	ClientNodeSelection e2epod.NodeSelection
-
-	// Some test drivers initialize a storage server. This is
-	// the configuration that then has to be used to run tests.
-	// The values above are ignored for such tests.
-	ServerConfig *e2evolume.TestConfig
-
-	// Some drivers run in their own namespace
-	DriverNamespace *v1.Namespace
-}
-
-// GetUniqueDriverName returns unique driver name that can be used parallelly in tests
-func (config *PerTestConfig) GetUniqueDriverName() string {
-	return config.Driver.GetDriverInfo().Name + "-" + config.Framework.UniqueName
 }

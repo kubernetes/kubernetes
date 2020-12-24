@@ -72,8 +72,22 @@ import (
 )
 
 const (
+	// Minimal number of nodes for the cluster to be considered large.
+	largeClusterThreshold = 100
+
+	// TODO(justinsb): Avoid hardcoding this.
+	awsMasterIP = "172.20.0.9"
+
+	// AllContainers specifies that all containers be visited
+	// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
+	AllContainers = InitContainers | Containers | EphemeralContainers
+)
+
+// DEPRECATED constants. Use the timeouts in framework.Framework instead.
+const (
 	// PodListTimeout is how long to wait for the pod to be listable.
 	PodListTimeout = time.Minute
+
 	// PodStartTimeout is how long to wait for the pod to be started.
 	PodStartTimeout = 5 * time.Minute
 
@@ -136,16 +150,6 @@ const (
 
 	// SnapshotDeleteTimeout is how long for snapshot to delete snapshotContent.
 	SnapshotDeleteTimeout = 5 * time.Minute
-
-	// Minimal number of nodes for the cluster to be considered large.
-	largeClusterThreshold = 100
-
-	// TODO(justinsb): Avoid hardcoding this.
-	awsMasterIP = "172.20.0.9"
-
-	// AllContainers specifies that all containers be visited
-	// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
-	AllContainers = InitContainers | Containers | EphemeralContainers
 )
 
 var (
@@ -818,7 +822,7 @@ func (f *Framework) MatchContainerOutput(
 	}()
 
 	// Wait for client pod to complete.
-	podErr := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, createdPod.Name, ns)
+	podErr := e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, createdPod.Name, ns, f.Timeouts.PodStart)
 
 	// Grab its logs.  Get host first.
 	podStatus, err := podClient.Get(context.TODO(), createdPod.Name, metav1.GetOptions{})

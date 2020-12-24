@@ -404,7 +404,6 @@ func TestGOAWAYHTTP1Requests(t *testing.T) {
 	s := httptest.NewUnstartedServer(WithProbabilisticGoaway(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("hello"))
-		return
 	}), 1))
 
 	http2Options := &http2.Server{}

@@ -83,6 +83,7 @@ go_library(
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
         "//test/integration:go_default_library",
         "//test/integration/framework:go_default_library",
+        "//test/utils/image:go_default_library",
         "//vendor/go.etcd.io/etcd/clientv3:go_default_library",
         "//vendor/go.etcd.io/etcd/clientv3/concurrency:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",

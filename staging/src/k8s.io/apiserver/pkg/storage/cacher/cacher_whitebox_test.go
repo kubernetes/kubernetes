@@ -299,7 +299,7 @@ func (d *dummyStorage) Versioner() storage.Versioner { return nil }
 func (d *dummyStorage) Create(_ context.Context, _ string, _, _ runtime.Object, _ uint64) error {
 	return fmt.Errorf("unimplemented")
 }
-func (d *dummyStorage) Delete(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc) error {
+func (d *dummyStorage) Delete(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, _ runtime.Object) error {
 	return fmt.Errorf("unimplemented")
 }
 func (d *dummyStorage) Watch(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
@@ -877,7 +877,7 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 	resourceVersion := uint64(1000)
 	err = cacher.watchCache.Add(&examplev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            fmt.Sprintf("pod-0"),
+			Name:            "pod-0",
 			Namespace:       "ns",
 			ResourceVersion: fmt.Sprintf("%v", resourceVersion),
 		}})

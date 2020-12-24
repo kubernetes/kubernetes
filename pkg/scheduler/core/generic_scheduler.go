@@ -525,9 +525,9 @@ func (g *genericScheduler) prioritizeNodes(
 			}
 			wg.Add(1)
 			go func(extIndex int) {
-				metrics.SchedulerGoroutines.WithLabelValues("prioritizing_extender").Inc()
+				metrics.SchedulerGoroutines.WithLabelValues(metrics.PrioritizingExtender).Inc()
 				defer func() {
-					metrics.SchedulerGoroutines.WithLabelValues("prioritizing_extender").Dec()
+					metrics.SchedulerGoroutines.WithLabelValues(metrics.PrioritizingExtender).Dec()
 					wg.Done()
 				}()
 				prioritizedList, weight, err := g.extenders[extIndex].Prioritize(pod, nodes)

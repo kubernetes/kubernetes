@@ -89,7 +89,6 @@ pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/config/v1alpha1
 pkg/controlplane/controller/crdregistration
 pkg/controlplane/tunneler
-pkg/credentialprovider/plugin
 pkg/features
 pkg/kubeapiserver
 pkg/kubectl/cmd/convert

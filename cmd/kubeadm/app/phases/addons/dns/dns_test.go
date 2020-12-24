@@ -553,7 +553,7 @@ func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
 	}
 }
 
-func TestCreateCoreDNSConfigMap(t *testing.T) {
+func TestCreateCoreDNSAddon(t *testing.T) {
 	tests := []struct {
 		name                 string
 		initialCorefileData  string
@@ -561,9 +561,166 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
 		coreDNSVersion       string
 	}{
 		{
+			name:                "Empty Corefile",
+			initialCorefileData: "",
+			expectedCorefileData: `.:53 {
+    errors
+    health {
+       lameduck 5s
+    }
+    ready
+    kubernetes cluster.local in-addr.arpa ip6.arpa {
+       pods insecure
+       fallthrough in-addr.arpa ip6.arpa
+       ttl 30
+    }
+    prometheus :9153
+    forward . /etc/resolv.conf {
+       max_concurrent 1000
+    }
+    cache 30
+    loop
+    reload
+    loadbalance
+}
+`,
+			coreDNSVersion: "1.6.7",
+		},
+		{
+			name: "Default Corefile",
+			initialCorefileData: `.:53 {
+        errors
+        health {
+            lameduck 5s
+        }
+        ready
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+            pods insecure
+            fallthrough in-addr.arpa ip6.arpa
+            ttl 30
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf
+        cache 30
+        loop
+        reload
+        loadbalance
+    }
+`,
+			expectedCorefileData: `.:53 {
+    errors
+    health {
+       lameduck 5s
+    }
+    ready
+    kubernetes cluster.local in-addr.arpa ip6.arpa {
+       pods insecure
+       fallthrough in-addr.arpa ip6.arpa
+       ttl 30
+    }
+    prometheus :9153
+    forward . /etc/resolv.conf {
+       max_concurrent 1000
+    }
+    cache 30
+    loop
+    reload
+    loadbalance
+}
+`,
+			coreDNSVersion: "1.6.7",
+		},
+		{
+			name: "Modified Corefile with only newdefaults needed",
+			initialCorefileData: `.:53 {
+        errors
+        log
+        health
+        ready
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+            pods insecure
+            fallthrough in-addr.arpa ip6.arpa
+            ttl 30
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf
+        cache 30
+        loop
+        reload
+        loadbalance
+    }
+`,
+			expectedCorefileData: `.:53 {
+    errors
+    log
+    health {
+        lameduck 5s
+    }
+    ready
+    kubernetes cluster.local in-addr.arpa ip6.arpa {
+        pods insecure
+        fallthrough in-addr.arpa ip6.arpa
+        ttl 30
+    }
+    prometheus :9153
+    forward . /etc/resolv.conf {
+        max_concurrent 1000
+    }
+    cache 30
+    loop
+    reload
+    loadbalance
+}
+`,
+			coreDNSVersion: "1.6.2",
+		},
+		{
+			name: "Default Corefile with rearranged plugins",
+			initialCorefileData: `.:53 {
+        errors
+        cache 30
+        prometheus :9153
+        forward . /etc/resolv.conf
+        loop
+        reload
+        loadbalance
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           upstream
+           fallthrough in-addr.arpa ip6.arpa
+           ttl 30
+        }
+        health
+    }
+`,
+			expectedCorefileData: `.:53 {
+    errors
+    health {
+       lameduck 5s
+    }
+    ready
+    kubernetes cluster.local in-addr.arpa ip6.arpa {
+       pods insecure
+       fallthrough in-addr.arpa ip6.arpa
+       ttl 30
+    }
+    prometheus :9153
+    forward . /etc/resolv.conf {
+       max_concurrent 1000
+    }
+    cache 30
+    loop
+    reload
+    loadbalance
+}
+`,
+			coreDNSVersion: "1.3.1",
+		},
+		{
 			name: "Remove Deprecated options",
 			initialCorefileData: `.:53 {
         errors
+        logs
         health
         kubernetes cluster.local in-addr.arpa ip6.arpa {
            pods insecure
@@ -580,6 +737,7 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
     }`,
 			expectedCorefileData: `.:53 {
     errors
+    logs
     health {
         lameduck 5s
     }
@@ -642,19 +800,106 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
 `,
 			coreDNSVersion: "1.3.1",
 		},
+		{
+			name: "Modified Corefile with no migration required",
+			initialCorefileData: `consul {
+        errors
+        forward . 10.10.96.16:8600 10.10.96.17:8600 10.10.96.18:8600 {
+            max_concurrent 1000
+        }
+        loadbalance
+        cache 5
+        reload
+    }
+    domain.int {
+       errors
+       forward . 10.10.0.140 10.10.0.240 10.10.51.40 {
+           max_concurrent 1000
+       }
+       loadbalance
+       cache 3600
+       reload
+    }
+    .:53 {
+      errors
+      health {
+          lameduck 5s
+      }
+      ready
+      kubernetes cluster.local in-addr.arpa ip6.arpa {
+          pods insecure
+          fallthrough in-addr.arpa ip6.arpa
+      }
+      prometheus :9153
+      forward . /etc/resolv.conf {
+          prefer_udp
+          max_concurrent 1000
+      }
+      cache 30
+      loop
+      reload
+      loadbalance
+    }
+`,
+			expectedCorefileData: `consul {
+        errors
+        forward . 10.10.96.16:8600 10.10.96.17:8600 10.10.96.18:8600 {
+            max_concurrent 1000
+        }
+        loadbalance
+        cache 5
+        reload
+    }
+    domain.int {
+       errors
+       forward . 10.10.0.140 10.10.0.240 10.10.51.40 {
+           max_concurrent 1000
+       }
+       loadbalance
+       cache 3600
+       reload
+    }
+    .:53 {
+      errors
+      health {
+          lameduck 5s
+      }
+      ready
+      kubernetes cluster.local in-addr.arpa ip6.arpa {
+          pods insecure
+          fallthrough in-addr.arpa ip6.arpa
+      }
+      prometheus :9153
+      forward . /etc/resolv.conf {
+          prefer_udp
+          max_concurrent 1000
+      }
+      cache 30
+      loop
+      reload
+      loadbalance
+    }
+`,
+			coreDNSVersion: "1.6.7",
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			client := createClientAndCoreDNSManifest(t, tc.initialCorefileData, tc.coreDNSVersion)
-			// Get the Corefile and installed CoreDNS version.
-			cm, corefile, currentInstalledCoreDNSVersion, err := GetCoreDNSInfo(client)
+
+			configMapBytes, err := kubeadmutil.ParseTemplate(CoreDNSConfigMap, struct{ DNSDomain, UpstreamNameserver, StubDomain string }{
+				DNSDomain:          "cluster.local",
+				UpstreamNameserver: "/etc/resolv.conf",
+				StubDomain:         "",
+			})
 			if err != nil {
-				t.Fatalf("unable to fetch CoreDNS current installed version and ConfigMap.")
+				t.Errorf("unexpected ParseTemplate failure: %+v", err)
 			}
-			err = migrateCoreDNSCorefile(client, cm, corefile, currentInstalledCoreDNSVersion)
+
+			err = createCoreDNSAddon(nil, nil, configMapBytes, client)
 			if err != nil {
-				t.Fatalf("error creating the CoreDNS ConfigMap: %v", err)
+				t.Fatalf("error creating the CoreDNS Addon: %v", err)
 			}
 			migratedConfigMap, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.CoreDNSConfigMap, metav1.GetOptions{})
 			if !strings.EqualFold(migratedConfigMap.Data["Corefile"], tc.expectedCorefileData) {

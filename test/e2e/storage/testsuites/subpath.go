@@ -39,8 +39,9 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -55,22 +56,16 @@ var (
 )
 
 type subPathTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo storageframework.TestSuiteInfo
 }
 
-var _ TestSuite = &subPathTestSuite{}
-
-// InitSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
-func InitSubPathTestSuite() TestSuite {
+// InitCustomSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomSubPathTestSuite(patterns []storageframework.TestPattern) storageframework.TestSuite {
 	return &subPathTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "subPath",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsInlineVolume,
-				testpatterns.DefaultFsPreprovisionedPV,
-				testpatterns.DefaultFsDynamicPV,
-				testpatterns.NtfsDynamicPV,
-			},
+		tsInfo: storageframework.TestSuiteInfo{
+			Name:         "subPath",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
@@ -78,23 +73,35 @@ func InitSubPathTestSuite() TestSuite {
 	}
 }
 
-func (s *subPathTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitSubPathTestSuite() storageframework.TestSuite {
+	patterns := []storageframework.TestPattern{
+		storageframework.DefaultFsInlineVolume,
+		storageframework.DefaultFsPreprovisionedPV,
+		storageframework.DefaultFsDynamicPV,
+		storageframework.NtfsDynamicPV,
+	}
+	return InitCustomSubPathTestSuite(patterns)
+}
+
+func (s *subPathTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *subPathTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
-	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(
-		testpatterns.PreprovisionedPV,
-		testpatterns.InlineVolume))
+func (s *subPathTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+	skipVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(
+		storageframework.PreprovisionedPV,
+		storageframework.InlineVolume))
 }
 
-func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *PerTestConfig
+		config        *storageframework.PerTestConfig
 		driverCleanup func()
 
 		hostExec          utils.HostExec
-		resource          *VolumeResource
+		resource          *storageframework.VolumeResource
 		roVolSource       *v1.VolumeSource
 		pod               *v1.Pod
 		formatPod         *v1.Pod
@@ -106,13 +113,9 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 	}
 	var l local
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("provisioning")
+	f := framework.NewFrameworkWithCustomTimeouts("provisioning", storageframework.GetDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}
@@ -121,24 +124,24 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
-		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		l.hostExec = utils.NewHostExec(f)
 
 		// Setup subPath test dependent resource
 		volType := pattern.VolType
 		switch volType {
-		case testpatterns.InlineVolume:
-			if iDriver, ok := driver.(InlineVolumeTestDriver); ok {
+		case storageframework.InlineVolume:
+			if iDriver, ok := driver.(storageframework.InlineVolumeTestDriver); ok {
 				l.roVolSource = iDriver.GetVolumeSource(true, pattern.FsType, l.resource.Volume)
 			}
-		case testpatterns.PreprovisionedPV:
+		case storageframework.PreprovisionedPV:
 			l.roVolSource = &v1.VolumeSource{
 				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
 					ClaimName: l.resource.Pvc.Name,
 					ReadOnly:  true,
 				},
 			}
-		case testpatterns.DynamicPV:
+		case storageframework.DynamicPV:
 			l.roVolSource = &v1.VolumeSource{
 				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
 					ClaimName: l.resource.Pvc.Name,
@@ -175,7 +178,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 			l.resource = nil
 		}
 
-		errs = append(errs, tryFunc(l.driverCleanup))
+		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
 		l.driverCleanup = nil
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 
@@ -457,7 +460,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		}()
 
 		// Wait for pod to be running
-		err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, l.pod)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, l.pod.Name, l.pod.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		// Exec into container that mounted the volume, delete subpath directory
@@ -727,7 +730,7 @@ func waitForPodSubpathError(f *framework.Framework, pod *v1.Pod, allowContainerT
 		return fmt.Errorf("failed to find container that uses subpath")
 	}
 
-	waitErr := wait.PollImmediate(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
+	waitErr := wait.PollImmediate(framework.Poll, f.Timeouts.PodStart, func() (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -805,7 +808,7 @@ func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks
 	defer func() {
 		e2epod.DeletePodWithWait(f.ClientSet, pod)
 	}()
-	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for pod to be running")
 
 	ginkgo.By("Failing liveness probe")
@@ -978,8 +981,7 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 	removeUnusedContainers(pod)
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating pod")
-
-	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for pod to be running")
 
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
@@ -1010,7 +1012,7 @@ func formatVolume(f *framework.Framework, pod *v1.Pod) {
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating volume init pod")
 
-	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+	err = e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for volume init pod to succeed")
 
 	err = e2epod.DeletePodWithWait(f.ClientSet, pod)

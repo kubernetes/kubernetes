@@ -111,7 +111,7 @@ func ClearEntriesForNAT(execer exec.Interface, origin, dest string, protocol v1.
 	return nil
 }
 
-// ClearEntriesForPortNAT uses the conntrack tool to delete the contrack entries
+// ClearEntriesForPortNAT uses the conntrack tool to delete the conntrack entries
 // for connections specified by the {dest IP, port} pair.
 // Known issue:
 // https://github.com/kubernetes/kubernetes/issues/59368

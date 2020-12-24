@@ -434,7 +434,9 @@ func TestServiceToServiceMap(t *testing.T) {
 			},
 		},
 		{
-			desc: "service with extra space in LoadBalancerSourceRanges",
+			desc:     "service with extra space in LoadBalancerSourceRanges",
+			ipFamily: v1.IPv4Protocol,
+
 			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "extra-space",

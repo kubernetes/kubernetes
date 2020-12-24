@@ -41,11 +41,10 @@ func NewCRIStatsProvider(
 	runtimeCache kubecontainer.RuntimeCache,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
-	logMetricsService LogMetricsService,
-	osInterface kubecontainer.OSInterface,
+	hostStatsProvider HostStatsProvider,
 ) *Provider {
 	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer,
-		runtimeService, imageService, logMetricsService, osInterface))
+		runtimeService, imageService, hostStatsProvider))
 }
 
 // NewCadvisorStatsProvider returns a containerStatsProvider that provides both
@@ -57,8 +56,9 @@ func NewCadvisorStatsProvider(
 	runtimeCache kubecontainer.RuntimeCache,
 	imageService kubecontainer.ImageService,
 	statusProvider status.PodStatusProvider,
+	hostStatsProvider HostStatsProvider,
 ) *Provider {
-	return newStatsProvider(cadvisor, podManager, runtimeCache, newCadvisorStatsProvider(cadvisor, resourceAnalyzer, imageService, statusProvider))
+	return newStatsProvider(cadvisor, podManager, runtimeCache, newCadvisorStatsProvider(cadvisor, resourceAnalyzer, imageService, statusProvider, hostStatsProvider))
 }
 
 // newStatsProvider returns a new Provider that provides node stats from

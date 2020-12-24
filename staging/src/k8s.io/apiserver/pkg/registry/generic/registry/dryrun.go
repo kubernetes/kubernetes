@@ -43,7 +43,7 @@ func (s *DryRunnableStorage) Create(ctx context.Context, key string, obj, out ru
 	return s.Storage.Create(ctx, key, obj, out, ttl)
 }
 
-func (s *DryRunnableStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, deleteValidation storage.ValidateObjectFunc, dryRun bool) error {
+func (s *DryRunnableStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, deleteValidation storage.ValidateObjectFunc, dryRun bool, cachedExistingObject runtime.Object) error {
 	if dryRun {
 		if err := s.Storage.Get(ctx, key, storage.GetOptions{}, out); err != nil {
 			return err
@@ -53,7 +53,7 @@ func (s *DryRunnableStorage) Delete(ctx context.Context, key string, out runtime
 		}
 		return deleteValidation(ctx, out)
 	}
-	return s.Storage.Delete(ctx, key, out, preconditions, deleteValidation)
+	return s.Storage.Delete(ctx, key, out, preconditions, deleteValidation, cachedExistingObject)
 }
 
 func (s *DryRunnableStorage) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
@@ -78,7 +78,7 @@ func (s *DryRunnableStorage) List(ctx context.Context, key string, opts storage.
 
 func (s *DryRunnableStorage) GuaranteedUpdate(
 	ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
-	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, dryRun bool, suggestion runtime.Object) error {
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, dryRun bool, cachedExistingObject runtime.Object) error {
 	if dryRun {
 		err := s.Storage.Get(ctx, key, storage.GetOptions{IgnoreNotFound: ignoreNotFound}, ptrToType)
 		if err != nil {
@@ -98,7 +98,7 @@ func (s *DryRunnableStorage) GuaranteedUpdate(
 		}
 		return s.copyInto(out, ptrToType)
 	}
-	return s.Storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, suggestion)
+	return s.Storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject)
 }
 
 func (s *DryRunnableStorage) Count(key string) (int64, error) {

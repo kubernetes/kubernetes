@@ -928,8 +928,12 @@ func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 }
 
 func runPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
+	return runPausePodWithTimeout(f, conf, framework.PollShortTimeout)
+}
+
+func runPausePodWithTimeout(f *framework.Framework, conf pausePodConfig, timeout time.Duration) *v1.Pod {
 	pod := createPausePod(f, conf)
-	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PollShortTimeout))
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, timeout))
 	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), conf.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pod
@@ -1090,11 +1094,11 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 				{
 					Name:  "agnhost",
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"netexec", "--http-port=80", "--udp-port=80"},
+					Args:  []string{"netexec", "--http-port=8080", "--udp-port=8080"},
 					Ports: []v1.ContainerPort{
 						{
 							HostPort:      port,
-							ContainerPort: 80,
+							ContainerPort: 8080,
 							Protocol:      protocol,
 							HostIP:        hostIP,
 						},
@@ -1104,7 +1108,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 							HTTPGet: &v1.HTTPGetAction{
 								Path: "/hostname",
 								Port: intstr.IntOrString{
-									IntVal: int32(80),
+									IntVal: int32(8080),
 								},
 								Scheme: v1.URISchemeHTTP,
 							},

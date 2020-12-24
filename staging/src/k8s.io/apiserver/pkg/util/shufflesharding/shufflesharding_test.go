@@ -254,7 +254,6 @@ func TestUniformDistribution(t *testing.T) {
 			t.Errorf("Only %v percent of the hands got a central count", goodPct)
 		}
 	}
-	return
 }
 
 func TestDealer_DealIntoHand(t *testing.T) {
@@ -277,7 +276,7 @@ func TestDealer_DealIntoHand(t *testing.T) {
 		},
 		{
 			"size: 6 cap: 6 slice",
-			make([]int, 6, 6),
+			make([]int, 6),
 			6,
 		},
 		{
@@ -287,7 +286,7 @@ func TestDealer_DealIntoHand(t *testing.T) {
 		},
 		{
 			"size: 4 cap: 4 slice",
-			make([]int, 4, 4),
+			make([]int, 4),
 			6,
 		},
 		{
@@ -297,7 +296,7 @@ func TestDealer_DealIntoHand(t *testing.T) {
 		},
 		{
 			"size: 10 cap: 10 slice",
-			make([]int, 10, 10),
+			make([]int, 10),
 			6,
 		},
 		{

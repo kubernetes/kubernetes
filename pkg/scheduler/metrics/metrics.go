@@ -28,13 +28,10 @@ import (
 const (
 	// SchedulerSubsystem - subsystem name used by scheduler
 	SchedulerSubsystem = "scheduler"
-
-	// OperationLabel - operation label name
-	OperationLabel = "operation"
 	// Below are possible values for the operation label. Each represents a substep of e2e scheduling:
 
-	// PreemptionEvaluation - preemption evaluation operation label value (occurs in case of scheduling fitError).
-	PreemptionEvaluation = "preemption_evaluation"
+	// PrioritizingExtender - prioritizing extender operation label value
+	PrioritizingExtender = "prioritizing_extender"
 	// Binding - binding operation label value
 	Binding = "binding"
 	// E2eScheduling - e2e scheduling operation label value
@@ -65,26 +62,6 @@ var (
 			Help:           "Scheduling algorithm latency in seconds",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
-		},
-	)
-	DeprecatedSchedulingAlgorithmPreemptionEvaluationDuration = metrics.NewHistogram(
-		&metrics.HistogramOpts{
-			Subsystem:         SchedulerSubsystem,
-			Name:              "scheduling_algorithm_preemption_evaluation_seconds",
-			Help:              "Scheduling algorithm preemption evaluation duration in seconds",
-			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.20.0",
-		},
-	)
-	DeprecatedBindingLatency = metrics.NewHistogram(
-		&metrics.HistogramOpts{
-			Subsystem:         SchedulerSubsystem,
-			Name:              "binding_duration_seconds",
-			Help:              "Binding latency in seconds",
-			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.20.0",
 		},
 	)
 	PreemptionVictims = metrics.NewHistogram(
@@ -191,8 +168,6 @@ var (
 		scheduleAttempts,
 		e2eSchedulingLatency,
 		SchedulingAlgorithmLatency,
-		DeprecatedBindingLatency,
-		DeprecatedSchedulingAlgorithmPreemptionEvaluationDuration,
 		PreemptionVictims,
 		PreemptionAttempts,
 		pendingPods,

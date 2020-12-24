@@ -983,7 +983,6 @@ func ensureSystemCgroups(rootCgroupPath string, manager cgroups.Manager) error {
 
 			pids = append(pids, pid)
 		}
-		klog.Infof("Found %d PIDs in root, %d of them are not to be moved", len(allPids), len(allPids)-len(pids))
 
 		// Check if we have moved all the non-kernel PIDs.
 		if len(pids) == 0 {
