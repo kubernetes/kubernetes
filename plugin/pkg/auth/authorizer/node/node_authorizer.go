@@ -83,6 +83,7 @@ var (
 	csiNodeResource   = storageapi.Resource("csinodes")
 )
 
+// RulesFor returns all known rules for a particular user within a specified namespace.
 func (r *NodeAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	if _, isNode := r.identifier.NodeIdentity(user); isNode {
 		// indicate nodes do not have fully enumerated permissions
@@ -91,6 +92,7 @@ func (r *NodeAuthorizer) RulesFor(user user.Info, namespace string) ([]authorize
 	return nil, nil, false, nil
 }
 
+// Authorize authorizes a given user's access to resources based on specified attributes.
 func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	nodeName, isNode := r.identifier.NodeIdentity(attrs.GetUser())
 	if !isNode {
