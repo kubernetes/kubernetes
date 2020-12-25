@@ -741,6 +741,7 @@ func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 		ps, ok := cache.podStates[key]
 		if !ok {
 			klog.Fatal("Key found in assumed set but not in podStates. Potentially a logical error.")
+			continue
 		}
 		if !ps.bindingFinished {
 			klog.V(5).Infof("Couldn't expire cache for pod %v/%v. Binding is still in progress.",
