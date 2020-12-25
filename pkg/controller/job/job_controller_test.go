@@ -1593,9 +1593,11 @@ func TestJobBackoffOnRestartPolicyNever(t *testing.T) {
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
 			for _, pod := range newPodList(tc.failedPods, v1.PodFailed, job) {
+				pod := pod
 				podIndexer.Add(&pod)
 			}
 			for _, pod := range newPodList(tc.activePods, tc.activePodsPhase, job) {
+				pod := pod
 				podIndexer.Add(&pod)
 			}
 

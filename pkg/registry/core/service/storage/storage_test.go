@@ -607,6 +607,7 @@ func TestServiceDefaulting(t *testing.T) {
 			copyUndefaultedList := undefaultedServiceList.DeepCopy()
 			// run for each Service
 			for i, svc := range copyUndefaultedList.Items {
+				svc := svc
 				storage.defaultOnRead(&svc)
 				compareSvc(svc, defaultedServiceList.Items[i])
 			}
