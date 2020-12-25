@@ -76,7 +76,7 @@ func (v *authorizingVisitor) visit(source fmt.Stringer, rule *rbacv1.PolicyRule,
 	return true
 }
 
-// Authorize authorizes the requested attributes for a given user and returns 
+// Authorize authorizes the requested attributes for a given user and returns
 // any errors that may have occured during the process.
 func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	ruleCheckingVisitor := &authorizingVisitor{requestAttributes: requestAttributes}
@@ -132,7 +132,7 @@ func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes author
 	return authorizer.DecisionNoOpinion, reason, nil
 }
 
-// RulesFor fetches the PolicyRules for a given user and any errors 
+// RulesFor fetches the PolicyRules for a given user and any errors
 // that may have occured during the process.
 func (r *RBACAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	var (
