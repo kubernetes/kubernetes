@@ -47,7 +47,7 @@ const (
 	preScoreStateKey = "PreScore" + Name
 
 	// ErrReasonPod is the reason for Pod's node affinity/selector not matching.
-	ErrReasonPod = "node(s) didn't match Pod's node affinity"
+	ErrReasonPod = "node(s) didn't match Pod's node affinity/selector"
 
 	// errReasonEnforced is the reason for added node affinity not matching.
 	errReasonEnforced = "node(s) didn't match scheduler-enforced node affinity"
