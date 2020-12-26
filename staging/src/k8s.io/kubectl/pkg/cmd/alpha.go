@@ -40,7 +40,7 @@ func NewCmdAlpha(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 
 	// NewKubeletCommand() will hide the alpha command if it has no subcommands. Overriding
 	// the help function ensures a reasonable message if someone types the hidden command anyway.
-	if !cmd.HasSubCommands() {
+	if !cmd.HasAvailableSubCommands() {
 		cmd.SetHelpFunc(func(*cobra.Command, []string) {
 			cmd.Println(i18n.T("No alpha commands are available in this version of kubectl"))
 		})
