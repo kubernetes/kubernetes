@@ -685,7 +685,7 @@ func (s *ProxyServer) Run() error {
 		if max > 0 {
 			err := s.Conntracker.SetMax(max)
 			if err != nil {
-				if errors.Is(err, errReadOnlySysFS) {
+				if !errors.Is(err, errReadOnlySysFS) {
 					return err
 				}
 				// errReadOnlySysFS is caused by a known docker issue (https://github.com/docker/docker/issues/24000),
