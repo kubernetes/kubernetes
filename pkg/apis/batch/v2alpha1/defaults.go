@@ -25,7 +25,8 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_CronJob(obj *batchv2alpha1.CronJob) {
+// SetDefaultsCronJob sets default values for CronJob if no values are provided.
+func SetDefaultsCronJob(obj *batchv2alpha1.CronJob) {
 	if obj.Spec.ConcurrencyPolicy == "" {
 		obj.Spec.ConcurrencyPolicy = batchv2alpha1.AllowConcurrent
 	}

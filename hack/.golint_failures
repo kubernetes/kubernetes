@@ -14,9 +14,6 @@ pkg/apis/authentication/v1
 pkg/apis/autoscaling/v1
 pkg/apis/autoscaling/v2beta1
 pkg/apis/autoscaling/v2beta2
-pkg/apis/batch/v1
-pkg/apis/batch/v1beta1
-pkg/apis/batch/v2alpha1
 pkg/apis/certificates
 pkg/apis/certificates/v1beta1
 pkg/apis/certificates/validation

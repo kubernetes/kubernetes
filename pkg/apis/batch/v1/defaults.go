@@ -25,7 +25,8 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_Job(obj *batchv1.Job) {
+// SetDefaultsJob sets default values for Job if no values are provided.
+func SetDefaultsJob(obj *batchv1.Job) {
 	// For a non-parallel job, you can leave both `.spec.completions` and
 	// `.spec.parallelism` unset.  When both are unset, both are defaulted to 1.
 	if obj.Spec.Completions == nil && obj.Spec.Parallelism == nil {

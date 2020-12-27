@@ -29,7 +29,6 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
-	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -263,9 +262,8 @@ func Convert_batch_JobTemplate_To_v2alpha1_JobTemplate(in *batch.JobTemplate, ou
 
 func autoConvert_v2alpha1_JobTemplateSpec_To_batch_JobTemplateSpec(in *v2alpha1.JobTemplateSpec, out *batch.JobTemplateSpec, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := batchv1.Convert_v1_JobSpec_To_batch_JobSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
+	// FIXME: Provide conversion function to convert batchv1.JobSpec to batch.JobSpec
+	compileErrorOnMissingConversion()
 	return nil
 }
 
@@ -276,9 +274,8 @@ func Convert_v2alpha1_JobTemplateSpec_To_batch_JobTemplateSpec(in *v2alpha1.JobT
 
 func autoConvert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec(in *batch.JobTemplateSpec, out *v2alpha1.JobTemplateSpec, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := batchv1.Convert_batch_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
+	// FIXME: Provide conversion function to convert batch.JobSpec to batchv1.JobSpec
+	compileErrorOnMissingConversion()
 	return nil
 }
 

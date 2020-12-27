@@ -40,7 +40,9 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	)
 }
 
-func Convert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *batchv1.JobSpec, s conversion.Scope) error {
+// ConvertBatchJobSpecToV1JobSpec converts a Batch JobSpec to a Batch v1 JobSpec.
+// If the conversion fails, an error is returned.
+func ConvertBatchJobSpecToV1JobSpec(in *batch.JobSpec, out *batchv1.JobSpec, s conversion.Scope) error {
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
@@ -60,7 +62,9 @@ func Convert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *batchv1.JobSpec
 	return nil
 }
 
-func Convert_v1_JobSpec_To_batch_JobSpec(in *batchv1.JobSpec, out *batch.JobSpec, s conversion.Scope) error {
+// ConvertV1JobSpecToBatchJobSpec converts a Batch v1 JobSpec to a Batch JobSpec.
+// If the conversion fails, an error is returned.
+func ConvertV1JobSpecToBatchJobSpec(in *batchv1.JobSpec, out *batch.JobSpec, s conversion.Scope) error {
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
