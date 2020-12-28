@@ -964,7 +964,7 @@ func (proxier *Proxier) syncProxyRules() {
 	masqRule := []string{
 		"-A", string(kubePostroutingChain),
 		"-m", "comment", "--comment", `"kubernetes service traffic requiring SNAT"`,
-		"-j", "MASQUERADE",
+		"-j", "SNAT", "--to-source", proxier.nodeIP.String(),
 	}
 	if proxier.iptables.HasRandomFully() {
 		masqRule = append(masqRule, "--random-fully")
