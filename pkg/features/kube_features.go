@@ -140,13 +140,16 @@ const (
 	// owner @smarterclayton
 	// alpha: v1.16
 	// beta:  v1.19
+	// ga:  v1.21
 	//
 	// Enable legacy behavior to vary cluster functionality on the node-role.kubernetes.io labels. On by default (legacy), will be turned off in 1.18.
+	// Lock to false in v1.21 and remove in v1.22.
 	LegacyNodeRoleBehavior featuregate.Feature = "LegacyNodeRoleBehavior"
 
 	// owner @brendandburns
 	// alpha: v1.9
 	// beta:  v1.19
+	// ga:  v1.21
 	//
 	// Enable nodes to exclude themselves from service load balancers
 	ServiceNodeExclusion featuregate.Feature = "ServiceNodeExclusion"
@@ -154,6 +157,7 @@ const (
 	// owner @smarterclayton
 	// alpha: v1.16
 	// beta:  v1.19
+	// ga:  v1.21
 	//
 	// Enable nodes to exclude themselves from network disruption checks
 	NodeDisruptionExclusion featuregate.Feature = "NodeDisruptionExclusion"
@@ -753,8 +757,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CPUManager:                     {Default: true, PreRelease: featuregate.Beta},
 	CPUCFSQuotaPeriod:              {Default: false, PreRelease: featuregate.Alpha},
 	TopologyManager:                {Default: true, PreRelease: featuregate.Beta},
-	ServiceNodeExclusion:           {Default: true, PreRelease: featuregate.Beta},
-	NodeDisruptionExclusion:        {Default: true, PreRelease: featuregate.Beta},
+	ServiceNodeExclusion:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
+	NodeDisruptionExclusion:        {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	CSIDriverRegistry:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	CSINodeInfo:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	BlockVolume:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
@@ -851,5 +855,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
 	HPAScaleToZero:         {Default: false, PreRelease: featuregate.Alpha},
-	LegacyNodeRoleBehavior: {Default: true, PreRelease: featuregate.Beta},
+	LegacyNodeRoleBehavior: {Default: false, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 }

@@ -24,7 +24,6 @@ package nodelifecycle
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -38,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsv1informers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -56,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
@@ -949,36 +946,8 @@ func (nc *Controller) processNoTaintBaseEviction(node *v1.Node, observedReadyCon
 const labelNodeDisruptionExclusion = "node.kubernetes.io/exclude-disruption"
 
 func isNodeExcludedFromDisruptionChecks(node *v1.Node) bool {
-	// DEPRECATED: will be removed in 1.19
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyNodeRoleBehavior) {
-		if legacyIsMasterNode(node.Name) {
-			return true
-		}
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeDisruptionExclusion) {
-		if _, ok := node.Labels[labelNodeDisruptionExclusion]; ok {
-			return true
-		}
-	}
-	return false
-}
-
-// legacyIsMasterNode returns true if given node is a registered master according
-// to the logic historically used for this function. This code path is deprecated
-// and the node disruption exclusion label should be used in the future.
-// This code will not be allowed to update to use the node-role label, since
-// node-roles may not be used for feature enablement.
-// DEPRECATED: Will be removed in 1.19
-func legacyIsMasterNode(nodeName string) bool {
-	// We are trying to capture "master(-...)?$" regexp.
-	// However, using regexp.MatchString() results even in more than 35%
-	// of all space allocations in ControllerManager spent in this function.
-	// That's why we are trying to be a bit smarter.
-	if strings.HasSuffix(nodeName, "master") {
+	if _, ok := node.Labels[labelNodeDisruptionExclusion]; ok {
 		return true
-	}
-	if len(nodeName) >= 10 {
-		return strings.HasSuffix(nodeName[:len(nodeName)-3], "master-")
 	}
 	return false
 }

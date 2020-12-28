@@ -38,6 +38,7 @@ const (
 	// owner @brendandburns
 	// alpha: v1.9
 	// beta:  v1.19
+	// ga:  v1.21
 	//
 	// Enable nodes to exclude themselves from service load balancers
 	// Original copy from k8s.io/kubernetes/pkg/features/kube_features.go
@@ -58,7 +59,7 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 // cloudPublicFeatureGates consists of cloud-specific feature keys.
 // To add a new feature, define a key for it at k8s.io/api/pkg/features and add it here.
 var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	LegacyNodeRoleBehavior: {Default: true, PreRelease: featuregate.Beta},
-	ServiceNodeExclusion:   {Default: true, PreRelease: featuregate.Beta},
+	LegacyNodeRoleBehavior: {Default: false, PreRelease: featuregate.GA, LockToDefault: true},
+	ServiceNodeExclusion:   {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	IPv6DualStack:          {Default: false, PreRelease: featuregate.Alpha},
 }
