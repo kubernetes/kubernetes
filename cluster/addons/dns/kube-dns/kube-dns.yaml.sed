@@ -105,8 +105,6 @@ spec:
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
-      nodeSelector:
-        kubernetes.io/os: linux
       volumes:
       - name: kube-dns-config
         configMap:
