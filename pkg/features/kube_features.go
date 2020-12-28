@@ -573,6 +573,12 @@ const (
 	// This feature is deprecated, and will be removed in v1.22.
 	CronJobControllerV2 featuregate.Feature = "CronJobControllerV2"
 
+	// owner: @smarterclayton
+	// alpha: v1.21
+	//
+	// DaemonSets allow workloads to maintain availability during update per node
+	DaemonSetUpdateSurge featuregate.Feature = "DaemonSetUpdateSurge"
+
 	// owner: @m1093782566
 	// alpha: v1.17
 	//
@@ -808,6 +814,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
 	CronJobControllerV2:                            {Default: false, PreRelease: featuregate.Alpha},
+	DaemonSetUpdateSurge:                           {Default: false, PreRelease: featuregate.Alpha},
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
 	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.Beta},

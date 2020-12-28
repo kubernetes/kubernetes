@@ -139,7 +139,7 @@ func (PodDisruptionBudgetStatus) SwaggerDoc() map[string]string {
 }
 
 var map_PodSecurityPolicy = map[string]string{
-	"":         "PodSecurityPolicy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
+	"":         "PodSecurityPolicy governs the ability to make requests that affect the Security Context that will be applied to a pod and container. Deprecated in 1.21.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec defines the policy enforced.",
 }

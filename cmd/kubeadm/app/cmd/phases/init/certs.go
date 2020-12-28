@@ -263,7 +263,7 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 			return nil
 		}
 
-		if certData, _, err := pkiutil.TryLoadCertAndKeyFromDisk(data.CertificateDir(), cert.BaseName); err == nil {
+		if certData, intermediates, err := pkiutil.TryLoadCertChainFromDisk(data.CertificateDir(), cert.BaseName); err == nil {
 			certsphase.CheckCertificatePeriodValidity(cert.BaseName, certData)
 
 			caCertData, err := pkiutil.TryLoadCertFromDisk(data.CertificateDir(), caCert.BaseName)
@@ -273,7 +273,7 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 
 			certsphase.CheckCertificatePeriodValidity(caCert.BaseName, caCertData)
 
-			if err := certData.CheckSignatureFrom(caCertData); err != nil {
+			if err := pkiutil.VerifyCertChain(certData, intermediates, caCertData); err != nil {
 				return errors.Wrapf(err, "[certs] certificate %s not signed by CA certificate %s", cert.BaseName, caCert.BaseName)
 			}
 

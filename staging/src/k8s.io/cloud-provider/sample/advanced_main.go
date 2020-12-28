@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+
 	"k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/options"
@@ -50,9 +51,6 @@ const (
 func advancedMain() {
 	rand.Seed(time.Now().UnixNano())
 
-	// cloudProviderConfigFile shows an sample of parse config file from flag option
-	var flagset *pflag.FlagSet = pflag.NewFlagSet("flagSet", pflag.ContinueOnError)
-	var cloudProviderConfigFile *string = flagset.String("cloud-provider-configfile", "", "This is the sample input for cloud provider config file")
 	pflag.CommandLine.ParseErrorsWhitelist.UnknownFlags = true
 	_ = pflag.CommandLine.Parse(os.Args[1:])
 
@@ -69,7 +67,7 @@ func advancedMain() {
 		os.Exit(1)
 	}
 
-	cloud, err := cloudprovider.InitCloudProvider(cloudProviderName, *cloudProviderConfigFile)
+	cloud, err := cloudprovider.InitCloudProvider(cloudProviderName, c.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile)
 	if err != nil {
 		klog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}

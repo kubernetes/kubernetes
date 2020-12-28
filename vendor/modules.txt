@@ -29,10 +29,10 @@ github.com/Azure/go-ansiterm/winterm
 # github.com/Azure/go-autorest v14.2.0+incompatible => github.com/Azure/go-autorest v14.2.0+incompatible
 github.com/Azure/go-autorest
 # github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.2.0+incompatible
-# github.com/Azure/go-autorest/autorest v0.11.1 => github.com/Azure/go-autorest/autorest v0.11.1
+# github.com/Azure/go-autorest/autorest v0.11.12 => github.com/Azure/go-autorest/autorest v0.11.12
 ## explicit
 github.com/Azure/go-autorest/autorest
-# github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.11.1
+# github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.11.12
 # github.com/Azure/go-autorest/autorest/adal v0.9.5 => github.com/Azure/go-autorest/autorest/adal v0.9.5
 ## explicit
 github.com/Azure/go-autorest/autorest/adal
@@ -498,9 +498,9 @@ github.com/gogo/protobuf/vanity/command
 ## explicit
 # github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 github.com/golang/groupcache/lru
-# github.com/golang/mock v1.4.1 => github.com/golang/mock v1.4.1
+# github.com/golang/mock v1.4.4 => github.com/golang/mock v1.4.4
 ## explicit
-# github.com/golang/mock => github.com/golang/mock v1.4.1
+# github.com/golang/mock => github.com/golang/mock v1.4.4
 github.com/golang/mock/gomock
 # github.com/golang/protobuf v1.4.3 => github.com/golang/protobuf v1.4.3
 # github.com/golang/protobuf => github.com/golang/protobuf v1.4.3
@@ -2584,8 +2584,6 @@ k8s.io/utils/trace
 # modernc.org/strutil => modernc.org/strutil v1.0.0
 # modernc.org/xc => modernc.org/xc v1.0.0
 # rsc.io/pdf => rsc.io/pdf v0.1.1
-# rsc.io/quote/v3 => rsc.io/quote/v3 v3.1.0
-# rsc.io/sampler => rsc.io/sampler v1.3.0
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.14 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.14
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.14
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client

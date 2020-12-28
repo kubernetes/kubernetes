@@ -1481,6 +1481,22 @@ func TestReplicaCalcDuringRollingUpdateWithMaxSurge(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcDuringRollingUpdateWithMaxSurgeCM(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  2,
+		expectedReplicas: 2,
+		podPhase:         []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning},
+		metric: &metricInfo{
+			name:                "qps",
+			levels:              []int64{10000, 10000},
+			targetUtilization:   17000,
+			expectedUtilization: 10000,
+			metricType:          podMetric,
+		},
+	}
+	tc.runTest(t)
+}
+
 // TestComputedToleranceAlgImplementation is a regression test which
 // back-calculates a minimal percentage for downscaling based on a small percentage
 // increase in pod utilization which is calibrated against the tolerance value.
