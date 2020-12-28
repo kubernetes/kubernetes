@@ -46,9 +46,8 @@ const (
 )
 
 type csiAttacher struct {
-	plugin        *csiPlugin
-	k8s           kubernetes.Interface
-	waitSleepTime time.Duration
+	plugin *csiPlugin
+	k8s    kubernetes.Interface
 
 	csiClient csiClient
 }

@@ -990,7 +990,6 @@ func TestAttacherDetach(t *testing.T) {
 				t.Errorf("test case %s failed: %v", tc.name, err)
 			}
 			watchError := tc.watcherError
-			csiAttacher.waitSleepTime = 100 * time.Millisecond
 			go func() {
 				if watchError {
 					errStatus := apierrors.NewInternalError(fmt.Errorf("we got an error")).Status()
