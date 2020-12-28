@@ -387,7 +387,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			}
 
 			if devMounter != nil {
-				csiDevMounter := devMounter.(*csiAttacher)
+				csiDevMounter := getCsiAttacherFromDeviceMounter(devMounter)
 				csiDevMounter.csiClient = csiClient
 				devMountPath, err := csiDevMounter.GetDeviceMountPath(volSpec)
 				if err != nil {
@@ -550,8 +550,8 @@ func TestCSI_VolumeAll(t *testing.T) {
 				}
 
 				if devMounter != nil && devUnmounter != nil {
-					csiDevMounter := devMounter.(*csiAttacher)
-					csiDevUnmounter := devUnmounter.(*csiAttacher)
+					csiDevMounter := getCsiAttacherFromDeviceMounter(devMounter)
+					csiDevUnmounter := getCsiAttacherFromDeviceUnmounter(devUnmounter)
 					csiDevUnmounter.csiClient = csiClient
 
 					devMountPath, err := csiDevMounter.GetDeviceMountPath(volSpec)
@@ -592,7 +592,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				if err != nil {
 					t.Fatal("csiTest.VolumeAll volumePlugin.GetVolumeName failed:", err)
 				}
-				csiDetacher := volDetacher.(*csiAttacher)
+				csiDetacher := getCsiAttacherFromVolumeDetacher(volDetacher)
 				csiDetacher.csiClient = csiClient
 				if err := csiDetacher.Detach(volName, host.GetNodeName()); err != nil {
 					t.Fatal("csiTest.VolumeAll detacher.Detach failed:", err)

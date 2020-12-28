@@ -944,8 +944,9 @@ func (p *csiPlugin) newAttacherDetacher() (*csiAttacher, error) {
 	}
 
 	return &csiAttacher{
-		plugin: p,
-		k8s:    k8s,
+		plugin:       p,
+		k8s:          k8s,
+		watchTimeout: csiTimeout,
 	}, nil
 }
 

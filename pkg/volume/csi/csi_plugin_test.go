@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	api "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -881,12 +882,15 @@ func TestPluginNewAttacher(t *testing.T) {
 		t.Fatalf("failed to create new attacher: %v", err)
 	}
 
-	csiAttacher := attacher.(*csiAttacher)
+	csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 	if csiAttacher.plugin == nil {
 		t.Error("plugin not set for attacher")
 	}
 	if csiAttacher.k8s == nil {
 		t.Error("Kubernetes client not set for attacher")
+	}
+	if csiAttacher.watchTimeout == time.Duration(0) {
+		t.Error("watch timeout not set for attacher")
 	}
 }
 
@@ -901,12 +905,15 @@ func TestPluginNewDetacher(t *testing.T) {
 		t.Fatalf("failed to create new detacher: %v", err)
 	}
 
-	csiDetacher := detacher.(*csiAttacher)
+	csiDetacher := getCsiAttacherFromVolumeDetacher(detacher)
 	if csiDetacher.plugin == nil {
 		t.Error("plugin not set for detacher")
 	}
 	if csiDetacher.k8s == nil {
 		t.Error("Kubernetes client not set for detacher")
+	}
+	if csiDetacher.watchTimeout == time.Duration(0) {
+		t.Error("watch timeout not set for detacher")
 	}
 }
 

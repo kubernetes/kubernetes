@@ -52,6 +52,8 @@ import (
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
+const testWatchTimeout = 10 * time.Second
+
 var (
 	bFalse = false
 	bTrue  = true
@@ -209,7 +211,7 @@ func TestAttacherAttach(t *testing.T) {
 				t.Fatalf("failed to create new attacher: %v", err)
 			}
 
-			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 
 			// FIXME: We need to ensure this goroutine exits in the test.
 			go func(spec *volume.Spec, nodename string, fail bool) {
@@ -293,7 +295,7 @@ func TestAttacherAttachWithInline(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create new attacher: %v", err)
 			}
-			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 
 			// FIXME: We need to ensure this goroutine exits in the test.
 			go func(spec *volume.Spec, nodename string, fail bool) {
@@ -378,7 +380,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create new attacher: %v", err)
 			}
-			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
 
 			pluginCanAttach, err := plug.CanAttach(spec)
@@ -473,7 +475,7 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create new attacher: %v", err)
 			}
-			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
 
 			pluginCanAttach, err := plug.CanAttach(spec)
@@ -547,7 +549,7 @@ func TestAttacherWaitForAttach(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create new attacher: %v", err)
 			}
-			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 
 			if test.makeAttachment != nil {
 				attachment := test.makeAttachment()
@@ -629,7 +631,7 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create new attacher: %v", err)
 			}
-			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 
 			if test.makeAttachment != nil {
 				attachment := test.makeAttachment()
@@ -716,7 +718,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create new attacher: %v", err)
 			}
-			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 			t.Logf("running test: %v", tc.name)
 			pvName := fmt.Sprintf("test-pv-%d", i)
 			volID := fmt.Sprintf("test-vol-%d", i)
@@ -812,7 +814,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create new attacher: %v", err)
 			}
-			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 			nodeName := "fakeNode"
 
 			var specs []*volume.Spec
@@ -883,7 +885,7 @@ func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create new attacher: %v", err)
 			}
-			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 			nodeName := "fakeNode"
 
 			var specs []*volume.Spec
@@ -976,7 +978,7 @@ func TestAttacherDetach(t *testing.T) {
 			if err0 != nil {
 				t.Fatalf("failed to create new attacher: %v", err0)
 			}
-			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 
 			pv := makeTestPV("test-pv", 10, testDriver, tc.volID)
 			spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
@@ -1028,7 +1030,7 @@ func TestAttacherGetDeviceMountPath(t *testing.T) {
 	if err0 != nil {
 		t.Fatalf("failed to create new attacher: %v", err0)
 	}
-	csiAttacher := attacher.(*csiAttacher)
+	csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 
 	pluginDir := csiAttacher.plugin.host.GetPluginDir(plug.GetPluginName())
 
@@ -1193,7 +1195,7 @@ func TestAttacherMountDevice(t *testing.T) {
 			if err0 != nil {
 				t.Fatalf("failed to create new attacher: %v", err0)
 			}
-			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 			csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
 
 			if tc.deviceMountPath != "" {
@@ -1356,7 +1358,7 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 			if err0 != nil {
 				t.Fatalf("failed to create new attacher: %v", err0)
 			}
-			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 			csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
 
 			if tc.deviceMountPath != "" {
@@ -1484,7 +1486,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			if err0 != nil {
 				t.Fatalf("failed to create new attacher: %v", err0)
 			}
-			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
 			csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
 
 			if tc.deviceMountPath != "" {
@@ -1629,4 +1631,28 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset, setupInf
 	}
 
 	return csiPlug, fakeWatcher, tmpDir, fakeClient
+}
+
+func getCsiAttacherFromVolumeAttacher(attacher volume.Attacher) *csiAttacher {
+	csiAttacher := attacher.(*csiAttacher)
+	csiAttacher.watchTimeout = testWatchTimeout
+	return csiAttacher
+}
+
+func getCsiAttacherFromVolumeDetacher(detacher volume.Detacher) *csiAttacher {
+	csiAttacher := detacher.(*csiAttacher)
+	csiAttacher.watchTimeout = testWatchTimeout
+	return csiAttacher
+}
+
+func getCsiAttacherFromDeviceMounter(deviceMounter volume.DeviceMounter) *csiAttacher {
+	csiAttacher := deviceMounter.(*csiAttacher)
+	csiAttacher.watchTimeout = testWatchTimeout
+	return csiAttacher
+}
+
+func getCsiAttacherFromDeviceUnmounter(deviceUnmounter volume.DeviceUnmounter) *csiAttacher {
+	csiAttacher := deviceUnmounter.(*csiAttacher)
+	csiAttacher.watchTimeout = testWatchTimeout
+	return csiAttacher
 }
