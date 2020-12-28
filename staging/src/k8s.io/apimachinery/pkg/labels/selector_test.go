@@ -738,3 +738,21 @@ func TestValidatedSelectorFromSet(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkRequirementString(b *testing.B) {
+	r := Requirement{
+		key:      "environment",
+		operator: selection.NotIn,
+		strValues: []string{
+			"dev",
+		},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if r.String() != "environment notin (dev)" {
+			b.Errorf("Unexpected Requirement string")
+		}
+	}
+}

@@ -17,7 +17,6 @@ limitations under the License.
 package labels
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 	"strconv"
@@ -274,48 +273,55 @@ func (s internalSelector) Empty() bool {
 // Requirement. If called on an invalid Requirement, an error is
 // returned. See NewRequirement for creating a valid Requirement.
 func (r *Requirement) String() string {
-	var buffer bytes.Buffer
+	var sb strings.Builder
+	sb.Grow(
+		// length of r.key
+		len(r.key) +
+			// length of 'r.operator' + 2 spaces for the worst case ('in' and 'notin')
+			len(r.operator) + 2 +
+			// length of 'r.strValues' slice times. Heuristically 5 chars per word
+			+5*len(r.strValues))
 	if r.operator == selection.DoesNotExist {
-		buffer.WriteString("!")
+		sb.WriteString("!")
 	}
-	buffer.WriteString(r.key)
+	sb.WriteString(r.key)
 
 	switch r.operator {
 	case selection.Equals:
-		buffer.WriteString("=")
+		sb.WriteString("=")
 	case selection.DoubleEquals:
-		buffer.WriteString("==")
+		sb.WriteString("==")
 	case selection.NotEquals:
-		buffer.WriteString("!=")
+		sb.WriteString("!=")
 	case selection.In:
-		buffer.WriteString(" in ")
+		sb.WriteString(" in ")
 	case selection.NotIn:
-		buffer.WriteString(" notin ")
+		sb.WriteString(" notin ")
 	case selection.GreaterThan:
-		buffer.WriteString(">")
+		sb.WriteString(">")
 	case selection.LessThan:
-		buffer.WriteString("<")
+		sb.WriteString("<")
 	case selection.Exists, selection.DoesNotExist:
-		return buffer.String()
+		return sb.String()
 	}
 
 	switch r.operator {
 	case selection.In, selection.NotIn:
-		buffer.WriteString("(")
+		sb.WriteString("(")
 	}
 	if len(r.strValues) == 1 {
-		buffer.WriteString(r.strValues[0])
+		sb.WriteString(r.strValues[0])
 	} else { // only > 1 since == 0 prohibited by NewRequirement
 		// normalizes value order on output, without mutating the in-memory selector representation
 		// also avoids normalization when it is not required, and ensures we do not mutate shared data
-		buffer.WriteString(strings.Join(safeSort(r.strValues), ","))
+		sb.WriteString(strings.Join(safeSort(r.strValues), ","))
 	}
 
 	switch r.operator {
 	case selection.In, selection.NotIn:
-		buffer.WriteString(")")
+		sb.WriteString(")")
 	}
-	return buffer.String()
+	return sb.String()
 }
 
 // safeSort sorts input strings without modification
