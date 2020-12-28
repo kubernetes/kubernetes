@@ -693,7 +693,7 @@ func parseQuotedString(quotedString string) (string, string, error) {
 	var remainder string
 	escaping := false
 	closedQuote := false
-	result := &bytes.Buffer{}
+	result := &strings.Builder{}
 loop:
 	for i := 0; i < len(quotedString); i++ {
 		b := quotedString[i]
