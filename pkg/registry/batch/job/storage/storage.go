@@ -68,6 +68,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		UpdateStrategy:      job.Strategy,
 		DeleteStrategy:      job.Strategy,
 		ResetFieldsStrategy: job.Strategy,
+		ReturnDeletedObject: true,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
