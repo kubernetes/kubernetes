@@ -23,6 +23,7 @@ import (
 	"math/rand"
 	"sort"
 	"sync/atomic"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -242,8 +243,13 @@ func PodEligibleToPreemptOthers(pod *v1.Pod, nodeInfos framework.NodeInfoLister,
 			podPriority := corev1helpers.PodPriority(pod)
 			for _, p := range nodeInfo.Pods {
 				if p.Pod.DeletionTimestamp != nil && corev1helpers.PodPriority(p.Pod) < podPriority {
-					// There is a terminating pod on the nominated node.
-					return false
+					if p.Pod.Spec.TerminationGracePeriodSeconds != nil {
+						gracePeriod := *p.Pod.Spec.TerminationGracePeriodSeconds
+						if p.Pod.DeletionTimestamp.Add(time.Duration(gracePeriod) * time.Second).After(time.Now()) {
+							// There is a terminating pod on the nominated node, the pod is still in the period of grace deletion.
+							return false
+						}
+					}
 				}
 			}
 		}
