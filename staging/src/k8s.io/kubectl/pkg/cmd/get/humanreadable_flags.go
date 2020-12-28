@@ -18,9 +18,9 @@ package get
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 )
 
@@ -60,13 +60,15 @@ func (f *HumanPrintFlags) EnsureWithNamespace() error {
 
 // AllowedFormats returns more customized formating options
 func (f *HumanPrintFlags) AllowedFormats() []string {
-	return []string{"wide"}
+	return []string{"csv", "wide"}
 }
 
 // ToPrinter receives an outputFormat and returns a printer capable of
 // handling human-readable output.
 func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, error) {
-	if len(outputFormat) > 0 && outputFormat != "wide" {
+	switch outputFormat {
+	case "wide", "csv", "":
+	default:
 		return nil, genericclioptions.NoCompatiblePrinterError{Options: f, AllowedFormats: f.AllowedFormats()}
 	}
 
@@ -90,6 +92,7 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 		WithKind:      showKind,
 		NoHeaders:     f.NoHeaders,
 		Wide:          outputFormat == "wide",
+		CSV:           outputFormat == "csv",
 		WithNamespace: f.WithNamespace,
 		ColumnLabels:  columnLabels,
 		ShowLabels:    showLabels,

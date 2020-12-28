@@ -17,6 +17,7 @@ limitations under the License.
 package printers
 
 import (
+	"encoding/csv"
 	"fmt"
 	"io"
 	"reflect"
@@ -24,6 +25,7 @@ import (
 	"time"
 
 	"github.com/liggitt/tabwriter"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -84,21 +86,23 @@ func NewTablePrinter(options PrintOptions) ResourcePrinter {
 	return printer
 }
 
-func printHeader(columnNames []string, w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "%s\n", strings.Join(columnNames, "\t")); err != nil {
-		return err
-	}
-	return nil
+func printHeader(columnNames []string, w writer) error {
+	return w.Write(columnNames)
 }
 
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
 func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) error {
-
-	if _, found := output.(*tabwriter.Writer); !found {
-		w := GetNewTabWriter(output)
-		output = w
-		defer w.Flush()
+	var outputWriter writer
+	if !h.options.CSV {
+		w, found := output.(*tabwriter.Writer)
+		if !found {
+			w = GetNewTabWriter(output)
+		}
+		outputWriter = &tabWriter{inner: w}
+	} else {
+		outputWriter = &csvWriter{inner: csv.NewWriter(output)}
 	}
+	defer outputWriter.Flush()
 
 	var eventType string
 	if event, isEvent := obj.(*metav1.WatchEvent); isEvent {
@@ -140,7 +144,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 				return err
 			}
 		}
-		return printTable(table, output, localOptions)
+		return printTable(table, outputWriter, localOptions)
 	}
 
 	// Could not find print handler for "obj"; use the default or status print handler.
@@ -155,10 +159,10 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 	includeHeaders := h.lastType != handler && !h.options.NoHeaders
 
 	if h.lastType != nil && h.lastType != handler && !h.options.NoHeaders {
-		fmt.Fprintln(output)
+		outputWriter.Write(nil)
 	}
 
-	if err := printRowsForHandlerEntry(output, handler, eventType, obj, h.options, includeHeaders); err != nil {
+	if err := printRowsForHandlerEntry(outputWriter, handler, eventType, obj, h.options, includeHeaders); err != nil {
 		return err
 	}
 	h.lastType = handler
@@ -169,29 +173,25 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 // printTable prints a table to the provided output respecting the filtering rules for options
 // for wide columns and filtered rows. It filters out rows that are Completed. You should call
 // decorateTable if you receive a table from a remote server before calling printTable.
-func printTable(table *metav1.Table, output io.Writer, options PrintOptions) error {
+func printTable(table *metav1.Table, output writer, options PrintOptions) error {
+	var records []string
 	if !options.NoHeaders {
 		// avoid printing headers if we have no rows to display
 		if len(table.Rows) == 0 {
 			return nil
 		}
 
-		first := true
 		for _, column := range table.ColumnDefinitions {
 			if !options.Wide && column.Priority != 0 {
 				continue
 			}
-			if first {
-				first = false
-			} else {
-				fmt.Fprint(output, "\t")
-			}
-			fmt.Fprint(output, strings.ToUpper(column.Name))
+			records = append(records, strings.ToUpper(column.Name))
 		}
-		fmt.Fprintln(output)
+		output.Write(records)
 	}
+
 	for _, row := range table.Rows {
-		first := true
+		records = records[:0]
 		for i, cell := range row.Cells {
 			if i >= len(table.ColumnDefinitions) {
 				// https://issue.k8s.io/66379
@@ -202,16 +202,11 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 			if !options.Wide && column.Priority != 0 {
 				continue
 			}
-			if first {
-				first = false
-			} else {
-				fmt.Fprint(output, "\t")
-			}
 			if cell != nil {
-				fmt.Fprint(output, cell)
+				records = append(records, fmt.Sprint(cell))
 			}
 		}
-		fmt.Fprintln(output)
+		output.Write(records)
 	}
 	return nil
 }
@@ -383,7 +378,7 @@ func decorateTable(table *metav1.Table, options PrintOptions) error {
 // printRowsForHandlerEntry prints the incremental table output (headers if the current type is
 // different from lastType) including all the rows in the object. It returns the current type
 // or an error, if any.
-func printRowsForHandlerEntry(output io.Writer, handler *printHandler, eventType string, obj runtime.Object, options PrintOptions, includeHeaders bool) error {
+func printRowsForHandlerEntry(output writer, handler *printHandler, eventType string, obj runtime.Object, options PrintOptions, includeHeaders bool) error {
 	var results []reflect.Value
 
 	args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(options)}
@@ -437,45 +432,38 @@ func formatEventType(eventType string) string {
 }
 
 // printRows writes the provided rows to output.
-func printRows(output io.Writer, eventType string, rows []metav1.TableRow, options PrintOptions) {
+func printRows(output writer, eventType string, rows []metav1.TableRow, options PrintOptions) {
 	for _, row := range rows {
+		var records []string
 		if len(eventType) > 0 {
-			fmt.Fprint(output, formatEventType(eventType))
-			fmt.Fprint(output, "\t")
+			records = append(records, formatEventType(eventType))
 		}
 		if options.WithNamespace {
 			if obj := row.Object.Object; obj != nil {
 				if m, err := meta.Accessor(obj); err == nil {
-					fmt.Fprint(output, m.GetNamespace())
+					records = append(records, m.GetNamespace())
 				}
 			}
-			fmt.Fprint(output, "\t")
 		}
 
 		for i, cell := range row.Cells {
-			if i != 0 {
-				fmt.Fprint(output, "\t")
-			} else {
-				// TODO: remove this once we drop the legacy printers
-				if options.WithKind && !options.Kind.Empty() {
-					fmt.Fprintf(output, "%s/%s", strings.ToLower(options.Kind.String()), cell)
-					continue
-				}
+			// TODO: remove this once we drop the legacy printers
+			if i == 0 && options.WithKind && !options.Kind.Empty() {
+				records = append(records, fmt.Sprintf("%s/%s", strings.ToLower(options.Kind.String()), cell))
+				continue
 			}
-			fmt.Fprint(output, cell)
+			records = append(records, fmt.Sprint(cell))
 		}
 
 		hasLabels := len(options.ColumnLabels) > 0
 		if obj := row.Object.Object; obj != nil && (hasLabels || options.ShowLabels) {
 			if m, err := meta.Accessor(obj); err == nil {
 				for _, value := range labelValues(m.GetLabels(), options) {
-					output.Write([]byte("\t"))
-					output.Write([]byte(value))
+					records = append(records, value)
 				}
 			}
 		}
-
-		output.Write([]byte("\n"))
+		output.Write(records)
 	}
 }
 

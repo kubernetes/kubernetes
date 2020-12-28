@@ -225,7 +225,9 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	}
 
 	// human readable printers have special conversion rules, so we determine if we're using one.
-	if (len(*o.PrintFlags.OutputFormat) == 0 && len(templateArg) == 0) || *o.PrintFlags.OutputFormat == "wide" {
+	if (len(*o.PrintFlags.OutputFormat) == 0 && len(templateArg) == 0) ||
+		*o.PrintFlags.OutputFormat == "wide" ||
+		*o.PrintFlags.OutputFormat == "csv" {
 		o.IsHumanReadablePrinter = true
 	}
 
@@ -573,6 +575,9 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		// if we are using OpenAPI columns to print
 		if o.PrintWithOpenAPICols {
 			printer.PrintObj(info.Object, w)
+			continue
+		} else if *o.PrintFlags.OutputFormat == "csv" {
+			printer.PrintObj(info.Object, separatorWriter)
 			continue
 		}
 

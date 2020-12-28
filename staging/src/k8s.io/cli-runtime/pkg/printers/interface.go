@@ -43,6 +43,7 @@ type PrintOptions struct {
 	WithNamespace bool
 	WithKind      bool
 	Wide          bool
+	CSV           bool
 	ShowLabels    bool
 	Kind          schema.GroupKind
 	ColumnLabels  []string
