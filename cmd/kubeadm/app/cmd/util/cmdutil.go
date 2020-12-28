@@ -71,7 +71,7 @@ func GetKubeConfigPath(file string) string {
 	if file != "" {
 		return file
 	}
-	// Find a config in the standard locations using DefaultClientConfigLoadingRules,
+	// Find a config in the standard locations using NewDefaultClientConfigLoadingRules,
 	// but also consider the default config path.
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	rules.Precedence = append(rules.Precedence, kubeadmconstants.GetAdminKubeConfigPath())
