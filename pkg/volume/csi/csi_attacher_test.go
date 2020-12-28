@@ -34,19 +34,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
-	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -201,7 +197,8 @@ func TestAttacherAttach(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("test case: %s", tc.name)
-			plug, tmpDir, fakeClient := newTestWatchPlugin(t, nil)
+			fakeClient := fakeclient.NewSimpleClientset()
+			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
 			fakeWatcher := watch.NewRaceFreeFake()
@@ -292,7 +289,8 @@ func TestAttacherAttachWithInline(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("test case: %s", tc.name)
-			plug, tmpDir, fakeClient := newTestWatchPlugin(t, nil)
+			fakeClient := fakeclient.NewSimpleClientset()
+			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
 			fakeWatcher := watch.NewRaceFreeFake()
@@ -367,7 +365,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 				getTestCSIDriver("attachable", nil, &bTrue, nil),
 				getTestCSIDriver("nil", nil, nil, nil),
 			)
-			plug, tmpDir, _ := newTestWatchPlugin(t, fakeClient)
+			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
 			attachmentWatchCreated := make(chan core.Action)
@@ -552,7 +550,8 @@ func TestAttacherWaitForAttach(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			plug, tmpDir, _ := newTestWatchPlugin(t, nil)
+			fakeClient := fakeclient.NewSimpleClientset()
+			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
 			attacher, err := plug.NewAttacher()
@@ -634,7 +633,8 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			plug, tmpDir, _ := newTestWatchPlugin(t, nil)
+			fakeClient := fakeclient.NewSimpleClientset()
+			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
 			attacher, err := plug.NewAttacher()
@@ -721,7 +721,8 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			plug, tmpDir, fakeClient := newTestWatchPlugin(t, nil)
+			fakeClient := fakeclient.NewSimpleClientset()
+			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
 			fakeWatcher := watch.NewRaceFreeFake()
@@ -986,7 +987,8 @@ func TestAttacherDetach(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("running test: %v", tc.name)
-			plug, tmpDir, fakeClient := newTestWatchPlugin(t, nil)
+			fakeClient := fakeclient.NewSimpleClientset()
+			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
 			fakeWatcher := watch.NewRaceFreeFake()
@@ -1050,7 +1052,8 @@ func TestAttacherDetach(t *testing.T) {
 func TestAttacherGetDeviceMountPath(t *testing.T) {
 	// Setup
 	// Create a new attacher
-	plug, tmpDir, _ := newTestWatchPlugin(t, nil)
+	fakeClient := fakeclient.NewSimpleClientset()
+	plug, tmpDir := newTestPlugin(t, fakeClient)
 	defer os.RemoveAll(tmpDir)
 	attacher, err0 := plug.NewAttacher()
 	if err0 != nil {
@@ -1215,7 +1218,8 @@ func TestAttacherMountDevice(t *testing.T) {
 
 			// Setup
 			// Create a new attacher
-			plug, tmpDir, fakeClient := newTestWatchPlugin(t, nil)
+			fakeClient := fakeclient.NewSimpleClientset()
+			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
 			fakeWatcher := watch.NewRaceFreeFake()
@@ -1387,7 +1391,8 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 
 			// Setup
 			// Create a new attacher
-			plug, tmpDir, fakeClient := newTestWatchPlugin(t, nil)
+			fakeClient := fakeclient.NewSimpleClientset()
+			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
 			fakeWatcher := watch.NewRaceFreeFake()
@@ -1526,7 +1531,8 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			t.Logf("Running test case: %s", tc.testName)
 			// Setup
 			// Create a new attacher
-			plug, tmpDir, _ := newTestWatchPlugin(t, nil)
+			fakeClient := fakeclient.NewSimpleClientset()
+			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 			attacher, err0 := plug.NewAttacher()
 			if err0 != nil {
@@ -1610,66 +1616,6 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			}
 		})
 	}
-}
-
-// create a plugin mgr to load plugins and setup a fake client
-func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlugin, string, *fakeclient.Clientset) {
-	tmpDir, err := utiltesting.MkTmpdir("csi-test")
-	if err != nil {
-		t.Fatalf("can't create temp dir: %v", err)
-	}
-
-	if fakeClient == nil {
-		fakeClient = fakeclient.NewSimpleClientset()
-	}
-	fakeClient.Tracker().Add(&v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "fakeNode",
-		},
-		Spec: v1.NodeSpec{},
-	})
-
-	// Start informer for CSIDrivers.
-	factory := informers.NewSharedInformerFactory(fakeClient, CsiResyncPeriod)
-	csiDriverInformer := factory.Storage().V1().CSIDrivers()
-	csiDriverLister := csiDriverInformer.Lister()
-	volumeAttachmentInformer := factory.Storage().V1().VolumeAttachments()
-	volumeAttachmentLister := volumeAttachmentInformer.Lister()
-
-	factory.Start(wait.NeverStop)
-	ctx, cancel := context.WithTimeout(context.Background(), TestInformerSyncTimeout)
-	defer cancel()
-	syncedTypes := factory.WaitForCacheSync(ctx.Done())
-	if len(syncedTypes) != 2 {
-		t.Fatalf("informers are not synced")
-	}
-	for ty, ok := range syncedTypes {
-		if !ok {
-			t.Fatalf("failed to sync: %#v", ty)
-		}
-	}
-
-	host := volumetest.NewFakeKubeletVolumeHostWithCSINodeName(t,
-		tmpDir,
-		fakeClient,
-		ProbeVolumePlugins(),
-		"fakeNode",
-		csiDriverLister,
-		volumeAttachmentLister,
-	)
-	plugMgr := host.GetPluginMgr()
-
-	plug, err := plugMgr.FindPluginByName(CSIPluginName)
-	if err != nil {
-		t.Fatalf("can't find plugin %v", CSIPluginName)
-	}
-
-	csiPlug, ok := plug.(*csiPlugin)
-	if !ok {
-		t.Fatalf("cannot assert plugin to be type csiPlugin")
-	}
-
-	return csiPlug, tmpDir, fakeClient
 }
 
 func getCsiAttacherFromVolumeAttacher(attacher volume.Attacher) *csiAttacher {
