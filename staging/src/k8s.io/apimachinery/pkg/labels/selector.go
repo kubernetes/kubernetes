@@ -673,7 +673,7 @@ func (p *Parser) parseRequirement() (*Requirement, error) {
 
 }
 
-// parseKeyAndInferOperator parse literals.
+// parseKeyAndInferOperator parses literals.
 // in case of no operator '!, in, notin, ==, =, !=' are found
 // the 'exists' operator is inferred
 func (p *Parser) parseKeyAndInferOperator() (string, selection.Operator, error) {

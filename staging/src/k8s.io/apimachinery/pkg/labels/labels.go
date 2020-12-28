@@ -79,7 +79,7 @@ func (ls Set) AsSelectorPreValidated() Selector {
 	return SelectorFromValidatedSet(ls)
 }
 
-// FormatLabels convert label map into plain string
+// FormatLabels converts label map into plain string
 func FormatLabels(labelMap map[string]string) string {
 	l := Set(labelMap).String()
 	if l == "" {
