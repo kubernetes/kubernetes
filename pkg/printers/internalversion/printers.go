@@ -1101,7 +1101,10 @@ func getServiceExternalIP(svc *api.Service, wide bool) string {
 		}
 		return "<none>"
 	case api.ServiceTypeLoadBalancer:
-		lbIps := loadBalancerStatusStringer(svc.Status.LoadBalancer, wide)
+		var lbIps string
+		if svc.Status.LoadBalancer != nil {
+			lbIps = loadBalancerStatusStringer(*svc.Status.LoadBalancer, wide)
+		}
 		if len(svc.Spec.ExternalIPs) > 0 {
 			results := []string{}
 			if len(lbIps) > 0 {

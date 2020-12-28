@@ -889,7 +889,7 @@ func (s *Controller) patchStatus(service *v1.Service, previousStatus, newStatus 
 	}
 	// Make a copy so we don't mutate the shared informer cache.
 	updated := service.DeepCopy()
-	updated.Status.LoadBalancer = *newStatus
+	updated.Status.LoadBalancer = newStatus
 
 	klog.V(2).Infof("Patching status for service %s/%s", updated.Namespace, updated.Name)
 	_, err := servicehelper.PatchService(s.kubeClient.CoreV1(), service, updated)

@@ -4470,7 +4470,7 @@ func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 // ValidateServiceStatusUpdate tests if required fields in the Service are set when updating status.
 func ValidateServiceStatusUpdate(service, oldService *core.Service) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateLoadBalancerStatus(&service.Status.LoadBalancer, field.NewPath("status", "loadBalancer"))...)
+	allErrs = append(allErrs, ValidateLoadBalancerStatus(service.Status.LoadBalancer, field.NewPath("status", "loadBalancer"))...)
 	return allErrs
 }
 

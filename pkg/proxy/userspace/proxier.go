@@ -719,7 +719,7 @@ func sameConfig(info *ServiceInfo, service *v1.Service, port *v1.ServicePort) bo
 	if !ipsEqual(info.externalIPs, service.Spec.ExternalIPs) {
 		return false
 	}
-	if !servicehelper.LoadBalancerStatusEqual(&info.loadBalancerStatus, &service.Status.LoadBalancer) {
+	if !servicehelper.LoadBalancerStatusEqual(&info.loadBalancerStatus, service.Status.LoadBalancer) {
 		return false
 	}
 	if info.sessionAffinityType != service.Spec.SessionAffinity {

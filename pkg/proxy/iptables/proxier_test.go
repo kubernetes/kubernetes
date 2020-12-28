@@ -1391,7 +1391,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 			svc.Spec.LoadBalancerIP = "5.6.7.8"
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "foobar", "UDP", 8675, 30061, 7000)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "baz", "UDP", 8676, 30062, 7001)
-			svc.Status.LoadBalancer = v1.LoadBalancerStatus{
+			svc.Status.LoadBalancer = &v1.LoadBalancerStatus{
 				Ingress: []v1.LoadBalancerIngress{
 					{IP: "10.1.2.4"},
 				},
@@ -1403,7 +1403,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 			svc.Spec.LoadBalancerIP = "5.6.7.8"
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "foobar2", "UDP", 8677, 30063, 7002)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "baz", "UDP", 8678, 30064, 7003)
-			svc.Status.LoadBalancer = v1.LoadBalancerStatus{
+			svc.Status.LoadBalancer = &v1.LoadBalancerStatus{
 				Ingress: []v1.LoadBalancerIngress{
 					{IP: "10.1.2.3"},
 				},
@@ -1546,7 +1546,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 		svc.Spec.LoadBalancerIP = "5.6.7.8"
 		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "something", "UDP", 1234, 4321, 7002)
 		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "somethingelse", "TCP", 1235, 5321, 7003)
-		svc.Status.LoadBalancer = v1.LoadBalancerStatus{
+		svc.Status.LoadBalancer = &v1.LoadBalancerStatus{
 			Ingress: []v1.LoadBalancerIngress{
 				{IP: "10.1.2.3"},
 			},

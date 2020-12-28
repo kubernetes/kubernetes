@@ -7669,8 +7669,14 @@ func Convert_core_ServiceSpec_To_v1_ServiceSpec(in *core.ServiceSpec, out *v1.Se
 }
 
 func autoConvert_v1_ServiceStatus_To_core_ServiceStatus(in *v1.ServiceStatus, out *core.ServiceStatus, s conversion.Scope) error {
-	if err := Convert_v1_LoadBalancerStatus_To_core_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
-		return err
+	if in.LoadBalancer != nil {
+		in, out := &in.LoadBalancer, &out.LoadBalancer
+		*out = new(core.LoadBalancerStatus)
+		if err := Convert_v1_LoadBalancerStatus_To_core_LoadBalancerStatus(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.LoadBalancer = nil
 	}
 	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
 	return nil
@@ -7682,8 +7688,14 @@ func Convert_v1_ServiceStatus_To_core_ServiceStatus(in *v1.ServiceStatus, out *c
 }
 
 func autoConvert_core_ServiceStatus_To_v1_ServiceStatus(in *core.ServiceStatus, out *v1.ServiceStatus, s conversion.Scope) error {
-	if err := Convert_core_LoadBalancerStatus_To_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
-		return err
+	if in.LoadBalancer != nil {
+		in, out := &in.LoadBalancer, &out.LoadBalancer
+		*out = new(v1.LoadBalancerStatus)
+		if err := Convert_core_LoadBalancerStatus_To_v1_LoadBalancerStatus(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.LoadBalancer = nil
 	}
 	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
 	return nil

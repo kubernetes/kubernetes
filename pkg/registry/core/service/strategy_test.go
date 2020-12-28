@@ -62,7 +62,7 @@ func TestExportService(t *testing.T) {
 					Namespace: "bar",
 				},
 				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
+					LoadBalancer: &api.LoadBalancerStatus{
 						Ingress: []api.LoadBalancerIngress{
 							{IP: "1.2.3.4"},
 						},
@@ -87,7 +87,7 @@ func TestExportService(t *testing.T) {
 					ClusterIPs: []string{"10.0.0.1"},
 				},
 				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
+					LoadBalancer: &api.LoadBalancerStatus{
 						Ingress: []api.LoadBalancerIngress{
 							{IP: "1.2.3.4"},
 						},
@@ -114,7 +114,7 @@ func TestExportService(t *testing.T) {
 					ClusterIPs: []string{"10.0.0.1", "2001::1"},
 				},
 				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
+					LoadBalancer: &api.LoadBalancerStatus{
 						Ingress: []api.LoadBalancerIngress{
 							{IP: "1.2.3.4"},
 						},
@@ -299,7 +299,7 @@ func TestServiceStatusStrategy(t *testing.T) {
 	newService.ResourceVersion = "4"
 	newService.Spec.SessionAffinity = "ClientIP"
 	newService.Status = api.ServiceStatus{
-		LoadBalancer: api.LoadBalancerStatus{
+		LoadBalancer: &api.LoadBalancerStatus{
 			Ingress: []api.LoadBalancerIngress{
 				{IP: "127.0.0.2"},
 			},
@@ -338,7 +338,7 @@ func makeServiceWithConditions(conditions []metav1.Condition) *api.Service {
 func makeServiceWithPorts(ports []api.PortStatus) *api.Service {
 	return &api.Service{
 		Status: api.ServiceStatus{
-			LoadBalancer: api.LoadBalancerStatus{
+			LoadBalancer: &api.LoadBalancerStatus{
 				Ingress: []api.LoadBalancerIngress{
 					{
 						Ports: ports,

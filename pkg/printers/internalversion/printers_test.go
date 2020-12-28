@@ -1079,7 +1079,7 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 					Ports:      []api.ServicePort{{Port: 80, Protocol: "TCP"}},
 				},
 				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
+					LoadBalancer: &api.LoadBalancerStatus{
 						Ingress: []api.LoadBalancerIngress{{IP: "2.3.4.5"}, {IP: "3.4.5.6"}}},
 				},
 			},
@@ -1111,7 +1111,7 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 					Ports:      []api.ServicePort{{Port: 80, Protocol: "TCP"}, {Port: 8090, Protocol: "UDP"}, {Port: 8000, Protocol: "TCP"}},
 				},
 				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
+					LoadBalancer: &api.LoadBalancerStatus{
 						Ingress: []api.LoadBalancerIngress{{IP: "2.3.4.5"}}},
 				},
 			},
@@ -1129,7 +1129,7 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 					Ports:      []api.ServicePort{{Port: 80, Protocol: "TCP"}, {Port: 8090, Protocol: "UDP"}, {Port: 8000, Protocol: "TCP"}},
 				},
 				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
+					LoadBalancer: &api.LoadBalancerStatus{
 						Ingress: []api.LoadBalancerIngress{{IP: "2.3.4.5"}, {IP: "3.4.5.6"}, {IP: "5.6.7.8", Hostname: "host5678"}}},
 				},
 			},
@@ -1148,7 +1148,7 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 					Selector:   map[string]string{"foo": "bar"},
 				},
 				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
+					LoadBalancer: &api.LoadBalancerStatus{
 						Ingress: []api.LoadBalancerIngress{{IP: "2.3.4.5"}, {IP: "3.4.5.6"}, {IP: "5.6.7.8", Hostname: "host5678"}}},
 				},
 			},
@@ -3186,7 +3186,7 @@ func TestPrintService(t *testing.T) {
 					ExternalIPs: singleExternalIP,
 				},
 				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
+					LoadBalancer: &api.LoadBalancerStatus{
 						Ingress: []api.LoadBalancerIngress{
 							{
 								IP:       "3.4.5.6",
@@ -3216,7 +3216,7 @@ func TestPrintService(t *testing.T) {
 					ExternalIPs: mulExternalIP,
 				},
 				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
+					LoadBalancer: &api.LoadBalancerStatus{
 						Ingress: []api.LoadBalancerIngress{
 							{
 								IP:       "2.3.4.5",

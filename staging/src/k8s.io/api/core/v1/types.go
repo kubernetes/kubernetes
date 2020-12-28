@@ -3952,7 +3952,7 @@ type ServiceStatus struct {
 	// LoadBalancer contains the current status of the load-balancer,
 	// if one is present.
 	// +optional
-	LoadBalancer LoadBalancerStatus `json:"loadBalancer,omitempty" protobuf:"bytes,1,opt,name=loadBalancer"`
+	LoadBalancer *LoadBalancerStatus `json:"loadBalancer,omitempty" protobuf:"bytes,1,opt,name=loadBalancer"`
 	// Current service state
 	// +optional
 	// +patchMergeKey=type

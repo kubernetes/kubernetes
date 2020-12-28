@@ -3487,7 +3487,7 @@ type ServiceStatus struct {
 	// LoadBalancer contains the current status of the load-balancer,
 	// if one is present.
 	// +optional
-	LoadBalancer LoadBalancerStatus
+	LoadBalancer *LoadBalancerStatus
 
 	// Current service condition
 	// +optional

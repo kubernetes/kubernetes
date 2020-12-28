@@ -491,7 +491,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	// Update service from LoadBalancer to non-LoadBalancer, should remove any LoadBalancerStatus.
 	if service.Spec.Type != api.ServiceTypeLoadBalancer {
 		// Although loadbalancer delete is actually asynchronous, we don't need to expose the user to that complexity.
-		service.Status.LoadBalancer = api.LoadBalancerStatus{}
+		service.Status.LoadBalancer = nil
 	}
 
 	// Handle ExternalTraffic related updates.
