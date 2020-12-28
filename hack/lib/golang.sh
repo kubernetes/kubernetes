@@ -49,6 +49,7 @@ readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
   linux/s390x
   linux/ppc64le
   darwin/amd64
+  darwin/arm64
   windows/amd64
   windows/386
 )
@@ -62,6 +63,7 @@ readonly KUBE_SUPPORTED_TEST_PLATFORMS=(
   linux/s390x
   linux/ppc64le
   darwin/amd64
+  darwin/arm64
   windows/amd64
 )
 
@@ -213,11 +215,13 @@ kube::golang::setup_platforms() {
     if [[ "${KUBE_BUILDER_OS:-}" == "darwin"* ]]; then
       KUBE_TEST_PLATFORMS=(
         darwin/amd64
+        darwin/arm64
         linux/amd64
       )
       readonly KUBE_TEST_PLATFORMS
       KUBE_CLIENT_PLATFORMS=(
         darwin/amd64
+        darwin/arm64
         linux/amd64
       )
       readonly KUBE_CLIENT_PLATFORMS
