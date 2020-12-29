@@ -17,7 +17,7 @@ limitations under the License.
 package ports
 
 // In this file, we can see all default port of cluster.
-// It's also a important documentation for us. So don't remove them easily.
+// It's also an important documentation for us. So don't remove them easily.
 const (
 	// ProxyStatusPort is the default port for the proxy metrics server.
 	// May be overridden by a flag at startup.
