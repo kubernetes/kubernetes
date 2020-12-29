@@ -119,6 +119,20 @@ func TestPrintTable_ColumnPriority(t *testing.T) {
 			options:  PrintOptions{},
 			expected: "NAME    READY   STATUS\ntest1   1/1     podPhase\n",
 		},
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer", Priority: 1}, // Priority > 0
+				{Name: "Age", Type: "string", Priority: 1},      // Priority > 0
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
+			},
+			options:  PrintOptions{CSV: true},
+			expected: "NAME,READY,STATUS\ntest1,1/1,podPhase\n",
+		},
 		// Test a basic multi-row table row table. Columns with priority > 0 are not printed.
 		{
 			columns: []metav1.TableColumnDefinition{
@@ -138,6 +152,26 @@ func TestPrintTable_ColumnPriority(t *testing.T) {
 test1   1/1     podPhase
 test2   1/2     podPhase
 test3   4/4     podPhase
+`,
+		},
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer", Priority: 1}, // Priority > 0
+				{Name: "Age", Type: "string", Priority: 1},      // Priority > 0
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
+				{Cells: []interface{}{"test2", "1/2", "podPhase", int64(30), "21h"}},
+				{Cells: []interface{}{"test3", "4/4", "podPhase", int64(1), "22h"}},
+			},
+			options: PrintOptions{CSV: true},
+			expected: `NAME,READY,STATUS
+test1,1/1,podPhase
+test2,1/2,podPhase
+test3,4/4,podPhase
 `,
 		},
 		// Test a single row table with "wide" printing option. Columns with priority > 0 are printed.
@@ -217,6 +251,20 @@ func TestPrintTable_ColumnHeaders(t *testing.T) {
 			options:  PrintOptions{},
 			expected: "NAME    READY   STATUS     RETRIES   AGE\ntest1   1/1     podPhase   5         20h\n",
 		},
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
+			},
+			options:  PrintOptions{CSV: true},
+			expected: "NAME,READY,STATUS,RETRIES,AGE\ntest1,1/1,podPhase,5,20h\n",
+		},
 		// Test a basic multi-row table row table, shows columns.
 		{
 			columns: []metav1.TableColumnDefinition{
@@ -238,6 +286,26 @@ test2   1/2     podPhase   30        21h
 test3   4/4     podPhase   1         22h
 `,
 		},
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
+				{Cells: []interface{}{"test2", "1/2", "podPhase", int64(30), "21h"}},
+				{Cells: []interface{}{"test3", "4/4", "podPhase", int64(1), "22h"}},
+			},
+			options: PrintOptions{CSV: true},
+			expected: `NAME,READY,STATUS,RETRIES,AGE
+test1,1/1,podPhase,5,20h
+test2,1/2,podPhase,30,21h
+test3,4/4,podPhase,1,22h
+`,
+		},
 		// Test a single row table with "NoHeaders" option, doesn't print columns.
 		{
 			columns: []metav1.TableColumnDefinition{
@@ -253,6 +321,21 @@ test3   4/4     podPhase   1         22h
 			// Print with no headers.
 			options:  PrintOptions{NoHeaders: true},
 			expected: "test1   1/1   podPhase   5     20h\n",
+		},
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
+			},
+			// Print with no headers.
+			options:  PrintOptions{NoHeaders: true, CSV: true},
+			expected: "test1,1/1,podPhase,5,20h\n",
 		},
 		// Test a multi-row table row table with "NoHeaders" option, doesn't print columns.
 		{
@@ -272,6 +355,25 @@ test3   4/4     podPhase   1         22h
 			expected: `test1   1/1   podPhase   5     20h
 test2   1/2   podPhase   30    21h
 test3   4/4   podPhase   1     22h
+`,
+		},
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
+				{Cells: []interface{}{"test2", "1/2", "podPhase", int64(30), "21h"}},
+				{Cells: []interface{}{"test3", "4/4", "podPhase", int64(1), "22h"}},
+			},
+			options: PrintOptions{NoHeaders: true, CSV: true},
+			expected: `test1,1/1,podPhase,5,20h
+test2,1/2,podPhase,30,21h
+test3,4/4,podPhase,1,22h
 `,
 		},
 	}
@@ -320,6 +422,26 @@ func TestPrintTable_WithNamespace(t *testing.T) {
 test-namespace   test1   1/1     podPhase   5         20h
 `,
 		},
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+					Object: runtime.RawExtension{Object: testPod},
+				},
+			},
+			// Print with namespace column prepended.
+			options: PrintOptions{WithNamespace: true, CSV: true},
+			expected: `NAMESPACE,NAME,READY,STATUS,RETRIES,AGE
+test-namespace,test1,1/1,podPhase,5,20h
+`,
+		},
 	}
 	for _, test := range tests {
 		// Create the table from the columns and rows.
@@ -363,6 +485,25 @@ func TestPrintTable_WithKind(t *testing.T) {
 			options: PrintOptions{WithKind: true, Kind: schema.GroupKind{Kind: "Pod"}},
 			expected: `NAME        READY   STATUS     RETRIES   AGE
 pod/test1   1/1     podPhase   5         20h
+`,
+		},
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string", Format: "name"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+				},
+			},
+			// Print with Kind "pod" prepended to name.
+			options: PrintOptions{WithKind: true, Kind: schema.GroupKind{Kind: "Pod"}, CSV: true},
+			expected: `NAME,READY,STATUS,RETRIES,AGE
+pod/test1,1/1,podPhase,5,20h
 `,
 		},
 	}
@@ -431,6 +572,26 @@ test1   1/1     podPhase   5         20h   first-label=12,second-label=label-val
 test1   1/1     podPhase   5         20h   label-value
 `,
 		},
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+					Object: runtime.RawExtension{Object: testPod},
+				},
+			},
+			// Print "second-label" as column name, with label value.
+			options: PrintOptions{ColumnLabels: []string{"second-label"}, CSV: true},
+			expected: `NAME,READY,STATUS,RETRIES,AGE,SECOND-LABEL
+test1,1/1,podPhase,5,20h,label-value
+`,
+		},
 		// Test a table "ColumnLabels" option, appends labels as columns.
 		{
 			columns: []metav1.TableColumnDefinition{
@@ -450,6 +611,26 @@ test1   1/1     podPhase   5         20h   label-value
 			options: PrintOptions{ColumnLabels: []string{"first-label", "second-label"}},
 			expected: `NAME    READY   STATUS     RETRIES   AGE   FIRST-LABEL   SECOND-LABEL
 test1   1/1     podPhase   5         20h   12            label-value
+`,
+		},
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+					Object: runtime.RawExtension{Object: testPod},
+				},
+			},
+			// Print multiple-labels as columns, with their values.
+			options: PrintOptions{ColumnLabels: []string{"first-label", "second-label"}, CSV: true},
+			expected: `NAME,READY,STATUS,RETRIES,AGE,FIRST-LABEL,SECOND-LABEL
+test1,1/1,podPhase,5,20h,12,label-value
 `,
 		},
 	}
@@ -482,17 +663,32 @@ func TestPrintTable_NonTable(t *testing.T) {
 			options:  PrintOptions{},
 			expected: "NAME            AGE\ntest-pod-name   <unknown>\n",
 		},
+		{
+			object:   testPod,
+			options:  PrintOptions{CSV: true},
+			expected: "NAME,AGE\ntest-pod-name,<unknown>\n",
+		},
 		// Test non-table default printing for a pod with "NoHeaders" option.
 		{
 			object:   testPod,
 			options:  PrintOptions{NoHeaders: true},
 			expected: "test-pod-name   <unknown>\n",
 		},
+		{
+			object:   testPod,
+			options:  PrintOptions{NoHeaders: true, CSV: true},
+			expected: "test-pod-name,<unknown>\n",
+		},
 		// Test non-table default printing for a pod with "WithNamespace" option.
 		{
 			object:   testPod,
 			options:  PrintOptions{WithNamespace: true},
 			expected: "NAMESPACE        NAME            AGE\ntest-namespace   test-pod-name   <unknown>\n",
+		},
+		{
+			object:   testPod,
+			options:  PrintOptions{WithNamespace: true, CSV: true},
+			expected: "NAMESPACE,NAME,AGE\ntest-namespace,test-pod-name,<unknown>\n",
 		},
 		// Test non-table default printing for a pod with "ShowLabels" option.
 		{
@@ -510,11 +706,23 @@ test-pod-name   <unknown>   first-label=12,second-label=label-value
 Failure   test-status-reason   test-status-message
 `,
 		},
+		{
+			object:  testStatus,
+			options: PrintOptions{CSV: true},
+			expected: `STATUS,REASON,MESSAGE
+Failure,test-status-reason,test-status-message
+`,
+		},
 		// Test non-table default printing for a Status resource with NoHeaders options.
 		{
 			object:   testStatus,
 			options:  PrintOptions{NoHeaders: true},
 			expected: "Failure   test-status-reason   test-status-message\n",
+		},
+		{
+			object:   testStatus,
+			options:  PrintOptions{NoHeaders: true, CSV: true},
+			expected: "Failure,test-status-reason,test-status-message\n",
 		},
 	}
 	for _, test := range tests {
@@ -554,6 +762,25 @@ func TestPrintTable_WatchEvents(t *testing.T) {
 			options: PrintOptions{},
 			expected: `EVENT   NAME    READY   STATUS     RETRIES   AGE
 Added   test1   1/1     podPhase   5         20h
+`,
+		},
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+					Object: runtime.RawExtension{Object: testPod},
+				},
+			},
+			options: PrintOptions{CSV: true},
+			expected: `EVENT,NAME,READY,STATUS,RETRIES,AGE
+Added,test1,1/1,podPhase,5,20h
 `,
 		},
 		// Print WatchEvent with Table, and "NoHeaders", "WithNamespace", and "ShowLabels" options.
@@ -623,6 +850,40 @@ func TestPrintUnstructuredObject(t *testing.T) {
 			"status": "ok",
 		},
 	}
+	obj2 := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Test",
+			"dummy1":     "present",
+			"dummy2":     "present",
+			"items": []interface{}{
+				map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name":              "MyName",
+						"namespace":         "MyNamespace",
+						"creationTimestamp": "2017-04-01T00:00:00Z",
+						"resourceVersion":   123,
+						"uid":               "00000000-0000-0000-0000-000000000001",
+						"dummy3":            "present",
+						"labels":            map[string]interface{}{"test": "other"},
+					},
+				},
+				map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name":              "MyName2",
+						"namespace":         "MyNamespace",
+						"creationTimestamp": "2017-04-01T00:00:00Z",
+						"resourceVersion":   123,
+						"uid":               "00000000-0000-0000-0000-000000000001",
+						"dummy3":            "present",
+						"labels":            "badlabel",
+					},
+				},
+			},
+			"url":    "http://localhost",
+			"status": "ok",
+		},
+	}
 
 	tests := []struct {
 		expected string
@@ -634,10 +895,23 @@ func TestPrintUnstructuredObject(t *testing.T) {
 			object:   obj,
 		},
 		{
+			options:  PrintOptions{CSV: true},
+			expected: "NAME,AGE\nMyName,\\d+",
+			object:   obj,
+		},
+		{
 			options: PrintOptions{
 				WithNamespace: true,
 			},
 			expected: "NAMESPACE\\s+NAME\\s+AGE\nMyNamespace\\s+MyName\\s+\\d+",
+			object:   obj,
+		},
+		{
+			options: PrintOptions{
+				WithNamespace: true,
+				CSV:           true,
+			},
+			expected: "NAMESPACE,NAME,AGE\nMyNamespace,MyName,\\d+",
 			object:   obj,
 		},
 		{
@@ -650,40 +924,12 @@ func TestPrintUnstructuredObject(t *testing.T) {
 		},
 		{
 			expected: "NAME\\s+AGE\nMyName\\s+\\d+\\w+\nMyName2\\s+\\d+",
-			object: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "v1",
-					"kind":       "Test",
-					"dummy1":     "present",
-					"dummy2":     "present",
-					"items": []interface{}{
-						map[string]interface{}{
-							"metadata": map[string]interface{}{
-								"name":              "MyName",
-								"namespace":         "MyNamespace",
-								"creationTimestamp": "2017-04-01T00:00:00Z",
-								"resourceVersion":   123,
-								"uid":               "00000000-0000-0000-0000-000000000001",
-								"dummy3":            "present",
-								"labels":            map[string]interface{}{"test": "other"},
-							},
-						},
-						map[string]interface{}{
-							"metadata": map[string]interface{}{
-								"name":              "MyName2",
-								"namespace":         "MyNamespace",
-								"creationTimestamp": "2017-04-01T00:00:00Z",
-								"resourceVersion":   123,
-								"uid":               "00000000-0000-0000-0000-000000000001",
-								"dummy3":            "present",
-								"labels":            "badlabel",
-							},
-						},
-					},
-					"url":    "http://localhost",
-					"status": "ok",
-				},
-			},
+			object:   obj2,
+		},
+		{
+			options:  PrintOptions{CSV: true},
+			expected: "NAME,AGE\nMyName,\\d+\\w+\nMyName2,\\d+",
+			object:   obj2,
 		},
 	}
 	out := bytes.NewBuffer([]byte{})
@@ -715,10 +961,20 @@ func (obj *TestUnknownType) DeepCopyObject() runtime.Object {
 }
 
 func TestUnknownTypePrinting(t *testing.T) {
-	printer := NewTablePrinter(PrintOptions{})
-	buffer := &bytes.Buffer{}
-	err := printer.PrintObj(&TestUnknownType{}, buffer)
-	if err == nil {
-		t.Errorf("An error was expected from printing unknown type")
+	tests := []struct {
+		options PrintOptions
+	}{
+		{},
+		{
+			options: PrintOptions{CSV: true},
+		},
+	}
+	for _, test := range tests {
+		printer := NewTablePrinter(test.options)
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&TestUnknownType{}, buffer)
+		if err == nil {
+			t.Errorf("An error was expected from printing unknown type")
+		}
 	}
 }
