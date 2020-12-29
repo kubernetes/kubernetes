@@ -344,7 +344,7 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 				if err != nil {
 					// TODO: we should handle container not found (i.e. container was deleted) case differently
 					// once https://github.com/kubernetes/kubernetes/issues/63336 is resolved
-					klog.Infof("Error getting ContainerStatus for containerID %q: %v", containerID, err)
+					klog.InfoS("Error getting ContainerStatus", "containerID", containerID, "err", err)
 				} else if status.State != runtimeapi.ContainerState_CONTAINER_EXITED {
 					// Here is how container log rotation works (see containerLogManager#rotateLatestLog):
 					//
@@ -357,17 +357,17 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 					// See https://github.com/kubernetes/kubernetes/issues/52172
 					//
 					// We only remove unhealthy symlink for dead containers
-					klog.V(5).Infof("Container %q is still running, not removing symlink %q.", containerID, logSymlink)
+					klog.V(5).InfoS("Container is still running, not removing symlink.", "containerID", containerID, "logSymlink", logSymlink)
 					continue
 				}
 			} else {
-				klog.V(4).Infof("unable to obtain container Id: %v", err)
+				klog.V(4).InfoS("unable to obtain container Id", "err", err)
 			}
 			err := osInterface.Remove(logSymlink)
 			if err != nil {
 				klog.Errorf("Failed to remove container log dead symlink %q: %v", logSymlink, err)
 			} else {
-				klog.V(4).Infof("removed symlink %s", logSymlink)
+				klog.V(4).InfoS("removed symlink", "logSymlink", logSymlink)
 			}
 		}
 	}
