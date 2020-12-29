@@ -326,7 +326,7 @@ const (
 	CoreDNSDeploymentName = "coredns"
 
 	// CoreDNSImageName specifies the name of the image for CoreDNS add-on
-	CoreDNSImageName = "coredns"
+	CoreDNSImageName = "coredns/coredns"
 
 	// KubeDNSConfigMap specifies in what ConfigMap in the kube-system namespace the kube-dns config should be stored
 	KubeDNSConfigMap = "kube-dns"
@@ -347,7 +347,7 @@ const (
 	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "1.7.0"
+	CoreDNSVersion = "v1.8.0"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"

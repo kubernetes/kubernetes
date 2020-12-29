@@ -267,9 +267,9 @@ github.com/containernetworking/cni/pkg/types/020
 github.com/containernetworking/cni/pkg/types/current
 github.com/containernetworking/cni/pkg/utils
 github.com/containernetworking/cni/pkg/version
-# github.com/coredns/corefile-migration v1.0.10 => github.com/coredns/corefile-migration v1.0.10
+# github.com/coredns/corefile-migration v1.0.11 => github.com/coredns/corefile-migration v1.0.11
 ## explicit
-# github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.10
+# github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.11
 github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile
 # github.com/coreos/bbolt => github.com/coreos/bbolt v1.3.2
