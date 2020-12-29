@@ -107,7 +107,7 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 			gomega.Expect(result.Stdout).NotTo(gomega.ContainSubstring("node-problem-detector.service: Failed"))
 
 			if isStandaloneMode[host] {
-				cpuUsage, uptime := getCPUStat(f, host)
+				cpuUsage, uptime := getCPUStat(host)
 				cpuUsageStats[host] = append(cpuUsageStats[host], cpuUsage)
 				uptimeStats[host] = append(uptimeStats[host], uptime)
 			}
@@ -147,11 +147,11 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 		for i := 1; i <= numIterations; i++ {
 			for j, host := range hosts {
 				if isStandaloneMode[host] {
-					rss, workingSet := getMemoryStat(f, host)
+					rss, workingSet := getMemoryStat(host)
 					rssStats[host] = append(rssStats[host], rss)
 					workingSetStats[host] = append(workingSetStats[host], workingSet)
 					if i == numIterations {
-						cpuUsage, uptime := getCPUStat(f, host)
+						cpuUsage, uptime := getCPUStat(host)
 						cpuUsageStats[host] = append(cpuUsageStats[host], cpuUsage)
 						uptimeStats[host] = append(uptimeStats[host], uptime)
 					}
@@ -239,7 +239,7 @@ func verifyNodeCondition(f *framework.Framework, condition v1.NodeConditionType,
 	return nil
 }
 
-func getMemoryStat(f *framework.Framework, host string) (rss, workingSet float64) {
+func getMemoryStat(host string) (rss, workingSet float64) {
 	memCmd := "cat /sys/fs/cgroup/memory/system.slice/node-problem-detector.service/memory.usage_in_bytes && cat /sys/fs/cgroup/memory/system.slice/node-problem-detector.service/memory.stat"
 	result, err := e2essh.SSH(memCmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
@@ -275,7 +275,7 @@ func getMemoryStat(f *framework.Framework, host string) (rss, workingSet float64
 	return
 }
 
-func getCPUStat(f *framework.Framework, host string) (usage, uptime float64) {
+func getCPUStat(host string) (usage, uptime float64) {
 	cpuCmd := "cat /sys/fs/cgroup/cpu/system.slice/node-problem-detector.service/cpuacct.usage && cat /proc/uptime | awk '{print $1}'"
 	result, err := e2essh.SSH(cpuCmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
