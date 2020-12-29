@@ -582,8 +582,8 @@ func (f *framework) GetWaitingPod(uid types.UID) WaitingPod {
 
 func pluginNameToConfig(args []config.PluginConfig) map[string]*runtime.Unknown {
 	pc := make(map[string]*runtime.Unknown, 0)
-	for _, p := range args {
-		pc[p.Name] = &p.Args
+	for i := range args {
+		pc[args[i].Name] = &args[i].Args
 	}
 	return pc
 }
