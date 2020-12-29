@@ -122,10 +122,10 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 				_ = initializeResources(f)
 
 				_, _, _, model, k8s := getK8SModel(f)
-				framework.ExpectNoError(k8s.CleanNetworkPolicies(model.NamespaceNames), "unable to clean network policies")
+				framework.ExpectNoError(k8s.cleanNetworkPolicies(model.NamespaceNames), "unable to clean network policies")
 				err := wait.Poll(waitInterval, waitTimeout, func() (done bool, err error) {
 					for _, ns := range model.NamespaceNames {
-						netpols, err := k8s.ClientSet.NetworkingV1().NetworkPolicies(ns).List(context.TODO(), metav1.ListOptions{})
+						netpols, err := k8s.clientSet.NetworkingV1().NetworkPolicies(ns).List(context.TODO(), metav1.ListOptions{})
 						framework.ExpectNoError(err, "get network policies from ns %s", ns)
 						if len(netpols.Items) > 0 {
 							return false, nil
@@ -698,7 +698,7 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
 			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 
-			err := k8s.CleanNetworkPolicies(model.NamespaceNames)
+			err := k8s.cleanNetworkPolicies(model.NamespaceNames)
 			time.Sleep(3 * time.Second) // TODO we can remove this eventually, its just a hack to keep CI stable.
 			framework.ExpectNoError(err, "unable to clean network policies")
 
@@ -880,10 +880,10 @@ func defaultModel(namespaces []string, dnsDomain string) *Model {
 	return NewModel(namespaces, []string{"a", "b", "c"}, []int32{80, 81}, protocols, dnsDomain)
 }
 
-// getK8sModel uses the e2e framework to create all necessary namespace resources, and returns the default probing model used
-// in the scaffold of this test.
-func getK8SModel(f *framework.Framework) (string, string, string, *Model, *Scenario) {
-	k8s := NewScenario(f)
+// getK8sModel generates a network policy model using the framework's root namespace and cluster DNS domain.
+// This function is deterministic and has no side effects, so may be safely called multiple times.
+func getK8SModel(f *framework.Framework) (string, string, string, *Model, *kubeManager) {
+	k8s := newKubeManager(f)
 	rootNs := f.Namespace.GetName()
 	nsX, nsY, nsZ, namespaces := getNamespaces(rootNs)
 
@@ -892,13 +892,15 @@ func getK8SModel(f *framework.Framework) (string, string, string, *Model, *Scena
 	return nsX, nsY, nsZ, model, k8s
 }
 
-// initializeResources generates a model and then waits for the model to be up-and-running (i.e. all pods are ready and running in their namespaces).
+// initializeResources uses the e2e framework to create all necessary namespace resources, based on the network policy
+// model derived from the framework.  It then waits for the resources described by the model to be up and running
+// (i.e. all pods are ready and running in their namespaces).
 func initializeResources(f *framework.Framework) error {
 	_, _, _, model, k8s := getK8SModel(f)
 
 	framework.Logf("initializing cluster: ensuring namespaces, deployments, and pods exist and are ready")
 
-	err := k8s.InitializeCluster(model)
+	err := k8s.initializeCluster(model)
 	if err != nil {
 		return err
 	}
