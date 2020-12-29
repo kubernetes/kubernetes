@@ -259,7 +259,7 @@ func writeToFile(f *framework.Framework, pod *v1.Pod, fpath, ddInput string, fsi
 }
 
 // Verify that the test file is the expected size and contains the expected content.
-func verifyFile(f *framework.Framework, pod *v1.Pod, fpath string, expectSize int64, ddInput string) error {
+func verifyFile(f *framework.Framework, pod *v1.Pod, fpath string, expectSize int64) error {
 	ginkgo.By("verifying file size")
 	rtnstr, stderr, err := e2evolume.PodExec(f, pod, fmt.Sprintf("stat -c %%s %s", fpath))
 	if err != nil || rtnstr == "" {
@@ -358,7 +358,7 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config e2evolu
 		if err = writeToFile(f, clientPod, fpath, ddInput, fsize); err != nil {
 			return err
 		}
-		if err = verifyFile(f, clientPod, fpath, fsize, ddInput); err != nil {
+		if err = verifyFile(f, clientPod, fpath, fsize); err != nil {
 			return err
 		}
 	}
