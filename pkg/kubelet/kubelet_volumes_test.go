@@ -537,32 +537,3 @@ func (f *stubVolume) SetUp(mounterArgs volume.MounterArgs) error {
 func (f *stubVolume) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	return nil
 }
-
-type stubBlockVolume struct {
-	dirPath string
-	volName string
-}
-
-func (f *stubBlockVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
-	return "", nil
-}
-
-func (f *stubBlockVolume) GetPodDeviceMapPath() (string, string) {
-	return f.dirPath, f.volName
-}
-
-func (f *stubBlockVolume) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (f stubBlockVolume) MapPodDevice() error {
-	return nil
-}
-
-func (f *stubBlockVolume) TearDownDevice(mapPath string, devicePath string) error {
-	return nil
-}
-
-func (f *stubBlockVolume) UnmapPodDevice() error {
-	return nil
-}

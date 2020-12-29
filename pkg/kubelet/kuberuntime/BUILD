@@ -14,7 +14,6 @@ go_library(
         "fake_kuberuntime_manager.go",
         "helpers.go",
         "helpers_linux.go",
-        "helpers_unsupported.go",
         "instrumented_services.go",
         "kuberuntime_container.go",
         "kuberuntime_container_linux.go",
@@ -27,7 +26,6 @@ go_library(
         "kuberuntime_sandbox.go",
         "labels.go",
         "legacy.go",
-        "security_context.go",
         "security_context_others.go",
         "security_context_windows.go",
     ],
@@ -52,8 +50,6 @@ go_library(
         "//pkg/kubelet/util:go_default_library",
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
-        "//pkg/security/apparmor:go_default_library",
-        "//pkg/securitycontext:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//pkg/util/selinux:go_default_library",
         "//pkg/util/tail:go_default_library",
@@ -77,18 +73,57 @@ go_library(
         "//vendor/google.golang.org/grpc/status:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//pkg/securitycontext:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/apis/core/v1/helper:go_default_library",
             "//pkg/kubelet/qos:go_default_library",
+            "//pkg/securitycontext:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//pkg/securitycontext:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//pkg/securitycontext:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//pkg/securitycontext:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//pkg/securitycontext:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//pkg/securitycontext:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
+            "//pkg/securitycontext:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/apis/core/v1/helper:go_default_library",
             "//pkg/kubelet/qos:go_default_library",
+            "//pkg/securitycontext:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//pkg/securitycontext:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//pkg/securitycontext:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//pkg/securitycontext:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//pkg/securitycontext:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//pkg/securitycontext:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/kubelet/apis:go_default_library",
+            "//pkg/securitycontext:go_default_library",
         ],
         "//conditions:default": [],
     }),

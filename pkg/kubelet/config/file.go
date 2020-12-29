@@ -26,13 +26,15 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilio "k8s.io/utils/io"
 )
+
+//lint:file-ignore U1000 Ignore all unused code, because they are used in the file_linux.go
 
 type podEventType int
 

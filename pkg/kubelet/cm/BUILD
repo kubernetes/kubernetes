@@ -11,7 +11,6 @@ go_library(
         "container_manager_unsupported.go",
         "container_manager_windows.go",
         "fake_internal_container_lifecycle.go",
-        "helpers.go",
         "helpers_linux.go",
         "helpers_unsupported.go",
         "internal_container_lifecycle.go",
