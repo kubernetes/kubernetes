@@ -92,7 +92,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	if len(c.extenders) != 0 {
 		var ignorableExtenders []framework.Extender
 		for ii := range c.extenders {
-			klog.V(2).Infof("Creating extender with config %+v", c.extenders[ii])
+			klog.V(2).InfoS("Creating extender with config", "config", c.extenders[ii])
 			extender, err := core.NewHTTPExtender(&c.extenders[ii])
 			if err != nil {
 				return nil, err
@@ -184,7 +184,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 
 // createFromProvider creates a scheduler from the name of a registered algorithm provider.
 func (c *Configurator) createFromProvider(providerName string) (*Scheduler, error) {
-	klog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
+	klog.V(2).InfoS("Creating scheduler from algorithm provider ", "provider", providerName)
 	r := algorithmprovider.NewRegistry()
 	defaultPlugins, exist := r[providerName]
 	if !exist {
@@ -207,7 +207,7 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	lr := frameworkplugins.NewLegacyRegistry()
 	args := &frameworkplugins.ConfigProducerArgs{}
 
-	klog.V(2).Infof("Creating scheduler from configuration: %v", policy)
+	klog.V(2).InfoS("Creating scheduler from configuration", "policy", policy)
 
 	// validate the policy configuration
 	if err := validation.ValidatePolicy(policy); err != nil {
@@ -216,11 +216,11 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 
 	predicateKeys := sets.NewString()
 	if policy.Predicates == nil {
-		klog.V(2).Infof("Using predicates from algorithm provider '%v'", schedulerapi.SchedulerDefaultProviderName)
+		klog.V(2).InfoS("Using predicates from algorithm provider", "provider", schedulerapi.SchedulerDefaultProviderName)
 		predicateKeys = lr.DefaultPredicates
 	} else {
 		for _, predicate := range policy.Predicates {
-			klog.V(2).Infof("Registering predicate: %s", predicate.Name)
+			klog.V(2).InfoS("Registering predicate", "predicate", predicate.Name)
 			predicateKeys.Insert(lr.ProcessPredicatePolicy(predicate, args))
 		}
 	}
@@ -232,10 +232,10 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	} else {
 		for _, priority := range policy.Priorities {
 			if priority.Name == frameworkplugins.EqualPriority {
-				klog.V(2).Infof("Skip registering priority: %s", priority.Name)
+				klog.V(2).InfoS("Skip registering priority", "priority", priority.Name)
 				continue
 			}
-			klog.V(2).Infof("Registering priority: %s", priority.Name)
+			klog.V(2).InfoS("Registering priority", "priority", priority.Name)
 			priorityKeys[lr.ProcessPriorityPolicy(priority, args)] = priority.Weight
 		}
 	}
@@ -254,7 +254,7 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 		c.alwaysCheckAllPredicates = policy.AlwaysCheckAllPredicates
 	}
 
-	klog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v'", predicateKeys, priorityKeys)
+	klog.V(2).InfoS("Creating scheduler with fit predicates and priority functions", "predicates", predicateKeys, "priorityFunctions", priorityKeys)
 
 	// Combine all framework configurations. If this results in any duplication, framework
 	// instantiation should fail.
@@ -321,6 +321,7 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 			klog.V(2).InfoS("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", err)
 		} else if apierrors.IsNotFound(err) {
 			klog.V(2).Infof("Unable to schedule %v/%v: possibly due to node not found: %v; waiting", pod.Namespace, pod.Name, err)
+			klog.V(2).InfoS("Unable to schedule pod; node not found; waiting", "pod", klog.KObj(pod), "node", err.Error())
 			if errStatus, ok := err.(apierrors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
 				nodeName := errStatus.Status().Details.Name
 				// when node is not found, We do not remove the node right away. Trying again to get
@@ -329,7 +330,7 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 				if err != nil && apierrors.IsNotFound(err) {
 					node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 					if err := schedulerCache.RemoveNode(&node); err != nil {
-						klog.V(4).Infof("Node %q is not found; failed to remove it from the cache.", node.Name)
+						klog.V(4).InfoS("Node is not found,failed to remove it from the cache", "node", node.Name)
 					}
 				}
 			}
@@ -340,14 +341,14 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 		// Check if the Pod exists in informer cache.
 		cachedPod, err := podLister.Pods(pod.Namespace).Get(pod.Name)
 		if err != nil {
-			klog.Warningf("Pod %v/%v doesn't exist in informer cache: %v", pod.Namespace, pod.Name, err)
+			klog.InfoS("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "cache", err)
 			return
 		}
 
 		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
 		if len(cachedPod.Spec.NodeName) != 0 {
-			klog.Warningf("Pod %v/%v has been assigned with %v. Abort adding it back to queue.", pod.Namespace, pod.Name, cachedPod.Spec.NodeName)
+			klog.InfoS("Pod has been assigned. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
 			return
 		}
 

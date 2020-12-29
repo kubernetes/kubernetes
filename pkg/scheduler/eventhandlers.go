@@ -97,7 +97,7 @@ func (sched *Scheduler) addNodeToCache(obj interface{}) {
 	}
 
 	if err := sched.SchedulerCache.AddNode(node); err != nil {
-		klog.Errorf("scheduler cache AddNode failed: %v", err)
+		klog.ErrorS(err, "Scheduler cache AddNode failed")
 	}
 
 	klog.V(3).Infof("add event for node %q", node.Name)
@@ -117,7 +117,7 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 	}
 
 	if err := sched.SchedulerCache.UpdateNode(oldNode, newNode); err != nil {
-		klog.Errorf("scheduler cache UpdateNode failed: %v", err)
+		klog.ErrorS(err, "Scheduler cache UpdateNode failed")
 	}
 
 	// Only activate unschedulable pods if the node became more schedulable.
@@ -148,14 +148,14 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 		klog.Errorf("cannot convert to *v1.Node: %v", t)
 		return
 	}
-	klog.V(3).Infof("delete event for node %q", node.Name)
+	klog.V(3).InfoS("delete event for node", "node", node.Name)
 	// NOTE: Updates must be written to scheduler cache before invalidating
 	// equivalence cache, because we could snapshot equivalence cache after the
 	// invalidation and then snapshot the cache itself. If the cache is
 	// snapshotted before updates are written, we would update equivalence
 	// cache with stale information which is based on snapshot of old cache.
 	if err := sched.SchedulerCache.RemoveNode(node); err != nil {
-		klog.Errorf("scheduler cache RemoveNode failed: %v", err)
+		klog.ErrorS(err, "scheduler cache RemoveNode failed")
 	}
 }
 
@@ -229,7 +229,7 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 	klog.V(3).InfoS("Add event for scheduled pod", "pod", klog.KObj(pod))
 
 	if err := sched.SchedulerCache.AddPod(pod); err != nil {
-		klog.Errorf("scheduler cache AddPod failed: %v", err)
+		klog.ErrorS(err, "scheduler cache AddPod failed")
 	}
 
 	sched.SchedulingQueue.AssignedPodAdded(pod)
@@ -262,7 +262,7 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 	// snapshotted before updates are written, we would update equivalence
 	// cache with stale information which is based on snapshot of old cache.
 	if err := sched.SchedulerCache.UpdatePod(oldPod, newPod); err != nil {
-		klog.Errorf("scheduler cache UpdatePod failed: %v", err)
+		klog.ErrorS(err, "scheduler cache UpdatePod failed")
 	}
 
 	sched.SchedulingQueue.AssignedPodUpdated(newPod)
@@ -291,7 +291,7 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 	// snapshotted before updates are written, we would update equivalence
 	// cache with stale information which is based on snapshot of old cache.
 	if err := sched.SchedulerCache.RemovePod(pod); err != nil {
-		klog.Errorf("scheduler cache RemovePod failed: %v", err)
+		klog.ErrorS(err, "scheduler cache RemovePod failed")
 	}
 
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.AssignedPodDelete)
@@ -357,7 +357,7 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 	if !reflect.DeepEqual(assumedPodCopy, podCopy) {
 		return false
 	}
-	klog.V(3).Infof("Skipping pod %s/%s update", pod.Namespace, pod.Name)
+	klog.V(3).InfoS("Skipping pod update", "pod", klog.KObj(pod))
 	return true
 }
 
