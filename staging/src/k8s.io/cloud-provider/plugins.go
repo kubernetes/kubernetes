@@ -58,7 +58,7 @@ func RegisterCloudProvider(name string, cloud Factory) {
 	if _, found := providers[name]; found {
 		klog.Fatalf("Cloud provider %q was registered twice", name)
 	}
-	klog.V(1).Infof("Registered cloud provider %q", name)
+	klog.V(1).InfoS("Registered cloud provider", "name", name)
 	providers[name] = cloud
 }
 
@@ -102,7 +102,7 @@ func DeprecationWarningForProvider(providerName string) {
 			detail = fmt.Sprintf("Please use 'external' cloud provider for %s: %s", providerName, provider.detail)
 		}
 
-		klog.Warningf("WARNING: %s built-in cloud provider is now deprecated. %s", providerName, detail)
+		klog.InfoS("WARNING: built-in cloud provider is now deprecated.", "providerName", providerName, "detail", detail)
 		break
 	}
 }
@@ -117,7 +117,7 @@ func InitCloudProvider(name string, configFilePath string) (Interface, error) {
 	}
 
 	if IsExternal(name) {
-		klog.Info("External cloud provider specified")
+		klog.InfoS("External cloud provider specified")
 		return nil, nil
 	}
 
@@ -125,8 +125,8 @@ func InitCloudProvider(name string, configFilePath string) (Interface, error) {
 		var config *os.File
 		config, err = os.Open(configFilePath)
 		if err != nil {
-			klog.Fatalf("Couldn't open cloud provider configuration %s: %#v",
-				configFilePath, err)
+			klog.ErrorS(err,"Couldn't open cloud provider configuration","configFilePath",
+				configFilePath)
 		}
 
 		defer config.Close()
