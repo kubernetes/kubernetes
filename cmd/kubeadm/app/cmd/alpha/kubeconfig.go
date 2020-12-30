@@ -43,8 +43,8 @@ var (
 	`)
 )
 
-// newCmdKubeConfigUtility returns main command for kubeconfig phase
-func newCmdKubeConfigUtility(out io.Writer) *cobra.Command {
+// NewCmdKubeConfigUtility returns main command for kubeconfig phase
+func NewCmdKubeConfigUtility(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "kubeconfig",
 		Short: "Kubeconfig file utilities",
