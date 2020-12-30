@@ -141,10 +141,10 @@ type TestPlugin struct {
 	inj  injectedResult
 }
 
-func (pl *TestPlugin) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *TestPlugin) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Code(pl.inj.PreFilterAddPodStatus), "injected status")
 }
-func (pl *TestPlugin) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *TestPlugin) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Code(pl.inj.PreFilterRemovePodStatus), "injected status")
 }
 
@@ -241,13 +241,13 @@ func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, stat
 }
 
 func (pl *TestPreFilterWithExtensionsPlugin) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
-	podToAdd *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	pl.AddCalled++
 	return nil
 }
 
 func (pl *TestPreFilterWithExtensionsPlugin) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
-	podToRemove *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	pl.RemoveCalled++
 	return nil
 }
