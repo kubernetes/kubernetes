@@ -78,7 +78,10 @@ var (
 		kubectl diff -f pod.json
 
 		# Diff file read from stdin
-		cat service.yaml | kubectl diff -f -`))
+		cat service.yaml | kubectl diff -f -
+
+		# Diff resources in resources.yaml that matches label app=nginx
+		kubectl diff -f resources.yaml -l app=nginx`))
 )
 
 // Number of times we try to diff before giving-up
