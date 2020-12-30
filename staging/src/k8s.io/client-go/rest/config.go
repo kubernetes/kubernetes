@@ -46,6 +46,10 @@ const (
 	DefaultBurst int     = 10
 )
 
+const(
+	kubernetesSVCDNSName = "kubernetes.default"
+)
+
 var ErrNotInCluster = errors.New("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
 
 // Config holds the common attributes that can be passed to a Kubernetes client on
@@ -504,8 +508,7 @@ func InClusterConfig() (*Config, error) {
 	}
 
 	return &Config{
-		// TODO: switch to using cluster DNS.
-		Host:            "https://" + net.JoinHostPort(host, port),
+		Host:            "https://" + net.JoinHostPort(kubernetesSVCDNSName, port),
 		TLSClientConfig: tlsClientConfig,
 		BearerToken:     string(token),
 		BearerTokenFile: tokenFile,
