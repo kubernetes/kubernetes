@@ -930,7 +930,7 @@ func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) (status *
 		return nil
 	}
 	defer f.waitingPods.remove(pod.UID)
-	klog.V(4).Infof("pod %q waiting on permit", pod.Name)
+	klog.V(4).InfoS("pod waiting on permit", "pod", klog.KObj(pod))
 
 	startTime := time.Now()
 	s := <-waitingPod.s
