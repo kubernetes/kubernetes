@@ -85,6 +85,22 @@ type JobTemplateSpec struct {
 	Spec JobSpec
 }
 
+// CompletionMode specifies how Pod completions of a Job are tracked.
+type CompletionMode string
+
+const (
+	// NonIndexedCompletion is a Job completion mode. In this mode, the Job is
+	// considered complete when there have been .spec.completions
+	// successfully completed Pods. Pod completions are homologous to each other.
+	NonIndexedCompletion CompletionMode = "NonIndexed"
+
+	// IndexedCompletion is a Job completion mode. In this mode, the Pods of a
+	// Job get an associated completion index from 0 to (.spec.completions - 1).
+	// The Job is  considered complete when a Pod completes for each completion
+	// index.
+	IndexedCompletion CompletionMode = "Indexed"
+)
+
 // JobSpec describes how the job execution will look like.
 type JobSpec struct {
 
@@ -149,6 +165,28 @@ type JobSpec struct {
 	// TTLAfterFinished feature.
 	// +optional
 	TTLSecondsAfterFinished *int32
+
+	// CompletionMode specifies how Pod completions are tracked. It can be
+	// `NonIndexed` (default) or `Indexed`.
+	//
+	// `NonIndexed` means that the Job is considered complete when there have
+	// been .spec.completions successfully completed Pods. Each Pod completion is
+	// homologous to each other.
+	//
+	// `Indexed` means that the Pods of a
+	// Job get an associated completion index from 0 to (.spec.completions - 1),
+	// available in the annotation batch.alpha.kubernetes.io/job-completion-index.
+	// The Job is considered complete when there is one successfully completed Pod
+	// for each index.
+	// When value is `Indexed`, .spec.completions must be specified and
+	// `.spec.parallelism` must be less than or equal to 10^5.
+	//
+	// This field is alpha-level and is only honored by servers that enable the
+	// IndexedJob feature gate. More completion modes can be added in the future.
+	// If the Job controller observes a mode that it doesn't recognize, the
+	// controller skips updates for the Job.
+	// +optional
+	CompletionMode CompletionMode
 }
 
 // JobStatus represents the current state of a Job.
@@ -183,6 +221,16 @@ type JobStatus struct {
 	// The number of pods which reached phase Failed.
 	// +optional
 	Failed int32
+
+	// CompletedIndexes holds the completed indexes when .spec.completionMode =
+	// "Indexed" in a text format. The indexes are represented as decimal integers
+	// separated by commas. The numbers are listed in increasing order. Three or
+	// more consecutive numbers are compressed and represented by the first and
+	// last element of the series, separated by a hyphen.
+	// For example, if the completed indexes are 1, 3, 4, 5 and 7, they are
+	// represented as "1,3-5,7".
+	// +optional
+	CompletedIndexes string
 }
 
 // JobConditionType is a valid value for JobCondition.Type

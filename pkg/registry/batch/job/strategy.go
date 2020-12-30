@@ -80,6 +80,10 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 		job.Spec.TTLSecondsAfterFinished = nil
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) {
+		job.Spec.CompletionMode = batch.NonIndexedCompletion
+	}
+
 	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
 }
 
@@ -91,6 +95,10 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) && oldJob.Spec.TTLSecondsAfterFinished == nil {
 		newJob.Spec.TTLSecondsAfterFinished = nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) && oldJob.Spec.CompletionMode == batch.NonIndexedCompletion {
+		newJob.Spec.CompletionMode = batch.NonIndexedCompletion
 	}
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)

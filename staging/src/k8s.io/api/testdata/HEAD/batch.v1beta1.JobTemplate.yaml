@@ -62,6 +62,7 @@ template:
   spec:
     activeDeadlineSeconds: -9086179100394185427
     backoffLimit: -1796008812
+    completionMode: tS誖Śs垦
     completions: -1771909905
     manualSelector: false
     parallelism: -443114323
