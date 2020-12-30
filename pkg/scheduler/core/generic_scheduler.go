@@ -353,8 +353,7 @@ func (g *genericScheduler) findNodesThatPassExtenders(pod *v1.Pod, feasibleNodes
 		feasibleList, failedMap, err := extender.Filter(pod, feasibleNodes)
 		if err != nil {
 			if extender.IsIgnorable() {
-				klog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
-					extender, err)
+				klog.ErrorS(err, "Skipping extender as it returned error and has ignorable flag set", "extender", extender)
 				continue
 			}
 			return nil, err

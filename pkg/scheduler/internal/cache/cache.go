@@ -393,7 +393,7 @@ func (cache *schedulerCache) finishBinding(pod *v1.Pod, now time.Time) error {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
 
-	klog.V(5).Infof("Finished binding for pod %v. Can be expired.", key)
+	klog.V(5).InfoS("Finished binding for pod. Can be expired.", key)
 	currState, ok := cache.podStates[key]
 	if ok && cache.assumedPods[key] {
 		dl := now.Add(cache.ttl)
@@ -490,7 +490,7 @@ func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 			klog.Warningf("Pod %v was assumed to be on %v but got added to %v", key, pod.Spec.NodeName, currState.pod.Spec.NodeName)
 			// Clean this up.
 			if err = cache.removePod(currState.pod); err != nil {
-				klog.Errorf("removing pod error: %v", err)
+				klog.ErrorS(err, "removing pod error")
 			}
 			cache.addPod(pod)
 		}
@@ -743,12 +743,11 @@ func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 			klog.Fatal("Key found in assumed set but not in podStates. Potentially a logical error.")
 		}
 		if !ps.bindingFinished {
-			klog.V(5).Infof("Couldn't expire cache for pod %v/%v. Binding is still in progress.",
-				ps.pod.Namespace, ps.pod.Name)
+			klog.V(5).InfoS("Couldn't expire cache for pod. Binding is still in progress.", "pod", klog.KObj(ps.pod))
 			continue
 		}
 		if now.After(*ps.deadline) {
-			klog.Warningf("Pod %s/%s expired", ps.pod.Namespace, ps.pod.Name)
+			klog.InfoS("Pod expired", "pod", klog.KObj(ps.pod))
 			if err := cache.expirePod(key, ps); err != nil {
 				klog.Errorf("ExpirePod failed for %s: %v", key, err)
 			}

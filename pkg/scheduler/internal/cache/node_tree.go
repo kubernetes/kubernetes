@@ -53,7 +53,7 @@ func (nt *nodeTree) addNode(n *v1.Node) {
 	if na, ok := nt.tree[zone]; ok {
 		for _, nodeName := range na {
 			if nodeName == n.Name {
-				klog.Warningf("node %q already exist in the NodeTree", n.Name)
+				klog.InfoS("node already exist in the NodeTree", "node", n.Name)
 				return
 			}
 		}
@@ -62,7 +62,7 @@ func (nt *nodeTree) addNode(n *v1.Node) {
 		nt.zones = append(nt.zones, zone)
 		nt.tree[zone] = []string{n.Name}
 	}
-	klog.V(2).Infof("Added node %q in group %q to NodeTree", n.Name, zone)
+	klog.V(2).InfoS("Added node to NodeTree", "node", n.Name, "zone", zone)
 	nt.numNodes++
 }
 
@@ -76,7 +76,7 @@ func (nt *nodeTree) removeNode(n *v1.Node) error {
 				if len(nt.tree[zone]) == 0 {
 					nt.removeZone(zone)
 				}
-				klog.V(2).Infof("Removed node %q in group %q from NodeTree", n.Name, zone)
+				klog.V(2).InfoS("Removed node from NodeTree", "node", n.Name, "zone", zone)
 				nt.numNodes--
 				return nil
 			}

@@ -250,7 +250,7 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 	defer p.lock.Unlock()
 	pInfo := p.newQueuedPodInfo(pod)
 	if err := p.activeQ.Add(pInfo); err != nil {
-		klog.Errorf("Error adding pod %v to the scheduling queue: %v", nsNameForPod(pod), err)
+		klog.ErrorS(err, "Error adding pod to the scheduling queue", klog.KObj(pod))
 		return err
 	}
 	if p.unschedulableQ.get(pod) != nil {
@@ -514,14 +514,14 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 		pod := pInfo.Pod
 		if p.isPodBackingoff(pInfo) {
 			if err := p.podBackoffQ.Add(pInfo); err != nil {
-				klog.Errorf("Error adding pod %v to the backoff queue: %v", pod.Name, err)
+				klog.ErrorS(err, "Error adding pod to the backoff queue", "pod", klog.KObj(pod))
 			} else {
 				metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Inc()
 				p.unschedulableQ.delete(pod)
 			}
 		} else {
 			if err := p.activeQ.Add(pInfo); err != nil {
-				klog.Errorf("Error adding pod %v to the scheduling queue: %v", pod.Name, err)
+				klog.ErrorS(err, "Error adding pod to the scheduling queue", "pod", klog.KObj(pod))
 			} else {
 				metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Inc()
 				p.unschedulableQ.delete(pod)
@@ -748,7 +748,7 @@ func (npm *nominatedPodMap) add(p *v1.Pod, nodeName string) {
 	npm.nominatedPodToNode[p.UID] = nnn
 	for _, np := range npm.nominatedPods[nnn] {
 		if np.UID == p.UID {
-			klog.V(4).Infof("Pod %v/%v already exists in the nominated map!", p.Namespace, p.Name)
+			klog.V(4).InfoS("Pod already exists in the nominated map!", "pod", klog.KObj(p))
 			return
 		}
 	}
@@ -810,10 +810,10 @@ func MakeNextPodFunc(queue SchedulingQueue) func() *framework.QueuedPodInfo {
 	return func() *framework.QueuedPodInfo {
 		podInfo, err := queue.Pop()
 		if err == nil {
-			klog.V(4).Infof("About to try and schedule pod %v/%v", podInfo.Pod.Namespace, podInfo.Pod.Name)
+			klog.V(4).InfoS("About to try and schedule pod", "pod", klog.KObj(podInfo.Pod))
 			return podInfo
 		}
-		klog.Errorf("Error while retrieving next pod from scheduling queue: %v", err)
+		klog.ErrorS(err, "Error while retrieving next pod from scheduling queue")
 		return nil
 	}
 }
