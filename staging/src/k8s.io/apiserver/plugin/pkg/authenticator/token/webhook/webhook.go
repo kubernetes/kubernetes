@@ -113,7 +113,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 	}, webhook.DefaultShouldRetry)
 	if err != nil {
 		// An error here indicates bad configuration or an outage. Log for debugging.
-		klog.Errorf("Failed to make webhook authenticator request: %v", err)
+		klog.ErrorS(err, "Failed to make webhook authenticator request")
 		return nil, false, err
 	}
 
