@@ -41,11 +41,11 @@ func appendPluginBasedOnMigrationFeatureFlags(plugins []volume.VolumePlugin, inT
 	// CSI migration is complete
 	err := csimigration.CheckMigrationFeatureFlags(featureGate, pluginMigration, pluginMigrationComplete)
 	if err != nil {
-		klog.Warningf("Unexpected CSI Migration Feature Flags combination detected: %v. CSI Migration may not take effect", err)
+		klog.InfoS("Unexpected CSI Migration Feature Flags combination detected: %v. CSI Migration may not take effect", err)
 		// TODO: fail and return here once alpha only tests can set the feature flags for a plugin correctly
 	}
 	if featureGate.Enabled(features.CSIMigration) && featureGate.Enabled(pluginMigration) && featureGate.Enabled(pluginMigrationComplete) {
-		klog.Infof("Skip registration of plugin %s since feature flag %v is enabled", inTreePluginName, pluginMigrationComplete)
+		klog.InfoS("Skip registration of plugin %s since feature flag %v is enabled", inTreePluginName, pluginMigrationComplete)
 		return plugins, nil
 	}
 	plugins = append(plugins, fn()...)
