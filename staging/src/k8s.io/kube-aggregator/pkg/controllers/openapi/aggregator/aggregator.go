@@ -106,10 +106,10 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	}
 
 	// Build initial spec to serve.
-	klog.V(2).Infof("Building initial OpenAPI spec")
+	klog.V(2).InfoS("Building initial OpenAPI spec")
 	defer func(start time.Time) {
 		duration := time.Since(start)
-		klog.V(2).Infof("Finished initial OpenAPI spec generation after %v", duration)
+		klog.V(2).InfoS("Finished initial OpenAPI spec generation after duration", "duration", duration)
 
 		regenerationCounter.With(map[string]string{"apiservice": "*", "reason": "startup"})
 		regenerationDurationGauge.With(map[string]string{"reason": "startup"}).Set(duration.Seconds())
@@ -228,10 +228,10 @@ func (s *specAggregator) tryUpdatingServiceSpecs(specInfo *openAPISpecInfo) erro
 	if existedBefore && origSpecInfo != nil && origSpecInfo.etag == specInfo.etag {
 		return nil
 	}
-	klog.V(2).Infof("Updating OpenAPI spec because %s is updated", specInfo.apiService.Name)
+	klog.V(2).InfoS("Updating OpenAPI spec because specInfo is updated", "specInfo", specInfo.apiService.Name)
 	defer func(start time.Time) {
 		duration := time.Since(start)
-		klog.V(2).Infof("Finished OpenAPI spec generation after %v", duration)
+		klog.V(2).InfoS("Finished OpenAPI spec generation after sometime", "duration", duration)
 
 		reason := "add"
 		if updated {
@@ -260,10 +260,10 @@ func (s *specAggregator) tryDeleteServiceSpecs(apiServiceName string) error {
 		return nil
 	}
 	delete(s.openAPISpecs, apiServiceName)
-	klog.V(2).Infof("Updating OpenAPI spec because %s is removed", apiServiceName)
+	klog.V(2).InfoS("Updating OpenAPI spec because apiService is removed", "apiServiceName", apiServiceName)
 	defer func(start time.Time) {
 		duration := time.Since(start)
-		klog.V(2).Infof("Finished OpenAPI spec generation after %v", duration)
+		klog.V(2).InfoS("Finished OpenAPI spec generation after some time", "duration", duration)
 
 		regenerationCounter.With(map[string]string{"apiservice": apiServiceName, "reason": "delete"})
 		regenerationDurationGauge.With(map[string]string{"reason": "delete"}).Set(duration.Seconds())
