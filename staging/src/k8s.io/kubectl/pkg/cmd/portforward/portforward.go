@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strconv"
 	"strings"
@@ -49,6 +50,7 @@ import (
 type PortForwardOptions struct {
 	Namespace     string
 	PodName       string
+	Command       []string
 	RESTClient    *restclient.RESTClient
 	Config        *restclient.Config
 	PodClient     corev1client.PodsGetter
@@ -57,6 +59,8 @@ type PortForwardOptions struct {
 	PortForwarder portForwarder
 	StopChannel   chan struct{}
 	ReadyChannel  chan struct{}
+
+	genericclioptions.IOStreams
 }
 
 var (
@@ -89,7 +93,10 @@ var (
 		kubectl port-forward --address localhost,10.19.21.23 pod/mypod 8888:5000
 
 		# Listen on a random port locally, forwarding to 5000 in the pod
-		kubectl port-forward pod/mypod :5000`))
+		kubectl port-forward pod/mypod :5000
+		
+		# Listen on port 5432 locally, forwarding data to/from 5432 in the pod, then execute the provided command on the local machine.
+		kubectl port-forward pod/postgres 5432 -- psql -h localhost -p 5432 -c "select 1"`))
 )
 
 const (
@@ -99,20 +106,22 @@ const (
 
 func NewCmdPortForward(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	opts := &PortForwardOptions{
+		IOStreams: streams,
 		PortForwarder: &defaultPortForwarder{
 			IOStreams: streams,
 		},
 	}
 	cmd := &cobra.Command{
-		Use:                   "port-forward TYPE/NAME [options] [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
+		Use:                   "port-forward TYPE/NAME [options] [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N] [-- COMMAND [args...]]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Forward one or more local ports to a pod"),
 		Long:                  portforwardLong,
 		Example:               portforwardExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(opts.Complete(f, cmd, args))
-			cmdutil.CheckErr(opts.Validate())
-			cmdutil.CheckErr(opts.RunPortForward())
+			argsLenAtDash := cmd.ArgsLenAtDash()
+			cmdutil.CheckErr(opts.Complete(f, cmd, args, argsLenAtDash))
+			cmdutil.CheckErr(opts.Validate(argsLenAtDash))
+			cmdutil.CheckErr(opts.Run())
 		},
 	}
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodPortForwardWaitTimeout)
@@ -288,10 +297,18 @@ func checkUDPPortInPod(ports []string, pod *corev1.Pod) error {
 }
 
 // Complete completes all the required options for port-forward cmd.
-func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, argsLenAtDash int) error {
 	var err error
 	if len(args) < 2 {
 		return cmdutil.UsageErrorf(cmd, "TYPE/NAME and list of ports are required for port-forward")
+	}
+
+	var ports []string
+	if argsLenAtDash > -1 {
+		o.Command = args[argsLenAtDash:]
+		ports = args[1:argsLenAtDash]
+	} else {
+		ports = args[1:]
 	}
 
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
@@ -327,20 +344,20 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	// handle service port mapping to target port if needed
 	switch t := obj.(type) {
 	case *corev1.Service:
-		err = checkUDPPortInService(args[1:], t)
+		err = checkUDPPortInService(ports, t)
 		if err != nil {
 			return err
 		}
-		o.Ports, err = translateServicePortToTargetPort(args[1:], *t, *forwardablePod)
+		o.Ports, err = translateServicePortToTargetPort(ports, *t, *forwardablePod)
 		if err != nil {
 			return err
 		}
 	default:
-		err = checkUDPPortInPod(args[1:], forwardablePod)
+		err = checkUDPPortInPod(ports, forwardablePod)
 		if err != nil {
 			return err
 		}
-		o.Ports, err = convertPodNamedPortToNumber(args[1:], *forwardablePod)
+		o.Ports, err = convertPodNamedPortToNumber(ports, *forwardablePod)
 		if err != nil {
 			return err
 		}
@@ -368,9 +385,13 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 }
 
 // Validate validates all the required options for port-forward cmd.
-func (o PortForwardOptions) Validate() error {
+func (o PortForwardOptions) Validate(argsLenAtDash int) error {
 	if len(o.PodName) == 0 {
 		return fmt.Errorf("pod name or resource type/name must be specified")
+	}
+
+	if argsLenAtDash > -1 && len(o.Command) == 0 {
+		return fmt.Errorf("you must specify at least one command")
 	}
 
 	if len(o.Ports) < 1 {
@@ -383,8 +404,8 @@ func (o PortForwardOptions) Validate() error {
 	return nil
 }
 
-// RunPortForward implements all the necessary functionality for port-forward cmd.
-func (o PortForwardOptions) RunPortForward() error {
+// Run implements all the necessary functionality for port-forward cmd.
+func (o PortForwardOptions) Run() error {
 	pod, err := o.PodClient.Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -398,8 +419,14 @@ func (o PortForwardOptions) RunPortForward() error {
 	signal.Notify(signals, os.Interrupt)
 	defer signal.Stop(signals)
 
+	stopChan := make(chan struct{}, 1)
+
 	go func() {
-		<-signals
+		select {
+		case <-signals:
+		case <-stopChan:
+		}
+
 		if o.StopChannel != nil {
 			close(o.StopChannel)
 		}
@@ -411,5 +438,30 @@ func (o PortForwardOptions) RunPortForward() error {
 		Name(pod.Name).
 		SubResource("portforward")
 
-	return o.PortForwarder.ForwardPorts("POST", req.URL(), o)
+	if len(o.Command) == 0 {
+		return o.PortForwarder.ForwardPorts("POST", req.URL(), o)
+	}
+
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- o.PortForwarder.ForwardPorts("POST", req.URL(), o)
+	}()
+
+	cmd := exec.Command(o.Command[0], o.Command[1:]...)
+	cmd.Stdin = o.In
+	cmd.Stdout = o.Out
+	cmd.Stderr = o.ErrOut
+
+	select {
+	case <-o.ReadyChannel:
+		go func() {
+			err := cmd.Run()
+			close(stopChan)
+			errChan <- err
+		}()
+	case err := <-errChan:
+		return err
+	}
+
+	return <-errChan
 }
