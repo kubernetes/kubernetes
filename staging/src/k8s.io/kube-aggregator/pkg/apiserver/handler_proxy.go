@@ -99,7 +99,7 @@ func proxyError(w http.ResponseWriter, req *http.Request, error string, code int
 	ctx := req.Context()
 	info, ok := genericapirequest.RequestInfoFrom(ctx)
 	if !ok {
-		klog.Warning("no RequestInfo found in the context")
+		klog.InfoS("no RequestInfo found in the context")
 		return
 	}
 	// TODO: record long-running request differently? The long-running check func does not necessarily match the one of the aggregated apiserver
@@ -143,7 +143,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	location.Scheme = "https"
 	rloc, err := r.serviceResolver.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName, handlingInfo.servicePort)
 	if err != nil {
-		klog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
+		klog.ErrorS(err, "error resolving", "service", klog.KRef(handlingInfo.serviceNamespace, handlingInfo.serviceName))
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
 		return
 	}
@@ -271,7 +271,7 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 		var egressDialer utilnet.DialFunc
 		egressDialer, err := r.egressSelector.Lookup(networkContext)
 		if err != nil {
-			klog.Warning(err.Error())
+			klog.InfoS(err.Error())
 		} else {
 			newInfo.restConfig.Dial = egressDialer
 		}
@@ -280,7 +280,7 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 	}
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)
 	if newInfo.transportBuildingError != nil {
-		klog.Warning(newInfo.transportBuildingError.Error())
+		klog.InfoS(newInfo.transportBuildingError.Error())
 	}
 	r.handlingInfo.Store(newInfo)
 }

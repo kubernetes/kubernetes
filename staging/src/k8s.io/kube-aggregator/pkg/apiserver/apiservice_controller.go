@@ -94,8 +94,8 @@ func (c *APIServiceRegistrationController) Run(stopCh <-chan struct{}, handlerSy
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting APIServiceRegistrationController")
-	defer klog.Infof("Shutting down APIServiceRegistrationController")
+	klog.InfoS("Starting APIServiceRegistrationController")
+	defer klog.InfoS("Shutting down APIServiceRegistrationController")
 
 	if !controllers.WaitForCacheSync("APIServiceRegistrationController", stopCh, c.apiServiceSynced) {
 		return
@@ -158,7 +158,7 @@ func (c *APIServiceRegistrationController) processNextWorkItem() bool {
 func (c *APIServiceRegistrationController) enqueueInternal(obj *v1.APIService) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		klog.Errorf("Couldn't get key for object %#v: %v", obj, err)
+		klog.ErrorS(err, "Couldn't get key for object", "object", obj)
 		return
 	}
 
@@ -167,13 +167,13 @@ func (c *APIServiceRegistrationController) enqueueInternal(obj *v1.APIService) {
 
 func (c *APIServiceRegistrationController) addAPIService(obj interface{}) {
 	castObj := obj.(*v1.APIService)
-	klog.V(4).Infof("Adding %s", castObj.Name)
+	klog.V(4).InfoS("Adding", "object", castObj.Name)
 	c.enqueueInternal(castObj)
 }
 
 func (c *APIServiceRegistrationController) updateAPIService(obj, _ interface{}) {
 	castObj := obj.(*v1.APIService)
-	klog.V(4).Infof("Updating %s", castObj.Name)
+	klog.V(4).InfoS("Updating", "object", castObj.Name)
 	c.enqueueInternal(castObj)
 }
 
@@ -182,16 +182,16 @@ func (c *APIServiceRegistrationController) deleteAPIService(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			klog.Errorf("Couldn't get object from tombstone %#v", obj)
+			klog.ErrorS(nil, "Couldn't get object from tombstone", "object", obj)
 			return
 		}
 		castObj, ok = tombstone.Obj.(*v1.APIService)
 		if !ok {
-			klog.Errorf("Tombstone contained object that is not expected %#v", obj)
+			klog.ErrorS(nil, "Tombstone contained object that is not expected", "object",obj)
 			return
 		}
 	}
-	klog.V(4).Infof("Deleting %q", castObj.Name)
+	klog.V(4).InfoS("Deleting", "object", castObj.Name)
 	c.enqueueInternal(castObj)
 }
 
