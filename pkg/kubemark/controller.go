@@ -251,7 +251,7 @@ func (kubemarkController *KubemarkController) RemoveNodeFromNodeGroup(nodeGroup 
 		err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(namespaceKubemark).Delete(context.TODO(), pod.ObjectMeta.Labels["name"],
 			metav1.DeleteOptions{PropagationPolicy: &policy})
 		if err == nil {
-			klog.Infof("marking node %s for deletion", node)
+			klog.InfoS("Marking node for deletion", "node", klog.KRef("", node))
 			// Mark node for deletion from kubemark cluster.
 			// Once it becomes unready after replication controller
 			// deletion has been noticed, we will delete it explicitly.

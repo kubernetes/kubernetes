@@ -18,6 +18,7 @@ package kubemark
 
 import (
 	"fmt"
+	"k8s.io/utils/mount"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -153,7 +154,7 @@ type HollowKubletOptions struct {
 func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
 	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
 	podFilePath := utils.MakeTempDirOrDie("static-pods", testRootDir)
-	klog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
+	klog.InfoS("Using testRootDir as root dir for hollow-kubelet", "testRootDir", testRootDir)
 
 	// Flags struct
 	f := options.NewKubeletFlags()
