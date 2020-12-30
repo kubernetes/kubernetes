@@ -21,6 +21,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/i18n"
 )
 
 // NewCmdAuth returns an initialized Command instance for 'auth' sub command
@@ -28,8 +29,8 @@ func NewCmdAuth(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "auth",
-		Short: "Inspect authorization",
-		Long:  `Inspect authorization`,
+		Short: i18n.T("Inspect authorization"),
+		Long:  i18n.T("Inspect authorization"),
 		Run:   cmdutil.DefaultSubCommandRun(streams.ErrOut),
 	}
 

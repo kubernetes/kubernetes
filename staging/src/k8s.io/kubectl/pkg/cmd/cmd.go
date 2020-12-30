@@ -440,11 +440,11 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:   "kubectl",
 		Short: i18n.T("kubectl controls the Kubernetes cluster manager"),
-		Long: templates.LongDesc(`
+		Long: templates.LongDesc(i18n.T(`
       kubectl controls the Kubernetes cluster manager.
 
       Find more information at:
-            https://kubernetes.io/docs/reference/kubectl/overview/`),
+            https://kubernetes.io/docs/reference/kubectl/overview/`)),
 		Run: runHelp,
 		// Hook before and after Run initialize and write profiles to disk,
 		// respectively.

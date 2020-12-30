@@ -41,6 +41,7 @@ import (
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
+	"k8s.io/kubectl/pkg/util/i18n"
 	rbacutil "k8s.io/kubectl/pkg/util/rbac"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -66,15 +67,15 @@ type CanIOptions struct {
 }
 
 var (
-	canILong = templates.LongDesc(`
+	canILong = templates.LongDesc(i18n.T(`
 		Check whether an action is allowed.
 
 		VERB is a logical Kubernetes API verb like 'get', 'list', 'watch', 'delete', etc.
 		TYPE is a Kubernetes resource. Shortcuts and groups will be resolved.
 		NONRESOURCEURL is a partial URL starts with "/".
-		NAME is the name of a particular Kubernetes resource.`)
+		NAME is the name of a particular Kubernetes resource.`))
 
-	canIExample = templates.Examples(`
+	canIExample = templates.Examples(i18n.T(`
 		# Check to see if I can create pods in any namespace
 		kubectl auth can-i create pods --all-namespaces
 
@@ -94,7 +95,7 @@ var (
 		kubectl auth can-i get /logs/
 
 		# List all allowed actions in namespace "foo"
-		kubectl auth can-i --list --namespace=foo`)
+		kubectl auth can-i --list --namespace=foo`))
 
 	resourceVerbs       = sets.NewString("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection", "use", "bind", "impersonate", "*")
 	nonResourceURLVerbs = sets.NewString("get", "put", "post", "head", "options", "delete", "patch", "*")
@@ -109,7 +110,7 @@ func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd := &cobra.Command{
 		Use:                   "can-i VERB [TYPE | TYPE/NAME | NONRESOURCEURL]",
 		DisableFlagsInUseLine: true,
-		Short:                 "Check whether an action is allowed",
+		Short:                 i18n.T("Check whether an action is allowed"),
 		Long:                  canILong,
 		Example:               canIExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -35,6 +35,7 @@ import (
 	"k8s.io/component-helpers/auth/rbac/reconciliation"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -57,7 +58,7 @@ type ReconcileOptions struct {
 }
 
 var (
-	reconcileLong = templates.LongDesc(`
+	reconcileLong = templates.LongDesc(i18n.T(`
 		Reconciles rules for RBAC Role, RoleBinding, ClusterRole, and ClusterRoleBinding objects.
 
 		Missing objects are created, and the containing namespace is created for namespaced objects, if required.
@@ -68,11 +69,11 @@ var (
 		Existing bindings are updated to include the subjects in the input objects,
 		and remove extra subjects if --remove-extra-subjects is specified.
 
-		This is preferred to 'apply' for RBAC resources so that semantically-aware merging of rules and subjects is done.`)
+		This is preferred to 'apply' for RBAC resources so that semantically-aware merging of rules and subjects is done.`))
 
-	reconcileExample = templates.Examples(`
+	reconcileExample = templates.Examples(i18n.T(`
 		# Reconcile rbac resources from a file
-		kubectl auth reconcile -f my-rbac-rules.yaml`)
+		kubectl auth reconcile -f my-rbac-rules.yaml`))
 )
 
 // NewReconcileOptions returns a new ReconcileOptions instance
@@ -91,7 +92,7 @@ func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd := &cobra.Command{
 		Use:                   "reconcile -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:                 "Reconciles rules for RBAC Role, RoleBinding, ClusterRole, and ClusterRoleBinding objects",
+		Short:                 i18n.T("Reconciles rules for RBAC Role, RoleBinding, ClusterRole, and ClusterRoleBinding objects"),
 		Long:                  reconcileLong,
 		Example:               reconcileExample,
 		Run: func(cmd *cobra.Command, args []string) {
