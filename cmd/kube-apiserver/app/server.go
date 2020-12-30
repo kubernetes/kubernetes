@@ -179,7 +179,7 @@ cluster's shared state through which all other components interact.`,
 // Run runs the specified APIServer.  This should never exit.
 func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
-	klog.Infof("Version: %+v", version.Get())
+	klog.InfoS("Version: %+v", version.Get())
 
 	server, err := CreateServerChain(completeOptions, stopCh)
 	if err != nil {
@@ -629,7 +629,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 				return options, fmt.Errorf("error finding host name: %v", err)
 			}
 		}
-		klog.Infof("external host was not specified, using %v", s.GenericServerRunOptions.ExternalHost)
+		klog.InfoS("external host was not specified, using %v", s.GenericServerRunOptions.ExternalHost)
 	}
 
 	s.Authentication.ApplyAuthorization(s.Authorization)
@@ -645,7 +645,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 			if kubeauthenticator.IsValidServiceAccountKeyFile(s.SecureServing.ServerCert.CertKey.KeyFile) {
 				s.Authentication.ServiceAccounts.KeyFiles = []string{s.SecureServing.ServerCert.CertKey.KeyFile}
 			} else {
-				klog.Warning("No TLS key provided, service account token authentication disabled")
+				klog.InfoS("No TLS key provided, service account token authentication disabled")
 			}
 		}
 	}
@@ -664,10 +664,10 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 			}
 			if s.Authentication.ServiceAccounts.ExtendExpiration {
 				if s.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.WarnOnlyBoundTokenExpirationSeconds*time.Second {
-					klog.Warningf("service-account-extend-token-expiration is true, in order to correctly trigger safe transition logic, service-account-max-token-expiration must be set longer than 3607 seconds (currently %s)", s.Authentication.ServiceAccounts.MaxExpiration)
+					klog.InfoS("service-account-extend-token-expiration is true, in order to correctly trigger safe transition logic, service-account-max-token-expiration must be set longer than 3607 seconds (currently %s)", s.Authentication.ServiceAccounts.MaxExpiration)
 				}
 				if s.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.ExpirationExtensionSeconds*time.Second {
-					klog.Warningf("service-account-extend-token-expiration is true, enabling tokens valid up to 1 year, which is longer than service-account-max-token-expiration set to %s", s.Authentication.ServiceAccounts.MaxExpiration)
+					klog.InfoS("service-account-extend-token-expiration is true, enabling tokens valid up to 1 year, which is longer than service-account-max-token-expiration set to %s", s.Authentication.ServiceAccounts.MaxExpiration)
 				}
 			}
 		}
