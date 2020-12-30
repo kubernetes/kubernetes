@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/coredns/corefile-migration/migration"
 	"github.com/pkg/errors"
@@ -116,7 +117,7 @@ func checkMigration(client clientset.Interface) error {
 		return err
 	}
 
-	_, err = migration.Migrate(currentInstalledCoreDNSversion, kubeadmconstants.CoreDNSVersion, corefile, false)
+	_, err = migration.Migrate(currentInstalledCoreDNSversion, strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v"), corefile, false)
 	if err != nil {
 		return errors.Wrap(err, "CoreDNS will not be upgraded")
 	}
