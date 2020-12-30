@@ -2162,6 +2162,16 @@
     The content MUST be accessible from all the mapped volume mounts.
   release: v1.9
   file: test/e2e/common/configmap_volume.go
+- testname: ConfigMap Volume, immutability
+  codename: '[sig-storage] ConfigMap should be immutable if `immutable` field is set
+    [Conformance]'
+  description: Create a ConfigMap. Update it's data field, the update MUST succeed.
+    Mark the ConfigMap as immutable, the update MUST succeed. Try to update its data,
+    the update MUST fail. Try to mark the ConfigMap back as not immutable, the update
+    MUST fail. Try to update the ConfigMap`s metadata (labels), the update must succeed.
+    Try to delete the ConfigMap, the deletion must succeed.
+  release: v1.21
+  file: test/e2e/common/configmap_volume.go
 - testname: ConfigMap Volume, update
   codename: '[sig-storage] ConfigMap updates should be reflected in volume [NodeConformance]
     [Conformance]'
@@ -2770,6 +2780,16 @@
     into the container in to two different custom paths. Pod MUST be able to read
     the secret from the both the mounted volumes from the two specified custom paths.
   release: v1.9
+  file: test/e2e/common/secrets_volume.go
+- testname: Secrets Volume, immutability
+  codename: '[sig-storage] Secrets should be immutable if `immutable` field is set
+    [Conformance]'
+  description: Create a secret. Update it's data field, the update MUST succeed. Mark
+    the secret as immutable, the update MUST succeed. Try to update its data, the
+    update MUST fail. Try to mark the secret back as not immutable, the update MUST
+    fail. Try to update the secret`s metadata (labels), the update must succeed. Try
+    to delete the secret, the deletion must succeed.
+  release: v1.21
   file: test/e2e/common/secrets_volume.go
 - testname: 'SubPath: Reading content from a configmap volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
