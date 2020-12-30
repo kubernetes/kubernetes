@@ -95,6 +95,9 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	// TODO: remove "certs" from "alpha"
 	// https://github.com/kubernetes/kubeadm/issues/2291
 	cmds.AddCommand(alpha.NewCmdCertsUtility(out))
+	// TODO: remove "kubeconfig" from "alpha"
+	// https://github.com/kubernetes/kubeadm/issues/2292
+	cmds.AddCommand(alpha.NewCmdKubeConfigUtility(out))
 
 	return cmds
 }
