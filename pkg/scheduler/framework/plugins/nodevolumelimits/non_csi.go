@@ -224,7 +224,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 		if err != nil {
 			// we don't fail here because the CSINode object is only necessary
 			// for determining whether the migration is enabled or not
-			klog.V(5).Infof("Could not get a CSINode object for the node: %v", err)
+			klog.ErrorS(err, "Could not get a CSINode object for the node")
 		}
 	}
 
@@ -286,7 +286,7 @@ func (pl *nonCSILimits) filterVolumes(volumes []v1.Volume, namespace string, fil
 			if err != nil || pvc == nil {
 				// If the PVC is invalid, we don't count the volume because
 				// there's no guarantee that it belongs to the running predicate.
-				klog.V(4).Infof("Unable to look up PVC info for %s/%s, assuming PVC doesn't match predicate when counting limits: %v", namespace, pvcName, err)
+				klog.ErrorS(err, "Unable to look up PVC info, assuming PVC doesn't match predicate when counting limits", "namespace", namespace, "pvcName", pvcName)
 				continue
 			}
 
@@ -297,7 +297,7 @@ func (pl *nonCSILimits) filterVolumes(volumes []v1.Volume, namespace string, fil
 				// original PV where it was bound to, so we count the volume if
 				// it belongs to the running predicate.
 				if pl.matchProvisioner(pvc) {
-					klog.V(4).Infof("PVC %s/%s is not bound, assuming PVC matches predicate when counting limits", namespace, pvcName)
+					klog.V(4).InfoS("PVC is not bound, assuming PVC matches predicate when counting limits", "namespace", namespace, "pvcName", pvcName)
 					filteredVolumes[pvID] = true
 				}
 				continue
@@ -308,7 +308,7 @@ func (pl *nonCSILimits) filterVolumes(volumes []v1.Volume, namespace string, fil
 				// If the PV is invalid and PVC belongs to the running predicate,
 				// log the error and count the PV towards the PV limit.
 				if pl.matchProvisioner(pvc) {
-					klog.V(4).Infof("Unable to look up PV info for %s/%s/%s, assuming PV matches predicate when counting limits: %v", namespace, pvcName, pvName, err)
+					klog.ErrorS(err, "Unable to look up PV info, assuming PV matches predicate when counting limits", "namespace", namespace, "pvcName", pvcName, "pvName", pvName )
 					filteredVolumes[pvID] = true
 				}
 				continue
@@ -341,7 +341,7 @@ func (pl *nonCSILimits) matchProvisioner(pvc *v1.PersistentVolumeClaim) bool {
 func getMaxVolLimitFromEnv() int {
 	if rawMaxVols := os.Getenv(KubeMaxPDVols); rawMaxVols != "" {
 		if parsedMaxVols, err := strconv.Atoi(rawMaxVols); err != nil {
-			klog.Errorf("Unable to parse maximum PD volumes value, using default: %v", err)
+			klog.ErrorS(err, "Unable to parse maximum PD volumes value, using default")
 		} else if parsedMaxVols <= 0 {
 			klog.Errorf("Maximum PD volumes must be a positive value, using default")
 		} else {

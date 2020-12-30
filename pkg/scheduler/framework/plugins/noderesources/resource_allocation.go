@@ -104,9 +104,7 @@ func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.P
 		}
 	}
 	if klog.V(10).Enabled() {
-		klog.Infof("requested resource %v not considered for node score calculation",
-			resource,
-		)
+		klog.InfoS("requested resource not considered for node score calculation", "resource", resource)
 	}
 	return 0, 0
 }

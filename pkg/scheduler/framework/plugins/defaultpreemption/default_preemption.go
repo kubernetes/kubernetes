@@ -123,13 +123,13 @@ func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.Cycle
 	// However, tests may need to manually initialize the shared pod informer.
 	pod, err := pl.podLister.Pods(pod.Namespace).Get(pod.Name)
 	if err != nil {
-		klog.Errorf("Error getting the updated preemptor pod object: %v", err)
+		klog.ErrorS(err, "Error getting the updated preemptor pod object")
 		return "", err
 	}
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
 	if !PodEligibleToPreemptOthers(pod, nodeLister, m[pod.Status.NominatedNodeName]) {
-		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
+		klog.V(5).InfoS("Pod is not eligible for more preemption.", "pod", klog.KObj(pod))
 		return "", nil
 	}
 
@@ -193,10 +193,10 @@ func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framewor
 
 	potentialNodes := nodesWherePreemptionMightHelp(allNodes, m)
 	if len(potentialNodes) == 0 {
-		klog.V(3).Infof("Preemption will not help schedule pod %v/%v on any node.", pod.Namespace, pod.Name)
+		klog.V(3).InfoS("Preemption will not help schedule pod on any node.", "pod", klog.KObj(pod))
 		// In this case, we should clean-up any existing nominated node name of the pod.
 		if err := util.ClearNominatedNodeName(pl.fh.ClientSet(), pod); err != nil {
-			klog.Errorf("Cannot clear 'NominatedNodeName' field of pod %v/%v: %v", pod.Namespace, pod.Name, err)
+			klog.ErrorS(err, "Cannot clear 'NominatedNodeName' field of pod", "pod", klog.KObj(pod))
 			// We do not return as this error is not critical.
 		}
 		return nil, nil
@@ -227,7 +227,7 @@ func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framewor
 // terminating pods on the node, we don't consider this for preempting more pods.
 func PodEligibleToPreemptOthers(pod *v1.Pod, nodeInfos framework.NodeInfoLister, nominatedNodeStatus *framework.Status) bool {
 	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
-		klog.V(5).Infof("Pod %v/%v is not eligible for preemption because it has a preemptionPolicy of %v", pod.Namespace, pod.Name, v1.PreemptNever)
+		klog.V(5).InfoS("Pod is not eligible for preemption because it has a preemptionPolicy of PreemptNever", "pod", klog.KObj(pod))
 		return false
 	}
 	nomNodeName := pod.Status.NominatedNodeName
@@ -363,8 +363,7 @@ func CallExtenders(extenders []framework.Extender, pod *v1.Pod, nodeLister frame
 		nodeNameToVictims, err := extender.ProcessPreemption(pod, victimsMap, nodeLister)
 		if err != nil {
 			if extender.IsIgnorable() {
-				klog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
-					extender, err)
+				klog.InfoS("Skipping extender as it returned error and has ignorable flag set", "extender", extender, "error", err)
 				continue
 			}
 			return nil, err
@@ -625,7 +624,7 @@ func selectVictimsOnNode(
 	// priority pods is not a recommended configuration anyway.
 	if fits, _, err := core.PodPassesFiltersOnNode(ctx, ph, state, pod, nodeInfo); !fits {
 		if err != nil {
-			klog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
+			klog.ErrorS(err, "Encountered error while selecting victims on node", "node", nodeInfo.Node().Name)
 		}
 
 		return nil, 0, false
@@ -647,13 +646,13 @@ func selectVictimsOnNode(
 				return false, err
 			}
 			victims = append(victims, p)
-			klog.V(5).Infof("Pod %v/%v is a potential preemption victim on node %v.", p.Namespace, p.Name, nodeInfo.Node().Name)
+			klog.V(5).InfoS("Pod is a potential preemption victim on node", "pod", klog.KObj(p), "node", nodeInfo.Node().Name)
 		}
 		return fits, nil
 	}
 	for _, p := range violatingVictims {
 		if fits, err := reprievePod(p); err != nil {
-			klog.Warningf("Failed to reprieve pod %q: %v", p.Name, err)
+			klog.ErrorS(err, "Failed to reprieve pod", "pod", klog.KObj(p))
 			return nil, 0, false
 		} else if !fits {
 			numViolatingVictim++
@@ -662,7 +661,7 @@ func selectVictimsOnNode(
 	// Now we try to reprieve non-violating victims.
 	for _, p := range nonViolatingVictims {
 		if _, err := reprievePod(p); err != nil {
-			klog.Warningf("Failed to reprieve pod %q: %v", p.Name, err)
+			klog.ErrorS(err, "Failed to reprieve pod", "pod", klog.KObj(p))
 			return nil, 0, false
 		}
 	}
@@ -676,7 +675,7 @@ func selectVictimsOnNode(
 func PrepareCandidate(c Candidate, fh framework.Handle, cs kubernetes.Interface, pod *v1.Pod) error {
 	for _, victim := range c.Victims().Pods {
 		if err := util.DeletePod(cs, victim); err != nil {
-			klog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
+			klog.ErrorS(err, "Error preempting pod", "pod", klog.KObj(victim))
 			return err
 		}
 		// If the victim is a WaitingPod, send a reject message to the PermitPlugin
@@ -694,7 +693,7 @@ func PrepareCandidate(c Candidate, fh framework.Handle, cs kubernetes.Interface,
 	// lets scheduler find another place for them.
 	nominatedPods := getLowerPriorityNominatedPods(fh.PreemptHandle(), pod, c.Name())
 	if err := util.ClearNominatedNodeName(cs, nominatedPods...); err != nil {
-		klog.Errorf("Cannot clear 'NominatedNodeName' field: %v", err)
+		klog.ErrorS(err, "Cannot clear 'NominatedNodeName' field")
 		// We do not return as this error is not critical.
 	}
 

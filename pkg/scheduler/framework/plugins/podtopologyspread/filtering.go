@@ -294,7 +294,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		tpKey := c.TopologyKey
 		tpVal, ok := node.Labels[c.TopologyKey]
 		if !ok {
-			klog.V(5).Infof("node '%s' doesn't have required label '%s'", node.Name, tpKey)
+			klog.V(5).InfoS("node doesn't have required label", "node", node.Name, "label", tpKey)
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNodeLabelNotMatch)
 		}
 
