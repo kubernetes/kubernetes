@@ -62,6 +62,8 @@ type CanIOptions struct {
 	ResourceName   string
 	List           bool
 
+	allowed bool
+
 	genericclioptions.IOStreams
 }
 
@@ -103,6 +105,7 @@ var (
 // NewCmdCanI returns an initialized Command for 'auth can-i' sub command
 func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CanIOptions{
+		allowed:   true,
 		IOStreams: streams,
 	}
 
@@ -245,6 +248,11 @@ func (o *CanIOptions) RunAccessList() error {
 
 // RunAccessCheck checks if user has access to a certain resource or non resource URL
 func (o *CanIOptions) RunAccessCheck() (bool, error) {
+	if !o.allowed {
+		fmt.Fprintln(o.Out, "no")
+		return false, nil
+	}
+
 	var sar *authorizationv1.SelfSubjectAccessReview
 	if o.NonResourceURL == "" {
 		sar = &authorizationv1.SelfSubjectAccessReview{
@@ -309,6 +317,7 @@ func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) sc
 			} else {
 				fmt.Fprintf(o.ErrOut, "Warning: the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group)
 			}
+			o.allowed = false
 			return schema.GroupVersionResource{Resource: resourceArg}
 		}
 	}

@@ -784,7 +784,7 @@ runTests() {
     output_message=$(kubectl auth can-i get pods --subresource=log 2>&1 "${kube_flags[@]}")
     kube::test::if_has_string "${output_message}" "yes"
 
-    output_message=$(kubectl auth can-i get invalid_resource 2>&1 "${kube_flags[@]}")
+    output_message=$(! kubectl auth can-i get invalid_resource 2>&1 "${kube_flags[@]}")
     kube::test::if_has_string "${output_message}" "the server doesn't have a resource type"
 
     output_message=$(kubectl auth can-i get /logs/ 2>&1 "${kube_flags[@]}")
@@ -807,7 +807,7 @@ runTests() {
     kube::test::if_has_not_string "${output_message}" "Warning"
 
     # kubectl auth can-i get foo does not print a namespaced warning message, and only prints a single lookup error
-    output_message=$(kubectl auth can-i get foo 2>&1 "${kube_flags[@]}")
+    output_message=$(! kubectl auth can-i get foo 2>&1 "${kube_flags[@]}")
     kube::test::if_has_string "${output_message}" "Warning: the server doesn't have a resource type 'foo'"
     kube::test::if_has_not_string "${output_message}" "Warning: resource 'foo' is not namespace scoped"
 

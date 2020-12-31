@@ -45,8 +45,10 @@ func TestRunAccessCheck(t *testing.T) {
 		expectedBodyStrings []string
 	}{
 		{
-			name:    "restmapping for args",
-			o:       &CanIOptions{},
+			name: "restmapping for args",
+			o: &CanIOptions{
+				allowed: true,
+			},
 			args:    []string{"get", "replicaset"},
 			allowed: true,
 			expectedBodyStrings: []string{
@@ -54,8 +56,10 @@ func TestRunAccessCheck(t *testing.T) {
 			},
 		},
 		{
-			name:    "simple success",
-			o:       &CanIOptions{},
+			name: "simple success",
+			o: &CanIOptions{
+				allowed: true,
+			},
 			args:    []string{"get", "deployments.extensions/foo"},
 			allowed: true,
 			expectedBodyStrings: []string{
@@ -66,6 +70,7 @@ func TestRunAccessCheck(t *testing.T) {
 			name: "all namespaces",
 			o: &CanIOptions{
 				AllNamespaces: true,
+				allowed:       true,
 			},
 			args:    []string{"get", "deployments.extensions/foo"},
 			allowed: true,
@@ -77,6 +82,7 @@ func TestRunAccessCheck(t *testing.T) {
 			name: "disallowed",
 			o: &CanIOptions{
 				AllNamespaces: true,
+				allowed:       true,
 			},
 			args:    []string{"get", "deployments.extensions/foo"},
 			allowed: false,
@@ -88,6 +94,7 @@ func TestRunAccessCheck(t *testing.T) {
 			name: "forcedError",
 			o: &CanIOptions{
 				AllNamespaces: true,
+				allowed:       true,
 			},
 			args:      []string{"get", "deployments.extensions/foo"},
 			allowed:   false,
@@ -101,6 +108,7 @@ func TestRunAccessCheck(t *testing.T) {
 			o: &CanIOptions{
 				AllNamespaces: true,
 				Subresource:   "log",
+				allowed:       true,
 			},
 			args:    []string{"get", "pods"},
 			allowed: true,
@@ -109,12 +117,36 @@ func TestRunAccessCheck(t *testing.T) {
 			},
 		},
 		{
-			name:    "nonResourceURL",
-			o:       &CanIOptions{},
+			name: "nonResourceURL",
+			o: &CanIOptions{
+				allowed: true,
+			},
 			args:    []string{"get", "/logs"},
 			allowed: true,
 			expectedBodyStrings: []string{
 				`{"nonResourceAttributes":{"path":"/logs","verb":"get"}}`,
+			},
+		},
+		{
+			name: "nonExistentResource1",
+			o: &CanIOptions{
+				allowed: true,
+			},
+			args:    []string{"get", "foo"},
+			allowed: false,
+			expectedBodyStrings: []string{
+				`{"resourceAttributes":{"namespace":"test","verb":"get","resource":"foo"}}`,
+			},
+		},
+		{
+			name: "nonExistentResource2",
+			o: &CanIOptions{
+				allowed: true,
+			},
+			args:    []string{"get", "deployment.extensions"},
+			allowed: false,
+			expectedBodyStrings: []string{
+				`{"resourceAttributes":{"namespace":"test","verb":"get","group":"extensions","resource":"deployments"}}`,
 			},
 		},
 	}
@@ -187,7 +219,10 @@ func TestRunAccessCheck(t *testing.T) {
 
 func TestRunAccessList(t *testing.T) {
 	t.Run("test access list", func(t *testing.T) {
-		options := &CanIOptions{List: true}
+		options := &CanIOptions{
+			List:    true,
+			allowed: true,
+		}
 		expectedOutput := "Resources   Non-Resource URLs   Resource Names    Verbs\n" +
 			"job.*       []                  [test-resource]   [get list]\n" +
 			"pod.*       []                  [test-resource]   [get list]\n" +
