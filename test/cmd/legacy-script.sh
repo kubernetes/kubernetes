@@ -787,6 +787,9 @@ runTests() {
     output_message=$(! kubectl auth can-i get invalid_resource 2>&1 "${kube_flags[@]}")
     kube::test::if_has_string "${output_message}" "the server doesn't have a resource type"
 
+    output_message=$(! kubectl auth can-i invalid_verb pods 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "Warning: verb 'invalid_verb' is not a known verb"
+
     output_message=$(kubectl auth can-i get /logs/ 2>&1 "${kube_flags[@]}")
     kube::test::if_has_string "${output_message}" "yes"
 

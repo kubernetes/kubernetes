@@ -149,6 +149,28 @@ func TestRunAccessCheck(t *testing.T) {
 				`{"resourceAttributes":{"namespace":"test","verb":"get","group":"extensions","resource":"deployments"}}`,
 			},
 		},
+		{
+			name: "nonExistentVerb1",
+			o: &CanIOptions{
+				allowed: true,
+			},
+			args:    []string{"foo", "pod"},
+			allowed: false,
+			expectedBodyStrings: []string{
+				`{"resourceAttributes":{"namespace":"test","verb":"foo","resource":"pods"}}`,
+			},
+		},
+		{
+			name: "nonExistentVerb2",
+			o: &CanIOptions{
+				allowed: true,
+			},
+			args:    []string{"foo", "/logs"},
+			allowed: false,
+			expectedBodyStrings: []string{
+				`{"nonResourceAttributes":{"path":"/logs","verb":"foo"}}`,
+			},
+		},
 	}
 
 	for _, test := range tests {

@@ -210,6 +210,7 @@ func (o *CanIOptions) Validate() error {
 		}
 		if !isKnownNonResourceVerb(o.Verb) {
 			fmt.Fprintf(o.ErrOut, "Warning: verb '%s' is not a known verb\n", o.Verb)
+			o.allowed = false
 		}
 	} else if !o.Resource.Empty() && !o.AllNamespaces && o.DiscoveryClient != nil {
 		if namespaced, err := isNamespaced(o.Resource, o.DiscoveryClient); err == nil && !namespaced {
@@ -221,6 +222,7 @@ func (o *CanIOptions) Validate() error {
 		}
 		if !isKnownResourceVerb(o.Verb) {
 			fmt.Fprintf(o.ErrOut, "Warning: verb '%s' is not a known verb\n", o.Verb)
+			o.allowed = false
 		}
 
 	}
