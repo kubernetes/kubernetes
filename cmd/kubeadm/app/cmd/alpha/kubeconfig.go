@@ -58,7 +58,7 @@ func NewCmdKubeConfigUtility(out io.Writer) *cobra.Command {
 // newCmdUserKubeConfig returns sub commands for kubeconfig phase
 func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 
-	initCfg := &kubeadmapiv1beta2.InitConfiguration{}
+	initCfg := cmdutil.DefaultInitConfiguration()
 	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{}
 
 	var (
