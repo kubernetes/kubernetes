@@ -1618,7 +1618,7 @@ func GetTestVolumePluginMgr(t *testing.T) (*VolumePluginMgr, *FakeVolumePlugin) 
 		nil,     /* kubeClient */
 		plugins, /* plugins */
 	)
-	return v.pluginMgr, plugins[0].(*FakeVolumePlugin)
+	return v.GetPluginMgr(), plugins[0].(*FakeVolumePlugin)
 }
 
 func GetTestKubeletVolumePluginMgr(t *testing.T) (*VolumePluginMgr, *FakeVolumePlugin) {
@@ -1629,7 +1629,7 @@ func GetTestKubeletVolumePluginMgr(t *testing.T) (*VolumePluginMgr, *FakeVolumeP
 		nil,     /* kubeClient */
 		plugins, /* plugins */
 	)
-	return v.pluginMgr, plugins[0].(*FakeVolumePlugin)
+	return v.GetPluginMgr(), plugins[0].(*FakeVolumePlugin)
 }
 
 // CreateTestPVC returns a provisionable PVC for tests
