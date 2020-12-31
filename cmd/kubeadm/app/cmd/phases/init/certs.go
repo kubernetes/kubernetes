@@ -154,12 +154,12 @@ func getCertPhaseFlags(name string) []string {
 
 func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	//Defaulted config we will use to get SAN certs
-	defaultConfig := &kubeadmapiv1beta2.InitConfiguration{
-		LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{
-			// GetAPIServerAltNames errors without an AdvertiseAddress; this is as good as any.
-			AdvertiseAddress: "127.0.0.1",
-		},
+	defaultConfig := cmdutil.DefaultInitConfiguration()
+	// GetAPIServerAltNames errors without an AdvertiseAddress; this is as good as any.
+	defaultConfig.LocalAPIEndpoint = kubeadmapiv1beta2.APIEndpoint{
+		AdvertiseAddress: "127.0.0.1",
 	}
+
 	defaultInternalConfig := &kubeadmapi.InitConfiguration{}
 
 	kubeadmscheme.Scheme.Default(defaultConfig)

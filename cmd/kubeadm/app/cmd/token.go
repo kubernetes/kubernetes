@@ -92,7 +92,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	tokenCmd.PersistentFlags().BoolVar(&dryRun,
 		options.DryRun, dryRun, "Whether to enable dry-run mode or not")
 
-	cfg := &kubeadmapiv1beta2.InitConfiguration{}
+	cfg := cmdutil.DefaultInitConfiguration()
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
@@ -243,11 +243,6 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	klog.V(1).Infoln("[token] loading configurations")
-
-	// In fact, we don't do any CRI ops at all.
-	// This is just to force skipping the CRI detection.
-	// Ref: https://github.com/kubernetes/kubeadm/issues/1559
-	initCfg.NodeRegistration.CRISocket = kubeadmconstants.DefaultDockerCRISocket
 
 	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg)
 	if err != nil {

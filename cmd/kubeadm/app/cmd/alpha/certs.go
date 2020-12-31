@@ -133,7 +133,7 @@ func (o *genCSRConfig) addFlagSet(flagSet *pflag.FlagSet) {
 func (o *genCSRConfig) load() (err error) {
 	o.kubeadmConfig, err = configutil.LoadOrDefaultInitConfiguration(
 		o.kubeadmConfigPath,
-		&kubeadmapiv1beta2.InitConfiguration{},
+		cmdutil.DefaultInitConfiguration(),
 		&kubeadmapiv1beta2.ClusterConfiguration{},
 	)
 	if err != nil {
@@ -358,7 +358,7 @@ func getInternalCfg(cfgPath string, kubeconfigPath string, cfg kubeadmapiv1beta2
 	}
 
 	// Otherwise read config from --config if provided, otherwise use default configuration
-	return configutil.LoadOrDefaultInitConfiguration(cfgPath, &kubeadmapiv1beta2.InitConfiguration{}, &cfg)
+	return configutil.LoadOrDefaultInitConfiguration(cfgPath, cmdutil.DefaultInitConfiguration(), &cfg)
 }
 
 // newCmdCertsExpiration creates a new `cert check-expiration` command.
