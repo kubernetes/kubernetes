@@ -358,7 +358,7 @@ func TestUpdateAnnotations(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		options := &AnnotateOptions{
+		options := &Options{
 			overwrite:         test.overwrite,
 			newAnnotations:    test.annotations,
 			removeAnnotations: test.remove,
