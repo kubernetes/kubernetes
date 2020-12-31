@@ -166,14 +166,14 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 
 func (dc *DeploymentController) addDeployment(obj interface{}) {
 	d := obj.(*apps.Deployment)
-	klog.V(4).Infof("Adding deployment %s", d.Name)
+	klog.V(4).InfoS("Adding deployment", "deployment", klog.KObj(d), "deploymentName", d.Name)
 	dc.enqueueDeployment(d)
 }
 
 func (dc *DeploymentController) updateDeployment(old, cur interface{}) {
 	oldD := old.(*apps.Deployment)
 	curD := cur.(*apps.Deployment)
-	klog.V(4).Infof("Updating deployment %s", oldD.Name)
+	klog.V(4).InfoS("Updating deployment", "deployment", klog.KObj(oldD), "deploymentName", oldD.Name)
 	dc.enqueueDeployment(curD)
 }
 
@@ -191,7 +191,7 @@ func (dc *DeploymentController) deleteDeployment(obj interface{}) {
 			return
 		}
 	}
-	klog.V(4).Infof("Deleting deployment %s", d.Name)
+	klog.V(4).InfoS("Deleting deployment", "deployment", klog.KObj(d), "deploymentName", d.Name)
 	dc.enqueueDeployment(d)
 }
 
@@ -212,7 +212,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 		if d == nil {
 			return
 		}
-		klog.V(4).Infof("ReplicaSet %s added.", rs.Name)
+		klog.V(4).InfoS("ReplicaSet added", "ReplicaSet", klog.KObj(rs), "ReplicaSetName", rs.Name)
 		dc.enqueueDeployment(d)
 		return
 	}
@@ -223,7 +223,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 	if len(ds) == 0 {
 		return
 	}
-	klog.V(4).Infof("Orphan ReplicaSet %s added.", rs.Name)
+	klog.V(4).InfoS("Orphan ReplicaSet added.", "ReplicaSet", klog.KObj(rs), "ReplicaSetName", rs.Name)
 	for _, d := range ds {
 		dc.enqueueDeployment(d)
 	}
@@ -243,8 +243,8 @@ func (dc *DeploymentController) getDeploymentsForReplicaSet(rs *apps.ReplicaSet)
 	if len(deployments) > 1 {
 		// ControllerRef will ensure we don't do anything crazy, but more than one
 		// item in this list nevertheless constitutes user error.
-		klog.V(4).Infof("user error! more than one deployment is selecting replica set %s/%s with labels: %#v, returning %s/%s",
-			rs.Namespace, rs.Name, rs.Labels, deployments[0].Namespace, deployments[0].Name)
+	        klog.V(4).InfoS("user error! the label key of ReplicaSet can be matched by more than one deployment!", "ReplicaSet",
+			klog.KObj(rs), "ReplicaSetNamespace", rs.Namespace, "ReplicaSetName", rs.Name, "ReplicaSetLabels", rs.Labels)	
 	}
 	return deployments
 }
@@ -278,7 +278,7 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 		if d == nil {
 			return
 		}
-		klog.V(4).Infof("ReplicaSet %s updated.", curRS.Name)
+		klog.V(4).InfoS("ReplicaSet updated.", "ReplicaSet", klog.KObj(curRS), "ReplicaSetName", curRS.Name)
 		dc.enqueueDeployment(d)
 		return
 	}
@@ -291,7 +291,7 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 		if len(ds) == 0 {
 			return
 		}
-		klog.V(4).Infof("Orphan ReplicaSet %s updated.", curRS.Name)
+		klog.V(4).InfoS("Orphan ReplicaSet updated.", "ReplicaSet", klog.KObj(curRS), "ReplicaSetName", curRS.Name)
 		for _, d := range ds {
 			dc.enqueueDeployment(d)
 		}
@@ -330,7 +330,7 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 	if d == nil {
 		return
 	}
-	klog.V(4).Infof("ReplicaSet %s deleted.", rs.Name)
+	klog.V(4).InfoS("ReplicaSet deleted.", "ReplicaSet", klog.KObj(rs), "ReplicaSetName", rs.Name)
 	dc.enqueueDeployment(d)
 }
 
@@ -354,7 +354,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 			return
 		}
 	}
-	klog.V(4).Infof("Pod %s deleted.", pod.Name)
+	klog.V(4).InfoS("Pod is deleted.", "Pod", klog.KObj(pod))
 	if d := dc.getDeploymentForPod(pod); d != nil && d.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType {
 		// Sync if this Deployment now has no more Pods.
 		rsList, err := util.ListReplicaSets(d, util.RsListFromClient(dc.client.AppsV1()))
