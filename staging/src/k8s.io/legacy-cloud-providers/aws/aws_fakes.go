@@ -145,7 +145,7 @@ func (ec2i *FakeEC2Impl) DescribeInstances(request *ec2.DescribeInstancesInput) 
 	for _, instance := range ec2i.aws.instances {
 		if request.InstanceIds != nil {
 			if instance.InstanceId == nil {
-				klog.Warning("Instance with no instance id: ", instance)
+				klog.InfoS("Instance with no instance id.","instance", instance)
 				continue
 			}
 
