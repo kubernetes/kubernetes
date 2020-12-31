@@ -253,7 +253,33 @@ type fakeAttachDetachVolumeHost struct {
 var _ AttachDetachVolumeHost = &fakeAttachDetachVolumeHost{}
 var _ FakeVolumeHost = &fakeAttachDetachVolumeHost{}
 
-// TODO: Create constructors for AttachDetachVolumeHost once it's consumed in tests.
+func NewFakeAttachDetachVolumeHostWithCSINodeName(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
+	return newFakeAttachDetachVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, nodeName, driverLister, volumeAttachLister)
+}
+
+func newFakeAttachDetachVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
+	host := &fakeAttachDetachVolumeHost{}
+	host.rootDir = rootDir
+	host.kubeClient = kubeClient
+	host.cloud = cloud
+	host.nodeName = nodeName
+	host.csiDriverLister = driverLister
+	host.volumeAttachmentLister = volumeAttachLister
+	host.mounter = mount.NewFakeMounter(nil)
+	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
+	host.exec = &testingexec.FakeExec{DisableScripts: true}
+	host.pluginMgr = &VolumePluginMgr{}
+	if err := host.pluginMgr.InitPlugins(plugins, nil /* prober */, host); err != nil {
+		t.Fatalf("Failed to init plugins while creating fake volume host: %v", err)
+	}
+	host.subpather = &subpath.FakeSubpath{}
+	host.informerFactory = informers.NewSharedInformerFactory(kubeClient, time.Minute)
+	// Wait until the InitPlugins setup is finished before returning from this setup func
+	if err := host.WaitForKubeletErrNil(); err != nil {
+		t.Fatalf("Failed to wait for kubelet err to be nil while creating fake volume host: %v", err)
+	}
+	return host
+}
 
 func (f *fakeAttachDetachVolumeHost) CSINodeLister() storagelistersv1.CSINodeLister {
 	// not needed for testing
