@@ -168,24 +168,6 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 
 // Validate makes sure provided values for ReconcileOptions are valid
 func (o *ReconcileOptions) Validate() error {
-	if o.Visitor == nil {
-		return errors.New("ReconcileOptions.Visitor must be set")
-	}
-	if o.RBACClient == nil {
-		return errors.New("ReconcileOptions.RBACClient must be set")
-	}
-	if o.NamespaceClient == nil {
-		return errors.New("ReconcileOptions.NamespaceClient must be set")
-	}
-	if o.PrintObject == nil {
-		return errors.New("ReconcileOptions.Print must be set")
-	}
-	if o.Out == nil {
-		return errors.New("ReconcileOptions.Out must be set")
-	}
-	if o.ErrOut == nil {
-		return errors.New("ReconcileOptions.Err must be set")
-	}
 	return nil
 }
 
