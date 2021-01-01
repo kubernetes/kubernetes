@@ -199,6 +199,7 @@ func populateVolumeOptions(pluginName, pvcName string, capacityGB resource.Quant
 	return volumeOptions, nil
 }
 
+//lint:ignore U1000 function is actually referenced
 // Returns the first path that exists, or empty string if none exist.
 func verifyDevicePath(devicePaths []string) (string, error) {
 	for _, path := range devicePaths {
@@ -212,6 +213,7 @@ func verifyDevicePath(devicePaths []string) (string, error) {
 	return "", nil
 }
 
+//lint:ignore U1000 function is actually referenced
 // Returns list of all paths for given EBS mount
 // This is more interesting on GCE (where we are able to identify volumes under /dev/disk-by-id)
 // Here it is mostly about applying the partition path
@@ -257,6 +259,7 @@ func getCloudProvider(cloudProvider cloudprovider.Interface) (*aws.Cloud, error)
 	return awsCloudProvider, nil
 }
 
+//lint:ignore U1000 function is actually referenced
 // findNvmeVolume looks for the nvme volume with the specified name
 // It follows the symlink (if it exists) and returns the absolute path to the device
 func findNvmeVolume(findName string) (device string, err error) {

@@ -412,6 +412,7 @@ func TestMapUnmap(t *testing.T) {
 	}
 }
 
+//lint:ignore U1000 function is actually referenced
 func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGroup int64) error {
 	mounter, err := plug.NewMounter(getTestVolume(false, tmpDir, false, nil), pod, volume.VolumeOptions{})
 	if err != nil {

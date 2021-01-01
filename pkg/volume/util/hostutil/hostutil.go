@@ -74,6 +74,7 @@ type HostUtils interface {
 // the Interface.
 var _ HostUtils = &HostUtil{}
 
+//lint:ignore U1000 function is actually referenced
 // getFileType checks for file/directory/socket and block/character devices.
 func getFileType(pathname string) (FileType, error) {
 	var pathType FileType

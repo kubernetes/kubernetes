@@ -45,6 +45,7 @@ type Interface interface {
 	ClearQuota(m mount.Interface, path string) error
 }
 
+//lint:ignore U1000 function is actually referenced
 func enabledQuotasForMonitoring() bool {
 	return utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring)
 }
