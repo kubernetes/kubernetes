@@ -89,6 +89,12 @@ func (f *FitError) Error() string {
 	return reasonMsg
 }
 
+// FilterStatus is a wrapper of framework.Status, used when filtering nodes
+type FilterStatus struct {
+	Status *framework.Status
+	Name   string
+}
+
 // ScheduleAlgorithm is an interface implemented by things that know how to schedule pods
 // onto machines.
 // TODO: Rename this type.
@@ -279,6 +285,7 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, fwk fra
 	// Create feasible list with enough space to avoid growing it
 	// and allow assigning.
 	feasibleNodes := make([]*v1.Node, numNodesToFind)
+	errorStatuses := make([]*FilterStatus, numNodesToFind)
 
 	if !fwk.HasFilterPlugins() {
 		length := len(allNodes)
@@ -290,8 +297,8 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, fwk fra
 	}
 
 	errCh := parallelize.NewErrorChannel()
-	var statusesLock sync.Mutex
 	var feasibleNodesLen int32
+	var errorNodesLen int32
 	ctx, cancel := context.WithCancel(ctx)
 	checkNode := func(i int) {
 		// We check the nodes starting from where we left off in the previous scheduling cycle,
@@ -312,9 +319,16 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, fwk fra
 			}
 		} else {
 			if !status.IsSuccess() {
-				statusesLock.Lock()
-				statuses[nodeInfo.Node().Name] = status
-				statusesLock.Unlock()
+				length := atomic.AddInt32(&errorNodesLen, 1)
+				if length > numNodesToFind {
+					cancel()
+					atomic.AddInt32(&errorNodesLen, -1)
+				} else {
+					errorStatuses[length-1] = &FilterStatus{
+						Name:   nodeInfo.Node().Name,
+						Status: status,
+					}
+				}
 			}
 		}
 	}
@@ -335,6 +349,9 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, fwk fra
 	g.nextStartNodeIndex = (g.nextStartNodeIndex + processedNodes) % len(allNodes)
 
 	feasibleNodes = feasibleNodes[:feasibleNodesLen]
+	for i := int32(0); i < errorNodesLen; i++ {
+		statuses[errorStatuses[i].Name] = errorStatuses[i].Status
+	}
 	if err := errCh.ReceiveError(); err != nil {
 		statusCode = framework.Error
 		return nil, err
