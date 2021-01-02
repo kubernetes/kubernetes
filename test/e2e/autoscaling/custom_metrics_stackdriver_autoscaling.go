@@ -235,7 +235,7 @@ func (tc *CustomMetricTestCase) Run() {
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
 	if err != nil {
-		framework.Failf("Failed to initialize gcm default client, %v", err)
+		framework.Failf("Failed to initialize gcm default client: %v", err)
 	}
 
 	// Hack for running tests locally, needed to authenticate in Stackdriver
@@ -253,7 +253,7 @@ func (tc *CustomMetricTestCase) Run() {
 
 	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
-		framework.Failf("Failed to create gcm service, %v", err)
+		framework.Failf("Failed to create gcm service: %v", err)
 	}
 
 	// Set up a cluster: create a custom metric and set up k8s-sd adapter
