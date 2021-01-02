@@ -120,15 +120,3 @@ type TestAuthorizer struct{}
 func (t *TestAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	return authorizer.DecisionNoOpinion, "", nil
 }
-
-// wantClientCert is a test stub for testing that fulfulls the WantsClientCert interface.
-type clientCertWanter struct {
-	gotCert, gotKey []byte
-}
-
-func (s *clientCertWanter) SetClientCert(cert, key []byte) { s.gotCert, s.gotKey = cert, key }
-func (s *clientCertWanter) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
-	return nil
-}
-func (s *clientCertWanter) Handles(o admission.Operation) bool { return false }
-func (s *clientCertWanter) ValidateInitialization() error      { return nil }
