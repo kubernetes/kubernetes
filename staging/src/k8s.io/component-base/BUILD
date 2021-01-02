@@ -9,6 +9,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/component-base/cli/completion:all-srcs",
         "//staging/src/k8s.io/component-base/cli/flag:all-srcs",
         "//staging/src/k8s.io/component-base/cli/globalflag:all-srcs",
         "//staging/src/k8s.io/component-base/codec:all-srcs",

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,34 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package completion
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/spf13/cobra"
-
-	"k8s.io/component-base/cli/completion"
 )
 
-const shellsError = "Unexpected empty completion shells list"
-
-func TestNewCmdCompletion(t *testing.T) {
-	var out bytes.Buffer
-	shells := completion.GetSupportedShells()
+func TestGetSupportedShells(t *testing.T) {
+	shells := GetSupportedShells()
 	if len(shells) == 0 {
-		t.Errorf(shellsError)
-	}
-	// test newCmdCompletion with a valid shell.
-	// use a dummy parent command as newCmdCompletion needs it.
-	parentCmd := &cobra.Command{}
-	args := []string{"completion", shells[0]}
-	parentCmd.SetArgs(args)
-	cmd := newCmdCompletion(&out, "")
-	parentCmd.AddCommand(cmd)
-	if err := parentCmd.Execute(); err != nil {
-		t.Errorf("Cannot exectute newCmdCompletion: %v", err)
+		t.Error("No supported shells")
 	}
 }
 
@@ -55,28 +40,14 @@ func TestRunCompletion(t *testing.T) {
 
 	testCases := []TestCase{
 		{
-			name:          "invalid: missing argument",
-			args:          []string{},
-			expectedError: true,
-		},
-		{
-			name:          "invalid: too many arguments",
-			args:          []string{"", ""},
-			expectedError: true,
-		},
-		{
 			name:          "invalid: unsupported shell name",
 			args:          []string{"unsupported"},
 			expectedError: true,
 		},
 	}
 
-	// test all supported shells
-	shells := completion.GetSupportedShells()
-	if len(shells) == 0 {
-		t.Errorf(shellsError)
-	}
-	for _, shell := range shells {
+	// Test all supported shells.
+	for _, shell := range GetSupportedShells() {
 		test := TestCase{
 			name: "valid: test shell " + shell,
 			args: []string{shell},
@@ -91,7 +62,7 @@ func TestRunCompletion(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := RunCompletion(&out, "", cmd, tc.args); (err != nil) != tc.expectedError {
+			if err := RunCompletionForShell(&out, "", cmd, tc.args[0]); (err != nil) != tc.expectedError {
 				t.Errorf("Test case %q: TestRunCompletion expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
 			}
 		})

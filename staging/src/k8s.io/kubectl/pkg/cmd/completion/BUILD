@@ -7,6 +7,7 @@ go_library(
     importpath = "k8s.io/kubectl/pkg/cmd/completion",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/component-base/cli/completion:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/i18n:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
