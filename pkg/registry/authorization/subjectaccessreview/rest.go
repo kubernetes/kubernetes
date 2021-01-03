@@ -30,22 +30,27 @@ import (
 	authorizationutil "k8s.io/kubernetes/pkg/registry/authorization/util"
 )
 
+// REST implements a RESTStorage for subjectaccessreview
 type REST struct {
 	authorizer authorizer.Authorizer
 }
 
+// NewREST returns a RESTStorage object that will work against subjectaccessreview
 func NewREST(authorizer authorizer.Authorizer) *REST {
 	return &REST{authorizer}
 }
 
+// NamespaceScoped fulfill rest.Scoper
 func (r *REST) NamespaceScoped() bool {
 	return false
 }
 
+// New creates a new subjectaccessreview object
 func (r *REST) New() runtime.Object {
 	return &authorizationapi.SubjectAccessReview{}
 }
 
+// Create attempts to get self subject rules in specific namespace
 func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	subjectAccessReview, ok := obj.(*authorizationapi.SubjectAccessReview)
 	if !ok {

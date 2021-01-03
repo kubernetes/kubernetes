@@ -32,12 +32,14 @@ import (
 	"k8s.io/kubernetes/pkg/registry/authorization/subjectaccessreview"
 )
 
-type RESTStorageProvider struct {
+// StorageProvider is a REST storage provider for storage_authorization
+type StorageProvider struct {
 	Authorizer   authorizer.Authorizer
 	RuleResolver authorizer.RuleResolver
 }
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
+// NewRESTStorage returns a StorageProvider
+func (p StorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
 	if p.Authorizer == nil {
 		return genericapiserver.APIGroupInfo{}, false, nil
 	}
@@ -57,7 +59,7 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	return apiGroupInfo, true, nil
 }
 
-func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p StorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	// subjectaccessreviews
 	storage["subjectaccessreviews"] = subjectaccessreview.NewREST(p.Authorizer)
@@ -71,7 +73,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	return storage
 }
 
-func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p StorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	// subjectaccessreviews
 	storage["subjectaccessreviews"] = subjectaccessreview.NewREST(p.Authorizer)
@@ -85,6 +87,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	return storage
 }
 
-func (p RESTStorageProvider) GroupName() string {
+// GroupName is the group name use in this package
+func (p StorageProvider) GroupName() string {
 	return authorization.GroupName
 }
