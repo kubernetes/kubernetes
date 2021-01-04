@@ -50,9 +50,6 @@ var (
 	Code403 = map[int]bool{403: true}
 	Code404 = map[int]bool{404: true}
 	Code405 = map[int]bool{405: true}
-	Code409 = map[int]bool{409: true}
-	Code422 = map[int]bool{422: true}
-	Code500 = map[int]bool{500: true}
 	Code503 = map[int]bool{503: true}
 )
 
