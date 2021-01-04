@@ -349,7 +349,7 @@ func getCurrentCertificateOrBootstrap(
 	currentCert, err := store.Current()
 	if err == nil {
 		// if the current cert is expired, fall back to the bootstrap cert
-		if currentCert.Leaf != nil && time.Now().Before(currentCert.Leaf.NotAfter) {
+		if currentCert.Leaf != nil && time.Now().Before(currentCert.Leaf.NotAfter) && time.Now().After(currentCert.Leaf.NotBefore) {
 			return currentCert, false, nil
 		}
 	} else {

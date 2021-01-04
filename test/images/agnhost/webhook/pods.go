@@ -28,10 +28,10 @@ import (
 
 const (
 	podsInitContainerPatch string = `[
-		 {"op":"add","path":"/spec/initContainers","value":[{"image":"webhook-added-image","name":"webhook-added-init-container","imagePullPolicy":"IfNotPresent","resources":{}}]}
+		 {"op":"add","path":"/spec/initContainers","value":[{"image":"webhook-added-image","name":"webhook-added-init-container","resources":{}}]}
 	]`
 	podsSidecarPatch string = `[
-		{"op":"add", "path":"/spec/containers/-","value":{"image":"%v","name":"webhook-added-sidecar","imagePullPolicy":"IfNotPresent","resources":{}}}
+		{"op":"add", "path":"/spec/containers/-","value":{"image":"%v","name":"webhook-added-sidecar","resources":{}}}
 	]`
 )
 
