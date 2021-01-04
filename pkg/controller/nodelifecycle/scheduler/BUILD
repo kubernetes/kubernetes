@@ -3,9 +3,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "node_affinity_manager.go",
         "rate_limited_queue.go",
         "taint_manager.go",
         "timed_workers.go",
+        "util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler",
     visibility = ["//visibility:public"],
@@ -24,6 +26,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1/nodeaffinity:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
@@ -31,6 +34,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "node_affinity_manager_test.go",
         "rate_limited_queue_test.go",
         "taint_manager_test.go",
         "timed_workers_test.go",

@@ -17,7 +17,6 @@ limitations under the License.
 package scheduler
 
 import (
-	"context"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -27,7 +26,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
@@ -97,26 +95,6 @@ type NoExecuteTaintManager struct {
 
 	nodeUpdateQueue workqueue.Interface
 	podUpdateQueue  workqueue.Interface
-}
-
-func deletePodHandler(c clientset.Interface, emitEventFunc func(types.NamespacedName)) func(args *WorkArgs) error {
-	return func(args *WorkArgs) error {
-		ns := args.NamespacedName.Namespace
-		name := args.NamespacedName.Name
-		klog.V(0).Infof("NoExecuteTaintManager is deleting Pod: %v", args.NamespacedName.String())
-		if emitEventFunc != nil {
-			emitEventFunc(args.NamespacedName)
-		}
-		var err error
-		for i := 0; i < retries; i++ {
-			err = c.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
-			if err == nil {
-				break
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
-		return err
-	}
 }
 
 func getNoExecuteTaints(taints []v1.Taint) []v1.Taint {

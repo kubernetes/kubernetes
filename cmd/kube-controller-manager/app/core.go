@@ -209,6 +209,7 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 		ctx.ComponentConfig.NodeLifecycleController.LargeClusterSizeThreshold,
 		ctx.ComponentConfig.NodeLifecycleController.UnhealthyZoneThreshold,
 		ctx.ComponentConfig.NodeLifecycleController.EnableTaintManager,
+		ctx.ComponentConfig.NodeLifecycleController.EnableNodeAffinityManager,
 	)
 	if err != nil {
 		return nil, true, err

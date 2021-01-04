@@ -50,10 +50,9 @@ func NodeMatchesNodeAffinity(affinity *v1.NodeAffinity, node *v1.Node) bool {
 		return true
 	}
 	// Match node selector for requiredDuringSchedulingRequiredDuringExecution.
-	// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-	// if affinity.RequiredDuringSchedulingRequiredDuringExecution != nil && !nodeMatchesNodeSelector(node, affinity.RequiredDuringSchedulingRequiredDuringExecution) {
-	// 	return false
-	// }
+	if affinity.RequiredDuringSchedulingRequiredDuringExecution != nil && !nodeMatchesNodeSelector(node, affinity.RequiredDuringSchedulingRequiredDuringExecution) {
+		return false
+	}
 
 	// Match node selector for requiredDuringSchedulingIgnoredDuringExecution.
 	if affinity.RequiredDuringSchedulingIgnoredDuringExecution != nil && !nodeMatchesNodeSelector(node, affinity.RequiredDuringSchedulingIgnoredDuringExecution) {

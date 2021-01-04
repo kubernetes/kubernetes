@@ -83,7 +83,9 @@ func SetAntiAffinity(nodeSelection *NodeSelection, nodeName string) {
 // SetNodeAffinity modifies the given pod object with
 // NodeAffinity to the given node name.
 func SetNodeAffinity(podSpec *v1.PodSpec, nodeName string) {
-	nodeSelection := &NodeSelection{}
+	nodeSelection := &NodeSelection{
+		Affinity: podSpec.Affinity,
+	}
 	SetAffinity(nodeSelection, nodeName)
 	podSpec.Affinity = nodeSelection.Affinity
 }

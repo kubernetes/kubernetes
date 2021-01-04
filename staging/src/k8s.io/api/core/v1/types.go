@@ -2788,14 +2788,13 @@ type PodAffinityTerm struct {
 
 // Node affinity is a group of node affinity scheduling rules.
 type NodeAffinity struct {
-	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
 	// If the affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the affinity requirements specified by this field cease to be met
 	// at some point during pod execution (e.g. due to an update), the system
 	// will try to eventually evict the pod from its node.
 	// +optional
-	// RequiredDuringSchedulingRequiredDuringExecution *NodeSelector `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
+	RequiredDuringSchedulingRequiredDuringExecution *NodeSelector `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty" protobuf:"bytes,1,opt,name=requiredDuringSchedulingRequiredDuringExecution"`
 
 	// If the affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
@@ -2803,7 +2802,7 @@ type NodeAffinity struct {
 	// at some point during pod execution (e.g. due to an update), the system
 	// may or may not try to eventually evict the pod from its node.
 	// +optional
-	RequiredDuringSchedulingIgnoredDuringExecution *NodeSelector `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty" protobuf:"bytes,1,opt,name=requiredDuringSchedulingIgnoredDuringExecution"`
+	RequiredDuringSchedulingIgnoredDuringExecution *NodeSelector `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty" protobuf:"bytes,2,opt,name=requiredDuringSchedulingIgnoredDuringExecution"`
 	// The scheduler will prefer to schedule pods to nodes that satisfy
 	// the affinity expressions specified by this field, but it may choose
 	// a node that violates one or more of the expressions. The node that is
@@ -2814,7 +2813,7 @@ type NodeAffinity struct {
 	// "weight" to the sum if the node matches the corresponding matchExpressions; the
 	// node(s) with the highest sum are the most preferred.
 	// +optional
-	PreferredDuringSchedulingIgnoredDuringExecution []PreferredSchedulingTerm `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty" protobuf:"bytes,2,rep,name=preferredDuringSchedulingIgnoredDuringExecution"`
+	PreferredDuringSchedulingIgnoredDuringExecution []PreferredSchedulingTerm `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty" protobuf:"bytes,3,rep,name=preferredDuringSchedulingIgnoredDuringExecution"`
 }
 
 // An empty preferred scheduling term matches all objects with implicit weight 0

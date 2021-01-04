@@ -159,13 +159,18 @@ func New(plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
 		handle: h,
 	}
 	if args.AddedAffinity != nil {
+		if ns := args.AddedAffinity.RequiredDuringSchedulingRequiredDuringExecution; ns != nil {
+			pl.addedNodeSelector, err = nodeaffinity.NewNodeSelector(ns)
+			if err != nil {
+				return nil, fmt.Errorf("parsing addedAffinity.requiredDuringSchedulingRequiredDuringExecution: %w", err)
+			}
+		}
 		if ns := args.AddedAffinity.RequiredDuringSchedulingIgnoredDuringExecution; ns != nil {
 			pl.addedNodeSelector, err = nodeaffinity.NewNodeSelector(ns)
 			if err != nil {
 				return nil, fmt.Errorf("parsing addedAffinity.requiredDuringSchedulingIgnoredDuringExecution: %w", err)
 			}
 		}
-		// TODO: parse requiredDuringSchedulingRequiredDuringExecution when it gets added to the API.
 		if terms := args.AddedAffinity.PreferredDuringSchedulingIgnoredDuringExecution; len(terms) != 0 {
 			pl.addedPrefSchedTerms, err = nodeaffinity.NewPreferredSchedulingTerms(terms)
 			if err != nil {

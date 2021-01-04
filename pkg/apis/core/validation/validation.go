@@ -3610,10 +3610,9 @@ func validatePodAntiAffinity(podAntiAffinity *core.PodAntiAffinity, fldPath *fie
 // validateNodeAffinity tests that the specified nodeAffinity fields have valid data
 func validateNodeAffinity(na *core.NodeAffinity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// TODO: Uncomment the next three lines once RequiredDuringSchedulingRequiredDuringExecution is implemented.
-	// if na.RequiredDuringSchedulingRequiredDuringExecution != nil {
-	//	allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingRequiredDuringExecution, fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
-	// }
+	if na.RequiredDuringSchedulingRequiredDuringExecution != nil {
+		allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingRequiredDuringExecution, fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
+	}
 	if na.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 		allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingIgnoredDuringExecution, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
 	}

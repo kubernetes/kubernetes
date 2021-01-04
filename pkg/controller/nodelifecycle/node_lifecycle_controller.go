@@ -259,7 +259,8 @@ func (n *nodeEvictionMap) getStatus(nodeName string) (evictionStatus, bool) {
 
 // Controller is the controller that manages node's life cycle.
 type Controller struct {
-	taintManager *scheduler.NoExecuteTaintManager
+	taintManager        *scheduler.NoExecuteTaintManager
+	nodeAffinityManager *scheduler.ExecutionNodeAffinityManager
 
 	podLister         corelisters.PodLister
 	podInformerSynced cache.InformerSynced
@@ -344,6 +345,11 @@ type Controller struct {
 	// tainted nodes, if they're not tolerated.
 	runTaintManager bool
 
+	// if set to true Controller will start NodeAffinityManager that will evict Pods with
+	// node affinity required during execution no longer satisfifed when
+	// node labels changed in runtime.
+	runNodeAffinityManager bool
+
 	nodeUpdateQueue workqueue.Interface
 	podUpdateQueue  workqueue.RateLimitingInterface
 }
@@ -364,6 +370,7 @@ func NewNodeLifecycleController(
 	largeClusterThreshold int32,
 	unhealthyZoneThreshold float32,
 	runTaintManager bool,
+	runNodeAffinityManager bool,
 ) (*Controller, error) {
 
 	if kubeClient == nil {
@@ -404,6 +411,7 @@ func NewNodeLifecycleController(
 		largeClusterThreshold:       largeClusterThreshold,
 		unhealthyZoneThreshold:      unhealthyZoneThreshold,
 		runTaintManager:             runTaintManager,
+		runNodeAffinityManager:      runNodeAffinityManager,
 		nodeUpdateQueue:             workqueue.NewNamed("node_lifecycle_controller"),
 		podUpdateQueue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "node_lifecycle_controller_pods"),
 	}
@@ -481,10 +489,21 @@ func NewNodeLifecycleController(
 	}
 	nc.podLister = podInformer.Lister()
 
+	podGetter := func(name, namespace string) (*v1.Pod, error) { return nc.podLister.Pods(namespace).Get(name) }
+	nodeLister := nodeInformer.Lister()
+	nodeGetter := func(name string) (*v1.Node, error) { return nodeLister.Get(name) }
+
+	if nc.runNodeAffinityManager {
+		nc.nodeAffinityManager = scheduler.NewNodeAffinityManager(kubeClient, nodeGetter, nc.getPodsAssignedToNode)
+		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(oldNode, newNode *v1.Node) error {
+				nc.nodeAffinityManager.NodeUpdated(oldNode, newNode)
+				return nil
+			}),
+		})
+	}
+
 	if nc.runTaintManager {
-		podGetter := func(name, namespace string) (*v1.Pod, error) { return nc.podLister.Pods(namespace).Get(name) }
-		nodeLister := nodeInformer.Lister()
-		nodeGetter := func(name string) (*v1.Node, error) { return nodeLister.Get(name) }
 		nc.taintManager = scheduler.NewNoExecuteTaintManager(kubeClient, podGetter, nodeGetter, nc.getPodsAssignedToNode)
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
@@ -545,6 +564,10 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 
 	if nc.runTaintManager {
 		go nc.taintManager.Run(stopCh)
+	}
+
+	if nc.runNodeAffinityManager {
+		go nc.nodeAffinityManager.Run(stopCh)
 	}
 
 	// Close node update queue to cleanup go routine.

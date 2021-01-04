@@ -47,4 +47,7 @@ func RecommendedDefaultNodeLifecycleControllerConfiguration(obj *kubectrlmgrconf
 	if obj.EnableTaintManager == nil {
 		obj.EnableTaintManager = utilpointer.BoolPtr(true)
 	}
+	if obj.EnableNodeAffinityManager == nil {
+		obj.EnableNodeAffinityManager = utilpointer.BoolPtr(true)
+	}
 }

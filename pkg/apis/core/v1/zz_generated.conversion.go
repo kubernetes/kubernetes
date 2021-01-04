@@ -4577,6 +4577,7 @@ func Convert_core_NodeAddress_To_v1_NodeAddress(in *core.NodeAddress, out *v1.No
 }
 
 func autoConvert_v1_NodeAffinity_To_core_NodeAffinity(in *v1.NodeAffinity, out *core.NodeAffinity, s conversion.Scope) error {
+	out.RequiredDuringSchedulingRequiredDuringExecution = (*core.NodeSelector)(unsafe.Pointer(in.RequiredDuringSchedulingRequiredDuringExecution))
 	out.RequiredDuringSchedulingIgnoredDuringExecution = (*core.NodeSelector)(unsafe.Pointer(in.RequiredDuringSchedulingIgnoredDuringExecution))
 	out.PreferredDuringSchedulingIgnoredDuringExecution = *(*[]core.PreferredSchedulingTerm)(unsafe.Pointer(&in.PreferredDuringSchedulingIgnoredDuringExecution))
 	return nil
@@ -4588,6 +4589,7 @@ func Convert_v1_NodeAffinity_To_core_NodeAffinity(in *v1.NodeAffinity, out *core
 }
 
 func autoConvert_core_NodeAffinity_To_v1_NodeAffinity(in *core.NodeAffinity, out *v1.NodeAffinity, s conversion.Scope) error {
+	out.RequiredDuringSchedulingRequiredDuringExecution = (*v1.NodeSelector)(unsafe.Pointer(in.RequiredDuringSchedulingRequiredDuringExecution))
 	out.RequiredDuringSchedulingIgnoredDuringExecution = (*v1.NodeSelector)(unsafe.Pointer(in.RequiredDuringSchedulingIgnoredDuringExecution))
 	out.PreferredDuringSchedulingIgnoredDuringExecution = *(*[]v1.PreferredSchedulingTerm)(unsafe.Pointer(&in.PreferredDuringSchedulingIgnoredDuringExecution))
 	return nil

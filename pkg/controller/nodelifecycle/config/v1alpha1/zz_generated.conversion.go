@@ -84,6 +84,9 @@ func autoConvert_v1alpha1_NodeLifecycleControllerConfiguration_To_config_NodeLif
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableTaintManager, &out.EnableTaintManager, s); err != nil {
 		return err
 	}
+	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableNodeAffinityManager, &out.EnableNodeAffinityManager, s); err != nil {
+		return err
+	}
 	out.NodeEvictionRate = in.NodeEvictionRate
 	out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
 	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
@@ -96,6 +99,9 @@ func autoConvert_v1alpha1_NodeLifecycleControllerConfiguration_To_config_NodeLif
 
 func autoConvert_config_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLifecycleControllerConfiguration(in *config.NodeLifecycleControllerConfiguration, out *v1alpha1.NodeLifecycleControllerConfiguration, s conversion.Scope) error {
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableTaintManager, &out.EnableTaintManager, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableNodeAffinityManager, &out.EnableNodeAffinityManager, s); err != nil {
 		return err
 	}
 	out.NodeEvictionRate = in.NodeEvictionRate

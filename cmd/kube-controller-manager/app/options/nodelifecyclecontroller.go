@@ -45,6 +45,7 @@ func (o *NodeLifecycleControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&o.LargeClusterSizeThreshold, "large-cluster-size-threshold", 50, "Number of nodes from which NodeController treats the cluster as large for the eviction logic purposes. --secondary-node-eviction-rate is implicitly overridden to 0 for clusters this size or smaller.")
 	fs.Float32Var(&o.UnhealthyZoneThreshold, "unhealthy-zone-threshold", 0.55, "Fraction of Nodes in a zone which needs to be not Ready (minimum 3) for zone to be treated as unhealthy. ")
 	fs.BoolVar(&o.EnableTaintManager, "enable-taint-manager", o.EnableTaintManager, "WARNING: Beta feature. If set to true enables NoExecute Taints and will evict all not-tolerating Pod running on Nodes tainted with this kind of Taints.")
+	fs.BoolVar(&o.EnableNodeAffinityManager, "enable-node-affinity-manager", o.EnableNodeAffinityManager, "WARNING: Alpha feature. If set to true enables Execution NodeAffinity and will evict all Pods running on Nodes no longer satisfied NodeAffinity. Potential performance issue.")
 }
 
 // ApplyTo fills up NodeLifecycleController config with options.
@@ -54,6 +55,7 @@ func (o *NodeLifecycleControllerOptions) ApplyTo(cfg *nodelifecycleconfig.NodeLi
 	}
 
 	cfg.EnableTaintManager = o.EnableTaintManager
+	cfg.EnableNodeAffinityManager = o.EnableNodeAffinityManager
 	cfg.NodeStartupGracePeriod = o.NodeStartupGracePeriod
 	cfg.NodeMonitorGracePeriod = o.NodeMonitorGracePeriod
 	cfg.PodEvictionTimeout = o.PodEvictionTimeout

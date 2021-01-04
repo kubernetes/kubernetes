@@ -6,6 +6,7 @@ go_library(
         "events.go",
         "framework.go",
         "limit_range.go",
+        "node_affinity.go",
         "nvidia-gpus.go",
         "predicates.go",
         "preemption.go",

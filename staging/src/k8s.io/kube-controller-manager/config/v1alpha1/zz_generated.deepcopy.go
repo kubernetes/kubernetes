@@ -371,6 +371,11 @@ func (in *NodeLifecycleControllerConfiguration) DeepCopyInto(out *NodeLifecycleC
 		*out = new(bool)
 		**out = **in
 	}
+	if in.EnableNodeAffinityManager != nil {
+		in, out := &in.EnableNodeAffinityManager, &out.EnableNodeAffinityManager
+		*out = new(bool)
+		**out = **in
+	}
 	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
 	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
 	out.PodEvictionTimeout = in.PodEvictionTimeout
