@@ -116,7 +116,7 @@ var (
 		DELETE to delete the pods.
 		The 'drain' evicts or deletes all pods except mirror pods (which cannot be deleted through
 		the API server).  If there are DaemonSet-managed pods, drain will not proceed
-		without --ignore-daemonsets, and regardless it will not delete any
+		with --ignore-daemonsets=false, and regardless it will not delete any
 		DaemonSet-managed pods, because those pods would be immediately replaced by the
 		DaemonSet controller, which ignores unschedulable markings.  If there are any
 		pods that are neither mirror pods nor managed by ReplicationController,
@@ -145,9 +145,10 @@ func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 		PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 		drainer: &drain.Helper{
-			GracePeriodSeconds: -1,
-			Out:                ioStreams.Out,
-			ErrOut:             ioStreams.ErrOut,
+			GracePeriodSeconds:  -1,
+			IgnoreAllDaemonSets: true,
+			Out:                 ioStreams.Out,
+			ErrOut:              ioStreams.ErrOut,
 		},
 	}
 	o.drainer.OnPodDeletedOrEvicted = o.onPodDeletedOrEvicted
