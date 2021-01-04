@@ -113,7 +113,7 @@ func SIGDescribeCopy(text string, body func()) bool {
 	return ginkgo.Describe("[sig-network] "+text, body)
 }
 
-var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
+var _ = SIGDescribeCopy("Netpol [Disruptive][LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("netpol")
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {
