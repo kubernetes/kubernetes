@@ -60,7 +60,7 @@ type protocolPort struct {
 
 var protocolSCTP = v1.ProtocolSCTP
 
-var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
+var _ = SIGDescribe("NetworkPolicy [Disruptive][LinuxOnly]", func() {
 	var service *v1.Service
 	var podServer *v1.Pod
 	var podServerLabelSelector string
