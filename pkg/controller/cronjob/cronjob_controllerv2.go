@@ -72,7 +72,7 @@ type ControllerV2 struct {
 }
 
 // NewControllerV2 creates and initializes a new Controller.
-func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer batchv1beta1informers.CronJobInformer, kubeClient clientset.Interface) (*ControllerV2, error) {
+func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobInformer batchv1beta1informers.CronJobInformer, kubeClient clientset.Interface) (*ControllerV2, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&covev1client.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
@@ -91,10 +91,10 @@ func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer 
 		cronJobControl: &realCJControl{KubeClient: kubeClient},
 
 		jobLister:     jobInformer.Lister(),
-		cronJobLister: cronJobsInformer.Lister(),
+		cronJobLister: cronJobInformer.Lister(),
 
 		jobListerSynced:     jobInformer.Informer().HasSynced,
-		cronJobListerSynced: cronJobsInformer.Informer().HasSynced,
+		cronJobListerSynced: cronJobInformer.Informer().HasSynced,
 		now:                 time.Now,
 	}
 
@@ -104,7 +104,7 @@ func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer 
 		DeleteFunc: jm.deleteJob,
 	})
 
-	cronJobsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	cronJobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			jm.enqueueController(obj)
 		},
