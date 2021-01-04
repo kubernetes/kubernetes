@@ -88,7 +88,7 @@ func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer 
 		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "cronjob-controller"}),
 
 		jobControl:     realJobControl{KubeClient: kubeClient},
-		cronJobControl: &realCJControl{KubeClient: kubeClient},
+		cronJobControl: realCJControl{KubeClient: kubeClient},
 
 		jobLister:     jobInformer.Lister(),
 		cronJobLister: cronJobsInformer.Lister(),

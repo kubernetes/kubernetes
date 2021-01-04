@@ -46,13 +46,13 @@ type realCJControl struct {
 	KubeClient clientset.Interface
 }
 
-func (c *realCJControl) GetCronJob(namespace, name string) (*batchv1beta1.CronJob, error) {
+func (c realCJControl) GetCronJob(namespace, name string) (*batchv1beta1.CronJob, error) {
 	return c.KubeClient.BatchV1beta1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 var _ cjControlInterface = &realCJControl{}
 
-func (c *realCJControl) UpdateStatus(cj *batchv1beta1.CronJob) (*batchv1beta1.CronJob, error) {
+func (c realCJControl) UpdateStatus(cj *batchv1beta1.CronJob) (*batchv1beta1.CronJob, error) {
 	return c.KubeClient.BatchV1beta1().CronJobs(cj.Namespace).UpdateStatus(context.TODO(), cj, metav1.UpdateOptions{})
 }
 
