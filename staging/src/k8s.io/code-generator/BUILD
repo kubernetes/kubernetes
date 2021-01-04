@@ -16,6 +16,7 @@ filegroup(
         "//staging/src/k8s.io/code-generator/cmd/go-to-protobuf:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/import-boss:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/informer-gen:all-srcs",
+        "//staging/src/k8s.io/code-generator/cmd/injection-gen:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/lister-gen:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/openapi-gen:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/prerelease-lifecycle-gen:all-srcs",

@@ -50,7 +50,7 @@ shift 4
   # To support running this script from anywhere, we have to first cd into this directory
   # so we can install the tools.
   cd "$(dirname "${0}")"
-  go install ./cmd/{defaulter-gen,client-gen,lister-gen,informer-gen,deepcopy-gen}
+  go install ./cmd/{defaulter-gen,client-gen,lister-gen,informer-gen,deepcopy-gen,injection-gen}
 )
 # Go installs the above commands to get installed in $GOBIN if defined, and $GOPATH/bin otherwise:
 GOBIN="$(go env GOBIN)"
@@ -92,4 +92,33 @@ if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
            --listers-package "${OUTPUT_PKG}/listers" \
            --output-package "${OUTPUT_PKG}/informers" \
            "$@"
+fi
+
+if [ "${GENS}" = "all" ] || grep -qw "injection" <<<"${GENS}"; then
+  echo "Generating injection for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/injection"
+
+  if [[ -z "${VERSIONED_CLIENTSET_PKG:-}" ]]; then
+    VERSIONED_CLIENTSET_PKG="${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/versioned"
+  fi
+
+  if [[ -z "${EXTERNAL_INFORMER_PKG:-}" ]]; then
+    EXTERNAL_INFORMER_PKG="${OUTPUT_PKG}/informers/externalversions"
+  fi
+
+  if [[ -z "${LISTERS_PKG:-}" ]]; then
+    LISTERS_PKG="${OUTPUT_PKG}/listers"
+  fi
+
+  echo "Generating injection for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}"
+
+  # Clear old injection
+  rm -rf ${OUTPUT_PKG}/injection
+
+  "${gobin}/injection-gen" \
+    --input-dirs $(codegen::join , "${FQ_APIS[@]}") \
+    --versioned-clientset-package ${VERSIONED_CLIENTSET_PKG} \
+    --external-versions-informers-package ${EXTERNAL_INFORMER_PKG} \
+    --listers-package ${LISTERS_PKG} \
+    --output-package "${OUTPUT_PKG}/injection" \
+    "$@"
 fi

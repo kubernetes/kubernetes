@@ -9,6 +9,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/client-go/controller:all-srcs",
         "//staging/src/k8s.io/client-go/discovery:all-srcs",
         "//staging/src/k8s.io/client-go/dynamic:all-srcs",
         "//staging/src/k8s.io/client-go/examples/create-update-delete-deployment:all-srcs",
@@ -19,6 +20,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/examples/out-of-cluster-client-configuration:all-srcs",
         "//staging/src/k8s.io/client-go/examples/workqueue:all-srcs",
         "//staging/src/k8s.io/client-go/informers:all-srcs",
+        "//staging/src/k8s.io/client-go/injection:all-srcs",
         "//staging/src/k8s.io/client-go/kubernetes:all-srcs",
         "//staging/src/k8s.io/client-go/kubernetes_test:all-srcs",
         "//staging/src/k8s.io/client-go/listers/admissionregistration/v1:all-srcs",

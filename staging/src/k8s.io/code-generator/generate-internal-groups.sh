@@ -120,3 +120,30 @@ if [ "${GENS}" = "all" ] || grep -qw "openapi" <<<"${GENS}"; then
            -O zz_generated.openapi \
            "$@"
 fi
+
+if [ "${GENS}" = "all" ] || grep -qw "injection" <<<"${GENS}"; then
+  echo "Generating injection for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/injection"
+
+  if [[ -z "${VERSIONED_CLIENTSET_PKG:-}" ]]; then
+    VERSIONED_CLIENTSET_PKG="${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/versioned"
+  fi
+
+  if [[ -z "${EXTERNAL_INFORMER_PKG:-}" ]]; then
+    EXTERNAL_INFORMER_PKG="${OUTPUT_PKG}/informers/externalversions"
+  fi
+
+  if [[ -z "${LISTERS_PKG:-}" ]]; then
+    LISTERS_PKG="${OUTPUT_PKG}/listers"
+  fi
+
+  # Clear old injection
+  rm -rf ${OUTPUT_PKG}/injection
+
+  "${GOPATH}/bin/injection-gen" \
+    --input-dirs $(codegen::join , "${ALL_FQ_APIS[@]}") \
+    --versioned-clientset-package ${VERSIONED_CLIENTSET_PKG} \
+    --external-versions-informers-package ${EXTERNAL_INFORMER_PKG} \
+    --listers-package ${LISTERS_PKG} \
+    --output-package "${OUTPUT_PKG}/injection" \
+    "$@"
+fi
