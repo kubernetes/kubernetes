@@ -252,15 +252,6 @@ const (
 	// Do not remove this feature gate even though it's GA
 	VolumeSubpath featuregate.Feature = "VolumeSubpath"
 
-	// owner: @gnufied
-	// beta : v1.12
-	// GA   : v1.17
-
-	//
-	// Add support for volume plugins to report node specific
-	// volume limits
-	AttachVolumeLimit featuregate.Feature = "AttachVolumeLimit"
-
 	// owner: @ravig
 	// alpha: v1.11
 	//
@@ -749,7 +740,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExpandPersistentVolumes:        {Default: true, PreRelease: featuregate.Beta},
 	ExpandInUsePersistentVolumes:   {Default: true, PreRelease: featuregate.Beta},
 	ExpandCSIVolumes:               {Default: true, PreRelease: featuregate.Beta},
-	AttachVolumeLimit:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	CPUManager:                     {Default: true, PreRelease: featuregate.Beta},
 	CPUCFSQuotaPeriod:              {Default: false, PreRelease: featuregate.Alpha},
 	TopologyManager:                {Default: true, PreRelease: featuregate.Beta},
