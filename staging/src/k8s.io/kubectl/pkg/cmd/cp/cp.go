@@ -28,7 +28,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -66,12 +65,6 @@ var (
 
 		# Copy /tmp/foo from a remote pod to /tmp/bar locally
 		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar`))
-
-	cpUsageStr = dedent.Dedent(`
-		expected 'cp <file-spec-src> <file-spec-dest> [-c container]'.
-		<file-spec> is:
-		[namespace/]pod-name:/file/path for a remote file
-		/file/path for a local file`)
 )
 
 // CopyOptions have the data required to perform the copy operation
@@ -81,7 +74,7 @@ type CopyOptions struct {
 	NoPreserve bool
 
 	ClientConfig      *restclient.Config
-	Clientset         kubernetes.Interface
+	ClientSet         kubernetes.Interface
 	ExecParentCmdName string
 
 	genericclioptions.IOStreams
@@ -110,7 +103,7 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 	cmd.Flags().StringVarP(&o.Container, "container", "c", o.Container, "Container name. If omitted, the first container in the pod will be chosen")
-	cmd.Flags().BoolVarP(&o.NoPreserve, "no-preserve", "", false, "The copied file/directory's ownership and permissions will not be preserved in the container")
+	cmd.Flags().BoolVar(&o.NoPreserve, "no-preserve", false, "The copied file/directory's ownership and permissions will not be preserved in the container")
 
 	return cmd
 }
@@ -168,7 +161,7 @@ func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.Clientset, err = f.KubernetesClientSet()
+	o.ClientSet, err = f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
@@ -182,9 +175,6 @@ func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 // Validate makes sure provided values for CopyOptions are valid
 func (o *CopyOptions) Validate(cmd *cobra.Command, args []string) error {
-	if len(args) != 2 {
-		return cmdutil.UsageErrorf(cmd, cpUsageStr)
-	}
 	return nil
 }
 
@@ -523,7 +513,7 @@ func (o *CopyOptions) execute(options *exec.ExecOptions) error {
 	}
 
 	options.Config = o.ClientConfig
-	options.PodClient = o.Clientset.CoreV1()
+	options.PodClient = o.ClientSet.CoreV1()
 
 	if err := options.Validate(); err != nil {
 		return err
