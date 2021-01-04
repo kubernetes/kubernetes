@@ -52,6 +52,10 @@ import (
 const (
 	// Name of the plugin used in the plugin registry and configurations.
 	Name = "DefaultPreemption"
+	// DefaultTolerationPeriodSeconds indicates how long scheduler will wait for a pod to be deleted before starting to
+	// preempt pods on other nodes. If the TerminationGracePeriodSeconds is set for the pod, the time scheduler
+	// could tolerate will be sum(DefaultTolerationPeriodSeconds, TerminationGracePeriodSeconds).
+	DefaultTolerationPeriodSeconds = 30
 )
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
@@ -243,12 +247,13 @@ func PodEligibleToPreemptOthers(pod *v1.Pod, nodeInfos framework.NodeInfoLister,
 			podPriority := corev1helpers.PodPriority(pod)
 			for _, p := range nodeInfo.Pods {
 				if p.Pod.DeletionTimestamp != nil && corev1helpers.PodPriority(p.Pod) < podPriority {
+					gracePeriod := int64(DefaultTolerationPeriodSeconds)
 					if p.Pod.Spec.TerminationGracePeriodSeconds != nil {
-						gracePeriod := *p.Pod.Spec.TerminationGracePeriodSeconds
-						if p.Pod.DeletionTimestamp.Add(time.Duration(gracePeriod) * time.Second).After(time.Now()) {
-							// There is a terminating pod on the nominated node, the pod is still in the period of grace deletion.
-							return false
-						}
+						gracePeriod = *p.Pod.Spec.TerminationGracePeriodSeconds + DefaultTolerationPeriodSeconds
+					}
+					if p.Pod.DeletionTimestamp.Add(time.Duration(gracePeriod) * time.Second).After(time.Now()) {
+						// There is a terminating pod on the nominated node, the pod is still in the period of grace deletion.
+						return false
 					}
 				}
 			}

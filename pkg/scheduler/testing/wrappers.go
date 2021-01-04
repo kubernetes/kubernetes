@@ -198,12 +198,6 @@ func (p *PodWrapper) ZeroTerminationGracePeriod() *PodWrapper {
 	return p
 }
 
-// TerminationGracePeriod sets the TerminationGracePeriodSeconds of the inner pod to sec.
-func (p *PodWrapper) TerminationGracePeriod(sec int64) *PodWrapper {
-	p.Spec.TerminationGracePeriodSeconds = &sec
-	return p
-}
-
 // Node sets `s` as the nodeName of the inner pod.
 func (p *PodWrapper) Node(s string) *PodWrapper {
 	p.Spec.NodeName = s
