@@ -414,7 +414,7 @@ Kubernetes will no longer ship an instance of the Cloud Controller Manager binar
 ## Known Issues
 
 ### Summary API in kubelet doesn't have accelerator metrics
-Currently, cadvisor_stats_provider provides AcceleratorStats but cri_stats_provider does not. As a result, when using cri_stats_provider, kubelet's Summary API does not have accelerator metrics. [There is an open work in progress to fix this](https://github.com/kubernetes/kubernetes/pull/96873).
+Currently, cadvisor_stats_provider provides AcceleratorStats but cri_stats_provider does not. As a result, when using cri_stats_provider, kubelet's Summary API does not have accelerator metrics. [#96873](https://github.com/kubernetes/kubernetes/pull/96873).
 
 ## Urgent Upgrade Notes 
 
