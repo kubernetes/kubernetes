@@ -213,9 +213,6 @@ func (o *AttachOptions) Validate() error {
 	if len(o.Resources) > 2 {
 		return fmt.Errorf("expected POD, TYPE/NAME, or TYPE NAME, (at most 2 arguments) saw %d: %v", len(o.Resources), o.Resources)
 	}
-	if o.GetPodTimeout <= 0 {
-		return fmt.Errorf("--pod-running-timeout must be higher than zero")
-	}
 
 	return nil
 }
