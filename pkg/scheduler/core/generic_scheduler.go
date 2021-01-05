@@ -29,7 +29,6 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
-	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -297,12 +296,12 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, fwk fra
 		// We check the nodes starting from where we left off in the previous scheduling cycle,
 		// this is to make sure all nodes have the same chance of being examined across pods.
 		nodeInfo := allNodes[(g.nextStartNodeIndex+i)%len(allNodes)]
-		fits, status, err := PodPassesFiltersOnNode(ctx, fwk.PreemptHandle(), state, pod, nodeInfo)
-		if err != nil {
-			errCh.SendErrorWithCancel(err, cancel)
+		status := fwk.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
+		if status.Code() == framework.Error {
+			errCh.SendErrorWithCancel(status.AsError(), cancel)
 			return
 		}
-		if fits {
+		if status.IsSuccess() {
 			length := atomic.AddInt32(&feasibleNodesLen, 1)
 			if length > numNodesToFind {
 				cancel()
@@ -311,11 +310,9 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, fwk fra
 				feasibleNodes[length-1] = nodeInfo.Node()
 			}
 		} else {
-			if !status.IsSuccess() {
-				statusesLock.Lock()
-				statuses[nodeInfo.Node().Name] = status
-				statusesLock.Unlock()
-			}
+			statusesLock.Lock()
+			statuses[nodeInfo.Node().Name] = status
+			statusesLock.Unlock()
 		}
 	}
 
@@ -370,96 +367,6 @@ func (g *genericScheduler) findNodesThatPassExtenders(pod *v1.Pod, feasibleNodes
 		feasibleNodes = feasibleList
 	}
 	return feasibleNodes, nil
-}
-
-// addNominatedPods adds pods with equal or greater priority which are nominated
-// to run on the node. It returns 1) whether any pod was added, 2) augmented cycleState,
-// 3) augmented nodeInfo.
-func addNominatedPods(ctx context.Context, ph framework.PreemptHandle, pod *v1.Pod, state *framework.CycleState, nodeInfo *framework.NodeInfo) (bool, *framework.CycleState, *framework.NodeInfo, error) {
-	if ph == nil || nodeInfo == nil || nodeInfo.Node() == nil {
-		// This may happen only in tests.
-		return false, state, nodeInfo, nil
-	}
-	nominatedPods := ph.NominatedPodsForNode(nodeInfo.Node().Name)
-	if len(nominatedPods) == 0 {
-		return false, state, nodeInfo, nil
-	}
-	nodeInfoOut := nodeInfo.Clone()
-	stateOut := state.Clone()
-	podsAdded := false
-	for _, p := range nominatedPods {
-		if corev1helpers.PodPriority(p) >= corev1helpers.PodPriority(pod) && p.UID != pod.UID {
-			nodeInfoOut.AddPod(p)
-			status := ph.RunPreFilterExtensionAddPod(ctx, stateOut, pod, p, nodeInfoOut)
-			if !status.IsSuccess() {
-				return false, state, nodeInfo, status.AsError()
-			}
-			podsAdded = true
-		}
-	}
-	return podsAdded, stateOut, nodeInfoOut, nil
-}
-
-// PodPassesFiltersOnNode checks whether a node given by NodeInfo satisfies the
-// filter plugins.
-// This function is called from two different places: Schedule and Preempt.
-// When it is called from Schedule, we want to test whether the pod is
-// schedulable on the node with all the existing pods on the node plus higher
-// and equal priority pods nominated to run on the node.
-// When it is called from Preempt, we should remove the victims of preemption
-// and add the nominated pods. Removal of the victims is done by
-// SelectVictimsOnNode(). Preempt removes victims from PreFilter state and
-// NodeInfo before calling this function.
-// TODO: move this out so that plugins don't need to depend on <core> pkg.
-func PodPassesFiltersOnNode(
-	ctx context.Context,
-	ph framework.PreemptHandle,
-	state *framework.CycleState,
-	pod *v1.Pod,
-	info *framework.NodeInfo,
-) (bool, *framework.Status, error) {
-	var status *framework.Status
-
-	podsAdded := false
-	// We run filters twice in some cases. If the node has greater or equal priority
-	// nominated pods, we run them when those pods are added to PreFilter state and nodeInfo.
-	// If all filters succeed in this pass, we run them again when these
-	// nominated pods are not added. This second pass is necessary because some
-	// filters such as inter-pod affinity may not pass without the nominated pods.
-	// If there are no nominated pods for the node or if the first run of the
-	// filters fail, we don't run the second pass.
-	// We consider only equal or higher priority pods in the first pass, because
-	// those are the current "pod" must yield to them and not take a space opened
-	// for running them. It is ok if the current "pod" take resources freed for
-	// lower priority pods.
-	// Requiring that the new pod is schedulable in both circumstances ensures that
-	// we are making a conservative decision: filters like resources and inter-pod
-	// anti-affinity are more likely to fail when the nominated pods are treated
-	// as running, while filters like pod affinity are more likely to fail when
-	// the nominated pods are treated as not running. We can't just assume the
-	// nominated pods are running because they are not running right now and in fact,
-	// they may end up getting scheduled to a different node.
-	for i := 0; i < 2; i++ {
-		stateToUse := state
-		nodeInfoToUse := info
-		if i == 0 {
-			var err error
-			podsAdded, stateToUse, nodeInfoToUse, err = addNominatedPods(ctx, ph, pod, state, info)
-			if err != nil {
-				return false, nil, err
-			}
-		} else if !podsAdded || !status.IsSuccess() {
-			break
-		}
-
-		statusMap := ph.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
-		status = statusMap.Merge()
-		if !status.IsSuccess() && !status.IsUnschedulable() {
-			return false, status, status.AsError()
-		}
-	}
-
-	return status.IsSuccess(), status, nil
 }
 
 // prioritizeNodes prioritizes the nodes by running the score plugins,

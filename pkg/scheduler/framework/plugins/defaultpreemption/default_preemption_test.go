@@ -978,7 +978,7 @@ func TestDryRunPreemption(t *testing.T) {
 					t.Errorf("cycle %d: Unexpected PreFilter Status: %v", cycle, status)
 				}
 				offset, numCandidates := pl.getOffsetAndNumCandidates(int32(len(nodeInfos)))
-				got := dryRunPreemption(context.Background(), fwk.PreemptHandle(), state, pod, nodeInfos, tt.pdbs, offset, numCandidates)
+				got := dryRunPreemption(context.Background(), fwk, state, pod, nodeInfos, tt.pdbs, offset, numCandidates)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1201,7 +1201,7 @@ func TestSelectBestCandidate(t *testing.T) {
 
 			pl := &DefaultPreemption{args: *getDefaultDefaultPreemptionArgs()}
 			offset, numCandidates := pl.getOffsetAndNumCandidates(int32(len(nodeInfos)))
-			candidates := dryRunPreemption(context.Background(), fwk.PreemptHandle(), state, tt.pod, nodeInfos, nil, offset, numCandidates)
+			candidates := dryRunPreemption(context.Background(), fwk, state, tt.pod, nodeInfos, nil, offset, numCandidates)
 			s := SelectCandidate(candidates)
 			found := false
 			for _, nodeName := range tt.expected {

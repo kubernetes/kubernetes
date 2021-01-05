@@ -12,7 +12,6 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/apis/config/validation:go_default_library",
-        "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/internal/parallelize:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",

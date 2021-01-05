@@ -539,6 +539,9 @@ type Handle interface {
 
 	SharedInformerFactory() informers.SharedInformerFactory
 
+	// RunFilterPluginsWithNominatedPods runs the set of configured filter plugins for nominated pod on the given node.
+	RunFilterPluginsWithNominatedPods(ctx context.Context, state *CycleState, pod *v1.Pod, info *NodeInfo) *Status
+
 	// TODO: unroll the wrapped interfaces to Handle.
 	PreemptHandle() PreemptHandle
 }
