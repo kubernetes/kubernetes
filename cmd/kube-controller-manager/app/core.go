@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	storagev1informer "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
@@ -320,12 +319,7 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 		return nil, true, fmt.Errorf("duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
 	}
 
-	var (
-		csiNodeInformer storagev1informer.CSINodeInformer
-	)
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		csiNodeInformer = ctx.InformerFactory.Storage().V1().CSINodes()
-	}
+	csiNodeInformer := ctx.InformerFactory.Storage().V1().CSINodes()
 	csiDriverInformer := ctx.InformerFactory.Storage().V1().CSIDrivers()
 
 	plugins, err := ProbeAttachableVolumePlugins()

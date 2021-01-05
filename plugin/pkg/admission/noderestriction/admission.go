@@ -71,7 +71,6 @@ type Plugin struct {
 	podsGetter     corev1lister.PodLister
 	nodesGetter    corev1lister.NodeLister
 
-	csiNodeInfoEnabled             bool
 	expandPersistentVolumesEnabled bool
 }
 
@@ -83,7 +82,6 @@ var (
 
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	p.csiNodeInfoEnabled = featureGates.Enabled(features.CSINodeInfo)
 	p.expandPersistentVolumesEnabled = featureGates.Enabled(features.ExpandPersistentVolumes)
 }
 
@@ -163,10 +161,7 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		return p.admitLease(nodeName, a)
 
 	case csiNodeResource:
-		if p.csiNodeInfoEnabled {
-			return p.admitCSINode(nodeName, a)
-		}
-		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gates %s", features.CSINodeInfo))
+		return p.admitCSINode(nodeName, a)
 
 	default:
 		return nil

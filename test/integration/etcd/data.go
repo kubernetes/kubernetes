@@ -20,8 +20,6 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
 )
@@ -538,20 +536,18 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		// --
 	}
 
-	// add csinodes if CSINodeInfo feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		// k8s.io/kubernetes/pkg/apis/storage/v1beta1
-		etcdStorageData[gvr("storage.k8s.io", "v1beta1", "csinodes")] = StorageData{
-			Stub:             `{"metadata": {"name": "csini1"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}}`,
-			ExpectedEtcdPath: "/registry/csinodes/csini1",
-			ExpectedGVK:      gvkP("storage.k8s.io", "v1", "CSINode"),
-		}
+	// add csinodes
+	// k8s.io/kubernetes/pkg/apis/storage/v1beta1
+	etcdStorageData[gvr("storage.k8s.io", "v1beta1", "csinodes")] = StorageData{
+		Stub:             `{"metadata": {"name": "csini1"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}}`,
+		ExpectedEtcdPath: "/registry/csinodes/csini1",
+		ExpectedGVK:      gvkP("storage.k8s.io", "v1", "CSINode"),
+	}
 
-		// k8s.io/kubernetes/pkg/apis/storage/v1
-		etcdStorageData[gvr("storage.k8s.io", "v1", "csinodes")] = StorageData{
-			Stub:             `{"metadata": {"name": "csini2"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}}`,
-			ExpectedEtcdPath: "/registry/csinodes/csini2",
-		}
+	// k8s.io/kubernetes/pkg/apis/storage/v1
+	etcdStorageData[gvr("storage.k8s.io", "v1", "csinodes")] = StorageData{
+		Stub:             `{"metadata": {"name": "csini2"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}}`,
+		ExpectedEtcdPath: "/registry/csinodes/csini2",
 	}
 
 	// add csidrivers

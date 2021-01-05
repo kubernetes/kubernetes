@@ -157,13 +157,6 @@ const (
 	// Enable all logic related to the CSIDriver API object in storage.k8s.io
 	CSIDriverRegistry featuregate.Feature = "CSIDriverRegistry"
 
-	// owner: @verult
-	// alpha: v1.12
-	// beta:  v1.14
-	// ga:    v1.17
-	// Enable all logic related to the CSINode API object in storage.k8s.io
-	CSINodeInfo featuregate.Feature = "CSINodeInfo"
-
 	// owner: @screeley44
 	// alpha: v1.9
 	// beta:  v1.13
@@ -721,7 +714,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceNodeExclusion:           {Default: true, PreRelease: featuregate.Beta},
 	NodeDisruptionExclusion:        {Default: true, PreRelease: featuregate.Beta},
 	CSIDriverRegistry:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
-	CSINodeInfo:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	BlockVolume:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	StorageObjectInUseProtection:   {Default: true, PreRelease: featuregate.GA},
 	SupportPodPidsLimit:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23

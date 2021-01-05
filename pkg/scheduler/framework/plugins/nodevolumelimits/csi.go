@@ -270,10 +270,11 @@ func NewCSI(_ runtime.Object, handle framework.Handle) (framework.Plugin, error)
 	informerFactory := handle.SharedInformerFactory()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
+	csiNodesLister := informerFactory.Storage().V1().CSINodes().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 
 	return &CSILimits{
-		csiNodeLister:        getCSINodeListerIfEnabled(informerFactory),
+		csiNodeLister:        csiNodesLister,
 		pvLister:             pvLister,
 		pvcLister:            pvcLister,
 		scLister:             scLister,
