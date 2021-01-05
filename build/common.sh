@@ -570,10 +570,16 @@ function kube::build::run_build_command_ex() {
     --env "KUBE_VERBOSE=${KUBE_VERBOSE}"
     --env "KUBE_BUILD_WITH_COVERAGE=${KUBE_BUILD_WITH_COVERAGE:-}"
     --env "GOFLAGS=${GOFLAGS:-}"
-    --env "GOLDFLAGS=${GOLDFLAGS:-}"
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
     --env "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-}"
   )
+
+  # use GOLDFLAGS only if it is set explicitly.
+  if [[ -v GOLDFLAGS ]]; then
+    docker_run_opts+=(
+      --env "GOLDFLAGS=${GOLDFLAGS:-}"
+    )
+  fi
 
   if [[ -n "${DOCKER_CGROUP_PARENT:-}" ]]; then
     kube::log::status "Using ${DOCKER_CGROUP_PARENT} as container cgroup parent"
