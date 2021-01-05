@@ -235,11 +235,11 @@ func main() {
 	sort.Strings(c.dirs)
 
 	if len(*importAliases) > 0 {
-		bytes, err := ioutil.ReadFile(*importAliases)
+		byteArr, err := ioutil.ReadFile(*importAliases)
 		if err != nil {
 			log.Fatalf("Error reading import aliases: %v", err)
 		}
-		err = json.Unmarshal(bytes, &aliases)
+		err = json.Unmarshal(byteArr, &aliases)
 		if err != nil {
 			log.Fatalf("Error loading aliases: %v", err)
 		}

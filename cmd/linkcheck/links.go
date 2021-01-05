@@ -180,7 +180,7 @@ func main() {
 		os.Exit(2)
 	}
 	client := http.Client{
-		Timeout: time.Duration(5 * time.Second),
+		Timeout: 5 * time.Second,
 	}
 	invalidLink := false
 	if err := filepath.Walk(*rootDir, newWalkFunc(&invalidLink, &client)); err != nil {

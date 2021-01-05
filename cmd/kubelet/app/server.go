@@ -668,7 +668,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				if first < 0 || last >= machineInfo.NumCores {
 					// the specified cpuset is outside of the range of what the machine has
 					klog.Infof("Invalid cpuset specified by --reserved-cpus")
-					return fmt.Errorf("Invalid cpuset %q specified by --reserved-cpus", s.ReservedSystemCPUs)
+					return fmt.Errorf("invalid cpuset %q specified by --reserved-cpus", s.ReservedSystemCPUs)
 				}
 			}
 		} else {
