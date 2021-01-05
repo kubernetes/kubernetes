@@ -49,7 +49,9 @@ const (
 	PolicyTypeEgress PolicyType = "Egress"
 )
 
-// NetworkPolicySpec provides the specification of a NetworkPolicy
+// NetworkPolicySpec provides the specification of a NetworkPolicy.
+// In order for a connection to succeed, it must be allowed by any egress rules applied to
+// the source pods as well as any ingress rules applied to the destination pods.
 type NetworkPolicySpec struct {
 	// Selects the pods to which this NetworkPolicy object applies. The array of
 	// ingress rules is applied to any pods selected by this field. Multiple network
