@@ -68,14 +68,6 @@ const (
 	// certificate as expiration approaches.
 	RotateKubeletServerCertificate featuregate.Feature = "RotateKubeletServerCertificate"
 
-	// owner: @mikedanese
-	// beta: v1.8
-	// ga: v1.19
-	//
-	// Automatically renews the client certificate used for communicating with
-	// the API server as the certificate approaches expiration.
-	RotateKubeletClientCertificate featuregate.Feature = "RotateKubeletClientCertificate"
-
 	// owner: @jinxu
 	// beta: v1.10
 	//
@@ -485,14 +477,6 @@ const (
 	// Enables NonPreempting option for priorityClass and pod.
 	NonPreemptingPriority featuregate.Feature = "NonPreemptingPriority"
 
-	// owner: @j-griffith
-	// alpha: v1.15
-	// beta: v1.16
-	// GA: v1.18
-	//
-	// Enable support for specifying an existing PVC as a DataSource
-	VolumePVCDataSource featuregate.Feature = "VolumePVCDataSource"
-
 	// owner: @egernst
 	// alpha: v1.16
 	// beta: v1.18
@@ -524,14 +508,6 @@ const (
 	//
 	// Enable Endpoint Slice consumption by kube-proxy in Windows for improved scalability.
 	WindowsEndpointSliceProxying featuregate.Feature = "WindowsEndpointSliceProxying"
-
-	// owner: @Huang-Wei
-	// alpha: v1.16
-	// beta: v1.18
-	// GA: v1.19
-	//
-	// Schedule pods evenly across available topology domains.
-	EvenPodsSpread featuregate.Feature = "EvenPodsSpread"
 
 	// owner: @matthyx
 	// alpha: v1.16
@@ -732,7 +708,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
 	DevicePlugins:                  {Default: true, PreRelease: featuregate.Beta},
 	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.Beta},
-	RotateKubeletClientCertificate: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	LocalStorageCapacityIsolation:  {Default: true, PreRelease: featuregate.Beta},
 	Sysctls:                        {Default: true, PreRelease: featuregate.Beta},
 	EphemeralContainers:            {Default: false, PreRelease: featuregate.Alpha},
@@ -791,7 +766,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WindowsRunAsUserName:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: true, PreRelease: featuregate.Beta},
-	VolumePVCDataSource:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	PodOverhead:                                    {Default: true, PreRelease: featuregate.Beta},
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
 	EndpointSlice:                                  {Default: true, PreRelease: featuregate.Beta},
@@ -799,7 +773,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	EndpointSliceTerminatingCondition:              {Default: false, PreRelease: featuregate.Alpha},
 	EndpointSliceNodeName:                          {Default: false, PreRelease: featuregate.Alpha},
 	WindowsEndpointSliceProxying:                   {Default: false, PreRelease: featuregate.Alpha},
-	EvenPodsSpread:                                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	StartupProbe:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
