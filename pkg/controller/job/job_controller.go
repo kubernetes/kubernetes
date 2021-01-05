@@ -439,6 +439,7 @@ func (jm *Controller) getPodsForJob(j *batch.Job) ([]*v1.Pod, error) {
 // it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
 // concurrently with the same key.
 func (jm *Controller) syncJob(key string) (bool, error) {
+	fmt.Printf("key=%v\n", key)
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing job %q (%v)", key, time.Since(startTime))
@@ -588,6 +589,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 		job.Status.Failed = failed
 
 		if err := jm.updateHandler(&job); err != nil {
+			fmt.Printf("this=%v\n", err)
 			return forget, err
 		}
 
@@ -688,6 +690,10 @@ func (jm *Controller) manageJob(activePods []*v1.Pod, succeeded int32, job *batc
 	var activeLock sync.Mutex
 	active := int32(len(activePods))
 	parallelism := *job.Spec.Parallelism
+	if *job.Spec.Stopped {
+		parallelism = 0
+	}
+	fmt.Printf("active=%d, parallelism=%d\n", active, parallelism)
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))

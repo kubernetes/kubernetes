@@ -60,6 +60,15 @@ type JobList struct {
 // JobSpec describes how the job execution will look like.
 type JobSpec struct {
 
+	// Stopped specifies whether the job controller should create Pods or not. If
+	// a Job is created in the stopped state, no Pods are created by the job
+	// controller. If a Job enters the stopped state (i.e. the flag goes from
+	// false to true), the job controller will delete all Pods associated with
+	// this job. This field is generally used by higher-level orchestrators that
+	// need more control over when the Pods of a Job are created.
+	// +optional
+	Stopped *bool `json:"stopped,omitempty"`
+
 	// Specifies the maximum desired number of pods the job should
 	// run at any given time. The actual number of pods running in steady state will
 	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
@@ -130,8 +139,9 @@ type JobSpec struct {
 
 // JobStatus represents the current state of a Job.
 type JobStatus struct {
-	// The latest available observations of an object's current state.
-	// When a job fails, one of the conditions will have type == "Failed".
+	// The latest available observations of an object's current state.  Exactly
+	// one of "Active", "Stopped", "Failed", or "Complete" will be a part of the
+	// Job's conditions.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
 	// +optional
 	// +patchMergeKey=type
@@ -168,6 +178,10 @@ type JobConditionType string
 
 // These are valid conditions of a job.
 const (
+	// JobRunning means the job is currently active.
+	JobActive JobConditionType = "Active"
+	// JobStopped means the job has been stopped.
+	JobStopped JobConditionType = "Stopped"
 	// JobComplete means the job has completed its execution.
 	JobComplete JobConditionType = "Complete"
 	// JobFailed means the job has failed its execution.

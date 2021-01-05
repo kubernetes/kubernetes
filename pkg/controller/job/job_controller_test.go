@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	utilpointer "k8s.io/utils/pointer"
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -45,7 +46,7 @@ import (
 
 var alwaysReady = func() bool { return true }
 
-func newJob(parallelism, completions, backoffLimit int32) *batch.Job {
+func newJob(stopped bool, parallelism, completions, backoffLimit int32) *batch.Job {
 	j := &batch.Job{
 		TypeMeta: metav1.TypeMeta{Kind: "Job"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -54,6 +55,7 @@ func newJob(parallelism, completions, backoffLimit int32) *batch.Job {
 			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: batch.JobSpec{
+			Stopped: utilpointer.BoolPtr(stopped),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
@@ -284,7 +286,7 @@ func TestControllerSyncJob(t *testing.T) {
 		}
 
 		// job & pods setup
-		job := newJob(tc.parallelism, tc.completions, tc.backoffLimit)
+		job := newJob(false, tc.parallelism, tc.completions, tc.backoffLimit)
 		if tc.deleting {
 			now := metav1.Now()
 			job.DeletionTimestamp = &now
@@ -425,7 +427,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		}
 
 		// job & pods setup
-		job := newJob(tc.parallelism, tc.completions, tc.backoffLimit)
+		job := newJob(false, tc.parallelism, tc.completions, tc.backoffLimit)
 		job.Spec.ActiveDeadlineSeconds = &tc.activeDeadlineSeconds
 		start := metav1.Unix(metav1.Now().Time.Unix()-tc.startTime, 0)
 		job.Status.StartTime = &start
@@ -490,7 +492,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 		return nil
 	}
 
-	job := newJob(1, 1, 6)
+	job := newJob(false, 1, 1, 6)
 	activeDeadlineSeconds := int64(10)
 	job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
 	start := metav1.Unix(metav1.Now().Time.Unix()-15, 0)
@@ -523,7 +525,7 @@ func TestSyncJobComplete(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 
-	job := newJob(1, 1, 6)
+	job := newJob(false, 1, 1, 6)
 	job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, "", ""))
 	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	forget, err := manager.syncJob(testutil.GetKey(job, t))
@@ -551,7 +553,7 @@ func TestSyncJobDeleted(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 	manager.updateHandler = func(job *batch.Job) error { return nil }
-	job := newJob(2, 2, 6)
+	job := newJob(false, 2, 2, 6)
 	forget, err := manager.syncJob(testutil.GetKey(job, t))
 	if err != nil {
 		t.Errorf("Unexpected error when syncing jobs %v", err)
@@ -580,7 +582,7 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 		manager.queue.AddRateLimited(testutil.GetKey(job, t))
 		return updateError
 	}
-	job := newJob(2, 2, 6)
+	job := newJob(false, 2, 2, 6)
 	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	forget, err := manager.syncJob(testutil.GetKey(job, t))
 	if err == nil || err != updateError {
@@ -685,9 +687,9 @@ func TestGetPodsForJob(t *testing.T) {
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
-	job1 := newJob(1, 1, 6)
+	job1 := newJob(false, 1, 1, 6)
 	job1.Name = "job1"
-	job2 := newJob(1, 1, 6)
+	job2 := newJob(false, 1, 1, 6)
 	job2.Name = "job2"
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
@@ -726,7 +728,7 @@ func TestGetPodsForJob(t *testing.T) {
 }
 
 func TestGetPodsForJobAdopt(t *testing.T) {
-	job1 := newJob(1, 1, 6)
+	job1 := newJob(false, 1, 1, 6)
 	job1.Name = "job1"
 	clientset := fake.NewSimpleClientset(job1)
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
@@ -752,7 +754,7 @@ func TestGetPodsForJobAdopt(t *testing.T) {
 }
 
 func TestGetPodsForJobNoAdoptIfBeingDeleted(t *testing.T) {
-	job1 := newJob(1, 1, 6)
+	job1 := newJob(false, 1, 1, 6)
 	job1.Name = "job1"
 	job1.DeletionTimestamp = &metav1.Time{}
 	clientset := fake.NewSimpleClientset(job1)
@@ -782,7 +784,7 @@ func TestGetPodsForJobNoAdoptIfBeingDeleted(t *testing.T) {
 }
 
 func TestGetPodsForJobNoAdoptIfBeingDeletedRace(t *testing.T) {
-	job1 := newJob(1, 1, 6)
+	job1 := newJob(false, 1, 1, 6)
 	job1.Name = "job1"
 	// The up-to-date object says it's being deleted.
 	job1.DeletionTimestamp = &metav1.Time{}
@@ -821,7 +823,7 @@ func TestGetPodsForJobRelease(t *testing.T) {
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
-	job1 := newJob(1, 1, 6)
+	job1 := newJob(false, 1, 1, 6)
 	job1.Name = "job1"
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
 
@@ -850,9 +852,9 @@ func TestAddPod(t *testing.T) {
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
-	job1 := newJob(1, 1, 6)
+	job1 := newJob(false, 1, 1, 6)
 	job1.Name = "job1"
-	job2 := newJob(1, 1, 6)
+	job2 := newJob(false, 1, 1, 6)
 	job2.Name = "job2"
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
@@ -895,11 +897,11 @@ func TestAddPodOrphan(t *testing.T) {
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
-	job1 := newJob(1, 1, 6)
+	job1 := newJob(false, 1, 1, 6)
 	job1.Name = "job1"
-	job2 := newJob(1, 1, 6)
+	job2 := newJob(false, 1, 1, 6)
 	job2.Name = "job2"
-	job3 := newJob(1, 1, 6)
+	job3 := newJob(false, 1, 1, 6)
 	job3.Name = "job3"
 	job3.Spec.Selector.MatchLabels = map[string]string{"other": "labels"}
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
@@ -917,15 +919,63 @@ func TestAddPodOrphan(t *testing.T) {
 	}
 }
 
+func TestStoppedJob(t *testing.T) {
+	clientset := fake.NewSimpleClientset()
+	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	jm.podStoreSynced = alwaysReady
+	jm.jobStoreSynced = alwaysReady
+	receiveChan := make(chan struct{})
+	defer close(receiveChan)
+	origSyncHandler := jm.syncHandler
+	jm.syncHandler = func(key string) (bool, error) {
+		ret, err := origSyncHandler(key)
+		receiveChan <- struct{}{}
+		return ret, err
+	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informer.Start(stopCh)
+	go jm.Run(1, stopCh)
+
+	job1 := newJob(false, 1, 1, 6)
+	job1.Name = "job1"
+	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
+	<-receiveChan
+
+	pod1 := newPod("pod1", job1)
+	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
+
+	pods, err := jm.getPodsForJob(job1)
+	if err != nil {
+		t.Fatalf("getPodsForJob() error: %v", err)
+	}
+	if got, want := len(pods), 1; got != want {
+		t.Errorf("len(pods) = %v, want %v", got, want)
+	}
+
+	job1Update1 := *job1
+	job1Update1.Spec.Stopped = utilpointer.BoolPtr(true)
+	// informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1Update1)
+	jm.updateJob(job1, &job1Update1)
+
+	pods, err = jm.getPodsForJob(&job1Update1)
+	if err != nil {
+		t.Fatalf("getPodsForJob() error: %v", err)
+	}
+	if got, want := len(pods), 0; got != want {
+		t.Errorf("len(pods) = %v, want %v", got, want)
+	}
+}
+
 func TestUpdatePod(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
-	job1 := newJob(1, 1, 6)
+	job1 := newJob(false, 1, 1, 6)
 	job1.Name = "job1"
-	job2 := newJob(1, 1, 6)
+	job2 := newJob(false, 1, 1, 6)
 	job2.Name = "job2"
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
@@ -972,9 +1022,9 @@ func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
-	job1 := newJob(1, 1, 6)
+	job1 := newJob(false, 1, 1, 6)
 	job1.Name = "job1"
-	job2 := newJob(1, 1, 6)
+	job2 := newJob(false, 1, 1, 6)
 	job2.Name = "job2"
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
@@ -999,9 +1049,9 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
-	job1 := newJob(1, 1, 6)
+	job1 := newJob(false, 1, 1, 6)
 	job1.Name = "job1"
-	job2 := newJob(1, 1, 6)
+	job2 := newJob(false, 1, 1, 6)
 	job2.Name = "job2"
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
@@ -1025,9 +1075,9 @@ func TestUpdatePodRelease(t *testing.T) {
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
-	job1 := newJob(1, 1, 6)
+	job1 := newJob(false, 1, 1, 6)
 	job1.Name = "job1"
-	job2 := newJob(1, 1, 6)
+	job2 := newJob(false, 1, 1, 6)
 	job2.Name = "job2"
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
@@ -1051,9 +1101,9 @@ func TestDeletePod(t *testing.T) {
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
-	job1 := newJob(1, 1, 6)
+	job1 := newJob(false, 1, 1, 6)
 	job1.Name = "job1"
-	job2 := newJob(1, 1, 6)
+	job2 := newJob(false, 1, 1, 6)
 	job2.Name = "job2"
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job2)
@@ -1096,11 +1146,11 @@ func TestDeletePodOrphan(t *testing.T) {
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
 
-	job1 := newJob(1, 1, 6)
+	job1 := newJob(false, 1, 1, 6)
 	job1.Name = "job1"
-	job2 := newJob(1, 1, 6)
+	job2 := newJob(false, 1, 1, 6)
 	job2.Name = "job2"
-	job3 := newJob(1, 1, 6)
+	job3 := newJob(false, 1, 1, 6)
 	job3.Name = "job3"
 	job3.Spec.Selector.MatchLabels = map[string]string{"other": "labels"}
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
@@ -1139,7 +1189,7 @@ func TestSyncJobExpectations(t *testing.T) {
 	manager.jobStoreSynced = alwaysReady
 	manager.updateHandler = func(job *batch.Job) error { return nil }
 
-	job := newJob(2, 2, 6)
+	job := newJob(false, 2, 2, 6)
 	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	pods := newPodList(2, v1.PodPending, job)
 	podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
@@ -1207,7 +1257,7 @@ func TestWatchJobs(t *testing.T) {
 }
 
 func TestWatchPods(t *testing.T) {
-	testJob := newJob(2, 2, 6)
+	testJob := newJob(false, 2, 2, 6)
 	clientset := fake.NewSimpleClientset(testJob)
 	fakeWatch := watch.NewFake()
 	clientset.PrependWatchReactor("pods", core.DefaultWatchReactor(fakeWatch, nil))
@@ -1306,7 +1356,7 @@ func TestJobBackoffReset(t *testing.T) {
 		}
 
 		// job & pods setup
-		job := newJob(tc.parallelism, tc.completions, tc.backoffLimit)
+		job := newJob(false, tc.parallelism, tc.completions, tc.backoffLimit)
 		key := testutil.GetKey(job, t)
 		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
@@ -1355,7 +1405,7 @@ func (f *fakeRateLimitingQueue) AddAfter(item interface{}, duration time.Duratio
 }
 
 func TestJobBackoff(t *testing.T) {
-	job := newJob(1, 1, 1)
+	job := newJob(false, 1, 1, 1)
 	oldPod := newPod(fmt.Sprintf("pod-%v", rand.String(10)), job)
 	oldPod.Status.Phase = v1.PodRunning
 	oldPod.ResourceVersion = "1"
@@ -1486,7 +1536,7 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			}
 
 			// job & pods setup
-			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit)
+			job := newJob(false, tc.parallelism, tc.completions, tc.backoffLimit)
 			job.Spec.Template.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
@@ -1588,7 +1638,7 @@ func TestJobBackoffOnRestartPolicyNever(t *testing.T) {
 			}
 
 			// job & pods setup
-			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit)
+			job := newJob(false, tc.parallelism, tc.completions, tc.backoffLimit)
 			job.Spec.Template.Spec.RestartPolicy = v1.RestartPolicyNever
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()

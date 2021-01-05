@@ -88,6 +88,15 @@ type JobTemplateSpec struct {
 // JobSpec describes how the job execution will look like.
 type JobSpec struct {
 
+	// Stopped specifies whether the job controller should create Pods or not. If
+	// a Job is created in the stopped state, no Pods are created by the job
+	// controller. If a Job enters the stopped state (i.e. the flag goes from
+	// false to true), the job controller will delete all Pods associated with
+	// this job. This field is generally used by higher-level orchestrators that
+	// need more control over when the Pods of a Job are created.
+	// +optional
+	Stopped *bool
+
 	// Specifies the maximum desired number of pods the job should
 	// run at any given time. The actual number of pods running in steady state will
 	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
