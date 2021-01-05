@@ -1755,7 +1755,7 @@ Prior to 1.17 and for existing nodes created by `kubeadm init` where kubelet cli
 - Add `scheduler_goroutines` metric to track number of kube-scheduler binding and prioritizing goroutines ([#83535](https://github.com/kubernetes/kubernetes/pull/83535), [@wgliang](https://github.com/wgliang))
 - Adding initial EndpointSlice metrics. ([#83257](https://github.com/kubernetes/kubernetes/pull/83257), [@robscott](https://github.com/robscott))
 - Adds a metric `apiserver_request_error_total` to kube-apiserver. This metric tallies the number of `request_errors` encountered by verb, group, version, resource, subresource, scope, component, and code. ([#83427](https://github.com/kubernetes/kubernetes/pull/83427), [@logicalhan](https://github.com/logicalhan))
-- A new `kubelet_preemptions` metric is reported from Kubelets to track the number of preemptions occuring over time, and which resource is triggering those preemptions. ([#84120](https://github.com/kubernetes/kubernetes/pull/84120), [@smarterclayton](https://github.com/smarterclayton))
+- A new `kubelet_preemptions` metric is reported from Kubelets to track the number of preemptions occurring over time, and which resource is triggering those preemptions. ([#84120](https://github.com/kubernetes/kubernetes/pull/84120), [@smarterclayton](https://github.com/smarterclayton))
 - Kube-apiserver: Added metrics `authentication_latency_seconds` that can be used to understand the latency of authentication. ([#82409](https://github.com/kubernetes/kubernetes/pull/82409), [@RainbowMango](https://github.com/RainbowMango))
 - Add `plugin_execution_duration_seconds` metric for scheduler framework plugins. ([#84522](https://github.com/kubernetes/kubernetes/pull/84522), [@liu-cong](https://github.com/liu-cong))
 - Add `permit_wait_duration_seconds` metric to the scheduler. ([#84011](https://github.com/kubernetes/kubernetes/pull/84011), [@liu-cong](https://github.com/liu-cong))
@@ -2776,7 +2776,7 @@ filename | sha512 hash
 * Reduced frequency of DescribeVolumes calls of AWS API when attaching/detaching a volume. ([#84181](https://github.com/kubernetes/kubernetes/pull/84181), [@jsafrane](https://github.com/jsafrane))
 * Add a metric to track number of scheduler binding and prioritizing goroutines ([#83535](https://github.com/kubernetes/kubernetes/pull/83535), [@wgliang](https://github.com/wgliang))
 * Fix kubelet metrics gathering on non-English Windows hosts ([#84156](https://github.com/kubernetes/kubernetes/pull/84156), [@wawa0210](https://github.com/wawa0210))
-* A new `kubelet_preemptions` metric is reported from Kubelets to track the number of preemptions occuring over time, and which resource is triggering those preemptions. ([#84120](https://github.com/kubernetes/kubernetes/pull/84120), [@smarterclayton](https://github.com/smarterclayton))
+* A new `kubelet_preemptions` metric is reported from Kubelets to track the number of preemptions occurring over time, and which resource is triggering those preemptions. ([#84120](https://github.com/kubernetes/kubernetes/pull/84120), [@smarterclayton](https://github.com/smarterclayton))
 
 
 
