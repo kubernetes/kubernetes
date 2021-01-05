@@ -118,10 +118,14 @@ aliases:
 
   # SIG Release
   release-engineering-approvers:
-    - alejandrox1 # SIG Technical Lead
-    - justaugustus # SIG Chair
-    - saschagrunert # SIG Technical Lead
-    - tpepper # SIG Chair
+    - cpanato # Release Manager
+    - feiskyer # Release Manager
+    - hasheddan # Release Manager / SIG Technical Lead
+    - idealhack # Release Manager
+    - justaugustus # Release Manager / SIG Chair
+    - puerco # Release Manager
+    - saschagrunert # Release Manager / SIG Chair
+    - xmudrii # Release Manager
   release-engineering-reviewers:
     - cpanato # Branch Manager
     - feiskyer # Patch Release Team
