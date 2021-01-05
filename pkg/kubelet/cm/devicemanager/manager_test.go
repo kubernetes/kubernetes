@@ -282,8 +282,8 @@ func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, soc
 
 func setupInProbeMode(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *Stub, pluginmanager.PluginManager) {
 	m, updateChan := setupDeviceManager(t, devs, callback, socketName)
-	pm := setupPluginManager(t, pluginSocketName, m)
 	p := setupDevicePlugin(t, devs, pluginSocketName)
+	pm := setupPluginManager(t, pluginSocketName, m)
 	return m, updateChan, p, pm
 }
 
