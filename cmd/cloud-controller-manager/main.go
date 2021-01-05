@@ -103,16 +103,16 @@ func main() {
 	//delete(controllerInitializers, "cloud-node-lifecycle")
 
 	// Here is an example to add an controller(NodeIpamController) which will be used by cloud provider
-	// generate nodeipamconfig. Here is an sample code. Please pass the right parameter in your code.
+	// generate nodeIPAMConfig. Here is an sample code. Please pass the right parameter in your code.
 	// If you do not need additional controller, please ignore.
-	nodeipamconfig := nodeipamconfig.NodeIPAMControllerConfiguration{
+	nodeIPAMConfig := nodeipamconfig.NodeIPAMControllerConfiguration{
 		ServiceCIDR:          "sample",
 		SecondaryServiceCIDR: "sample",
 		NodeCIDRMaskSize:     11,
 		NodeCIDRMaskSizeIPv4: 11,
 		NodeCIDRMaskSizeIPv6: 111,
 	}
-	controllerInitializers["nodeipam"] = startNodeIpamControllerWrapper(c.Complete(), nodeipamconfig, cloud)
+	controllerInitializers["nodeipam"] = startNodeIpamControllerWrapper(c.Complete(), nodeIPAMConfig, cloud)
 
 	command := app.NewCloudControllerManagerCommand(s, c, controllerInitializers)
 
@@ -137,8 +137,8 @@ func main() {
 	}
 }
 
-func startNodeIpamControllerWrapper(ccmconfig *cloudcontrollerconfig.CompletedConfig, nodeipamconfig nodeipamconfig.NodeIPAMControllerConfiguration, cloud cloudprovider.Interface) func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
+func startNodeIpamControllerWrapper(ccmconfig *cloudcontrollerconfig.CompletedConfig, nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration, cloud cloudprovider.Interface) func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
 	return func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
-		return startNodeIpamController(ccmconfig, nodeipamconfig, ctx, cloud)
+		return startNodeIpamController(ccmconfig, nodeIPAMConfig, ctx, cloud)
 	}
 }
