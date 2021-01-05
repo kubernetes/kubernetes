@@ -166,6 +166,12 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 			return nil, err
 		}
 		klog.V(2).Infof("ensureInternalLoadBalancer(%v): reserved IP %q for the forwarding rule", loadBalancerName, ipToUse)
+		defer func() {
+			// Release the address if all resources were created successfully, or if we error out.
+			if err := addrMgr.ReleaseAddress(); err != nil {
+				klog.Errorf("ensureInternalLoadBalancer: failed to release address reservation, possibly causing an orphan: %v", err)
+			}
+		}()
 	}
 
 	// Ensure firewall rules if necessary
@@ -207,13 +213,6 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	// Delete the previous internal load balancer resources if necessary
 	if existingBackendService != nil {
 		g.clearPreviousInternalResources(svc, loadBalancerName, existingBackendService, backendServiceName, hcName)
-	}
-
-	if addrMgr != nil {
-		// Now that the controller knows the forwarding rule exists, we can release the address.
-		if err := addrMgr.ReleaseAddress(); err != nil {
-			klog.Errorf("ensureInternalLoadBalancer: failed to release address reservation, possibly causing an orphan: %v", err)
-		}
 	}
 
 	// Get the most recent forwarding rule for the address.
