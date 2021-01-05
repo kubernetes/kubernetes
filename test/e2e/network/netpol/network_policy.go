@@ -586,6 +586,17 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityIsolated})
 		})
 
+		ginkgo.It("should deny egress from pods based on PodSelector [Feature:NetworkPolicy] ", func() {
+			nsX, _, _, model, k8s := getK8SModel(f)
+			policy := GetDenyEgressForTarget("deny-egress-pod-a", metav1.LabelSelector{MatchLabels: map[string]string{"pod": "a"}})
+			CreatePolicy(k8s, policy, nsX)
+
+			reachability := NewReachability(model.AllPods(), true)
+			reachability.ExpectAllEgress(NewPodString(nsX, "a"), false)
+
+			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+		})
+
 		ginkgo.It("should work with Ingress, Egress specified together [Feature:NetworkPolicy]", func() {
 			allowedPodLabels := &metav1.LabelSelector{MatchLabels: map[string]string{"pod": "b"}}
 			policy := GetAllowIngressByPod("allow-client-a-via-pod-selector", map[string]string{"pod": "a"}, allowedPodLabels)
