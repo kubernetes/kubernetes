@@ -63,7 +63,7 @@ const (
 )
 
 // AllContainers specifies that all containers be visited
-const AllContainers ContainerType = (InitContainers | Containers | EphemeralContainers)
+const AllContainers = InitContainers | Containers | EphemeralContainers
 
 // AllFeatureEnabledContainers returns a ContainerType mask which includes all container
 // types except for the ones guarded by feature gate.
