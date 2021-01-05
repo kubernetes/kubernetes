@@ -48,6 +48,10 @@ function configure-etcd-params {
   if [[ -n "${ETCD_COMPACTION_INTERVAL_SEC:-}" ]]; then
     params_ref+=" --etcd-compaction-interval=${ETCD_COMPACTION_INTERVAL_SEC}s"
   fi
+
+  if [[ -n "${KUBE_APISERVER_EVENT_TTL_SEC:-}" ]]; then
+    params_ref+=" --event-ttl=${KUBE_APISERVER_EVENT_TTL_SEC}s"
+  fi
 }
 
 # Starts kubernetes apiserver.
