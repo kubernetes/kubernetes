@@ -874,43 +874,57 @@ func (a *HorizontalController) storeScaleEvent(behavior *autoscalingv2.Horizonta
 // - replaces old recommendation with the newest recommendation,
 // - returns {max,min} of recommendations that are not older than constraints.Scale{Up,Down}.DelaySeconds
 func (a *HorizontalController) stabilizeRecommendationWithBehaviors(args NormalizationArg) (int32, string, string) {
-	recommendation := args.DesiredReplicas
+	now := time.Now()
+
 	foundOldSample := false
 	oldSampleIndex := 0
-	var scaleDelaySeconds int32
-	var reason, message string
 
-	var betterRecommendation func(int32, int32) int32
+	upRecommendation := args.DesiredReplicas
+	upDelaySeconds := *args.ScaleUpBehavior.StabilizationWindowSeconds
+	upCutoff := now.Add(-time.Second * time.Duration(upDelaySeconds))
 
-	if args.DesiredReplicas >= args.CurrentReplicas {
-		scaleDelaySeconds = *args.ScaleUpBehavior.StabilizationWindowSeconds
-		betterRecommendation = min
-		reason = "ScaleUpStabilized"
-		message = "recent recommendations were lower than current one, applying the lowest recent recommendation"
-	} else {
-		scaleDelaySeconds = *args.ScaleDownBehavior.StabilizationWindowSeconds
-		betterRecommendation = max
-		reason = "ScaleDownStabilized"
-		message = "recent recommendations were higher than current one, applying the highest recent recommendation"
-	}
+	downRecommendation := args.DesiredReplicas
+	downDelaySeconds := *args.ScaleDownBehavior.StabilizationWindowSeconds
+	downCutoff := now.Add(-time.Second * time.Duration(downDelaySeconds))
 
-	maxDelaySeconds := max(*args.ScaleUpBehavior.StabilizationWindowSeconds, *args.ScaleDownBehavior.StabilizationWindowSeconds)
-	obsoleteCutoff := time.Now().Add(-time.Second * time.Duration(maxDelaySeconds))
-
-	cutoff := time.Now().Add(-time.Second * time.Duration(scaleDelaySeconds))
+	// Calculate the upper and lower stabilization limits.
 	for i, rec := range a.recommendations[args.Key] {
-		if rec.timestamp.After(cutoff) {
-			recommendation = betterRecommendation(rec.recommendation, recommendation)
+		if rec.timestamp.After(upCutoff) {
+			upRecommendation = min(rec.recommendation, upRecommendation)
 		}
-		if rec.timestamp.Before(obsoleteCutoff) {
+		if rec.timestamp.After(downCutoff) {
+			downRecommendation = max(rec.recommendation, downRecommendation)
+		}
+		if rec.timestamp.Before(upCutoff) && rec.timestamp.Before(downCutoff) {
 			foundOldSample = true
 			oldSampleIndex = i
 		}
 	}
+
+	// Bring the recommendation to within the upper and lower limits (stabilize).
+	recommendation := args.CurrentReplicas
+	if recommendation < upRecommendation {
+		recommendation = upRecommendation
+	}
+	if recommendation > downRecommendation {
+		recommendation = downRecommendation
+	}
+
+	// Record the unstabilized recommendation.
 	if foundOldSample {
 		a.recommendations[args.Key][oldSampleIndex] = timestampedRecommendation{args.DesiredReplicas, time.Now()}
 	} else {
 		a.recommendations[args.Key] = append(a.recommendations[args.Key], timestampedRecommendation{args.DesiredReplicas, time.Now()})
+	}
+
+	// Determine a human-friendly message.
+	var reason, message string
+	if args.DesiredReplicas >= args.CurrentReplicas {
+		reason = "ScaleUpStabilized"
+		message = "recent recommendations were lower than current one, applying the lowest recent recommendation"
+	} else {
+		reason = "ScaleDownStabilized"
+		message = "recent recommendations were higher than current one, applying the highest recent recommendation"
 	}
 	return recommendation, reason, message
 }
