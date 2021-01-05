@@ -455,14 +455,7 @@ func newCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 
 // NewImagesList returns the underlying struct for the "kubeadm config images list" command
 func NewImagesList(cfgPath string, cfg *kubeadmapiv1beta2.ClusterConfiguration) (*ImagesList, error) {
-	// Avoid running the CRI auto-detection code as we don't need it
-	versionedInitCfg := &kubeadmapiv1beta2.InitConfiguration{
-		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
-			CRISocket: constants.DefaultDockerCRISocket,
-		},
-	}
-
-	initcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, versionedInitCfg, cfg)
+	initcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, cmdutil.DefaultInitConfiguration(), cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not convert cfg to an internal cfg")
 	}
