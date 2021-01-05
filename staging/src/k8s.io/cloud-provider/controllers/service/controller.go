@@ -56,28 +56,12 @@ const (
 	minRetryDelay = 5 * time.Second
 	maxRetryDelay = 300 * time.Second
 
-	// labelNodeRoleMaster specifies that a node is a master. The use of this label within the
-	// controller is deprecated and only considered when the LegacyNodeRoleBehavior feature gate
-	// is on.
-	labelNodeRoleMaster = "node-role.kubernetes.io/master"
-
 	// labelNodeRoleExcludeBalancer specifies that the node should not be considered as a target
 	// for external load-balancers which use nodes as a second hop (e.g. many cloud LBs which only
 	// understand nodes). For services that use externalTrafficPolicy=Local, this may mean that
 	// any backends on excluded nodes are not reachable by those external load-balancers.
-	// Implementations of this exclusion may vary based on provider. This label is honored starting
-	// in 1.16 when the ServiceNodeExclusion gate is on.
+	// Implementations of this exclusion may vary based on provider.
 	labelNodeRoleExcludeBalancer = "node.kubernetes.io/exclude-from-external-load-balancers"
-
-	// serviceNodeExclusionFeature is the feature gate name that
-	// enables nodes to exclude themselves from service load balancers
-	// originated from: https://github.com/kubernetes/kubernetes/blob/28e800245e/pkg/features/kube_features.go#L178
-	serviceNodeExclusionFeature = "ServiceNodeExclusion"
-
-	// legacyNodeRoleBehaviorFeature is the feature gate name that enables legacy
-	// behavior to vary cluster functionality on the node-role.kubernetes.io
-	// labels.
-	legacyNodeRoleBehaviorFeature = "LegacyNodeRoleBehavior"
 )
 
 type cachedService struct {
@@ -110,9 +94,6 @@ type Controller struct {
 	nodeListerSynced    cache.InformerSynced
 	// services that need to be synced
 	queue workqueue.RateLimitingInterface
-	// feature gates stored in local field for better testability
-	legacyNodeRoleFeatureEnabled       bool
-	serviceNodeExclusionFeatureEnabled bool
 }
 
 // New returns a new service controller to keep cloud provider service resources
@@ -137,18 +118,16 @@ func New(
 	}
 
 	s := &Controller{
-		cloud:                              cloud,
-		knownHosts:                         []*v1.Node{},
-		kubeClient:                         kubeClient,
-		clusterName:                        clusterName,
-		cache:                              &serviceCache{serviceMap: make(map[string]*cachedService)},
-		eventBroadcaster:                   broadcaster,
-		eventRecorder:                      recorder,
-		nodeLister:                         nodeInformer.Lister(),
-		nodeListerSynced:                   nodeInformer.Informer().HasSynced,
-		queue:                              workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
-		legacyNodeRoleFeatureEnabled:       featureGate.Enabled(legacyNodeRoleBehaviorFeature),
-		serviceNodeExclusionFeatureEnabled: featureGate.Enabled(serviceNodeExclusionFeature),
+		cloud:            cloud,
+		knownHosts:       []*v1.Node{},
+		kubeClient:       kubeClient,
+		clusterName:      clusterName,
+		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
+		eventBroadcaster: broadcaster,
+		eventRecorder:    recorder,
+		nodeLister:       nodeInformer.Lister(),
+		nodeListerSynced: nodeInformer.Informer().HasSynced,
+		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
 	}
 
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -635,17 +614,8 @@ func nodeSlicesEqualForLB(x, y []*v1.Node) bool {
 
 func (s *Controller) getNodeConditionPredicate() NodeConditionPredicate {
 	return func(node *v1.Node) bool {
-		if s.legacyNodeRoleFeatureEnabled {
-			// As of 1.6, we will taint the master, but not necessarily mark it unschedulable.
-			// Recognize nodes labeled as master, and filter them also, as we were doing previously.
-			if _, hasMasterRoleLabel := node.Labels[labelNodeRoleMaster]; hasMasterRoleLabel {
-				return false
-			}
-		}
-		if s.serviceNodeExclusionFeatureEnabled {
-			if _, hasExcludeBalancerLabel := node.Labels[labelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
-				return false
-			}
+		if _, hasExcludeBalancerLabel := node.Labels[labelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
+			return false
 		}
 
 		// If we have no info, don't accept

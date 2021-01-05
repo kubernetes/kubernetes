@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
@@ -41,12 +40,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
@@ -1140,7 +1137,8 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 			description:       "Network Disruption: One zone is down - eviction should take place.",
 		},
 		// NetworkDisruption: Node created long time ago, node controller posted Unknown for a long period
-		// of on first Node, eviction should stop even though -master Node is healthy.
+		// of on first Node, eviction should stop even though Node with label
+		// node.kubernetes.io/exclude-disruption is healthy.
 		{
 			nodeList: []*v1.Node{
 				{
@@ -1174,6 +1172,7 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 							v1.LabelTopologyZone:            "zone1",
 							v1.LabelFailureDomainBetaRegion: "region1",
 							v1.LabelFailureDomainBetaZone:   "zone1",
+							labelNodeDisruptionExclusion:    "",
 						},
 					},
 					Status: v1.NodeStatus{
@@ -1200,7 +1199,7 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
 			},
 			expectedEvictPods: false,
-			description:       "NetworkDisruption: eviction should stop, only -master Node is healthy",
+			description:       "NetworkDisruption: eviction should stop, only Node with label node.kubernetes.io/exclude-disruption is healthy",
 		},
 		// NetworkDisruption: Node created long time ago, node controller posted Unknown for a long period of time on both Nodes.
 		// Initially both zones down, one comes back - eviction should take place
@@ -3577,26 +3576,15 @@ func Test_isNodeExcludedFromDisruptionChecks(t *testing.T) {
 	tests := []struct {
 		name string
 
-		enableExclusion bool
-		enableLegacy    bool
-		input           *v1.Node
-		want            bool
+		input *v1.Node
+		want  bool
 	}{
 		{want: false, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}}},
 		{want: false, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Name: "master-abc"}}},
-		{want: false, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeDisruptionExclusion: ""}}}},
-
-		{want: false, enableExclusion: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Name: "master-abc"}}},
-		{want: false, enableLegacy: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeDisruptionExclusion: ""}}}},
-
-		{want: true, enableLegacy: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Name: "master-abc"}}},
-		{want: true, enableExclusion: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeDisruptionExclusion: ""}}}},
+		{want: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeDisruptionExclusion: ""}}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDisruptionExclusion, tt.enableExclusion)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LegacyNodeRoleBehavior, tt.enableLegacy)()
-
 			if result := isNodeExcludedFromDisruptionChecks(tt.input); result != tt.want {
 				t.Errorf("isNodeExcludedFromDisruptionChecks() = %v, want %v", result, tt.want)
 			}
