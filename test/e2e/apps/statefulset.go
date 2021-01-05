@@ -18,6 +18,7 @@ package apps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -27,6 +28,7 @@ import (
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -830,7 +832,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		/*
-			Release: v1.16
+			Release: v1.16, v1.21
 			Testname: StatefulSet resource Replica scaling
 			Description: Create a StatefulSet resource.
 			Newly created StatefulSet resource MUST have a scale of one.
@@ -868,6 +870,24 @@ var _ = SIGDescribe("StatefulSet", func() {
 				framework.Failf("Failed to get statefulset resource: %v", err)
 			}
 			framework.ExpectEqual(*(ss.Spec.Replicas), int32(2))
+
+			ginkgo.By("Patch a scale subresource")
+			scale.ResourceVersion = "" // indicate the scale update should be unconditional
+			scale.Spec.Replicas = 4    // should be 2 after "UpdateScale" operation, now Patch to 4
+			ssScalePatchPayload, err := json.Marshal(autoscalingv1.Scale{
+				Spec: autoscalingv1.ScaleSpec{
+					Replicas: scale.Spec.Replicas,
+				},
+			})
+			framework.ExpectNoError(err, "Could not Marshal JSON for patch payload")
+
+			_, err = c.AppsV1().StatefulSets(ns).Patch(context.TODO(), ssName, types.StrategicMergePatchType, []byte(ssScalePatchPayload), metav1.PatchOptions{}, "scale")
+			framework.ExpectNoError(err, "Failed to patch stateful set: %v", err)
+
+			ginkgo.By("verifying the statefulset Spec.Replicas was modified")
+			ss, err = c.AppsV1().StatefulSets(ns).Get(context.TODO(), ssName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Failed to get statefulset resource: %v", err)
+			framework.ExpectEqual(*(ss.Spec.Replicas), int32(4), "statefulset should have 4 replicas")
 		})
 	})
 

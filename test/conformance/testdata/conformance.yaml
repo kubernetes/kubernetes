@@ -1315,7 +1315,7 @@
   description: Create a StatefulSet resource. Newly created StatefulSet resource MUST
     have a scale of one. Bring the scale of the StatefulSet resource up to two. StatefulSet
     scale MUST be at two replicas.
-  release: v1.16
+  release: v1.16, v1.21
   file: test/e2e/apps/statefulset.go
 - testname: StatefulSet, Rolling Update with Partition
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
