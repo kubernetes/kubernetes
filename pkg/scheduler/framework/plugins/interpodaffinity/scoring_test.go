@@ -372,7 +372,7 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: labelRgIndia}},
 			},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 50}, {Name: "machine3", Score: framework.MaxNodeScore}, {Name: "machine4", Score: framework.MaxNodeScore}, {Name: "machine5", Score: 50}},
-			name:         "Affinity: nodes in one region has more matching pods comparing to other reqion, so the region which has more macthes will get high score",
+			name:         "Affinity: nodes in one region has more matching pods comparing to other region, so the region which has more matches will get high score",
 		},
 		// Test with the different operators and values for pod affinity scheduling preference, including some match failures.
 		{
@@ -438,7 +438,7 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
 			},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: framework.MaxNodeScore}},
-			name:         "Anti Affinity: pod that doesnot match existing pods in node will get high score ",
+			name:         "Anti Affinity: pod that does not match existing pods in node will get high score ",
 		},
 		{
 			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: awayFromS1InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
@@ -451,7 +451,7 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
 			},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: framework.MaxNodeScore}},
-			name:         "Anti Affinity: pod that does not matches topology key & matches the pods in nodes will get higher score comparing to others ",
+			name:         "Anti Affinity: pod that does not match topology key & match the pods in nodes will get higher score comparing to others ",
 		},
 		{
 			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: awayFromS1InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
@@ -465,7 +465,7 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 			},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: framework.MaxNodeScore}},
-			name:         "Anti Affinity: one node has more matching pods comparing to other node, so the node which has more unmacthes will get high score",
+			name:         "Anti Affinity: one node has more matching pods comparing to other node, so the node which has more unmatches will get high score",
 		},
 		// Test the symmetry cases for anti affinity
 		{
@@ -498,7 +498,7 @@ func TestPreferredAffinity(t *testing.T) {
 		// Combined cases considering both affinity and anti-affinity, the pod to schedule and existing pods have the same labels (they are in the same RC/service),
 		// the pod prefer to run together with its brother pods in the same region, but wants to stay away from them at node level,
 		// so that all the pods of a RC/service can stay in a same region but trying to separate with each other
-		// machine-1,machine-3,machine-4 are in ChinaRegion others machin-2,machine-5 are in IndiaRegion
+		// machine-1,machine-3,machine-4 are in ChinaRegion others machine-2,machine-5 are in IndiaRegion
 		{
 			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS1InRegionAwayFromS2InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			pods: []*v1.Pod{
