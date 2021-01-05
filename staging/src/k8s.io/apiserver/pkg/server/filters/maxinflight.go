@@ -33,10 +33,6 @@ import (
 )
 
 const (
-	// Constant for the retry-after interval on rate limiting.
-	// TODO: maybe make this dynamic? or user-adjustable?
-	retryAfter = "1"
-
 	// How often inflight usage metric should be updated. Because
 	// the metrics tracks maximal value over period making this
 	// longer will increase the metric value.
@@ -121,6 +117,7 @@ func WithMaxInFlightLimit(
 	nonMutatingLimit int,
 	mutatingLimit int,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
+	retryAfter time.Duration,
 ) http.Handler {
 	if nonMutatingLimit == 0 && mutatingLimit == 0 {
 		return handler
@@ -201,7 +198,7 @@ func WithMaxInFlightLimit(
 					metrics.DroppedRequests.WithLabelValues(metrics.ReadOnlyKind).Inc()
 				}
 				metrics.RecordRequestTermination(r, requestInfo, metrics.APIServerComponent, http.StatusTooManyRequests)
-				tooManyRequests(r, w)
+				tooManyRequests(r, w, retryAfter)
 			}
 		}
 	})
@@ -213,8 +210,8 @@ func StartMaxInFlightWatermarkMaintenance(stopCh <-chan struct{}) {
 	startWatermarkMaintenance(watermark, stopCh)
 }
 
-func tooManyRequests(req *http.Request, w http.ResponseWriter) {
+func tooManyRequests(req *http.Request, w http.ResponseWriter, retryAfter time.Duration) {
 	// Return a 429 status indicating "Too Many Requests"
-	w.Header().Set("Retry-After", retryAfter)
+	w.Header().Set("Retry-After", fmt.Sprintf("%.0f", retryAfter.Seconds()))
 	http.Error(w, "Too many requests, please try again later.", http.StatusTooManyRequests)
 }

@@ -140,7 +140,7 @@ func newApfServerWithHooks(decision mockDecision, onExecute, postExecute, postEn
 		mockDecision: decision,
 		postEnqueue:  postEnqueue,
 		postDequeue:  postDequeue,
-	})
+	}, time.Second)
 
 	handler := apifilters.WithRequestInfo(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(apirequest.WithUser(r.Context(), &user.DefaultInfo{
@@ -497,7 +497,7 @@ func newHandlerChain(t *testing.T, handler http.Handler, filter utilflowcontrol.
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
-	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter)
+	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter, time.Second)
 
 	// add the handler in the chain that adds the specified user to the request context
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

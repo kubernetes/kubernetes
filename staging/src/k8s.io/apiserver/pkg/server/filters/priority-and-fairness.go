@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -66,6 +67,7 @@ func WithPriorityAndFairness(
 	handler http.Handler,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 	fcIfc utilflowcontrol.Interface,
+	retryAfter time.Duration,
 ) http.Handler {
 	if fcIfc == nil {
 		klog.Warningf("priority and fairness support not found, skipping")
@@ -146,7 +148,7 @@ func WithPriorityAndFairness(
 				epmetrics.DroppedRequests.WithLabelValues(epmetrics.ReadOnlyKind).Inc()
 			}
 			epmetrics.RecordRequestTermination(r, requestInfo, epmetrics.APIServerComponent, http.StatusTooManyRequests)
-			tooManyRequests(r, w)
+			tooManyRequests(r, w, retryAfter)
 		}
 
 	})

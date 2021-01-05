@@ -38,6 +38,7 @@ type ServerRunOptions struct {
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
 	RequestTimeout              time.Duration
+	RetryAfter                  time.Duration
 	GoawayChance                float64
 	LivezGracePeriod            time.Duration
 	MinRequestTimeout           int
@@ -61,6 +62,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		RequestTimeout:              defaults.RequestTimeout,
 		LivezGracePeriod:            defaults.LivezGracePeriod,
 		MinRequestTimeout:           defaults.MinRequestTimeout,
+		RetryAfter:                  defaults.RetryAfter,
 		ShutdownDelayDuration:       defaults.ShutdownDelayDuration,
 		JSONPatchMaxCopyBytes:       defaults.JSONPatchMaxCopyBytes,
 		MaxRequestBodyBytes:         defaults.MaxRequestBodyBytes,
@@ -78,6 +80,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.RequestTimeout = s.RequestTimeout
 	c.GoawayChance = s.GoawayChance
 	c.MinRequestTimeout = s.MinRequestTimeout
+	c.RetryAfter = s.RetryAfter
 	c.ShutdownDelayDuration = s.ShutdownDelayDuration
 	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
 	c.MaxRequestBodyBytes = s.MaxRequestBodyBytes
@@ -121,6 +124,10 @@ func (s *ServerRunOptions) Validate() []error {
 
 	if s.RequestTimeout.Nanoseconds() < 0 {
 		errors = append(errors, fmt.Errorf("--request-timeout can not be negative value"))
+	}
+
+	if s.RetryAfter.Nanoseconds() < 0 {
+		errors = append(errors, fmt.Errorf("--retry-after can not be negative value"))
 	}
 
 	if s.GoawayChance < 0 || s.GoawayChance > 0.02 {
@@ -185,6 +192,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"An optional field indicating the duration a handler must keep a request open before timing "+
 		"it out. This is the default request timeout for requests but may be overridden by flags such as "+
 		"--min-request-timeout for specific types of requests.")
+
+	fs.DurationVar(&s.RetryAfter, "retry-after", s.RetryAfter, ""+
+		"RetryAfter is used as value for setting the Retry-After response HTTP header, which indicates "+
+		"how long the user agent should wait before making a follow-up request.")
 
 	fs.Float64Var(&s.GoawayChance, "goaway-chance", s.GoawayChance, ""+
 		"To prevent HTTP/2 clients from getting stuck on a single apiserver, randomly close a connection (GOAWAY). "+

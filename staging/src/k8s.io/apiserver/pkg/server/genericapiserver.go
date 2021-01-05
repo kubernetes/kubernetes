@@ -189,6 +189,10 @@ type GenericAPIServer struct {
 	// HandlerChainWaitGroup allows you to wait for all chain handlers finish after the server shutdown.
 	HandlerChainWaitGroup *utilwaitgroup.SafeWaitGroup
 
+	// RetryAfter is used as value for setting the Retry-After response HTTP header, which indicates how long the user
+	// agent should wait before making a follow-up request.
+	RetryAfter time.Duration
+
 	// ShutdownDelayDuration allows to block shutdown for some time, e.g. until endpoints pointing to this API server
 	// have converged on all node. During this time, the API server keeps serving, /healthz will return 200,
 	// but /readyz will return failure.

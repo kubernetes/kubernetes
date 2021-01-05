@@ -135,6 +135,7 @@ func TestAddFlags(t *testing.T) {
 			MinRequestTimeout:           1800,
 			JSONPatchMaxCopyBytes:       int64(3 * 1024 * 1024),
 			MaxRequestBodyBytes:         int64(3 * 1024 * 1024),
+			RetryAfter:                  time.Second,
 		},
 		Admission: &kubeoptions.AdmissionOptions{
 			GenericAdmission: &apiserveroptions.AdmissionOptions{

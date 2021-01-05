@@ -202,6 +202,9 @@ type Config struct {
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc apirequest.LongRunningRequestCheck
 
+	// RetryAfter is the interval set on retry-after headers from apiserver
+	RetryAfter time.Duration
+
 	// GoawayChance is the probability that send a GOAWAY to HTTP/2 clients. When client received
 	// GOAWAY, the in-flight requests will not be affected and new requests will use
 	// a new TCP connection to triggering re-balancing to another server behind the load balance.
@@ -315,6 +318,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		MaxRequestsInFlight:         400,
 		MaxMutatingRequestsInFlight: 200,
 		RequestTimeout:              time.Duration(60) * time.Second,
+		RetryAfter:                  time.Second,
 		MinRequestTimeout:           1800,
 		LivezGracePeriod:            time.Duration(0),
 		ShutdownDelayDuration:       time.Duration(0),
@@ -562,6 +566,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		HandlerChainWaitGroup:      c.HandlerChainWaitGroup,
 
 		minRequestTimeout:     time.Duration(c.MinRequestTimeout) * time.Second,
+		RetryAfter:            c.RetryAfter,
 		ShutdownTimeout:       c.RequestTimeout,
 		ShutdownDelayDuration: c.ShutdownDelayDuration,
 		SecureServingInfo:     c.SecureServing,
@@ -723,10 +728,10 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 
 	if c.FlowControl != nil {
 		handler = filterlatency.TrackCompleted(handler)
-		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl)
+		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl, c.RetryAfter)
 		handler = filterlatency.TrackStarted(handler, "priorityandfairness")
 	} else {
-		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
+		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc, c.RetryAfter)
 	}
 
 	handler = filterlatency.TrackCompleted(handler)

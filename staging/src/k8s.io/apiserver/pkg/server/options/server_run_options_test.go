@@ -74,6 +74,21 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			expectErr: "--request-timeout can not be negative value",
 		},
 		{
+			name: "Test when RetryAfter is negative value",
+			testOptions: &ServerRunOptions{
+				AdvertiseAddress:            net.ParseIP("192.168.10.10"),
+				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
+				MaxRequestsInFlight:         400,
+				MaxMutatingRequestsInFlight: 200,
+				RequestTimeout:              time.Duration(2) * time.Minute,
+				MinRequestTimeout:           1800,
+				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
+				MaxRequestBodyBytes:         10 * 1024 * 1024,
+				RetryAfter:                  -time.Duration(2) * time.Second,
+			},
+			expectErr: "--retry-after can not be negative value",
+		},
+		{
 			name: "Test when MinRequestTimeout is negative value",
 			testOptions: &ServerRunOptions{
 				AdvertiseAddress:            net.ParseIP("192.168.10.10"),
