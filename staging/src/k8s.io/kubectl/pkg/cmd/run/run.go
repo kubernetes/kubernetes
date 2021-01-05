@@ -336,11 +336,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	allErrs := []error{}
 	if o.Expose {
-		serviceGenerator := cmdutil.GetFlagString(cmd, "service-generator")
-		if len(serviceGenerator) == 0 {
-			return cmdutil.UsageErrorf(cmd, "No service generator specified")
-		}
-		serviceRunObject, err := o.generateService(f, cmd, serviceGenerator, params)
+		serviceRunObject, err := o.generateService(f, cmd, cmdutil.GetFlagString(cmd, "service-generator"), params)
 		if err != nil {
 			allErrs = append(allErrs, err)
 		} else {
