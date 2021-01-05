@@ -114,7 +114,7 @@ func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, e
 	}
 
 	if cloud.ProviderName() != aws.ProviderName {
-		return nil, fmt.Errorf("Expected aws cloud, found %s", cloud.ProviderName())
+		return nil, fmt.Errorf("expected aws cloud, found %s", cloud.ProviderName())
 	}
 
 	instances, ok := cloud.Instances()
@@ -241,7 +241,7 @@ func getVolumeSource(
 		return spec.PersistentVolume.Spec.AWSElasticBlockStore, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference an AWS EBS volume type")
+	return nil, false, fmt.Errorf("spec does not reference an AWS EBS volume type")
 }
 
 func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {

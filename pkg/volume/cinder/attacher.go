@@ -102,7 +102,7 @@ func (attacher *cinderDiskAttacher) waitOperationFinished(volumeID string) error
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
+		err = fmt.Errorf("volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
 	}
 
 	return err
@@ -124,7 +124,7 @@ func (attacher *cinderDiskAttacher) waitDiskAttached(instanceID, volumeID string
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Volume %q failed to be attached within the alloted time", volumeID)
+		err = fmt.Errorf("volume %q failed to be attached within the alloted time", volumeID)
 	}
 
 	return err
@@ -222,7 +222,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 	}
 
 	if devicePath == "" {
-		return "", fmt.Errorf("WaitForAttach failed for Cinder disk %q: devicePath is empty", volumeID)
+		return "", fmt.Errorf("waitForAttach failed for Cinder disk %q: devicePath is empty", volumeID)
 	}
 
 	ticker := time.NewTicker(probeVolumeInitDelay)
@@ -346,7 +346,7 @@ func (detacher *cinderDiskDetacher) waitOperationFinished(volumeID string) error
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
+		err = fmt.Errorf("volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
 	}
 
 	return err
@@ -368,7 +368,7 @@ func (detacher *cinderDiskDetacher) waitDiskDetached(instanceID, volumeID string
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Volume %q failed to detach within the alloted time", volumeID)
+		err = fmt.Errorf("volume %q failed to detach within the alloted time", volumeID)
 	}
 
 	return err

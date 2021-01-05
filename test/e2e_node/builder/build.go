@@ -63,14 +63,14 @@ func getK8sBin(bin string) (string, error) {
 			return "", err
 		}
 		if _, err := os.Stat(filepath.Join(*k8sBinDir, bin)); err != nil {
-			return "", fmt.Errorf("Could not find %s under directory %s", bin, absPath)
+			return "", fmt.Errorf("could not find %s under directory %s", bin, absPath)
 		}
 		return filepath.Join(absPath, bin), nil
 	}
 
 	path, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
-		return "", fmt.Errorf("Could not find absolute path of directory containing the tests %s", filepath.Dir(os.Args[0]))
+		return "", fmt.Errorf("could not find absolute path of directory containing the tests %s", filepath.Dir(os.Args[0]))
 	}
 	if _, err := os.Stat(filepath.Join(path, bin)); err == nil {
 		return filepath.Join(path, bin), nil

@@ -94,7 +94,7 @@ func (a *classDefaulterPlugin) Admit(ctx context.Context, attr admission.Attribu
 	// if we can't convert then we don't handle this object so just return
 	if !ok {
 		klog.V(3).Infof("Expected Ingress resource, got: %v", attr.GetKind())
-		return errors.NewInternalError(fmt.Errorf("Expected Ingress resource, got: %v", attr.GetKind()))
+		return errors.NewInternalError(fmt.Errorf("expected Ingress resource, got: %v", attr.GetKind()))
 	}
 
 	// IngressClassName field has been set, no need to set a default value.
