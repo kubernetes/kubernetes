@@ -33,10 +33,6 @@ func NewCmdAlpha(in io.Reader, out io.Writer) *cobra.Command {
 	deprecateCommand(`please use the same command under "kubeadm kubeconfig"`, kubeconfigCmd)
 	cmd.AddCommand(kubeconfigCmd)
 
-	certsCommand := NewCmdCertsUtility(out)
-	deprecateCommand(`please use the same command under "kubeadm certs"`, certsCommand)
-	cmd.AddCommand(certsCommand)
-
 	return cmd
 }
 
