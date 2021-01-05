@@ -24,7 +24,7 @@ accessed without the need for a Proxy.
 {% method %}
 ## Connecting to an internal Service
 
-Connect to a internal Service using the Proxy command, and the Service Proxy url.
+Connect to an internal Service using the Proxy command, and the Service Proxy url.
 
 To visit the nginx service go to the Proxy URL at
 `http://127.0.0.1:8001/api/v1/namespaces/default/services/nginx/proxy/`
