@@ -865,8 +865,8 @@ func TestGarbageCollectorSync(t *testing.T) {
 	// Setting the period to 200ms allows the WaitForCacheSync() to check
 	// for cache sync ~2 times in every wait.PollImmediateUntil() loop.
 	//
-	// The 1s sleep in the test allows GetDelableResources and
-	// gc.resyncMoitors to run ~5 times to ensure the changes to the
+	// The 1s sleep in the test allows GetDeletableResources and
+	// gc.resyncMonitors to run ~5 times to ensure the changes to the
 	// fakeDiscoveryClient are picked up.
 	go gc.Sync(fakeDiscoveryClient, 200*time.Millisecond, stopCh)
 
