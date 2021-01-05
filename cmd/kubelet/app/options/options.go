@@ -245,12 +245,12 @@ func NewKubeletConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
 	}
 	versioned := &v1beta1.KubeletConfiguration{}
 	scheme.Default(versioned)
-	config := &kubeletconfig.KubeletConfiguration{}
-	if err := scheme.Convert(versioned, config, nil); err != nil {
+	configuration := &kubeletconfig.KubeletConfiguration{}
+	if err := scheme.Convert(versioned, configuration, nil); err != nil {
 		return nil, err
 	}
-	applyLegacyDefaults(config)
-	return config, nil
+	applyLegacyDefaults(configuration)
+	return configuration, nil
 }
 
 // applyLegacyDefaults applies legacy default values to the KubeletConfiguration in order to
@@ -276,13 +276,13 @@ type KubeletServer struct {
 
 // NewKubeletServer will create a new KubeletServer with default values.
 func NewKubeletServer() (*KubeletServer, error) {
-	config, err := NewKubeletConfiguration()
+	configuration, err := NewKubeletConfiguration()
 	if err != nil {
 		return nil, err
 	}
 	return &KubeletServer{
 		KubeletFlags:         *NewKubeletFlags(),
-		KubeletConfiguration: *config,
+		KubeletConfiguration: *configuration,
 	}, nil
 }
 

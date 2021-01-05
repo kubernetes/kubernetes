@@ -49,19 +49,19 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubel
 		sarClient = client.AuthorizationV1().SubjectAccessReviews()
 	}
 
-	authenticator, runAuthenticatorCAReload, err := BuildAuthn(tokenClient, config.Authentication)
+	authenticatorRequest, runAuthenticatorCAReload, err := BuildAuthn(tokenClient, config.Authentication)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	attributes := server.NewNodeAuthorizerAttributesGetter(nodeName)
 
-	authorizer, err := BuildAuthz(sarClient, config.Authorization)
+	authz, err := BuildAuthz(sarClient, config.Authorization)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return server.NewKubeletAuth(authenticator, attributes, authorizer), runAuthenticatorCAReload, nil
+	return server.NewKubeletAuth(authenticatorRequest, attributes, authz), runAuthenticatorCAReload, nil
 }
 
 // BuildAuthn creates an authenticator compatible with the kubelet's needs
@@ -89,12 +89,12 @@ func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletc
 		authenticatorConfig.TokenAccessReviewClient = client
 	}
 
-	authenticator, _, err := authenticatorConfig.New()
+	authenticatorRequest, _, err := authenticatorConfig.New()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return authenticator, func(stopCh <-chan struct{}) {
+	return authenticatorRequest, func(stopCh <-chan struct{}) {
 		if dynamicCAContentFromFile != nil {
 			go dynamicCAContentFromFile.Run(1, stopCh)
 		}

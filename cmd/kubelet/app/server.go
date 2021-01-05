@@ -925,11 +925,11 @@ func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, 
 		// credentials. In the future it would be desirable to change the behavior of bootstrap
 		// to always fall back to the external bootstrap credentials when such credentials are
 		// provided by a fundamental trust system like cloud VM identity or an HSM module.
-		config := certConfig
+		conf := certConfig
 		if current != nil {
-			config = clientConfig
+			conf = clientConfig
 		}
-		return clientset.NewForConfig(config)
+		return clientset.NewForConfig(conf)
 	}
 
 	return kubeletcertificate.NewKubeletClientCertificateManager(
