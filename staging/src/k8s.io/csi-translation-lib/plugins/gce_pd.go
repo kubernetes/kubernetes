@@ -215,7 +215,12 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 		return nil, fmt.Errorf("pv is nil or GCE Persistent Disk source not defined on pv")
 	}
 
+	// depend on which version it migrates from, the label could be failuredomain beta or topology GA version
 	zonesLabel := pv.Labels[v1.LabelFailureDomainBetaZone]
+	if zonesLabel == "" {
+		zonesLabel = pv.Labels[v1.LabelTopologyZone]
+	}
+
 	zones := strings.Split(zonesLabel, labelMultiZoneDelimiter)
 	if len(zones) == 1 && len(zones[0]) != 0 {
 		// Zonal
@@ -287,6 +292,8 @@ func (g *gcePersistentDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.Persisten
 	}
 
 	// TODO: Take the zone/regional information and stick it into the label.
+
+	removeTopology(pv, GCEPDTopologyKey)
 
 	pv.Spec.CSI = nil
 	pv.Spec.GCEPersistentDisk = gceSource

@@ -119,6 +119,8 @@ func (t *osCinderCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume) 
 		ReadOnly: csiSource.ReadOnly,
 	}
 
+	removeTopology(pv, CinderTopologyKey)
+
 	pv.Spec.CSI = nil
 	pv.Spec.Cinder = cinderSource
 	return pv, nil

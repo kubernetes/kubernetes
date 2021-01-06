@@ -142,6 +142,32 @@ func addTopology(pv *v1.PersistentVolume, topologyKey string, zones []string) er
 	return nil
 }
 
+// removeTopology removes the topology from the given PV. Return false
+// if the topology key is not found
+func removeTopology(pv *v1.PersistentVolume, topologyKey string) bool {
+	// Make sure the necessary fields exist
+	if pv == nil || pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil || len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
+		return false
+	}
+
+	nsrequirements := pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions
+
+	index := -1
+	for i, nodeSelectorRequirement := range nsrequirements {
+		if nodeSelectorRequirement.Key == topologyKey {
+			index = i
+			break
+		}
+	}
+	// We found the key that need to be removed
+	if index != -1 {
+		nsrequirements[len(nsrequirements)-1], nsrequirements[index] = nsrequirements[index], nsrequirements[len(nsrequirements)-1]
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = nsrequirements[:len(nsrequirements)-1]
+		return true
+	}
+	return false
+}
+
 // translateTopology converts existing zone labels or in-tree topology to CSI topology.
 // In-tree topology has precedence over zone labels.
 func translateTopology(pv *v1.PersistentVolume, topologyKey string) error {
@@ -150,12 +176,24 @@ func translateTopology(pv *v1.PersistentVolume, topologyKey string) error {
 		return nil
 	}
 
+	// migrate beta topology node affinity
 	zones := getTopologyZones(pv, v1.LabelFailureDomainBetaZone)
 	if len(zones) > 0 {
 		return replaceTopology(pv, v1.LabelFailureDomainBetaZone, topologyKey)
 	}
 
-	if label, ok := pv.Labels[v1.LabelFailureDomainBetaZone]; ok {
+	// migrate GA topology node affinity
+	zones = getTopologyZones(pv, v1.LabelTopologyZone)
+	if len(zones) > 0 {
+		return replaceTopology(pv, v1.LabelTopologyZone, topologyKey)
+	}
+
+	// if nothing is in the NodeAffinity, try to fetch the topology from PV labels
+	label, ok := pv.Labels[v1.LabelFailureDomainBetaZone]
+	if !ok {
+		label, ok = pv.Labels[v1.LabelTopologyZone]
+	}
+	if ok {
 		zones = strings.Split(label, labelMultiZoneDelimiter)
 		if len(zones) > 0 {
 			return addTopology(pv, topologyKey, zones)

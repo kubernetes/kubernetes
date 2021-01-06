@@ -215,6 +215,8 @@ func (t *azureDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 		}
 	}
 
+	removeTopology(pv, AzureDiskTopologyKey)
+
 	pv.Spec.CSI = nil
 	pv.Spec.AzureDisk = azureSource
 

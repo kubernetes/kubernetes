@@ -174,6 +174,8 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateCSIPVToInTree(pv *v1.Persis
 		ebsSource.Partition = int32(partValue)
 	}
 
+	removeTopology(pv, AWSEBSTopologyKey)
+
 	pv.Spec.CSI = nil
 	pv.Spec.AWSElasticBlockStore = ebsSource
 	return pv, nil

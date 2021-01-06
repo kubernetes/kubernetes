@@ -212,3 +212,44 @@ func TestAddTopology(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoveTopology(t *testing.T) {
+	testCases := []struct {
+		name             string
+		topologyKey      string
+		zones            []string
+		expOk            bool
+		expectedAffinity *v1.VolumeNodeAffinity
+	}{
+		{
+			name:        "normal zones",
+			topologyKey: GCEPDTopologyKey,
+			zones:       []string{"us-central1-a"},
+			expOk:       true,
+			expectedAffinity: &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("Running test: %v", tc.name)
+		pv := &v1.PersistentVolume{
+			Spec: v1.PersistentVolumeSpec{},
+		}
+		err := addTopology(pv, tc.topologyKey, tc.zones)
+		ok := removeTopology(pv, tc.topologyKey)
+		if tc.expOk != ok {
+			t.Errorf("Expected ok: %v, but got: %v", tc.expOk, ok)
+		}
+		if err == nil && !reflect.DeepEqual(pv.Spec.NodeAffinity, tc.expectedAffinity) {
+			t.Errorf("Expected affinity: %v, but got: %v", tc.expectedAffinity, pv.Spec.NodeAffinity)
+		}
+	}
+}
