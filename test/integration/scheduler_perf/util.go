@@ -160,7 +160,10 @@ func newMetricsCollector(config *metricsCollectorConfig, labels map[string]strin
 }
 
 func (*metricsCollector) run(ctx context.Context) {
-	// metricCollector doesn't need to start before the tests, so nothing to do here.
+	// metricCollector doesn't need to start before the tests, but all the items in the registry
+	// should be reset to get rid of the data that is generated during the phase of environment preparation,
+	// create init pod for example.
+	legacyregistry.Reset()
 }
 
 func (pc *metricsCollector) collect() []DataItem {
