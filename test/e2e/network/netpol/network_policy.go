@@ -799,34 +799,29 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityAllow})
 		})
 
-		ginkgo.It("should enforce policies to check ingress and egress policies can be controlled independently based on PodSelector [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should keep separate ingress and egress policies for the same target [Feature:NetworkPolicy]", func() {
 			/*
-					Test steps:
-					1. Verify every pod in every namespace can talk to each other
-				       - including a -> b and b -> a
-					2. Create a policy to allow egress a -> b (target = a)
-				    3. Create a policy to *deny* ingress b -> a (target = a)
-					4. Verify a -> b allowed; b -> a blocked
+				Test steps:
+				1. Verify every pod in every namespace can talk to each other
+				   - including a -> b and b -> a
+				2. Create a policy to allow egress a -> b (target = a)
+				3. Create a policy to *deny* ingress b -> a (target = a)
+				4. Verify a -> b allowed; b -> a blocked
 			*/
 			targetLabels := map[string]string{"pod": "a"}
+			nsX, _, _, model, k8s := getK8SModel(f)
 
 			ginkgo.By("Creating a network policy for pod-a which allows Egress traffic to pod-b.")
-
 			allowEgressPolicy := GetAllowEgressForTarget(metav1.LabelSelector{MatchLabels: targetLabels})
-			nsX, _, _, model, k8s := getK8SModel(f)
 			CreatePolicy(k8s, allowEgressPolicy, nsX)
 
-			allowEgressReachability := NewReachability(model.AllPods(), true)
-			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: allowEgressReachability})
-
 			ginkgo.By("Creating a network policy for pod-a that denies traffic from pod-b.")
-
 			denyAllIngressPolicy := GetDenyIngressForTarget(metav1.LabelSelector{MatchLabels: targetLabels})
 			CreatePolicy(k8s, denyAllIngressPolicy, nsX)
 
-			denyIngressToXReachability := NewReachability(model.AllPods(), true)
-			denyIngressToXReachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
-			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: denyIngressToXReachability})
+			reachability := NewReachability(model.AllPods(), true)
+			reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
+			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
 		ginkgo.It("should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy] [Feature:SCTP]", func() {
