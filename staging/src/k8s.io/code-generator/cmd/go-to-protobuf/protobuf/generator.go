@@ -477,11 +477,11 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 	case types.Builtin:
 		field.Type, err = locator.ProtoTypeFor(t)
 	case types.Map:
-		valueField := &protoField{}
+		valueField := &protoField{Extras: make(map[string]string)}
 		if err := memberTypeToProtobufField(locator, valueField, t.Elem); err != nil {
 			return err
 		}
-		keyField := &protoField{}
+		keyField := &protoField{Extras: make(map[string]string)}
 		if err := memberTypeToProtobufField(locator, keyField, t.Key); err != nil {
 			return err
 		}
