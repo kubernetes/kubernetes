@@ -2075,6 +2075,11 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 				klog.Errorf("Failed to delete endpoint: %v in gracefulDeleteQueue, error: %v", ep, err)
 				continue
 			}
+			err = proxier.ipvs.UpdateRealServer(appliedVirtualServer, newDest)
+			if err != nil {
+				klog.Errorf("Failed to update destination: %v, error: %v", newDest, err)
+			}
+			continue
 		}
 		err = proxier.ipvs.AddRealServer(appliedVirtualServer, newDest)
 		if err != nil {
