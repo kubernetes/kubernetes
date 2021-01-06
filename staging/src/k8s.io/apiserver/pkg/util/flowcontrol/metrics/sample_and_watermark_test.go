@@ -25,9 +25,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 )
 
-const samplesHistName = "sawtestsamples"
+const (
+	samplesHistName = "sawtestsamples"
+	ddtRange        = 3000
+	ddtOffset       = 500
+	numIterations   = 100
+)
 
 func TestSampler(t *testing.T) {
 	t0 := time.Now()
@@ -45,9 +51,10 @@ func TestSampler(t *testing.T) {
 	}
 	dt := 2 * samplingPeriod
 	t1 := t0.Add(dt)
+	klog.Infof("Expect about %v warnings about time going backwards; this is fake time deliberately misbehaving.", (numIterations*ddtOffset)/ddtRange)
 	t.Logf("t0=%s", t0)
-	for i := 0; i < 100; i++ {
-		ddt := time.Microsecond * time.Duration(rand.Intn(3000)-500)
+	for i := 0; i < numIterations; i++ {
+		ddt := time.Microsecond * time.Duration(rand.Intn(ddtRange)-ddtOffset)
 		t1 = t1.Add(ddt)
 		diff := t1.Sub(t0)
 		if diff > dt {
