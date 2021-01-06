@@ -29,11 +29,11 @@ import (
 
 var (
 	defaultZoneLabels = map[string]string{
-		v1.LabelFailureDomainBetaZone:   "us-east-1a",
+		v1.LabelTopologyZone:            "us-east-1a",
 		v1.LabelFailureDomainBetaRegion: "us-east-1",
 	}
 	regionalPDLabels = map[string]string{
-		v1.LabelFailureDomainBetaZone: "europe-west1-b__europe-west1-c",
+		v1.LabelTopologyZone: "europe-west1-b__europe-west1-c",
 	}
 )
 
@@ -94,50 +94,59 @@ func TestTranslationStability(t *testing.T) {
 func TestTopologyTranslation(t *testing.T) {
 	testCases := []struct {
 		name                 string
+		key                  string
 		pv                   *v1.PersistentVolume
 		expectedNodeAffinity *v1.VolumeNodeAffinity
 	}{
 		{
 			name:                 "GCE PD with zone labels",
+			key:                  plugins.GCEPDTopologyKey,
 			pv:                   makeGCEPDPV(defaultZoneLabels, nil /*topology*/),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "us-east-1a"),
 		},
 		{
 			name:                 "GCE PD with existing topology (beta keys)",
-			pv:                   makeGCEPDPV(nil /*labels*/, makeTopology(v1.LabelFailureDomainBetaZone, "us-east-2a")),
+			key:                  plugins.GCEPDTopologyKey,
+			pv:                   makeGCEPDPV(nil /*labels*/, makeTopology(v1.LabelTopologyZone, "us-east-2a")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "us-east-2a"),
 		},
 		{
 			name:                 "GCE PD with existing topology (CSI keys)",
+			key:                  plugins.GCEPDTopologyKey,
 			pv:                   makeGCEPDPV(nil /*labels*/, makeTopology(plugins.GCEPDTopologyKey, "us-east-2a")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "us-east-2a"),
 		},
 		{
 			name:                 "GCE PD with zone labels and topology",
-			pv:                   makeGCEPDPV(defaultZoneLabels, makeTopology(v1.LabelFailureDomainBetaZone, "us-east-2a")),
+			key:                  plugins.GCEPDTopologyKey,
+			pv:                   makeGCEPDPV(defaultZoneLabels, makeTopology(v1.LabelTopologyZone, "us-east-2a")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "us-east-2a"),
 		},
 		{
 			name:                 "GCE PD with regional zones",
+			key:                  plugins.GCEPDTopologyKey,
 			pv:                   makeGCEPDPV(regionalPDLabels, nil /*topology*/),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "europe-west1-b", "europe-west1-c"),
 		},
 		{
 			name:                 "GCE PD with regional topology",
-			pv:                   makeGCEPDPV(nil /*labels*/, makeTopology(v1.LabelFailureDomainBetaZone, "europe-west1-b", "europe-west1-c")),
+			key:                  plugins.GCEPDTopologyKey,
+			pv:                   makeGCEPDPV(nil /*labels*/, makeTopology(v1.LabelTopologyZone, "europe-west1-b", "europe-west1-c")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "europe-west1-b", "europe-west1-c"),
 		},
 		{
 			name:                 "GCE PD with regional zone and topology",
-			pv:                   makeGCEPDPV(regionalPDLabels, makeTopology(v1.LabelFailureDomainBetaZone, "europe-west1-f", "europe-west1-g")),
+			key:                  plugins.GCEPDTopologyKey,
+			pv:                   makeGCEPDPV(regionalPDLabels, makeTopology(v1.LabelTopologyZone, "europe-west1-f", "europe-west1-g")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "europe-west1-f", "europe-west1-g"),
 		},
 		{
 			name: "GCE PD with multiple node selector terms",
+			key:  plugins.GCEPDTopologyKey,
 			pv: makeGCEPDPVMultTerms(
 				nil, /*labels*/
-				makeTopology(v1.LabelFailureDomainBetaZone, "europe-west1-f"),
-				makeTopology(v1.LabelFailureDomainBetaZone, "europe-west1-g")),
+				makeTopology(v1.LabelTopologyZone, "europe-west1-f"),
+				makeTopology(v1.LabelTopologyZone, "europe-west1-g")),
 			expectedNodeAffinity: makeNodeAffinity(
 				true, /*multiTerms*/
 				plugins.GCEPDTopologyKey, "europe-west1-f", "europe-west1-g"),
@@ -150,7 +159,7 @@ func TestTopologyTranslation(t *testing.T) {
 		},
 		{
 			name:                 "AWS EBS with zone labels and topology",
-			pv:                   makeAWSEBSPV(defaultZoneLabels, makeTopology(v1.LabelFailureDomainBetaZone, "us-east-2a")),
+			pv:                   makeAWSEBSPV(defaultZoneLabels, makeTopology(v1.LabelTopologyZone, "us-east-2a")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.AWSEBSTopologyKey, "us-east-2a"),
 		},
 		// Cinder test cases: test mosty topology key, i.e., don't repeat testing done with GCE
@@ -161,7 +170,7 @@ func TestTopologyTranslation(t *testing.T) {
 		},
 		{
 			name:                 "OpenStack Cinder with zone labels and topology",
-			pv:                   makeCinderPV(defaultZoneLabels, makeTopology(v1.LabelFailureDomainBetaZone, "us-east-2a")),
+			pv:                   makeCinderPV(defaultZoneLabels, makeTopology(v1.LabelTopologyZone, "us-east-2a")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.CinderTopologyKey, "us-east-2a"),
 		},
 	}
@@ -181,15 +190,15 @@ func TestTopologyTranslation(t *testing.T) {
 			t.Errorf("Expected node affinity %v, got %v", *test.expectedNodeAffinity, *nodeAffinity)
 		}
 
-		// Translate back to in-tree and make sure node affinity is still set
+		// Translate back to in-tree and make sure node affinity has been removed
 		newInTreePV, err := ctl.TranslateCSIPVToInTree(newCSIPV)
 		if err != nil {
 			t.Errorf("Error when translating to in-tree: %v", err)
 		}
 
 		nodeAffinity = newInTreePV.Spec.NodeAffinity
-		if !reflect.DeepEqual(nodeAffinity, test.expectedNodeAffinity) {
-			t.Errorf("Expected node affinity %v, got %v", *test.expectedNodeAffinity, *nodeAffinity)
+		if topologyKeyExist(test.key, nodeAffinity) {
+			t.Errorf("Expected node affinity key %v being removed, got %v", test.key, *nodeAffinity)
 		}
 	}
 }
@@ -312,6 +321,22 @@ func makeTopology(key string, values ...string) *v1.NodeSelectorRequirement {
 		Operator: v1.NodeSelectorOpIn,
 		Values:   values,
 	}
+}
+
+func topologyKeyExist(key string, vna *v1.VolumeNodeAffinity) bool {
+	if vna == nil || vna.Required == nil || vna.Required.NodeSelectorTerms == nil || len(vna.Required.NodeSelectorTerms) == 0 {
+		return false
+	}
+
+	for _, nodeSelectorTerms := range vna.Required.NodeSelectorTerms {
+		nsrequirements := nodeSelectorTerms.MatchExpressions
+		for _, nodeSelectorRequirement := range nsrequirements {
+			if nodeSelectorRequirement.Key == key {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func TestTranslateInTreeInlineVolumeToCSINameUniqueness(t *testing.T) {

@@ -146,26 +146,31 @@ func addTopology(pv *v1.PersistentVolume, topologyKey string, zones []string) er
 // if the topology key is not found
 func removeTopology(pv *v1.PersistentVolume, topologyKey string) bool {
 	// Make sure the necessary fields exist
-	if pv == nil || pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil || len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
+	if pv == nil || pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil ||
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms == nil || len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
 		return false
 	}
 
-	nsrequirements := pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions
+	succeed := false
+	for termIndex, nodeSelectorTerms := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
+		nsrequirements := nodeSelectorTerms.MatchExpressions
 
-	index := -1
-	for i, nodeSelectorRequirement := range nsrequirements {
-		if nodeSelectorRequirement.Key == topologyKey {
-			index = i
-			break
+		index := -1
+		for i, nodeSelectorRequirement := range nsrequirements {
+			if nodeSelectorRequirement.Key == topologyKey {
+				index = i
+				break
+			}
+		}
+		// We found the key that need to be removed
+		if index != -1 {
+			nsrequirements[len(nsrequirements)-1], nsrequirements[index] = nsrequirements[index], nsrequirements[len(nsrequirements)-1]
+			pv.Spec.NodeAffinity.Required.NodeSelectorTerms[termIndex].MatchExpressions = nsrequirements[:len(nsrequirements)-1]
+			succeed = true
 		}
 	}
-	// We found the key that need to be removed
-	if index != -1 {
-		nsrequirements[len(nsrequirements)-1], nsrequirements[index] = nsrequirements[index], nsrequirements[len(nsrequirements)-1]
-		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = nsrequirements[:len(nsrequirements)-1]
-		return true
-	}
-	return false
+
+	return succeed
 }
 
 // translateTopology converts existing zone labels or in-tree topology to CSI topology.
