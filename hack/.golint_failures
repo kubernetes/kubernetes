@@ -112,9 +112,6 @@ pkg/proxy/apis/config/v1alpha1
 pkg/proxy/userspace
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
-pkg/registry/admissionregistration/rest
-pkg/registry/authentication/rest
-pkg/registry/authentication/tokenreview
 pkg/registry/authorization/localsubjectaccessreview
 pkg/registry/authorization/rest
 pkg/registry/authorization/selfsubjectaccessreview

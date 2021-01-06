@@ -34,11 +34,13 @@ import (
 
 var badAuthenticatorAuds = apierrors.NewInternalError(errors.New("error validating audiences"))
 
+// REST implements a RESTStorage for tokenreview.
 type REST struct {
 	tokenAuthenticator authenticator.Request
 	apiAudiences       []string
 }
 
+// NewREST returns a RESTStorage object that will work against tokenreview.
 func NewREST(tokenAuthenticator authenticator.Request, apiAudiences []string) *REST {
 	return &REST{
 		tokenAuthenticator: tokenAuthenticator,
@@ -46,14 +48,17 @@ func NewREST(tokenAuthenticator authenticator.Request, apiAudiences []string) *R
 	}
 }
 
+// NamespaceScoped fulfill rest.Scoper.
 func (r *REST) NamespaceScoped() bool {
 	return false
 }
 
+// New creates a new tokenreview object.
 func (r *REST) New() runtime.Object {
 	return &authentication.TokenReview{}
 }
 
+// Create reviews the token and records the results in tokenReview.Status.
 func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	tokenReview, ok := obj.(*authentication.TokenReview)
 	if !ok {
