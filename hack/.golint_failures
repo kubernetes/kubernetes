@@ -106,7 +106,6 @@ pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
 pkg/kubelet/sysctl
-pkg/kubelet/types
 pkg/kubemark
 pkg/proxy/apis/config
 pkg/proxy/apis/config/v1alpha1
