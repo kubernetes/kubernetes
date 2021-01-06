@@ -7,7 +7,7 @@ go 1.15
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
-	github.com/evanphx/json-patch v4.9.0+incompatible
+	github.com/evanphx/json-patch v0.5.2
 	github.com/googleapis/gnostic v0.4.1
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/mailru/easyjson v0.7.0 // indirect
