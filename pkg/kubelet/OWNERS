@@ -1,0 +1,16 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - rphillips
+  - sjenning
+  - mrunalp
+
+# adding mrunalp and sjenning from the upstream Kubelet OWNERS file:
+#   https://github.com/kubernetes/kubernetes/blob/17bb2fc050ec786b60db7d8d6d4d3ac8eeac205b/pkg/kubelet/OWNERS#L10-L11
+# sub-package approvers for "UPSTREAM: <PR>: ..." changes that merged upstream
+# carry patches for "UPSTREAM: <carry>: ..." will be approved by the root level approvers
+approvers:
+  - sjenning
+  - mrunalp
+
+component: node
