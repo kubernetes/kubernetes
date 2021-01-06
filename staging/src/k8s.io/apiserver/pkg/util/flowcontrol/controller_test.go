@@ -21,12 +21,15 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
@@ -305,6 +308,106 @@ func TestConfigConsumer(t *testing.T) {
 			cts.requestWG.Wait()
 		})
 	}
+}
+
+func TestAPFControllerWithGracefulShutdown(t *testing.T) {
+	const plName = "test-ps"
+	fs := &flowcontrol.FlowSchema{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-fs",
+		},
+		Spec: flowcontrol.FlowSchemaSpec{
+			MatchingPrecedence: 100,
+			PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+				Name: plName,
+			},
+			DistinguisherMethod: &flowcontrol.FlowDistinguisherMethod{
+				Type: flowcontrol.FlowDistinguisherMethodByUserType,
+			},
+		},
+	}
+
+	pl := &flowcontrol.PriorityLevelConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: plName,
+		},
+		Spec: flowcontrol.PriorityLevelConfigurationSpec{
+			Type: flowcontrol.PriorityLevelEnablementLimited,
+			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+				AssuredConcurrencyShares: 10,
+				LimitResponse: flowcontrol.LimitResponse{
+					Type: flowcontrol.LimitResponseTypeReject,
+				},
+			},
+		},
+	}
+
+	clientset := clientsetfake.NewSimpleClientset(fs, pl)
+	informerFactory := informers.NewSharedInformerFactory(clientset, time.Second)
+	flowcontrolClient := clientset.FlowcontrolV1beta1()
+	cts := &ctlrTestState{t: t,
+		fcIfc:           flowcontrolClient,
+		existingFSs:     map[string]*flowcontrol.FlowSchema{},
+		existingPLs:     map[string]*flowcontrol.PriorityLevelConfiguration{},
+		heldRequestsMap: map[string][]heldRequest{},
+		queues:          map[string]*ctlrTestQueueSet{},
+	}
+	controller := newTestableController(
+		informerFactory,
+		flowcontrolClient,
+		100,
+		time.Minute,
+		metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		cts,
+	)
+
+	stopCh, controllerCompletedCh := make(chan struct{}), make(chan struct{})
+	var controllerErr error
+
+	informerFactory.Start(stopCh)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	status := informerFactory.WaitForCacheSync(ctx.Done())
+	if names := unsynced(status); len(names) > 0 {
+		t.Fatalf("WaitForCacheSync did not successfully complete, resources=%#v", names)
+	}
+
+	go func() {
+		defer close(controllerCompletedCh)
+		controllerErr = controller.Run(stopCh)
+	}()
+
+	// ensure that the controller has run its first loop.
+	err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
+		if controller.getPriorityLevelState(plName) == nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Errorf("expected the controller to reconcile the priority level configuration object: %s, error: %s", plName, err)
+	}
+
+	close(stopCh)
+	t.Log("waiting for the controller Run function to shutdown gracefully")
+	<-controllerCompletedCh
+
+	if controllerErr != nil {
+		t.Errorf("expected nil error from controller Run function, but got: %#v", controllerErr)
+	}
+}
+
+func unsynced(status map[reflect.Type]bool) []string {
+	names := make([]string, 0)
+
+	for objType, synced := range status {
+		if !synced {
+			names = append(names, objType.Name())
+		}
+	}
+
+	return names
 }
 
 func checkNewFS(cts *ctlrTestState, rng *rand.Rand, trialName string, ftr *fsTestingRecord, catchAlls map[bool]*flowcontrol.FlowSchema) {
