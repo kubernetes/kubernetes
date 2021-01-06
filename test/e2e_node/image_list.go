@@ -66,11 +66,11 @@ var NodePrePullImageList = sets.NewString(
 	"gcr.io/kubernetes-e2e-test-images/node-perf/tf-wide-deep-amd64:1.0",
 )
 
-// updateImageAllowList updates the framework.ImagePrePullList with
+// UpdateImageAllowList updates the framework.ImagePrePullList with
 // 1. the hard coded lists
 // 2. the ones passed in from framework.TestContext.ExtraEnvs
 // So this function needs to be called after the extra envs are applied.
-func updateImageAllowList() {
+func UpdateImageAllowList() {
 	// Union NodePrePullImageList and PrePulledImages into the framework image pre-pull list.
 	framework.ImagePrePullList = NodePrePullImageList.Union(commontest.PrePulledImages)
 	// Images from extra envs

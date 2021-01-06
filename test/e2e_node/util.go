@@ -59,8 +59,11 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var startServices = flag.Bool("start-services", true, "If true, start local node services")
-var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
+// StartServices is a flag to control if start local node services.
+var StartServices = flag.Bool("start-services", true, "If true, start local node services")
+
+// StopServices is a flag to control if stop local node services after running tests.
+var StopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 
 const (

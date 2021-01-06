@@ -182,7 +182,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
 	if framework.TestContext.PrepullImages {
 		klog.Infof("Pre-pulling images so that they are cached for the tests.")
-		updateImageAllowList()
+		UpdateImageAllowList()
 		err := PrePullAllImages()
 		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 	}
@@ -192,10 +192,10 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// We should mask locksmithd when provisioning the machine.
 	maskLocksmithdOnCoreos()
 
-	if *startServices {
+	if *StartServices {
 		// If the services are expected to stop after test, they should monitor the test process.
 		// If the services are expected to keep running after test, they should not monitor the test process.
-		e2es = services.NewE2EServices(*stopServices)
+		e2es = services.NewE2EServices(*StopServices)
 		gomega.Expect(e2es.Start()).To(gomega.Succeed(), "should be able to start node services.")
 	} else {
 		klog.Infof("Running tests without starting services.")
@@ -220,7 +220,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 // Tear down the kubelet on the node
 var _ = ginkgo.SynchronizedAfterSuite(func() {}, func() {
 	if e2es != nil {
-		if *startServices && *stopServices {
+		if *StartServices && *StopServices {
 			klog.Infof("Stopping node services...")
 			e2es.Stop()
 		}
@@ -285,7 +285,7 @@ func waitForNodeReady() {
 // update test context with node configuration.
 func updateTestContext() error {
 	setExtraEnvs()
-	updateImageAllowList()
+	UpdateImageAllowList()
 
 	client, err := getAPIServerClient()
 	if err != nil {
