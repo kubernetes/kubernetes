@@ -181,6 +181,9 @@ func (t *azureDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 	if pv == nil || pv.Spec.CSI == nil {
 		return nil, fmt.Errorf("pv is nil or CSI source not defined on pv")
 	}
+	if pv == nil || pv.Spec.CSI == nil {
+		return nil, fmt.Errorf("pv is nil or CSI source not defined on pv")
+	}
 	csiSource := pv.Spec.CSI
 
 	diskURI := csiSource.VolumeHandle
