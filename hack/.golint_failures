@@ -119,9 +119,6 @@ pkg/registry/authorization/localsubjectaccessreview
 pkg/registry/authorization/rest
 pkg/registry/authorization/selfsubjectaccessreview
 pkg/registry/authorization/subjectaccessreview
-pkg/registry/autoscaling/rest
-pkg/registry/batch/job
-pkg/registry/batch/rest
 pkg/registry/certificates/certificates
 pkg/registry/certificates/rest
 pkg/registry/coordination/rest

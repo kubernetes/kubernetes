@@ -185,6 +185,7 @@ type jobStatusStrategy struct {
 	jobStrategy
 }
 
+// StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = jobStatusStrategy{Strategy}
 
 func (jobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
@@ -197,8 +198,8 @@ func (jobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	return validation.ValidateJobUpdateStatus(obj.(*batch.Job), old.(*batch.Job))
 }
 
-// JobSelectableFields returns a field set that represents the object for matching purposes.
-func JobToSelectableFields(job *batch.Job) fields.Set {
+// ToSelectableFields returns a field set that represents the object for matching purposes.
+func ToSelectableFields(job *batch.Job) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&job.ObjectMeta, true)
 	specificFieldsSet := fields.Set{
 		"status.successful": strconv.Itoa(int(job.Status.Succeeded)),
@@ -210,9 +211,9 @@ func JobToSelectableFields(job *batch.Job) fields.Set {
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	job, ok := obj.(*batch.Job)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a job.")
+		return nil, nil, fmt.Errorf("given object is not a job")
 	}
-	return labels.Set(job.ObjectMeta.Labels), JobToSelectableFields(job), nil
+	return labels.Set(job.ObjectMeta.Labels), ToSelectableFields(job), nil
 }
 
 // MatchJob is the filter used by the generic etcd backend to route

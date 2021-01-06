@@ -283,7 +283,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		"batch/v1",
 		"Job",
-		JobToSelectableFields(&batch.Job{}),
+		ToSelectableFields(&batch.Job{}),
 		nil,
 	)
 }
