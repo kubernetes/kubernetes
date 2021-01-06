@@ -278,7 +278,7 @@ func getPodDNSType(pod *v1.Pod) (podDNSType, error) {
 		if !kubecontainer.IsHostNetworkPod(pod) {
 			return podDNSCluster, nil
 		}
-		// Fallback to DNSDefault for pod on hostnetowrk.
+		// Fallback to DNSDefault for pod on hostnetwork.
 		fallthrough
 	case v1.DNSDefault:
 		return podDNSHost, nil
