@@ -7,28 +7,24 @@ package bindata
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"unicode"
 	"unicode/utf8"
 )
 
-// writeRelease writes the release code file.
-func writeRelease(w io.Writer, c *Config, toc []Asset) error {
+// writeReleaseFunctions writes the release code file.
+func writeReleaseFunctions(w io.Writer, c *Config, toc []Asset) error {
 	err := writeReleaseHeader(w, c)
 	if err != nil {
 		return err
 	}
 
-	err = writeAssetFS(w, c)
-	if err != nil {
-		return err
-	}
-
 	for i := range toc {
-		err = writeReleaseAsset(w, c, &toc[i])
-		if err != nil {
+		if err := writeReleaseAsset(w, c, &toc[i]); err != nil {
 			return err
 		}
 	}
@@ -42,15 +38,15 @@ func writeReleaseHeader(w io.Writer, c *Config) error {
 	var err error
 	if c.NoCompress {
 		if c.NoMemCopy {
-			err = header_uncompressed_nomemcopy(w, c)
+			err = header_uncompressed_nomemcopy(w)
 		} else {
-			err = header_uncompressed_memcopy(w, c)
+			err = header_uncompressed_memcopy(w)
 		}
 	} else {
 		if c.NoMemCopy {
-			err = header_compressed_nomemcopy(w, c)
+			err = header_compressed_nomemcopy(w)
 		} else {
-			err = header_compressed_memcopy(w, c)
+			err = header_compressed_memcopy(w)
 		}
 	}
 	if err != nil {
@@ -70,128 +66,138 @@ func writeReleaseAsset(w io.Writer, c *Config, asset *Asset) error {
 
 	defer fd.Close()
 
+	h := sha256.New()
+	tr := io.TeeReader(fd, h)
 	if c.NoCompress {
 		if c.NoMemCopy {
-			err = uncompressed_nomemcopy(w, asset, fd)
+			err = uncompressed_nomemcopy(w, asset, tr)
 		} else {
-			err = uncompressed_memcopy(w, asset, fd)
+			err = uncompressed_memcopy(w, asset, tr)
 		}
 	} else {
 		if c.NoMemCopy {
-			err = compressed_nomemcopy(w, asset, fd)
+			err = compressed_nomemcopy(w, asset, tr)
 		} else {
-			err = compressed_memcopy(w, asset, fd)
+			err = compressed_memcopy(w, asset, tr)
 		}
 	}
 	if err != nil {
 		return err
 	}
-	return asset_release_common(w, c, asset)
+	var digest [sha256.Size]byte
+	copy(digest[:], h.Sum(nil))
+	return asset_release_common(w, c, asset, digest)
 }
+
+var (
+	backquote = []byte("`")
+	bom       = []byte("\xEF\xBB\xBF")
+)
 
 // sanitize prepares a valid UTF-8 string as a raw string constant.
 // Based on https://code.google.com/p/go/source/browse/godoc/static/makestatic.go?repo=tools
 func sanitize(b []byte) []byte {
-	// Replace ` with `+"`"+`
-	b = bytes.Replace(b, []byte("`"), []byte("`+\"`\"+`"), -1)
-
-	// Replace BOM with `+"\xEF\xBB\xBF"+`
-	// (A BOM is valid UTF-8 but not permitted in Go source files.
-	// I wouldn't bother handling this, but for some insane reason
-	// jquery.js has a BOM somewhere in the middle.)
-	return bytes.Replace(b, []byte("\xEF\xBB\xBF"), []byte("`+\"\\xEF\\xBB\\xBF\"+`"), -1)
-}
-
-func header_compressed_nomemcopy(w io.Writer, c *Config) error {
-	var header string
-
-	if c.HttpFileSystem {
-		header = `import (
-	"bytes"
-	"compress/gzip"
-	"fmt"
-	"net/http"
-	"io"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"`
-	} else {
-		header = `import (
-	"bytes"
-	"compress/gzip"
-	"fmt"
-	"io"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"`
+	var chunks [][]byte
+	for i, b := range bytes.Split(b, backquote) {
+		if i > 0 {
+			chunks = append(chunks, backquote)
+		}
+		for j, c := range bytes.Split(b, bom) {
+			if j > 0 {
+				chunks = append(chunks, bom)
+			}
+			if len(c) > 0 {
+				chunks = append(chunks, c)
+			}
+		}
 	}
 
-	_, err := fmt.Fprintf(w, `%s
+	var buf bytes.Buffer
+	sanitizeChunks(&buf, chunks)
+	return buf.Bytes()
+}
+
+func sanitizeChunks(buf *bytes.Buffer, chunks [][]byte) {
+	n := len(chunks)
+	if n >= 2 {
+		buf.WriteString("(")
+		sanitizeChunks(buf, chunks[:n/2])
+		buf.WriteString(" + ")
+		sanitizeChunks(buf, chunks[n/2:])
+		buf.WriteString(")")
+		return
+	}
+	b := chunks[0]
+	if bytes.Equal(b, backquote) {
+		buf.WriteString("\"`\"")
+		return
+	}
+	if bytes.Equal(b, bom) {
+		buf.WriteString(`"\xEF\xBB\xBF"`)
+		return
+	}
+	buf.WriteString("`")
+	buf.Write(b)
+	buf.WriteString("`")
+}
+
+func header_compressed_nomemcopy(w io.Writer) error {
+	_, err := fmt.Fprintf(w, `import (
+	"bytes"
+	"compress/gzip"
+	"crypto/sha256"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 )
 
 func bindataRead(data, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(strings.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("Read %%q: %%v", name, err)
+		return nil, fmt.Errorf("read %%q: %`+wrappedError+`", name, err)
 	}
 
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, gz)
-	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("Read %%q: %%v", name, err)
+		return nil, fmt.Errorf("read %%q: %`+wrappedError+`", name, err)
 	}
+
+	clErr := gz.Close()
 	if clErr != nil {
-		return nil, err
+		return nil, clErr
 	}
 
 	return buf.Bytes(), nil
 }
 
-`, header)
+`)
 	return err
 }
 
-func header_compressed_memcopy(w io.Writer, c *Config) error {
-	var header string
-
-	if c.HttpFileSystem {
-		header = `import (
+func header_compressed_memcopy(w io.Writer) error {
+	_, err := fmt.Fprintf(w, `import (
 	"bytes"
 	"compress/gzip"
-	"fmt"
-	"net/http"
-	"io"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"`
-	} else {
-		header = `import (
-	"bytes"
-	"compress/gzip"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"`
-	}
-
-	_, err := fmt.Fprintf(w, `%s
+	"time"
 )
 
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("Read %%q: %%v", name, err)
+		return nil, fmt.Errorf("read %%q: %`+wrappedError+`", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -199,7 +205,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("Read %%q: %%v", name, err)
+		return nil, fmt.Errorf("read %%q: %`+wrappedError+`", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -208,27 +214,13 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-`, header)
+`)
 	return err
 }
 
-func header_uncompressed_nomemcopy(w io.Writer, c *Config) error {
-	var header string
-
-	if c.HttpFileSystem {
-		header = `import (
-	"bytes"
-	"fmt"
-	"net/http"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"reflect"
-	"strings"
-	"time"
-	"unsafe"`
-	} else {
-		header = `import (
+func header_uncompressed_nomemcopy(w io.Writer) error {
+	_, err := fmt.Fprintf(w, `import (
+	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -236,10 +228,7 @@ func header_uncompressed_nomemcopy(w io.Writer, c *Config) error {
 	"reflect"
 	"strings"
 	"time"
-	"unsafe"`
-	}
-
-	_, err := fmt.Fprintf(w, `%s
+	"unsafe"
 )
 
 func bindataRead(data, name string) ([]byte, error) {
@@ -253,43 +242,30 @@ func bindataRead(data, name string) ([]byte, error) {
 	return b, nil
 }
 
-`, header)
+`)
 	return err
 }
 
-func header_uncompressed_memcopy(w io.Writer, c *Config) error {
-	var header string
-
-	if c.HttpFileSystem {
-		header = `import (
-	"bytes"
-	"fmt"
-	"net/http"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"`
-	} else {
-		header = `import (
+func header_uncompressed_memcopy(w io.Writer) error {
+	_, err := fmt.Fprintf(w, `import (
+	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"`
-	}
-
-	_, err := fmt.Fprintf(w, `%s
+	"time"
 )
-`, header)
+
+`)
 	return err
 }
 
 func header_release_common(w io.Writer) error {
 	_, err := fmt.Fprintf(w, `type asset struct {
-	bytes []byte
-	info  os.FileInfo
+	bytes  []byte
+	info   os.FileInfo
+	digest [sha256.Size]byte
 }
 
 type bindataFileInfo struct {
@@ -299,32 +275,21 @@ type bindataFileInfo struct {
 	modTime time.Time
 }
 
-// Name return file name
 func (fi bindataFileInfo) Name() string {
 	return fi.name
 }
-
-// Size return file size
 func (fi bindataFileInfo) Size() int64 {
 	return fi.size
 }
-
-// Mode return file mode
 func (fi bindataFileInfo) Mode() os.FileMode {
 	return fi.mode
 }
-
-// Mode return file modify time
 func (fi bindataFileInfo) ModTime() time.Time {
 	return fi.modTime
 }
-
-// IsDir return file whether a directory
 func (fi bindataFileInfo) IsDir() bool {
-	return fi.mode&os.ModeDir != 0
+	return false
 }
-
-// Sys return file is sys mode
 func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
@@ -411,6 +376,24 @@ func %sBytes() ([]byte, error) {
 	return err
 }
 
+func validSanitizedUtf8(b []byte) bool {
+	if !utf8.Valid(b) {
+		return false
+	}
+	for len(b) > 0 {
+		r, size := utf8.DecodeRune(b)
+		if r == 0 {
+			return false
+		}
+		if unicode.In(r, unicode.Cf) {
+			// staticcheck doesn't like these; fallback to slow decoder
+			return false
+		}
+		b = b[size:]
+	}
+	return true
+}
+
 func uncompressed_memcopy(w io.Writer, asset *Asset, r io.Reader) error {
 	_, err := fmt.Fprintf(w, `var _%s = []byte(`, asset.Func)
 	if err != nil {
@@ -421,8 +404,8 @@ func uncompressed_memcopy(w io.Writer, asset *Asset, r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	if utf8.Valid(b) && !bytes.Contains(b, []byte{0}) {
-		fmt.Fprintf(w, "`%s`", sanitize(b))
+	if len(b) > 0 && validSanitizedUtf8(b) {
+		w.Write(sanitize(b))
 	} else {
 		fmt.Fprintf(w, "%+q", b)
 	}
@@ -437,7 +420,7 @@ func %sBytes() ([]byte, error) {
 	return err
 }
 
-func asset_release_common(w io.Writer, c *Config, asset *Asset) error {
+func asset_release_common(w io.Writer, c *Config, asset *Asset, digest [sha256.Size]byte) error {
 	fi, err := os.Stat(asset.Path)
 	if err != nil {
 		return err
@@ -463,11 +446,11 @@ func asset_release_common(w io.Writer, c *Config, asset *Asset) error {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: %q, size: %d, mode: os.FileMode(%d), modTime: time.Unix(%d, 0)}
-	a := &asset{bytes: bytes, info: info}
+	info := bindataFileInfo{name: %q, size: %d, mode: os.FileMode(%#o), modTime: time.Unix(%d, 0)}
+	a := &asset{bytes: bytes, info: info, digest: %#v}
 	return a, nil
 }
 
-`, asset.Func, asset.Func, asset.Name, size, mode, modTime)
+`, asset.Func, asset.Func, asset.Name, size, mode, modTime, digest)
 	return err
 }

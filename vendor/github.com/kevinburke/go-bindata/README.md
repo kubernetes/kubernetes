@@ -1,22 +1,62 @@
 ## bindata
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/go-bindata/bindata)](https://goreportcard.com/report/github.com/go-bindata/bindata)
+*This fork is maintained by Kevin Burke, and is the version trusted by Homebrew.
+Changes made include:*
 
-This package converts any file into managable Go source code. Useful for
+- Atomic writes; generated file cannot be read while partially complete.
+
+- Better encoding of files that contain characters in the Unicode format range.
+
+- Generated file reports file sizes.
+
+- Generated code is run through go fmt.
+
+- SHA256 hashes are computed for all files and stored in the binary. You can
+use this to detect in-memory corruption and to provide easy cache-busting
+mechanisms.
+
+- Added AssetString and MustAssetString functions.
+
+- ByName is not public.
+
+- Some errors in file writes were unchecked, but are now checked.
+
+- File modes are stored in octal (0644) instead of nonsensical decimal (420)
+
+This package converts any file into manageable Go source code. Useful for
 embedding binary data into a go program. The file data is optionally gzip
 compressed before being converted to a raw byte slice.
 
-It comes with a command line tool in the `go-bindata` sub directory.
-This tool offers a set of command line options, used to customize the
-output being generated.
+It comes with a command line tool in the `go-bindata` subdirectory. This tool
+offers a set of command line options, used to customize the output being
+generated.
 
 
 ### Installation
 
-To install the library and command line program, use the following:
+On Macs, you can install the binary using [Homebrew](https://brew.sh):
 
-	go get -u github.com/go-bindata/go-bindata/...
+```
+brew install go-bindata
+```
 
+You can also download a binary from the [releases page][releases]. Switch in
+your GOOS for the word "linux" below, and the latest version for the version
+listed below:
+
+```
+curl --silent --location --output /usr/local/bin/go-bindata https://github.com/kevinburke/go-bindata/releases/download/v3.11.0/go-bindata-linux-amd64
+chmod 755 /usr/local/bin/go-bindata
+```
+
+Alternatively, you can download the source code, if you have a working Go
+installation:
+
+```
+go get -u github.com/kevinburke/go-bindata/...
+```
+
+[releases]: https://github.com/kevinburke/go-bindata/releases
 
 ### Usage
 
@@ -29,13 +69,13 @@ working directory. It includes all assets from the `data` directory.
 
 	$ go-bindata data/
 
-To include all input sub-directories recursively, use the elipsis postfix
+To include all input sub-directories recursively, use the ellipsis postfix
 as defined for Go import paths. Otherwise it will only consider assets in the
 input directory itself.
 
 	$ go-bindata data/...
 
-To specify the name of the output file being generated, we use the following:
+To specify the name of the output file being generated, use the `-o` option:
 
 	$ go-bindata -o myfile.go data/
 
@@ -44,7 +84,7 @@ Multiple input directories can be specified if necessary.
 	$ go-bindata dir1/... /path/to/dir2/... dir3
 
 
-The following paragraphs detail some of the command line options which can be 
+The following paragraphs detail some of the command line options which can be
 supplied to `go-bindata`. Refer to the `testdata/out` directory for various
 output examples from the assets in `testdata/in`. Each example uses different
 command line options.
@@ -92,7 +132,7 @@ It will now embed the latest version of the assets.
 
 Using the `-nomemcopy` flag, will alter the way the output file is generated.
 It will employ a hack that allows us to read the file data directly from
-the compiled program's `.rodata` section. This ensures that when we call
+the compiled program's `.rodata` section. This ensures that when we
 call our generated function, we omit unnecessary memcopies.
 
 The downside of this, is that it requires dependencies on the `reflect` and
@@ -104,9 +144,9 @@ For most use-cases this is not a problem, but if you ever try to alter the
 returned byte slice, a runtime panic is thrown. Use this mode only on target
 platforms where memory constraints are an issue.
 
-The default behaviour is to use the old code generation method. This
-prevents the two previously mentioned issues, but will employ at least one
-extra memcopy and thus increase memory requirements.
+The default behavior is to use the old code generation method. This prevents the
+two previously mentioned issues, but will employ at least one extra memcopy and
+thus increase memory requirements.
 
 For instance, consider the following two examples:
 
@@ -149,7 +189,7 @@ This feature is useful if you do not care for compression, or the supplied
 resource is already compressed. Doing it again would not add any value and may
 even increase the size of the data.
 
-The default behaviour of the program is to use compression.
+The default behavior of the program is to use compression.
 
 
 ### Path prefix stripping
@@ -173,7 +213,6 @@ Running with the `-prefix` flag, we get:
 
 	_bindata["templates/foo.html"] = templates_foo_html
 
-
 ### Build tags
 
 With the optional `-tags` flag, you can specify any go build tags that
@@ -186,6 +225,5 @@ and must follow the build tags syntax specified by the go tool.
 
 ### Related projects
 
-[go-bindata-assetfs](https://github.com/elazarl/go-bindata-assetfs#readme) - 
+[go-bindata-assetfs](https://github.com/elazarl/go-bindata-assetfs#readme) -
 implements `http.FileSystem` interface. Allows you to serve assets with `net/http`.
-

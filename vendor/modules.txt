@@ -404,11 +404,6 @@ github.com/fvbommel/sortorder
 github.com/ghodss/yaml
 # github.com/ghodss/yaml => github.com/ghodss/yaml v1.0.0
 # github.com/go-acme/lego => github.com/go-acme/lego v2.5.0+incompatible
-# github.com/go-bindata/go-bindata v3.1.1+incompatible => github.com/go-bindata/go-bindata v3.1.1+incompatible
-## explicit
-github.com/go-bindata/go-bindata
-# github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
-github.com/go-bindata/go-bindata/go-bindata
 # github.com/go-gl/glfw/v3.3/glfw => github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4
 # github.com/go-kit/kit => github.com/go-kit/kit v0.9.0
 # github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.4.0
@@ -732,6 +727,11 @@ github.com/json-iterator/go
 # github.com/karrick/godirwalk v1.16.1 => github.com/karrick/godirwalk v1.16.1
 github.com/karrick/godirwalk
 # github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.16.1
+# github.com/kevinburke/go-bindata v3.22.0+incompatible => github.com/kevinburke/go-bindata v3.22.0+incompatible
+## explicit
+github.com/kevinburke/go-bindata
+# github.com/kevinburke/go-bindata => github.com/kevinburke/go-bindata v3.22.0+incompatible
+github.com/kevinburke/go-bindata/go-bindata
 # github.com/kisielk/errcheck => github.com/kisielk/errcheck v1.2.0
 # github.com/kisielk/gotool => github.com/kisielk/gotool v1.0.0
 # github.com/klauspost/cpuid => github.com/klauspost/cpuid v1.2.0

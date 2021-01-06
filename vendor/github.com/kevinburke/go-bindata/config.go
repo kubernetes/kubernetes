@@ -61,18 +61,18 @@ type Config struct {
 	// the compiled program's `.rodata` section. This ensures that when we call
 	// call our generated function, we omit unnecessary mem copies.
 	//
-	// The downside of this, is that it requires dependencies on the `reflect` and
-	// `unsafe` packages. These may be restricted on platforms like AppEngine and
-	// thus prevent you from using this mode.
+	// The downside of this is that it requires dependencies on the `reflect`
+	// and `unsafe` packages. These may be restricted on platforms like
+	// AppEngine and thus prevent you from using this mode.
 	//
-	// Another disadvantage is that the byte slice we create, is strictly read-only.
-	// For most use-cases this is not a problem, but if you ever try to alter the
-	// returned byte slice, a runtime panic is thrown. Use this mode only on target
-	// platforms where memory constraints are an issue.
+	// Another disadvantage is that the byte slice we create is strictly
+	// read-only. For most use-cases this is not a problem, but if you ever try
+	// to alter the returned byte slice, a runtime panic is thrown. Use this
+	// mode only on target platforms where memory constraints are an issue.
 	//
-	// The default behaviour is to use the old code generation method. This
-	// prevents the two previously mentioned issues, but will employ at least one
-	// extra memcopy and thus increase memory requirements.
+	// The default behavior is to use the old code generation method. This
+	// prevents the two previously mentioned issues, but will employ at least
+	// one extra memcopy and thus increase memory requirements.
 	//
 	// For instance, consider the following two examples:
 	//
@@ -106,19 +106,15 @@ type Config struct {
 	// the file data when called. Defaults to false.
 	NoCompress bool
 
-	// HttpFileSystem means whether generate return http.FileSystem interface
-	// instance's function.When true,will generate relate code.
-	HttpFileSystem bool
-
-	// Perform a debug build. This generates an asset file, which
-	// loads the asset contents directly from disk at their original
-	// location, instead of embedding the contents in the code.
+	// Perform a debug build. This generates an asset file, which loads the
+	// asset contents directly from disk at their original location, instead of
+	// embedding the contents in the code.
 	//
-	// This is mostly useful if you anticipate that the assets are
-	// going to change during your development cycle. You will always
-	// want your code to access the latest version of the asset.
-	// Only in release mode, will the assets actually be embedded
-	// in the code. The default behaviour is Release mode.
+	// This is mostly useful if you anticipate that the assets are going to
+	// change during your development cycle. You will always want your code to
+	// access the latest version of the asset. Only in release mode, will the
+	// assets actually be embedded in the code. The default behavior is Release
+	// mode.
 	Debug bool
 
 	// Perform a dev build, which is nearly identical to the debug option. The
@@ -152,7 +148,6 @@ func NewConfig() *Config {
 	c.Package = "main"
 	c.NoMemCopy = false
 	c.NoCompress = false
-	c.HttpFileSystem = false
 	c.Debug = false
 	c.Output = "./bindata.go"
 	c.Ignore = make([]*regexp.Regexp, 0)
@@ -163,20 +158,20 @@ func NewConfig() *Config {
 // Part of which means checking if certain file/directory paths exist.
 func (c *Config) validate() error {
 	if len(c.Package) == 0 {
-		return fmt.Errorf("Missing package name")
+		return fmt.Errorf("missing package name")
 	}
 
 	for _, input := range c.Input {
 		_, err := os.Lstat(input.Path)
 		if err != nil {
-			return fmt.Errorf("Failed to stat input path '%s': %v", input.Path, err)
+			return fmt.Errorf("failed to stat input path '%s': %v", input.Path, err)
 		}
 	}
 
 	if len(c.Output) == 0 {
 		cwd, err := os.Getwd()
 		if err != nil {
-			return fmt.Errorf("Unable to determine current working directory.")
+			return fmt.Errorf("unable to determine current working directory")
 		}
 
 		c.Output = filepath.Join(cwd, "bindata.go")
@@ -185,7 +180,7 @@ func (c *Config) validate() error {
 	stat, err := os.Lstat(c.Output)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return fmt.Errorf("Output path: %v", err)
+			return fmt.Errorf("output path: %v", err)
 		}
 
 		// File does not exist. This is fine, just make
@@ -195,13 +190,13 @@ func (c *Config) validate() error {
 			err = os.MkdirAll(dir, 0744)
 
 			if err != nil {
-				return fmt.Errorf("Create output directory: %v", err)
+				return fmt.Errorf("create output directory: %v", err)
 			}
 		}
 	}
 
 	if stat != nil && stat.IsDir() {
-		return fmt.Errorf("Output path is a directory.")
+		return fmt.Errorf("output path %q is a directory", c.Output)
 	}
 
 	return nil

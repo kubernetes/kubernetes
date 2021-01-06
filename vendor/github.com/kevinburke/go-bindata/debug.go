@@ -1,6 +1,6 @@
 // This work is subject to the CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
 // license. Its contents can be found at:
-// http://creativecommons.org/publicdomain/zero/1.0/
+// https://creativecommons.org/publicdomain/zero/1.0/
 
 package bindata
 
@@ -9,14 +9,9 @@ import (
 	"io"
 )
 
-// writeDebug writes the debug code file.
-func writeDebug(w io.Writer, c *Config, toc []Asset) error {
-	err := writeDebugHeader(w, c)
-	if err != nil {
-		return err
-	}
-
-	err = writeAssetFS(w, c)
+// writeDebugFunctions writes the debug code file.
+func writeDebugFunctions(w io.Writer, c *Config, toc []Asset) error {
+	err := writeDebugHeader(w)
 	if err != nil {
 		return err
 	}
@@ -33,46 +28,32 @@ func writeDebug(w io.Writer, c *Config, toc []Asset) error {
 
 // writeDebugHeader writes output file headers.
 // This targets debug builds.
-func writeDebugHeader(w io.Writer, c *Config) error {
-	var header string
-
-	if c.HttpFileSystem {
-		header = `import (
-	"bytes"
-	"net/http"
+func writeDebugHeader(w io.Writer) error {
+	_, err := fmt.Fprintf(w, `import (
+	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"`
-	} else {
-		header = `import (
-	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"`
-	}
-
-	_, err := fmt.Fprintf(w, `%s
 )
 
 // bindataRead reads the given file from disk. It returns an error on failure.
 func bindataRead(path, name string) ([]byte, error) {
 	buf, err := ioutil.ReadFile(path)
 	if err != nil {
-		err = fmt.Errorf("Error reading asset %%s at %%s: %%v", name, path, err)
+		err = fmt.Errorf("Error reading asset %%s at %%s: %`+wrappedError+`", name, path, err)
 	}
 	return buf, err
 }
 
 type asset struct {
-	bytes []byte
-	info  os.FileInfo
+	bytes  []byte
+	info   os.FileInfo
+	digest [sha256.Size]byte
 }
 
-`, header)
+`)
 	return err
 }
 
@@ -96,7 +77,7 @@ func %s() (*asset, error) {
 
 	fi, err := os.Stat(path)
 	if err != nil {
-		err = fmt.Errorf("Error reading asset info %%s at %%s: %%v", name, path, err)
+		err = fmt.Errorf("Error reading asset info %%s at %%s: %`+wrappedError+`", name, path, err)
 	}
 
 	a := &asset{bytes: bytes, info: fi}

@@ -20,7 +20,7 @@ limitations under the License.
 package tools
 
 import (
-	_ "github.com/go-bindata/go-bindata/go-bindata"
+	_ "github.com/kevinburke/go-bindata/go-bindata"
 	_ "github.com/onsi/ginkgo/ginkgo"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo"

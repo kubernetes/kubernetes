@@ -49,9 +49,9 @@ For most use-cases this is not a problem, but if you ever try to alter the
 returned byte slice, a runtime panic is thrown. Use this mode only on target
 platforms where memory constraints are an issue.
 
-The default behaviour is to use the old code generation method. This
-prevents the two previously mentioned issues, but will employ at least one
-extra memcopy and thus increase memory requirements.
+The default behavior is to use the old code generation method. This prevents the
+two previously mentioned issues, but will employ at least one extra memcopy and
+thus increase memory requirements.
 
 For instance, consider the following two examples:
 
@@ -90,7 +90,7 @@ This feature is useful if you do not care for compression, or the supplied
 resource is already compressed. Doing it again would not add any value and may
 even increase the size of the data.
 
-The default behaviour of the program is to use compression.
+The default behavior of the program is to use compression.
 
 
 Path prefix stripping

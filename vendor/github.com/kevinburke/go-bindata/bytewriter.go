@@ -15,6 +15,7 @@ var (
 	space      = []byte{' '}
 )
 
+// ByteWriter writes the hex-encoded version of input bytes to its Writer.
 type ByteWriter struct {
 	io.Writer
 	c int
@@ -39,6 +40,5 @@ func (w *ByteWriter) Write(p []byte) (n int, err error) {
 	}
 
 	n++
-
 	return
 }

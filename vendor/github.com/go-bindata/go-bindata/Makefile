@@ -1,2 +1,0 @@
-all:
-	make -C testdata

@@ -12,25 +12,24 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/go-bindata/go-bindata"
+	"github.com/kevinburke/go-bindata"
 )
 
 func main() {
 	cfg := parseArgs()
-	err := bindata.Translate(cfg)
-
-	if err != nil {
+	if err := bindata.Translate(cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "bindata: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-// parseArgs create s a new, filled configuration instance
+// parseArgs creates a new, filled configuration instance
 // by reading and parsing command line options.
 //
 // This function exits the program with an error, if
 // any of the command line options are incorrect.
 func parseArgs() *bindata.Config {
+	var longVersion bool
 	var version bool
 
 	c := bindata.NewConfig()
@@ -48,11 +47,11 @@ func parseArgs() *bindata.Config {
 	flag.BoolVar(&c.NoMemCopy, "nomemcopy", c.NoMemCopy, "Use a .rodata hack to get rid of unnecessary memcopies. Refer to the documentation to see what implications this carries.")
 	flag.BoolVar(&c.NoCompress, "nocompress", c.NoCompress, "Assets will *not* be GZIP compressed when this flag is specified.")
 	flag.BoolVar(&c.NoMetadata, "nometadata", c.NoMetadata, "Assets will not preserve size, mode, and modtime info.")
-	flag.BoolVar(&c.HttpFileSystem, "fs", c.HttpFileSystem, "Whether generate instance http.FileSystem interface code.")
 	flag.UintVar(&c.Mode, "mode", c.Mode, "Optional file mode override for all files.")
 	flag.Int64Var(&c.ModTime, "modtime", c.ModTime, "Optional modification unix timestamp override for all files.")
 	flag.StringVar(&c.Output, "o", c.Output, "Optional name of the output file to be generated.")
-	flag.BoolVar(&version, "version", false, "Displays version information.")
+	flag.BoolVar(&longVersion, "version", false, "Displays verbose version information.")
+	flag.BoolVar(&version, "v", false, "Displays version information.")
 
 	ignore := make([]string, 0)
 	flag.Var((*AppendSliceValue)(&ignore), "ignore", "Regex pattern to ignore")
@@ -67,6 +66,10 @@ func parseArgs() *bindata.Config {
 
 	if version {
 		fmt.Printf("%s\n", Version())
+		os.Exit(0)
+	}
+	if longVersion {
+		fmt.Printf("%s\n", LongVersion())
 		os.Exit(0)
 	}
 
@@ -86,7 +89,7 @@ func parseArgs() *bindata.Config {
 	return c
 }
 
-// parseRecursive determines whether the given path has a recrusive indicator and
+// parseRecursive determines whether the given path has a recursive indicator and
 // returns a new path with the recursive indicator chopped off if it does.
 //
 //  ex:
