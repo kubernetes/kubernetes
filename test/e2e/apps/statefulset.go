@@ -1317,7 +1317,7 @@ func deleteStatefulPodAtIndex(c clientset.Interface, index int, ss *appsv1.State
 	}
 }
 
-// getStatefulSetPodNameAtIndex gets formated pod name given index.
+// getStatefulSetPodNameAtIndex gets formatted pod name given index.
 func getStatefulSetPodNameAtIndex(index int, ss *appsv1.StatefulSet) string {
 	// TODO: we won't use "-index" as the name strategy forever,
 	// pull the name out from an identity mapper.
