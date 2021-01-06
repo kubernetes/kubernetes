@@ -274,7 +274,7 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 				parts := strings.Split(basePath, podCgroupNamePrefix)
 				// the uid is missing, so we log the unexpected cgroup not of form pod<uid>
 				if len(parts) != 2 {
-					klog.Errorf("pod cgroup manager ignoring unexpected cgroup %v because it is not a pod", cgroupfsPath)
+					klog.Errorf("Pod cgroup manager ignoring unexpected cgroup %v because it is not a pod", cgroupfsPath)
 					continue
 				}
 				podUID := parts[1]

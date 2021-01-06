@@ -192,11 +192,11 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 	// CPU cgroup is required and so it expected to be mounted at this point.
 	periodExists, err := utilpath.Exists(utilpath.CheckFollowSymlink, path.Join(cpuMountPoint, "cpu.cfs_period_us"))
 	if err != nil {
-		klog.Errorf("failed to detect if CPU cgroup cpu.cfs_period_us is available - %v", err)
+		klog.Errorf("Failed to detect if CPU cgroup cpu.cfs_period_us is available - %v", err)
 	}
 	quotaExists, err := utilpath.Exists(utilpath.CheckFollowSymlink, path.Join(cpuMountPoint, "cpu.cfs_quota_us"))
 	if err != nil {
-		klog.Errorf("failed to detect if CPU cgroup cpu.cfs_quota_us is available - %v", err)
+		klog.Errorf("Failed to detect if CPU cgroup cpu.cfs_quota_us is available - %v", err)
 	}
 	if quotaExists && periodExists {
 		f.cpuHardcapping = true
@@ -335,7 +335,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			cm.topologyManager,
 		)
 		if err != nil {
-			klog.Errorf("failed to initialize cpu manager: %v", err)
+			klog.Errorf("Failed to initialize cpu manager: %v", err)
 			return nil, err
 		}
 		cm.topologyManager.AddHintProvider(cm.cpuManager)
@@ -530,7 +530,7 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 			}
 			cont, err := getContainer(os.Getpid())
 			if err != nil {
-				klog.Errorf("failed to find cgroups of kubelet - %v", err)
+				klog.Errorf("Failed to find cgroups of kubelet - %v", err)
 				return
 			}
 			cm.Lock()

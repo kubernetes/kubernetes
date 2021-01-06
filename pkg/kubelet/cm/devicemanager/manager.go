@@ -191,7 +191,7 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 	}
 	m.mutex.Unlock()
 	if err := m.writeCheckpoint(); err != nil {
-		klog.Errorf("writing checkpoint encountered %v", err)
+		klog.Errorf("Writing checkpoint encountered %v", err)
 	}
 }
 
@@ -265,7 +265,7 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 	// Removes all stale sockets in m.socketdir. Device plugins can monitor
 	// this and use it as a signal to re-register with the new Kubelet.
 	if err := m.removeContents(m.socketdir); err != nil {
-		klog.Errorf("Fail to clean up stale contents under %s: %v", m.socketdir, err)
+		klog.Errorf("Failed to clean up stale contents under %s: %v", m.socketdir, err)
 	}
 
 	s, err := net.Listen("unix", socketPath)
@@ -534,7 +534,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 			// should always be consistent. Otherwise, we run with the risk
 			// of failing to garbage collect non-existing resources or devices.
 			if !ok {
-				klog.Errorf("unexpected: healthyDevices and endpoints are out of sync")
+				klog.Errorf("Unexpected: healthyDevices and endpoints are out of sync")
 			}
 			delete(m.endpoints, resourceName)
 			delete(m.healthyDevices, resourceName)
@@ -549,7 +549,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 		eI, ok := m.endpoints[resourceName]
 		if (ok && eI.e.stopGracePeriodExpired()) || !ok {
 			if !ok {
-				klog.Errorf("unexpected: unhealthyDevices and endpoints are out of sync")
+				klog.Errorf("Unexpected: unhealthyDevices and endpoints are out of sync")
 			}
 			delete(m.endpoints, resourceName)
 			delete(m.unhealthyDevices, resourceName)
@@ -565,7 +565,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 	m.mutex.Unlock()
 	if needsUpdateCheckpoint {
 		if err := m.writeCheckpoint(); err != nil {
-			klog.Errorf("writing checkpoint encountered %v", err)
+			klog.Errorf("Writing checkpoint encountered %v", err)
 		}
 	}
 	return capacity, allocatable, deletedResources.UnsortedList()
