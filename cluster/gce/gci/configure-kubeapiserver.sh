@@ -92,6 +92,9 @@ function start-kube-apiserver {
     fi
     params+=" --tls-sni-cert-key=${OLD_MASTER_CERT_PATH},${OLD_MASTER_KEY_PATH}:${old_ips}"
   fi
+  if [[ -n "${TLS_CIPHER_SUITES:-}" ]]; then
+    params+=" --tls-cipher-suites=${TLS_CIPHER_SUITES}"
+  fi
   params+=" --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname"
   if [[ -s "${REQUESTHEADER_CA_CERT_PATH:-}" ]]; then
     params+=" --requestheader-client-ca-file=${REQUESTHEADER_CA_CERT_PATH}"

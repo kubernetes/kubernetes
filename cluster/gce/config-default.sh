@@ -553,3 +553,6 @@ export KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP="${KUBE_APISERVER_HEALTHCHECK_ON_HO
 
 # ETCD_PROGRESS_NOTIFY_INTERVAL defines the interval for etcd watch progress notify events.
 export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-10m}"
+
+# TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver. If this variable is unset or empty, kube-apiserver is allowed to use any cipher it supports.
+export TLS_CIPHER_SUITES=""
