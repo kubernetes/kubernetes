@@ -130,7 +130,7 @@ func (l *persistentVolumeLabel) Admit(ctx context.Context, a admission.Attribute
 
 			// Set NodeSelectorRequirements based on the labels
 			var values []string
-			if k == v1.LabelFailureDomainBetaZone {
+			if k == v1.LabelTopologyZone {
 				zones, err := volumehelpers.LabelZonesToSet(v)
 				if err != nil {
 					return admission.NewForbidden(a, fmt.Errorf("failed to convert label string for Zone: %s to a Set", v))
@@ -172,14 +172,14 @@ func (l *persistentVolumeLabel) findVolumeLabels(volume *api.PersistentVolume) (
 	existingLabels := volume.Labels
 
 	// All cloud providers set only these two labels.
-	domain, domainOK := existingLabels[v1.LabelFailureDomainBetaZone]
-	region, regionOK := existingLabels[v1.LabelFailureDomainBetaRegion]
+	domain, domainOK := existingLabels[v1.LabelTopologyZone]
+	region, regionOK := existingLabels[v1.LabelTopologyRegion]
 	isDynamicallyProvisioned := metav1.HasAnnotation(volume.ObjectMeta, persistentvolume.AnnDynamicallyProvisioned)
 	if isDynamicallyProvisioned && domainOK && regionOK {
 		// PV already has all the labels and we can trust the dynamic provisioning that it provided correct values.
 		return map[string]string{
-			v1.LabelFailureDomainBetaZone:   domain,
-			v1.LabelFailureDomainBetaRegion: region,
+			v1.LabelTopologyZone:   domain,
+			v1.LabelTopologyRegion: region,
 		}, nil
 	}
 
