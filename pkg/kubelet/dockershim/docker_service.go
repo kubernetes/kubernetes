@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
@@ -267,11 +268,12 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 	} else {
 		cgroupDriver = dockerInfo.CgroupDriver
 	}
-	if len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
+	if runtime.GOOS == "linux" && len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
 		return nil, fmt.Errorf("misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", kubeCgroupDriver, cgroupDriver)
 	}
 	klog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	ds.cgroupDriver = cgroupDriver
+
 	ds.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {
 			return ds.getDockerVersion()
