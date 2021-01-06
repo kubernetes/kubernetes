@@ -1,8 +1,0 @@
-{
-  "kind": "CreateOptions",
-  "apiVersion": "v1",
-  "dryRun": [
-    "2"
-  ],
-  "fieldManager": "3"
-}
