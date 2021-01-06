@@ -56,12 +56,12 @@ const (
 	minRetryDelay = 5 * time.Second
 	maxRetryDelay = 300 * time.Second
 
-	// labelNodeRoleExcludeBalancer specifies that the node should not be considered as a target
+	// labelNodeExcludeBalancers specifies that the node should not be considered as a target
 	// for external load-balancers which use nodes as a second hop (e.g. many cloud LBs which only
 	// understand nodes). For services that use externalTrafficPolicy=Local, this may mean that
 	// any backends on excluded nodes are not reachable by those external load-balancers.
 	// Implementations of this exclusion may vary based on provider.
-	labelNodeRoleExcludeBalancer = "node.kubernetes.io/exclude-from-external-load-balancers"
+	labelNodeExcludeBalancers = "node.kubernetes.io/exclude-from-external-load-balancers"
 )
 
 type cachedService struct {
@@ -614,7 +614,7 @@ func nodeSlicesEqualForLB(x, y []*v1.Node) bool {
 
 func (s *Controller) getNodeConditionPredicate() NodeConditionPredicate {
 	return func(node *v1.Node) bool {
-		if _, hasExcludeBalancerLabel := node.Labels[labelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
+		if _, hasExcludeBalancerLabel := node.Labels[labelNodeExcludeBalancers]; hasExcludeBalancerLabel {
 			return false
 		}
 
