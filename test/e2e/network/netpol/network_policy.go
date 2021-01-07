@@ -634,6 +634,95 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityPort81})
 		})
 
+		ginkgo.It("should support denying of egress traffic on the client side (even if the server explicitly allows this traffic) [Feature:NetworkPolicy]", func() {
+			// x/a --> y/a and y/b
+			// Egress allowed to y/a only. Egress to y/b should be blocked
+			// Ingress on y/a and y/b allow traffic from x/a
+			// Expectation: traffic from x/a to y/a allowed only, traffic from x/a to y/b denied by egress policy
+
+			nsX, nsY, _, model, k8s := getK8SModel(f)
+
+			// Building egress policy for x/a to y/a only
+			allowedEgressNamespaces := &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"ns": nsY,
+				},
+			}
+			allowedEgressPods := &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"pod": "a",
+				},
+			}
+			egressPolicy := GetAllowEgressByNamespaceAndPod("allow-to-ns-y-pod-a", map[string]string{"pod": "a"}, allowedEgressNamespaces, allowedEgressPods)
+			CreatePolicy(k8s, egressPolicy, nsX)
+
+			// Creating ingress policy to allow from x/a to y/a and y/b
+			allowedIngressNamespaces := &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"ns": nsX,
+				},
+			}
+			allowedIngressPods := &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"pod": "a",
+				},
+			}
+			allowIngressPolicyPodA := GetAllowIngressByNamespaceAndPod("allow-from-xa-on-ya-match-selector", map[string]string{"pod": "a"}, allowedIngressNamespaces, allowedIngressPods)
+			allowIngressPolicyPodB := GetAllowIngressByNamespaceAndPod("allow-from-xa-on-yb-match-selector", map[string]string{"pod": "b"}, allowedIngressNamespaces, allowedIngressPods)
+
+			CreatePolicy(k8s, allowIngressPolicyPodA, nsY)
+			CreatePolicy(k8s, allowIngressPolicyPodB, nsY)
+
+			// While applying the policies, traffic needs to be allowed by both egress and ingress rules.
+			// Egress rules only
+			// 	xa	xb	xc	ya	yb	yc	za	zb	zc
+			// xa	X	X	X	.	*X*	X	X	X	X
+			// xb	.	.	.	.	.	.	.	.	.
+			// xc	.	.	.	.	.	.	.	.	.
+			// ya	.	.	.	.	.	.	.	.	.
+			// yb	.	.	.	.	.	.	.	.	.
+			// yc	.	.	.	.	.	.	.	.	.
+			// za	.	.	.	.	.	.	.	.	.
+			// zb	.	.	.	.	.	.	.	.	.
+			// zc	.	.	.	.	.	.	.	.	.
+			// Ingress rules only
+			// 	xa	xb	xc	ya	yb	yc	za	zb	zc
+			// xa	.	.	.	*.*	.	.	.	.	.
+			// xb	.	.	X	X	.	.	.	.	.
+			// xc	.	.	X	X	.	.	.	.	.
+			// ya	.	.	X	X	.	.	.	.	.
+			// yb	.	.	X	X	.	.	.	.	.
+			// yc	.	.	X	X	.	.	.	.	.
+			// za	.	.	X	X	.	.	.	.	.
+			// zb	.	.	X	X	.	.	.	.	.
+			// zc	.	.	X	X	.	.	.	.	.
+			// In the resulting truth table, connections from x/a should only be allowed to y/a. x/a to y/b should be blocked by the egress on x/a.
+			// Expected results
+			// 	xa	xb	xc	ya	yb	yc	za	zb	zc
+			// xa	X	X	X	.	*X*	X	X	X	X
+			// xb	.	.	.	X	X	.	.	.	.
+			// xc	.	.	.	X	X	.	.	.	.
+			// ya	.	.	.	X	X	.	.	.	.
+			// yb	.	.	.	X	X	.	.	.	.
+			// yc	.	.	.	X	X	.	.	.	.
+			// za	.	.	.	X	X	.	.	.	.
+			// zb	.	.	.	X	X	.	.	.	.
+			// zc	.	.	.	X	X	.	.	.	.
+
+			reachability := NewReachability(model.AllPods(), true)
+			// Default all traffic flows.
+			// Exception: x/a can only egress to y/a, others are false
+			// Exception: y/a can only allow ingress from x/a, others are false
+			// Exception: y/b has no allowed traffic (due to limit on x/a egress)
+
+			reachability.ExpectPeer(&Peer{Namespace: nsX, Pod: "a"}, &Peer{}, false)
+			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsY, Pod: "a"}, false)
+			reachability.ExpectPeer(&Peer{Namespace: nsX, Pod: "a"}, &Peer{Namespace: nsY, Pod: "a"}, true)
+			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsY, Pod: "b"}, false)
+
+			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+		})
+
 		ginkgo.It("should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func() {
 			nsX, nsY, _, model, k8s := getK8SModel(f)
 			allowedNamespaces := &metav1.LabelSelector{
