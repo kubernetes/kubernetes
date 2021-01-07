@@ -107,6 +107,7 @@ type Request struct {
 	resource     string
 	resourceName string
 	subresource  string
+	groupVersion schema.GroupVersion
 
 	// output
 	err   error
@@ -127,8 +128,10 @@ func NewRequest(c *RESTClient) *Request {
 	var pathPrefix string
 	if c.base != nil {
 		pathPrefix = path.Join("/", c.base.Path, c.versionedAPIPath)
-	} else {
+	} else if len(c.versionedAPIPath) > 0 {
 		pathPrefix = path.Join("/", c.versionedAPIPath)
+	} else {
+		pathPrefix = "/"
 	}
 
 	var timeout time.Duration
@@ -138,6 +141,7 @@ func NewRequest(c *RESTClient) *Request {
 
 	r := &Request{
 		c:              c,
+		groupVersion:   c.content.GroupVersion,
 		rateLimiter:    c.rateLimiter,
 		backoff:        backoff,
 		timeout:        timeout,
@@ -347,13 +351,31 @@ func (r *Request) Param(paramName, s string) *Request {
 	return r.setParam(paramName, s)
 }
 
+// GroupVersion sets the API group and version associated with this request, and resets the prefix to
+// /api/<group> (for v1) or /apis/<group>/<version> (for all other group/versions)
+func (r *Request) GroupVersion(groupVersion schema.GroupVersion) *Request {
+	versionedAPIPath := "/apis"
+	if groupVersion.Group == "" && groupVersion.Version == "v1" {
+		versionedAPIPath = "/api"
+	}
+
+	if r.c.base != nil {
+		r.pathPrefix = path.Join("/", r.c.base.Path, versionedAPIPath, groupVersion.Group, groupVersion.Version)
+	} else {
+		r.pathPrefix = path.Join("/", versionedAPIPath, groupVersion.Group, groupVersion.Version)
+	}
+
+	r.groupVersion = groupVersion
+	return r
+}
+
 // VersionedParams will take the provided object, serialize it to a map[string][]string using the
 // implicit RESTClient API version and the default parameter codec, and then add those as parameters
 // to the request. Use this to provide versioned query parameters from client libraries.
 // VersionedParams will not write query parameters that have omitempty set and are empty. If a
 // parameter has already been set it is appended to (Params and VersionedParams are additive).
 func (r *Request) VersionedParams(obj runtime.Object, codec runtime.ParameterCodec) *Request {
-	return r.SpecificallyVersionedParams(obj, codec, r.c.content.GroupVersion)
+	return r.SpecificallyVersionedParams(obj, codec, r.groupVersion)
 }
 
 func (r *Request) SpecificallyVersionedParams(obj runtime.Object, codec runtime.ParameterCodec, version schema.GroupVersion) *Request {
@@ -1227,7 +1249,7 @@ func (r *Request) newUnstructuredResponseError(body []byte, isTextResponse bool,
 	}
 	var groupResource schema.GroupResource
 	if len(r.resource) > 0 {
-		groupResource.Group = r.c.content.GroupVersion.Group
+		groupResource.Group = r.groupVersion.Group
 		groupResource.Resource = r.resource
 	}
 	return errors.NewGenericServerResponse(
