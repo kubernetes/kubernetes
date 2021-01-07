@@ -559,7 +559,8 @@ const (
 
 	// owner: @wojtek-t
 	// alpha: v1.18
-	// beta: v1.19
+	// beta:  v1.19
+	// ga:    v1.21
 	//
 	// Enables a feature to make secrets and configmaps data immutable.
 	ImmutableEphemeralVolumes featuregate.Feature = "ImmutableEphemeralVolumes"
@@ -776,7 +777,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DaemonSetUpdateSurge:                           {Default: false, PreRelease: featuregate.Alpha},
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
 	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.Beta},
+	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.Beta},
 	DownwardAPIHugePages:                           {Default: false, PreRelease: featuregate.Alpha},
 	ExternalPolicyForExternalIP:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22

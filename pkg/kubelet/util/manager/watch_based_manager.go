@@ -34,8 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 type listObjectFunc func(string, metav1.ListOptions) (runtime.Object, error)
@@ -208,7 +206,7 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 		//   already have it from here
 		// - doing that would require significant refactoring to reflector
 		// we limit ourselves to just quickly stop the reflector here.
-		if utilfeature.DefaultFeatureGate.Enabled(features.ImmutableEphemeralVolumes) && c.isImmutable(object) {
+		if c.isImmutable(object) {
 			if item.stop() {
 				klog.V(4).Infof("Stopped watching for changes of %q/%q - object is immutable", namespace, name)
 			}
