@@ -18,10 +18,15 @@ limitations under the License.
 
 package v1
 
+import (
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
+)
+
 // ServiceStatusApplyConfiguration represents an declarative configuration of the ServiceStatus type for use
 // with apply.
 type ServiceStatusApplyConfiguration struct {
 	LoadBalancer *LoadBalancerStatusApplyConfiguration `json:"loadBalancer,omitempty"`
+	Conditions   *metav1.ConditionList                 `json:"conditions,omitempty"`
 }
 
 // ServiceStatusApplyConfiguration constructs an declarative configuration of the ServiceStatus type for use with
@@ -45,6 +50,26 @@ func (b *ServiceStatusApplyConfiguration) RemoveLoadBalancer() *ServiceStatusApp
 // GetLoadBalancer gets the LoadBalancer field from the declarative configuration.
 func (b *ServiceStatusApplyConfiguration) GetLoadBalancer() (value *LoadBalancerStatusApplyConfiguration, ok bool) {
 	return b.LoadBalancer, b.LoadBalancer != nil
+}
+
+// SetConditions sets the Conditions field in the declarative configuration to the given value.
+func (b *ServiceStatusApplyConfiguration) SetConditions(value metav1.ConditionList) *ServiceStatusApplyConfiguration {
+	b.Conditions = &value
+	return b
+}
+
+// RemoveConditions removes the Conditions field from the declarative configuration.
+func (b *ServiceStatusApplyConfiguration) RemoveConditions() *ServiceStatusApplyConfiguration {
+	b.Conditions = nil
+	return b
+}
+
+// GetConditions gets the Conditions field from the declarative configuration.
+func (b *ServiceStatusApplyConfiguration) GetConditions() (value metav1.ConditionList, ok bool) {
+	if v := b.Conditions; v != nil {
+		return *v, true
+	}
+	return value, false
 }
 
 // ServiceStatusList represents a listAlias of ServiceStatusApplyConfiguration.

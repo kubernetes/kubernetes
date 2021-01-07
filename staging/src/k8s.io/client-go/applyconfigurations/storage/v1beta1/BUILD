@@ -9,6 +9,7 @@ go_library(
         "csinodedriver.go",
         "csinodespec.go",
         "storageclass.go",
+        "tokenrequest.go",
         "volumeattachment.go",
         "volumeattachmentsource.go",
         "volumeattachmentspec.go",

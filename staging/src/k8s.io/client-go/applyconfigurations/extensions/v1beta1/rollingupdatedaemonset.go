@@ -26,6 +26,7 @@ import (
 // with apply.
 type RollingUpdateDaemonSetApplyConfiguration struct {
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
+	MaxSurge       *intstr.IntOrString `json:"maxSurge,omitempty"`
 }
 
 // RollingUpdateDaemonSetApplyConfiguration constructs an declarative configuration of the RollingUpdateDaemonSet type for use with
@@ -49,6 +50,26 @@ func (b *RollingUpdateDaemonSetApplyConfiguration) RemoveMaxUnavailable() *Rolli
 // GetMaxUnavailable gets the MaxUnavailable field from the declarative configuration.
 func (b *RollingUpdateDaemonSetApplyConfiguration) GetMaxUnavailable() (value intstr.IntOrString, ok bool) {
 	if v := b.MaxUnavailable; v != nil {
+		return *v, true
+	}
+	return value, false
+}
+
+// SetMaxSurge sets the MaxSurge field in the declarative configuration to the given value.
+func (b *RollingUpdateDaemonSetApplyConfiguration) SetMaxSurge(value intstr.IntOrString) *RollingUpdateDaemonSetApplyConfiguration {
+	b.MaxSurge = &value
+	return b
+}
+
+// RemoveMaxSurge removes the MaxSurge field from the declarative configuration.
+func (b *RollingUpdateDaemonSetApplyConfiguration) RemoveMaxSurge() *RollingUpdateDaemonSetApplyConfiguration {
+	b.MaxSurge = nil
+	return b
+}
+
+// GetMaxSurge gets the MaxSurge field from the declarative configuration.
+func (b *RollingUpdateDaemonSetApplyConfiguration) GetMaxSurge() (value intstr.IntOrString, ok bool) {
+	if v := b.MaxSurge; v != nil {
 		return *v, true
 	}
 	return value, false

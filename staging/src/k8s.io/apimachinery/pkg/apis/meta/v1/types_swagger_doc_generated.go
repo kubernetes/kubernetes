@@ -86,6 +86,16 @@ func (APIVersions) SwaggerDoc() map[string]string {
 	return map_APIVersions
 }
 
+var map_ApplyOptions = map[string]string{
+	"":       "ApplyOptions may be provided when applying an API object. ApplyOptions is meant to be a subset of PatchOptions that does not include FieldManager. FieldManager is required for apply requests so it is required parameter on clientset Apply functions, and therefore not included in ApplyOptions.",
+	"dryRun": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"force":  "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+}
+
+func (ApplyOptions) SwaggerDoc() map[string]string {
+	return map_ApplyOptions
+}
+
 var map_Condition = map[string]string{
 	"":                   "Condition contains details for one aspect of the current state of this API Resource.",
 	"type":               "type of condition in CamelCase or in foo.example.com/CamelCase.",

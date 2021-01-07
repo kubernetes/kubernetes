@@ -18,6 +18,7 @@ package util
 
 import "strings"
 
+// ParsePathGroupVersion parses the path and group version parts from a resource string.
 func ParsePathGroupVersion(pgvString string) (gvPath string, gvString string) {
 	subs := strings.Split(pgvString, "/")
 	length := len(subs)

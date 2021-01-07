@@ -134,6 +134,26 @@ message APIVersions {
   repeated ServerAddressByClientCIDR serverAddressByClientCIDRs = 2;
 }
 
+// ApplyOptions may be provided when applying an API object.
+// ApplyOptions is meant to be a subset of PatchOptions that does not include FieldManager.
+// FieldManager is required for apply requests so it is required parameter on clientset
+// Apply functions, and therefore not included in ApplyOptions.
+message ApplyOptions {
+  // When present, indicates that modifications should not be
+  // persisted. An invalid or unrecognized dryRun directive will
+  // result in an error response and no further processing of the
+  // request. Valid values are:
+  // - All: all dry run stages will be processed
+  // +optional
+  repeated string dryRun = 1;
+
+  // Force is going to "force" Apply requests. It means user will
+  // re-acquire conflicting fields owned by other people. Force
+  // flag must be unset for non-apply patch requests.
+  // +optional
+  optional bool force = 2;
+}
+
 // Condition contains details for one aspect of the current state of this API Resource.
 // ---
 // This struct is intended for direct use as an array at the field path .status.conditions.  For example,

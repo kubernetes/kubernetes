@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	flowcontrolv1beta1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -126,6 +129,28 @@ func (c *FakeFlowSchemas) DeleteCollection(ctx context.Context, opts v1.DeleteOp
 func (c *FakeFlowSchemas) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.FlowSchema, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(flowschemasResource, name, pt, data, subresources...), &v1beta1.FlowSchema{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.FlowSchema), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied flowSchema.
+func (c *FakeFlowSchemas) Apply(ctx context.Context, flowSchema *flowcontrolv1beta1.FlowSchemaApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *v1beta1.FlowSchema, err error) {
+	data, err := json.Marshal(flowSchema)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := flowSchema.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("flowSchema.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("flowSchema.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(flowschemasResource, name, types.ApplyPatchType, data, subresources...), &v1beta1.FlowSchema{})
 	if obj == nil {
 		return nil, err
 	}

@@ -54,6 +54,9 @@ func (g *applyConfigurationGenerator) Imports(*generator.Context) (imports []str
 	return g.imports.ImportLines()
 }
 
+// TypeParams provides a struct that an apply configuration
+// is generated for as well as the apply configuration details
+// and types referenced by the struct.
 type TypeParams struct {
 	Struct      *types.Type
 	ApplyConfig applyConfig
@@ -64,7 +67,7 @@ type memberParams struct {
 	TypeParams
 	Member     types.Member
 	MemberType *types.Type
-	JsonTags   jsonTags
+	JSONTags   JSONTags
 }
 
 func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
@@ -87,7 +90,7 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 
 	for _, member := range t.Members {
 		memberType := g.refGraph.applyConfigForType(member.Type)
-		if jsonTags, ok := lookupJsonTags(member); ok {
+		if jsonTags, ok := lookupJSONTags(member); ok {
 			if g.refGraph.isApplyConfig(member.Type) {
 				memberType = &types.Type{Kind: types.Pointer, Elem: memberType}
 			}
@@ -95,7 +98,7 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 				TypeParams: typeParams,
 				Member:     member,
 				MemberType: memberType,
-				JsonTags:   jsonTags,
+				JSONTags:   jsonTags,
 			}
 			g.generateMemberSet(sw, memberParams)
 			g.generateMemberRemove(sw, memberParams)
@@ -115,24 +118,24 @@ func (g *applyConfigurationGenerator) generateStruct(t *types.Type, sw *generato
 	sw.Do("type $.ApplyConfig.ApplyConfiguration|public$ struct {\n", typeParams)
 
 	for _, structMember := range typeParams.Struct.Members {
-		if structMemberTags, ok := lookupJsonTags(structMember); ok {
+		if structMemberTags, ok := lookupJSONTags(structMember); ok {
 			if structMemberTags.inline {
 				params := memberParams{
 					TypeParams: typeParams,
 					Member:     structMember,
 					MemberType: g.refGraph.applyConfigForType(structMember.Type),
-					JsonTags:   structMemberTags,
+					JSONTags:   structMemberTags,
 				}
-				sw.Do("$.MemberType|raw$ `json:\"$.JsonTags$\"`\n", params)
+				sw.Do("$.MemberType|raw$ `json:\"$.JSONTags$\"`\n", params)
 			} else {
 				structMemberTags.omitempty = true
 				params := memberParams{
 					TypeParams: typeParams,
 					Member:     structMember,
 					MemberType: g.refGraph.applyConfigForType(structMember.Type),
-					JsonTags:   structMemberTags,
+					JSONTags:   structMemberTags,
 				}
-				sw.Do("$.Member.Name$ *$.MemberType|raw$ `json:\"$.JsonTags$\"`\n", params)
+				sw.Do("$.Member.Name$ *$.MemberType|raw$ `json:\"$.JSONTags$\"`\n", params)
 			}
 		}
 	}
@@ -142,7 +145,7 @@ func (g *applyConfigurationGenerator) generateStruct(t *types.Type, sw *generato
 func (g *applyConfigurationGenerator) generateMemberSet(sw *generator.SnippetWriter, memberParams memberParams) {
 	sw.Do("// Set$.Member.Name$ sets the $.Member.Name$ field in the declarative configuration to the given value.\n", memberParams)
 	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) Set$.Member.Name$(value $.MemberType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
-	if memberParams.JsonTags.inline {
+	if memberParams.JSONTags.inline {
 		sw.Do("if value != nil {\n", memberParams)
 		sw.Do("  b.$.Member.Name$ApplyConfiguration = *value\n", memberParams)
 		sw.Do("}\n", memberParams)
@@ -156,7 +159,7 @@ func (g *applyConfigurationGenerator) generateMemberSet(sw *generator.SnippetWri
 }
 
 func (g *applyConfigurationGenerator) generateMemberRemove(sw *generator.SnippetWriter, memberParams memberParams) {
-	if memberParams.JsonTags.inline {
+	if memberParams.JSONTags.inline {
 		// Inline types cannot be removed
 		return
 	}
@@ -170,7 +173,7 @@ func (g *applyConfigurationGenerator) generateMemberRemove(sw *generator.Snippet
 func (g *applyConfigurationGenerator) generateMemberGet(sw *generator.SnippetWriter, memberParams memberParams) {
 	sw.Do("// Get$.Member.Name$ gets the $.Member.Name$ field from the declarative configuration.\n", memberParams)
 	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) Get$.Member.Name$() (value $.MemberType|raw$, ok bool) {\n", memberParams)
-	if memberParams.JsonTags.inline {
+	if memberParams.JSONTags.inline {
 		sw.Do("return &b.$.Member.Name$ApplyConfiguration, true\n", memberParams)
 	} else if g.refGraph.isApplyConfig(memberParams.Member.Type) {
 		sw.Do("return b.$.Member.Name$, b.$.Member.Name$ != nil\n", memberParams)

@@ -32,8 +32,8 @@ import (
 )
 
 const (
+	// ApplyConfigurationTypeSuffix is the suffix of generated apply configuration types.
 	ApplyConfigurationTypeSuffix = "ApplyConfiguration"
-	FieldTypeSuffix              = "Fields"
 )
 
 // NameSystems returns the name system used by the generators in this package.
@@ -211,6 +211,6 @@ func isInternalPackage(p *types.Package) bool {
 
 // isInternal returns true if the tags for a member do not contain a json tag
 func isInternal(m types.Member) bool {
-	_, ok := lookupJsonTags(m)
+	_, ok := lookupJSONTags(m)
 	return !ok
 }

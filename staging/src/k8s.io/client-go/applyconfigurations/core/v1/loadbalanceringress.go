@@ -21,8 +21,9 @@ package v1
 // LoadBalancerIngressApplyConfiguration represents an declarative configuration of the LoadBalancerIngress type for use
 // with apply.
 type LoadBalancerIngressApplyConfiguration struct {
-	IP       *string `json:"ip,omitempty"`
-	Hostname *string `json:"hostname,omitempty"`
+	IP       *string         `json:"ip,omitempty"`
+	Hostname *string         `json:"hostname,omitempty"`
+	Ports    *PortStatusList `json:"ports,omitempty"`
 }
 
 // LoadBalancerIngressApplyConfiguration constructs an declarative configuration of the LoadBalancerIngress type for use with
@@ -66,6 +67,26 @@ func (b *LoadBalancerIngressApplyConfiguration) RemoveHostname() *LoadBalancerIn
 // GetHostname gets the Hostname field from the declarative configuration.
 func (b *LoadBalancerIngressApplyConfiguration) GetHostname() (value string, ok bool) {
 	if v := b.Hostname; v != nil {
+		return *v, true
+	}
+	return value, false
+}
+
+// SetPorts sets the Ports field in the declarative configuration to the given value.
+func (b *LoadBalancerIngressApplyConfiguration) SetPorts(value PortStatusList) *LoadBalancerIngressApplyConfiguration {
+	b.Ports = &value
+	return b
+}
+
+// RemovePorts removes the Ports field from the declarative configuration.
+func (b *LoadBalancerIngressApplyConfiguration) RemovePorts() *LoadBalancerIngressApplyConfiguration {
+	b.Ports = nil
+	return b
+}
+
+// GetPorts gets the Ports field from the declarative configuration.
+func (b *LoadBalancerIngressApplyConfiguration) GetPorts() (value PortStatusList, ok bool) {
+	if v := b.Ports; v != nil {
 		return *v, true
 	}
 	return value, false

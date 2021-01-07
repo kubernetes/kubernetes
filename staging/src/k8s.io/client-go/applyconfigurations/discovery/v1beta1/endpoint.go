@@ -30,6 +30,7 @@ type EndpointApplyConfiguration struct {
 	Hostname   *string                               `json:"hostname,omitempty"`
 	TargetRef  *v1.ObjectReferenceApplyConfiguration `json:"targetRef,omitempty"`
 	Topology   *map[string]string                    `json:"topology,omitempty"`
+	NodeName   *string                               `json:"nodeName,omitempty"`
 }
 
 // EndpointApplyConfiguration constructs an declarative configuration of the Endpoint type for use with
@@ -127,6 +128,26 @@ func (b *EndpointApplyConfiguration) RemoveTopology() *EndpointApplyConfiguratio
 // GetTopology gets the Topology field from the declarative configuration.
 func (b *EndpointApplyConfiguration) GetTopology() (value map[string]string, ok bool) {
 	if v := b.Topology; v != nil {
+		return *v, true
+	}
+	return value, false
+}
+
+// SetNodeName sets the NodeName field in the declarative configuration to the given value.
+func (b *EndpointApplyConfiguration) SetNodeName(value string) *EndpointApplyConfiguration {
+	b.NodeName = &value
+	return b
+}
+
+// RemoveNodeName removes the NodeName field from the declarative configuration.
+func (b *EndpointApplyConfiguration) RemoveNodeName() *EndpointApplyConfiguration {
+	b.NodeName = nil
+	return b
+}
+
+// GetNodeName gets the NodeName field from the declarative configuration.
+func (b *EndpointApplyConfiguration) GetNodeName() (value string, ok bool) {
+	if v := b.NodeName; v != nil {
 		return *v, true
 	}
 	return value, false

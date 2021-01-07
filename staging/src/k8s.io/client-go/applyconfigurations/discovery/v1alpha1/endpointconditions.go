@@ -21,7 +21,9 @@ package v1alpha1
 // EndpointConditionsApplyConfiguration represents an declarative configuration of the EndpointConditions type for use
 // with apply.
 type EndpointConditionsApplyConfiguration struct {
-	Ready *bool `json:"ready,omitempty"`
+	Ready       *bool `json:"ready,omitempty"`
+	Serving     *bool `json:"serving,omitempty"`
+	Terminating *bool `json:"terminating,omitempty"`
 }
 
 // EndpointConditionsApplyConfiguration constructs an declarative configuration of the EndpointConditions type for use with
@@ -45,6 +47,46 @@ func (b *EndpointConditionsApplyConfiguration) RemoveReady() *EndpointConditions
 // GetReady gets the Ready field from the declarative configuration.
 func (b *EndpointConditionsApplyConfiguration) GetReady() (value bool, ok bool) {
 	if v := b.Ready; v != nil {
+		return *v, true
+	}
+	return value, false
+}
+
+// SetServing sets the Serving field in the declarative configuration to the given value.
+func (b *EndpointConditionsApplyConfiguration) SetServing(value bool) *EndpointConditionsApplyConfiguration {
+	b.Serving = &value
+	return b
+}
+
+// RemoveServing removes the Serving field from the declarative configuration.
+func (b *EndpointConditionsApplyConfiguration) RemoveServing() *EndpointConditionsApplyConfiguration {
+	b.Serving = nil
+	return b
+}
+
+// GetServing gets the Serving field from the declarative configuration.
+func (b *EndpointConditionsApplyConfiguration) GetServing() (value bool, ok bool) {
+	if v := b.Serving; v != nil {
+		return *v, true
+	}
+	return value, false
+}
+
+// SetTerminating sets the Terminating field in the declarative configuration to the given value.
+func (b *EndpointConditionsApplyConfiguration) SetTerminating(value bool) *EndpointConditionsApplyConfiguration {
+	b.Terminating = &value
+	return b
+}
+
+// RemoveTerminating removes the Terminating field from the declarative configuration.
+func (b *EndpointConditionsApplyConfiguration) RemoveTerminating() *EndpointConditionsApplyConfiguration {
+	b.Terminating = nil
+	return b
+}
+
+// GetTerminating gets the Terminating field from the declarative configuration.
+func (b *EndpointConditionsApplyConfiguration) GetTerminating() (value bool, ok bool) {
+	if v := b.Terminating; v != nil {
 		return *v, true
 	}
 	return value, false

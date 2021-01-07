@@ -142,17 +142,13 @@ func requiresApplyConfiguration(t *types.Type) bool {
 	if _, ok := excludeTypes[t.Name]; ok {
 		return false
 	}
-	var hasJsonTaggedMembers bool
+	var hasJSONTaggedMembers bool
 	for _, member := range t.Members {
-		memberType := member.Type
-		if memberType.Kind == types.Pointer {
-			memberType = memberType.Elem
-		}
-		if _, ok := lookupJsonTags(member); ok {
-			hasJsonTaggedMembers = true
+		if _, ok := lookupJSONTags(member); ok {
+			hasJSONTaggedMembers = true
 		}
 	}
-	if !hasJsonTaggedMembers {
+	if !hasJSONTaggedMembers {
 		return false
 	}
 

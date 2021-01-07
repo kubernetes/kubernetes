@@ -121,6 +121,7 @@ go_library(
         "podstatus.go",
         "podtemplate.go",
         "podtemplatespec.go",
+        "portstatus.go",
         "portworxvolumesource.go",
         "preferredschedulingterm.go",
         "probe.go",

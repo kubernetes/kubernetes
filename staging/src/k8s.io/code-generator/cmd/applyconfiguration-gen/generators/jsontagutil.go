@@ -26,14 +26,15 @@ import (
 // TODO: This implements the same functionality as https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apimachinery/pkg/runtime/converter.go#L236
 // but is based on the highly efficient approach from https://golang.org/src/encoding/json/encode.go
 
-type jsonTags struct {
+// JSONTags represents a go json field tag.
+type JSONTags struct {
 	name      string
 	omit      bool
 	inline    bool
 	omitempty bool
 }
 
-func (t jsonTags) String() string {
+func (t JSONTags) String() string {
 	var tag string
 	if !t.inline {
 		tag += t.name
@@ -47,16 +48,16 @@ func (t jsonTags) String() string {
 	return tag
 }
 
-func lookupJsonTags(m types.Member) (jsonTags, bool) {
+func lookupJSONTags(m types.Member) (JSONTags, bool) {
 	tag := reflect.StructTag(m.Tags).Get("json")
 	if tag == "" || tag == "-" {
-		return jsonTags{}, false
+		return JSONTags{}, false
 	}
 	name, opts := parseTag(tag)
 	if name == "" {
 		name = m.Name
 	}
-	return jsonTags{
+	return JSONTags{
 		name:      name,
 		omit:      false,
 		inline:    opts.Contains("inline"),

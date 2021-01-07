@@ -25,23 +25,24 @@ import (
 // ServiceSpecApplyConfiguration represents an declarative configuration of the ServiceSpec type for use
 // with apply.
 type ServiceSpecApplyConfiguration struct {
-	Ports                    *ServicePortList                         `json:"ports,omitempty"`
-	Selector                 *map[string]string                       `json:"selector,omitempty"`
-	ClusterIP                *string                                  `json:"clusterIP,omitempty"`
-	ClusterIPs               *[]string                                `json:"clusterIPs,omitempty"`
-	Type                     *corev1.ServiceType                      `json:"type,omitempty"`
-	ExternalIPs              *[]string                                `json:"externalIPs,omitempty"`
-	SessionAffinity          *corev1.ServiceAffinity                  `json:"sessionAffinity,omitempty"`
-	LoadBalancerIP           *string                                  `json:"loadBalancerIP,omitempty"`
-	LoadBalancerSourceRanges *[]string                                `json:"loadBalancerSourceRanges,omitempty"`
-	ExternalName             *string                                  `json:"externalName,omitempty"`
-	ExternalTrafficPolicy    *corev1.ServiceExternalTrafficPolicyType `json:"externalTrafficPolicy,omitempty"`
-	HealthCheckNodePort      *int32                                   `json:"healthCheckNodePort,omitempty"`
-	PublishNotReadyAddresses *bool                                    `json:"publishNotReadyAddresses,omitempty"`
-	SessionAffinityConfig    *SessionAffinityConfigApplyConfiguration `json:"sessionAffinityConfig,omitempty"`
-	IPFamilies               *[]corev1.IPFamily                       `json:"ipFamilies,omitempty"`
-	TopologyKeys             *[]string                                `json:"topologyKeys,omitempty"`
-	IPFamilyPolicy           *corev1.IPFamilyPolicyType               `json:"ipFamilyPolicy,omitempty"`
+	Ports                         *ServicePortList                         `json:"ports,omitempty"`
+	Selector                      *map[string]string                       `json:"selector,omitempty"`
+	ClusterIP                     *string                                  `json:"clusterIP,omitempty"`
+	ClusterIPs                    *[]string                                `json:"clusterIPs,omitempty"`
+	Type                          *corev1.ServiceType                      `json:"type,omitempty"`
+	ExternalIPs                   *[]string                                `json:"externalIPs,omitempty"`
+	SessionAffinity               *corev1.ServiceAffinity                  `json:"sessionAffinity,omitempty"`
+	LoadBalancerIP                *string                                  `json:"loadBalancerIP,omitempty"`
+	LoadBalancerSourceRanges      *[]string                                `json:"loadBalancerSourceRanges,omitempty"`
+	ExternalName                  *string                                  `json:"externalName,omitempty"`
+	ExternalTrafficPolicy         *corev1.ServiceExternalTrafficPolicyType `json:"externalTrafficPolicy,omitempty"`
+	HealthCheckNodePort           *int32                                   `json:"healthCheckNodePort,omitempty"`
+	PublishNotReadyAddresses      *bool                                    `json:"publishNotReadyAddresses,omitempty"`
+	SessionAffinityConfig         *SessionAffinityConfigApplyConfiguration `json:"sessionAffinityConfig,omitempty"`
+	TopologyKeys                  *[]string                                `json:"topologyKeys,omitempty"`
+	IPFamilies                    *[]corev1.IPFamily                       `json:"ipFamilies,omitempty"`
+	IPFamilyPolicy                *corev1.IPFamilyPolicyType               `json:"ipFamilyPolicy,omitempty"`
+	AllocateLoadBalancerNodePorts *bool                                    `json:"allocateLoadBalancerNodePorts,omitempty"`
 }
 
 // ServiceSpecApplyConfiguration constructs an declarative configuration of the ServiceSpec type for use with
@@ -327,26 +328,6 @@ func (b *ServiceSpecApplyConfiguration) GetSessionAffinityConfig() (value *Sessi
 	return b.SessionAffinityConfig, b.SessionAffinityConfig != nil
 }
 
-// SetIPFamilies sets the IPFamilies field in the declarative configuration to the given value.
-func (b *ServiceSpecApplyConfiguration) SetIPFamilies(value []corev1.IPFamily) *ServiceSpecApplyConfiguration {
-	b.IPFamilies = &value
-	return b
-}
-
-// RemoveIPFamilies removes the IPFamilies field from the declarative configuration.
-func (b *ServiceSpecApplyConfiguration) RemoveIPFamilies() *ServiceSpecApplyConfiguration {
-	b.IPFamilies = nil
-	return b
-}
-
-// GetIPFamilies gets the IPFamilies field from the declarative configuration.
-func (b *ServiceSpecApplyConfiguration) GetIPFamilies() (value []corev1.IPFamily, ok bool) {
-	if v := b.IPFamilies; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // SetTopologyKeys sets the TopologyKeys field in the declarative configuration to the given value.
 func (b *ServiceSpecApplyConfiguration) SetTopologyKeys(value []string) *ServiceSpecApplyConfiguration {
 	b.TopologyKeys = &value
@@ -367,6 +348,26 @@ func (b *ServiceSpecApplyConfiguration) GetTopologyKeys() (value []string, ok bo
 	return value, false
 }
 
+// SetIPFamilies sets the IPFamilies field in the declarative configuration to the given value.
+func (b *ServiceSpecApplyConfiguration) SetIPFamilies(value []corev1.IPFamily) *ServiceSpecApplyConfiguration {
+	b.IPFamilies = &value
+	return b
+}
+
+// RemoveIPFamilies removes the IPFamilies field from the declarative configuration.
+func (b *ServiceSpecApplyConfiguration) RemoveIPFamilies() *ServiceSpecApplyConfiguration {
+	b.IPFamilies = nil
+	return b
+}
+
+// GetIPFamilies gets the IPFamilies field from the declarative configuration.
+func (b *ServiceSpecApplyConfiguration) GetIPFamilies() (value []corev1.IPFamily, ok bool) {
+	if v := b.IPFamilies; v != nil {
+		return *v, true
+	}
+	return value, false
+}
+
 // SetIPFamilyPolicy sets the IPFamilyPolicy field in the declarative configuration to the given value.
 func (b *ServiceSpecApplyConfiguration) SetIPFamilyPolicy(value corev1.IPFamilyPolicyType) *ServiceSpecApplyConfiguration {
 	b.IPFamilyPolicy = &value
@@ -382,6 +383,26 @@ func (b *ServiceSpecApplyConfiguration) RemoveIPFamilyPolicy() *ServiceSpecApply
 // GetIPFamilyPolicy gets the IPFamilyPolicy field from the declarative configuration.
 func (b *ServiceSpecApplyConfiguration) GetIPFamilyPolicy() (value corev1.IPFamilyPolicyType, ok bool) {
 	if v := b.IPFamilyPolicy; v != nil {
+		return *v, true
+	}
+	return value, false
+}
+
+// SetAllocateLoadBalancerNodePorts sets the AllocateLoadBalancerNodePorts field in the declarative configuration to the given value.
+func (b *ServiceSpecApplyConfiguration) SetAllocateLoadBalancerNodePorts(value bool) *ServiceSpecApplyConfiguration {
+	b.AllocateLoadBalancerNodePorts = &value
+	return b
+}
+
+// RemoveAllocateLoadBalancerNodePorts removes the AllocateLoadBalancerNodePorts field from the declarative configuration.
+func (b *ServiceSpecApplyConfiguration) RemoveAllocateLoadBalancerNodePorts() *ServiceSpecApplyConfiguration {
+	b.AllocateLoadBalancerNodePorts = nil
+	return b
+}
+
+// GetAllocateLoadBalancerNodePorts gets the AllocateLoadBalancerNodePorts field from the declarative configuration.
+func (b *ServiceSpecApplyConfiguration) GetAllocateLoadBalancerNodePorts() (value bool, ok bool) {
+	if v := b.AllocateLoadBalancerNodePorts; v != nil {
 		return *v, true
 	}
 	return value, false

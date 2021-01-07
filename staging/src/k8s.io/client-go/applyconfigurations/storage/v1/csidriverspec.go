@@ -30,6 +30,8 @@ type CSIDriverSpecApplyConfiguration struct {
 	VolumeLifecycleModes *[]v1.VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty"`
 	StorageCapacity      *bool                     `json:"storageCapacity,omitempty"`
 	FSGroupPolicy        *v1.FSGroupPolicy         `json:"fsGroupPolicy,omitempty"`
+	TokenRequests        *TokenRequestList         `json:"tokenRequests,omitempty"`
+	RequiresRepublish    *bool                     `json:"requiresRepublish,omitempty"`
 }
 
 // CSIDriverSpecApplyConfiguration constructs an declarative configuration of the CSIDriverSpec type for use with
@@ -133,6 +135,46 @@ func (b *CSIDriverSpecApplyConfiguration) RemoveFSGroupPolicy() *CSIDriverSpecAp
 // GetFSGroupPolicy gets the FSGroupPolicy field from the declarative configuration.
 func (b *CSIDriverSpecApplyConfiguration) GetFSGroupPolicy() (value v1.FSGroupPolicy, ok bool) {
 	if v := b.FSGroupPolicy; v != nil {
+		return *v, true
+	}
+	return value, false
+}
+
+// SetTokenRequests sets the TokenRequests field in the declarative configuration to the given value.
+func (b *CSIDriverSpecApplyConfiguration) SetTokenRequests(value TokenRequestList) *CSIDriverSpecApplyConfiguration {
+	b.TokenRequests = &value
+	return b
+}
+
+// RemoveTokenRequests removes the TokenRequests field from the declarative configuration.
+func (b *CSIDriverSpecApplyConfiguration) RemoveTokenRequests() *CSIDriverSpecApplyConfiguration {
+	b.TokenRequests = nil
+	return b
+}
+
+// GetTokenRequests gets the TokenRequests field from the declarative configuration.
+func (b *CSIDriverSpecApplyConfiguration) GetTokenRequests() (value TokenRequestList, ok bool) {
+	if v := b.TokenRequests; v != nil {
+		return *v, true
+	}
+	return value, false
+}
+
+// SetRequiresRepublish sets the RequiresRepublish field in the declarative configuration to the given value.
+func (b *CSIDriverSpecApplyConfiguration) SetRequiresRepublish(value bool) *CSIDriverSpecApplyConfiguration {
+	b.RequiresRepublish = &value
+	return b
+}
+
+// RemoveRequiresRepublish removes the RequiresRepublish field from the declarative configuration.
+func (b *CSIDriverSpecApplyConfiguration) RemoveRequiresRepublish() *CSIDriverSpecApplyConfiguration {
+	b.RequiresRepublish = nil
+	return b
+}
+
+// GetRequiresRepublish gets the RequiresRepublish field from the declarative configuration.
+func (b *CSIDriverSpecApplyConfiguration) GetRequiresRepublish() (value bool, ok bool) {
+	if v := b.RequiresRepublish; v != nil {
 		return *v, true
 	}
 	return value, false
