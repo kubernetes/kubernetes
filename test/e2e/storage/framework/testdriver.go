@@ -124,7 +124,7 @@ type SnapshottableTestDriver interface {
 	TestDriver
 	// GetSnapshotClass returns a SnapshotClass to create snapshot.
 	// It will return nil, if the TestDriver doesn't support it.
-	GetSnapshotClass(config *PerTestConfig) *unstructured.Unstructured
+	GetSnapshotClass(config *PerTestConfig, parameters map[string]string) *unstructured.Unstructured
 }
 
 // CustomTimeoutsTestDriver represents an interface fo a TestDriver that supports custom timeouts.

@@ -1272,7 +1272,8 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By("Creating snapshot")
 				// TODO: Test VolumeSnapshots with Retain policy
-				snapshotClass, snapshot := storageframework.CreateSnapshot(sDriver, m.config, storageframework.DynamicSnapshotDelete, claim.Name, claim.Namespace, f.Timeouts)
+				parameters := map[string]string{}
+				snapshotClass, snapshot := storageframework.CreateSnapshot(sDriver, m.config, storageframework.DynamicSnapshotDelete, claim.Name, claim.Namespace, f.Timeouts, parameters)
 				framework.ExpectNoError(err, "failed to create snapshot")
 				m.vsc[snapshotClass.GetName()] = snapshotClass
 				volumeSnapshotName := snapshot.GetName()
@@ -1490,7 +1491,127 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			})
 		}
 	})
+
+	ginkgo.Context("CSI Volume Snapshots secrets [Feature:VolumeSnapshotDataSource]", func() {
+
+		var (
+			// CSISnapshotterSecretName is the name of the secret to be created
+			CSISnapshotterSecretName string = "snapshot-secret"
+
+			// CSISnapshotterSecretNameAnnotation is the annotation key for the CSI snapshotter secret name in VolumeSnapshotClass.parameters
+			CSISnapshotterSecretNameAnnotation string = "csi.storage.k8s.io/snapshotter-secret-name"
+
+			// CSISnapshotterSecretNamespaceAnnotation is the annotation key for the CSI snapshotter secret namespace in VolumeSnapshotClass.parameters
+			CSISnapshotterSecretNamespaceAnnotation string = "csi.storage.k8s.io/snapshotter-secret-namespace"
+
+			// anotations holds the annotations object
+			annotations interface{}
+		)
+
+		// Global variable in all scripts (called before each test)
+		globalScript := `counter=0; console.log("globals loaded", OK, DEADLINEEXCEEDED)`
+		tests := []struct {
+			name                 string
+			createVolumeScript   string
+			createSnapshotScript string
+		}{
+			{
+				// volume snapshot should be created using secrets successfully even if there is a failure in the first few attempts,
+				name:               "volume snapshot create/delete with secrets",
+				createVolumeScript: `OK`,
+				// Fail the first 8 calls to create snapshot and succeed the  9th call.
+				createSnapshotScript: `console.log("Counter:", ++counter); if (counter < 8) { DEADLINEEXCEEDED; } else { OK; }`,
+			},
+		}
+		for _, test := range tests {
+			ginkgo.It(test.name, func() {
+				scripts := map[string]string{
+					"globals":             globalScript,
+					"createVolumeStart":   test.createVolumeScript,
+					"createSnapshotStart": test.createSnapshotScript,
+				}
+				init(testParameters{
+					disableAttach:   true,
+					registerDriver:  true,
+					enableSnapshot:  true,
+					javascriptHooks: scripts,
+				})
+
+				sDriver, ok := m.driver.(storageframework.SnapshottableTestDriver)
+				if !ok {
+					e2eskipper.Skipf("mock driver does not support snapshots -- skipping")
+				}
+				defer cleanup()
+
+				var sc *storagev1.StorageClass
+				if dDriver, ok := m.driver.(storageframework.DynamicPVTestDriver); ok {
+					sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
+				}
+				ginkgo.By("Creating storage class")
+				class, err := m.cs.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
+				framework.ExpectNoError(err, "Failed to create storage class: %v", err)
+				m.sc[class.Name] = class
+				pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+					Name:             "snapshot-test-pvc",
+					StorageClassName: &(class.Name),
+				}, f.Namespace.Name)
+
+				ginkgo.By(fmt.Sprintf("Creating PVC %s/%s", pvc.Namespace, pvc.Name))
+				pvc, err = m.cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
+				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+
+				ginkgo.By("Wait for PVC to be Bound")
+				_, err = e2epv.WaitForPVClaimBoundPhase(m.cs, []*v1.PersistentVolumeClaim{pvc}, 1*time.Minute)
+				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+
+				ginkgo.By("Creating Secret")
+				secret := &v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: f.Namespace.Name,
+						Name:      CSISnapshotterSecretName,
+					},
+					Data: map[string][]byte{
+						"secret-data": []byte("secret-value-1"),
+					},
+				}
+
+				if secret, err := m.cs.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
+					framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+				}
+
+				ginkgo.By("Creating snapshot with secrets")
+				parameters := map[string]string{
+					CSISnapshotterSecretNameAnnotation:      CSISnapshotterSecretName,
+					CSISnapshotterSecretNamespaceAnnotation: f.Namespace.Name,
+				}
+
+				_, snapshot := storageframework.CreateSnapshot(sDriver, m.config, storageframework.DynamicSnapshotDelete, pvc.Name, pvc.Namespace, f.Timeouts, parameters)
+				framework.ExpectNoError(err, "failed to create snapshot")
+				snapshotcontent := utils.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot)
+				if annotations, ok = snapshotcontent.Object["metadata"].(map[string]interface{})["annotations"]; !ok {
+					framework.Failf("Unable to get volume snapshot content annotations")
+				}
+
+				// checks if delete snapshot secrets annotation is applied to the VolumeSnapshotContent.
+				checkDeleteSnapshotSecrets(m.cs, annotations)
+
+				// delete the snapshot and check if the snapshot is deleted.
+				deleteSnapshot(m.cs, m.config, snapshot)
+			})
+		}
+	})
 })
+
+func deleteSnapshot(cs clientset.Interface, config *storageframework.PerTestConfig, snapshot *unstructured.Unstructured) {
+	// delete the given snapshot
+	dc := config.Framework.DynamicClient
+	err := dc.Resource(utils.SnapshotGVR).Namespace(snapshot.GetNamespace()).Delete(context.TODO(), snapshot.GetName(), metav1.DeleteOptions{})
+	framework.ExpectNoError(err)
+
+	// check if the snapshot is deleted
+	_, err = dc.Resource(utils.SnapshotGVR).Get(context.TODO(), snapshot.GetName(), metav1.GetOptions{})
+	framework.ExpectError(err)
+}
 
 // A lot of this code was copied from e2e/framework. It would be nicer
 // if it could be reused - see https://github.com/kubernetes/kubernetes/issues/92754
@@ -1987,4 +2108,41 @@ func getVolumeLimitFromCSINode(csiNode *storagev1.CSINode, driverName string) in
 		}
 	}
 	return 0
+}
+
+// checkDeleteSnapshotSecrets checks if delete snapshot secrets annotation is applied to the VolumeSnapshotContent.
+func checkDeleteSnapshotSecrets(cs clientset.Interface, annotations interface{}) error {
+	ginkgo.By("checking if delete snapshot secrets annotation is applied to the VolumeSnapshotContent")
+
+	var (
+		annDeletionSecretName      string
+		annDeletionSecretNamespace string
+		ok                         bool
+		err                        error
+
+		// CSISnapshotterDeleteSecretNameAnnotation is the annotation key for the CSI snapshotter delete secret name in VolumeSnapshotClass.parameters
+		CSISnapshotterDeleteSecretNameAnnotation string = "snapshot.storage.kubernetes.io/deletion-secret-name"
+
+		// CSISnapshotterDeleteSecretNamespaceAnnotation is the annotation key for the CSI snapshotter delete secret namespace in VolumeSnapshotClass.parameters
+		CSISnapshotterDeleteSecretNamespaceAnnotation string = "snapshot.storage.kubernetes.io/deletion-secret-namespace"
+	)
+
+	annotationsObj, ok := annotations.(map[string]interface{})
+	if !ok {
+		framework.Failf("failed to get annotations from annotations object")
+	}
+
+	if annDeletionSecretName, ok = annotationsObj[CSISnapshotterDeleteSecretNameAnnotation].(string); !ok {
+		framework.Failf("unable to get secret annotation name")
+	}
+	if annDeletionSecretNamespace, ok = annotationsObj[CSISnapshotterDeleteSecretNamespaceAnnotation].(string); !ok {
+		framework.Failf("unable to get secret annotation namespace")
+	}
+
+	// verify if secrets exists
+	if _, err = cs.CoreV1().Secrets(annDeletionSecretNamespace).Get(context.TODO(), annDeletionSecretName, metav1.GetOptions{}); err != nil {
+		framework.Failf("unable to get test secret %s: %v", annDeletionSecretName, err)
+	}
+
+	return err
 }
