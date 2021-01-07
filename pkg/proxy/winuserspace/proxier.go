@@ -52,7 +52,6 @@ type serviceInfo struct {
 	socket              proxySocket
 	timeout             time.Duration
 	activeClients       *clientCache
-	dnsClients          *dnsClientCache
 	sessionAffinityType v1.ServiceAffinity
 }
 
@@ -237,7 +236,6 @@ func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPo
 		socket:              sock,
 		timeout:             timeout,
 		activeClients:       newClientCache(),
-		dnsClients:          newDNSClientCache(),
 		sessionAffinityType: v1.ServiceAffinityNone, // default
 	}
 	proxier.setServiceInfo(servicePortPortalName, si)
