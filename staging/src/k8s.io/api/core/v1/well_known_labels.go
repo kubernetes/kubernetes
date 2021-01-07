@@ -65,5 +65,4 @@ const (
 	// any backends on excluded nodes are not reachable by those external load-balancers.
 	// Implementations of this exclusion may vary based on provider.
 	LabelNodeExcludeBalancers = "node.kubernetes.io/exclude-from-external-load-balancers"
-
 )
