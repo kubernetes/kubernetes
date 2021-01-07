@@ -44,7 +44,7 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/klog/v2"
-	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
+	nodeipamconfig "k8s.io/legacy-cloud-providers/gce/nodeipam/config"
 	// For existing cloud providers, the option to import legacy providers is still available.
 	// e.g. _"k8s.io/legacy-cloud-providers/<provider>"
 )

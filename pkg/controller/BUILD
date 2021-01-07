@@ -110,7 +110,6 @@ filegroup(
         "//pkg/controller/history:all-srcs",
         "//pkg/controller/job:all-srcs",
         "//pkg/controller/namespace:all-srcs",
-        "//pkg/controller/nodeipam:all-srcs",
         "//pkg/controller/nodelifecycle:all-srcs",
         "//pkg/controller/podautoscaler:all-srcs",
         "//pkg/controller/podgc:all-srcs",

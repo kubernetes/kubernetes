@@ -2494,6 +2494,15 @@ k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient/mockvmssvmclient
 k8s.io/legacy-cloud-providers/azure/metrics
 k8s.io/legacy-cloud-providers/azure/retry
 k8s.io/legacy-cloud-providers/gce
+k8s.io/legacy-cloud-providers/gce/nodeipam
+k8s.io/legacy-cloud-providers/gce/nodeipam/config
+k8s.io/legacy-cloud-providers/gce/nodeipam/config/v1alpha1
+k8s.io/legacy-cloud-providers/gce/nodeipam/ipam
+k8s.io/legacy-cloud-providers/gce/nodeipam/ipam/cidrset
+k8s.io/legacy-cloud-providers/gce/nodeipam/ipam/sync
+k8s.io/legacy-cloud-providers/gce/nodeipam/util
+k8s.io/legacy-cloud-providers/gce/nodeipam/util/node
+k8s.io/legacy-cloud-providers/gce/nodeipam/util/taints
 k8s.io/legacy-cloud-providers/openstack
 k8s.io/legacy-cloud-providers/vsphere
 k8s.io/legacy-cloud-providers/vsphere/testing

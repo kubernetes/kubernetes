@@ -32,9 +32,9 @@ import (
 	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
-	nodeipamcontroller "k8s.io/kubernetes/pkg/controller/nodeipam"
-	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
-	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
+	nodeipamcontroller "k8s.io/legacy-cloud-providers/gce/nodeipam"
+	nodeipamconfig "k8s.io/legacy-cloud-providers/gce/nodeipam/config"
+	"k8s.io/legacy-cloud-providers/gce/nodeipam/ipam"
 	netutils "k8s.io/utils/net"
 )
 

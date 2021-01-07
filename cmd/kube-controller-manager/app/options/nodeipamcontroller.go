@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
+	nodeipamconfig "k8s.io/legacy-cloud-providers/gce/nodeipam/config"
 )
 
 // NodeIPAMControllerOptions holds the NodeIpamController options.

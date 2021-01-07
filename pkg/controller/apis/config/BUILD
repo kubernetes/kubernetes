@@ -21,7 +21,6 @@ go_library(
         "//pkg/controller/garbagecollector/config:go_default_library",
         "//pkg/controller/job/config:go_default_library",
         "//pkg/controller/namespace/config:go_default_library",
-        "//pkg/controller/nodeipam/config:go_default_library",
         "//pkg/controller/nodelifecycle/config:go_default_library",
         "//pkg/controller/podautoscaler/config:go_default_library",
         "//pkg/controller/podgc/config:go_default_library",
@@ -39,6 +38,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/config:go_default_library",
         "//staging/src/k8s.io/cloud-provider/controllers/service/config:go_default_library",
         "//staging/src/k8s.io/controller-manager/config:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/gce/nodeipam/config:go_default_library",
     ],
 )
 

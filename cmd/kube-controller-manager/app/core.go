@@ -47,9 +47,6 @@ import (
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
-	nodeipamcontroller "k8s.io/kubernetes/pkg/controller/nodeipam"
-	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
-	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	lifecyclecontroller "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
@@ -67,6 +64,9 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
+	nodeipamcontroller "k8s.io/legacy-cloud-providers/gce/nodeipam"
+	nodeipamconfig "k8s.io/legacy-cloud-providers/gce/nodeipam/config"
+	"k8s.io/legacy-cloud-providers/gce/nodeipam/ipam"
 	netutils "k8s.io/utils/net"
 )
 

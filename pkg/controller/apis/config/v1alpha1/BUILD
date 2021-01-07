@@ -24,7 +24,6 @@ go_library(
         "//pkg/controller/garbagecollector/config/v1alpha1:go_default_library",
         "//pkg/controller/job/config/v1alpha1:go_default_library",
         "//pkg/controller/namespace/config/v1alpha1:go_default_library",
-        "//pkg/controller/nodeipam/config/v1alpha1:go_default_library",
         "//pkg/controller/nodelifecycle/config/v1alpha1:go_default_library",
         "//pkg/controller/podautoscaler/config/v1alpha1:go_default_library",
         "//pkg/controller/podgc/config/v1alpha1:go_default_library",
@@ -44,6 +43,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/controllers/service/config/v1alpha1:go_default_library",
         "//staging/src/k8s.io/controller-manager/config/v1alpha1:go_default_library",
         "//staging/src/k8s.io/kube-controller-manager/config/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/gce/nodeipam/config/v1alpha1:go_default_library",
     ],
 )
 

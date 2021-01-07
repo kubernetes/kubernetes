@@ -31,7 +31,6 @@ import (
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
-	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
 	poautosclerconfig "k8s.io/kubernetes/pkg/controller/podautoscaler/config"
 	podgcconfig "k8s.io/kubernetes/pkg/controller/podgc/config"
@@ -43,6 +42,7 @@ import (
 	ttlafterfinishedconfig "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config"
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
+	nodeipamconfig "k8s.io/legacy-cloud-providers/gce/nodeipam/config"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

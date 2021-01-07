@@ -30,7 +30,7 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/job/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/namespace/config/v1alpha1
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/nodeipam/config/v1alpha1
+// +k8s:conversion-gen=k8s.io/legacy-cloud-providers/gce/nodeipam/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/nodelifecycle/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/podautoscaler/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/podgc/config/v1alpha1
