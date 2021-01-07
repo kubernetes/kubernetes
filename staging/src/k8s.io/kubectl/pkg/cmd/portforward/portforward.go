@@ -56,6 +56,7 @@ type PortForwardOptions struct {
 	PodClient     corev1client.PodsGetter
 	Address       []string
 	Ports         []string
+	Quiet         bool
 	PortForwarder portForwarder
 	StopChannel   chan struct{}
 	ReadyChannel  chan struct{}
@@ -107,9 +108,6 @@ const (
 func NewCmdPortForward(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	opts := &PortForwardOptions{
 		IOStreams: streams,
-		PortForwarder: &defaultPortForwarder{
-			IOStreams: streams,
-		},
 	}
 	cmd := &cobra.Command{
 		Use:                   "port-forward TYPE/NAME [options] [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N] [-- COMMAND [args...]]",
@@ -126,6 +124,7 @@ func NewCmdPortForward(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	}
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodPortForwardWaitTimeout)
 	cmd.Flags().StringSliceVar(&opts.Address, "address", []string{"localhost"}, "Addresses to listen on (comma separated). Only accepts IP addresses or localhost as a value. When localhost is supplied, kubectl will try to bind on both 127.0.0.1 and ::1 and will fail if neither of these addresses are available to bind.")
+	cmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", opts.Quiet, "If true, it will silence the port-forwarder, allowing users to capture the undisturbed stdout and stderr from the provided command")
 	// TODO support UID
 	return cmd
 }
@@ -301,6 +300,12 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	var err error
 	if len(args) < 2 {
 		return cmdutil.UsageErrorf(cmd, "TYPE/NAME and list of ports are required for port-forward")
+	}
+
+	if o.Quiet {
+		o.PortForwarder = &defaultPortForwarder{}
+	} else {
+		o.PortForwarder = &defaultPortForwarder{IOStreams: o.IOStreams}
 	}
 
 	var ports []string
