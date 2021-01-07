@@ -56,6 +56,7 @@ func (g *genClientset) Filter(c *generator.Context, t *types.Type) bool {
 
 func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
+	imports = append(imports, filepath.Join(g.clientsetPackage, "scheme"))
 	for _, group := range g.groups {
 		for _, version := range group.Versions {
 			typedClientPath := filepath.Join(g.clientsetPackage, "typed", strings.ToLower(group.PackageName), strings.ToLower(version.NonEmpty()))
@@ -75,6 +76,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	m := map[string]interface{}{
 		"allGroups":                            allGroups,
 		"Config":                               c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Config"}),
+		"restConfig":                           c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Config"}),
 		"DefaultKubernetesUserAgent":           c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "DefaultKubernetesUserAgent"}),
 		"RESTClientInterface":                  c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"DiscoveryInterface":                   c.Universe.Type(types.Name{Package: "k8s.io/client-go/discovery", Name: "DiscoveryInterface"}),
@@ -83,6 +85,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 		"NewDiscoveryClientForConfigOrDie":     c.Universe.Function(types.Name{Package: "k8s.io/client-go/discovery", Name: "NewDiscoveryClientForConfigOrDie"}),
 		"NewDiscoveryClient":                   c.Universe.Function(types.Name{Package: "k8s.io/client-go/discovery", Name: "NewDiscoveryClient"}),
 		"flowcontrolNewTokenBucketRateLimiter": c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/flowcontrol", Name: "NewTokenBucketRateLimiter"}),
+		"restRESTClientFor":                    c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientFor"}),
 	}
 	sw.Do(clientsetInterface, m)
 	sw.Do(clientsetTemplate, m)
@@ -93,6 +96,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	sw.Do(newClientsetForConfigTemplate, m)
 	sw.Do(newClientsetForConfigOrDieTemplate, m)
 	sw.Do(newClientsetForRESTClientTemplate, m)
+	sw.Do(setClientsetClientDefaultsTemplate, m)
 
 	return sw.Error()
 }
@@ -144,17 +148,18 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 		}
 		configShallowCopy.RateLimiter = $.flowcontrolNewTokenBucketRateLimiter|raw$(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
+	if err := setConfigDefaults(&configShallowCopy); err != nil {
+		return nil, err
+	}
+	client, err := $.restRESTClientFor|raw$(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+
 	var cs Clientset
-	var err error
-$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$, err =$.PackageAlias$.NewForConfig(&configShallowCopy)
-	if err!=nil {
-		return nil, err
-	}
+$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$ =$.PackageAlias$.New(client)
 $end$
-	cs.DiscoveryClient, err = $.NewDiscoveryClientForConfig|raw$(&configShallowCopy)
-	if err!=nil {
-		return nil, err
-	}
+	cs.DiscoveryClient = $.NewDiscoveryClient|raw$(client)
 	return &cs, nil
 }
 `
@@ -179,5 +184,18 @@ $range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$ =$.PackageAlias$.New(
 $end$
 	cs.DiscoveryClient = $.NewDiscoveryClient|raw$(c)
 	return &cs
+}
+`
+
+var setClientsetClientDefaultsTemplate = `
+func setConfigDefaults(config *$.restConfig|raw$) error {
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	}
+	if config.UserAgent == "" {
+		config.UserAgent = $.DefaultKubernetesUserAgent|raw$()
+	}
+
+	return nil
 }
 `

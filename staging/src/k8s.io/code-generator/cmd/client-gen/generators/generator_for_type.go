@@ -26,12 +26,14 @@ import (
 	"k8s.io/gengo/types"
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
+	"k8s.io/code-generator/cmd/client-gen/path"
 )
 
 // genClientForType produces a file for each top-level type.
 type genClientForType struct {
 	generator.DefaultGen
 	outputPackage    string
+	inputPackage     string
 	clientsetPackage string
 	group            string
 	version          string
@@ -126,6 +128,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 			},
 		})
 	}
+
 	m := map[string]interface{}{
 		"type":                 t,
 		"inputType":            t,
@@ -133,11 +136,14 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"package":              pkg,
 		"Package":              namer.IC(pkg),
 		"namespaced":           !tags.NonNamespaced,
+		"group":                g.group,
 		"Group":                namer.IC(g.group),
 		"subresource":          false,
 		"subresourcePath":      "",
 		"GroupGoName":          g.groupGoName,
+		"version":              g.version,
 		"Version":              namer.IC(g.version),
+		"prefix":               prefix,
 		"CreateOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "CreateOptions"}),
 		"DeleteOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}),
 		"GetOptions":           c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
@@ -148,6 +154,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
 		"RESTClientInterface":  c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"schemeParameterCodec": c.Universe.Variable(types.Name{Package: filepath.Join(g.clientsetPackage, "scheme"), Name: "ParameterCodec"}),
+		"SchemeGroupVersion":   c.Universe.Variable(types.Name{Package: path.Vendorless(g.inputPackage), Name: "SchemeGroupVersion"}),
 	}
 
 	sw.Do(getterComment, m)
@@ -400,6 +407,7 @@ func (c *$.type|privatePlural$) List(ctx context.Context, opts $.ListOptions|raw
 	result = &$.resultType|raw$List{}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Timeout(timeout).
@@ -419,6 +427,7 @@ func (c *$.type|privatePlural$) List(ctx context.Context, $.type|private$Name st
 	result = &$.resultType|raw$List{}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").

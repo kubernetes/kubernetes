@@ -209,16 +209,12 @@ func New(c $.restRESTClientInterface|raw$) *$.GroupGoName$$.Version$Client {
 
 var setInternalVersionClientDefaultsTemplate = `
 func setConfigDefaults(config *$.restConfig|raw$) error {
-	config.APIPath = $.apiPath$
 	if config.UserAgent == "" {
 		config.UserAgent = $.restDefaultKubernetesUserAgent|raw$()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != scheme.Scheme.PrioritizedVersionsForGroup("$.groupName$")[0].Group {
-		gv := scheme.Scheme.PrioritizedVersionsForGroup("$.groupName$")[0]
-		config.GroupVersion = &gv
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs
 	}
-	config.NegotiatedSerializer = scheme.Codecs
-
 	if config.QPS == 0 {
 		config.QPS = 5
 	}
@@ -232,11 +228,9 @@ func setConfigDefaults(config *$.restConfig|raw$) error {
 
 var setClientDefaultsTemplate = `
 func setConfigDefaults(config *$.restConfig|raw$) error {
-	gv := $.SchemeGroupVersion|raw$
-	config.GroupVersion =  &gv
-	config.APIPath = $.apiPath$
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
-
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	}
 	if config.UserAgent == "" {
 		config.UserAgent = $.restDefaultKubernetesUserAgent|raw$()
 	}

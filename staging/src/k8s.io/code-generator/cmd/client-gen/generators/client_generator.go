@@ -152,6 +152,7 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 						OptionalName: strings.ToLower(c.Namers["private"].Name(t)),
 					},
 					outputPackage:    groupVersionClientPackage,
+					inputPackage:     inputPackage,
 					clientsetPackage: clientsetPackage,
 					group:            gv.Group.NonEmpty(),
 					version:          gv.Version.String(),
