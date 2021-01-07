@@ -377,6 +377,128 @@ func TestLog(t *testing.T) {
 			},
 			expectedErr: "Error from the ConsumeRequestFn",
 		},
+		{
+			name: "get logs from multiple requests and ignores the error if the container fails",
+			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+				mock := &logTestMock{
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "some-pod-error-container",
+							FieldPath: "spec.containers{some-container}",
+						}: &responseWrapperMock{err: errors.New("error-container")},
+						{
+							Kind:      "Pod",
+							Name:      "some-pod-1",
+							FieldPath: "spec.containers{some-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source 1\n")},
+						{
+							Kind:      "Pod",
+							Name:      "some-pod-2",
+							FieldPath: "spec.containers{some-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source 2\n")},
+					},
+				}
+
+				o := NewLogsOptions(streams, false)
+				o.LogsForObject = mock.mockLogsForObject
+				o.ConsumeRequestFn = mock.mockConsumeRequest
+				o.IgnoreLogErrors = true
+				return o
+			},
+			expectedOutSubstrings: []string{
+				"error-container\n",
+				"test log content from source 1\n",
+				"test log content from source 2\n",
+			},
+		},
+		{
+			name: "get logs from multiple requests and an container fails",
+			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+				mock := &logTestMock{
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "some-pod-error-container",
+							FieldPath: "spec.containers{some-container}",
+						}: &responseWrapperMock{err: errors.New("error-container")},
+						{
+							Kind:      "Pod",
+							Name:      "some-pod",
+							FieldPath: "spec.containers{some-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source\n")},
+					},
+				}
+
+				o := NewLogsOptions(streams, false)
+				o.LogsForObject = mock.mockLogsForObject
+				o.ConsumeRequestFn = mock.mockConsumeRequest
+				return o
+			},
+			expectedErr: "error-container",
+		},
+		{
+			name: "follow logs from multiple requests and ignores the error if the container fails",
+			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+				mock := &logTestMock{
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "some-pod-error-container",
+							FieldPath: "spec.containers{some-container}",
+						}: &responseWrapperMock{err: errors.New("error-container")},
+						{
+							Kind:      "Pod",
+							Name:      "some-pod-1",
+							FieldPath: "spec.containers{some-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source 1\n")},
+						{
+							Kind:      "Pod",
+							Name:      "some-pod-2",
+							FieldPath: "spec.containers{some-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source 2\n")},
+					},
+				}
+
+				o := NewLogsOptions(streams, false)
+				o.LogsForObject = mock.mockLogsForObject
+				o.ConsumeRequestFn = mock.mockConsumeRequest
+				o.IgnoreLogErrors = true
+				o.Follow = true
+				return o
+			},
+			expectedOutSubstrings: []string{
+				"error-container\n",
+				"test log content from source 1\n",
+				"test log content from source 2\n",
+			},
+		},
+		{
+			name: "follow logs from multiple requests and an container fails",
+			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+				mock := &logTestMock{
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "some-pod-error-container",
+							FieldPath: "spec.containers{some-container}",
+						}: &responseWrapperMock{err: errors.New("error-container")},
+						{
+							Kind:      "Pod",
+							Name:      "some-pod",
+							FieldPath: "spec.containers{some-container}",
+						}: &responseWrapperMock{data: strings.NewReader("test log content from source\n")},
+					},
+				}
+
+				o := NewLogsOptions(streams, false)
+				o.LogsForObject = mock.mockLogsForObject
+				o.ConsumeRequestFn = mock.mockConsumeRequest
+				o.Follow = true
+				return o
+			},
+			expectedErr: "error-container",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
