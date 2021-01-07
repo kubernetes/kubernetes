@@ -120,7 +120,10 @@ func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zone
 		var ok bool
 		zoneFromNode, ok = node.ObjectMeta.Labels[v1.LabelTopologyZone]
 		if !ok {
-			return nil, fmt.Errorf("%s Label for node missing", v1.LabelTopologyZone)
+			zoneFromNode, ok = node.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
+			if !ok {
+				return nil, fmt.Errorf("Either %s or %s Label for node missing", v1.LabelTopologyZone, v1.LabelFailureDomainBetaZone)
+			}
 		}
 		// if single replica volume and node with zone found, return immediately
 		if numReplicas == 1 {
@@ -185,7 +188,7 @@ func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (se
 	zones := make(sets.String)
 	for _, term := range allowedTopologies {
 		for _, exp := range term.MatchLabelExpressions {
-			if exp.Key == v1.LabelTopologyZone {
+			if exp.Key == v1.LabelTopologyZone || exp.Key == v1.LabelFailureDomainBetaZone {
 				for _, value := range exp.Values {
 					zones.Insert(value)
 				}
