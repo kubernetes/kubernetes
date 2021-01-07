@@ -65,12 +65,13 @@ func (spg SampleAndWaterMarkPairGenerator) metrics() Registerables {
 // populate histograms of samples and low- and high-water-marks.  The
 // generator has a samplePeriod, and the histograms get an observation
 // every samplePeriod.  The sampling windows are quantized based on
-// the monotonic rather than wall-clock times.  The `t0` field is
-// there so to provide a baseline for monotonic clock differences.
+// the monotonic rather than wall-clock times.
 type SampleAndWaterMarkObserverGenerator struct {
 	*sampleAndWaterMarkObserverGenerator
 }
 
+// The `t0` field is there so to provide a baseline for
+// monotonic clock differences.
 type sampleAndWaterMarkObserverGenerator struct {
 	clock        clock.PassiveClock
 	t0           time.Time
@@ -93,41 +94,58 @@ func NewSampleAndWaterMarkHistogramsGenerator(clock clock.PassiveClock, samplePe
 		}}
 }
 
-func (swg *sampleAndWaterMarkObserverGenerator) quantize(when time.Time) int64 {
-	return int64(when.Sub(swg.t0) / swg.samplePeriod)
+// quantize returns the number of sampling periods since t0.
+// This also checks for huge jumps in time and logs an error
+// if/when one is found.
+// Call this only with saw locked.
+func (saw *sampleAndWaterMarkHistograms) quantize(when *time.Time) int64 {
+	diff := when.Sub(saw.t0)
+	newDiff := diff - saw.roughOffset
+	if newDiff < -400*24*time.Hour || newDiff > 400*24*time.Hour {
+		klog.Errorf("quantize %p: time made big jump from t0=%s to when=%s", saw, saw.t0.Add(saw.roughOffset), *when)
+	}
+	saw.roughOffset = diff
+	return int64(diff / saw.samplePeriod)
 }
 
 // Generate makes a new TimedObserver
 func (swg *sampleAndWaterMarkObserverGenerator) Generate(x, x1 float64, labelValues []string) TimedObserver {
 	relX := x / x1
 	when := swg.clock.Now()
-	return &sampleAndWaterMarkHistograms{
+	saw := &sampleAndWaterMarkHistograms{
 		sampleAndWaterMarkObserverGenerator: swg,
 		labelValues:                         labelValues,
 		loLabelValues:                       append([]string{labelValueLo}, labelValues...),
 		hiLabelValues:                       append([]string{labelValueHi}, labelValues...),
+		roughOffset:                         when.Sub(swg.t0),
 		x1:                                  x1,
 		sampleAndWaterMarkAccumulator: sampleAndWaterMarkAccumulator{
-			lastSet:    when,
-			lastSetInt: swg.quantize(when),
-			x:          x,
-			relX:       relX,
-			loRelX:     relX,
-			hiRelX:     relX,
+			lastSet: when,
+			x:       x,
+			relX:    relX,
+			loRelX:  relX,
+			hiRelX:  relX,
 		}}
+	saw.lastSetInt = saw.quantize(&when)
+	return saw
 }
 
 func (swg *sampleAndWaterMarkObserverGenerator) metrics() Registerables {
 	return Registerables{swg.samples, swg.waterMarks}
 }
 
+// The sum t0+roughOffset is kept near the current time,
+// and a big jump is logged as an error.
+// See #97685 for an example issue reporting huge time jumps
+// due to bugs.
 type sampleAndWaterMarkHistograms struct {
 	*sampleAndWaterMarkObserverGenerator
 	labelValues                  []string
 	loLabelValues, hiLabelValues []string
 
 	sync.Mutex
-	x1 float64
+	roughOffset time.Duration
+	x1          float64
 	sampleAndWaterMarkAccumulator
 }
 
@@ -168,7 +186,7 @@ func (saw *sampleAndWaterMarkHistograms) innerSet(updateXOrX1 func()) {
 		saw.Lock()
 		defer saw.Unlock()
 		when = saw.clock.Now()
-		whenInt = saw.quantize(when)
+		whenInt = saw.quantize(&when)
 		acc = saw.sampleAndWaterMarkAccumulator
 		wellOrdered = !when.Before(acc.lastSet)
 		updateXOrX1()
