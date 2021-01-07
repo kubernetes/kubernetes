@@ -303,19 +303,40 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		// Apply 10 taints to first node
 		nodeName := nodeList.Items[0].Name
 
-		ginkgo.By("Trying to apply 10 (tolerable) taints on the first node.")
+		// First, create a set of tolerable taints (+tolerations) for the first node.
+		// Generate 10 tolerable taints for the first node (and matching tolerations)
+		tolerableTaints := make([]v1.Taint, 0)
 		var tolerations []v1.Toleration
 		for i := 0; i < 10; i++ {
-			testTaint := addRandomTaintToNode(cs, nodeName)
+			testTaint := getRandomTaint()
+			tolerableTaints = append(tolerableTaints, testTaint)
 			tolerations = append(tolerations, v1.Toleration{Key: testTaint.Key, Value: testTaint.Value, Effect: testTaint.Effect})
-			defer e2enode.RemoveTaintOffNode(cs, nodeName, *testTaint)
 		}
+		// Generate 10 intolerable taints for each of the remaining nodes
+		intolerableTaints := make(map[string][]v1.Taint)
+		for i := 1; i < len(nodeList.Items); i++ {
+			nodeTaints := make([]v1.Taint, 0)
+			for i := 0; i < 10; i++ {
+				nodeTaints = append(nodeTaints, getRandomTaint())
+			}
+			intolerableTaints[nodeList.Items[i].Name] = nodeTaints
+		}
+
+		// Apply the tolerable taints generated above to the first node
+		ginkgo.By("Trying to apply 10 (tolerable) taints on the first node.")
+		// We immediately defer the removal of these taints because addTaintToNode can
+		// panic and RemoveTaintsOffNode does not return an error if the taint does not exist.
+		defer e2enode.RemoveTaintsOffNode(cs, nodeName, tolerableTaints)
+		for _, taint := range tolerableTaints {
+			addTaintToNode(cs, nodeName, taint)
+		}
+		// Apply the intolerable taints to each of the following nodes
 		ginkgo.By("Adding 10 intolerable taints to all other nodes")
 		for i := 1; i < len(nodeList.Items); i++ {
 			node := nodeList.Items[i]
-			for i := 0; i < 10; i++ {
-				testTaint := addRandomTaintToNode(cs, node.Name)
-				defer e2enode.RemoveTaintOffNode(cs, node.Name, *testTaint)
+			defer e2enode.RemoveTaintsOffNode(cs, node.Name, intolerableTaints[node.Name])
+			for _, taint := range intolerableTaints[node.Name] {
+				addTaintToNode(cs, node.Name, taint)
 			}
 		}
 
@@ -582,13 +603,15 @@ func createRC(ns, rsName string, replicas int32, rcPodLabels map[string]string, 
 	return rc
 }
 
-func addRandomTaintToNode(cs clientset.Interface, nodeName string) *v1.Taint {
-	testTaint := v1.Taint{
-		Key:    fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(uuid.NewUUID())),
+func getRandomTaint() v1.Taint {
+	return v1.Taint{
+		Key:    fmt.Sprintf("kubernetes.io/scheduling-priorities-e2e-taint-key-%s", string(uuid.NewUUID())),
 		Value:  fmt.Sprintf("testing-taint-value-%s", string(uuid.NewUUID())),
 		Effect: v1.TaintEffectPreferNoSchedule,
 	}
+}
+
+func addTaintToNode(cs clientset.Interface, nodeName string, testTaint v1.Taint) {
 	e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 	framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-	return &testTaint
 }
