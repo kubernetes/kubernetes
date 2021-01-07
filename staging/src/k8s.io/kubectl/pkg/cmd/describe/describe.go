@@ -179,16 +179,22 @@ func (o *DescribeOptions) Run() error {
 
 	errs := sets.NewString()
 	first := true
+	describerCache := newDescriberCache()
 	for _, info := range infos {
 		mapping := info.ResourceMapping()
-		describer, err := o.Describer(mapping)
-		if err != nil {
-			if errs.Has(err.Error()) {
+		describer := describerCache.get(mapping)
+		if describer == nil {
+			var err error
+			describer, err = o.Describer(mapping)
+			if err != nil {
+				if errs.Has(err.Error()) {
+					continue
+				}
+				allErrs = append(allErrs, err)
+				errs.Insert(err.Error())
 				continue
 			}
-			allErrs = append(allErrs, err)
-			errs.Insert(err.Error())
-			continue
+			describerCache.put(mapping, describer)
 		}
 		s, err := describer.Describe(info.Namespace, info.Name, *o.DescriberSettings)
 		if err != nil {
