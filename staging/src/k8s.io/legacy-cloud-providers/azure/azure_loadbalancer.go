@@ -1129,6 +1129,10 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 						if err != nil {
 							return nil, err
 						}
+						if nodeName == "" {
+							// VM may under deletion
+							continue
+						}
 						// If a node is not supposed to be included in the LB, it
 						// would not be in the `nodes` slice. We need to check the nodes that
 						// have been added to the LB's backendpool, find the unwanted ones and
