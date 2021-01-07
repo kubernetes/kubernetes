@@ -30,7 +30,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("DNS", func() {
+var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
@@ -49,6 +49,9 @@ var _ = SIGDescribe("DNS", func() {
 		testUtilsPod.Spec.DNSConfig = &v1.PodDNSConfig{
 			Nameservers: []string{testInjectedIP},
 			Searches:    []string{testSearchPath},
+		}
+		testUtilsPod.Spec.NodeSelector = map[string]string{
+			"kubernetes.io/os": "windows",
 		}
 		testUtilsPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testUtilsPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
