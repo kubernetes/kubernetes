@@ -40,6 +40,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	ref "k8s.io/client-go/tools/reference"
+	v1apply "k8s.io/client-go/typebuilders/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -347,6 +348,24 @@ func (m *FakeNodeHandler) Patch(_ context.Context, name string, pt types.PatchTy
 	}
 
 	return &updatedNode, nil
+}
+
+// Apply applies a Node in the fake store.
+func (m *FakeNodeHandler) Apply(ctx context.Context, node v1apply.NodeBuilder, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.Node, err error) {
+	patchOpts := opts.ToPatchOptions(fieldManager)
+	data, err := node.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := node.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("node.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("node.ObjectMeta.Name must be provided to Apply")
+	}
+	return m.Patch(ctx, name, types.ApplyPatchType, data, patchOpts, subresources...)
 }
 
 // FakeRecorder is used as a fake during testing.

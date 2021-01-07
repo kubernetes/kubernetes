@@ -43,6 +43,8 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	appsav1pply "k8s.io/client-go/typebuilders/apps/v1"
+
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	appsconversion "k8s.io/kubernetes/pkg/apis/apps/v1"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -245,6 +247,11 @@ func (c conversionClient) Watch(ctx context.Context, opts metav1.ListOptions) (w
 func (c conversionClient) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *apps.ReplicaSet, err error) {
 	// This is not used by RSC.
 	return nil, errors.New("Patch() is not implemented for conversionClient")
+}
+
+func (c conversionClient) Apply(context.Context, appsav1pply.ReplicaSetBuilder, string, metav1.ApplyOptions, ...string) (result *apps.ReplicaSet, err error) {
+	// This is not used by RSC.
+	return nil, errors.New("Apply() is not implemented for conversionClient")
 }
 
 func (c conversionClient) GetScale(ctx context.Context, name string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
