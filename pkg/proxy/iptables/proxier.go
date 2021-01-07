@@ -395,6 +395,7 @@ type iptablesJumpChain struct {
 var iptablesJumpChains = []iptablesJumpChain{
 	{utiliptables.TableFilter, kubeExternalServicesChain, utiliptables.ChainInput, "kubernetes externally-visible service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeExternalServicesChain, utiliptables.ChainForward, "kubernetes externally-visible service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
+	{utiliptables.TableFilter, kubeNodePortsChain, utiliptables.ChainInput, "kubernetes health check service ports", nil},
 	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainForward, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeForwardChain, utiliptables.ChainForward, "kubernetes forwarding rules", nil},
@@ -479,7 +480,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		filterChains := bytes.NewBuffer(nil)
 		filterRules := bytes.NewBuffer(nil)
 		utilproxy.WriteLine(filterChains, "*filter")
-		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain} {
+		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain} {
 			if _, found := existingFilterChains[chain]; found {
 				chainString := string(chain)
 				utilproxy.WriteBytesLine(filterChains, existingFilterChains[chain])
@@ -933,7 +934,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Make sure we keep stats for the top-level chains, if they existed
 	// (which most should have because we created them above).
-	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain} {
+	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain} {
 		if chain, ok := existingFilterChains[chainName]; ok {
 			utilproxy.WriteBytesLine(proxier.filterChains, chain)
 		} else {
@@ -1335,6 +1336,19 @@ func (proxier *Proxier) syncProxyRules() {
 					"-j", "REJECT",
 				)
 			}
+		}
+
+		// Capture healthCheckNodePorts.
+		if svcInfo.HealthCheckNodePort() != 0 {
+			// no matter if node has local endpoints, healthCheckNodePorts
+			// need to add a rule to accept the incoming connection
+			utilproxy.WriteLine(proxier.filterRules,
+				"-A", string(kubeNodePortsChain),
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s health check node port"`, svcNameString),
+				"-m", "tcp", "-p", "tcp",
+				"--dport", strconv.Itoa(svcInfo.HealthCheckNodePort()),
+				"-j", "ACCEPT",
+			)
 		}
 
 		if !hasEndpoints {

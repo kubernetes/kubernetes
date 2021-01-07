@@ -106,6 +106,7 @@ var iptablesJumpChain = []struct {
 	{utiliptables.TableNAT, utiliptables.ChainPrerouting, kubeServicesChain, "kubernetes service portals"},
 	{utiliptables.TableNAT, utiliptables.ChainPostrouting, kubePostroutingChain, "kubernetes postrouting rules"},
 	{utiliptables.TableFilter, utiliptables.ChainForward, KubeForwardChain, "kubernetes forwarding rules"},
+	{utiliptables.TableFilter, utiliptables.ChainInput, KubeNodePortChain, "kubernetes health check rules"},
 }
 
 var iptablesChains = []struct {
@@ -119,6 +120,7 @@ var iptablesChains = []struct {
 	{utiliptables.TableNAT, KubeLoadBalancerChain},
 	{utiliptables.TableNAT, KubeMarkMasqChain},
 	{utiliptables.TableFilter, KubeForwardChain},
+	{utiliptables.TableFilter, KubeNodePortChain},
 }
 
 var iptablesEnsureChains = []struct {
@@ -161,6 +163,7 @@ var ipsetInfo = []struct {
 	{kubeNodePortLocalSetUDP, utilipset.BitmapPort, kubeNodePortLocalSetUDPComment},
 	{kubeNodePortSetSCTP, utilipset.HashIPPort, kubeNodePortSetSCTPComment},
 	{kubeNodePortLocalSetSCTP, utilipset.HashIPPort, kubeNodePortLocalSetSCTPComment},
+	{kubeHealthCheckNodePortSet, utilipset.BitmapPort, kubeHealthCheckNodePortSetComment},
 }
 
 // ipsetWithIptablesChain is the ipsets list with iptables source chain and the chain jump to
@@ -1581,6 +1584,22 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 			}
 		}
+
+		if svcInfo.HealthCheckNodePort() != 0 {
+			nodePortSet := proxier.ipsetList[kubeHealthCheckNodePortSet]
+			entry := &utilipset.Entry{
+				// No need to provide ip info
+				Port:     svcInfo.HealthCheckNodePort(),
+				Protocol: "tcp",
+				SetType:  utilipset.BitmapPort,
+			}
+
+			if valid := nodePortSet.validateEntry(entry); !valid {
+				klog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, nodePortSet.Name))
+				continue
+			}
+			nodePortSet.activeEntries.Insert(entry.String())
+		}
 	}
 
 	// sync ipset entries
@@ -1814,6 +1833,14 @@ func (proxier *Proxier) writeIptablesRules() {
 		"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod destination rule"`,
 		"-m", "conntrack",
 		"--ctstate", "RELATED,ESTABLISHED",
+		"-j", "ACCEPT",
+	)
+
+	// Add rule to accept traffic towards health check node port
+	utilproxy.WriteLine(proxier.filterRules,
+		"-A", string(KubeNodePortChain),
+		"-m", "comment", "--comment", proxier.ipsetList[kubeHealthCheckNodePortSet].getComment(),
+		"-m", "set", "--match-set", proxier.ipsetList[kubeHealthCheckNodePortSet].Name, "dst",
 		"-j", "ACCEPT",
 	)
 

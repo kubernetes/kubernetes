@@ -75,6 +75,9 @@ const (
 
 	kubeNodePortLocalSetSCTPComment = "Kubernetes nodeport SCTP port with externalTrafficPolicy=local with type 'hash ip:port'"
 	kubeNodePortLocalSetSCTP        = "KUBE-NODE-PORT-LOCAL-SCTP-HASH"
+
+	kubeHealthCheckNodePortSetComment = "Kubernetes health check node port"
+	kubeHealthCheckNodePortSet        = "KUBE-HEALTH-CHECK-NODE-PORT"
 )
 
 // IPSetVersioner can query the current ipset version.
