@@ -509,7 +509,7 @@ func (b *volumeBinder) bindAPIUpdate(podName string, bindings []*BindingInfo, cl
 	}
 
 	// Update claims objects to trigger volume provisioning. Let the PV controller take care of the rest
-	// PV controller is expect to signal back by removing related annotations if actual provisioning fails
+	// PV controller is expected to signal back by removing related annotations if actual provisioning fails
 	for i, claim = range claimsToProvision {
 		klog.V(5).Infof("bindAPIUpdate: Pod %q, PVC %q", podName, getPVCName(claim))
 		newClaim, err := b.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claim, metav1.UpdateOptions{})
