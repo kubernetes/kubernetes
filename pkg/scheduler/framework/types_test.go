@@ -1060,6 +1060,8 @@ func TestNodeInfoRemovePod(t *testing.T) {
 		if !reflect.DeepEqual(test.expectedNodeInfo, ni) {
 			t.Errorf("expected: %#v, got: %#v", test.expectedNodeInfo, ni)
 		}
+		ni.RemoveNode()
+		ni.RemovePod(test.pod)
 	}
 }
 

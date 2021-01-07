@@ -581,7 +581,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
+	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, pod.Spec.NodeName)
 }
 
 // resets the slices to nil so that we can do DeepEqual in unit tests.
