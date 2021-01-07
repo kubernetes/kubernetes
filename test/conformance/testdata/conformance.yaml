@@ -659,7 +659,7 @@
     API Server using the current Aggregator [Conformance]'
   description: Ensure that the sample-apiserver code from 1.17 and compiled against
     1.17 will work on the current Aggregator/API-Server.
-  release: v1.17
+  release: v1.17, v1.21
   file: test/e2e/apimachinery/aggregator.go
 - testname: Custom Resource Definition Conversion Webhook, convert mixed version list
   codename: '[sig-api-machinery] CustomResourceConversionWebhook [Privileged:ClusterAdmin]
