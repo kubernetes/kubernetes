@@ -607,7 +607,7 @@ func nodeSlicesEqualForLB(x, y []*v1.Node) bool {
 
 func (s *Controller) getNodeConditionPredicate() NodeConditionPredicate {
 	return func(node *v1.Node) bool {
-		if _, hasExcludeBalancerLabel := node.Labels[labelNodeExcludeBalancers]; hasExcludeBalancerLabel {
+		if _, hasExcludeBalancerLabel := node.Labels[v1.LabelNodeExcludeBalancers]; hasExcludeBalancerLabel {
 			return false
 		}
 
