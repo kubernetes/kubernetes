@@ -1087,6 +1087,10 @@ func (as *availabilitySet) GetNodeNameByIPConfigurationID(ipConfigurationID stri
 	if vm.VirtualMachineProperties != nil && vm.AvailabilitySet != nil {
 		asID = to.String(vm.AvailabilitySet.ID)
 	}
+	if asID == "" {
+		return vmName, "", nil
+	}
+
 	asName, err := getAvailabilitySetNameByID(asID)
 	if err != nil {
 		return "", "", fmt.Errorf("cannot get the availability set name by the availability set ID %s", asID)
