@@ -1200,11 +1200,6 @@ func TestCompleteAndValidate(t *testing.T) {
 			wantError: true,
 		},
 		{
-			name:      "Invalid environment variables",
-			args:      "--image=busybox --env=FOO mypod",
-			wantError: true,
-		},
-		{
 			name:      "Invalid image name",
 			args:      "--image=image:label@deadbeef mypod",
 			wantError: true,
