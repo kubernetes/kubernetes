@@ -216,10 +216,6 @@ func (o *ScaleOptions) RunScale() error {
 		return nil
 	})
 
-	if len(o.ResourceVersion) != 0 && len(infos) > 1 {
-		return fmt.Errorf("cannot use --resource-version with multiple resources")
-	}
-
 	// only set a precondition if the user has requested one.  A nil precondition means we can do a blind update, so
 	// we avoid a Scale GET that may or may not succeed
 	var precondition *scale.ScalePrecondition
