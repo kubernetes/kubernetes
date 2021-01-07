@@ -72,7 +72,7 @@ type Patcher struct {
 	OpenapiSchema openapi.Resources
 }
 
-func newPatcher(o *ApplyOptions, info *resource.Info, helper *resource.Helper) (*Patcher, error) {
+func newPatcher(o *Options, info *resource.Info, helper *resource.Helper) (*Patcher, error) {
 	var openapiSchema openapi.Resources
 	if o.OpenAPIPatch {
 		openapiSchema = o.OpenAPISchema

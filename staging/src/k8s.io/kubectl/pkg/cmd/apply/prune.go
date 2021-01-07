@@ -50,7 +50,7 @@ type pruner struct {
 	out io.Writer
 }
 
-func newPruner(o *ApplyOptions) pruner {
+func newPruner(o *Options) pruner {
 	return pruner{
 		mapper:        o.Mapper,
 		dynamicClient: o.DynamicClient,
@@ -69,7 +69,7 @@ func newPruner(o *ApplyOptions) pruner {
 	}
 }
 
-func (p *pruner) pruneAll(o *ApplyOptions) error {
+func (p *pruner) pruneAll(o *Options) error {
 
 	namespacedRESTMappings, nonNamespacedRESTMappings, err := getRESTMappings(o.Mapper, &(o.PruneResources))
 	if err != nil {
