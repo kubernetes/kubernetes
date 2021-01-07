@@ -20,7 +20,6 @@ package v1
 
 import (
 	rest "k8s.io/client-go/rest"
-	v1 "k8s.io/code-generator/_examples/MixedCase/apis/example/v1"
 	"k8s.io/code-generator/_examples/MixedCase/clientset/versioned/scheme"
 )
 
@@ -72,11 +71,9 @@ func New(c rest.Interface) *ExampleV1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1.SchemeGroupVersion
-	config.GroupVersion = &gv
-	config.APIPath = "/apis"
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
-
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	}
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}

@@ -90,6 +90,8 @@ func (c *deployments) List(ctx context.Context, opts metav1.ListOptions) (result
 	result = &v1.DeploymentList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "apps", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

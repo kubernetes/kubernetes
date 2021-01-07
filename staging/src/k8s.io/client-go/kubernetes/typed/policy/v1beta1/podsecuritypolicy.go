@@ -81,6 +81,8 @@ func (c *podSecurityPolicies) List(ctx context.Context, opts v1.ListOptions) (re
 	}
 	result = &v1beta1.PodSecurityPolicyList{}
 	err = c.client.Get().
+		Prefix("/apis", "policy", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("podsecuritypolicies").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

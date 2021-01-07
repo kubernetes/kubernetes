@@ -85,6 +85,8 @@ func (c *cSIStorageCapacities) List(ctx context.Context, opts v1.ListOptions) (r
 	result = &v1alpha1.CSIStorageCapacityList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "storage.k8s.io", "v1alpha1").
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("csistoragecapacities").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

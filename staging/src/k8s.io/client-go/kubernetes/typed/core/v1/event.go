@@ -85,6 +85,8 @@ func (c *events) List(ctx context.Context, opts metav1.ListOptions) (result *v1.
 	result = &v1.EventList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "core", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

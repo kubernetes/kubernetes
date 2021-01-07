@@ -85,6 +85,8 @@ func (c *controllerRevisions) List(ctx context.Context, opts metav1.ListOptions)
 	result = &v1.ControllerRevisionList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "apps", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("controllerrevisions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

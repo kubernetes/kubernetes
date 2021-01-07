@@ -86,6 +86,8 @@ func (c *podDisruptionBudgets) List(ctx context.Context, opts v1.ListOptions) (r
 	result = &v1beta1.PodDisruptionBudgetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "policy", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("poddisruptionbudgets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

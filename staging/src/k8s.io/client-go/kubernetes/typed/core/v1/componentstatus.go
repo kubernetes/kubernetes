@@ -81,6 +81,8 @@ func (c *componentStatuses) List(ctx context.Context, opts metav1.ListOptions) (
 	}
 	result = &v1.ComponentStatusList{}
 	err = c.client.Get().
+		Prefix("/apis", "core", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("componentstatuses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

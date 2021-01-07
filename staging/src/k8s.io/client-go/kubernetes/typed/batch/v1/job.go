@@ -86,6 +86,8 @@ func (c *jobs) List(ctx context.Context, opts metav1.ListOptions) (result *v1.Jo
 	result = &v1.JobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "batch", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("jobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

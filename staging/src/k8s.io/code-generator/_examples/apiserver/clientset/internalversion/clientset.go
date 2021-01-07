@@ -24,6 +24,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	"k8s.io/code-generator/_examples/apiserver/clientset/internalversion/scheme"
 	exampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example/internalversion"
 	secondexampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example2/internalversion"
 	thirdexampleinternalversion "k8s.io/code-generator/_examples/apiserver/clientset/internalversion/typed/example3.io/internalversion"
@@ -79,25 +80,20 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
-	var cs Clientset
-	var err error
-	cs.example, err = exampleinternalversion.NewForConfig(&configShallowCopy)
-	if err != nil {
+	if err := setConfigDefaults(&configShallowCopy); err != nil {
 		return nil, err
 	}
-	cs.secondExample, err = secondexampleinternalversion.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
-	cs.thirdExample, err = thirdexampleinternalversion.NewForConfig(&configShallowCopy)
+	client, err := rest.RESTClientFor(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 
-	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
+	var cs Clientset
+	cs.example = exampleinternalversion.New(client)
+	cs.secondExample = secondexampleinternalversion.New(client)
+	cs.thirdExample = thirdexampleinternalversion.New(client)
+
+	cs.DiscoveryClient = discovery.NewDiscoveryClient(client)
 	return &cs, nil
 }
 
@@ -122,4 +118,15 @@ func New(c rest.Interface) *Clientset {
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs
+}
+
+func setConfigDefaults(config *rest.Config) error {
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	}
+	if config.UserAgent == "" {
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+
+	return nil
 }

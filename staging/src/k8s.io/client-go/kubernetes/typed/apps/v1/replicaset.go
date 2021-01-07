@@ -90,6 +90,8 @@ func (c *replicaSets) List(ctx context.Context, opts metav1.ListOptions) (result
 	result = &v1.ReplicaSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "apps", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

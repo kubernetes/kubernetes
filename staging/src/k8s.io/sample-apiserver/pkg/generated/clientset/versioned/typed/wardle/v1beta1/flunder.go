@@ -86,6 +86,8 @@ func (c *flunders) List(ctx context.Context, opts v1.ListOptions) (result *v1bet
 	result = &v1beta1.FlunderList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "wardle.example.com", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("flunders").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

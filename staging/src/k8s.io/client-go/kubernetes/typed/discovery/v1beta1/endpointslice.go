@@ -85,6 +85,8 @@ func (c *endpointSlices) List(ctx context.Context, opts v1.ListOptions) (result 
 	result = &v1beta1.EndpointSliceList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "discovery.k8s.io", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("endpointslices").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

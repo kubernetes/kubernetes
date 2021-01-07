@@ -85,6 +85,8 @@ func (c *networkPolicies) List(ctx context.Context, opts metav1.ListOptions) (re
 	result = &v1.NetworkPolicyList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "networking.k8s.io", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("networkpolicies").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

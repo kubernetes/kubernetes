@@ -90,6 +90,8 @@ func (c *statefulSets) List(ctx context.Context, opts metav1.ListOptions) (resul
 	result = &v1.StatefulSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "apps", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

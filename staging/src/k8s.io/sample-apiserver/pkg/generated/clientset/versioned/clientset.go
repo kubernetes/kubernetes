@@ -24,6 +24,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	"k8s.io/sample-apiserver/pkg/generated/clientset/versioned/scheme"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/typed/wardle/v1alpha1"
 	wardlev1beta1 "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/typed/wardle/v1beta1"
 )
@@ -71,21 +72,19 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
-	var cs Clientset
-	var err error
-	cs.wardleV1alpha1, err = wardlev1alpha1.NewForConfig(&configShallowCopy)
-	if err != nil {
+	if err := setConfigDefaults(&configShallowCopy); err != nil {
 		return nil, err
 	}
-	cs.wardleV1beta1, err = wardlev1beta1.NewForConfig(&configShallowCopy)
+	client, err := rest.RESTClientFor(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 
-	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
+	var cs Clientset
+	cs.wardleV1alpha1 = wardlev1alpha1.New(client)
+	cs.wardleV1beta1 = wardlev1beta1.New(client)
+
+	cs.DiscoveryClient = discovery.NewDiscoveryClient(client)
 	return &cs, nil
 }
 
@@ -108,4 +107,15 @@ func New(c rest.Interface) *Clientset {
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs
+}
+
+func setConfigDefaults(config *rest.Config) error {
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	}
+	if config.UserAgent == "" {
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+
+	return nil
 }

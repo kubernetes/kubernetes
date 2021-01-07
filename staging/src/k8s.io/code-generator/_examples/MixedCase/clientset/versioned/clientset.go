@@ -24,6 +24,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	"k8s.io/code-generator/_examples/MixedCase/clientset/versioned/scheme"
 	examplev1 "k8s.io/code-generator/_examples/MixedCase/clientset/versioned/typed/example/v1"
 )
 
@@ -63,17 +64,18 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
-	var cs Clientset
-	var err error
-	cs.exampleV1, err = examplev1.NewForConfig(&configShallowCopy)
+	if err := setConfigDefaults(&configShallowCopy); err != nil {
+		return nil, err
+	}
+	client, err := rest.RESTClientFor(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 
-	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
+	var cs Clientset
+	cs.exampleV1 = examplev1.New(client)
+
+	cs.DiscoveryClient = discovery.NewDiscoveryClient(client)
 	return &cs, nil
 }
 
@@ -94,4 +96,15 @@ func New(c rest.Interface) *Clientset {
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs
+}
+
+func setConfigDefaults(config *rest.Config) error {
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	}
+	if config.UserAgent == "" {
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+
+	return nil
 }

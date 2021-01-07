@@ -82,6 +82,8 @@ func (c *storageVersions) List(ctx context.Context, opts v1.ListOptions) (result
 	}
 	result = &v1alpha1.StorageVersionList{}
 	err = c.client.Get().
+		Prefix("/apis", "internal.apiserver.k8s.io", "v1alpha1").
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("storageversions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

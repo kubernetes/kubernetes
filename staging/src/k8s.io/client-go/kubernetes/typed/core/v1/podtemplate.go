@@ -85,6 +85,8 @@ func (c *podTemplates) List(ctx context.Context, opts metav1.ListOptions) (resul
 	result = &v1.PodTemplateList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "core", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("podtemplates").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

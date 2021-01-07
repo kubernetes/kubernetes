@@ -85,6 +85,8 @@ func (c *networkPolicies) List(ctx context.Context, opts v1.ListOptions) (result
 	result = &v1beta1.NetworkPolicyList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "extensions", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("networkpolicies").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

@@ -81,6 +81,8 @@ func (c *runtimeClasses) List(ctx context.Context, opts v1.ListOptions) (result 
 	}
 	result = &v1beta1.RuntimeClassList{}
 	err = c.client.Get().
+		Prefix("/apis", "node.k8s.io", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("runtimeclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

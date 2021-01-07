@@ -79,6 +79,8 @@ func (c *podMetricses) List(ctx context.Context, opts v1.ListOptions) (result *v
 	result = &v1beta1.PodMetricsList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "metrics.k8s.io", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("pods").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

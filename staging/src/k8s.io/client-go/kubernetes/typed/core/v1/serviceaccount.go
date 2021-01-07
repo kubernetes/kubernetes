@@ -88,6 +88,8 @@ func (c *serviceAccounts) List(ctx context.Context, opts metav1.ListOptions) (re
 	result = &v1.ServiceAccountList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "core", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("serviceaccounts").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

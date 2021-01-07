@@ -82,6 +82,8 @@ func (c *persistentVolumes) List(ctx context.Context, opts metav1.ListOptions) (
 	}
 	result = &v1.PersistentVolumeList{}
 	err = c.client.Get().
+		Prefix("/apis", "core", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("persistentvolumes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

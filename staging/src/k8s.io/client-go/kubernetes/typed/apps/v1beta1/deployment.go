@@ -86,6 +86,8 @@ func (c *deployments) List(ctx context.Context, opts v1.ListOptions) (result *v1
 	result = &v1beta1.DeploymentList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "apps", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

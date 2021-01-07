@@ -81,6 +81,8 @@ func (c *clusterRoleBindings) List(ctx context.Context, opts v1.ListOptions) (re
 	}
 	result = &v1alpha1.ClusterRoleBindingList{}
 	err = c.client.Get().
+		Prefix("/apis", "rbac.authorization.k8s.io", "v1alpha1").
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("clusterrolebindings").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

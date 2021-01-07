@@ -81,6 +81,8 @@ func (c *ingressClasses) List(ctx context.Context, opts metav1.ListOptions) (res
 	}
 	result = &v1.IngressClassList{}
 	err = c.client.Get().
+		Prefix("/apis", "networking.k8s.io", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("ingressclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

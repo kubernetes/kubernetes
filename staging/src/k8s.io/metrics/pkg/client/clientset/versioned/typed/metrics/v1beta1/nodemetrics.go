@@ -75,6 +75,8 @@ func (c *nodeMetricses) List(ctx context.Context, opts v1.ListOptions) (result *
 	}
 	result = &v1beta1.NodeMetricsList{}
 	err = c.client.Get().
+		Prefix("/apis", "metrics.k8s.io", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

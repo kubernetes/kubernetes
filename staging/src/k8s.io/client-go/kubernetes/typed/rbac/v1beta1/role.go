@@ -85,6 +85,8 @@ func (c *roles) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.
 	result = &v1beta1.RoleList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "rbac.authorization.k8s.io", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("roles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

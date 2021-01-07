@@ -81,6 +81,8 @@ func (c *fischers) List(ctx context.Context, opts v1.ListOptions) (result *v1alp
 	}
 	result = &v1alpha1.FischerList{}
 	err = c.client.Get().
+		Prefix("/apis", "wardle.example.com", "v1alpha1").
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("fischers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

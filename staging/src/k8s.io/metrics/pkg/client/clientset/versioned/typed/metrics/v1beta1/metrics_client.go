@@ -20,7 +20,6 @@ package v1beta1
 
 import (
 	rest "k8s.io/client-go/rest"
-	v1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	"k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
 
@@ -72,11 +71,9 @@ func New(c rest.Interface) *MetricsV1beta1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1beta1.SchemeGroupVersion
-	config.GroupVersion = &gv
-	config.APIPath = "/apis"
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
-
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	}
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}

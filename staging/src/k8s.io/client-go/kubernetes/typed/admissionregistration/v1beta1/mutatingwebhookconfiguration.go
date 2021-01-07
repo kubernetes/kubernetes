@@ -81,6 +81,8 @@ func (c *mutatingWebhookConfigurations) List(ctx context.Context, opts v1.ListOp
 	}
 	result = &v1beta1.MutatingWebhookConfigurationList{}
 	err = c.client.Get().
+		Prefix("/apis", "admissionregistration.k8s.io", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("mutatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

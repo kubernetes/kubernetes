@@ -86,6 +86,8 @@ func (c *persistentVolumeClaims) List(ctx context.Context, opts metav1.ListOptio
 	result = &v1.PersistentVolumeClaimList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "core", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("persistentvolumeclaims").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

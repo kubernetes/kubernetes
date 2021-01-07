@@ -81,6 +81,8 @@ func (c *storageClasses) List(ctx context.Context, opts metav1.ListOptions) (res
 	}
 	result = &v1.StorageClassList{}
 	err = c.client.Get().
+		Prefix("/apis", "storage.k8s.io", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("storageclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

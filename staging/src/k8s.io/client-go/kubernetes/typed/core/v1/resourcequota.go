@@ -86,6 +86,8 @@ func (c *resourceQuotas) List(ctx context.Context, opts metav1.ListOptions) (res
 	result = &v1.ResourceQuotaList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "core", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("resourcequotas").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

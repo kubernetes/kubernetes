@@ -86,6 +86,8 @@ func (c *testTypes) List(ctx context.Context, opts metav1.ListOptions) (result *
 	result = &v1.TestTypeList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "example-group.hyphens.code-generator.k8s.io", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

@@ -82,6 +82,8 @@ func (c *aPIServices) List(ctx context.Context, opts v1.ListOptions) (result *v1
 	}
 	result = &v1beta1.APIServiceList{}
 	err = c.client.Get().
+		Prefix("/apis", "apiregistration.k8s.io", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("apiservices").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

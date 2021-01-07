@@ -84,6 +84,8 @@ func (c *certificateSigningRequests) List(ctx context.Context, opts metav1.ListO
 	}
 	result = &v1.CertificateSigningRequestList{}
 	err = c.client.Get().
+		Prefix("/apis", "certificates.k8s.io", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("certificatesigningrequests").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

@@ -86,6 +86,8 @@ func (c *horizontalPodAutoscalers) List(ctx context.Context, opts metav1.ListOpt
 	result = &v1.HorizontalPodAutoscalerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "autoscaling", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("horizontalpodautoscalers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

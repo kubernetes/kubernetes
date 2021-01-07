@@ -89,6 +89,8 @@ func (c *pods) List(ctx context.Context, opts metav1.ListOptions) (result *v1.Po
 	result = &v1.PodList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "core", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("pods").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

@@ -81,6 +81,8 @@ func (c *priorityClasses) List(ctx context.Context, opts v1.ListOptions) (result
 	}
 	result = &v1alpha1.PriorityClassList{}
 	err = c.client.Get().
+		Prefix("/apis", "scheduling.k8s.io", "v1alpha1").
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("priorityclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

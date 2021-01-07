@@ -13,6 +13,7 @@ go_library(
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//staging/src/k8s.io/metrics/pkg/client/clientset/versioned/scheme:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1alpha1:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1:go_default_library",
     ],

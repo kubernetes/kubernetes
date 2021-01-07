@@ -86,6 +86,8 @@ func (c *ingresses) List(ctx context.Context, opts metav1.ListOptions) (result *
 	result = &v1.IngressList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "networking.k8s.io", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("ingresses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

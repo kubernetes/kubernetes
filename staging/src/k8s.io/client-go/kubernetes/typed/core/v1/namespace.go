@@ -81,6 +81,8 @@ func (c *namespaces) List(ctx context.Context, opts metav1.ListOptions) (result 
 	}
 	result = &v1.NamespaceList{}
 	err = c.client.Get().
+		Prefix("/apis", "core", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("namespaces").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

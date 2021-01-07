@@ -13,6 +13,7 @@ go_library(
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//staging/src/k8s.io/code-generator/_examples/apiserver/clientset/versioned/scheme:go_default_library",
         "//staging/src/k8s.io/code-generator/_examples/apiserver/clientset/versioned/typed/example/v1:go_default_library",
         "//staging/src/k8s.io/code-generator/_examples/apiserver/clientset/versioned/typed/example2/v1:go_default_library",
         "//staging/src/k8s.io/code-generator/_examples/apiserver/clientset/versioned/typed/example3.io/v1:go_default_library",

@@ -86,6 +86,8 @@ func (c *foos) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.
 	result = &v1alpha1.FooList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "samplecontroller.k8s.io", "v1alpha1").
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("foos").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

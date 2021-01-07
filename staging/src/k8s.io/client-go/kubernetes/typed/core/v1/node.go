@@ -82,6 +82,8 @@ func (c *nodes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.N
 	}
 	result = &v1.NodeList{}
 	err = c.client.Get().
+		Prefix("/apis", "core", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

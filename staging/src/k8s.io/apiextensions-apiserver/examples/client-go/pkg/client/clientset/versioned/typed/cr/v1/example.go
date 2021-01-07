@@ -85,6 +85,8 @@ func (c *examples) List(ctx context.Context, opts metav1.ListOptions) (result *v
 	result = &v1.ExampleList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "cr.example.apiextensions.k8s.io", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("examples").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

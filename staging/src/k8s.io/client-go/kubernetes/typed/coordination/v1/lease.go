@@ -85,6 +85,8 @@ func (c *leases) List(ctx context.Context, opts metav1.ListOptions) (result *v1.
 	result = &v1.LeaseList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "coordination.k8s.io", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("leases").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

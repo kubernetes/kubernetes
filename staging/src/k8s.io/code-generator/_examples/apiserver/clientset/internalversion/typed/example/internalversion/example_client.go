@@ -66,16 +66,12 @@ func New(c rest.Interface) *ExampleClient {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != scheme.Scheme.PrioritizedVersionsForGroup("example.apiserver.code-generator.k8s.io")[0].Group {
-		gv := scheme.Scheme.PrioritizedVersionsForGroup("example.apiserver.code-generator.k8s.io")[0]
-		config.GroupVersion = &gv
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs
 	}
-	config.NegotiatedSerializer = scheme.Codecs
-
 	if config.QPS == 0 {
 		config.QPS = 5
 	}

@@ -21,6 +21,7 @@ package clientset
 import (
 	"fmt"
 
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	discovery "k8s.io/client-go/discovery"
@@ -71,21 +72,19 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
-	var cs Clientset
-	var err error
-	cs.apiextensionsV1beta1, err = apiextensionsv1beta1.NewForConfig(&configShallowCopy)
-	if err != nil {
+	if err := setConfigDefaults(&configShallowCopy); err != nil {
 		return nil, err
 	}
-	cs.apiextensionsV1, err = apiextensionsv1.NewForConfig(&configShallowCopy)
+	client, err := rest.RESTClientFor(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 
-	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
+	var cs Clientset
+	cs.apiextensionsV1beta1 = apiextensionsv1beta1.New(client)
+	cs.apiextensionsV1 = apiextensionsv1.New(client)
+
+	cs.DiscoveryClient = discovery.NewDiscoveryClient(client)
 	return &cs, nil
 }
 
@@ -108,4 +107,15 @@ func New(c rest.Interface) *Clientset {
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs
+}
+
+func setConfigDefaults(config *rest.Config) error {
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	}
+	if config.UserAgent == "" {
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+
+	return nil
 }

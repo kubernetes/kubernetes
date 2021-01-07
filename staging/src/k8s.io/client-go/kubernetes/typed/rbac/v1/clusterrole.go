@@ -81,6 +81,8 @@ func (c *clusterRoles) List(ctx context.Context, opts metav1.ListOptions) (resul
 	}
 	result = &v1.ClusterRoleList{}
 	err = c.client.Get().
+		Prefix("/apis", "rbac.authorization.k8s.io", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("clusterroles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

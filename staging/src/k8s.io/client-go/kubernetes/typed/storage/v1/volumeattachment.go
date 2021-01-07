@@ -82,6 +82,8 @@ func (c *volumeAttachments) List(ctx context.Context, opts metav1.ListOptions) (
 	}
 	result = &v1.VolumeAttachmentList{}
 	err = c.client.Get().
+		Prefix("/apis", "storage.k8s.io", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("volumeattachments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

@@ -278,7 +278,7 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 	defer a.mu.Unlock()
 	a.onRotateList = append(a.onRotateList, d.CloseAll)
 	onRotateListLength := len(a.onRotateList)
-	if onRotateListLength > onRotateListWarningLength {
+	if onRotateListLength%onRotateListWarningLength == 0 {
 		klog.Warningf("constructing many client instances from the same exec auth config can cause performance problems during cert rotation and can exhaust available network connections; %d clients constructed calling %q", onRotateListLength, a.cmd)
 	}
 

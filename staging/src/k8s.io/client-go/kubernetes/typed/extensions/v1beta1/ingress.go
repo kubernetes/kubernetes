@@ -86,6 +86,8 @@ func (c *ingresses) List(ctx context.Context, opts v1.ListOptions) (result *v1be
 	result = &v1beta1.IngressList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "extensions", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("ingresses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

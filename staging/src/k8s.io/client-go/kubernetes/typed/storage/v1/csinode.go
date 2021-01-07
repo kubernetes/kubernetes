@@ -81,6 +81,8 @@ func (c *cSINodes) List(ctx context.Context, opts metav1.ListOptions) (result *v
 	}
 	result = &v1.CSINodeList{}
 	err = c.client.Get().
+		Prefix("/apis", "storage.k8s.io", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("csinodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

@@ -82,6 +82,8 @@ func (c *customResourceDefinitions) List(ctx context.Context, opts v1.ListOption
 	}
 	result = &v1beta1.CustomResourceDefinitionList{}
 	err = c.client.Get().
+		Prefix("/apis", "apiextensions.k8s.io", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("customresourcedefinitions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

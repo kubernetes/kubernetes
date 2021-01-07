@@ -82,6 +82,8 @@ func (c *priorityLevelConfigurations) List(ctx context.Context, opts v1.ListOpti
 	}
 	result = &v1alpha1.PriorityLevelConfigurationList{}
 	err = c.client.Get().
+		Prefix("/apis", "flowcontrol.apiserver.k8s.io", "v1alpha1").
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("prioritylevelconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

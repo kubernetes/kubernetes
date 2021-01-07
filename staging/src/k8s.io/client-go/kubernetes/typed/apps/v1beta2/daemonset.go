@@ -86,6 +86,8 @@ func (c *daemonSets) List(ctx context.Context, opts v1.ListOptions) (result *v1b
 	result = &v1beta2.DaemonSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "apps", "v1beta2").
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("daemonsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

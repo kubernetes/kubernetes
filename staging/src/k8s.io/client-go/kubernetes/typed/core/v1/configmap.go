@@ -85,6 +85,8 @@ func (c *configMaps) List(ctx context.Context, opts metav1.ListOptions) (result 
 	result = &v1.ConfigMapList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "core", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("configmaps").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

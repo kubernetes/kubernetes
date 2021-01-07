@@ -81,6 +81,8 @@ func (c *cSIDrivers) List(ctx context.Context, opts metav1.ListOptions) (result 
 	}
 	result = &v1.CSIDriverList{}
 	err = c.client.Get().
+		Prefix("/apis", "storage.k8s.io", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("csidrivers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

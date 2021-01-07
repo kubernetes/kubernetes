@@ -85,6 +85,8 @@ func (c *limitRanges) List(ctx context.Context, opts metav1.ListOptions) (result
 	result = &v1.LimitRangeList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "core", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("limitranges").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

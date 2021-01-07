@@ -86,6 +86,8 @@ func (c *clusterTestTypes) List(ctx context.Context, opts metav1.ListOptions) (r
 	}
 	result = &v1.ClusterTestTypeList{}
 	err = c.client.Get().
+		Prefix("/apis", "example.crd.code-generator.k8s.io", "v1").
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("clustertesttypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

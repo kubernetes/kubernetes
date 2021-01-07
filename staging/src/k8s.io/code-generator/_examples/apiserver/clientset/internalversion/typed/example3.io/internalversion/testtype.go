@@ -86,6 +86,8 @@ func (c *testTypes) List(ctx context.Context, opts v1.ListOptions) (result *exam
 	result = &example3io.TestTypeList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "example.dots.apiserver.code-generator.k8s.io", "").
+		GroupVersion(example3io.SchemeGroupVersion).
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

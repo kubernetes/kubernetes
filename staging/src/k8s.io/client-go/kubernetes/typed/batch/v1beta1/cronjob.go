@@ -86,6 +86,8 @@ func (c *cronJobs) List(ctx context.Context, opts v1.ListOptions) (result *v1bet
 	result = &v1beta1.CronJobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		Prefix("/apis", "batch", "v1beta1").
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("cronjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
