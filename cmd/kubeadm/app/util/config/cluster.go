@@ -125,7 +125,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 		// However, if newControlPlane == true, initcfg.NodeRegistration is not used at all and it's overwritten later on.
 		// Thus it's necessary to supply some default value, that will avoid the call to DetectCRISocket() and as
 		// initcfg.NodeRegistration is discarded, setting whatever value here is harmless.
-		initcfg.NodeRegistration.CRISocket = constants.DefaultDockerCRISocket
+		initcfg.NodeRegistration.CRISocket = constants.UnknownCRISocket
 	}
 	return initcfg, nil
 }
