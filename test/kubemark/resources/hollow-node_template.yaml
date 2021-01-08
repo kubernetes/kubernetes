@@ -31,6 +31,9 @@ spec:
       - name: logs-volume
         hostPath:
           path: /var/log
+      - name: containerd
+        hostPath:
+          path: /run/containerd
       - name: no-serviceaccount-access-to-real-master
         emptyDir: {}
       containers:
@@ -67,6 +70,8 @@ spec:
           readOnly: true
         - name: logs-volume
           mountPath: /var/log
+        - name: containerd
+          mountPath: /run/containerd
         resources:
           requests:
             cpu: {{hollow_kubelet_millicpu}}m
