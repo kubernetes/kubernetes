@@ -45,26 +45,37 @@ const (
 var _ = SIGDescribe("API priority and fairness", func() {
 	f := framework.NewDefaultFramework("apf")
 
-	ginkgo.It("should ensure that requests can be classified by testing flow-schemas/priority-levels", func() {
+	ginkgo.It("should ensure that requests can be classified by adding FlowSchema and PriorityLevelConfiguration", func() {
 		testingFlowSchemaName := "e2e-testing-flowschema"
 		testingPriorityLevelName := "e2e-testing-prioritylevel"
 		matchingUsername := "noxu"
 		nonMatchingUsername := "foo"
 
-		ginkgo.By("creating a testing prioritylevel")
+		ginkgo.By("creating a testing PriorityLevelConfiguration object")
 		createdPriorityLevel, cleanup := createPriorityLevel(f, testingPriorityLevelName, 1)
 		defer cleanup()
 
-		ginkgo.By("creating a testing flowschema")
+		ginkgo.By("creating a testing FlowSchema object")
 		createdFlowSchema, cleanup := createFlowSchema(f, testingFlowSchemaName, 1000, testingPriorityLevelName, []string{matchingUsername})
 		defer cleanup()
 
-		ginkgo.By("checking response headers contain flow-schema/priority-level uid")
-		if !testResponseHeaderMatches(f, matchingUsername, string(createdPriorityLevel.UID), string(createdFlowSchema.UID)) {
-			framework.Failf("matching user doesnt received UID for the testing priority-level and flow-schema")
+		var response *http.Response
+		ginkgo.By("response headers should contain the UID of the appropriate FlowSchema and PriorityLevelConfiguration for a matching user")
+		response = makeRequest(f, matchingUsername)
+		if plUIDWant, plUIDGot := string(createdPriorityLevel.UID), getPriorityLevelUID(response); plUIDWant != plUIDGot {
+			framework.Failf("expected PriorityLevelConfiguration UID in the response header: %s, but got: %s, response header: %#v", plUIDWant, plUIDGot, response.Header)
 		}
-		if testResponseHeaderMatches(f, nonMatchingUsername, string(createdPriorityLevel.UID), string(createdPriorityLevel.UID)) {
-			framework.Failf("non-matching user unexpectedly received UID for the testing priority-level and flow-schema")
+		if fsUIDWant, fsUIDGot := string(createdFlowSchema.UID), getFlowSchemaUID(response); fsUIDWant != fsUIDGot {
+			framework.Failf("expected FlowSchema UID in the response header: %s, but got: %s, response header: %#v", fsUIDWant, fsUIDGot, response.Header)
+		}
+
+		ginkgo.By("response headers should contain non-empty UID of FlowSchema and PriorityLevelConfiguration for a non-matching user")
+		response = makeRequest(f, nonMatchingUsername)
+		if plUIDGot := getPriorityLevelUID(response); plUIDGot == "" {
+			framework.Failf("expected a non-empty PriorityLevelConfiguration UID in the response header, but got: %s, response header: %#v", plUIDGot, response.Header)
+		}
+		if fsUIDGot := getFlowSchemaUID(response); fsUIDGot == "" {
+			framework.Failf("expected a non-empty FlowSchema UID in the response header but got: %s, response header: %#v", fsUIDGot, response.Header)
 		}
 	})
 
@@ -341,15 +352,12 @@ func makeRequest(f *framework.Framework, username string) *http.Response {
 	return response
 }
 
-func testResponseHeaderMatches(f *framework.Framework, impersonatingUser, plUID, fsUID string) bool {
-	response := makeRequest(f, impersonatingUser)
-	if response.Header.Get(flowcontrol.ResponseHeaderMatchedFlowSchemaUID) != fsUID {
-		return false
-	}
-	if response.Header.Get(flowcontrol.ResponseHeaderMatchedPriorityLevelConfigurationUID) != plUID {
-		return false
-	}
-	return true
+func getPriorityLevelUID(response *http.Response) string {
+	return response.Header.Get(flowcontrol.ResponseHeaderMatchedPriorityLevelConfigurationUID)
+}
+
+func getFlowSchemaUID(response *http.Response) string {
+	return response.Header.Get(flowcontrol.ResponseHeaderMatchedFlowSchemaUID)
 }
 
 // uniformQPSLoadSingle loads the API server with requests at a uniform <qps>
