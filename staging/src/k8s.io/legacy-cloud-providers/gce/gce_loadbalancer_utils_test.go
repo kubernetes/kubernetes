@@ -246,6 +246,11 @@ func assertInternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service,
 	assert.Equal(t, backendServiceLink, fwdRule.BackendService)
 	// if no Subnetwork specified, defaults to the GCE NetworkURL
 	assert.Equal(t, gce.NetworkURL(), fwdRule.Subnetwork)
+
+	// Check that the IP address has been released. IP is only reserved until ensure function exits.
+	ip, err := gce.GetRegionAddress(lbName, gce.region)
+	require.Error(t, err)
+	assert.Nil(t, ip)
 }
 
 func assertInternalLbResourcesDeleted(t *testing.T, gce *Cloud, apiService *v1.Service, vals TestClusterValues, firewallsDeleted bool) {
@@ -284,6 +289,11 @@ func assertInternalLbResourcesDeleted(t *testing.T, gce *Cloud, apiService *v1.S
 	healthcheck, err := gce.GetHealthCheck(hcName)
 	require.Error(t, err)
 	assert.Nil(t, healthcheck)
+
+	// Check that the IP address has been released
+	ip, err := gce.GetRegionAddress(lbName, gce.region)
+	require.Error(t, err)
+	assert.Nil(t, ip)
 }
 
 func checkEvent(t *testing.T, recorder *record.FakeRecorder, expected string, shouldMatch bool) bool {
