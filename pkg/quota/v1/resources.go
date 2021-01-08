@@ -226,6 +226,17 @@ func IsZero(a corev1.ResourceList) bool {
 	return true
 }
 
+// RemoveZeros returns a new resource list that only has no zero values
+func RemoveZeros(a corev1.ResourceList) corev1.ResourceList {
+	result := corev1.ResourceList{}
+	for key, value := range a {
+		if !value.IsZero() {
+			result[key] = value
+		}
+	}
+	return result
+}
+
 // IsNegative returns the set of resource names that have a negative value.
 func IsNegative(a corev1.ResourceList) []corev1.ResourceName {
 	results := []corev1.ResourceName{}
