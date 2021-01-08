@@ -26,7 +26,7 @@ import (
 func TestTimeCache(t *testing.T) {
 	cache := &timeCache{cache: lru.New(2)}
 	if a, ok := cache.Get("123"); ok {
-		t.Errorf("expected cache miss, got %v, %v", a, ok)
+		t.Errorf("Expected cache miss, got %v, %v", a, ok)
 	}
 
 	now := time.Now()
@@ -35,21 +35,21 @@ func TestTimeCache(t *testing.T) {
 	cache.Add("soon", soon)
 
 	if a, ok := cache.Get("now"); !ok || !a.Equal(now) {
-		t.Errorf("expected cache hit matching %v, got %v, %v", now, a, ok)
+		t.Errorf("Expected cache hit matching %v, got %v, %v", now, a, ok)
 	}
 	if a, ok := cache.Get("soon"); !ok || !a.Equal(soon) {
-		t.Errorf("expected cache hit matching %v, got %v, %v", soon, a, ok)
+		t.Errorf("Expected cache hit matching %v, got %v, %v", soon, a, ok)
 	}
 
 	then := now.Add(-time.Minute)
 	cache.Add("then", then)
 	if a, ok := cache.Get("now"); ok {
-		t.Errorf("expected cache miss from oldest evicted value, got %v, %v", a, ok)
+		t.Errorf("Expected cache miss from oldest evicted value, got %v, %v", a, ok)
 	}
 	if a, ok := cache.Get("soon"); !ok || !a.Equal(soon) {
-		t.Errorf("expected cache hit matching %v, got %v, %v", soon, a, ok)
+		t.Errorf("Expected cache hit matching %v, got %v, %v", soon, a, ok)
 	}
 	if a, ok := cache.Get("then"); !ok || !a.Equal(then) {
-		t.Errorf("expected cache hit matching %v, got %v, %v", then, a, ok)
+		t.Errorf("Expected cache hit matching %v, got %v, %v", then, a, ok)
 	}
 }
