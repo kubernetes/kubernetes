@@ -142,7 +142,7 @@ func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec, eventRec
 		return fmt.Errorf("spec.PersistentVolume.Spec.HostPath is nil")
 	}
 
-	pod := plugin.config.RecyclerPodTemplate
+	pod := plugin.config.RecyclerPodTemplate.DeepCopy()
 	timeout := util.CalculateTimeoutForVolume(plugin.config.RecyclerMinimumTimeout, plugin.config.RecyclerTimeoutIncrement, spec.PersistentVolume)
 	// overrides
 	pod.Spec.ActiveDeadlineSeconds = &timeout
@@ -150,6 +150,15 @@ func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec, eventRec
 		HostPath: &v1.HostPathVolumeSource{
 			Path: spec.PersistentVolume.Spec.HostPath.Path,
 		},
+	}
+	if spec.PersistentVolume.Spec.NodeAffinity != nil {
+		if pod.Spec.Affinity == nil {
+			pod.Spec.Affinity = &v1.Affinity{}
+		}
+		if pod.Spec.Affinity.NodeAffinity == nil {
+			pod.Spec.Affinity.NodeAffinity = &v1.NodeAffinity{}
+		}
+		pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = spec.PersistentVolume.Spec.NodeAffinity.Required
 	}
 	return recyclerclient.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient(), eventRecorder)
 }
