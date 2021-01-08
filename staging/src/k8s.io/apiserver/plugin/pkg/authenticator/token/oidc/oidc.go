@@ -218,7 +218,7 @@ func New(opts Options) (*Authenticator, error) {
 	return newAuthenticator(opts, func(ctx context.Context, a *Authenticator, config *oidc.Config) {
 		// Asynchronously attempt to initialize the authenticator. This enables
 		// self-hosted providers, providers that run on top of Kubernetes itself.
-		go wait.PollUntil(time.Second*10, func() (done bool, err error) {
+		go wait.PollImmediateUntil(time.Second*10, func() (done bool, err error) {
 			provider, err := oidc.NewProvider(ctx, a.issuerURL)
 			if err != nil {
 				klog.Errorf("oidc authenticator: initializing plugin: %v", err)
