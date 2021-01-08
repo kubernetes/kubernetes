@@ -950,6 +950,11 @@ func TestEnsureInternalLoadBalancerErrors(t *testing.T) {
 			)
 			assert.Error(t, err, "Should return an error when "+desc)
 			assert.Nil(t, status, "Should not return a status when "+desc)
+
+			// ensure that the temporarily reserved IP address is released upon sync errors
+			ip, err := gce.GetRegionAddress(gce.GetLoadBalancerName(context.TODO(), params.clusterName, params.service), gce.region)
+			require.Error(t, err)
+			assert.Nil(t, ip)
 		})
 	}
 }
