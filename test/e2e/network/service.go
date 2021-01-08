@@ -3015,8 +3015,8 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 
 		ginkgo.By("reading clientIP using the TCP service's service port via its external VIP")
-		content := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, "/clientip")
-		clientIP := content.String()
+		clientIP, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, "/clientip")
+		framework.ExpectNoError(err)
 		framework.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIP)
 
 		ginkgo.By("checking if Source IP is preserved")
@@ -3298,8 +3298,10 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		ginkgo.By(fmt.Sprintf("checking source ip is NOT preserved through loadbalancer %v", ingressIP))
 		var clientIP string
 		pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
-			content := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, "/clientip")
-			clientIP = content.String()
+			clientIP, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, "/clientip")
+			if err != nil {
+				return false, nil
+			}
 			if strings.HasPrefix(clientIP, "10.") {
 				return true, nil
 			}
@@ -3323,8 +3325,10 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		})
 		framework.ExpectNoError(err)
 		pollErr = wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
-			content := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
-			clientIP = content.String()
+			clientIP, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
+			if err != nil {
+				return false, nil
+			}
 			ginkgo.By(fmt.Sprintf("Endpoint %v:%v%v returned client ip %v", ingressIP, svcTCPPort, path, clientIP))
 			if !strings.HasPrefix(clientIP, "10.") {
 				return true, nil
