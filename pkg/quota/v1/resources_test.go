@@ -287,6 +287,50 @@ func TestIsZero(t *testing.T) {
 	}
 }
 
+func TestRemoveZeros(t *testing.T) {
+	testCases := map[string]struct {
+		a        corev1.ResourceList
+		expected corev1.ResourceList
+	}{
+		"empty": {
+			a:        corev1.ResourceList{},
+			expected: corev1.ResourceList{},
+		},
+		"all-zeros": {
+			a: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("0"),
+				corev1.ResourceMemory: resource.MustParse("0"),
+			},
+			expected: corev1.ResourceList{},
+		},
+		"some-zeros": {
+			a: corev1.ResourceList{
+				corev1.ResourceCPU:     resource.MustParse("0"),
+				corev1.ResourceMemory:  resource.MustParse("0"),
+				corev1.ResourceStorage: resource.MustParse("100Gi"),
+			},
+			expected: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse("100Gi"),
+			},
+		},
+		"non-zero": {
+			a: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+	}
+	for testName, testCase := range testCases {
+		if result := RemoveZeros(testCase.a); !Equals(result, testCase.expected) {
+			t.Errorf("%s expected: %v, actual: %v", testName, testCase.expected, result)
+		}
+	}
+}
+
 func TestIsNegative(t *testing.T) {
 	testCases := map[string]struct {
 		a        corev1.ResourceList
