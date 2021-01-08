@@ -39,6 +39,15 @@ var (
 		[]string{"resource"},
 	)
 
+	terminatedWatchersCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "apiserver_terminated_watchers_total",
+			Help:           "Counter of watchers closed due to unresponsiveness broken by resource type.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+
 	watchCacheCapacityIncreaseTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Name:           "watch_cache_capacity_increase_total",
@@ -69,6 +78,7 @@ var (
 
 func init() {
 	legacyregistry.MustRegister(initCounter)
+	legacyregistry.MustRegister(terminatedWatchersCounter)
 	legacyregistry.MustRegister(watchCacheCapacityIncreaseTotal)
 	legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
 	legacyregistry.MustRegister(watchCacheCapacity)

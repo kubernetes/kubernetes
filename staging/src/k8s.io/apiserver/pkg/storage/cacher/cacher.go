@@ -1251,6 +1251,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
 		klog.V(1).Infof("Forcing watcher close due to unresponsiveness: %v", c.objectType.String())
+		terminatedWatchersCounter.WithLabelValues(c.objectType.String()).Inc()
 		c.forget()
 	}
 
