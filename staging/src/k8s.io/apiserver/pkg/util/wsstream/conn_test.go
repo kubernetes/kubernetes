@@ -59,7 +59,8 @@ func TestRawConn(t *testing.T) {
 		defer wg.Done()
 		data, err := ioutil.ReadAll(conn.channels[0])
 		if err != nil {
-			t.Fatal(err)
+			t.Errorf("%v", err)
+			return
 		}
 		if !reflect.DeepEqual(data, []byte("client")) {
 			t.Errorf("unexpected server read: %v", data)
@@ -75,7 +76,8 @@ func TestRawConn(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		if n, err := conn.channels[1].Write([]byte("server")); err != nil && n != 6 {
-			t.Fatalf("%d: %v", n, err)
+			t.Errorf("%d: %v", n, err)
+			return
 		}
 	}()
 
@@ -141,7 +143,8 @@ func TestBase64Conn(t *testing.T) {
 		defer wg.Done()
 		data, err := ioutil.ReadAll(conn.channels[0])
 		if err != nil {
-			t.Fatal(err)
+			t.Errorf("%v", err)
+			return
 		}
 		if !reflect.DeepEqual(data, []byte("client")) {
 			t.Errorf("unexpected server read: %s", string(data))
@@ -157,7 +160,8 @@ func TestBase64Conn(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		if n, err := conn.channels[1].Write([]byte("server")); err != nil && n != 6 {
-			t.Fatalf("%d: %v", n, err)
+			t.Errorf("%d: %v", n, err)
+			return
 		}
 	}()
 
