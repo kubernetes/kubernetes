@@ -58,6 +58,7 @@ go_test(
     srcs = [
         "builder_example_test.go",
         "builder_test.go",
+        "client_test.go",
         "crd_finder_test.go",
         "dry_run_verifier_test.go",
         "helper_test.go",
@@ -89,6 +90,7 @@ go_test(
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/googleapis/gnostic/openapiv2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto/testing:go_default_library",

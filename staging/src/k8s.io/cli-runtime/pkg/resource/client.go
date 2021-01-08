@@ -17,10 +17,43 @@ limitations under the License.
 package resource
 
 import (
+	"sync"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 )
+
+// clientPool allows RESTClient's to be reused per schema.GroupVersion.
+type clientPool struct {
+	mu         sync.Mutex
+	clientFunc func(version schema.GroupVersion) (RESTClient, error)
+	cache      map[schema.GroupVersion]RESTClient
+}
+
+func newClientPool(clientFunc func(version schema.GroupVersion) (RESTClient, error)) *clientPool {
+	return &clientPool{
+		clientFunc: clientFunc,
+		cache:      make(map[schema.GroupVersion]RESTClient),
+	}
+}
+
+func (c *clientPool) get(version schema.GroupVersion) (RESTClient, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	client, ok := c.cache[version]
+	if !ok {
+		var err error
+		client, err = c.clientFunc(version)
+		if err != nil {
+			return nil, err
+		}
+		c.cache[version] = client
+	}
+
+	return client, nil
+}
 
 // TODO require negotiatedSerializer.  leaving it optional lets us plumb current behavior and deal with the difference after major plumbing is complete
 func (clientConfigFn ClientConfigFunc) clientForGroupVersion(gv schema.GroupVersion, negotiatedSerializer runtime.NegotiatedSerializer) (RESTClient, error) {

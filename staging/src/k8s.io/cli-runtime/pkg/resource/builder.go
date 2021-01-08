@@ -283,7 +283,7 @@ func (b *Builder) Unstructured() *Builder {
 	b.mapper = &mapper{
 		localFn:      b.isLocal,
 		restMapperFn: b.restMapperFn,
-		clientFn:     b.getClient,
+		clientFn:     newClientPool(b.getClient).get,
 		decoder:      &metadataValidatingDecoder{unstructured.UnstructuredJSONScheme},
 	}
 
@@ -310,7 +310,7 @@ func (b *Builder) WithScheme(scheme *runtime.Scheme, decodingVersions ...schema.
 	b.mapper = &mapper{
 		localFn:      b.isLocal,
 		restMapperFn: b.restMapperFn,
-		clientFn:     b.getClient,
+		clientFn:     newClientPool(b.getClient).get,
 		decoder:      codecFactory.UniversalDecoder(decodingVersions...),
 	}
 
