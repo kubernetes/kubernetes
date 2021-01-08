@@ -559,3 +559,7 @@ export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-10m}"
 # It improves container image pull performance since most time is spent
 # unzipping the image layers to disk.
 export WINDOWS_ENABLE_PIGZ="${WINDOWS_ENABLE_PIGZ:-true}"
+
+# TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver. 
+# If this variable is unset or empty, kube-apiserver will allow its default set of cipher suites.
+export TLS_CIPHER_SUITES=""
