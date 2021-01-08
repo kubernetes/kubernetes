@@ -215,7 +215,12 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 		return nil, fmt.Errorf("pv is nil or GCE Persistent Disk source not defined on pv")
 	}
 
+	// depend on which version it migrates from, the label could be failuredomain beta or topology GA version
 	zonesLabel := pv.Labels[v1.LabelFailureDomainBetaZone]
+	if zonesLabel == "" {
+		zonesLabel = pv.Labels[v1.LabelTopologyZone]
+	}
+
 	zones := strings.Split(zonesLabel, labelMultiZoneDelimiter)
 	if len(zones) == 1 && len(zones[0]) != 0 {
 		// Zonal
@@ -249,7 +254,7 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 		},
 	}
 
-	if err := translateTopology(pv, GCEPDTopologyKey); err != nil {
+	if err := translateTopologyFromInTreeToCSI(pv, GCEPDTopologyKey); err != nil {
 		return nil, fmt.Errorf("failed to translate topology: %v", err)
 	}
 
@@ -286,7 +291,10 @@ func (g *gcePersistentDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.Persisten
 		gceSource.Partition = int32(partInt)
 	}
 
-	// TODO: Take the zone/regional information and stick it into the label.
+	// translate CSI topology to In-tree topology for rollback compatibility
+	if err := translateTopologyFromCSIToInTree(pv, GCEPDTopologyKey, gceRegionParser); err != nil {
+		return nil, fmt.Errorf("failed to translate topology. PV:%+v. Error:%v", *pv, err)
+	}
 
 	pv.Spec.CSI = nil
 	pv.Spec.GCEPersistentDisk = gceSource
@@ -367,6 +375,39 @@ func pdNameFromVolumeID(id string) (string, error) {
 		return "", fmt.Errorf("failed to get id components.Got: %v, wanted %v components or more. ", len(splitID), volIDTotalElements)
 	}
 	return splitID[volIDDiskNameValue], nil
+}
+
+func gceRegionParser(pv *v1.PersistentVolume) (string, error) {
+	_, zoneLabel, regionLabel := getTopologyLabel(pv)
+
+	regionVal := getTopologyValues(pv, regionLabel)
+	// if we found the val in topology directly
+	if len(regionVal) != 0 {
+		if len(regionVal) > 1 {
+			return "", fmt.Errorf("multiple regions found: %v", regionVal)
+		}
+		return regionVal[0], nil
+	}
+
+	// No region info found in NodeAffinity, generate it from Zones NodeAffinity
+	zonesVal := getTopologyValues(pv, zoneLabel)
+	if len(zonesVal) == 0 {
+		// No kubernetes NodeAffinity found, generate it from CSI Topology
+		zonesVal = getTopologyValues(pv, GCEPDTopologyKey)
+	}
+	if len(zonesVal) != 0 {
+		return getRegionFromZones(zonesVal)
+	}
+
+	// Not found anything in NodeAffinity, check region labels
+	regionValFromLabel, regionOK := pv.Labels[regionLabel]
+	if regionOK {
+		return regionValFromLabel, nil
+	}
+	// Not found anything in region labels, check zone labels
+	zonesVal = strings.Split(pv.Labels[zoneLabel], labelMultiZoneDelimiter)
+
+	return getRegionFromZones(zonesVal)
 }
 
 // TODO: Replace this with the imported one from GCE PD CSI Driver when

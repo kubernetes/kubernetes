@@ -142,7 +142,7 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateInTreePVToCSI(pv *v1.Persis
 		},
 	}
 
-	if err := translateTopology(pv, AWSEBSTopologyKey); err != nil {
+	if err := translateTopologyFromInTreeToCSI(pv, AWSEBSTopologyKey); err != nil {
 		return nil, fmt.Errorf("failed to translate topology: %v", err)
 	}
 
