@@ -76,6 +76,12 @@ type ObjectScheme interface {
 // ObjectReaction returns a ReactionFunc that applies core.Action to
 // the given tracker.
 func ObjectReaction(tracker ObjectTracker) ReactionFunc {
+	nonUpdatableSubresources := map[schema.GroupVersionResource][]string{
+		schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}:
+			{"attach", "binding", "eviction", "exec", "portforward", "proxy"},
+		schema.GroupVersionResource{Group: "", Version: "v1", Resource: "nodes"}: {"proxy"},
+		schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}: {"proxy"},
+	}
 	return func(action Action) (bool, runtime.Object, error) {
 		ns := action.GetNamespace()
 		gvr := action.GetResource()
@@ -104,6 +110,16 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 				// TODO: Currently we're handling subresource creation as an update
 				// on the enclosing resource. This works for some subresources but
 				// might not be generic enough.
+
+				// Do not update the parent resource if the parent resource is
+				// either pods, nodes, or services and the subresource is one of
+				// {attach, binding, eviction, exec, portforward, proxy}
+				// Issue: https://github.com/kubernetes/kubernetes/issues/80354
+				if sr, ok := nonUpdatableSubresources[action.Resource]; ok {
+					if nonUpdatable(sr, action.Subresource) {
+						return true, action.GetObject(), nil
+					}
+				}
 				err = tracker.Update(gvr, action.GetObject(), ns)
 			}
 			if err != nil {
@@ -192,6 +208,15 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			return false, nil, fmt.Errorf("no reaction implemented for %s", action)
 		}
 	}
+}
+
+func nonUpdatable(subResources []string, toUpdate string) bool{
+	for _, s := range subResources {
+		if s == toUpdate {
+			return true
+		}
+	}
+	return false
 }
 
 type tracker struct {

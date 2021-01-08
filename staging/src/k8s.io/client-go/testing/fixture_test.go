@@ -25,12 +25,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	corev1 "k8s.io/api/core/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 )
@@ -321,4 +324,63 @@ func TestGetWithExactMatch(t *testing.T) {
 	assert.Error(t, err)
 	errNotFound = errors.NewNotFound(gvr.GroupResource(), "pod")
 	assert.EqualError(t, err, errNotFound.Error())
+}
+
+func TestListPodAfterCreateSubresource(t *testing.T) {
+	podsResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+	podsKind := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+	}
+
+	cases := []struct {
+		name string
+		subresourceAction CreateActionImpl
+		parentResourceAction CreateActionImpl
+	}{
+		{
+			name: "eviction",
+			parentResourceAction: NewCreateAction(podsResource, "default", pod),
+			subresourceAction: NewCreateSubresourceAction(podsResource, "foo", "eviction", "default", &policyv1beta1.Eviction{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			}),
+		},
+		{
+			name: "binding",
+			parentResourceAction: NewCreateAction(podsResource, "default", pod),
+			subresourceAction: NewCreateSubresourceAction(podsResource, "cool", "binding", "default", &corev1.Binding{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			}),
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			assert.NoError(t, corev1.AddToScheme(scheme))
+			assert.NoError(t, policyv1beta1.AddToScheme(scheme))
+
+			codecs := serializer.NewCodecFactory(scheme)
+			o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+			reaction := ObjectReaction(o)
+
+			handled, obj, err := reaction(c.parentResourceAction)
+			assert.True(t, handled)
+			assert.NotNil(t, obj)
+			assert.NoError(t, err)
+
+			handled, obj, err = reaction(c.subresourceAction)
+			assert.True(t, handled)
+			assert.NotNil(t, obj)
+			assert.NoError(t, err)
+
+			action := NewListAction(podsResource, podsKind, "default", metav1.ListOptions{})
+			handled, list, err := reaction(action)
+			assert.True(t, handled)
+
+			pods := list.(*corev1.PodList)
+			assert.Equal(t, *pod, pods.Items[0])
+			assert.NoError(t, err)
+		})
+	}
 }
