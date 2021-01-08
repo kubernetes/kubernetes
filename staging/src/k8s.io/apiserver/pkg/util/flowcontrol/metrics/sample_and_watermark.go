@@ -93,7 +93,8 @@ func NewSampleAndWaterMarkHistogramsGenerator(clock clock.PassiveClock, samplePe
 		}}
 }
 
-func (swg *sampleAndWaterMarkObserverGenerator) quantize(when time.Time) int64 {
+// quantize calculates the number of sampling periods since swg.t0
+func (swg *sampleAndWaterMarkObserverGenerator) quantize(when *time.Time) int64 {
 	return int64(when.Sub(swg.t0) / swg.samplePeriod)
 }
 
@@ -109,7 +110,7 @@ func (swg *sampleAndWaterMarkObserverGenerator) Generate(x, x1 float64, labelVal
 		x1:                                  x1,
 		sampleAndWaterMarkAccumulator: sampleAndWaterMarkAccumulator{
 			lastSet:    when,
-			lastSetInt: swg.quantize(when),
+			lastSetInt: swg.quantize(&when),
 			x:          x,
 			relX:       relX,
 			loRelX:     relX,
@@ -161,6 +162,7 @@ func (saw *sampleAndWaterMarkHistograms) SetX1(x1 float64) {
 
 func (saw *sampleAndWaterMarkHistograms) innerSet(updateXOrX1 func()) {
 	var when time.Time
+	whenP := &when // tiptoe around https://github.com/golang/go/issues/43570 (for kube #97685)
 	var whenInt int64
 	var acc sampleAndWaterMarkAccumulator
 	var wellOrdered bool
@@ -168,7 +170,7 @@ func (saw *sampleAndWaterMarkHistograms) innerSet(updateXOrX1 func()) {
 		saw.Lock()
 		defer saw.Unlock()
 		when = saw.clock.Now()
-		whenInt = saw.quantize(when)
+		whenInt = saw.quantize(whenP)
 		acc = saw.sampleAndWaterMarkAccumulator
 		wellOrdered = !when.Before(acc.lastSet)
 		updateXOrX1()
