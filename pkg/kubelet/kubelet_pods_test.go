@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -2677,5 +2678,31 @@ func TestGenerateAPIPodStatusPodIPs(t *testing.T) {
 				t.Fatalf("Expected PodIP %q to equal PodIPs[0].IP %q", status.PodIP, status.PodIPs[0].IP)
 			}
 		})
+	}
+}
+
+func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
+	pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+
+	testTimestamp := time.Unix(123456789, 987654321)
+
+	criStatus := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{
+			{Name: "containerA", CreatedAt: testTimestamp},
+			{Name: "containerB", CreatedAt: testTimestamp.Add(1)},
+		},
+	}
+
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+
+	for i := 0; i < 10; i++ {
+		go func() {
+			kl.convertToAPIContainerStatuses(pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, false, false)
+		}()
 	}
 }
