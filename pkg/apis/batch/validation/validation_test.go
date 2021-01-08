@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -100,9 +99,11 @@ func TestValidateJob(t *testing.T) {
 		},
 	}
 	for k, v := range successCases {
-		if errs := ValidateJob(&v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
-			t.Errorf("expected success for %s: %v", k, errs)
-		}
+		t.Run(k, func(t *testing.T) {
+			if errs := ValidateJob(&v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+				t.Errorf("Got unexpected validation errors: %v", errs)
+			}
+		})
 	}
 	negative := int32(-1)
 	negative64 := int64(-1)
@@ -237,29 +238,22 @@ func TestValidateJob(t *testing.T) {
 				},
 			},
 		},
+		"spec.ttlSecondsAfterFinished:must be greater than or equal to 0": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "myjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.JobSpec{
+				TTLSecondsAfterFinished: &negative,
+				Selector:                validGeneratedSelector,
+				Template:                validPodTemplateSpecForGenerated,
+			},
+		},
 	}
 
-	for _, setFeature := range []bool{true, false} {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, setFeature)()
-		ttlCase := "spec.ttlSecondsAfterFinished:must be greater than or equal to 0"
-		if utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
-			errorCases[ttlCase] = batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "myjob",
-					Namespace: metav1.NamespaceDefault,
-					UID:       types.UID("1a2b3c"),
-				},
-				Spec: batch.JobSpec{
-					TTLSecondsAfterFinished: &negative,
-					Selector:                validGeneratedSelector,
-					Template:                validPodTemplateSpecForGenerated,
-				},
-			}
-		} else {
-			delete(errorCases, ttlCase)
-		}
-
-		for k, v := range errorCases {
+	for k, v := range errorCases {
+		t.Run(k, func(t *testing.T) {
 			errs := ValidateJob(&v, corevalidation.PodValidationOptions{})
 			if len(errs) == 0 {
 				t.Errorf("expected failure for %s", k)
@@ -270,7 +264,7 @@ func TestValidateJob(t *testing.T) {
 					t.Errorf("unexpected error: %v, expected: %s", err, k)
 				}
 			}
-		}
+		})
 	}
 }
 
