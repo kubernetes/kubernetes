@@ -510,7 +510,10 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 		}
 	}
 
-	if quota.IsZero(deltaUsage) {
+	// ignore items in deltaUsage with zero usage
+	deltaUsage = quota.RemoveZeros(deltaUsage)
+	// if there is no remaining non-zero usage, short-circuit and return
+	if len(deltaUsage) == 0 {
 		return quotas, nil
 	}
 
