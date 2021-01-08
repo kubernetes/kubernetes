@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -1621,6 +1622,107 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			})
 		}
 	})
+
+	ginkgo.Context("CSI Snapshot Controller metrics [Feature:VolumeSnapshotDataSource]", func() {
+		tests := []struct {
+			name    string
+			pattern storageframework.TestPattern
+		}{
+			{
+				name:    "snapshot controller should emit dynamic CreateSnapshot, CreateSnapshotAndReady, and DeleteSnapshot metrics",
+				pattern: storageframework.DynamicSnapshotDelete,
+			},
+			{
+				name:    "snapshot controller should emit pre-provisioned CreateSnapshot, CreateSnapshotAndReady, and DeleteSnapshot metrics",
+				pattern: storageframework.PreprovisionedSnapshotDelete,
+			},
+		}
+		for _, test := range tests {
+			ginkgo.It(test.name, func() {
+				init(testParameters{
+					disableAttach:  true,
+					registerDriver: true,
+					enableSnapshot: true,
+				})
+
+				sDriver, ok := m.driver.(storageframework.SnapshottableTestDriver)
+				if !ok {
+					e2eskipper.Skipf("mock driver does not support snapshots -- skipping")
+				}
+				defer cleanup()
+
+				metricsGrabber, err := e2emetrics.NewMetricsGrabber(m.config.Framework.ClientSet, nil, false, false, false, false, false, true)
+				if err != nil {
+					framework.Failf("Error creating metrics grabber : %v", err)
+				}
+
+				// Grab initial metrics - if this fails, snapshot controller metrics are not setup. Skip in this case.
+				_, err = metricsGrabber.GrabFromSnapshotController(framework.TestContext.SnapshotControllerPodName, framework.TestContext.SnapshotControllerHTTPPort)
+				if err != nil {
+					e2eskipper.Skipf("Snapshot controller metrics not found -- skipping")
+				}
+
+				ginkgo.By("getting all initial metric values")
+				metricsTestConfig := newSnapshotMetricsTestConfig("snapshot_controller_operation_total_seconds_count",
+					"count",
+					m.config.GetUniqueDriverName(),
+					"CreateSnapshot",
+					"success",
+					"",
+					test.pattern)
+				createSnapshotMetrics := newSnapshotControllerMetrics(metricsTestConfig, metricsGrabber)
+				originalCreateSnapshotCount, _ := createSnapshotMetrics.getSnapshotControllerMetricValue()
+				metricsTestConfig.operationName = "CreateSnapshotAndReady"
+				createSnapshotAndReadyMetrics := newSnapshotControllerMetrics(metricsTestConfig, metricsGrabber)
+				originalCreateSnapshotAndReadyCount, _ := createSnapshotAndReadyMetrics.getSnapshotControllerMetricValue()
+
+				metricsTestConfig.operationName = "DeleteSnapshot"
+				deleteSnapshotMetrics := newSnapshotControllerMetrics(metricsTestConfig, metricsGrabber)
+				originalDeleteSnapshotCount, _ := deleteSnapshotMetrics.getSnapshotControllerMetricValue()
+
+				ginkgo.By("Creating storage class")
+				var sc *storagev1.StorageClass
+				if dDriver, ok := m.driver.(storageframework.DynamicPVTestDriver); ok {
+					sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
+				}
+				class, err := m.cs.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
+				framework.ExpectNoError(err, "Failed to create storage class: %v", err)
+				m.sc[class.Name] = class
+				pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+					Name:             "snapshot-test-pvc",
+					StorageClassName: &(class.Name),
+				}, f.Namespace.Name)
+
+				ginkgo.By(fmt.Sprintf("Creating PVC %s/%s", pvc.Namespace, pvc.Name))
+				pvc, err = m.cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
+				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+
+				ginkgo.By("Wait for PVC to be Bound")
+				_, err = e2epv.WaitForPVClaimBoundPhase(m.cs, []*v1.PersistentVolumeClaim{pvc}, 1*time.Minute)
+				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+
+				ginkgo.By("Creating snapshot")
+				parameters := map[string]string{}
+				sr := storageframework.CreateSnapshotResource(sDriver, m.config, test.pattern, pvc.Name, pvc.Namespace, f.Timeouts, parameters)
+				framework.ExpectNoError(err, "failed to create snapshot")
+
+				ginkgo.By("Checking for CreateSnapshot metrics")
+				createSnapshotMetrics.waitForSnapshotControllerMetric(originalCreateSnapshotCount+1.0, f.Timeouts.SnapshotControllerMetrics)
+
+				ginkgo.By("Checking for CreateSnapshotAndReady metrics")
+				err = utils.WaitForSnapshotReady(m.config.Framework.DynamicClient, pvc.Namespace, sr.Vs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate)
+				framework.ExpectNoError(err, "failed to wait for snapshot ready")
+				createSnapshotAndReadyMetrics.waitForSnapshotControllerMetric(originalCreateSnapshotAndReadyCount+1.0, f.Timeouts.SnapshotControllerMetrics)
+
+				// delete the snapshot and check if the snapshot is deleted
+				deleteSnapshot(m.cs, m.config, sr.Vs)
+
+				ginkgo.By("check for delete metrics")
+				metricsTestConfig.operationName = "DeleteSnapshot"
+				deleteSnapshotMetrics.waitForSnapshotControllerMetric(originalDeleteSnapshotCount+1.0, f.Timeouts.SnapshotControllerMetrics)
+			})
+		}
+	})
 })
 
 func deleteSnapshot(cs clientset.Interface, config *storageframework.PerTestConfig, snapshot *unstructured.Unstructured) {
@@ -2135,4 +2237,184 @@ func createPreHook(method string, callback func(counter int64) error) *drivers.H
 			}
 		}(),
 	}
+}
+
+type snapshotMetricsTestConfig struct {
+	// expected values
+	metricName      string
+	metricType      string
+	driverName      string
+	operationName   string
+	operationStatus string
+	snapshotType    string
+	le              string
+}
+
+type snapshotControllerMetrics struct {
+	// configuration for metric
+	cfg            snapshotMetricsTestConfig
+	metricsGrabber *e2emetrics.Grabber
+
+	// results
+	countMetrics  map[string]float64
+	sumMetrics    map[string]float64
+	bucketMetrics map[string]float64
+}
+
+func newSnapshotMetricsTestConfig(metricName, metricType, driverName, operationName, operationStatus, le string, pattern storageframework.TestPattern) snapshotMetricsTestConfig {
+	var snapshotType string
+	switch pattern.SnapshotType {
+	case storageframework.DynamicCreatedSnapshot:
+		snapshotType = "dynamic"
+
+	case storageframework.PreprovisionedCreatedSnapshot:
+		snapshotType = "pre-provisioned"
+
+	default:
+		framework.Failf("invalid snapshotType: %v", pattern.SnapshotType)
+	}
+
+	return snapshotMetricsTestConfig{
+		metricName:      metricName,
+		metricType:      metricType,
+		driverName:      driverName,
+		operationName:   operationName,
+		operationStatus: operationStatus,
+		snapshotType:    snapshotType,
+		le:              le,
+	}
+}
+
+func newSnapshotControllerMetrics(cfg snapshotMetricsTestConfig, metricsGrabber *e2emetrics.Grabber) *snapshotControllerMetrics {
+	return &snapshotControllerMetrics{
+		cfg:            cfg,
+		metricsGrabber: metricsGrabber,
+
+		countMetrics:  make(map[string]float64),
+		sumMetrics:    make(map[string]float64),
+		bucketMetrics: make(map[string]float64),
+	}
+}
+
+func (scm *snapshotControllerMetrics) waitForSnapshotControllerMetric(expectedValue float64, timeout time.Duration) {
+	metricKey := scm.getMetricKey()
+	if successful := utils.WaitUntil(10*time.Second, timeout, func() bool {
+		// get metric value
+		actualValue, err := scm.getSnapshotControllerMetricValue()
+		if err != nil {
+			return false
+		}
+
+		// Another operation could have finished from a previous test,
+		// so we check if we have at least the expected value.
+		if actualValue < expectedValue {
+			return false
+		}
+
+		return true
+	}); successful {
+		return
+	}
+
+	scm.showMetricsFailure(metricKey)
+	framework.Failf("Unable to get valid snapshot controller metrics after %v", timeout)
+}
+
+func (scm *snapshotControllerMetrics) getSnapshotControllerMetricValue() (float64, error) {
+	metricKey := scm.getMetricKey()
+
+	// grab and parse into readable format
+	err := scm.grabSnapshotControllerMetrics()
+	if err != nil {
+		return 0, err
+	}
+
+	metrics := scm.getMetricsTable()
+	actual, ok := metrics[metricKey]
+	if !ok {
+		return 0, fmt.Errorf("did not find metric for key %s", metricKey)
+	}
+
+	return actual, nil
+}
+
+func (scm *snapshotControllerMetrics) getMetricsTable() map[string]float64 {
+	var metrics map[string]float64
+	switch scm.cfg.metricType {
+	case "count":
+		metrics = scm.countMetrics
+
+	case "sum":
+		metrics = scm.sumMetrics
+
+	case "bucket":
+		metrics = scm.bucketMetrics
+	}
+
+	return metrics
+}
+
+func (scm *snapshotControllerMetrics) showMetricsFailure(metricKey string) {
+	framework.Logf("failed to find metric key %s inside of the following metrics:", metricKey)
+
+	metrics := scm.getMetricsTable()
+	for k, v := range metrics {
+		framework.Logf("%s: %v", k, v)
+	}
+}
+
+func (scm *snapshotControllerMetrics) grabSnapshotControllerMetrics() error {
+	// pull all metrics
+	metrics, err := scm.metricsGrabber.GrabFromSnapshotController(framework.TestContext.SnapshotControllerPodName, framework.TestContext.SnapshotControllerHTTPPort)
+	if err != nil {
+		return err
+	}
+
+	for method, samples := range metrics {
+
+		for _, sample := range samples {
+			operationName := string(sample.Metric["operation_name"])
+			driverName := string(sample.Metric["driver_name"])
+			operationStatus := string(sample.Metric["operation_status"])
+			snapshotType := string(sample.Metric["snapshot_type"])
+			le := string(sample.Metric["le"])
+			key := snapshotMetricKey(scm.cfg.metricName, driverName, operationName, operationStatus, snapshotType, le)
+
+			switch method {
+			case "snapshot_controller_operation_total_seconds_count":
+				for _, sample := range samples {
+					scm.countMetrics[key] = float64(sample.Value)
+				}
+
+			case "snapshot_controller_operation_total_seconds_sum":
+				for _, sample := range samples {
+					scm.sumMetrics[key] = float64(sample.Value)
+				}
+
+			case "snapshot_controller_operation_total_seconds_bucket":
+				for _, sample := range samples {
+					scm.bucketMetrics[key] = float64(sample.Value)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (scm *snapshotControllerMetrics) getMetricKey() string {
+	return snapshotMetricKey(scm.cfg.metricName, scm.cfg.driverName, scm.cfg.operationName, scm.cfg.operationStatus, scm.cfg.snapshotType, scm.cfg.le)
+}
+
+func snapshotMetricKey(metricName, driverName, operationName, operationStatus, snapshotType, le string) string {
+	key := driverName
+
+	// build key for shorthand metrics storage
+	for _, s := range []string{metricName, operationName, operationStatus, snapshotType, le} {
+		if s != "" {
+			key = fmt.Sprintf("%s_%s", key, s)
+		}
+	}
+
+	return key
 }
