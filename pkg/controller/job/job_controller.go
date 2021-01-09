@@ -27,7 +27,6 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -453,7 +452,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 	}
 	sharedJob, err := jm.jobLister.Jobs(ns).Get(name)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			klog.V(4).Infof("Job has been deleted: %v", key)
 			jm.expectations.DeleteExpectations(key)
 			return true, nil
@@ -778,7 +777,7 @@ func (jm *Controller) manageJob(activePods []*v1.Pod, succeeded int32, job *batc
 					defer wait.Done()
 					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, metav1.NewControllerRef(job, controllerKind))
 					if err != nil {
-						if errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+						if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 							// If the namespace is being torn down, we can safely ignore
 							// this error since all subsequent creations will fail.
 							return
