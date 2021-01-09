@@ -301,7 +301,7 @@ func (im *realImageGCManager) GarbageCollect() error {
 	usagePercent := 100 - int(available*100/capacity)
 	if usagePercent >= im.policy.HighThresholdPercent {
 		amountToFree := capacity*int64(100-im.policy.LowThresholdPercent)/100 - available
-		klog.InfoS("[imageGCManager]: Disk usage on image filesystem is over the high threshold,Trying to down to the low threshold.", "usagePercent(%)", usagePercent, "highThreshold(%)", im.policy.HighThresholdPercent, "amountToFree(bytes)", amountToFree, "lowThreshold(%)", im.policy.LowThresholdPercent)
+		klog.InfoS("[imageGCManager]: Disk usage on image filesystem is over the high threshold,Trying to free bytes down to the low threshold.", "usagePercent(%)", usagePercent, "highThreshold(%)", im.policy.HighThresholdPercent, "amountToFree(bytes)", amountToFree, "lowThreshold(%)", im.policy.LowThresholdPercent)
 		freed, err := im.freeSpace(amountToFree, time.Now())
 		if err != nil {
 			return err
@@ -359,7 +359,7 @@ func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (
 		klog.V(5).InfoS("Evaluating image for possible garbage collection", "imageID", image.id)
 		// Images that are currently in used were given a newer lastUsed.
 		if image.lastUsed.Equal(freeTime) || image.lastUsed.After(freeTime) {
-                      klog.V(5).InfoS("Image's lastUsed >= freeTime, not eligible for garbage collection", "imageID", image.id, "imageLastUsed", image.lastUsed, "freeTime", freeTime)
+                      klog.V(5).InfoS("Image's lastUsed is >= freeTime, not eligible for garbage collection", "imageID", image.id, "imageLastUsed", image.lastUsed, "freeTime", freeTime)
 			continue
 		}
 
