@@ -137,7 +137,7 @@ type PriorityQueue struct {
 	// when a pod is popped.
 	schedulingCycle int64
 	// moveRequestCycle caches the sequence number of scheduling cycle when we
-	// received a move request. Unscheduable pods in and before this scheduling
+	// received a move request. Unschedulable pods in and before this scheduling
 	// cycle will be put back to activeQueue if we were trying to schedule them
 	// when we received move request.
 	moveRequestCycle int64
