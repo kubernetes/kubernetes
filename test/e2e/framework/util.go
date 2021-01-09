@@ -1234,20 +1234,23 @@ func RunCmdEnv(env []string, command string, args ...string) (string, string, er
 	return stdout, stderr, nil
 }
 
-// getMasterAddresses returns the externalIP, internalIP and hostname fields of the master.
-// If any of these is unavailable, it is set to "".
-func getMasterAddresses(c clientset.Interface) (string, string, string) {
-	var externalIP, internalIP, hostname string
+// getControlPlaneAddresses returns the externalIP, internalIP and hostname fields of control plane nodes.
+// If any of these is unavailable, empty slices are returned.
+func getControlPlaneAddresses(c clientset.Interface) ([]string, []string, []string) {
+	var externalIPs, internalIPs, hostnames []string
 
-	// Populate the internal IP.
+	// Populate the internal IPs.
 	eps, err := c.CoreV1().Endpoints(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 	if err != nil {
 		Failf("Failed to get kubernetes endpoints: %v", err)
 	}
-	if len(eps.Subsets) != 1 || len(eps.Subsets[0].Addresses) != 1 {
-		Failf("There are more than 1 endpoints for kubernetes service: %+v", eps)
+	for _, subset := range eps.Subsets {
+		for _, address := range subset.Addresses {
+			if address.IP != "" {
+				internalIPs = append(internalIPs, address.IP)
+			}
+		}
 	}
-	internalIP = eps.Subsets[0].Addresses[0].IP
 
 	// Populate the external IP/hostname.
 	hostURL, err := url.Parse(TestContext.Host)
@@ -1255,12 +1258,12 @@ func getMasterAddresses(c clientset.Interface) (string, string, string) {
 		Failf("Failed to parse hostname: %v", err)
 	}
 	if net.ParseIP(hostURL.Host) != nil {
-		externalIP = hostURL.Host
+		externalIPs = append(externalIPs, hostURL.Host)
 	} else {
-		hostname = hostURL.Host
+		hostnames = append(hostnames, hostURL.Host)
 	}
 
-	return externalIP, internalIP, hostname
+	return externalIPs, internalIPs, hostnames
 }
 
 // GetControlPlaneAddresses returns all IP addresses on which the kubelet can reach the control plane.
@@ -1268,16 +1271,16 @@ func getMasterAddresses(c clientset.Interface) (string, string, string) {
 // e.g. internal IPs to be used (issue #56787), so that we can be
 // sure to block the control plane fully during tests.
 func GetControlPlaneAddresses(c clientset.Interface) []string {
-	externalIP, internalIP, _ := getMasterAddresses(c)
+	externalIPs, internalIPs, _ := getControlPlaneAddresses(c)
 
 	ips := sets.NewString()
 	switch TestContext.Provider {
 	case "gce", "gke":
-		if externalIP != "" {
-			ips.Insert(externalIP)
+		for _, ip := range externalIPs {
+			ips.Insert(ip)
 		}
-		if internalIP != "" {
-			ips.Insert(internalIP)
+		for _, ip := range internalIPs {
+			ips.Insert(ip)
 		}
 	case "aws":
 		ips.Insert(awsMasterIP)
