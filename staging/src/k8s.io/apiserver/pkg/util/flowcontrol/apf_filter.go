@@ -112,21 +112,28 @@ func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest Reque
 	}
 	klog.V(7).Infof("Handle(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, isExempt=%v, queued=%v", requestDigest, fs.Name, fs.Spec.DistinguisherMethod, pl.Name, isExempt, queued)
 	var executed bool
-	idle := req.Finish(func() {
+	idle, panicking := true, true
+	defer func() {
+		klog.V(7).Infof("Handle(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, isExempt=%v, queued=%v, Finish() => panicking=%v idle=%v",
+			requestDigest, fs.Name, fs.Spec.DistinguisherMethod, pl.Name, isExempt, queued, panicking, idle)
+		if idle {
+			cfgCtlr.maybeReap(pl.Name)
+		}
+	}()
+	idle = req.Finish(func() {
 		if queued {
 			metrics.ObserveWaitingDuration(pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))
 		}
 		metrics.AddDispatch(pl.Name, fs.Name)
 		executed = true
 		startExecutionTime := time.Now()
+		defer func() {
+			metrics.ObserveExecutionDuration(pl.Name, fs.Name, time.Since(startExecutionTime))
+		}()
 		execFn()
-		metrics.ObserveExecutionDuration(pl.Name, fs.Name, time.Since(startExecutionTime))
 	})
 	if queued && !executed {
 		metrics.ObserveWaitingDuration(pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))
 	}
-	klog.V(7).Infof("Handle(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, isExempt=%v, queued=%v, Finish() => idle=%v", requestDigest, fs.Name, fs.Spec.DistinguisherMethod, pl.Name, isExempt, queued, idle)
-	if idle {
-		cfgCtlr.maybeReap(pl.Name)
-	}
+	panicking = false
 }
