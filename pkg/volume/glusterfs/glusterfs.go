@@ -46,6 +46,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -662,7 +663,9 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 			return fmt.Errorf("failed to release gid %v: %v", gid, err)
 		}
 	}
-	cli := gcli.NewClient(d.url, d.user, d.secretValue)
+	opts := gcli.DefaultClientOptions()
+	opts.DialContext = proxyutil.NewFilteredDialContext(opts.DialContext, nil, d.plugin.host.GetFilteredDialOptions())
+	cli := gcli.NewClientWithOptions(d.url, d.user, d.secretValue, opts)
 	if cli == nil {
 		klog.Errorf("failed to create glusterfs REST client")
 		return fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
@@ -794,7 +797,9 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 	if p.url == "" {
 		return nil, 0, "", fmt.Errorf("failed to create glusterfs REST client, REST URL is empty")
 	}
-	cli := gcli.NewClient(p.url, p.user, p.secretValue)
+	opts := gcli.DefaultClientOptions()
+	opts.DialContext = proxyutil.NewFilteredDialContext(opts.DialContext, nil, p.plugin.host.GetFilteredDialOptions())
+	cli := gcli.NewClientWithOptions(p.url, p.user, p.secretValue, opts)
 	if cli == nil {
 		return nil, 0, "", fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
 	}
@@ -1205,7 +1210,9 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 	klog.V(4).Infof("expanding volume: %q", volumeID)
 
 	//Create REST server connection
-	cli := gcli.NewClient(cfg.url, cfg.user, cfg.secretValue)
+	opts := gcli.DefaultClientOptions()
+	opts.DialContext = proxyutil.NewFilteredDialContext(opts.DialContext, nil, plugin.host.GetFilteredDialOptions())
+	cli := gcli.NewClientWithOptions(cfg.url, cfg.user, cfg.secretValue, opts)
 	if cli == nil {
 		klog.Errorf("failed to create glusterfs REST client")
 		return oldSize, fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")

@@ -56,6 +56,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "gke_patch_test.go",
         "metrics_du_test.go",
         "metrics_nil_test.go",
         "metrics_statfs_test.go",
@@ -69,6 +70,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
+        "//vendor/github.com/heketi/heketi/client/api/go-client:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/features:go_default_library",
