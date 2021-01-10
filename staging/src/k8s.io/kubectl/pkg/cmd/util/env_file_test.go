@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package versioned
+package util
 
 import (
 	"os"
@@ -50,7 +50,7 @@ func Test_processEnvFileLine(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			key, value, err := proccessEnvFileLine(tt.line, `filename`, tt.currentLine)
+			key, value, err := processEnvFileLine(tt.line, `filename`, tt.currentLine)
 			t.Logf("Testing that %s.", tt.name)
 			if tt.expectedKey != key {
 				t.Errorf("\texpected key %q, received %q", tt.expectedKey, key)
@@ -92,7 +92,7 @@ func Test_processEnvFileLine_readEnvironment(t *testing.T) {
 
 	os.Setenv(realKey, `my_value`)
 
-	key, value, err := proccessEnvFileLine([]byte(realKey), `filename`, 3)
+	key, value, err := processEnvFileLine([]byte(realKey), `filename`, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
