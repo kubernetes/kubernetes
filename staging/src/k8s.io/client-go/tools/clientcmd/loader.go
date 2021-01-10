@@ -40,14 +40,24 @@ import (
 const (
 	RecommendedConfigPathFlag   = "kubeconfig"
 	RecommendedConfigPathEnvVar = "KUBECONFIG"
-	RecommendedHomeDir          = ".kube"
+	RecommendedHomeDir          = ".config/kube"
 	RecommendedFileName         = "config"
 	RecommendedSchemaName       = "schema"
+
+	PrevRecommendedHomeDir = ".kube"
 )
 
 var (
-	RecommendedConfigDir  = filepath.Join(homedir.HomeDir(), RecommendedHomeDir)
-	RecommendedHomeFile   = filepath.Join(RecommendedConfigDir, RecommendedFileName)
+	/* Early days - Initial path for config: $HOME/.kube/.kubeconfig */
+	InitialRecommendedFileName = filepath.Join(homedir.HomeDir(), PrevRecommendedHomeDir, ".kubeconfig")
+
+	/* Second recommended path for config: $HOME/.kube/config */
+	KubeConfigRecommendedFileName = filepath.Join(homedir.HomeDir(), PrevRecommendedHomeDir, RecommendedFileName)
+
+	/* Current path uses XDG Base Directory Spec: $HOME/.config/kube/config */
+	RecommendedConfigDir = filepath.Join(homedir.HomeDir(), RecommendedHomeDir)
+	RecommendedHomeFile  = filepath.Join(RecommendedConfigDir, RecommendedFileName)
+
 	RecommendedSchemaFile = filepath.Join(RecommendedConfigDir, RecommendedSchemaName)
 )
 
@@ -59,10 +69,11 @@ func currentMigrationRules() map[string]string {
 	if goruntime.GOOS == "windows" {
 		oldRecommendedHomeFileName = RecommendedFileName
 	} else {
-		oldRecommendedHomeFileName = ".kubeconfig"
+		oldRecommendedHomeFileName = InitialRecommendedFileName
 	}
 	return map[string]string{
-		RecommendedHomeFile: filepath.Join(os.Getenv("HOME"), RecommendedHomeDir, oldRecommendedHomeFileName),
+		KubeConfigRecommendedFileName: oldRecommendedHomeFileName,
+		RecommendedHomeFile:           KubeConfigRecommendedFileName,
 	}
 }
 
@@ -201,7 +212,6 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 		}
 
 		config, err := LoadFromFile(filename)
-
 		if os.IsNotExist(err) {
 			// skip missing files
 			// Add to the missing list to produce a warning
@@ -281,12 +291,11 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 			return fmt.Errorf("cannot migrate %v to %v because it is a directory", source, destination)
 		}
 
-		data, err := ioutil.ReadFile(source)
+		config, err := LoadFromFile(source)
 		if err != nil {
 			return err
 		}
-		// destination is created with mode 0666 before umask
-		err = ioutil.WriteFile(destination, data, 0666)
+		err = WriteToFile(*config, destination)
 		if err != nil {
 			return err
 		}

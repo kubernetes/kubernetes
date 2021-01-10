@@ -873,7 +873,7 @@ func TestLoadingGetLoadingPrecedence(t *testing.T) {
 		precedence []string
 	}{
 		"default": {
-			precedence: []string{filepath.Join(os.Getenv("HOME"), ".kube/config")},
+			precedence: []string{filepath.Join(os.Getenv("HOME"), ".config/kube/config")},
 		},
 		"explicit": {
 			rules: &ClientConfigLoadingRules{
