@@ -163,11 +163,14 @@ func getTestCases(hostname types.NodeName) []*testCase {
 			},
 			expected: CreatePodUpdate(kubetypes.SET, kubetypes.FileSource, &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "test-" + string(hostname),
-					UID:         "12345",
-					Namespace:   "mynamespace",
-					Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "12345"},
-					SelfLink:    getSelfLink("test-"+string(hostname), "mynamespace"),
+					Name:      "test-" + string(hostname),
+					UID:       "12345",
+					Namespace: "mynamespace",
+					Annotations: map[string]string{
+						kubetypes.ConfigHashAnnotationKey:         "12345",
+						kubetypes.ConfigHashInternalAnnotationKey: "5c62b4264c31a432f77ed8081845e387",
+					},
+					SelfLink: getSelfLink("test-"+string(hostname), "mynamespace"),
 				},
 				Spec: v1.PodSpec{
 					NodeName:                      string(hostname),
@@ -330,6 +333,8 @@ func watchFileChanged(watchDir bool, symlink bool, t *testing.T) {
 				pod.Spec.Containers[0].Name = "image2"
 
 				testCase.expected.Pods[0].Spec.Containers[0].Name = "image2"
+				testCase.expected.Pods[0].Annotations[kubetypes.ConfigHashInternalAnnotationKey] =
+					"56e6670f5382b85bfcb869e7f4ed2cf5"
 				if symlink {
 					file = testCase.writeToFile(linkedDirName, fileName, t)
 					return

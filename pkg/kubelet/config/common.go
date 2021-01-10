@@ -58,9 +58,8 @@ func generatePodName(name string, nodeName types.NodeName) string {
 func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
-		hash.DeepHashObject(hasher, pod)
-		// DeepHashObject resets the hash, so we should write the pod source
-		// information AFTER it.
+		fmt.Fprintf(hasher, "pod:%s", pod.Name)
+		fmt.Fprintf(hasher, "namespace:%s", pod.Namespace)
 		if isFile {
 			fmt.Fprintf(hasher, "host:%s", nodeName)
 			fmt.Fprintf(hasher, "file:%s", source)
@@ -87,7 +86,13 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
 	}
-	// The generated UID is the hash of the file.
+
+	hasher := md5.New()
+	hash.DeepHashObject(hasher, pod)
+	// Using the hash of the pod to compare diff
+	pod.Annotations[kubetypes.ConfigHashInternalAnnotationKey] = hex.EncodeToString(hasher.Sum(nil)[0:])
+
+	// The generated UID is the hash of the pod identifier(name, namespace, source...)
 	pod.Annotations[kubetypes.ConfigHashAnnotationKey] = string(pod.UID)
 
 	if isFile {

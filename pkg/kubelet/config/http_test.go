@@ -160,11 +160,14 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				kubetypes.HTTPSource,
 				&v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
-						UID:         "111",
-						Name:        "foo" + "-" + nodeName,
-						Namespace:   "mynamespace",
-						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
-						SelfLink:    getSelfLink("foo-"+nodeName, "mynamespace"),
+						UID:       "111",
+						Name:      "foo" + "-" + nodeName,
+						Namespace: "mynamespace",
+						Annotations: map[string]string{
+							kubetypes.ConfigHashAnnotationKey:         "111",
+							kubetypes.ConfigHashInternalAnnotationKey: "63152656d2a3012a6798130d5b6dcae2",
+						},
+						SelfLink: getSelfLink("foo-"+nodeName, "mynamespace"),
 					},
 					Spec: v1.PodSpec{
 						NodeName:                      nodeName,
@@ -232,11 +235,14 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				kubetypes.HTTPSource,
 				&v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
-						UID:         "111",
-						Name:        "foo" + "-" + nodeName,
-						Namespace:   "default",
-						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
-						SelfLink:    getSelfLink("foo-"+nodeName, metav1.NamespaceDefault),
+						UID:       "111",
+						Name:      "foo" + "-" + nodeName,
+						Namespace: "default",
+						Annotations: map[string]string{
+							kubetypes.ConfigHashAnnotationKey:         "111",
+							kubetypes.ConfigHashInternalAnnotationKey: "a7dd5dc3ee4fe954826e7af351eade03",
+						},
+						SelfLink: getSelfLink("foo-"+nodeName, metav1.NamespaceDefault),
 					},
 					Spec: v1.PodSpec{
 						NodeName:                      nodeName,
@@ -261,11 +267,14 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				},
 				&v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
-						UID:         "222",
-						Name:        "bar" + "-" + nodeName,
-						Namespace:   "default",
-						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "222"},
-						SelfLink:    getSelfLink("bar-"+nodeName, metav1.NamespaceDefault),
+						UID:       "222",
+						Name:      "bar" + "-" + nodeName,
+						Namespace: "default",
+						Annotations: map[string]string{
+							kubetypes.ConfigHashAnnotationKey:         "222",
+							kubetypes.ConfigHashInternalAnnotationKey: "948fd58f0260cedfc4d96f3acf0e9e5b",
+						},
+						SelfLink: getSelfLink("bar-"+nodeName, metav1.NamespaceDefault),
 					},
 					Spec: v1.PodSpec{
 						NodeName:                      nodeName,

@@ -26,10 +26,11 @@ import (
 
 // Annotation keys for annotations used in this package.
 const (
-	ConfigSourceAnnotationKey    = "kubernetes.io/config.source"
-	ConfigMirrorAnnotationKey    = v1.MirrorPodAnnotationKey
-	ConfigFirstSeenAnnotationKey = "kubernetes.io/config.seen"
-	ConfigHashAnnotationKey      = "kubernetes.io/config.hash"
+	ConfigSourceAnnotationKey       = "kubernetes.io/config.source"
+	ConfigMirrorAnnotationKey       = v1.MirrorPodAnnotationKey
+	ConfigFirstSeenAnnotationKey    = "kubernetes.io/config.seen"
+	ConfigHashAnnotationKey         = "kubernetes.io/config.hash"
+	ConfigHashInternalAnnotationKey = "kubernetes.io/config.hash.internal"
 )
 
 // PodOperation defines what changes will be made on a pod configuration.
