@@ -18,10 +18,6 @@ package debug
 
 import (
 	"fmt"
-	"strings"
-	"testing"
-	"time"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/cobra"
@@ -31,6 +27,9 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/utils/pointer"
+	"strings"
+	"testing"
+	"time"
 )
 
 func TestGenerateDebugContainer(t *testing.T) {
@@ -285,6 +284,48 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 							Name:            "debugger",
 							Image:           "busybox",
 							ImagePullPolicy: corev1.PullIfNotPresent,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "basic with capabilities",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Container:  "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Overrides:  `{"securityContext":{"capabilities":{"add":["NET_ADMIN","SYS_TIME"]}}}`,
+			},
+			havePod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger",
+						},
+					},
+					NodeName: "node-1",
+				},
+			},
+			wantPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            "debugger",
+							Image:           "busybox",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"NET_ADMIN", "SYS_TIME"},
+								},
+							},
 						},
 					},
 				},
@@ -1164,12 +1205,67 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:     "debug args as container args with overrides",
+			nodeName: "node-XXX",
+			opts: &DebugOptions{
+				ArgsOnly:   true,
+				Container:  "custom-debugger",
+				Args:       []string{"echo", "one", "two", "three"},
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Overrides:  `{"securityContext":{"capabilities":{"add":["NET_ADMIN","SYS_TIME"]}}}`,
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-debugger-node-XXX-1",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:                     "custom-debugger",
+							Args:                     []string{"echo", "one", "two", "three"},
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/host",
+									Name:      "host-root",
+								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"NET_ADMIN", "SYS_TIME"},
+								},
+							},
+						},
+					},
+					HostIPC:       true,
+					HostNetwork:   true,
+					HostPID:       true,
+					NodeName:      "node-XXX",
+					RestartPolicy: corev1.RestartPolicyNever,
+					Volumes: []corev1.Volume{
+						{
+							Name: "host-root",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/"},
+							},
+						},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.opts.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
 			suffixCounter = 0
 
-			pod := tc.opts.generateNodeDebugPod(tc.nodeName)
+			pod, err := tc.opts.generateNodeDebugPod(tc.nodeName)
+			if err != nil {
+				t.Error("failed to generateNodeDebugPod", err)
+			}
 			if diff := cmp.Diff(tc.expected, pod); diff != "" {
 				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
 			}
@@ -1432,6 +1528,22 @@ func TestCompleteAndValidate(t *testing.T) {
 				ShareProcesses: true,
 				TargetNames:    []string{"mypod"},
 				TTY:            true,
+			},
+		},
+		{
+			name: "Pod copy: set overrides",
+			args: "mypod -it --copy-to=my-debugger --container=mycontainer --overrides={\"securityContext\":{\"capabilities\":{\"add\":[\"NET_ADMIN\",\"SYS_TIME\"]}}} -- sh",
+			wantOpts: &DebugOptions{
+				Attach:         true,
+				Args:           []string{"sh"},
+				Container:      "mycontainer",
+				CopyTo:         "my-debugger",
+				Interactive:    true,
+				Namespace:      "test",
+				ShareProcesses: true,
+				TargetNames:    []string{"mypod"},
+				TTY:            true,
+				Overrides:      "{\"securityContext\":{\"capabilities\":{\"add\":[\"NET_ADMIN\",\"SYS_TIME\"]}}}",
 			},
 		},
 		{

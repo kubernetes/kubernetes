@@ -18,7 +18,9 @@ package debug
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	jsonpatch "github.com/evanphx/json-patch"
 	"time"
 
 	"github.com/docker/distribution/reference"
@@ -92,6 +94,9 @@ var (
 		# Create an interactive debugging session on a node and immediately attach to it.
 		# The container will run in the host namespaces and the host's filesystem will be mounted at /host
 		kubectl debug node/mynode -it --image=busybox
+
+		# Create a copy of mypod adding a debug container and attach to it,but overload the spec with a partial set of values parsed from JSON.
+		kubectl debug mypod -it --image=busybox --copy-to=my-debugger --overrides={"securityContext":{"capabilities":{"add":["NET_ADMIN","SYS_TIME"]}}}
 `))
 )
 
@@ -117,6 +122,7 @@ type DebugOptions struct {
 	ShareProcesses  bool
 	TargetContainer string
 	TTY             bool
+	Overrides       string
 
 	attachChanged         bool
 	shareProcessedChanged bool
@@ -173,6 +179,7 @@ func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
 	cmd.Flags().BoolVar(&opt.ShareProcesses, "share-processes", opt.ShareProcesses, i18n.T("When used with '--copy-to', enable process namespace sharing in the copy."))
 	cmd.Flags().StringVar(&opt.TargetContainer, "target", "", i18n.T("When using an ephemeral container, target processes in this container name."))
 	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, i18n.T("Allocate a TTY for the debugging container."))
+	cmd.Flags().StringVar(&opt.Overrides, "overrides", "", i18n.T("An inline JSON override for the generated container object. If this is non-empty, it is used to override the generated container object. Requires that the object supply a valid container field."))
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.
@@ -360,7 +367,11 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 // Returns an already created pod and container name for subsequent attach, if applicable.
 func (o *DebugOptions) visitNode(ctx context.Context, node *corev1.Node) (*corev1.Pod, string, error) {
 	pods := o.podClient.Pods(o.Namespace)
-	newPod, err := pods.Create(ctx, o.generateNodeDebugPod(node.Name), metav1.CreateOptions{})
+	debugPod, err := o.generateNodeDebugPod(node.Name)
+	if err != nil {
+		return nil, "", err
+	}
+	newPod, err := pods.Create(ctx, debugPod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, "", err
 	}
@@ -409,6 +420,7 @@ func (o *DebugOptions) debugByCopy(ctx context.Context, pod *corev1.Pod) (*corev
 	if err != nil {
 		return nil, "", err
 	}
+
 	created, err := o.podClient.Pods(copied.Namespace).Create(ctx, copied, metav1.CreateOptions{})
 	if err != nil {
 		return nil, "", err
@@ -451,7 +463,7 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) *corev1.Ephemeral
 
 // generateNodeDebugPod generates a debugging pod that schedules on the specified node.
 // The generated pod will run in the host PID, Network & IPC namespaces, and it will have the node's filesystem mounted at /host.
-func (o *DebugOptions) generateNodeDebugPod(node string) *corev1.Pod {
+func (o *DebugOptions) generateNodeDebugPod(node string) (*corev1.Pod, error) {
 	cn := "debugger"
 	// Setting a user-specified container name doesn't make much difference when there's only one container,
 	// but the argument exists for pod debugging so it might be confusing if it didn't work here.
@@ -511,7 +523,15 @@ func (o *DebugOptions) generateNodeDebugPod(node string) *corev1.Pod {
 		p.Spec.Containers[0].Command = o.Args
 	}
 
-	return p
+	if len(o.Overrides) > 0 {
+		mergedContainer, err := mergeContainer(&p.Spec.Containers[0], o.Overrides)
+		if err != nil {
+			return nil, fmt.Errorf("failed to merge container from overrides :%v", err)
+		}
+		p.Spec.Containers[0] = *mergedContainer
+	}
+
+	return p, nil
 }
 
 // generatePodCopyWithDebugContainer takes a Pod and returns a copy and the debug container name of that copy
@@ -590,7 +610,35 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 	c.Stdin = o.Interactive
 	c.TTY = o.TTY
 
+	if len(o.Overrides) > 0 {
+		mergedContainer, err := mergeContainer(c, o.Overrides)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to merge container from overrides :%v", err)
+		}
+		*c = *mergedContainer
+	}
 	return copied, name, nil
+}
+
+func mergeContainer(container *corev1.Container, overRides string) (*corev1.Container, error) {
+	if len(overRides) == 0 {
+		return container, nil
+	}
+	target, err := json.Marshal(container)
+	if err != nil {
+		return nil, err
+	}
+	fragment := []byte(overRides)
+	patched, err := jsonpatch.MergePatch(target, fragment)
+	if err != nil {
+		return nil, err
+	}
+	mergedContainer := new(corev1.Container)
+	err = json.Unmarshal(patched, mergedContainer)
+	if err != nil {
+		return nil, err
+	}
+	return mergedContainer, nil
 }
 
 func (o *DebugOptions) computeDebugContainerName(pod *corev1.Pod) string {
