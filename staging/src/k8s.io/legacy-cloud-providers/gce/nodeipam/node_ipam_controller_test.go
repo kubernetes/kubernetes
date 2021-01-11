@@ -29,9 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/legacy-cloud-providers/gce/nodeipam/util"
 	"k8s.io/legacy-cloud-providers/gce"
 	"k8s.io/legacy-cloud-providers/gce/nodeipam/ipam"
+	"k8s.io/legacy-cloud-providers/gce/nodeipam/util"
 	netutils "k8s.io/utils/net"
 )
 

@@ -245,6 +245,8 @@
   - k8s.io/component-base/featuregate
   - k8s.io/component-base/metrics
   - k8s.io/component-base/metrics/legacyregistry
+  - k8s.io/metrics
+  - k8s.io/kube-controller-manager
 
 - baseImportPath: "./vendor/k8s.io/csi-translation-lib/"
   allowedImports:
