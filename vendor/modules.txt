@@ -686,9 +686,9 @@ github.com/hashicorp/hcl/json/token
 # github.com/hashicorp/mdns => github.com/hashicorp/mdns v1.0.0
 # github.com/hashicorp/memberlist => github.com/hashicorp/memberlist v0.1.3
 # github.com/hashicorp/serf => github.com/hashicorp/serf v0.8.2
-# github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible => github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
+# github.com/heketi/heketi v10.2.0+incompatible => github.com/heketi/heketi v10.2.0+incompatible
 ## explicit
-# github.com/heketi/heketi => github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
+# github.com/heketi/heketi => github.com/heketi/heketi v10.2.0+incompatible
 github.com/heketi/heketi/client/api/go-client
 github.com/heketi/heketi/pkg/glusterfs/api
 github.com/heketi/heketi/pkg/utils
