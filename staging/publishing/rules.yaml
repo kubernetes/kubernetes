@@ -1452,6 +1452,12 @@ rules:
       branch: master
     - repository: controller-manager
       branch: master
+    - repository: metrics
+      branch: master
+    - repository: code-generator
+      branch: master
+    - repository: kube-controller-manager
+      branch: master
   - source:
       branch: release-1.17
       dir: staging/src/k8s.io/legacy-cloud-providers
