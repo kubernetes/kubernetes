@@ -540,7 +540,6 @@ Currently, cadvisor_stats_provider provides AcceleratorStats but cri_stats_provi
 
 ### Feature
 
-- **Additional documentation e.g., KEPs (Kubernetes Enhancement Proposals), usage docs, etc.**:
 - A new metric `apiserver_request_filter_duration_seconds` has been introduced that 
   measures request filter latency in seconds. ([#95207](https://github.com/kubernetes/kubernetes/pull/95207), [@tkashem](https://github.com/tkashem)) [SIG API Machinery and Instrumentation]
 - A new set of alpha metrics are reported by the Kubernetes scheduler under the `/metrics/resources` endpoint that allow administrators to easily see the resource consumption (requests and limits for all resources on the pods) and compare it to actual pod usage or node capacity. ([#94866](https://github.com/kubernetes/kubernetes/pull/94866), [@smarterclayton](https://github.com/smarterclayton)) [SIG API Machinery, Instrumentation, Node and Scheduling]
@@ -832,23 +831,7 @@ Currently, cadvisor_stats_provider provides AcceleratorStats but cri_stats_provi
 
 ### Other (Cleanup or Flake)
 
-- **Additional documentation e.g., KEPs (Kubernetes Enhancement Proposals), usage docs, etc.**:
-  
-  <!--
-  This section can be blank if this pull request does not require a release note.
-  
-  When adding links which point to resources within git repositories, like
-  KEPs or supporting documentation, please reference a specific commit and avoid
-  linking directly to the master branch. This ensures that links reference a
-  specific point in time, rather than a document that may change over time.
-  
-  See here for guidance on getting permanent links to files: https://help.github.com/en/articles/getting-permanent-links-to-files
-  
-  Please use the following format for linking documentation:
-  - [KEP]: <link>
-  - [Usage]: <link>
-  - [Other doc]: <link>
-  --> ([#96443](https://github.com/kubernetes/kubernetes/pull/96443), [@alaypatel07](https://github.com/alaypatel07)) [SIG Apps]
+- Handle slow cronjob lister in cronjob controller v2 and improve memory footprint. ([#96443](https://github.com/kubernetes/kubernetes/pull/96443), [@alaypatel07](https://github.com/alaypatel07)) [SIG Apps]
 - --redirect-container-streaming is no longer functional. The flag will be removed in v1.22 ([#95935](https://github.com/kubernetes/kubernetes/pull/95935), [@tallclair](https://github.com/tallclair)) [SIG Node]
 - A new metric `requestAbortsTotal` has been introduced that counts aborted requests for each `group`, `version`, `verb`, `resource`, `subresource` and `scope`. ([#95002](https://github.com/kubernetes/kubernetes/pull/95002), [@p0lyn0mial](https://github.com/p0lyn0mial)) [SIG API Machinery, Cloud Provider, Instrumentation and Scheduling]
 - API priority and fairness metrics use snake_case in label names ([#96236](https://github.com/kubernetes/kubernetes/pull/96236), [@adtac](https://github.com/adtac)) [SIG API Machinery, Cluster Lifecycle, Instrumentation and Testing]
@@ -1342,7 +1325,10 @@ filename | sha512 hash
 
 ### Feature
 
-- **Additional documentation e.g., KEPs (Kubernetes Enhancement Proposals), usage docs, etc.**: ([#95896](https://github.com/kubernetes/kubernetes/pull/95896), [@zshihang](https://github.com/zshihang)) [SIG API Machinery and Cluster Lifecycle]
+- TokenRequest and TokenRequestProjection are now GA features. The following flags are required by the API server:
+  - `--service-account-issuer`, should be set to a URL identifying the API server that will be stable over the cluster lifetime.
+  - `--service-account-key-file`, set to one or more files containing one or more public keys used to verify tokens.
+  - `--service-account-signing-key-file`, set to a file containing a private key to use to sign service account tokens. Can be the same file given to `kube-controller-manager` with `--service-account-private-key-file`. ([#95896](https://github.com/kubernetes/kubernetes/pull/95896), [@zshihang](https://github.com/zshihang)) [SIG API Machinery and Cluster Lifecycle]
 - A new set of alpha metrics are reported by the Kubernetes scheduler under the `/metrics/resources` endpoint that allow administrators to easily see the resource consumption (requests and limits for all resources on the pods) and compare it to actual pod usage or node capacity. ([#94866](https://github.com/kubernetes/kubernetes/pull/94866), [@smarterclayton](https://github.com/smarterclayton)) [SIG API Machinery, Instrumentation, Node and Scheduling]
 - Add --experimental-logging-sanitization flag enabling runtime protection from leaking sensitive data in logs ([#96370](https://github.com/kubernetes/kubernetes/pull/96370), [@serathius](https://github.com/serathius)) [SIG API Machinery, Cluster Lifecycle and Instrumentation]
 - Add a StorageVersionAPI feature gate that makes API server update storageversions before serving certain write requests. 
