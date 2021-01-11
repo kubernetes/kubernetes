@@ -87,7 +87,7 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 		}
 		if secondaryNodeIPSpecified {
 			if err := validateNodeIPFunc(secondaryNodeIP); err != nil {
-				return fmt.Errorf("failed to validate secondaryNodeIP: %v", err)
+				return fmt.Errorf("failed to validate secondary nodeIP: %v", err)
 			}
 			klog.V(4).Infof("Using secondary node IP: %q", secondaryNodeIP.String())
 		}
