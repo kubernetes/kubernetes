@@ -382,6 +382,7 @@ func isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersio
 	if currentInstalledCoreDNSVersion == "" {
 		return isMigrationRequired, nil
 	}
+	currentInstalledCoreDNSVersion = strings.TrimLeft(currentInstalledCoreDNSVersion, "v")
 	deprecated, err := migration.Deprecated(currentInstalledCoreDNSVersion, strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v"), corefile)
 	if err != nil {
 		return isMigrationRequired, errors.Wrap(err, "unable to get list of changes to the configuration.")
