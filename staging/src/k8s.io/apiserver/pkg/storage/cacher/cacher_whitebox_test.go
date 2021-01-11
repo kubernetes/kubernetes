@@ -70,7 +70,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	}
 	// set the size of the buffer of w.result to 0, so that the writes to
 	// w.result is blocked.
-	w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType)
+	w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "")
 	go w.process(context.Background(), initEvents, 0)
 	w.Stop()
 	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
@@ -190,7 +190,7 @@ TestCase:
 			testCase.events[j].ResourceVersion = uint64(j) + 1
 		}
 
-		w := newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType)
+		w := newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "")
 		go w.process(context.Background(), testCase.events, 0)
 
 		ch := w.ResultChan()
@@ -527,7 +527,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	// timeout to zero and run the Stop goroutine concurrently.
 	// May sure that the watch will not be blocked on Stop.
 	for i := 0; i < maxRetriesToProduceTheRaceCondition; i++ {
-		w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType)
+		w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "")
 		go w.Stop()
 		select {
 		case <-done:
@@ -539,7 +539,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	deadline := time.Now().Add(time.Hour)
 	// After that, verifies the cacheWatcher.process goroutine works correctly.
 	for i := 0; i < maxRetriesToProduceTheRaceCondition; i++ {
-		w = newCacheWatcher(2, filter, emptyFunc, testVersioner{}, deadline, false, objectType)
+		w = newCacheWatcher(2, filter, emptyFunc, testVersioner{}, deadline, false, objectType, "")
 		w.input <- &watchCacheEvent{Object: &v1.Pod{}, ResourceVersion: uint64(i + 1)}
 		ctx, _ := context.WithDeadline(context.Background(), deadline)
 		go w.process(ctx, nil, 0)
@@ -598,7 +598,7 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 	forget := func() {}
 
 	newWatcher := func(deadline time.Time) *cacheWatcher {
-		return newCacheWatcher(0, filter, forget, testVersioner{}, deadline, true, objectType)
+		return newCacheWatcher(0, filter, forget, testVersioner{}, deadline, true, objectType, "")
 	}
 
 	clock := clock.NewFakeClock(time.Now())
