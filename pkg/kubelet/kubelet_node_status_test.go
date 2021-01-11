@@ -49,7 +49,6 @@ import (
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/component-base/version"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -1137,11 +1136,9 @@ func TestRegisterWithApiServer(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testKubeletHostname,
 				Labels: map[string]string{
-					v1.LabelHostname:      testKubeletHostname,
-					v1.LabelOSStable:      goruntime.GOOS,
-					v1.LabelArchStable:    goruntime.GOARCH,
-					kubeletapis.LabelOS:   goruntime.GOOS,
-					kubeletapis.LabelArch: goruntime.GOARCH,
+					v1.LabelHostname:   testKubeletHostname,
+					v1.LabelOSStable:   goruntime.GOOS,
+					v1.LabelArchStable: goruntime.GOARCH,
 				},
 			},
 		}, nil
@@ -1191,11 +1188,9 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		node := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					v1.LabelHostname:      testKubeletHostname,
-					v1.LabelOSStable:      goruntime.GOOS,
-					v1.LabelArchStable:    goruntime.GOARCH,
-					kubeletapis.LabelOS:   goruntime.GOOS,
-					kubeletapis.LabelArch: goruntime.GOARCH,
+					v1.LabelHostname:   testKubeletHostname,
+					v1.LabelOSStable:   goruntime.GOOS,
+					v1.LabelArchStable: goruntime.GOARCH,
 				},
 			},
 		}
