@@ -58,8 +58,8 @@ and then tested. After the pull request with those changes has been approved, th
 built and published to the `gcr.io/kubernetes-e2e-test-images` registry as well.
 
 Currently, the image building process has been automated with the Image Promoter, but *only* for the
-Conformance images (`agnhost`, `jessie-dnsutils`, `kitten`, `nautilus`, `nonewprivs`, `resource-consumer`,
-`sample-apiserver`).  After the pull request merges, a postsubmit job will be started with the new changes,
+images present in the [k8s-infra script used to generate the image building jobs](https://github.com/kubernetes/test-infra/blob/master/config/jobs/image-pushing/k8s-staging-e2e-test-images.sh#L20-L46). If you want to add a new image to the e2e folder, you need to update the k8s-infra repo with the mentioned script to generate the new image building job.
+After the pull request merges, a postsubmit job will be started with the new changes,
 which can be tracked [here](https://testgrid.k8s.io/sig-testing-images#post-kubernetes-push-images).
 After it passes successfully, the new image will reside in the `gcr.io/k8s-staging-e2e-test-images/${IMAGE_NAME}:${VERSION}`
 registry, from which it will have to be promoted by adding a line for it
