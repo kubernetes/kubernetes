@@ -28,11 +28,11 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 
 	"github.com/onsi/ginkgo"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	utilnet "k8s.io/utils/net"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
