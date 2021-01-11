@@ -127,7 +127,7 @@ func NewIndexerInformerWatcher(lw cache.ListerWatcher, objType runtime.Object) (
 				// We have no means of passing the additional information down using
 				// watch API based on watch.Event but the caller can filter such
 				// objects by checking if metadata.deletionTimestamp is set
-				obj = staleObj
+				obj = staleObj.Obj
 			}
 
 			e.push(watch.Event{
