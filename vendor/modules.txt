@@ -299,7 +299,7 @@ github.com/coreos/pkg/dlopen
 ## explicit
 # github.com/cpuguy83/go-md2man/v2 => github.com/cpuguy83/go-md2man/v2 v2.0.0
 github.com/cpuguy83/go-md2man/v2/md2man
-# github.com/creack/pty => github.com/creack/pty v1.1.7
+# github.com/creack/pty => github.com/creack/pty v1.1.9
 # github.com/cyphar/filepath-securejoin v0.2.2 => github.com/cyphar/filepath-securejoin v0.2.2
 github.com/cyphar/filepath-securejoin
 # github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.2.2
@@ -422,12 +422,12 @@ github.com/go-openapi/analysis/internal
 # github.com/go-openapi/errors v0.19.2 => github.com/go-openapi/errors v0.19.2
 github.com/go-openapi/errors
 # github.com/go-openapi/errors => github.com/go-openapi/errors v0.19.2
-# github.com/go-openapi/jsonpointer v0.19.3 => github.com/go-openapi/jsonpointer v0.19.3
+# github.com/go-openapi/jsonpointer v0.19.5 => github.com/go-openapi/jsonpointer v0.19.5
 github.com/go-openapi/jsonpointer
-# github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.3
-# github.com/go-openapi/jsonreference v0.19.3 => github.com/go-openapi/jsonreference v0.19.3
+# github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.5
+# github.com/go-openapi/jsonreference v0.19.5 => github.com/go-openapi/jsonreference v0.19.5
 github.com/go-openapi/jsonreference
-# github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.3
+# github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.5
 # github.com/go-openapi/loads v0.19.4 => github.com/go-openapi/loads v0.19.4
 ## explicit
 github.com/go-openapi/loads
@@ -435,17 +435,17 @@ github.com/go-openapi/loads
 # github.com/go-openapi/runtime v0.19.4 => github.com/go-openapi/runtime v0.19.4
 github.com/go-openapi/runtime
 # github.com/go-openapi/runtime => github.com/go-openapi/runtime v0.19.4
-# github.com/go-openapi/spec v0.19.3 => github.com/go-openapi/spec v0.19.3
+# github.com/go-openapi/spec v0.20.0 => github.com/go-openapi/spec v0.20.0
 ## explicit
 github.com/go-openapi/spec
-# github.com/go-openapi/spec => github.com/go-openapi/spec v0.19.3
+# github.com/go-openapi/spec => github.com/go-openapi/spec v0.20.0
 # github.com/go-openapi/strfmt v0.19.3 => github.com/go-openapi/strfmt v0.19.3
 ## explicit
 github.com/go-openapi/strfmt
 # github.com/go-openapi/strfmt => github.com/go-openapi/strfmt v0.19.3
-# github.com/go-openapi/swag v0.19.5 => github.com/go-openapi/swag v0.19.5
+# github.com/go-openapi/swag v0.19.12 => github.com/go-openapi/swag v0.19.12
 github.com/go-openapi/swag
-# github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.5
+# github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.12
 # github.com/go-openapi/validate v0.19.5 => github.com/go-openapi/validate v0.19.5
 ## explicit
 github.com/go-openapi/validate
@@ -721,6 +721,9 @@ github.com/jmespath/go-jmespath
 # github.com/jonboulle/clockwork v0.1.0 => github.com/jonboulle/clockwork v0.1.0
 github.com/jonboulle/clockwork
 # github.com/jonboulle/clockwork => github.com/jonboulle/clockwork v0.1.0
+# github.com/josharian/intern v1.0.0 => github.com/josharian/intern v1.0.0
+github.com/josharian/intern
+# github.com/josharian/intern => github.com/josharian/intern v1.0.0
 # github.com/json-iterator/go v1.1.10 => github.com/json-iterator/go v1.1.10
 ## explicit
 github.com/json-iterator/go
@@ -740,8 +743,7 @@ github.com/konsorten/go-windows-terminal-sequences
 # github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.3
 # github.com/kr/logfmt => github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515
 # github.com/kr/pretty => github.com/kr/pretty v0.2.0
-# github.com/kr/pty => github.com/kr/pty v1.1.5
-# github.com/kr/text => github.com/kr/text v0.1.0
+# github.com/kr/text => github.com/kr/text v0.2.0
 # github.com/kylelemons/godebug => github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348
 # github.com/libopenstorage/openstorage v1.0.0 => github.com/libopenstorage/openstorage v1.0.0
 ## explicit
@@ -770,8 +772,8 @@ github.com/lithammer/dedent
 # github.com/magiconair/properties v1.8.1 => github.com/magiconair/properties v1.8.1
 github.com/magiconair/properties
 # github.com/magiconair/properties => github.com/magiconair/properties v1.8.1
-# github.com/mailru/easyjson v0.7.0 => github.com/mailru/easyjson v0.7.0
-# github.com/mailru/easyjson => github.com/mailru/easyjson v0.7.0
+# github.com/mailru/easyjson v0.7.6 => github.com/mailru/easyjson v0.7.6
+# github.com/mailru/easyjson => github.com/mailru/easyjson v0.7.6
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
@@ -846,6 +848,7 @@ github.com/mvdan/xurls
 github.com/mxk/go-flowrate/flowrate
 # github.com/naoina/go-stringutil => github.com/naoina/go-stringutil v0.1.0
 # github.com/naoina/toml => github.com/naoina/toml v0.1.1
+# github.com/niemeyer/pretty => github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e
 # github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5
 # github.com/onsi/ginkgo v1.11.0 => github.com/onsi/ginkgo v1.11.0
 ## explicit
@@ -1536,7 +1539,7 @@ google.golang.org/protobuf/types/known/timestamppb
 google.golang.org/protobuf/types/known/wrapperspb
 google.golang.org/protobuf/types/pluginpb
 # gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
-# gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
+# gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f
 # gopkg.in/cheggaaa/pb.v1 => gopkg.in/cheggaaa/pb.v1 v1.0.25
 # gopkg.in/errgo.v2 => gopkg.in/errgo.v2 v2.1.0
 # gopkg.in/fsnotify.v1 v1.4.7 => gopkg.in/fsnotify.v1 v1.4.7
@@ -1573,13 +1576,13 @@ gopkg.in/tomb.v1
 # gopkg.in/warnings.v0 v0.1.1 => gopkg.in/warnings.v0 v0.1.1
 gopkg.in/warnings.v0
 # gopkg.in/warnings.v0 => gopkg.in/warnings.v0 v0.1.1
-# gopkg.in/yaml.v2 v2.2.8 => gopkg.in/yaml.v2 v2.2.8
+# gopkg.in/yaml.v2 v2.4.0 => gopkg.in/yaml.v2 v2.4.0
 ## explicit
 gopkg.in/yaml.v2
-# gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
-# gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c => gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+# gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.4.0
+# gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 => gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
 gopkg.in/yaml.v3
-# gopkg.in/yaml.v3 => gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+# gopkg.in/yaml.v3 => gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
 # gotest.tools => gotest.tools v2.2.0+incompatible
 # gotest.tools/v3 => gotest.tools/v3 v3.0.2
 # honnef.co/go/tools => honnef.co/go/tools v0.0.1-2020.1.3

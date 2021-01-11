@@ -212,6 +212,7 @@ filegroup(
         "//vendor/github.com/ishidawataru/sctp:all-srcs",
         "//vendor/github.com/jmespath/go-jmespath:all-srcs",
         "//vendor/github.com/jonboulle/clockwork:all-srcs",
+        "//vendor/github.com/josharian/intern:all-srcs",
         "//vendor/github.com/json-iterator/go:all-srcs",
         "//vendor/github.com/karrick/godirwalk:all-srcs",
         "//vendor/github.com/konsorten/go-windows-terminal-sequences:all-srcs",

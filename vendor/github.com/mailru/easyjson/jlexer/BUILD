@@ -10,6 +10,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/mailru/easyjson/jlexer",
     importpath = "github.com/mailru/easyjson/jlexer",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/josharian/intern:go_default_library"],
 )
 
 filegroup(

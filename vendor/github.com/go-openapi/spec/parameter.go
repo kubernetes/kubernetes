@@ -39,8 +39,7 @@ func PathParam(name string) *Parameter {
 
 // BodyParam creates a body parameter
 func BodyParam(name string, schema *Schema) *Parameter {
-	return &Parameter{ParamProps: ParamProps{Name: name, In: "body", Schema: schema},
-		SimpleSchema: SimpleSchema{Type: "object"}}
+	return &Parameter{ParamProps: ParamProps{Name: name, In: "body", Schema: schema}}
 }
 
 // FormDataParam creates a body parameter
@@ -58,7 +57,7 @@ func FileParam(name string) *Parameter {
 func SimpleArrayParam(name, tpe, fmt string) *Parameter {
 	return &Parameter{ParamProps: ParamProps{Name: name},
 		SimpleSchema: SimpleSchema{Type: jsonArray, CollectionFormat: "csv",
-			Items: &Items{SimpleSchema: SimpleSchema{Type: "string", Format: fmt}}}}
+			Items: &Items{SimpleSchema: SimpleSchema{Type: tpe, Format: fmt}}}}
 }
 
 // ParamRef creates a parameter that's a json reference
@@ -275,6 +274,12 @@ func (p *Parameter) UniqueValues() *Parameter {
 // AllowDuplicates this array can have duplicates
 func (p *Parameter) AllowDuplicates() *Parameter {
 	p.UniqueItems = false
+	return p
+}
+
+// WithValidations is a fluent method to set parameter validations
+func (p *Parameter) WithValidations(val CommonValidations) *Parameter {
+	p.SetValidations(SchemaValidations{CommonValidations: val})
 	return p
 }
 

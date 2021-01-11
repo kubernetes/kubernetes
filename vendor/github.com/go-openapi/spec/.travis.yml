@@ -1,12 +1,28 @@
 after_success:
 - bash <(curl -s https://codecov.io/bash)
 go:
-- 1.11.x
-- 1.12.x
+- 1.14.x
+- 1.x
+arch:
+  - amd64
+jobs:
+  include:
+  # only run fast tests on ppc64le
+  - go: 1.x
+    arch: ppc64le
+    script:
+    - gotestsum -f short-verbose -- ./...
+
+  # include linting job, but only for latest go version and amd64 arch
+  - go: 1.x
+    arch: amd64
+    install:
+      go get github.com/golangci/golangci-lint/cmd/golangci-lint
+    script:
+    - golangci-lint run --new-from-rev master
+
 install:
 - GO111MODULE=off go get -u gotest.tools/gotestsum
-env:
-- GO111MODULE=on
 language: go
 notifications:
   slack:

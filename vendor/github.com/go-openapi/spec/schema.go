@@ -158,41 +158,41 @@ func (r *SchemaURL) fromMap(v map[string]interface{}) error {
 
 // SchemaProps describes a JSON schema (draft 4)
 type SchemaProps struct {
-	ID                   string            `json:"id,omitempty"`
-	Ref                  Ref               `json:"-"`
-	Schema               SchemaURL         `json:"-"`
-	Description          string            `json:"description,omitempty"`
-	Type                 StringOrArray     `json:"type,omitempty"`
-	Nullable             bool              `json:"nullable,omitempty"`
-	Format               string            `json:"format,omitempty"`
-	Title                string            `json:"title,omitempty"`
-	Default              interface{}       `json:"default,omitempty"`
-	Maximum              *float64          `json:"maximum,omitempty"`
-	ExclusiveMaximum     bool              `json:"exclusiveMaximum,omitempty"`
-	Minimum              *float64          `json:"minimum,omitempty"`
-	ExclusiveMinimum     bool              `json:"exclusiveMinimum,omitempty"`
-	MaxLength            *int64            `json:"maxLength,omitempty"`
-	MinLength            *int64            `json:"minLength,omitempty"`
-	Pattern              string            `json:"pattern,omitempty"`
-	MaxItems             *int64            `json:"maxItems,omitempty"`
-	MinItems             *int64            `json:"minItems,omitempty"`
-	UniqueItems          bool              `json:"uniqueItems,omitempty"`
-	MultipleOf           *float64          `json:"multipleOf,omitempty"`
-	Enum                 []interface{}     `json:"enum,omitempty"`
-	MaxProperties        *int64            `json:"maxProperties,omitempty"`
-	MinProperties        *int64            `json:"minProperties,omitempty"`
-	Required             []string          `json:"required,omitempty"`
-	Items                *SchemaOrArray    `json:"items,omitempty"`
-	AllOf                []Schema          `json:"allOf,omitempty"`
-	OneOf                []Schema          `json:"oneOf,omitempty"`
-	AnyOf                []Schema          `json:"anyOf,omitempty"`
-	Not                  *Schema           `json:"not,omitempty"`
-	Properties           map[string]Schema `json:"properties,omitempty"`
-	AdditionalProperties *SchemaOrBool     `json:"additionalProperties,omitempty"`
-	PatternProperties    map[string]Schema `json:"patternProperties,omitempty"`
-	Dependencies         Dependencies      `json:"dependencies,omitempty"`
-	AdditionalItems      *SchemaOrBool     `json:"additionalItems,omitempty"`
-	Definitions          Definitions       `json:"definitions,omitempty"`
+	ID                   string           `json:"id,omitempty"`
+	Ref                  Ref              `json:"-"`
+	Schema               SchemaURL        `json:"-"`
+	Description          string           `json:"description,omitempty"`
+	Type                 StringOrArray    `json:"type,omitempty"`
+	Nullable             bool             `json:"nullable,omitempty"`
+	Format               string           `json:"format,omitempty"`
+	Title                string           `json:"title,omitempty"`
+	Default              interface{}      `json:"default,omitempty"`
+	Maximum              *float64         `json:"maximum,omitempty"`
+	ExclusiveMaximum     bool             `json:"exclusiveMaximum,omitempty"`
+	Minimum              *float64         `json:"minimum,omitempty"`
+	ExclusiveMinimum     bool             `json:"exclusiveMinimum,omitempty"`
+	MaxLength            *int64           `json:"maxLength,omitempty"`
+	MinLength            *int64           `json:"minLength,omitempty"`
+	Pattern              string           `json:"pattern,omitempty"`
+	MaxItems             *int64           `json:"maxItems,omitempty"`
+	MinItems             *int64           `json:"minItems,omitempty"`
+	UniqueItems          bool             `json:"uniqueItems,omitempty"`
+	MultipleOf           *float64         `json:"multipleOf,omitempty"`
+	Enum                 []interface{}    `json:"enum,omitempty"`
+	MaxProperties        *int64           `json:"maxProperties,omitempty"`
+	MinProperties        *int64           `json:"minProperties,omitempty"`
+	Required             []string         `json:"required,omitempty"`
+	Items                *SchemaOrArray   `json:"items,omitempty"`
+	AllOf                []Schema         `json:"allOf,omitempty"`
+	OneOf                []Schema         `json:"oneOf,omitempty"`
+	AnyOf                []Schema         `json:"anyOf,omitempty"`
+	Not                  *Schema          `json:"not,omitempty"`
+	Properties           SchemaProperties `json:"properties,omitempty"`
+	AdditionalProperties *SchemaOrBool    `json:"additionalProperties,omitempty"`
+	PatternProperties    SchemaProperties `json:"patternProperties,omitempty"`
+	Dependencies         Dependencies     `json:"dependencies,omitempty"`
+	AdditionalItems      *SchemaOrBool    `json:"additionalItems,omitempty"`
+	Definitions          Definitions      `json:"definitions,omitempty"`
 }
 
 // SwaggerSchemaProps are additional properties supported by swagger schemas, but not JSON-schema (draft 4)
@@ -511,6 +511,56 @@ func (s *Schema) AsUnwrappedXML() *Schema {
 	}
 	s.XML.Wrapped = false
 	return s
+}
+
+// SetValidations defines all schema validations.
+//
+// NOTE: Required, ReadOnly, AllOf, AnyOf, OneOf and Not are not considered.
+func (s *Schema) SetValidations(val SchemaValidations) {
+	s.Maximum = val.Maximum
+	s.ExclusiveMaximum = val.ExclusiveMaximum
+	s.Minimum = val.Minimum
+	s.ExclusiveMinimum = val.ExclusiveMinimum
+	s.MaxLength = val.MaxLength
+	s.MinLength = val.MinLength
+	s.Pattern = val.Pattern
+	s.MaxItems = val.MaxItems
+	s.MinItems = val.MinItems
+	s.UniqueItems = val.UniqueItems
+	s.MultipleOf = val.MultipleOf
+	s.Enum = val.Enum
+	s.MinProperties = val.MinProperties
+	s.MaxProperties = val.MaxProperties
+	s.PatternProperties = val.PatternProperties
+}
+
+// WithValidations is a fluent method to set schema validations
+func (s *Schema) WithValidations(val SchemaValidations) *Schema {
+	s.SetValidations(val)
+	return s
+}
+
+// Validations returns a clone of the validations for this schema
+func (s Schema) Validations() SchemaValidations {
+	return SchemaValidations{
+		CommonValidations: CommonValidations{
+			Maximum:          s.Maximum,
+			ExclusiveMaximum: s.ExclusiveMaximum,
+			Minimum:          s.Minimum,
+			ExclusiveMinimum: s.ExclusiveMinimum,
+			MaxLength:        s.MaxLength,
+			MinLength:        s.MinLength,
+			Pattern:          s.Pattern,
+			MaxItems:         s.MaxItems,
+			MinItems:         s.MinItems,
+			UniqueItems:      s.UniqueItems,
+			MultipleOf:       s.MultipleOf,
+			Enum:             s.Enum,
+		},
+		MinProperties:     s.MinProperties,
+		MaxProperties:     s.MaxProperties,
+		PatternProperties: s.PatternProperties,
+	}
 }
 
 // MarshalJSON marshal this to JSON

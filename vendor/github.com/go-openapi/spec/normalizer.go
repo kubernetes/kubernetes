@@ -20,8 +20,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
+
+const windowsOS = "windows"
 
 // normalize absolute path for cache.
 // on Windows, drive letters should be converted to lower as scheme in net/url.URL
@@ -71,27 +74,51 @@ func normalizePaths(refPath, base string) string {
 	return baseURL.String()
 }
 
+// isRoot is a temporary hack to discern windows file ref for ref.IsRoot().
+// TODO: a more thorough change is needed to handle windows file refs.
+func isRoot(ref *Ref) bool {
+	if runtime.GOOS != windowsOS {
+		return ref.IsRoot()
+	}
+	return !filepath.IsAbs(ref.String())
+}
+
+// isAbs is a temporary hack to discern windows file ref for url IsAbs().
+// TODO: a more thorough change is needed to handle windows file refs.
+func isAbs(u *url.URL) bool {
+	if runtime.GOOS != windowsOS {
+		return u.IsAbs()
+	}
+	if len(u.Scheme) <= 1 {
+		// drive letter got caught as URI scheme
+		return false
+	}
+	return u.IsAbs()
+}
+
 // denormalizePaths returns to simplest notation on file $ref,
 // i.e. strips the absolute path and sets a path relative to the base path.
 //
 // This is currently used when we rewrite ref after a circular ref has been detected
 func denormalizeFileRef(ref *Ref, relativeBase, originalRelativeBase string) *Ref {
-	debugLog("denormalizeFileRef for: %s", ref.String())
+	debugLog("denormalizeFileRef for: %s (relative: %s, original: %s)", ref.String(),
+		relativeBase, originalRelativeBase)
 
-	if ref.String() == "" || ref.IsRoot() || ref.HasFragmentOnly {
+	// log.Printf("denormalize: %s, IsRoot: %t,HasFragmentOnly: %t, HasFullURL: %t", ref.String(), ref.IsRoot(), ref.HasFragmentOnly, ref.HasFullURL)
+	if ref.String() == "" || isRoot(ref) || ref.HasFragmentOnly {
 		return ref
 	}
 	// strip relativeBase from URI
 	relativeBaseURL, _ := url.Parse(relativeBase)
 	relativeBaseURL.Fragment = ""
 
-	if relativeBaseURL.IsAbs() && strings.HasPrefix(ref.String(), relativeBase) {
+	if isAbs(relativeBaseURL) && strings.HasPrefix(ref.String(), relativeBase) {
 		// this should work for absolute URI (e.g. http://...): we have an exact match, just trim prefix
 		r, _ := NewRef(strings.TrimPrefix(ref.String(), relativeBase))
 		return &r
 	}
 
-	if relativeBaseURL.IsAbs() {
+	if isAbs(relativeBaseURL) {
 		// other absolute URL get unchanged (i.e. with a non-empty scheme)
 		return ref
 	}
@@ -111,7 +138,7 @@ func denormalizeFileRef(ref *Ref, relativeBase, originalRelativeBase string) *Re
 	//   my normalized ref points to: /mypath/item.json#/target
 	//   expected result: item.json#/target
 	parts := strings.Split(ref.String(), "#")
-	relativePath, err := filepath.Rel(path.Dir(originalRelativeBaseURL.String()), parts[0])
+	relativePath, err := filepath.Rel(filepath.Dir(originalRelativeBaseURL.String()), parts[0])
 	if err != nil {
 		// there is no common ancestor (e.g. different drives on windows)
 		// leaves the ref unchanged
@@ -148,5 +175,5 @@ func absPath(fname string) (string, error) {
 		return fname, nil
 	}
 	wd, err := os.Getwd()
-	return filepath.Join(wd, fname), err
+	return normalizeAbsPath(filepath.Join(wd, fname)), err
 }

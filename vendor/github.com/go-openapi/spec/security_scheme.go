@@ -82,12 +82,12 @@ func OAuth2AccessToken(authorizationURL, tokenURL string) *SecurityScheme {
 type SecuritySchemeProps struct {
 	Description      string            `json:"description,omitempty"`
 	Type             string            `json:"type"`
-	Name             string            `json:"name,omitempty"`             // api key
-	In               string            `json:"in,omitempty"`               // api key
-	Flow             string            `json:"flow,omitempty"`             // oauth2
-	AuthorizationURL string            `json:"authorizationUrl,omitempty"` // oauth2
-	TokenURL         string            `json:"tokenUrl,omitempty"`         // oauth2
-	Scopes           map[string]string `json:"scopes,omitempty"`           // oauth2
+	Name             string            `json:"name,omitempty"`     // api key
+	In               string            `json:"in,omitempty"`       // api key
+	Flow             string            `json:"flow,omitempty"`     // oauth2
+	AuthorizationURL string            `json:"authorizationUrl"`   // oauth2
+	TokenURL         string            `json:"tokenUrl,omitempty"` // oauth2
+	Scopes           map[string]string `json:"scopes,omitempty"`   // oauth2
 }
 
 // AddScope adds a scope to this security scheme
@@ -120,10 +120,40 @@ func (s SecurityScheme) JSONLookup(token string) (interface{}, error) {
 
 // MarshalJSON marshal this to JSON
 func (s SecurityScheme) MarshalJSON() ([]byte, error) {
-	b1, err := json.Marshal(s.SecuritySchemeProps)
+	var (
+		b1  []byte
+		err error
+	)
+
+	if s.Type == oauth2 {
+		// when oauth2, empty AuthorizationURL is added as empty string
+		b1, err = json.Marshal(s.SecuritySchemeProps)
+	} else {
+		// when not oauth2, empty AuthorizationURL should be omitted
+		b1, err = json.Marshal(struct {
+			Description      string            `json:"description,omitempty"`
+			Type             string            `json:"type"`
+			Name             string            `json:"name,omitempty"`             // api key
+			In               string            `json:"in,omitempty"`               // api key
+			Flow             string            `json:"flow,omitempty"`             // oauth2
+			AuthorizationURL string            `json:"authorizationUrl,omitempty"` // oauth2
+			TokenURL         string            `json:"tokenUrl,omitempty"`         // oauth2
+			Scopes           map[string]string `json:"scopes,omitempty"`           // oauth2
+		}{
+			Description:      s.Description,
+			Type:             s.Type,
+			Name:             s.Name,
+			In:               s.In,
+			Flow:             s.Flow,
+			AuthorizationURL: s.AuthorizationURL,
+			TokenURL:         s.TokenURL,
+			Scopes:           s.Scopes,
+		})
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	b2, err := json.Marshal(s.VendorExtensible)
 	if err != nil {
 		return nil, err

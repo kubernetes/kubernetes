@@ -91,7 +91,7 @@ func init() {
 }
 
 const (
-	//collectionFormatComma = "csv"
+	// collectionFormatComma = "csv"
 	collectionFormatSpace = "ssv"
 	collectionFormatTab   = "tsv"
 	collectionFormatPipe  = "pipes"
@@ -370,7 +370,7 @@ func IsZero(data interface{}) bool {
 // AddInitialisms add additional initialisms
 func AddInitialisms(words ...string) {
 	for _, word := range words {
-		//commonInitialisms[upper(word)] = true
+		// commonInitialisms[upper(word)] = true
 		commonInitialisms.add(upper(word))
 	}
 	// sort again

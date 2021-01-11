@@ -141,6 +141,12 @@ func (h *Header) AllowDuplicates() *Header {
 	return h
 }
 
+// WithValidations is a fluent method to set header validations
+func (h *Header) WithValidations(val CommonValidations) *Header {
+	h.SetValidations(SchemaValidations{CommonValidations: val})
+	return h
+}
+
 // MarshalJSON marshal this to JSON
 func (h Header) MarshalJSON() ([]byte, error) {
 	b1, err := json.Marshal(h.CommonValidations)

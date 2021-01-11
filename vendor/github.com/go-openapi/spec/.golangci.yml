@@ -21,3 +21,19 @@ linters:
     - lll
     - gochecknoinits
     - gochecknoglobals
+    - funlen
+    - godox
+    - gocognit
+    - whitespace
+    - wsl
+    - wrapcheck
+    - testpackage
+    - nlreturn
+    - gomnd
+    - exhaustivestruct
+    - goerr113
+    - errorlint
+    - nestif
+    - godot
+    - gofumpt
+    - paralleltest

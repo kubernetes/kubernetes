@@ -45,7 +45,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-bindata/go-bindata v3.1.1+incompatible
 	github.com/go-openapi/loads v0.19.4
-	github.com/go-openapi/spec v0.19.3
+	github.com/go-openapi/spec v0.20.0
 	github.com/go-openapi/strfmt v0.19.3
 	github.com/go-openapi/validate v0.19.5
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
@@ -110,7 +110,7 @@ require (
 	google.golang.org/grpc v1.27.1
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/square/go-jose.v2 v2.2.2
-	gopkg.in/yaml.v2 v2.2.8
+	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.0.0
 	k8s.io/apiextensions-apiserver v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -224,7 +224,7 @@ replace (
 	github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.1.0
 	github.com/coreos/pkg => github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/cpuguy83/go-md2man/v2 => github.com/cpuguy83/go-md2man/v2 v2.0.0
-	github.com/creack/pty => github.com/creack/pty v1.1.7
+	github.com/creack/pty => github.com/creack/pty v1.1.9
 	github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.2.2
 	github.com/davecgh/go-spew => github.com/davecgh/go-spew v1.1.1
 	github.com/daviddengcn/go-colortext => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
@@ -260,13 +260,13 @@ replace (
 	github.com/go-logr/logr => github.com/go-logr/logr v0.2.0
 	github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.19.5
 	github.com/go-openapi/errors => github.com/go-openapi/errors v0.19.2
-	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.3
-	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.3
+	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.5
+	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.5
 	github.com/go-openapi/loads => github.com/go-openapi/loads v0.19.4
 	github.com/go-openapi/runtime => github.com/go-openapi/runtime v0.19.4
-	github.com/go-openapi/spec => github.com/go-openapi/spec v0.19.3
+	github.com/go-openapi/spec => github.com/go-openapi/spec v0.20.0
 	github.com/go-openapi/strfmt => github.com/go-openapi/strfmt v0.19.3
-	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.5
+	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.12
 	github.com/go-openapi/validate => github.com/go-openapi/validate v0.19.5
 	github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 	github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
@@ -328,6 +328,7 @@ replace (
 	github.com/jmespath/go-jmespath => github.com/jmespath/go-jmespath v0.4.0
 	github.com/jmespath/go-jmespath/internal/testify => github.com/jmespath/go-jmespath/internal/testify v1.5.1
 	github.com/jonboulle/clockwork => github.com/jonboulle/clockwork v0.1.0
+	github.com/josharian/intern => github.com/josharian/intern v1.0.0
 	github.com/json-iterator/go => github.com/json-iterator/go v1.1.10
 	github.com/jstemmer/go-junit-report => github.com/jstemmer/go-junit-report v0.9.1
 	github.com/jtolds/gls => github.com/jtolds/gls v4.20.0+incompatible
@@ -340,8 +341,7 @@ replace (
 	github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.3
 	github.com/kr/logfmt => github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515
 	github.com/kr/pretty => github.com/kr/pretty v0.2.0
-	github.com/kr/pty => github.com/kr/pty v1.1.5
-	github.com/kr/text => github.com/kr/text v0.1.0
+	github.com/kr/text => github.com/kr/text v0.2.0
 	github.com/kylelemons/godebug => github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348
 	github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v1.0.0
 	github.com/liggitt/tabwriter => github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
@@ -352,7 +352,7 @@ replace (
 	github.com/lucas-clemente/quic-go => github.com/lucas-clemente/quic-go v0.10.2
 	github.com/lucas-clemente/quic-go-certificates => github.com/lucas-clemente/quic-go-certificates v0.0.0-20160823095156-d2f86524cced
 	github.com/magiconair/properties => github.com/magiconair/properties v1.8.1
-	github.com/mailru/easyjson => github.com/mailru/easyjson v0.7.0
+	github.com/mailru/easyjson => github.com/mailru/easyjson v0.7.6
 	github.com/marten-seemann/qtls => github.com/marten-seemann/qtls v0.2.3
 	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
 	github.com/mattn/go-isatty => github.com/mattn/go-isatty v0.0.4
@@ -383,6 +383,7 @@ replace (
 	github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/naoina/go-stringutil => github.com/naoina/go-stringutil v0.1.0
 	github.com/naoina/toml => github.com/naoina/toml v0.1.1
+	github.com/niemeyer/pretty => github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e
 	github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega => github.com/onsi/gomega v1.7.0
@@ -473,7 +474,7 @@ replace (
 	google.golang.org/grpc => google.golang.org/grpc v1.27.1
 	google.golang.org/protobuf => google.golang.org/protobuf v1.25.0
 	gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
-	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
+	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f
 	gopkg.in/cheggaaa/pb.v1 => gopkg.in/cheggaaa/pb.v1 v1.0.25
 	gopkg.in/errgo.v2 => gopkg.in/errgo.v2 v2.1.0
 	gopkg.in/fsnotify.v1 => gopkg.in/fsnotify.v1 v1.4.7
@@ -486,8 +487,8 @@ replace (
 	gopkg.in/square/go-jose.v2 => gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/tomb.v1 => gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 	gopkg.in/warnings.v0 => gopkg.in/warnings.v0 v0.1.1
-	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
-	gopkg.in/yaml.v3 => gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 => gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
 	gotest.tools => gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 => gotest.tools/v3 v3.0.2
 	honnef.co/go/tools => honnef.co/go/tools v0.0.1-2020.1.3
