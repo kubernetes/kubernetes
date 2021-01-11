@@ -38,7 +38,6 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
 func TestWatch(t *testing.T) {
@@ -226,13 +225,13 @@ func TestWatchError(t *testing.T) {
 	codec := &testCodec{apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	invalidStore := newStore(cluster.RandClient(), newPod, true, storagebackend.DefaultLeaseReuseDurationSeconds, codec, "", &prefixTransformer{prefix: []byte("test!")})
+	invalidStore := newStore(cluster.RandClient(), codec, newPod, "", &prefixTransformer{prefix: []byte("test!")}, true, NewDefaultLeaseManagerConfig())
 	ctx := context.Background()
 	w, err := invalidStore.Watch(ctx, "/abc", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	validStore := newStore(cluster.RandClient(), newPod, true, storagebackend.DefaultLeaseReuseDurationSeconds, codec, "", &prefixTransformer{prefix: []byte("test!")})
+	validStore := newStore(cluster.RandClient(), codec, newPod, "", &prefixTransformer{prefix: []byte("test!")}, true, NewDefaultLeaseManagerConfig())
 	validStore.GuaranteedUpdate(ctx, "/abc", &example.Pod{}, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
 			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}, nil
@@ -322,7 +321,7 @@ func TestProgressNotify(t *testing.T) {
 	}
 	cluster := integration.NewClusterV3(t, clusterConfig)
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), newPod, false, storagebackend.DefaultLeaseReuseDurationSeconds, codec, "", &prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	store := newStore(cluster.RandClient(), codec, newPod, "", &prefixTransformer{prefix: []byte(defaultTestPrefix)}, false, NewDefaultLeaseManagerConfig())
 	ctx := context.Background()
 
 	key := "/somekey"
