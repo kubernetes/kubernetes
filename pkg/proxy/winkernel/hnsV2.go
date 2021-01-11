@@ -201,7 +201,7 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 			} else if len(plist.FrontendVIPs) != 0 {
 				continue
 			}
-			LogJson(plist, "Found existing Hns loadbalancer policy resource", 1)
+			LogJson("policyList", plist, "Found existing Hns loadbalancer policy resource", 1)
 			return &loadBalancerInfo{
 				hnsID: plist.Id,
 			}, nil
@@ -280,7 +280,7 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 		return nil, err
 	}
 
-	LogJson(lb, "Hns loadbalancer policy resource", 1)
+	LogJson("hostComputeLoadBalancer", lb, "Hns loadbalancer policy resource", 1)
 
 	return &loadBalancerInfo{
 		hnsID: lb.Id,

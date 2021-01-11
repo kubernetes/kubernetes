@@ -192,7 +192,7 @@ func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 			} else if len(elbPolicy.VIPs) != 0 {
 				continue
 			}
-			LogJson(plist, "Found existing Hns loadbalancer policy resource", 1)
+			LogJson("policyList", plist, "Found existing Hns loadbalancer policy resource", 1)
 			return &loadBalancerInfo{
 				hnsID: plist.ID,
 			}, nil
@@ -218,7 +218,7 @@ func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 	)
 
 	if err == nil {
-		LogJson(lb, "Hns loadbalancer policy resource", 1)
+		LogJson("policyList", lb, "Hns loadbalancer policy resource", 1)
 	} else {
 		return nil, err
 	}
@@ -237,7 +237,7 @@ func (hns hnsV1) deleteLoadBalancer(hnsID string) error {
 	if err != nil {
 		return err
 	}
-	LogJson(hnsloadBalancer, "Removing Policy", 2)
+	LogJson("policyList", hnsloadBalancer, "Removing Policy", 2)
 
 	_, err = hnsloadBalancer.Delete()
 	return err
