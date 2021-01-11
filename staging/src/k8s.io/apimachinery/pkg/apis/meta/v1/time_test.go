@@ -53,17 +53,43 @@ func TestTimeMarshalYAML(t *testing.T) {
 
 func TestTimeUnmarshalYAML(t *testing.T) {
 	cases := []struct {
-		input  string
-		result Time
+		name       string
+		input      string
+		result     Time
+		shouldFail bool
 	}{
-		{"t: null\n", Time{}},
-		{"t: 1998-05-05T05:05:05Z\n", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+		{
+			"null timestamp should work",
+			"t: null\n",
+			Time{},
+			false,
+		},
+		{
+			"RFC3339 timestamp should work",
+			"t: 1998-05-05T05:05:05Z\n",
+			Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()},
+			false,
+		},
+		{
+			"RFC3339(Millis) timestamp should work",
+			"t: 1998-05-05T05:05:05.000Z\n",
+			Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()},
+			false,
+		},
+		{
+			"RFC3339(Micro) timestamp should work",
+			"t: 1998-05-05T05:05:05.000000Z\n",
+			Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()},
+			false,
+		},
 	}
 
 	for _, c := range cases {
 		var result TimeHolder
 		if err := yaml.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
+			if !c.shouldFail {
+				t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
+			}
 		}
 		if result.T != c.result {
 			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.result, result)
@@ -95,17 +121,43 @@ func TestTimeMarshalJSON(t *testing.T) {
 
 func TestTimeUnmarshalJSON(t *testing.T) {
 	cases := []struct {
-		input  string
-		result Time
+		name       string
+		input      string
+		result     Time
+		shouldFail bool
 	}{
-		{"{\"t\":null}", Time{}},
-		{"{\"t\":\"1998-05-05T05:05:05Z\"}", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+		{
+			"null timestamp should work",
+			"{\"t\":null}",
+			Time{},
+			false,
+		},
+		{
+			"RFC3339 timestamp should work",
+			"{\"t\":\"1998-05-05T05:05:05Z\"}",
+			Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()},
+			false,
+		},
+		{
+			"RFC3339(Millis) timestamp should work",
+			"{\"t\":\"1998-05-05T05:05:05.000Z\"}",
+			Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()},
+			false,
+		},
+		{
+			"RFC3339(Micro) timestamp should work",
+			"{\"t\":\"1998-05-05T05:05:05.000000Z\"}",
+			Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()},
+			false,
+		},
 	}
 
 	for _, c := range cases {
 		var result TimeHolder
 		if err := json.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
+			if !c.shouldFail {
+				t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
+			}
 		}
 		if result.T != c.result {
 			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.result, result)

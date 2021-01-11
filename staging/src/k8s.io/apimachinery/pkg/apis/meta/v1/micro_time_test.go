@@ -53,17 +53,43 @@ func TestMicroTimeMarshalYAML(t *testing.T) {
 
 func TestMicroTimeUnmarshalYAML(t *testing.T) {
 	cases := []struct {
-		input  string
-		result MicroTime
+		name       string
+		input      string
+		result     MicroTime
+		shouldFail bool
 	}{
-		{"t: null\n", MicroTime{}},
-		{"t: 1998-05-05T05:05:05.000000Z\n", MicroTime{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+		{
+			"null timestamp should work",
+			"t: null\n",
+			MicroTime{},
+			false,
+		},
+		{
+			"RFC3339 timestamp should fail due to lacking explicit precision",
+			"t: 1998-05-05T05:05:05Z\n",
+			MicroTime{},
+			true,
+		},
+		{
+			"RFC3339(Millis) timestamp should fail due to lacking explicit precision",
+			"t: 1998-05-05T05:05:05.000Z\n",
+			MicroTime{},
+			true,
+		},
+		{
+			"RFC3339(Micro) timestamp should work",
+			"t: 1998-05-05T05:05:05.000000Z\n",
+			MicroTime{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()},
+			false,
+		},
 	}
 
 	for _, c := range cases {
 		var result MicroTimeHolder
 		if err := yaml.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
+			if !c.shouldFail {
+				t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
+			}
 		}
 		if result.T != c.result {
 			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.result, result)
@@ -95,21 +121,49 @@ func TestMicroTimeMarshalJSON(t *testing.T) {
 
 func TestMicroTimeUnmarshalJSON(t *testing.T) {
 	cases := []struct {
-		input  string
-		result MicroTime
+		name       string
+		input      string
+		result     MicroTime
+		shouldFail bool
 	}{
-		{"{\"t\":null}", MicroTime{}},
-		{"{\"t\":\"1998-05-05T05:05:05.000000Z\"}", MicroTime{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+		{
+			"null timestamp should work",
+			"{\"t\":null}",
+			MicroTime{},
+			false,
+		},
+		{
+			"RFC3339 timestamp should fail due to lacking explicit precision",
+			"{\"t\":\"1998-05-05T05:05:05\"}",
+			MicroTime{},
+			true,
+		},
+		{
+			"RFC3339(Millis) timestamp should fail due to lacking explicit precision",
+			"{\"t\":\"1998-05-05T05:05:05.000Z\"}",
+			MicroTime{},
+			true,
+		},
+		{
+			"RFC3339(Micro) timestamp should work",
+			"{\"t\":\"1998-05-05T05:05:05.000000Z\"}",
+			MicroTime{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()},
+			false,
+		},
 	}
 
 	for _, c := range cases {
-		var result MicroTimeHolder
-		if err := json.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
-		}
-		if result.T != c.result {
-			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.result, result)
-		}
+		t.Run(c.name, func(t *testing.T) {
+			var result MicroTimeHolder
+			if err := json.Unmarshal([]byte(c.input), &result); err != nil {
+				if !c.shouldFail {
+					t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
+				}
+			}
+			if result.T != c.result {
+				t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.result, result)
+			}
+		})
 	}
 }
 
