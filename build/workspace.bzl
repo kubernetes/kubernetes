@@ -26,16 +26,16 @@ _CNI_TARBALL_ARCH_SHA256 = {
     "s390x": "3a0008f98ea5b4b6fd367cac3d8096f19bc080a779cf81fd0bcbc5bd1396ace7",
 }
 
-CRI_TOOLS_VERSION = "1.19.0"
+CRI_TOOLS_VERSION = "1.20.0"
 _CRI_TARBALL_ARCH_SHA256 = {
-    "linux-386": "fd0247b81a46adeca69ef3b7bbcf7d0e776df63195918236887243773b98a0c0",
-    "linux-amd64": "87d8ef70b61f2fe3d8b4a48f6f712fd798c6e293ed3723c1e4bbb5052098f0ae",
-    "linux-arm": "b72fd3c4b35f60f5db2cfcd8e932f6000cf9c2978b54adfcf60ee5e2d452e92f",
-    "linux-arm64": "ec040d14ca03e8e4e504a85dae5353e04b5d9d8aea3df68699258992c0eb8d88",
-    "linux-ppc64le": "72107c58960ee9405829c3366dbfcd86f163a990ea2102f3ed63a709096bc7ba",
-    "linux-s390x": "20ec106c307c9d56c2ecae1560b244f8ac26450b9704682f24bfb5f468b06776",
-    "windows-386": "3b7a41b556e3eae1fb56d17edc990ccd4839c8ab554249a8991155ee266dac4b",
-    "windows-amd64": "df60ff65ab71c5cf1d8c38f51db6f05e3d60a45d3a3293c3248c925c25375921",
+    "linux-386": "13ab9493cefca1d1ac5848ed52572e2ee5518a5bf2c527c0e5ed75b0e5c42c39",
+    "linux-amd64": "44d5f550ef3f41f9b53155906e0229ffdbee4b19452b4df540265e29572b899c",
+    "linux-arm": "ed5ffdd386261ec1146731421d4ac9c5c7f91e08486fee409452a3364bef792a",
+    "linux-arm64": "eda6879710eb046d335162d4afe8494c6f8161142ad3188022852f64b92806a8",
+    "linux-ppc64le": "da0c052983ba884f9605b14bf627664df67fcdb41c7f6908368bf4745f889b26",
+    "linux-s390x": "88e1e41502e6f649e1a9dd0392d6ddec1854d6cd9d826b69d092e80d74fc4aca",
+    "windows-386": "b37edede7e4eb11247f5677f4cab1a8bca4ea1bc26a5c6b3ee599adddc01f926",
+    "windows-amd64": "cc909108ee84d39b2e9d7ac0cb9599b6fa7fc51f5a7da7014052684cd3e3f65e",
 }
 
 ETCD_VERSION = "3.4.13"
