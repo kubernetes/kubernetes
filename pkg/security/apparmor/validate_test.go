@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -46,16 +46,7 @@ func TestValidateHost(t *testing.T) {
 	assert.NoError(t, validateHost())
 }
 
-func TestValidateProfile(t *testing.T) {
-	loadedProfiles := map[string]bool{
-		"docker-default": true,
-		"foo-bar":        true,
-		"baz":            true,
-		"/usr/sbin/ntpd": true,
-		"/usr/lib/connman/scripts/dhclient-script":      true,
-		"/usr/lib/NetworkManager/nm-dhcp-client.action": true,
-		"/usr/bin/evince-previewer//sanitized_helper":   true,
-	}
+func TestValidateProfileFormat(t *testing.T) {
 	tests := []struct {
 		profile     string
 		expectValid bool
@@ -66,12 +57,10 @@ func TestValidateProfile(t *testing.T) {
 		{"baz", false}, // Missing local prefix.
 		{v1.AppArmorBetaProfileNamePrefix + "/usr/sbin/ntpd", true},
 		{v1.AppArmorBetaProfileNamePrefix + "foo-bar", true},
-		{v1.AppArmorBetaProfileNamePrefix + "unloaded", false}, // Not loaded.
-		{v1.AppArmorBetaProfileNamePrefix + "", false},
 	}
 
 	for _, test := range tests {
-		err := validateProfile(test.profile, loadedProfiles)
+		err := ValidateProfileFormat(test.profile)
 		if test.expectValid {
 			assert.NoError(t, err, "Profile %s should be valid", test.profile)
 		} else {
@@ -120,8 +109,6 @@ func TestValidateValidHost(t *testing.T) {
 		{v1.AppArmorBetaProfileNamePrefix + "foo-container", true},
 		{v1.AppArmorBetaProfileNamePrefix + "/usr/sbin/ntpd", true},
 		{"docker-default", false},
-		{v1.AppArmorBetaProfileNamePrefix + "foo", false},
-		{v1.AppArmorBetaProfileNamePrefix + "", false},
 	}
 
 	for _, test := range tests {
@@ -154,23 +141,6 @@ func TestValidateValidHost(t *testing.T) {
 		},
 	}
 	assert.NoError(t, v.Validate(pod), "Multi-container pod should validate")
-	for k, val := range pod.Annotations {
-		pod.Annotations[k] = val + "-bad"
-		assert.Error(t, v.Validate(pod), fmt.Sprintf("Multi-container pod with invalid profile %s:%s", k, pod.Annotations[k]))
-		pod.Annotations[k] = val // Restore.
-	}
-}
-
-func TestParseProfileName(t *testing.T) {
-	tests := []struct{ line, expected string }{
-		{"foo://bar/baz (kill)", "foo://bar/baz"},
-		{"foo-bar (enforce)", "foo-bar"},
-		{"/usr/foo/bar/baz (complain)", "/usr/foo/bar/baz"},
-	}
-	for _, test := range tests {
-		name := parseProfileName(test.line)
-		assert.Equal(t, test.expected, name, "Parsing %s", test.line)
-	}
 }
 
 func getPodWithProfile(profile string) *v1.Pod {
