@@ -226,6 +226,10 @@ func (s *DelegatingAuthenticationOptions) WithClientTimeout(timeout time.Duratio
 }
 
 func (s *DelegatingAuthenticationOptions) Validate() []error {
+	if s == nil {
+		return nil
+	}
+
 	allErrors := []error{}
 	allErrors = append(allErrors, s.RequestHeader.Validate()...)
 
