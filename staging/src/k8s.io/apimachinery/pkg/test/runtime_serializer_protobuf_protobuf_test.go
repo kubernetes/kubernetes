@@ -223,8 +223,6 @@ func TestProtobufDecode(t *testing.T) {
 		0x22, 0x00, // content-encoding
 	}
 
-	//err1 := fmt.Errorf("a test error")
-
 	testCases := []struct {
 		obj   runtime.Object
 		data  []byte
