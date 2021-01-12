@@ -828,21 +828,6 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.V(2).InfoS("syncProxyRules complete", "elapsed", time.Since(start))
 	}()
 
-	localAddrs, err := utilproxy.GetLocalAddrs()
-	if err != nil {
-		klog.ErrorS(err, "Failed to get local addresses during proxy sync, assuming external IPs are not local")
-	} else if len(localAddrs) == 0 {
-		klog.InfoS("No local addresses found, assuming all external IPs are not local")
-	}
-
-	localAddrSet := utilnet.IPSet{}
-	localAddrSet.Insert(localAddrs...)
-
-	nodeAddresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
-	if err != nil {
-		klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
-	}
-
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
@@ -903,7 +888,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
 	existingFilterChains := make(map[utiliptables.Chain][]byte)
 	proxier.existingFilterChainsData.Reset()
-	err = proxier.iptables.SaveInto(utiliptables.TableFilter, proxier.existingFilterChainsData)
+	err := proxier.iptables.SaveInto(utiliptables.TableFilter, proxier.existingFilterChainsData)
 	if err != nil { // if we failed to get any rules
 		klog.ErrorS(err, "Failed to execute iptables-save, syncing all rules")
 	} else { // otherwise parse the output
@@ -1005,6 +990,12 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.endpointChainsNumber = 0
 	for svcName := range proxier.serviceMap {
 		proxier.endpointChainsNumber += len(proxier.endpointsMap[svcName])
+	}
+
+	localAddrSet := utilproxy.GetLocalAddrSet()
+	nodeAddresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
 	}
 
 	// Build rules for each service.
