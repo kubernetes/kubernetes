@@ -299,6 +299,59 @@ func assertInternalLbResourcesDeleted(t *testing.T, gce *Cloud, apiService *v1.S
 	assert.Nil(t, ip)
 }
 
+func assertILBAnnotationsSet(t *testing.T, gce *Cloud, clusterID string, svc *v1.Service, protocol v1.Protocol) {
+	// Get most current version of service resource
+	currSvc, err := gce.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	sharedBackend := shareBackendService(svc)
+	sharedHealthCheck := !servicehelpers.RequestsOnlyLocalTraffic(svc)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", currSvc)
+
+	// Only one key should exist with the FWD Rule name
+	var expectedKey, expectedNilKey string
+	if protocol == v1.ProtocolTCP {
+		expectedKey = TCPForwardingRuleKey
+		expectedNilKey = UDPForwardingRuleKey
+	} else {
+		expectedKey = UDPForwardingRuleKey
+		expectedNilKey = TCPForwardingRuleKey
+	}
+
+	expectedAnnotations := map[string]string{
+		expectedKey:       lbName,
+		BackendServiceKey: makeBackendServiceName(lbName, clusterID, sharedBackend, cloud.SchemeInternal, protocol, svc.Spec.SessionAffinity),
+		HealthCheckKey:    makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck),
+		FirewallRuleKey:   MakeFirewallName(lbName),
+		HCFirewallRuleKey: makeHealthCheckFirewallName(lbName, clusterID, sharedHealthCheck),
+	}
+
+	if _, ok := currSvc.Annotations[expectedNilKey]; ok {
+		t.Errorf("service %q, should not have annotation %q", currSvc.Name, expectedNilKey)
+	}
+
+	for k, v := range expectedAnnotations {
+		annotation, ok := currSvc.Annotations[k]
+		if !ok {
+			t.Errorf("service %q, does not have annotation %q", currSvc.Name, k)
+		}
+		assert.Equal(t, v, annotation)
+	}
+}
+
+func assertILBAnnotationsUnset(t *testing.T, gce *Cloud, svc *v1.Service) {
+	// Get most current version of service resource
+	currSvc, err := gce.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	assert.NoError(t, err)
+
+	for _, key := range ILBAnnotationKeys {
+		_, ok := currSvc.Annotations[key]
+		if ok {
+			t.Errorf("service %q, should not have a %q annotation", currSvc.Name, key)
+		}
+	}
+}
+
 func checkEvent(t *testing.T, recorder *record.FakeRecorder, expected string, shouldMatch bool) bool {
 	select {
 	case received := <-recorder.Events:

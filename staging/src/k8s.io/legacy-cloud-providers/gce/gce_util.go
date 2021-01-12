@@ -41,9 +41,11 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
+	servicehelpers "k8s.io/cloud-provider/service/helpers"
 )
 
 func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
@@ -354,7 +356,7 @@ func addFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key st
 }
 
 // removeFinalizer patches the service to remove finalizer.
-func removeFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key string) error {
+func removeFinalizerAndILBAnnotations(service *v1.Service, kubeClient v1core.CoreV1Interface, key string) error {
 	if !hasFinalizer(service, key) {
 		return nil
 	}
@@ -362,6 +364,8 @@ func removeFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key
 	// Make a copy so we don't mutate the shared informer cache.
 	updated := service.DeepCopy()
 	updated.ObjectMeta.Finalizers = removeString(updated.ObjectMeta.Finalizers, key)
+
+	deleteILBAnnotations(updated.Annotations)
 
 	_, err := servicehelper.PatchService(kubeClient, service, updated)
 	return err
@@ -387,4 +391,31 @@ func removeString(slice []string, s string) []string {
 		}
 	}
 	return newSlice
+}
+
+// deleteILBAnnotations deletes the ILB keys from the provided annotationMap
+func deleteILBAnnotations(annotationMap map[string]string) {
+	for _, key := range ILBAnnotationKeys {
+		delete(annotationMap, key)
+	}
+}
+
+// patchILBAnnotations patches the annotations on the service with the provided annotation map.
+// All existing ILB annotation keys will be deleted before adding back the keys and values in
+// provided map.
+func patchILBAnnotations(client clientset.Interface, service *v1.Service, annotationMap map[string]string) error {
+	newService := service.DeepCopy()
+	if newService.Annotations == nil {
+		newService.Annotations = make(map[string]string)
+	}
+
+	// Delete existing keys before setting new value
+	deleteILBAnnotations(newService.Annotations)
+
+	for k, v := range annotationMap {
+		newService.Annotations[k] = v
+	}
+
+	_, err := servicehelpers.PatchService(client.CoreV1(), service, newService)
+	return err
 }

@@ -121,13 +121,19 @@ func TestFirewallToGcloudArgs(t *testing.T) {
 	}
 }
 
-// TestAddRemoveFinalizer tests the add/remove and hasFinalizer methods.
+// TestAddRemoveFinalizer tests the addFinalizer, removeFinalizerAndILBAnnotaitons and hasFinalizer methods.
 func TestAddRemoveFinalizer(t *testing.T) {
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
 	gce, err := fakeGCECloud(vals)
 	if err != nil {
 		t.Fatalf("Failed to get GCE client, err %v", err)
 	}
+	svc.Annotations = map[string]string{
+		TCPForwardingRuleKey: "my-tcp-fwd-rule",
+		UDPForwardingRuleKey: "my-udp-fwd-rule",
+		"some-key":           "some-value",
+	}
+
 	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Failed to create service %s, err %v", svc.Name, err)
@@ -144,7 +150,7 @@ func TestAddRemoveFinalizer(t *testing.T) {
 	if !hasFinalizer(svc, ILBFinalizerV1) {
 		t.Errorf("Unable to find finalizer '%s' in service %s", ILBFinalizerV1, svc.Name)
 	}
-	err = removeFinalizer(svc, gce.client.CoreV1(), ILBFinalizerV1)
+	err = removeFinalizerAndILBAnnotations(svc, gce.client.CoreV1(), ILBFinalizerV1)
 	if err != nil {
 		t.Fatalf("Failed to remove finalizer, err %v", err)
 	}
@@ -155,4 +161,88 @@ func TestAddRemoveFinalizer(t *testing.T) {
 	if hasFinalizer(svc, ILBFinalizerV1) {
 		t.Errorf("Failed to remove finalizer '%s' in service %s", ILBFinalizerV1, svc.Name)
 	}
+
+	if len(svc.Annotations) != 1 {
+		t.Errorf("Failed to remove ILB Annotations, only 1 should exist, found %d", len(svc.Annotations))
+	}
+	val, ok := svc.Annotations["some-key"]
+	if !ok {
+		t.Errorf("deleteILBAnnotations should not delete not non ILB annotations")
+	}
+	if val != "some-value" {
+		t.Errorf("deleteILBAnnotations should not change the value of keys")
+	}
+}
+
+func TestPatchILBAnnotations(t *testing.T) {
+	annotationMap := map[string]string{
+		TCPForwardingRuleKey: "my-tcp-fwd-rule",
+		HealthCheckKey:       "my-hc",
+		BackendServiceKey:    "my-backend-service",
+		FirewallRuleKey:      "my-firewall",
+		HCFirewallRuleKey:    "my-hc-firewall",
+		"my-key":             "my-value",
+	}
+
+	updatedAnnotationMap := map[string]string{
+		UDPForwardingRuleKey: "my-udp-forwarding-rule",
+		FirewallRuleKey:      "my-firewall",
+	}
+
+	expectedAnnotationMap := map[string]string{
+		"my-key":             "my-value",
+		UDPForwardingRuleKey: "my-udp-forwarding-rule",
+		FirewallRuleKey:      "my-firewall",
+	}
+
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	gce, err := fakeGCECloud(vals)
+	if err != nil {
+		t.Fatalf("Failed to get GCE client, err %v", err)
+	}
+	svc.Annotations = annotationMap
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("Failed to create service %s, err %v", svc.Name, err)
+	}
+
+	err = patchILBAnnotations(gce.client, svc, updatedAnnotationMap)
+	if err != nil {
+		t.Errorf("Failed to patch ILB Annotations: %q", err)
+	}
+
+	currSvc, err := gce.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Failed to get service %s, err %v", svc.Name, err)
+	}
+
+	if !reflect.DeepEqual(currSvc.Annotations, expectedAnnotationMap) {
+		t.Errorf("Expected service %s to have updated annotation map %+v, but found %+v", svc.Name, expectedAnnotationMap, currSvc.Annotations)
+	}
+}
+
+func TestDeleteILBAnnotations(t *testing.T) {
+	annotationMap := map[string]string{
+		TCPForwardingRuleKey: "my-tcp-fwd-rule",
+		UDPForwardingRuleKey: "my-udp-fwd-rule",
+		HealthCheckKey:       "my-hc",
+		BackendServiceKey:    "my-backend-service",
+		FirewallRuleKey:      "my-firewall",
+		HCFirewallRuleKey:    "my-hc-firewall",
+		"some-key":           "some-value",
+	}
+
+	deleteILBAnnotations(annotationMap)
+
+	if len(annotationMap) != 1 {
+		t.Errorf("Failed to remove ILB Annotations, only 1 should exist, found %d", len(annotationMap))
+	}
+	val, ok := annotationMap["some-key"]
+	if !ok {
+		t.Errorf("deleteILBAnnotations should not delete not non ILB annotations")
+	}
+	if val != "some-value" {
+		t.Errorf("deleteILBAnnotations should not change the value of keys")
+	}
+
 }

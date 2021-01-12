@@ -187,6 +187,33 @@ func TestEnsureInternalLoadBalancer(t *testing.T) {
 	assertInternalLbResources(t, gce, svc, vals, nodeNames)
 }
 
+func TestEnsureInternalLoadBalancerAnnotations(t *testing.T) {
+	t.Parallel()
+
+	for _, protocol := range []v1.Protocol{v1.ProtocolUDP, v1.ProtocolTCP} {
+		vals := DefaultTestClusterValues()
+		nodeNames := []string{"test-node-1"}
+
+		gce, err := fakeGCECloud(vals)
+		require.NoError(t, err)
+		svc := fakeLoadbalancerService(string(LBTypeInternal))
+		svc.Spec.Ports[0].Protocol = protocol
+		svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+		require.NoError(t, err)
+		status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, status.Ingress)
+
+		svc, err = gce.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+		require.NoError(t, err)
+		assertILBAnnotationsSet(t, gce, vals.ClusterID, svc, protocol)
+
+		err = gce.ensureInternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, svc)
+		require.NoError(t, err)
+		assertILBAnnotationsUnset(t, gce, svc)
+	}
+}
+
 func TestEnsureInternalLoadBalancerDeprecatedAnnotation(t *testing.T) {
 	t.Parallel()
 

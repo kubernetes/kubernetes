@@ -45,9 +45,34 @@ const (
 	ILBFinalizerV1 = "gke.networking.io/l4-ilb-v1"
 	// ILBFinalizerV2 is the finalizer used by newer controllers that implement Internal LoadBalancer services.
 	ILBFinalizerV2 = "gke.networking.io/l4-ilb-v2"
+	//ServicePrefix is used to prefix annotations on the service
+	ServicePrefix = "service.kubernetes.io"
+	// TCPForwardingRuleKey is the key to record the GCP TCP Forwarding Rule Name
+	TCPForwardingRuleKey = ServicePrefix + "/tcp-forwarding-rule"
+	// UDPForwardingRuleKey is the key to record the GCP UDP Forwarding Rule Name
+	UDPForwardingRuleKey = ServicePrefix + "/udp-forwarding-rule"
+	// BackendServiceKey is the key to record the GCP backend service name
+	BackendServiceKey = ServicePrefix + "/backend-service"
+	// FirewallRuleKey is the key to record the GCP firewall rule name
+	FirewallRuleKey = ServicePrefix + "/firewall-rule"
+	// HCFirewallRuleKey is the key to record the GCP healthcheck firewall rule name
+	HCFirewallRuleKey = ServicePrefix + "/firewall-rule-for-hc"
+	// HealthCheckKey is the key to record the GCP healthcheck name
+	HealthCheckKey = ServicePrefix + "/healthcheck"
+
 	// maxInstancesPerInstanceGroup defines maximum number of VMs per InstanceGroup.
 	maxInstancesPerInstanceGroup = 1000
 )
+
+//ILBAnnotationKeys are all the ILB annotation keys used to give status
+var ILBAnnotationKeys = []string{
+	TCPForwardingRuleKey,
+	UDPForwardingRuleKey,
+	BackendServiceKey,
+	FirewallRuleKey,
+	HCFirewallRuleKey,
+	HealthCheckKey,
+}
 
 func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) && existingFwdRule == nil {
@@ -74,6 +99,7 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		g.metricsCollector.SetL4ILBService(nm.String(), serviceState)
 	}()
 
+	annotationMap := make(map[string]string)
 	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
 	klog.V(2).Infof("ensureInternalLoadBalancer(%v): Attaching %q finalizer", loadBalancerName, ILBFinalizerV1)
 	if err := addFinalizer(svc, g.client.CoreV1(), ILBFinalizerV1); err != nil {
@@ -85,6 +111,8 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	if protocol != v1.ProtocolTCP && protocol != v1.ProtocolUDP {
 		return nil, fmt.Errorf("Invalid protocol %s, only TCP and UDP are supported", string(protocol))
 	}
+	addForwardingRuleAnnotation(annotationMap, protocol, loadBalancerName)
+
 	scheme := cloud.SchemeInternal
 	options := getILBOptions(svc)
 	if g.IsLegacyNetwork() {
@@ -95,6 +123,7 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	sharedBackend := shareBackendService(svc)
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, sharedBackend, scheme, protocol, svc.Spec.SessionAffinity)
 	backendServiceLink := g.getBackendServiceLink(backendServiceName)
+	annotationMap[BackendServiceKey] = backendServiceName
 
 	// Ensure instance groups exist and nodes are assigned to groups
 	igName := makeInstanceGroupName(clusterID)
@@ -129,6 +158,7 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	if err != nil {
 		return nil, err
 	}
+	annotationMap[HealthCheckKey] = hcName
 
 	subnetworkURL := g.SubnetworkURL()
 	// Any subnet specified using the subnet annotation will be picked up and reflected in the forwarding rule.
@@ -162,7 +192,7 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	}
 
 	// Ensure firewall rules if necessary
-	if err = g.ensureInternalFirewalls(loadBalancerName, ipToUse, clusterID, nm, svc, strconv.Itoa(int(hcPort)), sharedHealthCheck, nodes); err != nil {
+	if err = g.ensureInternalFirewalls(loadBalancerName, ipToUse, clusterID, nm, svc, strconv.Itoa(int(hcPort)), sharedHealthCheck, nodes, annotationMap); err != nil {
 		return nil, err
 	}
 
@@ -239,7 +269,9 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 
 	status := &v1.LoadBalancerStatus{}
 	status.Ingress = []v1.LoadBalancerIngress{{IP: updatedFwdRule.IPAddress}}
-	return status, nil
+	klog.V(2).Infof("ensureInternalLoadBalancer(%v): Adding ILB status annotations to %q", loadBalancerName, nm)
+	err = patchILBAnnotations(g.client, svc, annotationMap)
+	return status, err
 }
 
 func (g *Cloud) clearPreviousInternalResources(svc *v1.Service, loadBalancerName string, existingBackendService *compute.BackendService, expectedBSName, expectedHCName string) {
@@ -349,9 +381,9 @@ func (g *Cloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID string,
 		return err
 	}
 
-	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): Removing %q finalizer", loadBalancerName, ILBFinalizerV1)
-	if err := removeFinalizer(svc, g.client.CoreV1(), ILBFinalizerV1); err != nil {
-		klog.Errorf("Failed to remove finalizer '%s' on service %s - %v", ILBFinalizerV1, svcNamespacedName, err)
+	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): Removing %q finalizer and ILB Annotations", loadBalancerName, ILBFinalizerV1)
+	if err := removeFinalizerAndILBAnnotations(svc, g.client.CoreV1(), ILBFinalizerV1); err != nil {
+		klog.Errorf("Failed to remove finalizer %q or ILB annotations on service %s - %v", ILBFinalizerV1, svcNamespacedName, err)
 		return err
 	}
 
@@ -478,7 +510,7 @@ func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, s
 	return err
 }
 
-func (g *Cloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID string, nm types.NamespacedName, svc *v1.Service, healthCheckPort string, sharedHealthCheck bool, nodes []*v1.Node) error {
+func (g *Cloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID string, nm types.NamespacedName, svc *v1.Service, healthCheckPort string, sharedHealthCheck bool, nodes []*v1.Node, annotationMap map[string]string) error {
 	// First firewall is for ingress traffic
 	fwDesc := makeFirewallDescription(nm.String(), ipAddress)
 	_, portRanges, protocol := getPortsAndProtocol(svc.Spec.Ports)
@@ -486,13 +518,16 @@ func (g *Cloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID s
 	if err != nil {
 		return err
 	}
-	err = g.ensureInternalFirewall(svc, MakeFirewallName(loadBalancerName), fwDesc, sourceRanges.StringSlice(), portRanges, protocol, nodes, loadBalancerName)
+	fwName := MakeFirewallName(loadBalancerName)
+	err = g.ensureInternalFirewall(svc, fwName, fwDesc, sourceRanges.StringSlice(), portRanges, protocol, nodes, loadBalancerName)
 	if err != nil {
 		return err
 	}
+	annotationMap[FirewallRuleKey] = fwName
 
 	// Second firewall is for health checking nodes / services
 	fwHCName := makeHealthCheckFirewallName(loadBalancerName, clusterID, sharedHealthCheck)
+	annotationMap[HCFirewallRuleKey] = fwHCName
 	hcSrcRanges := L4LoadBalancerSrcRanges()
 	return g.ensureInternalFirewall(svc, fwHCName, "", hcSrcRanges, []string{healthCheckPort}, v1.ProtocolTCP, nodes, "")
 }
@@ -979,4 +1014,14 @@ func forwardingRulesEqual(old, new *compute.ForwardingRule) bool {
 		oldResourceID.Equal(newResourceID) &&
 		old.AllowGlobalAccess == new.AllowGlobalAccess &&
 		old.Subnetwork == new.Subnetwork
+}
+
+// addForwardingRuleAnnotation picks the forwarding rule key based on the protocol and sets the
+// value as the ilbName in the annotationMap
+func addForwardingRuleAnnotation(annotationMap map[string]string, protocol v1.Protocol, ilbName string) {
+	if protocol == v1.ProtocolTCP {
+		annotationMap[TCPForwardingRuleKey] = ilbName
+	} else {
+		annotationMap[UDPForwardingRuleKey] = ilbName
+	}
 }
