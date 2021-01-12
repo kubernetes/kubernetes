@@ -1020,8 +1020,6 @@ func (proxier *Proxier) syncProxyRules() {
 
 		allEndpoints := proxier.endpointsMap[svcName]
 
-		hasEndpoints := len(allEndpoints) > 0
-
 		// Service Topology will not be enabled in the following cases:
 		// 1. externalTrafficPolicy=Local (mutually exclusive with service topology).
 		// 2. ServiceTopology is not enabled.
@@ -1029,8 +1027,17 @@ func (proxier *Proxier) syncProxyRules() {
 		// to get topology information).
 		if !svcInfo.OnlyNodeLocalEndpoints() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
 			allEndpoints = proxy.FilterTopologyEndpoint(proxier.nodeLabels, svcInfo.TopologyKeys(), allEndpoints)
-			hasEndpoints = len(allEndpoints) > 0
 		}
+
+		readyEndpoints := make([]proxy.Endpoint, 0, len(allEndpoints))
+		for _, endpoint := range allEndpoints {
+			if !endpoint.IsReady() {
+				continue
+			}
+
+			readyEndpoints = append(readyEndpoints, endpoint)
+		}
+		hasEndpoints := len(readyEndpoints) > 0
 
 		svcChain := svcInfo.servicePortChainName
 		if hasEndpoints {
@@ -1340,7 +1347,7 @@ func (proxier *Proxier) syncProxyRules() {
 		endpoints = endpoints[:0]
 		endpointChains = endpointChains[:0]
 		var endpointChain utiliptables.Chain
-		for _, ep := range allEndpoints {
+		for _, ep := range readyEndpoints {
 			epInfo, ok := ep.(*endpointsInfo)
 			if !ok {
 				klog.ErrorS(err, "Failed to cast endpointsInfo", "endpointsInfo", ep.String())
