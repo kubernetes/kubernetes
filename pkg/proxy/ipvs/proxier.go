@@ -190,7 +190,6 @@ var ipsetWithIptablesChain = []struct {
 }
 
 // In IPVS proxy mode, the following flags need to be set
-const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
 const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 const sysctlVSConnTrack = "net/ipv4/vs/conntrack"
 const sysctlConnReuse = "net/ipv4/vs/conn_reuse_mode"
@@ -361,11 +360,6 @@ func NewProxier(ipt utiliptables.Interface,
 	nodePortAddresses []string,
 	kernelHandler KernelHandler,
 ) (*Proxier, error) {
-	// Set the route_localnet sysctl we need for
-	if err := utilproxy.EnsureSysctl(sysctl, sysctlRouteLocalnet, 1); err != nil {
-		return nil, err
-	}
-
 	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
 	// are connected to a Linux bridge (but not SDN bridges).  Until most
 	// plugins handle this, log when config is missing
