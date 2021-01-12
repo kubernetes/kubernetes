@@ -18,6 +18,7 @@ package reconciler
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -1181,6 +1182,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 }
 
 func Test_UncertainDeviceGlobalMounts(t *testing.T) {
+	var wg sync.WaitGroup
 	var tests = []struct {
 		name                   string
 		deviceState            operationexecutor.DeviceMountState
@@ -1221,11 +1223,12 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 			supportRemount:         true,
 		},
 	}
-
 	for _, mode := range []v1.PersistentVolumeMode{v1.PersistentVolumeBlock, v1.PersistentVolumeFilesystem} {
 		for _, tc := range tests {
 			testName := fmt.Sprintf("%s [%s]", tc.name, mode)
-			t.Run(testName+"[", func(t *testing.T) {
+			wg.Add(1)
+			go t.Run(testName+"[", func(t *testing.T) {
+				defer wg.Done()
 
 				pv := &v1.PersistentVolume{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1353,9 +1356,11 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 			})
 		}
 	}
+	wg.Wait()
 }
 
 func Test_UncertainVolumeMountState(t *testing.T) {
+	var wg sync.WaitGroup
 	var tests = []struct {
 		name                   string
 		volumeState            operationexecutor.VolumeMountState
@@ -1406,7 +1411,9 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 	for _, mode := range []v1.PersistentVolumeMode{v1.PersistentVolumeBlock, v1.PersistentVolumeFilesystem} {
 		for _, tc := range tests {
 			testName := fmt.Sprintf("%s [%s]", tc.name, mode)
-			t.Run(testName, func(t *testing.T) {
+			wg.Add(1)
+			go t.Run(testName, func(t *testing.T) {
+				defer wg.Done()
 				pv := &v1.PersistentVolume{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: tc.volumeName,
@@ -1548,6 +1555,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 			})
 		}
 	}
+	wg.Wait()
 }
 
 func waitForUncertainGlobalMount(t *testing.T, volumeName v1.UniqueVolumeName, asw cache.ActualStateOfWorld) {
