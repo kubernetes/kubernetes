@@ -185,6 +185,10 @@ func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error)
 				klog.Warningf("Error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", confFile)
 				continue
 			}
+			if conf.Network.CNIVersion == "" {
+				klog.Warningf("Error loading CNI config file %s: no 'cniVersion'; perhaps this is a .conflist?", confFile)
+				continue
+			}
 
 			confList, err = libcni.ConfListFromConf(conf)
 			if err != nil {
