@@ -17,7 +17,7 @@
 REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
 
-TAG = 3.4.1
+TAG = 3.5
 REV = $(shell git describe --contains --always --match='v*')
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
