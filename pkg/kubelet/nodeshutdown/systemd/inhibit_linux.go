@@ -142,11 +142,12 @@ func (bus *DBusCon) MonitorShutdown() (<-chan bool, error) {
 			case event := <-busChan:
 				if event == nil || len(event.Body) == 0 {
 					klog.Errorf("Failed obtaining shutdown event, PrepareForShutdown event was empty")
+					continue
 				}
 				shutdownActive, ok := event.Body[0].(bool)
 				if !ok {
 					klog.Errorf("Failed obtaining shutdown event, PrepareForShutdown event was not bool type as expected")
-					return
+					continue
 				}
 				shutdownChan <- shutdownActive
 			}
