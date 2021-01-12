@@ -87,7 +87,6 @@ func RunKubelet() {
 
 const (
 	// Ports of different e2e services.
-	kubeletPort         = "10250"
 	kubeletReadOnlyPort = "10255"
 	// KubeletRootDirectory specifies the directory where the kubelet runtime information is stored.
 	KubeletRootDirectory = "/var/lib/kubelet"
