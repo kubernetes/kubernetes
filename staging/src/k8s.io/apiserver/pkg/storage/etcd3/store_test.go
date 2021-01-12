@@ -2079,7 +2079,6 @@ func Test_decodeContinue(t *testing.T) {
 
 func Test_growSlice(t *testing.T) {
 	type args struct {
-		t               reflect.Type
 		initialCapacity int
 		v               reflect.Value
 		maxCapacity     int
