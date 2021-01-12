@@ -18,10 +18,12 @@ package glusterfs
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"math"
 	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -46,6 +48,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -662,7 +665,7 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 			return fmt.Errorf("failed to release gid %v: %v", gid, err)
 		}
 	}
-	cli := gcli.NewClient(d.url, d.user, d.secretValue)
+	cli := filterClient(gcli.NewClient(d.url, d.user, d.secretValue), d.plugin.host.GetFilteredDialOptions())
 	if cli == nil {
 		klog.Errorf("failed to create glusterfs REST client")
 		return fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
@@ -701,6 +704,20 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 		klog.V(1).Infof("endpoint %v/%v is deleted successfully ", dynamicNamespace, dynamicEndpoint)
 	}
 	return nil
+}
+
+func filterClient(client *gcli.Client, opts *proxyutil.FilteredDialOptions) *gcli.Client {
+	if opts == nil {
+		return client
+	}
+	dialer := proxyutil.NewFilteredDialContext(nil, nil, opts)
+	client.SetClientFunc(func(tlsConfig *tls.Config, checkRedirect gcli.CheckRedirectFunc) (gcli.HttpPerformer, error) {
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.DialContext = dialer
+		transport.TLSClientConfig = tlsConfig
+		return &http.Client{Transport: transport, CheckRedirect: checkRedirect}, nil
+	})
+	return client
 }
 
 func (p *glusterfsVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
@@ -794,7 +811,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 	if p.url == "" {
 		return nil, 0, "", fmt.Errorf("failed to create glusterfs REST client, REST URL is empty")
 	}
-	cli := gcli.NewClient(p.url, p.user, p.secretValue)
+	cli := filterClient(gcli.NewClient(p.url, p.user, p.secretValue), p.plugin.host.GetFilteredDialOptions())
 	if cli == nil {
 		return nil, 0, "", fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
 	}
@@ -1205,7 +1222,7 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 	klog.V(4).Infof("expanding volume: %q", volumeID)
 
 	//Create REST server connection
-	cli := gcli.NewClient(cfg.url, cfg.user, cfg.secretValue)
+	cli := filterClient(gcli.NewClient(cfg.url, cfg.user, cfg.secretValue), plugin.host.GetFilteredDialOptions())
 	if cli == nil {
 		klog.Errorf("failed to create glusterfs REST client")
 		return oldSize, fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
