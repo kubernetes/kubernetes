@@ -17,9 +17,12 @@ limitations under the License.
 package field
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
+
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 func TestMakeFuncs(t *testing.T) {
@@ -171,5 +174,154 @@ func TestNotSupported(t *testing.T) {
 	expected := `Unsupported value: "v": supported values: "a", "b", "c"`
 	if notSupported.ErrorBody() != expected {
 		t.Errorf("Expected: %s\n, but got: %s\n", expected, notSupported.ErrorBody())
+	}
+}
+
+func TestErrorIs(t *testing.T) {
+
+	testCases := []struct {
+		name      string
+		targetErr *Error
+		cmpErr    error
+		wantIs    bool
+	}{
+		{
+			"Valid test with Invalid error",
+			Invalid(NewPath("f"), "v", "d"),
+			&Error{ErrorTypeInvalid, NewPath("f").String(), "v", "d"},
+			true,
+		},
+		{
+			"Valid test with Invalid error using wrapping",
+			Invalid(NewPath("f"), "v", "d"),
+			fmt.Errorf("%w", Invalid(NewPath("f"), "v", "d")),
+			true,
+		},
+		{
+			"Invalid test with Invalid error",
+			Invalid(NewPath("f"), "v", "d"),
+			&Error{ErrorTypeInvalid, NewPath("f").String(), "dv", "d"},
+			false,
+		},
+		{
+			"Valid test with NotSupported error",
+			NotSupported(NewPath("f"), "v", []string{"a", "b", "c"}),
+			&Error{ErrorTypeNotSupported, NewPath("f").String(), "v", `supported values: "a", "b", "c"`},
+			true,
+		},
+		{
+			"Invalid test with NotSupported error",
+			NotSupported(NewPath("f"), "v", []string{"a", "b", "c"}),
+			&Error{ErrorTypeNotSupported, NewPath("f").String(), "dv", `supported values: "a", "b", "c"`},
+			false,
+		},
+		{
+			"Valid test with Forbidden error",
+			Forbidden(NewPath("f"), "d"),
+			&Error{ErrorTypeForbidden, NewPath("f").String(), "", "d"},
+			true,
+		},
+		{
+			"Invalid test with Forbidden error",
+			Forbidden(NewPath("f"), "d"),
+			&Error{ErrorTypeForbidden, NewPath("f").String(), "dv", `supported values: "a", "b", "c"`},
+			false,
+		},
+		{
+			"Valid test with TooLong error",
+			TooLong(NewPath("f"), "v", 500),
+			&Error{ErrorTypeTooLong, NewPath("f").String(), "v", "must have at most 500 bytes"},
+			true,
+		},
+		{
+			"Invalid test with TooLong error",
+			TooLong(NewPath("f"), "v", 500),
+			&Error{ErrorTypeTooLong, NewPath("f").String(), "v", "must have at most 5001 bytes"},
+			false,
+		},
+		{
+			"Valid test with TooMany error",
+			TooMany(NewPath("f"), 500, 100),
+			&Error{ErrorTypeTooMany, NewPath("f").String(), 500, "must have at most 100 items"},
+			true,
+		},
+		{
+			"Invalid test with TooMany error",
+			TooMany(NewPath("f"), 500, 100),
+			&Error{ErrorTypeTooMany, NewPath("f").String(), "v", "must have at most 5001 items"},
+			false,
+		},
+		{
+			"Valid test with Duplicate error",
+			Duplicate(NewPath("f"), "v"),
+			&Error{ErrorTypeDuplicate, NewPath("f").String(), "v", ""},
+			true,
+		},
+		{
+			"Invalid test with Duplicate error",
+			Duplicate(NewPath("f"), "v"),
+			&Error{ErrorTypeDuplicate, NewPath("df").String(), "v", ""},
+			false,
+		},
+		{
+			"Valid test with NotFound error",
+			NotFound(NewPath("f"), "v"),
+			&Error{ErrorTypeNotFound, NewPath("f").String(), "v", ""},
+			true,
+		},
+		{
+			"Invalid test with NotFound error",
+			NotFound(NewPath("f"), "v"),
+			&Error{ErrorTypeNotFound, NewPath("f").String(), []string{"a", "b", "c"}, "d"},
+			false,
+		},
+		{
+			"Valid test with Required error",
+			Required(NewPath("f"), "d"),
+			&Error{ErrorTypeRequired, NewPath("f").String(), "", "d"},
+			true,
+		},
+		{
+			"Invalid test with Required error",
+			Required(NewPath("f"), "d"),
+			&Error{ErrorTypeNotFound, NewPath("f").String(), "", "d"},
+			false,
+		},
+		{
+			"Valid test with InternalError error",
+			InternalError(NewPath("f"), fmt.Errorf("e")),
+			&Error{ErrorTypeInternal, NewPath("f").String(), nil, fmt.Errorf("e").Error()},
+			true,
+		},
+		{
+			"Invalid test with InternalError error",
+			InternalError(NewPath("f"), fmt.Errorf("e")),
+			&Error{ErrorTypeInternal, NewPath("f").String(), "v", fmt.Errorf("e").Error()},
+			false,
+		},
+		{
+			"Valid test with InternalError using wrapping",
+			InternalError(NewPath("f"), fmt.Errorf("ex")),
+			fmt.Errorf("%w", InternalError(NewPath("f"), fmt.Errorf("ex"))),
+			true,
+		},
+		{
+			"Valid test with Aggregate errors",
+			Invalid(NewPath("f"), "v", "d"),
+			utilerrors.NewAggregate([]error{Invalid(NewPath("f"), "v", "d"), Invalid(NewPath("a"), "b", "c")}),
+			true,
+		},
+		{
+			"Invalid test with Aggregate errors",
+			Invalid(NewPath("f"), "v", "d"),
+			utilerrors.NewAggregate([]error{Invalid(NewPath("diff"), "v", "d"), Invalid(NewPath("a"), "b", "c")}),
+			false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		if errors.Is(testCase.cmpErr, testCase.targetErr) != testCase.wantIs {
+			t.Errorf("Test case: %s. cmpError: %q , targetErr: %q", testCase.name, testCase.cmpErr, testCase.targetErr)
+		}
 	}
 }

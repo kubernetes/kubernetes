@@ -270,3 +270,15 @@ func (list ErrorList) Filter(fns ...utilerrors.Matcher) ErrorList {
 	// FilterOut takes an Aggregate and returns an Aggregate
 	return fromAggregate(err.(utilerrors.Aggregate))
 }
+
+// Is reports whether any Error in err's chain matches target.
+func (v *Error) Is(target error) bool {
+	t, ok := target.(*Error)
+	if !ok {
+		return false
+	}
+	return v.Type == t.Type &&
+		v.Field == t.Field &&
+		v.BadValue == t.BadValue &&
+		v.Detail == t.Detail
+}
