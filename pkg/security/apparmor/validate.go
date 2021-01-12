@@ -73,14 +73,9 @@ func (v *validator) Validate(pod *v1.Pod) error {
 		return v.validateHostErr
 	}
 
-	loadedProfiles, err := v.getLoadedProfiles()
-	if err != nil {
-		return fmt.Errorf("could not read loaded profiles: %v", err)
-	}
-
 	var retErr error
 	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
-		retErr = validateProfile(GetProfileName(pod, container.Name), loadedProfiles)
+		retErr = ValidateProfileFormat(GetProfileName(pod, container.Name))
 		if retErr != nil {
 			return false
 		}
@@ -119,22 +114,6 @@ func validateHost(runtime string) error {
 	return nil
 }
 
-// Verify that the profile is valid and loaded.
-func validateProfile(profile string, loadedProfiles map[string]bool) error {
-	if err := ValidateProfileFormat(profile); err != nil {
-		return err
-	}
-
-	if strings.HasPrefix(profile, v1.AppArmorBetaProfileNamePrefix) {
-		profileName := strings.TrimPrefix(profile, v1.AppArmorBetaProfileNamePrefix)
-		if !loadedProfiles[profileName] {
-			return fmt.Errorf("profile %q is not loaded", profileName)
-		}
-	}
-
-	return nil
-}
-
 // ValidateProfileFormat checks the format of the profile.
 func ValidateProfileFormat(profile string) error {
 	if profile == "" || profile == v1.AppArmorBetaProfileRuntimeDefault || profile == v1.AppArmorBetaProfileNameUnconfined {
@@ -144,40 +123,6 @@ func ValidateProfileFormat(profile string) error {
 		return fmt.Errorf("invalid AppArmor profile name: %q", profile)
 	}
 	return nil
-}
-
-func (v *validator) getLoadedProfiles() (map[string]bool, error) {
-	profilesPath := path.Join(v.appArmorFS, "profiles")
-	profilesFile, err := os.Open(profilesPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open %s: %v", profilesPath, err)
-	}
-	defer profilesFile.Close()
-
-	profiles := map[string]bool{}
-	scanner := bufio.NewScanner(profilesFile)
-	for scanner.Scan() {
-		profileName := parseProfileName(scanner.Text())
-		if profileName == "" {
-			// Unknown line format; skip it.
-			continue
-		}
-		profiles[profileName] = true
-	}
-	return profiles, nil
-}
-
-// The profiles file is formatted with one profile per line, matching a form:
-//   namespace://profile-name (mode)
-//   profile-name (mode)
-// Where mode is {enforce, complain, kill}. The "namespace://" is only included for namespaced
-// profiles. For the purposes of Kubernetes, we consider the namespace part of the profile name.
-func parseProfileName(profileLine string) string {
-	modeIndex := strings.IndexRune(profileLine, '(')
-	if modeIndex < 0 {
-		return ""
-	}
-	return strings.TrimSpace(profileLine[:modeIndex])
 }
 
 func getAppArmorFS() (string, error) {
