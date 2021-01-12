@@ -669,7 +669,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.containerGC = containerGC
 	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, integer.IntMax(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
-	klet.sandboxDeleter = newPodSandboxDeleter(klet.containerRuntime)
 
 	// setup imageManager
 	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef, imageGCPolicy, crOptions.PodSandboxImage)
@@ -1103,9 +1102,6 @@ type Kubelet struct {
 
 	// trigger deleting containers in a pod
 	containerDeletor *podContainerDeletor
-
-	// trigger deleting sandboxes in a pod
-	sandboxDeleter *podSandboxDeleter
 
 	// config iptables util rules
 	makeIPTablesUtilChains bool
@@ -1933,9 +1929,6 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 				klog.V(4).Infof("SyncLoop (PLEG): ignore irrelevant event: %#v", e)
 			}
 		}
-		if e.Type == pleg.ContainerRemoved {
-			kl.deletePodSandbox(e.ID)
-		}
 
 		if e.Type == pleg.ContainerDied {
 			if containerID, ok := e.Data.(string); ok {
@@ -2256,16 +2249,6 @@ func (kl *Kubelet) fastStatusUpdateOnce() {
 			kl.syncNodeStatus()
 			return
 		}
-	}
-}
-
-func (kl *Kubelet) deletePodSandbox(podID types.UID) {
-	if podStatus, err := kl.podCache.Get(podID); err == nil {
-		toKeep := 1
-		if kl.IsPodDeleted(podID) {
-			toKeep = 0
-		}
-		kl.sandboxDeleter.deleteSandboxesInPod(podStatus, toKeep)
 	}
 }
 

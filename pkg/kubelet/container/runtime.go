@@ -114,8 +114,6 @@ type Runtime interface {
 	GetContainerLogs(ctx context.Context, pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error)
 	// Delete a container. If the container is still running, an error is returned.
 	DeleteContainer(containerID ContainerID) error
-	// DeleteSandbox deletes a sandbox.
-	DeleteSandbox(sandboxID string) error
 	// ImageService provides methods to image-related methods.
 	ImageService
 	// UpdatePodCIDR sends a new podCIDR to the runtime.
@@ -301,6 +299,7 @@ type PodStatus struct {
 	// Status of containers in the pod.
 	ContainerStatuses []*Status
 	// Status of the pod sandbox.
+	// Only for kuberuntime now, other runtime may keep it nil.
 	SandboxStatuses []*runtimeapi.PodSandboxStatus
 }
 
@@ -310,8 +309,6 @@ type Status struct {
 	ID ContainerID
 	// Name of the container.
 	Name string
-	// ID of the sandbox to which this container belongs.
-	PodSandboxID string
 	// Status of the container.
 	State State
 	// Creation time of the container.
