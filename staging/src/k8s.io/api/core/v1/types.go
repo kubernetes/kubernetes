@@ -3005,6 +3005,7 @@ type PodSpec struct {
 	// Selector which must match a node's labels for the pod to be scheduled on that node.
 	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
 	// +optional
+	// +mapType=atomic
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod.
@@ -3785,6 +3786,7 @@ type ReplicationControllerSpec struct {
 	// controller, if empty defaulted to labels on Pod template.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +optional
+	// +mapType=atomic
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
 
 	// TemplateRef is a reference to an object that describes the pod that will be created if
@@ -4083,6 +4085,7 @@ type ServiceSpec struct {
 	// Ignored if type is ExternalName.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/
 	// +optional
+	// +mapType=atomic
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
 
 	// clusterIP is the IP address of the service and is usually assigned

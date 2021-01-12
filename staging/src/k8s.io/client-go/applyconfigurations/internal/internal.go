@@ -5290,6 +5290,7 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             scalar: string
+          elementRelationship: atomic
     - name: overhead
       type:
         map:
@@ -5673,6 +5674,7 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             scalar: string
+          elementRelationship: atomic
     - name: template
       type:
         namedType: io.k8s.api.core.v1.PodTemplateSpec
@@ -6195,6 +6197,7 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             scalar: string
+          elementRelationship: atomic
     - name: sessionAffinity
       type:
         scalar: string
@@ -8859,6 +8862,7 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             scalar: string
+          elementRelationship: atomic
     - name: tolerations
       type:
         list:
@@ -8911,6 +8915,7 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             scalar: string
+          elementRelationship: atomic
     - name: tolerations
       type:
         list:
@@ -8956,6 +8961,7 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             scalar: string
+          elementRelationship: atomic
     - name: tolerations
       type:
         list:

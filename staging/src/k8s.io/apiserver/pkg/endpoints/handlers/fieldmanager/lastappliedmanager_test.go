@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,19 +31,21 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+type testArgs struct {
+	lastApplied       []byte
+	original          []byte
+	applied           []byte
+	fieldManager      string
+	expectConflictSet *fieldpath.Set
+}
+
 // TestApplyUsingLastAppliedAnnotation tests that applying to an object
 // created with the client-side apply last-applied annotation
 // will not give conflicts
 func TestApplyUsingLastAppliedAnnotation(t *testing.T) {
 	f := NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
-	tests := []struct {
-		lastApplied       []byte
-		original          []byte
-		applied           []byte
-		fieldManager      string
-		expectConflictSet *fieldpath.Set
-	}{
+	tests := []testArgs{
 		{
 			fieldManager: "kubectl",
 			lastApplied: []byte(`
@@ -556,6 +559,362 @@ spec:
 		},
 	}
 
+	testConflicts(t, f, tests)
+}
+
+func TestServiceApply(t *testing.T) {
+	f := NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("v1", "Service"))
+
+	tests := []testArgs{
+		{
+			fieldManager: "kubectl",
+			original: []byte(`
+apiVersion: v1
+kind: Service
+metadata:
+  name: test
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 8443
+  selector:
+    old: test
+`),
+			applied: []byte(`
+# All accepted while using the same field manager
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: test
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 8444
+  selector:
+    new: test
+`),
+		},
+		{
+			fieldManager: "kubectl",
+			original: []byte(`
+apiVersion: v1
+kind: Service
+metadata:
+  name: test
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 8443
+  selector:
+    old: test
+`),
+			applied: []byte(`
+# Allowed to remove selectors while using the same field manager
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: test
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 8444
+  selector: {}
+`),
+		},
+		{
+			fieldManager: "not_kubectl",
+			original: []byte(`
+apiVersion: v1
+kind: Service
+metadata:
+  name: test
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP # TODO: issue - this is a defaulted field, should not be required in a new spec
+    targetPort: 8443
+  selector:
+    old: test
+`),
+			applied: []byte(`
+# test selector update not allowed by last-applied
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: test
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 8444
+  selector:
+    new: test
+`),
+			expectConflictSet: fieldpath.NewSet(
+				fieldpath.MakePathOrDie("spec", "selector"), // selector is atomic
+				fieldpath.MakePathOrDie("spec", "ports", fieldpath.KeyByFields("port", 443, "protocol", "TCP"), "targetPort"),
+			),
+		},
+	}
+
+	testConflicts(t, f, tests)
+}
+
+func TestReplicationControllerApply(t *testing.T) {
+	f := NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("v1", "ReplicationController"))
+
+	tests := []testArgs{
+		{
+			fieldManager: "kubectl",
+			original: []byte(`
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: test
+spec:
+  replicas: 0
+  selector:
+    old: test
+`),
+			applied: []byte(`
+# All accepted while using the same field manager
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: test
+spec:
+  replicas: 3
+  selector:
+    new: test
+`),
+		},
+		{
+			fieldManager: "not_kubectl",
+			original: []byte(`
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: test
+spec:
+  replicas: 0
+  selector:
+    old: test
+`),
+			applied: []byte(`
+# test selector update not allowed by last-applied
+
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: test
+spec:
+  replicas: 3
+  selector:
+    new: test
+`),
+			expectConflictSet: fieldpath.NewSet(
+				fieldpath.MakePathOrDie("spec", "selector"), // selector is atomic
+				fieldpath.MakePathOrDie("spec", "replicas"),
+			),
+		},
+	}
+
+	testConflicts(t, f, tests)
+}
+
+func TestPodApply(t *testing.T) {
+	f := NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
+
+	tests := []testArgs{
+		{
+			fieldManager: "kubectl",
+			original: []byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test
+  namespace: test
+spec:
+  containers:
+  - args:
+    - -v=2
+    command:
+    - controller
+    image: some.registry/app:latest
+    name: doJob
+  nodeName: definetlyControlPlane
+  nodeSelector:
+    node-role.kubernetes.io/master: ""
+`),
+			applied: []byte(`
+# All accepted while using the same field manager
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test
+  namespace: test
+spec:
+  containers:
+  - args:
+    - -v=2
+    command:
+    - controller
+    image: some.registry/app:latest
+    name: doJob
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
+`),
+		},
+		{
+			fieldManager: "not_kubectl",
+			original: []byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test
+  namespace: test
+spec:
+  containers:
+  - args:
+    - -v=2
+    command:
+    - controller
+    image: some.registry/app:latest
+    name: doJob
+  nodeName: definetlyControlPlane
+  nodeSelector:
+    node-role.kubernetes.io/master: ""
+`),
+			applied: []byte(`
+# test selector update not allowed by last-applied
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test
+  namespace: test
+spec:
+  containers:
+  - args:
+    - -v=2
+    command:
+    - controller
+    image: some.registry/app:latest
+    name: doJob
+  nodeName: definetlyControlPlane
+  nodeSelector:
+    node-role.kubernetes.io/master: ""
+    otherNodeType: ""
+`),
+			expectConflictSet: fieldpath.NewSet(
+				fieldpath.MakePathOrDie("spec", "nodeSelector"), // selector is atomic
+			),
+		},
+		{
+			fieldManager: "not_kubectl",
+			original: []byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test
+  namespace: test
+spec:
+  containers:
+  - args:
+    - -v=2
+    command:
+    - controller
+    image: some.registry/app:latest
+    name: doJob
+  nodeName: definetlyControlPlane
+  nodeSelector:
+    node-role.kubernetes.io/master: ""
+`),
+			applied: []byte(`
+# purging selector not allowed for different manager
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test
+  namespace: test
+spec:
+  containers:
+  - args:
+    - -v=2
+    command:
+    - controller
+    image: some.registry/app:latest
+    name: doJob
+  nodeName: another
+  nodeSelector: {}
+`),
+			expectConflictSet: fieldpath.NewSet(
+				fieldpath.MakePathOrDie("spec", "nodeSelector"), // selector is atomic
+				fieldpath.MakePathOrDie("spec", "nodeName"),
+			),
+		},
+		{
+			fieldManager: "kubectl",
+			original: []byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test
+  namespace: test
+spec:
+  containers:
+  - args:
+    - -v=2
+    command:
+    - controller
+    image: some.registry/app:latest
+    name: doJob
+  nodeName: definetlyControlPlane
+  nodeSelector:
+    node-role.kubernetes.io/master: ""
+`),
+			applied: []byte(`
+# same manager could purge nodeSelector
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test
+  namespace: test
+spec:
+  containers:
+  - args:
+    - -v=2
+    command:
+    - controller
+    image: some.registry/app:latest
+    name: doJob
+  nodeName: another
+  nodeSelector: {}
+`),
+		},
+	}
+
+	testConflicts(t, f, tests)
+}
+
+func testConflicts(t *testing.T, f TestFieldManager, tests []testArgs) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("test %d", i), func(t *testing.T) {
 			f.Reset()
@@ -587,23 +946,34 @@ spec:
 				if err != nil {
 					t.Errorf("expected no error but got %v", err)
 				}
-				return
-			}
+			} else {
+				if err == nil || !apierrors.IsConflict(err) {
+					t.Errorf("expected to get conflicts but got %v", err)
+				}
 
-			if err == nil || !apierrors.IsConflict(err) {
-				t.Errorf("expected to get conflicts but got %v", err)
-			}
-
-			expectedConflicts := merge.Conflicts{}
-			test.expectConflictSet.Iterate(func(p fieldpath.Path) {
-				expectedConflicts = append(expectedConflicts, merge.Conflict{
-					Manager: `{"manager":"test_client_side_apply","operation":"Update","apiVersion":"apps/v1"}`,
-					Path:    p,
+				expectedConflicts := merge.Conflicts{}
+				test.expectConflictSet.Iterate(func(p fieldpath.Path) {
+					expectedConflicts = append(expectedConflicts, merge.Conflict{
+						Manager: fmt.Sprintf(`{"manager":"test_client_side_apply","operation":"Update","apiVersion":"%s"}`, f.APIVersion()),
+						Path:    p,
+					})
 				})
-			})
-			expectedConflictErr := internal.NewConflictError(expectedConflicts)
-			if !reflect.DeepEqual(expectedConflictErr, err) {
-				t.Errorf("expected to get\n%+v\nbut got\n%+v", expectedConflictErr, err)
+				expectedConflictErr := internal.NewConflictError(expectedConflicts)
+				if !reflect.DeepEqual(expectedConflictErr, err) {
+					t.Errorf("expected to get\n%+v\nbut got\n%+v", expectedConflictErr, err)
+				}
+
+				// Yet force should resolve all conflicts
+				err = f.Apply(appliedObj, test.fieldManager, true)
+				if err != nil {
+					t.Errorf("unexpected error during force ownership apply: %v", err)
+				}
+
+			}
+
+			// Eventually resource should contain applied changes
+			if !apiequality.Semantic.DeepDerivative(appliedObj, f.Get()) {
+				t.Errorf("expected equal resource: \n%#v, got: \n%#v", appliedObj, f.Get())
 			}
 		})
 	}

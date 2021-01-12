@@ -45,6 +45,7 @@ type ScaleStatus struct {
 
 	// label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
 	// +optional
+	// +mapType=atomic
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
 
 	// label selector for pods that should match the replicas count. This is a serializated
