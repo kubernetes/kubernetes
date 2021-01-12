@@ -244,9 +244,6 @@
     Query for the Pod with the new value for the label MUST be successful.
   release: v1.9
   file: test/e2e/common/pods.go
-  behaviors:
-  - pod/spec/label/create
-  - pod/spec/label/patch
 - testname: Pods, service environment variables
   codename: '[k8s.io] Pods should contain environment variables for services [NodeConformance]
     [Conformance]'
@@ -271,6 +268,14 @@
   description: Create a Pod. Pod status MUST return successfully and contains a valid
     IP address.
   release: v1.9
+  file: test/e2e/common/pods.go
+- testname: Pods, completes the lifecycle of a Pod and the PodStatus
+  codename: '[k8s.io] Pods should run through the lifecycle of Pods and PodStatus
+    [Conformance]'
+  description: A Pod is created with a static label which MUST succeed. It MUST succeed
+    when patching the label and the pod data. When checking and replacing the PodStatus
+    it MUST succeed. It MUST succeed when deleting the Pod.
+  release: v1.20
   file: test/e2e/common/pods.go
 - testname: Pods, remote command execution over websocket
   codename: '[k8s.io] Pods should support remote command execution over websockets
@@ -484,8 +489,6 @@
     have QOSClass set to PodQOSGuaranteed.
   release: v1.9
   file: test/e2e/node/pods.go
-  behaviors:
-  - pod/spec/container/resources
 - testname: Pods, prestop hook
   codename: '[k8s.io] [sig-node] PreStop should call prestop when killing a pod  [Conformance]'
   description: Create a server pod with a rest endpoint '/write' that changes state.Received
@@ -656,7 +659,7 @@
     API Server using the current Aggregator [Conformance]'
   description: Ensure that the sample-apiserver code from 1.17 and compiled against
     1.17 will work on the current Aggregator/API-Server.
-  release: v1.17
+  release: v1.17, v1.21
   file: test/e2e/apimachinery/aggregator.go
 - testname: Custom Resource Definition Conversion Webhook, convert mixed version list
   codename: '[sig-api-machinery] CustomResourceConversionWebhook [Privileged:ClusterAdmin]
@@ -820,7 +823,7 @@
   description: A set of events is created with a label selector which MUST be found
     when listed. The set of events is deleted and MUST NOT show up when listed by
     its label selector.
-  release: v1.19
+  release: v1.20
   file: test/e2e/apimachinery/events.go
 - testname: Event resource lifecycle
   codename: '[sig-api-machinery] Events should ensure that an event can be fetched,
@@ -828,7 +831,7 @@
   description: Create an event, the event MUST exist. The event is patched with a
     new message, the check MUST have the update message. The event is deleted and
     MUST NOT show up when listing all events.
-  release: v1.19
+  release: v1.20
   file: test/e2e/apimachinery/events.go
 - testname: Garbage Collector, delete deployment,  propagation policy background
   codename: '[sig-api-machinery] Garbage collector should delete RS created by deployment
@@ -1196,6 +1199,14 @@
     before the rollout finishes.
   release: v1.12
   file: test/e2e/apps/deployment.go
+- testname: Deployment, completes the lifecycle of a Deployment
+  codename: '[sig-apps] Deployment should run the lifecycle of a Deployment [Conformance]'
+  description: When a Deployment is created it MUST succeed with the required number
+    of replicas. It MUST succeed when the Deployment is patched. When scaling the
+    deployment is MUST succeed. When fetching and patching the DeploymentStatus it
+    MUST succeed. It MUST succeed when deleting the Deployment.
+  release: v1.20
+  file: test/e2e/apps/deployment.go
 - testname: Jobs, orphan pods, re-adoption
   codename: '[sig-apps] Job should adopt matching orphans and release non-matching
     pods [Conformance]'
@@ -1264,6 +1275,13 @@
   description: Attempt to create a Replication Controller with pods exceeding the
     namespace quota. The creation MUST fail
   release: v1.15
+  file: test/e2e/apps/rc.go
+- testname: Replication Controller, lifecycle
+  codename: '[sig-apps] ReplicationController should test the lifecycle of a ReplicationController
+    [Conformance]'
+  description: A Replication Controller (RC) is created, read, patched, and deleted
+    with verification.
+  release: v1.20
   file: test/e2e/apps/rc.go
 - testname: StatefulSet, Burst Scaling
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
@@ -1362,6 +1380,13 @@
     Container.
   release: v1.9
   file: test/e2e/auth/service_accounts.go
+- testname: TokenRequestProjection should mount a projected volume with token using
+    TokenRequest API.
+  codename: '[sig-auth] ServiceAccounts should mount projected service account token
+    [Conformance]'
+  description: Ensure that projected service account token is mounted.
+  release: v1.20
+  file: test/e2e/auth/service_accounts.go
 - testname: ServiceAccount lifecycle test
   codename: '[sig-auth] ServiceAccounts should run through the lifecycle of a ServiceAccount
     [Conformance]'
@@ -1391,9 +1416,9 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, cluster info
   codename: '[sig-cli] Kubectl client Kubectl cluster-info should check if Kubernetes
-    master services is included in cluster-info  [Conformance]'
+    control plane services is included in cluster-info  [Conformance]'
   description: Call kubectl to get cluster-info, output MUST contain cluster-info
-    returned and Kubernetes Master SHOULD be running.
+    returned and Kubernetes control plane SHOULD be running.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, describe pod or rc
@@ -1474,9 +1499,9 @@
   codename: '[sig-cli] Kubectl client Kubectl server-side dry-run should check if
     kubectl can dry-run update Pods [Conformance]'
   description: The command 'kubectl run' must create a pod with the specified image
-    name. After, the command 'kubectl replace --dry-run=server' should update the
-    Pod with the new image name and server-side dry-run enabled. The image name must
-    not change.
+    name. After, the command 'kubectl patch pod -p {...} --dry-run=server' should
+    update the Pod with the new image name and server-side dry-run enabled. The image
+    name must not change.
   release: v1.19
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, version
@@ -1955,6 +1980,16 @@
     The PodTemplate must be deleted.
   release: v1.19
   file: test/e2e/common/podtemplates.go
+- testname: RuntimeClass API
+  codename: '[sig-node] RuntimeClass  should support RuntimeClasses API operations
+    [Conformance]'
+  description: ' The node.k8s.io API group MUST exist in the /apis discovery document.
+    The node.k8s.io/v1 API group/version MUST exist in the /apis/mode.k8s.io discovery
+    document. The runtimeclasses resource MUST exist in the /apis/node.k8s.io/v1 discovery
+    document. The runtimeclasses resource must support create, get, list, watch, update,
+    patch, delete, and deletecollection.'
+  release: v1.20
+  file: test/e2e/common/runtimeclass.go
 - testname: LimitRange, resources
   codename: '[sig-scheduling] LimitRange should create a LimitRange with defaults
     and ensure pod has those defaults applied. [Conformance]'
@@ -2011,6 +2046,14 @@
     followed by Priority 4 Pod. The ReplicaSets with Replicas MUST contain the expected
     number of Replicas.
   release: v1.19
+  file: test/e2e/scheduling/preemption.go
+- testname: Scheduler, Verify PriorityClass endpoints
+  codename: '[sig-scheduling] SchedulerPreemption [Serial] PriorityClass endpoints
+    verify PriorityClass endpoints can be operated with different HTTP methods [Conformance]'
+  description: Verify that PriorityClass endpoints can be listed. When any mutable
+    field is either patched or updated it MUST succeed. When any immutable field is
+    either patched or updated it MUST fail.
+  release: v1.20
   file: test/e2e/scheduling/preemption.go
 - testname: Scheduler, Basic Preemption
   codename: '[sig-scheduling] SchedulerPreemption [Serial] validates basic preemption
@@ -2118,6 +2161,16 @@
     created Pod using the volume mount that is mapped to multiple paths in the Pod.
     The content MUST be accessible from all the mapped volume mounts.
   release: v1.9
+  file: test/e2e/common/configmap_volume.go
+- testname: ConfigMap Volume, immutability
+  codename: '[sig-storage] ConfigMap should be immutable if `immutable` field is set
+    [Conformance]'
+  description: Create a ConfigMap. Update it's data field, the update MUST succeed.
+    Mark the ConfigMap as immutable, the update MUST succeed. Try to update its data,
+    the update MUST fail. Try to mark the ConfigMap back as not immutable, the update
+    MUST fail. Try to update the ConfigMap`s metadata (labels), the update must succeed.
+    Try to delete the ConfigMap, the deletion must succeed.
+  release: v1.21
   file: test/e2e/common/configmap_volume.go
 - testname: ConfigMap Volume, update
   codename: '[sig-storage] ConfigMap updates should be reflected in volume [NodeConformance]
@@ -2727,6 +2780,16 @@
     into the container in to two different custom paths. Pod MUST be able to read
     the secret from the both the mounted volumes from the two specified custom paths.
   release: v1.9
+  file: test/e2e/common/secrets_volume.go
+- testname: Secrets Volume, immutability
+  codename: '[sig-storage] Secrets should be immutable if `immutable` field is set
+    [Conformance]'
+  description: Create a secret. Update it's data field, the update MUST succeed. Mark
+    the secret as immutable, the update MUST succeed. Try to update its data, the
+    update MUST fail. Try to mark the secret back as not immutable, the update MUST
+    fail. Try to update the secret`s metadata (labels), the update must succeed. Try
+    to delete the secret, the deletion must succeed.
+  release: v1.21
   file: test/e2e/common/secrets_volume.go
 - testname: 'SubPath: Reading content from a configmap volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with

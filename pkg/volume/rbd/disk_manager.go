@@ -96,7 +96,7 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 	klog.V(3).Infof("rbd: successfully bind mount %s to %s with options %v", globalPDPath, volPath, mountOptions)
 
 	if !b.ReadOnly {
-		volume.SetVolumeOwnership(&b, fsGroup, fsGroupChangePolicy)
+		volume.SetVolumeOwnership(&b, fsGroup, fsGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
 	}
 
 	return nil
@@ -116,7 +116,7 @@ func diskTearDown(manager diskManager, c rbdUnmounter, volPath string, mounter m
 
 	// Unmount the bind-mount inside this pod.
 	if err := mounter.Unmount(volPath); err != nil {
-		klog.Errorf("failed to umount %s", volPath)
+		klog.Errorf("failed to unmount %s", volPath)
 		return err
 	}
 

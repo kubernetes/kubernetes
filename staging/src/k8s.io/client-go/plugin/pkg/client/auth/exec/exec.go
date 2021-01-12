@@ -18,7 +18,6 @@ package exec
 
 import (
 	"bytes"
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -52,7 +51,6 @@ import (
 )
 
 const execInfoEnv = "KUBERNETES_EXEC_INFO"
-const onRotateListWarningLength = 1000
 const installHintVerboseHelp = `
 
 It looks like you are trying to use a client-go credential plugin that is not installed.
@@ -87,8 +85,15 @@ func newCache() *cache {
 
 var spewConfig = &spew.ConfigState{DisableMethods: true, Indent: " "}
 
-func cacheKey(c *api.ExecConfig) string {
-	return spewConfig.Sprint(c)
+func cacheKey(conf *api.ExecConfig, cluster *clientauthentication.Cluster) string {
+	key := struct {
+		conf    *api.ExecConfig
+		cluster *clientauthentication.Cluster
+	}{
+		conf:    conf,
+		cluster: cluster,
+	}
+	return spewConfig.Sprint(key)
 }
 
 type cache struct {
@@ -155,12 +160,12 @@ func (s *sometimes) Do(f func()) {
 }
 
 // GetAuthenticator returns an exec-based plugin for providing client credentials.
-func GetAuthenticator(config *api.ExecConfig) (*Authenticator, error) {
-	return newAuthenticator(globalCache, config)
+func GetAuthenticator(config *api.ExecConfig, cluster *clientauthentication.Cluster) (*Authenticator, error) {
+	return newAuthenticator(globalCache, config, cluster)
 }
 
-func newAuthenticator(c *cache, config *api.ExecConfig) (*Authenticator, error) {
-	key := cacheKey(config)
+func newAuthenticator(c *cache, config *api.ExecConfig, cluster *clientauthentication.Cluster) (*Authenticator, error) {
+	key := cacheKey(config, cluster)
 	if a, ok := c.get(key); ok {
 		return a, nil
 	}
@@ -170,10 +175,18 @@ func newAuthenticator(c *cache, config *api.ExecConfig) (*Authenticator, error) 
 		return nil, fmt.Errorf("exec plugin: invalid apiVersion %q", config.APIVersion)
 	}
 
+	connTracker := connrotation.NewConnectionTracker()
+	defaultDialer := connrotation.NewDialerWithTracker(
+		(&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		connTracker,
+	)
+
 	a := &Authenticator{
-		cmd:   config.Command,
-		args:  config.Args,
-		group: gv,
+		cmd:                config.Command,
+		args:               config.Args,
+		group:              gv,
+		cluster:            cluster,
+		provideClusterInfo: config.ProvideClusterInfo,
 
 		installHint: config.InstallHint,
 		sometimes: &sometimes{
@@ -187,6 +200,9 @@ func newAuthenticator(c *cache, config *api.ExecConfig) (*Authenticator, error) 
 		interactive: terminal.IsTerminal(int(os.Stdout.Fd())),
 		now:         time.Now,
 		environ:     os.Environ,
+
+		defaultDialer: defaultDialer,
+		connTracker:   connTracker,
 	}
 
 	for _, env := range config.Env {
@@ -200,10 +216,12 @@ func newAuthenticator(c *cache, config *api.ExecConfig) (*Authenticator, error) 
 // The plugin input and output are defined by the API group client.authentication.k8s.io.
 type Authenticator struct {
 	// Set by the config
-	cmd   string
-	args  []string
-	group schema.GroupVersion
-	env   []string
+	cmd                string
+	args               []string
+	group              schema.GroupVersion
+	env                []string
+	cluster            *clientauthentication.Cluster
+	provideClusterInfo bool
 
 	// Used to avoid log spew by rate limiting install hint printing. We didn't do
 	// this by interval based rate limiting alone since that way may have prevented
@@ -218,6 +236,11 @@ type Authenticator struct {
 	now         func() time.Time
 	environ     func() []string
 
+	// defaultDialer is used for clients which don't specify a custom dialer
+	defaultDialer *connrotation.Dialer
+	// connTracker tracks all connections opened that we need to close when rotating a client certificate
+	connTracker *connrotation.ConnectionTracker
+
 	// Cached results.
 	//
 	// The mutex also guards calling the plugin. Since the plugin could be
@@ -225,13 +248,11 @@ type Authenticator struct {
 	mu          sync.Mutex
 	cachedCreds *credentials
 	exp         time.Time
-
-	onRotateList []func()
 }
 
 type credentials struct {
-	token string
-	cert  *tls.Certificate
+	token string           `datapolicy:"token"`
+	cert  *tls.Certificate `datapolicy:"secret-key"`
 }
 
 // UpdateTransportConfig updates the transport.Config to use credentials
@@ -255,20 +276,12 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 	}
 	c.TLS.GetCert = a.cert
 
-	var dial func(ctx context.Context, network, addr string) (net.Conn, error)
+	var d *connrotation.Dialer
 	if c.Dial != nil {
-		dial = c.Dial
+		// if c has a custom dialer, we have to wrap it
+		d = connrotation.NewDialerWithTracker(c.Dial, a.connTracker)
 	} else {
-		dial = (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext
-	}
-	d := connrotation.NewDialer(dial)
-
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.onRotateList = append(a.onRotateList, d.CloseAll)
-	onRotateListLength := len(a.onRotateList)
-	if onRotateListLength > onRotateListWarningLength {
-		klog.Warningf("constructing many client instances from the same exec auth config can cause performance problems during cert rotation and can exhaust available network connections; %d clients constructed calling %q", onRotateListLength, a.cmd)
+		d = a.defaultDialer
 	}
 
 	c.Dial = d.DialContext
@@ -367,19 +380,16 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 			Interactive: a.interactive,
 		},
 	}
+	if a.provideClusterInfo {
+		cred.Spec.Cluster = a.cluster
+	}
 
 	env := append(a.environ(), a.env...)
-	if a.group == v1alpha1.SchemeGroupVersion {
-		// Input spec disabled for beta due to lack of use. Possibly re-enable this later if
-		// someone wants it back.
-		//
-		// See: https://github.com/kubernetes/kubernetes/issues/61796
-		data, err := runtime.Encode(codecs.LegacyCodec(a.group), cred)
-		if err != nil {
-			return fmt.Errorf("encode ExecCredentials: %v", err)
-		}
-		env = append(env, fmt.Sprintf("%s=%s", execInfoEnv, data))
+	data, err := runtime.Encode(codecs.LegacyCodec(a.group), cred)
+	if err != nil {
+		return fmt.Errorf("encode ExecCredentials: %v", err)
 	}
+	env = append(env, fmt.Sprintf("%s=%s", execInfoEnv, data))
 
 	stdout := &bytes.Buffer{}
 	cmd := exec.Command(a.cmd, a.args...)
@@ -450,9 +460,7 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 		if oldCreds.cert != nil && oldCreds.cert.Leaf != nil {
 			metrics.ClientCertRotationAge.Observe(time.Now().Sub(oldCreds.cert.Leaf.NotBefore))
 		}
-		for _, onRotate := range a.onRotateList {
-			onRotate()
-		}
+		a.connTracker.CloseAll()
 	}
 
 	expiry := time.Time{}

@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/internal/genid"
 	pref "google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -134,7 +135,7 @@ func consumeMap(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi *mapInfo
 		b = b[n:]
 		err := errUnknown
 		switch num {
-		case 1:
+		case genid.MapEntry_Key_field_number:
 			var v pref.Value
 			var o unmarshalOutput
 			v, o, err = mapi.keyFuncs.unmarshal(b, key, num, wtyp, opts)
@@ -143,7 +144,7 @@ func consumeMap(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi *mapInfo
 			}
 			key = v
 			n = o.n
-		case 2:
+		case genid.MapEntry_Value_field_number:
 			var v pref.Value
 			var o unmarshalOutput
 			v, o, err = mapi.valFuncs.unmarshal(b, val, num, wtyp, opts)

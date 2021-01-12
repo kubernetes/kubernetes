@@ -1,7 +1,7 @@
 dependencies:
   # agnhost: bump this one first
   - name: "agnhost"
-    version: "2.24"
+    version: "2.26"
     refPaths:
     - path: test/images/agnhost/VERSION
       match: \d.\d
@@ -17,7 +17,7 @@ dependencies:
 
   # Bazel
   - name: "repo-infra"
-    version: 0.1.1
+    version: 0.2.0
     refPaths:
     - path: build/root/WORKSPACE
       match: strip_prefix = "repo-infra-\d+.\d+.\d+"
@@ -49,7 +49,7 @@ dependencies:
       match: k8s.gcr.io/coredns
 
   - name: "coredns-kubeadm"
-    version: 1.7.0
+    version: 1.8.0
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: CoreDNSVersion =
@@ -99,21 +99,23 @@ dependencies:
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.15.2
+    version: 1.15.5
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: build/root/WORKSPACE
       match: (override_)?go_version = "\d+.\d+(alpha|beta|rc)?\.?\d+"
+    - path: cluster/addons/fluentd-elasticsearch/es-image/Dockerfile
+      match: 'FROM golang\:\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
     - path: test/images/Makefile
       match: GOLANG_VERSION=\d+.\d+(alpha|beta|rc)?\.?\d+
     - path: staging/publishing/rules.yaml
       match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.15.2-1
+    version: v1.15.5-1
     refPaths:
     - path: build/build-image/cross/VERSION
-    - path: test/images/sample-apiserver/Dockerfile
+    - path: test/images/sample-apiserver/Makefile
       match: k8s\.gcr\.io\/build-image\/kube-cross:v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   # Base images
@@ -144,7 +146,7 @@ dependencies:
       match: configs\[DebianIptables\] = Config{buildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
 
   - name: "k8s.gcr.io/go-runner: dependents"
-    version: buster-v2.0.1
+    version: buster-v2.2.2
     refPaths:
     - path: build/common.sh
       match: go_runner_version=
@@ -152,7 +154,7 @@ dependencies:
       match: tag =
 
   - name: "k8s.gcr.io/pause"
-    version: 3.3
+    version: 3.4
     refPaths:
     - path: build/pause/Makefile
       match: TAG =

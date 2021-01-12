@@ -17,6 +17,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume/glusterfs",
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
+        "//pkg/proxy/util:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

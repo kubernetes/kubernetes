@@ -77,6 +77,9 @@ func (c *Cache) UpdateSnapshot(snapshot *internalcache.Snapshot) error {
 	return nil
 }
 
+// NodeCount is a fake method for testing.
+func (c *Cache) NodeCount() int { return 0 }
+
 // PodCount is a fake method for testing.
 func (c *Cache) PodCount() (int, error) { return 0, nil }
 

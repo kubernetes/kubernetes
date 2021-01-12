@@ -179,7 +179,7 @@ func (az *Cloud) EnsureStorageAccount(accountOptions *AccountOptions, genAccount
 				accountOptions.Tags = make(map[string]string)
 			}
 			accountOptions.Tags["created-by"] = "azure"
-			tags := convertMaptoMapPointer(accountOptions.Tags)
+			tags := convertMapToMapPointer(accountOptions.Tags)
 
 			klog.V(2).Infof("azure - no matching account found, begin to create a new account %s in resource group %s, location: %s, accountType: %s, accountKind: %s, tags: %+v",
 				accountName, resourceGroup, location, accountType, kind, accountOptions.Tags)

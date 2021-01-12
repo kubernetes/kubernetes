@@ -151,7 +151,7 @@ func TestCreateClusterRole(t *testing.T) {
 	for name, test := range tests {
 		ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 		cmd := NewCmdCreateClusterRole(tf, ioStreams)
-		cmd.Flags().Set("dry-run", "true")
+		cmd.Flags().Set("dry-run", "client")
 		cmd.Flags().Set("output", "yaml")
 		cmd.Flags().Set("verb", test.verbs)
 		cmd.Flags().Set("resource", test.resources)

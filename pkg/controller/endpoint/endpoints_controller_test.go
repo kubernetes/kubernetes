@@ -42,7 +42,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/controller"
+	controllerpkg "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 	utilnet "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
@@ -203,7 +203,7 @@ func makeBlockingEndpointDeleteTestServer(t *testing.T, controller *endpointCont
 }
 
 type endpointController struct {
-	*EndpointController
+	*Controller
 	podStore       cache.Store
 	serviceStore   cache.Store
 	endpointsStore cache.Store
@@ -211,7 +211,7 @@ type endpointController struct {
 
 func newController(url string, batchPeriod time.Duration) *endpointController {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: url, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(client, controllerpkg.NoResyncPeriodFunc())
 	endpoints := NewEndpointController(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
 		informerFactory.Core().V1().Endpoints(), client, batchPeriod)
 	endpoints.podsSynced = alwaysReady
@@ -1256,8 +1256,8 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
-					IPFamily:  &ipv4,
+					ClusterIP:  v1.ClusterIPNone,
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			},
 
@@ -1289,7 +1289,7 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 				},
 			},
 
-			expectedEndpointFamily: ipv4,
+			expectedEndpointFamily: ipv6,
 		},
 		{
 			name: "v6 service, in a dual stack cluster",
@@ -1320,33 +1320,32 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 headless service, in a dual stack cluster",
+			name: "v6 headless service, in a dual stack cluster (connected to a new api-server)",
 
 			enableDualStack: true,
 			ipFamilies:      ipv4ipv6,
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
-					IPFamily:  &ipv6,
+					ClusterIP:  v1.ClusterIPNone,
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol}, // <- set by a api-server defaulting logic
 				},
 			},
 
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 legacy headless service, in a dual stack cluster",
+			name: "v6 legacy headless service, in a dual stack cluster  (connected to a old api-server)",
 
 			enableDualStack: false,
 			ipFamilies:      ipv4ipv6,
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
+					ClusterIP: v1.ClusterIPNone, // <- families are not set by api-server
 				},
 			},
 
-			// This is not the behavior we *want*, but it's the behavior we currently expect.
 			expectedEndpointFamily: ipv4,
 		},
 
@@ -1985,27 +1984,14 @@ func TestSyncEndpointsServiceNotFound(t *testing.T) {
 func TestEndpointPortFromServicePort(t *testing.T) {
 	http := utilpointer.StringPtr("http")
 	testCases := map[string]struct {
-		featureGateEnabled           bool
 		serviceAppProtocol           *string
 		expectedEndpointsAppProtocol *string
 	}{
-		"feature gate disabled, empty app protocol": {
-			featureGateEnabled:           false,
+		"empty app protocol": {
 			serviceAppProtocol:           nil,
 			expectedEndpointsAppProtocol: nil,
 		},
-		"feature gate disabled, http app protocol": {
-			featureGateEnabled:           false,
-			serviceAppProtocol:           http,
-			expectedEndpointsAppProtocol: nil,
-		},
-		"feature gate enabled, empty app protocol": {
-			featureGateEnabled:           true,
-			serviceAppProtocol:           nil,
-			expectedEndpointsAppProtocol: nil,
-		},
-		"feature gate enabled, http app protocol": {
-			featureGateEnabled:           true,
+		"http app protocol": {
 			serviceAppProtocol:           http,
 			expectedEndpointsAppProtocol: http,
 		},
@@ -2013,8 +1999,6 @@ func TestEndpointPortFromServicePort(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.featureGateEnabled)()
-
 			epp := endpointPortFromServicePort(&v1.ServicePort{Name: "test", AppProtocol: tc.serviceAppProtocol}, 80)
 
 			if epp.AppProtocol != tc.expectedEndpointsAppProtocol {

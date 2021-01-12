@@ -371,9 +371,16 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/secret-volumes/delete/data-1"))
 	})
 
-	// It should be forbidden to change data for secrets marked as immutable, but
-	// allowed to modify its metadata independently of its state.
-	ginkgo.It("should be immutable if `immutable` field is set", func() {
+	/*
+		Release: v1.21
+		Testname: Secrets Volume, immutability
+		Description: Create a secret. Update it's data field, the update MUST succeed.
+			Mark the secret as immutable, the update MUST succeed. Try to update its data, the update MUST fail.
+			Try to mark the secret back as not immutable, the update MUST fail.
+			Try to update the secret`s metadata (labels), the update must succeed.
+			Try to delete the secret, the deletion must succeed.
+	*/
+	framework.ConformanceIt("should be immutable if `immutable` field is set", func() {
 		name := "immutable"
 		secret := secretForTest(f.Namespace.Name, name)
 

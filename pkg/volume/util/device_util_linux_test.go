@@ -258,16 +258,16 @@ func TestFindSlaveDevicesOnMultipath(t *testing.T) {
 func TestGetISCSIPortalHostMapForTarget(t *testing.T) {
 	mockDeviceUtil := NewDeviceHandler(&mockOsIOHandler{})
 	portalHostMap, err := mockDeviceUtil.GetISCSIPortalHostMapForTarget("target1")
-	if nil != err {
+	if err != nil {
 		t.Fatalf("error getting scsi hosts for target: %v", err)
 	}
-	if nil == portalHostMap {
+	if portalHostMap == nil {
 		t.Fatal("no portal host map returned")
 	}
-	if 1 != len(portalHostMap) {
+	if len(portalHostMap) != 1 {
 		t.Fatalf("wrong number of map entries in portal host map: %d", len(portalHostMap))
 	}
-	if 2 != portalHostMap["10.0.0.1:3260"] {
+	if portalHostMap["10.0.0.1:3260"] != 2 {
 		t.Fatalf("incorrect entry in portal host map: %v", portalHostMap)
 	}
 }
@@ -275,16 +275,16 @@ func TestGetISCSIPortalHostMapForTarget(t *testing.T) {
 func TestFindDevicesForISCSILun(t *testing.T) {
 	mockDeviceUtil := NewDeviceHandler(&mockOsIOHandler{})
 	devices, err := mockDeviceUtil.FindDevicesForISCSILun("target1", 1)
-	if nil != err {
+	if err != nil {
 		t.Fatalf("error getting devices for lun: %v", err)
 	}
-	if nil == devices {
+	if devices == nil {
 		t.Fatal("no devices returned")
 	}
-	if 1 != len(devices) {
+	if len(devices) != 1 {
 		t.Fatalf("wrong number of devices: %d", len(devices))
 	}
-	if "sda" != devices[0] {
+	if devices[0] != "sda" {
 		t.Fatalf("incorrect device %v", devices)
 	}
 }

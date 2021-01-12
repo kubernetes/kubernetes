@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 )
@@ -56,6 +56,12 @@ var _ cloudprovider.Clusters = (*Cloud)(nil)
 
 // Cloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
 type Cloud struct {
+	DisableInstances     bool
+	DisableRoutes        bool
+	DisableLoadBalancers bool
+	DisableZones         bool
+	DisableClusters      bool
+
 	Exists bool
 	Err    error
 
@@ -64,6 +70,7 @@ type Cloud struct {
 	ErrByProviderID         error
 	NodeShutdown            bool
 	ErrShutdownByProviderID error
+	MetadataErr             error
 
 	Calls         []string
 	Addresses     []v1.NodeAddress
@@ -81,6 +88,7 @@ type Cloud struct {
 	RouteMap      map[string]*Route
 	Lock          sync.Mutex
 	Provider      string
+	ProviderID    map[types.NodeName]string
 	addCallLock   sync.Mutex
 	cloudprovider.Zone
 	VolumeLabelMap map[string]map[string]string
@@ -124,7 +132,7 @@ func (f *Cloud) Master(ctx context.Context, name string) (string, error) {
 
 // Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
 func (f *Cloud) Clusters() (cloudprovider.Clusters, bool) {
-	return f, true
+	return f, !f.DisableClusters
 }
 
 // ProviderName returns the cloud provider ID.
@@ -143,14 +151,14 @@ func (f *Cloud) HasClusterID() bool {
 // LoadBalancer returns a fake implementation of LoadBalancer.
 // Actually it just returns f itself.
 func (f *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
-	return f, true
+	return f, !f.DisableLoadBalancers
 }
 
 // Instances returns a fake implementation of Instances.
 //
 // Actually it just returns f itself.
 func (f *Cloud) Instances() (cloudprovider.Instances, bool) {
-	return f, true
+	return f, !f.DisableInstances
 }
 
 // InstancesV2 returns a fake implementation of InstancesV2.
@@ -165,12 +173,12 @@ func (f *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
 
 // Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
 func (f *Cloud) Zones() (cloudprovider.Zones, bool) {
-	return f, true
+	return f, !f.DisableZones
 }
 
 // Routes returns a routes interface along with whether the interface is supported.
 func (f *Cloud) Routes() (cloudprovider.Routes, bool) {
-	return f, true
+	return f, !f.DisableRoutes
 }
 
 // GetLoadBalancer is a stub implementation of LoadBalancer.GetLoadBalancer.
@@ -321,13 +329,20 @@ func (f *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprov
 	f.addCall("instance-metadata-by-provider-id")
 	f.addressesMux.Lock()
 	defer f.addressesMux.Unlock()
+
+	providerID := ""
+	id, ok := f.ProviderID[types.NodeName(node.Name)]
+	if ok {
+		providerID = id
+	}
+
 	return &cloudprovider.InstanceMetadata{
-		ProviderID:    node.Spec.ProviderID,
+		ProviderID:    providerID,
 		InstanceType:  f.InstanceTypes[types.NodeName(node.Spec.ProviderID)],
 		NodeAddresses: f.Addresses,
 		Zone:          f.Zone.FailureDomain,
 		Region:        f.Zone.Region,
-	}, f.Err
+	}, f.MetadataErr
 }
 
 // List is a test-spy implementation of Instances.List.

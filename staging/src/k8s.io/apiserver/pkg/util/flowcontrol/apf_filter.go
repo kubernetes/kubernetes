@@ -30,9 +30,13 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/klog/v2"
 
-	fctypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"
-	fcclientv1a1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
 )
+
+// ConfigConsumerAsFieldManager is how the config consuminng
+// controller appears in an ObjectMeta ManagedFieldsEntry.Manager
+const ConfigConsumerAsFieldManager = "api-priority-and-fairness-config-consumer-v1"
 
 // Interface defines how the API Priority and Fairness filter interacts with the underlying system.
 type Interface interface {
@@ -47,7 +51,7 @@ type Interface interface {
 	// not be invoked.
 	Handle(ctx context.Context,
 		requestDigest RequestDigest,
-		noteFn func(fs *fctypesv1a1.FlowSchema, pl *fctypesv1a1.PriorityLevelConfiguration),
+		noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
 		queueNoteFn fq.QueueNoteFn,
 		execFn func(),
 	)
@@ -69,35 +73,49 @@ type Interface interface {
 // New creates a new instance to implement API priority and fairness
 func New(
 	informerFactory kubeinformers.SharedInformerFactory,
-	flowcontrolClient fcclientv1a1.FlowcontrolV1alpha1Interface,
+	flowcontrolClient flowcontrolclient.FlowcontrolV1beta1Interface,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
 ) Interface {
 	grc := counter.NoOp{}
-	return NewTestable(
-		informerFactory,
-		flowcontrolClient,
-		serverConcurrencyLimit,
-		requestWaitLimit,
-		metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		fqs.NewQueueSetFactory(&clock.RealClock{}, grc),
-	)
+	return NewTestable(TestableConfig{
+		InformerFactory:        informerFactory,
+		FlowcontrolClient:      flowcontrolClient,
+		ServerConcurrencyLimit: serverConcurrencyLimit,
+		RequestWaitLimit:       requestWaitLimit,
+		ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		QueueSetFactory:        fqs.NewQueueSetFactory(&clock.RealClock{}, grc),
+	})
+}
+
+// TestableConfig carries the parameters to an implementation that is testable
+type TestableConfig struct {
+	// InformerFactory to use in building the controller
+	InformerFactory kubeinformers.SharedInformerFactory
+
+	// FlowcontrolClient to use for manipulating config objects
+	FlowcontrolClient flowcontrolclient.FlowcontrolV1beta1Interface
+
+	// ServerConcurrencyLimit for the controller to enforce
+	ServerConcurrencyLimit int
+
+	// RequestWaitLimit configured on the server
+	RequestWaitLimit time.Duration
+
+	// ObsPairGenerator for metrics
+	ObsPairGenerator metrics.TimedObserverPairGenerator
+
+	// QueueSetFactory for the queuing implementation
+	QueueSetFactory fq.QueueSetFactory
 }
 
 // NewTestable is extra flexible to facilitate testing
-func NewTestable(
-	informerFactory kubeinformers.SharedInformerFactory,
-	flowcontrolClient fcclientv1a1.FlowcontrolV1alpha1Interface,
-	serverConcurrencyLimit int,
-	requestWaitLimit time.Duration,
-	obsPairGenerator metrics.TimedObserverPairGenerator,
-	queueSetFactory fq.QueueSetFactory,
-) Interface {
-	return newTestableController(informerFactory, flowcontrolClient, serverConcurrencyLimit, requestWaitLimit, obsPairGenerator, queueSetFactory)
+func NewTestable(config TestableConfig) Interface {
+	return newTestableController(config)
 }
 
 func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest RequestDigest,
-	noteFn func(fs *fctypesv1a1.FlowSchema, pl *fctypesv1a1.PriorityLevelConfiguration),
+	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
 	queueNoteFn fq.QueueNoteFn,
 	execFn func()) {
 	fs, pl, isExempt, req, startWaitingTime := cfgCtlr.startRequest(ctx, requestDigest, queueNoteFn)
@@ -112,21 +130,28 @@ func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest Reque
 	}
 	klog.V(7).Infof("Handle(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, isExempt=%v, queued=%v", requestDigest, fs.Name, fs.Spec.DistinguisherMethod, pl.Name, isExempt, queued)
 	var executed bool
-	idle := req.Finish(func() {
+	idle, panicking := true, true
+	defer func() {
+		klog.V(7).Infof("Handle(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, isExempt=%v, queued=%v, Finish() => panicking=%v idle=%v",
+			requestDigest, fs.Name, fs.Spec.DistinguisherMethod, pl.Name, isExempt, queued, panicking, idle)
+		if idle {
+			cfgCtlr.maybeReap(pl.Name)
+		}
+	}()
+	idle = req.Finish(func() {
 		if queued {
 			metrics.ObserveWaitingDuration(pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))
 		}
 		metrics.AddDispatch(pl.Name, fs.Name)
 		executed = true
 		startExecutionTime := time.Now()
+		defer func() {
+			metrics.ObserveExecutionDuration(pl.Name, fs.Name, time.Since(startExecutionTime))
+		}()
 		execFn()
-		metrics.ObserveExecutionDuration(pl.Name, fs.Name, time.Since(startExecutionTime))
 	})
 	if queued && !executed {
 		metrics.ObserveWaitingDuration(pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))
 	}
-	klog.V(7).Infof("Handle(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, isExempt=%v, queued=%v, Finish() => idle=%v", requestDigest, fs.Name, fs.Spec.DistinguisherMethod, pl.Name, isExempt, queued, idle)
-	if idle {
-		cfgCtlr.maybeReap(pl.Name)
-	}
+	panicking = false
 }

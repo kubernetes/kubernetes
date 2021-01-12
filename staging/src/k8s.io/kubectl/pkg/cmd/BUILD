@@ -1,8 +1,12 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["alpha.go"],
+    srcs = [
+        "alpha.go",
+        "cmd.go",
+        "profiling.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd",
     importpath = "k8s.io/kubectl/pkg/cmd",
     visibility = [
@@ -10,11 +14,54 @@ go_library(
     ],
     deps = [
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/annotate:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/apiresources:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/apply:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/attach:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/auth:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/autoscale:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/certificates:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/completion:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/config:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/cp:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/create:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/debug:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/delete:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/describe:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/diff:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/drain:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/edit:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/exec:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/explain:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/expose:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/get:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/kustomize:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/label:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/logs:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/options:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/patch:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/plugin:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/portforward:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/proxy:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/replace:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/rollout:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/run:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/scale:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/set:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/taint:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/top:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/version:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/wait:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/i18n:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/term:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
 
@@ -32,6 +79,7 @@ filegroup(
         "//staging/src/k8s.io/kubectl/pkg/cmd/apiresources:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/apply:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/attach:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/auth:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/autoscale:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/certificates:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo:all-srcs",
@@ -72,4 +120,15 @@ filegroup(
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["cmd_test.go"],
+    data = ["//staging/src/k8s.io/kubectl/pkg/cmd/plugin/testdata"],
+    embed = [":go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
+    ],
 )

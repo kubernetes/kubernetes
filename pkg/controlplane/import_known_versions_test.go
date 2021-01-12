@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apinamingtest "k8s.io/apimachinery/pkg/api/apitesting/naming"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -70,6 +70,7 @@ var typesAllowedTags = map[reflect.Type]bool{
 	reflect.TypeOf(metav1.GroupVersionKind{}):     true,
 	reflect.TypeOf(metav1.GroupVersionResource{}): true,
 	reflect.TypeOf(metav1.Status{}):               true,
+	reflect.TypeOf(metav1.Condition{}):            true,
 }
 
 // These fields are limited exceptions to the standard JSON naming structure.

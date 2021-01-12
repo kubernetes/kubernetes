@@ -75,7 +75,7 @@ func init() {
 type AltTokenSource struct {
 	oauthClient *http.Client
 	tokenURL    string
-	tokenBody   string
+	tokenBody   string `datapolicy:"token"`
 	throttle    flowcontrol.RateLimiter
 }
 
@@ -104,7 +104,7 @@ func (a *AltTokenSource) token() (*oauth2.Token, error) {
 		return nil, err
 	}
 	var tok struct {
-		AccessToken string    `json:"accessToken"`
+		AccessToken string    `json:"accessToken" datapolicy:"token"`
 		ExpireTime  time.Time `json:"expireTime"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&tok); err != nil {

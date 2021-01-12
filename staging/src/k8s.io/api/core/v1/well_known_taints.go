@@ -43,6 +43,6 @@ const (
 	TaintNodeNetworkUnavailable = "node.kubernetes.io/network-unavailable"
 
 	// TaintNodePIDPressure will be added when node has pid pressure
-	// and removed when node has enough disk.
+	// and removed when node has enough pid.
 	TaintNodePIDPressure = "node.kubernetes.io/pid-pressure"
 )

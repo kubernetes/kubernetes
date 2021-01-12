@@ -72,10 +72,11 @@ type RestartDaemonConfig struct {
 	healthzPort  int
 	pollInterval time.Duration
 	pollTimeout  time.Duration
+	enableHTTPS  bool
 }
 
 // NewRestartConfig creates a RestartDaemonConfig for the given node and daemon.
-func NewRestartConfig(nodeName, daemonName string, healthzPort int, pollInterval, pollTimeout time.Duration) *RestartDaemonConfig {
+func NewRestartConfig(nodeName, daemonName string, healthzPort int, pollInterval, pollTimeout time.Duration, enableHTTPS bool) *RestartDaemonConfig {
 	if !framework.ProviderIs("gce") {
 		framework.Logf("WARNING: SSH through the restart config might not work on %s", framework.TestContext.Provider)
 	}
@@ -85,6 +86,7 @@ func NewRestartConfig(nodeName, daemonName string, healthzPort int, pollInterval
 		healthzPort:  healthzPort,
 		pollInterval: pollInterval,
 		pollTimeout:  pollTimeout,
+		enableHTTPS:  enableHTTPS,
 	}
 }
 
@@ -99,8 +101,15 @@ func (r *RestartDaemonConfig) waitUp() {
 	if framework.NodeOSDistroIs("windows") {
 		nullDev = "NUL"
 	}
-	healthzCheck := fmt.Sprintf(
-		"curl -s -o %v -I -w \"%%{http_code}\" http://localhost:%v/healthz", nullDev, r.healthzPort)
+	var healthzCheck string
+	if r.enableHTTPS {
+		healthzCheck = fmt.Sprintf(
+			"curl -sk -o %v -I -w \"%%{http_code}\" https://localhost:%v/healthz", nullDev, r.healthzPort)
+	} else {
+		healthzCheck = fmt.Sprintf(
+			"curl -s -o %v -I -w \"%%{http_code}\" http://localhost:%v/healthz", nullDev, r.healthzPort)
+
+	}
 	err := wait.Poll(r.pollInterval, r.pollTimeout, func() (bool, error) {
 		result, err := e2essh.NodeExec(r.nodeName, healthzCheck, framework.TestContext.Provider)
 		framework.ExpectNoError(err)
@@ -263,7 +272,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		// Requires master ssh access.
 		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
-			framework.GetMasterHost(), "kube-controller", ports.InsecureKubeControllerManagerPort, restartPollInterval, restartTimeout)
+			framework.APIAddress(), "kube-controller", ports.KubeControllerManagerPort, restartPollInterval, restartTimeout, true)
 		restarter.restart()
 
 		// The intent is to ensure the replication controller manager has observed and reported status of
@@ -294,7 +303,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		// Requires master ssh access.
 		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
-			framework.GetMasterHost(), "kube-scheduler", kubeschedulerconfig.DefaultInsecureSchedulerPort, restartPollInterval, restartTimeout)
+			framework.APIAddress(), "kube-scheduler", kubeschedulerconfig.DefaultKubeSchedulerPort, restartPollInterval, restartTimeout, true)
 
 		// Create pods while the scheduler is down and make sure the scheduler picks them up by
 		// scaling the rc to the same size.
@@ -319,7 +328,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		}
 		for _, ip := range nodeIPs {
 			restarter := NewRestartConfig(
-				ip, "kubelet", ports.KubeletReadOnlyPort, restartPollInterval, restartTimeout)
+				ip, "kubelet", ports.KubeletReadOnlyPort, restartPollInterval, restartTimeout, false)
 			restarter.restart()
 		}
 		postRestarts, badNodes := getContainerRestarts(f.ClientSet, ns, labelSelector)
@@ -336,7 +345,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		}
 		for _, ip := range nodeIPs {
 			restarter := NewRestartConfig(
-				ip, "kube-proxy", ports.ProxyHealthzPort, restartPollInterval, restartTimeout)
+				ip, "kube-proxy", ports.ProxyHealthzPort, restartPollInterval, restartTimeout, false)
 			// restart method will kill the kube-proxy process and wait for recovery,
 			// if not able to recover, will throw test failure.
 			restarter.restart()

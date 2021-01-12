@@ -198,6 +198,46 @@ var plugins = map[string]map[string]plugin{
 				"ignore":      {},
 			},
 		},
+		"v8 remove transfer option": plugin{
+			namedOptions: map[string]option{
+				"endpoint": {
+					status: ignored,
+					action: useFirstArgumentOnly,
+				},
+				"tls":                {},
+				"kubeconfig":         {},
+				"namespaces":         {},
+				"labels":             {},
+				"pods":               {},
+				"endpoint_pod_names": {},
+				"ttl":                {},
+				"noendpoints":        {},
+				"transfer": {
+					status: removed,
+					action: removeOption,
+				},
+				"fallthrough": {},
+				"ignore":      {},
+			},
+		},
+		"v8": plugin{
+			namedOptions: map[string]option{
+				"endpoint": {
+					status: ignored,
+					action: useFirstArgumentOnly,
+				},
+				"tls":                {},
+				"kubeconfig":         {},
+				"namespaces":         {},
+				"labels":             {},
+				"pods":               {},
+				"endpoint_pod_names": {},
+				"ttl":                {},
+				"noendpoints":        {},
+				"fallthrough":        {},
+				"ignore":             {},
+			},
+		},
 	},
 
 	"errors": {
@@ -328,6 +368,20 @@ var plugins = map[string]map[string]plugin{
 				"tls_servername": {},
 				"policy":         {},
 				"health_check":   {},
+				"max_concurrent": {},
+			},
+		},
+		"v3 add max_concurrent": plugin{
+			namedOptions: map[string]option{
+				"except":         {},
+				"force_tcp":      {},
+				"prefer_udp":     {},
+				"expire":         {},
+				"max_fails":      {},
+				"tls":            {},
+				"tls_servername": {},
+				"policy":         {},
+				"health_check":   {},
 				"max_concurrent": { // new option
 					status: newdefault,
 					add: func(c *corefile.Plugin) (*corefile.Plugin, error) {
@@ -390,6 +444,14 @@ var plugins = map[string]map[string]plugin{
 			namedOptions: proxyToForwardOptionsMigrations,
 		},
 	},
+
+	"transfer": {
+		"v1": plugin{
+			namedOptions: map[string]option{
+				"to": {},
+			},
+		},
+	},
 }
 
 func removePlugin(*corefile.Plugin) (*corefile.Plugin, error) { return nil, nil }
@@ -416,6 +478,36 @@ func addToServerBlockWithPlugins(sb *corefile.Server, newPlugin *corefile.Plugin
 		}
 	}
 	return sb, nil
+}
+
+func copyKubernetesTransferOptToPlugin(cf *corefile.Corefile) (*corefile.Corefile, error) {
+	for _, s := range cf.Servers {
+		var (
+			to   []string
+			zone string
+		)
+		for _, p := range s.Plugins {
+			if p.Name != "kubernetes" {
+				continue
+			}
+			zone = p.Args[0]
+			for _, o := range p.Options {
+				if o.Name != "transfer" {
+					continue
+				}
+				to = o.Args
+			}
+		}
+		if len(to) < 2 {
+			continue
+		}
+		s.Plugins = append(s.Plugins, &corefile.Plugin{
+			Name:    "transfer",
+			Args:    []string{zone},
+			Options: []*corefile.Option{{Name: "to", Args: to[1:]}},
+		})
+	}
+	return cf, nil
 }
 
 func addToKubernetesServerBlocks(sb *corefile.Server, newPlugin *corefile.Plugin) (*corefile.Server, error) {

@@ -51,6 +51,7 @@ import (
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
+	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
@@ -64,9 +65,12 @@ import (
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
@@ -78,7 +82,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
+	"k8s.io/component-base/version"
+	"k8s.io/component-helpers/apimachinery/lease"
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	flowcontrolv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
+	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/controlplane/tunneler"
@@ -88,8 +97,6 @@ import (
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
-
-	"k8s.io/klog/v2"
 
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
@@ -120,6 +127,14 @@ const (
 	DefaultEndpointReconcilerInterval = 10 * time.Second
 	// DefaultEndpointReconcilerTTL is the default TTL timeout for the storage layer
 	DefaultEndpointReconcilerTTL = 15 * time.Second
+	// IdentityLeaseComponentLabelKey is used to apply a component label to identity lease objects, indicating:
+	//   1. the lease is an identity lease (different from leader election leases)
+	//   2. which component owns this lease
+	IdentityLeaseComponentLabelKey = "k8s.io/component"
+	// KubeAPIServer defines variable used internally when referring to kube-apiserver component
+	KubeAPIServer = "kube-apiserver"
+	// KubeAPIServerIdentityLeaseLabelSelector selects kube-apiserver identity leases
+	KubeAPIServerIdentityLeaseLabelSelector = IdentityLeaseComponentLabelKey + "=" + KubeAPIServer
 )
 
 // ExtraConfig defines extra configuration for the master
@@ -198,6 +213,9 @@ type ExtraConfig struct {
 	ServiceAccountPublicKeys []interface{}
 
 	VersionedInformers informers.SharedInformerFactory
+
+	IdentityLeaseDurationSeconds      int
+	IdentityLeaseRenewIntervalSeconds int
 }
 
 // Config defines configuration for the master
@@ -258,7 +276,7 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	if err != nil {
 		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}
-	leaseStorage, _, err := storagefactory.Create(*config)
+	leaseStorage, _, err := storagefactory.Create(*config, nil)
 	if err != nil {
 		klog.Fatalf("Error creating storage factory: %v", err)
 	}
@@ -482,7 +500,49 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil
 	})
 
+	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
+		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+			kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
+			if err != nil {
+				return err
+			}
+			controller := lease.NewController(
+				clock.RealClock{},
+				kubeClient,
+				m.GenericAPIServer.APIServerID,
+				int32(c.ExtraConfig.IdentityLeaseDurationSeconds),
+				nil,
+				time.Duration(c.ExtraConfig.IdentityLeaseRenewIntervalSeconds)*time.Second,
+				metav1.NamespaceSystem,
+				labelAPIServerHeartbeat)
+			go controller.Run(wait.NeverStop)
+			return nil
+		})
+		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-garbage-collector", func(hookContext genericapiserver.PostStartHookContext) error {
+			kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
+			if err != nil {
+				return err
+			}
+			go apiserverleasegc.NewAPIServerLeaseGC(
+				kubeClient,
+				time.Duration(c.ExtraConfig.IdentityLeaseDurationSeconds)*time.Second,
+				metav1.NamespaceSystem,
+				KubeAPIServerIdentityLeaseLabelSelector,
+			).Run(wait.NeverStop)
+			return nil
+		})
+	}
+
 	return m, nil
+}
+
+func labelAPIServerHeartbeat(lease *coordinationapiv1.Lease) error {
+	if lease.Labels == nil {
+		lease.Labels = map[string]string{}
+	}
+	// This label indicates that kube-apiserver owns this identity lease object
+	lease.Labels[IdentityLeaseComponentLabelKey] = KubeAPIServer
+	return nil
 }
 
 // InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.
@@ -522,6 +582,12 @@ type RESTStorageProvider interface {
 func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) error {
 	apiGroupsInfo := []*genericapiserver.APIGroupInfo{}
 
+	// used later in the loop to filter the served resource by those that have expired.
+	resourceExpirationEvaluator, err := newResourceExpirationEvaluator(version.Get())
+	if err != nil {
+		return err
+	}
+
 	for _, restStorageBuilder := range restStorageProviders {
 		groupName := restStorageBuilder.GroupName()
 		if !apiResourceConfigSource.AnyVersionForGroupEnabled(groupName) {
@@ -536,6 +602,16 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 			klog.Warningf("API group %q is not enabled, skipping.", groupName)
 			continue
 		}
+
+		// Remove resources that serving kinds that are removed.
+		// We do this here so that we don't accidentally serve versions without resources or openapi information that for kinds we don't serve.
+		// This is a spot above the construction of individual storage handlers so that no sig accidentally forgets to check.
+		resourceExpirationEvaluator.removeDeletedKinds(groupName, apiGroupInfo.VersionedResourcesStorageMap)
+		if len(apiGroupInfo.VersionedResourcesStorageMap) == 0 {
+			klog.V(1).Infof("Removing API group %v because it is time to stop serving it because it has no versions per APILifecycle.", groupName)
+			continue
+		}
+
 		klog.V(1).Infof("Enabling API group %q.", groupName)
 
 		if postHookProvider, ok := restStorageBuilder.(genericapiserver.PostStartHookProvider); ok {
@@ -618,6 +694,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		extensionsapiv1beta1.SchemeGroupVersion,
 		networkingapiv1.SchemeGroupVersion,
 		networkingapiv1beta1.SchemeGroupVersion,
+		nodev1.SchemeGroupVersion,
 		nodev1beta1.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1.SchemeGroupVersion,
@@ -626,6 +703,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		storageapiv1beta1.SchemeGroupVersion,
 		schedulingapiv1beta1.SchemeGroupVersion,
 		schedulingapiv1.SchemeGroupVersion,
+		flowcontrolv1beta1.SchemeGroupVersion,
 	)
 	// enable non-deprecated beta resources in extensions/v1beta1 explicitly so we have a full list of what's possible to serve
 	ret.EnableResources(

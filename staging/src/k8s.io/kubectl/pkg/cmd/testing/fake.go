@@ -18,7 +18,6 @@ package testing
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -270,8 +269,6 @@ func convertExternalNamespacedType2ToInternalNamespacedType(in *ExternalNamespac
 	out.Namespace = in.Namespace
 	return nil
 }
-
-var errInvalidVersion = errors.New("not a version")
 
 // ValidVersion of API
 var ValidVersion = "v1"

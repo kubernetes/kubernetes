@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -47,9 +47,9 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNode(t *testing.T) {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	volumeNodeComboExists := asw.IsVolumeAttachedToNode(generatedVolumeName, nodeName)
-	if !volumeNodeComboExists {
-		t.Fatalf("%q/%q volume/node combo does not exist, it should.", generatedVolumeName, nodeName)
+	volumeNodeComboState := asw.GetAttachState(generatedVolumeName, nodeName)
+	if volumeNodeComboState != AttachStateAttached {
+		t.Fatalf("%q/%q volume/node combo is marked %q; expected 'Attached'.", generatedVolumeName, nodeName, volumeNodeComboState)
 	}
 
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -82,9 +82,9 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached(t *testing.T)
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	volumeNodeComboExists := asw.IsVolumeAttachedToNode(generatedVolumeName, nodeName)
-	if volumeNodeComboExists {
-		t.Fatalf("%q/%q volume/node combo does exist, it should not.", generatedVolumeName, nodeName)
+	volumeNodeComboState := asw.GetAttachState(generatedVolumeName, nodeName)
+	if volumeNodeComboState != AttachStateUncertain {
+		t.Fatalf("%q/%q volume/node combo is marked %q, expected 'Uncertain'.", generatedVolumeName, nodeName, volumeNodeComboState)
 	}
 
 	allVolumes := asw.GetAttachedVolumes()
@@ -131,9 +131,9 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached(t *testing.T)
 			generatedVolumeName2)
 	}
 
-	volumeNodeComboExists = asw.IsVolumeAttachedToNode(generatedVolumeName, nodeName)
-	if !volumeNodeComboExists {
-		t.Fatalf("%q/%q combo does not exist, it should.", generatedVolumeName, nodeName)
+	volumeNodeComboState = asw.GetAttachState(generatedVolumeName, nodeName)
+	if volumeNodeComboState != AttachStateAttached {
+		t.Fatalf("%q/%q volume/node combo is marked %q; expected 'Attached'.", generatedVolumeName, nodeName, volumeNodeComboState)
 	}
 
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -182,9 +182,9 @@ func Test_AddVolumeNode_Positive_NewVolumeTwoNodesWithFalseAttached(t *testing.T
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	volumeNodeComboExists := asw.IsVolumeAttachedToNode(generatedVolumeName, node1Name)
-	if volumeNodeComboExists {
-		t.Fatalf("%q/%q volume/node combo does exist, it should not.", generatedVolumeName, node1Name)
+	volumeNodeComboState := asw.GetAttachState(generatedVolumeName, node1Name)
+	if volumeNodeComboState != AttachStateUncertain {
+		t.Fatalf("%q/%q volume/node combo is marked %q, expected 'Uncertain'.", generatedVolumeName, node1Name, volumeNodeComboState)
 	}
 
 	generatedVolumeName2, add2Err := asw.AddVolumeNode(volumeName, volumeSpec, node2Name, devicePath, true)
@@ -201,9 +201,9 @@ func Test_AddVolumeNode_Positive_NewVolumeTwoNodesWithFalseAttached(t *testing.T
 			generatedVolumeName2)
 	}
 
-	volumeNodeComboExists = asw.IsVolumeAttachedToNode(generatedVolumeName, node2Name)
-	if !volumeNodeComboExists {
-		t.Fatalf("%q/%q combo does not exist, it should.", generatedVolumeName, node2Name)
+	volumeNodeComboState = asw.GetAttachState(generatedVolumeName, node2Name)
+	if volumeNodeComboState != AttachStateAttached {
+		t.Fatalf("%q/%q volume/node combo is marked %q; expected 'Attached'.", generatedVolumeName, node2Name, volumeNodeComboState)
 	}
 
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -268,14 +268,14 @@ func Test_AddVolumeNode_Positive_ExistingVolumeNewNode(t *testing.T) {
 			generatedVolumeName2)
 	}
 
-	volumeNode1ComboExists := asw.IsVolumeAttachedToNode(generatedVolumeName1, node1Name)
-	if !volumeNode1ComboExists {
-		t.Fatalf("%q/%q volume/node combo does not exist, it should.", generatedVolumeName1, node1Name)
+	volumeNode1ComboState := asw.GetAttachState(generatedVolumeName1, node1Name)
+	if volumeNode1ComboState != AttachStateAttached {
+		t.Fatalf("%q/%q volume/node combo is marked %q; expected 'Attached'.", generatedVolumeName1, node1Name, volumeNode1ComboState)
 	}
 
-	volumeNode2ComboExists := asw.IsVolumeAttachedToNode(generatedVolumeName1, node2Name)
-	if !volumeNode2ComboExists {
-		t.Fatalf("%q/%q volume/node combo does not exist, it should.", generatedVolumeName1, node2Name)
+	volumeNode2ComboState := asw.GetAttachState(generatedVolumeName1, node2Name)
+	if volumeNode2ComboState != AttachStateAttached {
+		t.Fatalf("%q/%q volume/node combo is marked %q; expected 'Attached'.", generatedVolumeName1, node2Name, volumeNode2ComboState)
 	}
 
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -317,9 +317,9 @@ func Test_AddVolumeNode_Positive_ExistingVolumeExistingNode(t *testing.T) {
 			generatedVolumeName2)
 	}
 
-	volumeNodeComboExists := asw.IsVolumeAttachedToNode(generatedVolumeName1, nodeName)
-	if !volumeNodeComboExists {
-		t.Fatalf("%q/%q volume/node combo does not exist, it should.", generatedVolumeName1, nodeName)
+	volumeNodeComboState := asw.GetAttachState(generatedVolumeName1, nodeName)
+	if volumeNodeComboState != AttachStateAttached {
+		t.Fatalf("%q/%q volume/node combo is marked %q; expected 'Attached'.", generatedVolumeName1, nodeName, volumeNodeComboState)
 	}
 
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -350,9 +350,9 @@ func Test_DeleteVolumeNode_Positive_VolumeExistsNodeExists(t *testing.T) {
 	asw.DeleteVolumeNode(generatedVolumeName, nodeName)
 
 	// Assert
-	volumeNodeComboExists := asw.IsVolumeAttachedToNode(generatedVolumeName, nodeName)
-	if volumeNodeComboExists {
-		t.Fatalf("%q/%q volume/node combo exists, it should not.", generatedVolumeName, nodeName)
+	volumeNodeComboState := asw.GetAttachState(generatedVolumeName, nodeName)
+	if volumeNodeComboState != AttachStateDetached {
+		t.Fatalf("%q/%q volume/node combo is marked %q, expected 'Detached'.", generatedVolumeName, nodeName, volumeNodeComboState)
 	}
 
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -374,9 +374,9 @@ func Test_DeleteVolumeNode_Positive_VolumeDoesntExistNodeDoesntExist(t *testing.
 	asw.DeleteVolumeNode(volumeName, nodeName)
 
 	// Assert
-	volumeNodeComboExists := asw.IsVolumeAttachedToNode(volumeName, nodeName)
-	if volumeNodeComboExists {
-		t.Fatalf("%q/%q volume/node combo exists, it should not.", volumeName, nodeName)
+	volumeNodeComboState := asw.GetAttachState(volumeName, nodeName)
+	if volumeNodeComboState != AttachStateDetached {
+		t.Fatalf("%q/%q volume/node combo is marked %q, expected 'Detached'.", volumeName, nodeName, volumeNodeComboState)
 	}
 
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -417,14 +417,14 @@ func Test_DeleteVolumeNode_Positive_TwoNodesOneDeleted(t *testing.T) {
 	asw.DeleteVolumeNode(generatedVolumeName1, node1Name)
 
 	// Assert
-	volumeNodeComboExists := asw.IsVolumeAttachedToNode(generatedVolumeName1, node1Name)
-	if volumeNodeComboExists {
-		t.Fatalf("%q/%q volume/node combo exists, it should not.", generatedVolumeName1, node1Name)
+	volumeNodeComboState := asw.GetAttachState(generatedVolumeName1, node1Name)
+	if volumeNodeComboState != AttachStateDetached {
+		t.Fatalf("%q/%q volume/node combo is marked %q, expected 'Detached'.", generatedVolumeName1, node1Name, volumeNodeComboState)
 	}
 
-	volumeNodeComboExists = asw.IsVolumeAttachedToNode(generatedVolumeName1, node2Name)
-	if !volumeNodeComboExists {
-		t.Fatalf("%q/%q volume/node combo does not exist, it should.", generatedVolumeName1, node2Name)
+	volumeNodeComboState = asw.GetAttachState(generatedVolumeName1, node2Name)
+	if volumeNodeComboState != AttachStateAttached {
+		t.Fatalf("%q/%q volume/node combo is marked %q; expected 'Attached'.", generatedVolumeName1, node2Name, volumeNodeComboState)
 	}
 
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -436,7 +436,7 @@ func Test_DeleteVolumeNode_Positive_TwoNodesOneDeleted(t *testing.T) {
 }
 
 // Populates data struct with one volume/node entry.
-// Calls IsVolumeAttachedToNode() to verify entry.
+// Calls GetAttachState() to verify entry.
 // Verifies the populated volume/node entry exists.
 func Test_VolumeNodeExists_Positive_VolumeExistsNodeExists(t *testing.T) {
 	// Arrange
@@ -452,11 +452,11 @@ func Test_VolumeNodeExists_Positive_VolumeExistsNodeExists(t *testing.T) {
 	}
 
 	// Act
-	volumeNodeComboExists := asw.IsVolumeAttachedToNode(generatedVolumeName, nodeName)
+	volumeNodeComboState := asw.GetAttachState(generatedVolumeName, nodeName)
 
 	// Assert
-	if !volumeNodeComboExists {
-		t.Fatalf("%q/%q volume/node combo does not exist, it should.", generatedVolumeName, nodeName)
+	if volumeNodeComboState != AttachStateAttached {
+		t.Fatalf("%q/%q volume/node combo is marked %q; expected 'Attached'.", generatedVolumeName, nodeName, volumeNodeComboState)
 	}
 
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -468,7 +468,7 @@ func Test_VolumeNodeExists_Positive_VolumeExistsNodeExists(t *testing.T) {
 }
 
 // Populates data struct with one volume1/node1 entry.
-// Calls IsVolumeAttachedToNode() with volume1/node2.
+// Calls GetAttachState() with volume1/node2.
 // Verifies requested entry does not exist, but populated entry does.
 func Test_VolumeNodeExists_Positive_VolumeExistsNodeDoesntExist(t *testing.T) {
 	// Arrange
@@ -485,11 +485,11 @@ func Test_VolumeNodeExists_Positive_VolumeExistsNodeDoesntExist(t *testing.T) {
 	}
 
 	// Act
-	volumeNodeComboExists := asw.IsVolumeAttachedToNode(generatedVolumeName, node2Name)
+	volumeNodeComboState := asw.GetAttachState(generatedVolumeName, node2Name)
 
 	// Assert
-	if volumeNodeComboExists {
-		t.Fatalf("%q/%q volume/node combo exists, it should not.", generatedVolumeName, node2Name)
+	if volumeNodeComboState != AttachStateDetached {
+		t.Fatalf("%q/%q volume/node combo is marked %q, expected 'Detached'.", generatedVolumeName, node2Name, volumeNodeComboState)
 	}
 
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -500,7 +500,7 @@ func Test_VolumeNodeExists_Positive_VolumeExistsNodeDoesntExist(t *testing.T) {
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), node1Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 }
 
-// Calls IsVolumeAttachedToNode() on empty data struct.
+// Calls GetAttachState() on empty data struct.
 // Verifies requested entry does not exist.
 func Test_VolumeNodeExists_Positive_VolumeAndNodeDontExist(t *testing.T) {
 	// Arrange
@@ -510,11 +510,11 @@ func Test_VolumeNodeExists_Positive_VolumeAndNodeDontExist(t *testing.T) {
 	nodeName := types.NodeName("node-name")
 
 	// Act
-	volumeNodeComboExists := asw.IsVolumeAttachedToNode(volumeName, nodeName)
+	volumeNodeComboState := asw.GetAttachState(volumeName, nodeName)
 
 	// Assert
-	if volumeNodeComboExists {
-		t.Fatalf("%q/%q volume/node combo exists, it should not.", volumeName, nodeName)
+	if volumeNodeComboState != AttachStateDetached {
+		t.Fatalf("%q/%q volume/node combo is marked %q, expected 'Detached'.", volumeName, nodeName, volumeNodeComboState)
 	}
 
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -1372,6 +1372,79 @@ func Test_updateNodeStatusUpdateNeededError(t *testing.T) {
 	if err == nil {
 		t.Fatalf("updateNodeStatusUpdateNeeded should return error, but got nothing")
 	}
+}
+
+// Mark a volume as attached to a node.
+// Verify GetAttachState returns AttachedState
+// Verify GetAttachedVolumes return this volume
+func Test_MarkVolumeAsAttached(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := NewActualStateOfWorld(volumePluginMgr)
+	volumeName := v1.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+
+	nodeName := types.NodeName("node-name")
+	devicePath := "fake/device/path"
+
+	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	if err != nil || plugin == nil {
+		t.Fatalf("Failed to get volume plugin from spec %v, %v", volumeSpec, err)
+	}
+
+	// Act
+	err = asw.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, devicePath)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	volumeNodeComboState := asw.GetAttachState(volumeName, nodeName)
+	if volumeNodeComboState != AttachStateAttached {
+		t.Fatalf("asw says the volume: %q is not attached (%v) to node:%q, it should.",
+			volumeName, AttachStateAttached, nodeName)
+	}
+	attachedVolumes := asw.GetAttachedVolumes()
+	if len(attachedVolumes) != 1 {
+		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
+	}
+	verifyAttachedVolume(t, attachedVolumes, volumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+}
+
+// Mark a volume as attachment as uncertain.
+// Verify GetAttachState returns UncertainState
+// Verify GetAttachedVolumes return this volume
+func Test_MarkVolumeAsUncertain(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := NewActualStateOfWorld(volumePluginMgr)
+	volumeName := v1.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+	nodeName := types.NodeName("node-name")
+
+	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	if err != nil || plugin == nil {
+		t.Fatalf("Failed to get volume plugin from spec %v, %v", volumeSpec, err)
+	}
+
+	// Act
+	err = asw.MarkVolumeAsUncertain(volumeName, volumeSpec, nodeName)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("MarkVolumeAsUncertain failed. Expected: <no error> Actual: <%v>", err)
+	}
+	volumeNodeComboState := asw.GetAttachState(volumeName, nodeName)
+	if volumeNodeComboState != AttachStateUncertain {
+		t.Fatalf("asw says the volume: %q is attached (%v) to node:%q, it should not.",
+			volumeName, volumeNodeComboState, nodeName)
+	}
+	attachedVolumes := asw.GetAttachedVolumes()
+	if len(attachedVolumes) != 1 {
+		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
+	}
+	verifyAttachedVolume(t, attachedVolumes, volumeName, string(volumeName), nodeName, "", true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 }
 
 func verifyAttachedVolume(

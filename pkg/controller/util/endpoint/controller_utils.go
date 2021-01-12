@@ -32,10 +32,8 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/hash"
-	utilnet "k8s.io/utils/net"
 )
 
 // ServiceSelectorCache is a cache of service selectors to avoid high CPU consumption caused by frequent calls to AsSelectorPreValidated (see #73527)
@@ -124,14 +122,14 @@ func DeepHashObjectToString(objectToWrite interface{}) string {
 	return hex.EncodeToString(hasher.Sum(nil)[0:])
 }
 
-// ShouldPodBeInEndpoints returns true if a specified pod should be in an
-// endpoints object. Terminating pods are only included if publishNotReady is true.
-func ShouldPodBeInEndpoints(pod *v1.Pod, publishNotReady bool) bool {
+// ShouldPodBeInEndpointSlice returns true if a specified pod should be in an EndpointSlice object.
+// Terminating pods are only included if includeTerminating is true
+func ShouldPodBeInEndpointSlice(pod *v1.Pod, includeTerminating bool) bool {
 	if len(pod.Status.PodIP) == 0 && len(pod.Status.PodIPs) == 0 {
 		return false
 	}
 
-	if !publishNotReady && pod.DeletionTimestamp != nil {
+	if !includeTerminating && pod.DeletionTimestamp != nil {
 		return false
 	}
 
@@ -276,19 +274,4 @@ func (sl portsInOrder) Less(i, j int) bool {
 	h1 := DeepHashObjectToString(sl[i])
 	h2 := DeepHashObjectToString(sl[j])
 	return h1 < h2
-}
-
-// IsIPv6Service checks if svc should have IPv6 endpoints
-func IsIPv6Service(svc *v1.Service) bool {
-	if helper.IsServiceIPSet(svc) {
-		return utilnet.IsIPv6String(svc.Spec.ClusterIP)
-	} else if svc.Spec.IPFamily != nil {
-		return *svc.Spec.IPFamily == v1.IPv6Protocol
-	} else {
-		// FIXME: for legacy headless Services with no IPFamily, the current
-		// thinking is that we should use the cluster default. Unfortunately
-		// the endpoint controller doesn't know the cluster default. For now,
-		// assume it's IPv4.
-		return false
-	}
 }

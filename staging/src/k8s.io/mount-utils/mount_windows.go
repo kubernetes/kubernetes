@@ -29,6 +29,10 @@ import (
 	"k8s.io/utils/keymutex"
 )
 
+const (
+	accessDenied string = "access is denied"
+)
+
 // Mounter provides the default implementation of mount.Interface
 // for the windows platform.  This implementation assumes that the
 // kubelet is running in the host's root mount namespace.
@@ -52,6 +56,12 @@ var getSMBMountMutex = keymutex.NewHashed(0)
 // currently only supports cifs(smb), bind mount(for disk)
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
 	return mounter.MountSensitive(source, target, fstype, options, nil /* sensitiveOptions */)
+}
+
+// MountSensitiveWithoutSystemd is the same as MountSensitive() but disable using ssytemd mount.
+// Windows not supported systemd mount, this function degrades to MountSensitive().
+func (mounter *Mounter) MountSensitiveWithoutSystemd(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
+	return mounter.MountSensitive(source, target, fstype, options, sensitiveOptions /* sensitiveOptions */)
 }
 
 // MountSensitive is the same as Mount() but this method allows
@@ -97,40 +107,48 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		getSMBMountMutex.LockKey(source)
 		defer getSMBMountMutex.UnlockKey(source)
 
-		var output string
-		var err error
 		username := allOptions[0]
 		password := allOptions[1]
-		if output, err = newSMBMapping(username, password, source); err != nil {
+		if output, err := newSMBMapping(username, password, source); err != nil {
 			klog.Warningf("SMB Mapping(%s) returned with error(%v), output(%s)", source, err, string(output))
 			if isSMBMappingExist(source) {
-				valid, errPath := isValidPath(source)
-				if errPath != nil {
-					return errPath
-				}
-				if valid {
-					err = nil
-					klog.V(2).Infof("SMB Mapping(%s) already exists and is still valid, skip error", source)
-				} else {
-					klog.V(2).Infof("SMB Mapping(%s) already exists while it's not valid, now begin to remove and remount", source)
-					if output, err = removeSMBMapping(source); err != nil {
-						return fmt.Errorf("Remove-SmbGlobalMapping failed: %v, output: %q", err, output)
+				valid, err := isValidPath(source)
+				if !valid {
+					if err == nil || isAccessDeniedError(err) {
+						klog.V(2).Infof("SMB Mapping(%s) already exists while it's not valid, return error: %v, now begin to remove and remount", source, err)
+						if output, err = removeSMBMapping(source); err != nil {
+							return fmt.Errorf("Remove-SmbGlobalMapping failed: %v, output: %q", err, output)
+						}
+						if output, err := newSMBMapping(username, password, source); err != nil {
+							return fmt.Errorf("New-SmbGlobalMapping(%s) failed: %v, output: %q", source, err, output)
+						}
 					}
-					output, err = newSMBMapping(username, password, source)
+				} else {
+					klog.V(2).Infof("SMB Mapping(%s) already exists and is still valid, skip error(%v)", source, err)
 				}
+			} else {
+				return fmt.Errorf("New-SmbGlobalMapping(%s) failed: %v, output: %q", source, err, output)
 			}
-		}
-		if err != nil {
-			return fmt.Errorf("New-SmbGlobalMapping(%s) failed: %v, output: %q", source, err, output)
 		}
 	}
 
-	output, err := exec.Command("cmd", "/c", "mklink", "/D", target, bindSource).CombinedOutput()
+	// There is an issue in golang where EvalSymlinks fails on Windows when passed a
+	// UNC share root path without a trailing backslash.
+	// Ex: \\SERVER\share will fail to resolve but \\SERVER\share\ will resolve
+	// containerD on Windows calls EvalSymlinks so we'll add the backslash when making the symlink if it is missing.
+	// https://github.com/golang/go/pull/42096 fixes this issue in golang but a fix will not be available until
+	// golang v1.16
+	mklinkSource := bindSource
+	if !strings.HasSuffix(mklinkSource, "\\") {
+		mklinkSource = mklinkSource + "\\"
+	}
+
+	output, err := exec.Command("cmd", "/c", "mklink", "/D", target, mklinkSource).CombinedOutput()
 	if err != nil {
-		klog.Errorf("mklink failed: %v, source(%q) target(%q) output: %q", err, bindSource, target, string(output))
+		klog.Errorf("mklink failed: %v, source(%q) target(%q) output: %q", err, mklinkSource, target, string(output))
 		return err
 	}
-	klog.V(2).Infof("mklink source(%q) on target(%q) successfully, output: %q", bindSource, target, string(output))
+	klog.V(2).Infof("mklink source(%q) on target(%q) successfully, output: %q", mklinkSource, target, string(output))
 
 	return nil
 }
@@ -176,6 +194,10 @@ func isValidPath(remotepath string) (bool, error) {
 	}
 
 	return strings.HasPrefix(strings.ToLower(string(output)), "true"), nil
+}
+
+func isAccessDeniedError(err error) bool {
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), accessDenied)
 }
 
 // remove SMB mapping

@@ -22,7 +22,27 @@ import (
 	"time"
 
 	"go.etcd.io/etcd/clientv3"
+	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
+	"k8s.io/klog/v2"
 )
+
+const (
+	defaultLeaseReuseDurationSeconds = 60
+	largeLeaseThreshold              = 5000
+)
+
+// LeaseManagerConfig is configuration for creating a lease manager.
+type LeaseManagerConfig struct {
+	// ReuseDurationSeconds specifies time in seconds that each lease is reused
+	ReuseDurationSeconds int64
+}
+
+// NewDefaultLeaseManagerConfig creates a LeaseManagerConfig with default values
+func NewDefaultLeaseManagerConfig() LeaseManagerConfig {
+	return LeaseManagerConfig{
+		ReuseDurationSeconds: defaultLeaseReuseDurationSeconds,
+	}
+}
 
 // leaseManager is used to manage leases requested from etcd. If a new write
 // needs a lease that has similar expiration time to the previous one, the old
@@ -36,14 +56,15 @@ type leaseManager struct {
 	prevLeaseExpirationTime time.Time
 	// The period of time in seconds and percent of TTL that each lease is
 	// reused. The minimum of them is used to avoid unreasonably large
-	// numbers. We use var instead of const for testing purposes.
+	// numbers.
 	leaseReuseDurationSeconds int64
 	leaseReuseDurationPercent float64
+	leaseAttachedObjectCount  int64
 }
 
 // newDefaultLeaseManager creates a new lease manager using default setting.
-func newDefaultLeaseManager(client *clientv3.Client) *leaseManager {
-	return newLeaseManager(client, 60, 0.05)
+func newDefaultLeaseManager(client *clientv3.Client, config LeaseManagerConfig) *leaseManager {
+	return newLeaseManager(client, config.ReuseDurationSeconds, 0.05)
 }
 
 // newLeaseManager creates a new lease manager with the number of buffered
@@ -57,14 +78,6 @@ func newLeaseManager(client *clientv3.Client, leaseReuseDurationSeconds int64, l
 	}
 }
 
-// setLeaseReuseDurationSeconds is used for testing purpose. It is used to
-// reduce the extra lease duration to avoid unnecessary timeout in testing.
-func (l *leaseManager) setLeaseReuseDurationSeconds(duration int64) {
-	l.leaseMu.Lock()
-	defer l.leaseMu.Unlock()
-	l.leaseReuseDurationSeconds = duration
-}
-
 // GetLease returns a lease based on requested ttl: if the cached previous
 // lease can be reused, reuse it; otherwise request a new one from etcd.
 func (l *leaseManager) GetLease(ctx context.Context, ttl int64) (clientv3.LeaseID, error) {
@@ -75,9 +88,15 @@ func (l *leaseManager) GetLease(ctx context.Context, ttl int64) (clientv3.LeaseI
 	reuseDurationSeconds := l.getReuseDurationSecondsLocked(ttl)
 	valid := now.Add(time.Duration(ttl) * time.Second).Before(l.prevLeaseExpirationTime)
 	sufficient := now.Add(time.Duration(ttl+reuseDurationSeconds) * time.Second).After(l.prevLeaseExpirationTime)
+
+	// We count all operations that happened in the same lease, regardless of success or failure.
+	// Currently each GetLease call only attach 1 object
+	l.leaseAttachedObjectCount++
+
 	if valid && sufficient {
 		return l.prevLeaseID, nil
 	}
+
 	// request a lease with a little extra ttl from etcd
 	ttl += reuseDurationSeconds
 	lcr, err := l.client.Lease.Grant(ctx, ttl)
@@ -87,6 +106,12 @@ func (l *leaseManager) GetLease(ctx context.Context, ttl int64) (clientv3.LeaseI
 	// cache the new lease id
 	l.prevLeaseID = lcr.ID
 	l.prevLeaseExpirationTime = now.Add(time.Duration(ttl) * time.Second)
+	// refresh count
+	if l.leaseAttachedObjectCount > largeLeaseThreshold {
+		klog.Infof("The object count for lease %x is large: %v", l.prevLeaseID, l.leaseAttachedObjectCount)
+	}
+	metrics.UpdateLeaseObjectCount(l.leaseAttachedObjectCount)
+	l.leaseAttachedObjectCount = 1
 	return lcr.ID, nil
 }
 

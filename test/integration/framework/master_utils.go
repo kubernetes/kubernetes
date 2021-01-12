@@ -198,12 +198,15 @@ func startMasterOrDie(masterConfig *controlplane.Config, incomingServer *httptes
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
 		masterConfig.GenericConfig.FlowControl = utilflowcontrol.New(
 			masterConfig.ExtraConfig.VersionedInformers,
-			clientset.FlowcontrolV1alpha1(),
+			clientset.FlowcontrolV1beta1(),
 			masterConfig.GenericConfig.MaxRequestsInFlight+masterConfig.GenericConfig.MaxMutatingRequestsInFlight,
 			masterConfig.GenericConfig.RequestTimeout/4,
 		)
 	}
 
+	if masterConfig.ExtraConfig.ServiceIPRange.IP == nil {
+		masterConfig.ExtraConfig.ServiceIPRange = net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(24, 32)}
+	}
 	m, err = masterConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		// We log the error first so that even if closeFn crashes, the error is shown

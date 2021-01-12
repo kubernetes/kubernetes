@@ -110,7 +110,79 @@ func TestIntOrStringMarshalJSONUnmarshalYAML(t *testing.T) {
 	}
 }
 
-func TestGetValueFromIntOrPercent(t *testing.T) {
+func TestGetIntFromIntOrString(t *testing.T) {
+	tests := []struct {
+		input      IntOrString
+		expectErr  bool
+		expectVal  int
+		expectPerc bool
+	}{
+		{
+			input:      FromInt(200),
+			expectErr:  false,
+			expectVal:  200,
+			expectPerc: false,
+		},
+		{
+			input:      FromString("200"),
+			expectErr:  true,
+			expectPerc: false,
+		},
+		{
+			input:      FromString("30%0"),
+			expectErr:  true,
+			expectPerc: false,
+		},
+		{
+			input:      FromString("40%"),
+			expectErr:  false,
+			expectVal:  40,
+			expectPerc: true,
+		},
+		{
+			input:      FromString("%"),
+			expectErr:  true,
+			expectPerc: false,
+		},
+		{
+			input:      FromString("a%"),
+			expectErr:  true,
+			expectPerc: false,
+		},
+		{
+			input:      FromString("a"),
+			expectErr:  true,
+			expectPerc: false,
+		},
+		{
+			input:      FromString("40#"),
+			expectErr:  true,
+			expectPerc: false,
+		},
+		{
+			input:      FromString("40%%"),
+			expectErr:  true,
+			expectPerc: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run("", func(t *testing.T) {
+			value, isPercent, err := getIntOrPercentValueSafely(&test.input)
+			if test.expectVal != value {
+				t.Fatalf("expected value does not match, expected: %d, got: %d", test.expectVal, value)
+			}
+			if test.expectPerc != isPercent {
+				t.Fatalf("expected percent does not match, expected: %t, got: %t", test.expectPerc, isPercent)
+			}
+			if test.expectErr != (err != nil) {
+				t.Fatalf("expected error does not match, expected error: %v, got: %v", test.expectErr, err)
+			}
+		})
+	}
+
+}
+
+func TestGetIntFromIntOrPercent(t *testing.T) {
 	tests := []struct {
 		input     IntOrString
 		total     int
@@ -156,11 +228,15 @@ func TestGetValueFromIntOrPercent(t *testing.T) {
 			input:     FromString("#%"),
 			expectErr: true,
 		},
+		{
+			input:     FromString("90"),
+			expectErr: true,
+		},
 	}
 
 	for i, test := range tests {
 		t.Logf("test case %d", i)
-		value, err := GetValueFromIntOrPercent(&test.input, test.total, test.roundUp)
+		value, err := GetScaledValueFromIntOrPercent(&test.input, test.total, test.roundUp)
 		if test.expectErr && err == nil {
 			t.Errorf("expected error, but got none")
 			continue
@@ -176,7 +252,7 @@ func TestGetValueFromIntOrPercent(t *testing.T) {
 }
 
 func TestGetValueFromIntOrPercentNil(t *testing.T) {
-	_, err := GetValueFromIntOrPercent(nil, 0, false)
+	_, err := GetScaledValueFromIntOrPercent(nil, 0, false)
 	if err == nil {
 		t.Errorf("expected error got none")
 	}

@@ -18,18 +18,17 @@ package services
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+
 	apiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-const (
-	clusterIPRange          = "10.0.0.1/24"
-	apiserverClientURL      = "http://localhost:8080"
-	apiserverHealthCheckURL = apiserverClientURL + "/healthz"
-)
+const clusterIPRange = "10.0.0.1/24"
 
 // APIServer is a server which manages apiserver.
 type APIServer struct {
@@ -47,14 +46,21 @@ func NewAPIServer(storageConfig storagebackend.Config) *APIServer {
 
 // Start starts the apiserver, returns when apiserver is ready.
 func (a *APIServer) Start() error {
+	const tokenFilePath = "known_tokens.csv"
+
 	o := options.NewServerRunOptions()
 	o.Etcd.StorageConfig = a.storageConfig
 	_, ipnet, err := net.ParseCIDR(clusterIPRange)
 	if err != nil {
 		return err
 	}
+	o.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
 	o.ServiceClusterIPRanges = ipnet.String()
 	o.AllowPrivileged = true
+	if err := generateTokenFile(tokenFilePath); err != nil {
+		return fmt.Errorf("failed to generate token file %s: %v", tokenFilePath, err)
+	}
+	o.Authentication.TokenFile.TokenFile = tokenFilePath
 	o.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
 	errCh := make(chan error)
 	go func() {
@@ -71,7 +77,7 @@ func (a *APIServer) Start() error {
 		}
 	}()
 
-	err = readinessCheck("apiserver", []string{apiserverHealthCheckURL}, errCh)
+	err = readinessCheck("apiserver", []string{getAPIServerHealthCheckURL()}, errCh)
 	if err != nil {
 		return err
 	}
@@ -96,9 +102,14 @@ func (a *APIServer) Name() string {
 }
 
 func getAPIServerClientURL() string {
-	return apiserverClientURL
+	return framework.TestContext.Host
 }
 
 func getAPIServerHealthCheckURL() string {
-	return apiserverHealthCheckURL
+	return framework.TestContext.Host + "/healthz"
+}
+
+func generateTokenFile(tokenFilePath string) error {
+	tokenFile := fmt.Sprintf("%s,kubelet,uid,system:masters\n", framework.TestContext.BearerToken)
+	return ioutil.WriteFile(tokenFilePath, []byte(tokenFile), 0644)
 }

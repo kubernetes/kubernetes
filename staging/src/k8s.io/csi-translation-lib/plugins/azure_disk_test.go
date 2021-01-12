@@ -269,7 +269,7 @@ func TestTranslateInTreeStorageClassToCSI(t *testing.T) {
 		},
 		{
 			name:       "some translated topology",
-			options:    NewStorageClass(map[string]string{}, generateToplogySelectors(v1.LabelZoneFailureDomain, []string{"foo"})),
+			options:    NewStorageClass(map[string]string{}, generateToplogySelectors(v1.LabelFailureDomainBetaZone, []string{"foo"})),
 			expOptions: NewStorageClass(map[string]string{}, generateToplogySelectors(AzureDiskTopologyKey, []string{"foo"})),
 		},
 		{

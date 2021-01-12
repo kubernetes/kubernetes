@@ -11,14 +11,12 @@ package dns
 //go:generate go run msg_generate.go
 
 import (
-	crand "crypto/rand"
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 const (
@@ -73,53 +71,23 @@ var (
 	ErrTime          error = &Error{err: "bad time"}      // ErrTime indicates a timing error in TSIG authentication.
 )
 
-// Id by default, returns a 16 bits random number to be used as a
-// message id. The random provided should be good enough. This being a
-// variable the function can be reassigned to a custom function.
-// For instance, to make it return a static value:
+// Id by default returns a 16-bit random number to be used as a message id. The
+// number is drawn from a cryptographically secure random number generator.
+// This being a variable the function can be reassigned to a custom function.
+// For instance, to make it return a static value for testing:
 //
 //	dns.Id = func() uint16 { return 3 }
 var Id = id
 
-var (
-	idLock sync.Mutex
-	idRand *rand.Rand
-)
-
 // id returns a 16 bits random number to be used as a
 // message id. The random provided should be good enough.
 func id() uint16 {
-	idLock.Lock()
-
-	if idRand == nil {
-		// This (partially) works around
-		// https://github.com/golang/go/issues/11833 by only
-		// seeding idRand upon the first call to id.
-
-		var seed int64
-		var buf [8]byte
-
-		if _, err := crand.Read(buf[:]); err == nil {
-			seed = int64(binary.LittleEndian.Uint64(buf[:]))
-		} else {
-			seed = rand.Int63()
-		}
-
-		idRand = rand.New(rand.NewSource(seed))
+	var output uint16
+	err := binary.Read(rand.Reader, binary.BigEndian, &output)
+	if err != nil {
+		panic("dns: reading random id failed: " + err.Error())
 	}
-
-	// The call to idRand.Uint32 must be within the
-	// mutex lock because *rand.Rand is not safe for
-	// concurrent use.
-	//
-	// There is no added performance overhead to calling
-	// idRand.Uint32 inside a mutex lock over just
-	// calling rand.Uint32 as the global math/rand rng
-	// is internally protected by a sync.Mutex.
-	id := uint16(idRand.Uint32())
-
-	idLock.Unlock()
-	return id
+	return output
 }
 
 // MsgHdr is a a manually-unpacked version of (id, bits).
@@ -429,18 +397,13 @@ Loop:
 			if budget <= 0 {
 				return "", lenmsg, ErrLongDomain
 			}
-			for j := off; j < off+c; j++ {
-				switch b := msg[j]; b {
-				case '.', '(', ')', ';', ' ', '@':
-					fallthrough
-				case '"', '\\':
+			for _, b := range msg[off : off+c] {
+				if isDomainNameLabelSpecial(b) {
 					s = append(s, '\\', b)
-				default:
-					if b < ' ' || b > '~' { // unprintable, use \DDD
-						s = append(s, escapeByte(b)...)
-					} else {
-						s = append(s, b)
-					}
+				} else if b < ' ' || b > '~' {
+					s = append(s, escapeByte(b)...)
+				} else {
+					s = append(s, b)
 				}
 			}
 			s = append(s, '.')
@@ -489,11 +452,11 @@ func packTxt(txt []string, msg []byte, offset int, tmp []byte) (int, error) {
 		return offset, nil
 	}
 	var err error
-	for i := range txt {
-		if len(txt[i]) > len(tmp) {
+	for _, s := range txt {
+		if len(s) > len(tmp) {
 			return offset, ErrBuf
 		}
-		offset, err = packTxtString(txt[i], msg, offset, tmp)
+		offset, err = packTxtString(s, msg, offset, tmp)
 		if err != nil {
 			return offset, err
 		}
@@ -693,7 +656,6 @@ func unpackRRslice(l int, msg []byte, off int) (dst1 []RR, off1 int, err error) 
 		}
 		// If offset does not increase anymore, l is a lie
 		if off1 == off {
-			l = i
 			break
 		}
 		dst = append(dst, r)
@@ -934,31 +896,31 @@ func (dns *Msg) String() string {
 	s += "ADDITIONAL: " + strconv.Itoa(len(dns.Extra)) + "\n"
 	if len(dns.Question) > 0 {
 		s += "\n;; QUESTION SECTION:\n"
-		for i := 0; i < len(dns.Question); i++ {
-			s += dns.Question[i].String() + "\n"
+		for _, r := range dns.Question {
+			s += r.String() + "\n"
 		}
 	}
 	if len(dns.Answer) > 0 {
 		s += "\n;; ANSWER SECTION:\n"
-		for i := 0; i < len(dns.Answer); i++ {
-			if dns.Answer[i] != nil {
-				s += dns.Answer[i].String() + "\n"
+		for _, r := range dns.Answer {
+			if r != nil {
+				s += r.String() + "\n"
 			}
 		}
 	}
 	if len(dns.Ns) > 0 {
 		s += "\n;; AUTHORITY SECTION:\n"
-		for i := 0; i < len(dns.Ns); i++ {
-			if dns.Ns[i] != nil {
-				s += dns.Ns[i].String() + "\n"
+		for _, r := range dns.Ns {
+			if r != nil {
+				s += r.String() + "\n"
 			}
 		}
 	}
 	if len(dns.Extra) > 0 {
 		s += "\n;; ADDITIONAL SECTION:\n"
-		for i := 0; i < len(dns.Extra); i++ {
-			if dns.Extra[i] != nil {
-				s += dns.Extra[i].String() + "\n"
+		for _, r := range dns.Extra {
+			if r != nil {
+				s += r.String() + "\n"
 			}
 		}
 	}
@@ -1091,33 +1053,20 @@ func (dns *Msg) CopyTo(r1 *Msg) *Msg {
 	}
 
 	rrArr := make([]RR, len(dns.Answer)+len(dns.Ns)+len(dns.Extra))
-	var rri int
+	r1.Answer, rrArr = rrArr[:0:len(dns.Answer)], rrArr[len(dns.Answer):]
+	r1.Ns, rrArr = rrArr[:0:len(dns.Ns)], rrArr[len(dns.Ns):]
+	r1.Extra = rrArr[:0:len(dns.Extra)]
 
-	if len(dns.Answer) > 0 {
-		rrbegin := rri
-		for i := 0; i < len(dns.Answer); i++ {
-			rrArr[rri] = dns.Answer[i].copy()
-			rri++
-		}
-		r1.Answer = rrArr[rrbegin:rri:rri]
+	for _, r := range dns.Answer {
+		r1.Answer = append(r1.Answer, r.copy())
 	}
 
-	if len(dns.Ns) > 0 {
-		rrbegin := rri
-		for i := 0; i < len(dns.Ns); i++ {
-			rrArr[rri] = dns.Ns[i].copy()
-			rri++
-		}
-		r1.Ns = rrArr[rrbegin:rri:rri]
+	for _, r := range dns.Ns {
+		r1.Ns = append(r1.Ns, r.copy())
 	}
 
-	if len(dns.Extra) > 0 {
-		rrbegin := rri
-		for i := 0; i < len(dns.Extra); i++ {
-			rrArr[rri] = dns.Extra[i].copy()
-			rri++
-		}
-		r1.Extra = rrArr[rrbegin:rri:rri]
+	for _, r := range dns.Extra {
+		r1.Extra = append(r1.Extra, r.copy())
 	}
 
 	return r1

@@ -19,7 +19,6 @@ package util
 import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -73,7 +72,7 @@ func GetNonzeroRequestForResource(resource v1.ResourceName, requests *v1.Resourc
 		}
 		return quantity.Value()
 	default:
-		if v1helper.IsScalarResourceName(resource) {
+		if IsScalarResourceName(resource) {
 			quantity, found := (*requests)[resource]
 			if !found {
 				return 0

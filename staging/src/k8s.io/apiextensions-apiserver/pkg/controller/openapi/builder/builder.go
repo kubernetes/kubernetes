@@ -74,9 +74,6 @@ type Options struct {
 	// Convert to OpenAPI v2.
 	V2 bool
 
-	// Strip defaults.
-	StripDefaults bool
-
 	// Strip value validation.
 	StripValueValidation bool
 
@@ -106,9 +103,6 @@ func BuildSwagger(crd *apiextensionsv1.CustomResourceDefinition, version string,
 				if opts.AllowNonStructural || len(structuralschema.ValidateStructural(nil, ss)) == 0 {
 					schema = ss
 
-					if opts.StripDefaults {
-						schema = schema.StripDefaults()
-					}
 					if opts.StripValueValidation {
 						schema = schema.StripValueValidations()
 					}

@@ -64,18 +64,18 @@ $(META_DIR)/$(GO_PKGDEPS_FILE): FORCE
 	    echo "DBG: calculating Go dependencies";  \
 	fi
 	hack/run-in-gopath.sh go install ./hack/make-rules/helpers/go2make
-	hack/run-in-gopath.sh go2make                     \
-	    k8s.io/kubernetes/...                         \
-	    --prune  k8s.io/kubernetes/staging            \
-	    --prune  k8s.io/kubernetes/vendor             \
-	    k8s.io/kubernetes/vendor/k8s.io/...           \
+	hack/run-in-gopath.sh go2make                       \
+	    k8s.io/kubernetes/...                           \
+	    --prune  k8s.io/kubernetes/staging              \
+	    --prune  k8s.io/kubernetes/vendor               \
+	    k8s.io/kubernetes/vendor/k8s.io/...             \
 	    github.com/go-bindata/go-bindata/go-bindata/... \
 	    > $@.tmp
-	if ! cmp -s $@.tmp $@; then                       \
-	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then          \
-	        echo "DBG: $(GO_PKGDEPS_FILE) changed";   \
-	    fi;                                           \
-	    cat $@.tmp > $@;                              \
+	if ! cmp -s $@.tmp $@; then                         \
+	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then            \
+	        echo "DBG: $(GO_PKGDEPS_FILE) changed";     \
+	    fi;                                             \
+	    cat $@.tmp > $@;                                \
 	fi
 	rm -f $@.tmp
 
@@ -123,10 +123,10 @@ ALL_K8S_TAG_FILES := $(shell                             \
 PRERELEASE_LIFECYCLE_BASENAME := $(GENERATED_FILE_PREFIX)prerelease-lifecycle
 PRERELEASE_LIFECYCLE_FILENAME := $(PRERELEASE_LIFECYCLE_BASENAME).go
 
-# The tool used to generate deep copies.
+# The tool used to generate prerelease-lifecycle code.
 PRERELEASE_LIFECYCLE_GEN := $(BIN_DIR)/prerelease-lifecycle-gen
 
-# Find all the directories that request deep-copy generation.
+# Find all the directories that request prerelease-lifecycle generation.
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all +k8s:prerelease-lifecycle-gen tags)
 endif
@@ -171,8 +171,8 @@ $(foreach dir, $(PRERELEASE_LIFECYCLE_DIRS), $(eval                     \
     $(dir)/$(PRERELEASE_LIFECYCLE_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
 ))
 
-# How to regenerate deep-copy code.  This is a little slow to run, so we batch
-# it up and trigger the batch from the 'generated_files' target.
+# How to regenerate prerelease-lifecycle code.  This is a little slow to run,
+# so we batch it up and trigger the batch from the 'generated_files' target.
 $(META_DIR)/$(PRERELEASE_LIFECYCLE_GEN).todo: $(PRERELEASE_LIFECYCLE_FILES)
 
 $(PRERELEASE_LIFECYCLE_FILES): $(PRERELEASE_LIFECYCLE_GEN)
@@ -318,8 +318,9 @@ DEFAULTER_DIRS := $(shell                                            \
         | xargs -n1 dirname                                          \
         | LC_ALL=C sort -u                                           \
 )
-
 DEFAULTER_FILES := $(addsuffix /$(DEFAULTER_FILENAME), $(DEFAULTER_DIRS))
+DEFAULTER_EXTRA_PEER_PKGS := \
+    $(addprefix $(PRJ_SRC_PATH)/, $(DEFAULTER_DIRS))
 
 # Reset the list of packages that need generation.
 $(shell mkdir -p $$(dirname $(META_DIR)/$(DEFAULTER_GEN)))
@@ -338,7 +339,7 @@ gen_defaulter: $(DEFAULTER_GEN) $(META_DIR)/$(DEFAULTER_GEN).todo
 	        --v $(KUBE_VERBOSE)                                         \
 	        --logtostderr                                               \
 	        -i "$$pkgs"                                                 \
-	        --extra-peer-dirs $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(DEFAULTER_DIRS)) | sed 's/ /,/g') \
+	        --extra-peer-dirs $$(echo $(DEFAULTER_EXTRA_PEER_PKGS) | sed 's/ /,/g') \
 	        -O $(DEFAULTER_BASENAME)                                    \
 	        "$$@";                                                      \
 	fi
@@ -359,9 +360,9 @@ $(foreach dir, $(DEFAULTER_DIRS), $(eval                     \
 $(META_DIR)/$(DEFAULTER_GEN).todo: $(DEFAULTER_FILES)
 
 $(DEFAULTER_FILES): $(DEFAULTER_GEN)
-	if [[ "$(DBG_CODEGEN)" == 1 ]]; then         \
+	if [[ "$(DBG_CODEGEN)" == 1 ]]; then      \
 	    echo "DBG: defaulter needed $(@D):";  \
-	    ls -lf --full-time $@ $? || true;        \
+	    ls -lf --full-time $@ $? || true;     \
 	fi
 	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(DEFAULTER_GEN).todo
 
@@ -421,9 +422,12 @@ CONVERSION_DIRS := $(shell                                              \
         | xargs -n1 dirname                                             \
         | LC_ALL=C sort -u                                              \
 )
-
 CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
-CONVERSION_EXTRA_PEER_DIRS := k8s.io/kubernetes/pkg/apis/core,k8s.io/kubernetes/pkg/apis/core/v1,k8s.io/api/core/v1
+CONVERSION_EXTRA_PEER_PKGS := \
+    k8s.io/kubernetes/pkg/apis/core \
+    k8s.io/kubernetes/pkg/apis/core/v1 \
+    k8s.io/api/core/v1
+CONVERSION_EXTRA_PKGS := $(addprefix $(PRJ_SRC_PATH)/, $(CONVERSION_DIRS))
 
 # Reset the list of packages that need generation.
 $(shell mkdir -p $$(dirname $(META_DIR)/$(CONVERSION_GEN)))
@@ -439,7 +443,8 @@ gen_conversion: $(CONVERSION_GEN) $(META_DIR)/$(CONVERSION_GEN).todo
 	        echo "DBG: running $(CONVERSION_GEN) for $$pkgs";            \
 	    fi;                                                              \
 	    ./hack/run-in-gopath.sh $(CONVERSION_GEN)                        \
-	        --extra-peer-dirs $(CONVERSION_EXTRA_PEER_DIRS)              \
+	        --extra-peer-dirs $$(echo $(CONVERSION_EXTRA_PEER_PKGS) | sed 's/ /,/g') \
+	        --extra-dirs $$(echo $(CONVERSION_EXTRA_PKGS) | sed 's/ /,/g') \
 	        --v $(KUBE_VERBOSE)                                          \
 	        --logtostderr                                                \
 	        -i "$$pkgs"                                                  \

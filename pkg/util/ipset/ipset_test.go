@@ -454,7 +454,6 @@ func TestDelEntry(t *testing.T) {
 }
 
 func TestTestEntry(t *testing.T) {
-	// TODO: IPv6?
 	testEntry := &Entry{
 		IP:       "10.120.7.100",
 		Port:     8080,
@@ -490,6 +489,54 @@ func TestTestEntry(t *testing.T) {
 		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ipset", "test", setName, "10.120.7.100,tcp:8080") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+	}
+	if !ok {
+		t.Errorf("expect entry exists in test set, got not")
+	}
+	// Failure
+	ok, err = runner.TestEntry(testEntry.String(), "FOOBAR")
+	if err == nil || ok {
+		t.Errorf("expect entry doesn't exist in test set")
+	}
+}
+
+func TestTestEntryIPv6(t *testing.T) {
+	testEntry := &Entry{
+		IP:       "fd00:1234:5678:dead:beaf::1",
+		Port:     8080,
+		Protocol: ProtocolTCP,
+		SetType:  HashIPPort,
+	}
+	setName := "NOT"
+	fcmd := fakeexec.FakeCmd{
+		CombinedOutputScript: []fakeexec.FakeAction{
+			// Success
+			func() ([]byte, []byte, error) {
+				return []byte("fd00:1234:5678:dead:beaf::1,tcp:8080 is in set " + setName + "."), nil, nil
+			},
+			// Failure
+			func() ([]byte, []byte, error) {
+				return []byte("fd00::2,tcp:8080 is NOT in set FOOBAR."), nil, &fakeexec.FakeExitError{Status: 1}
+			},
+		},
+	}
+	fexec := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	runner := New(&fexec)
+	// Success
+	ok, err := runner.TestEntry(testEntry.String(), setName)
+	if err != nil {
+		t.Errorf("expected success, got %v", err)
+	}
+	if fcmd.CombinedOutputCalls != 1 {
+		t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ipset", "test", setName, "fd00:1234:5678:dead:beaf::1,tcp:8080") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
 	}
 	if !ok {
@@ -1457,8 +1504,7 @@ func TestValidateEntry(t *testing.T) {
 				IP:       "10.20.30.40",
 				Protocol: ProtocolTCP,
 				Port:     53,
-				// TODO: CIDR /32 may not be valid
-				Net: "10.20.30.0/24",
+				Net:      "10.20.30.0/24",
 			},
 			set: &IPSet{
 				Name: "abc",
@@ -1567,6 +1613,58 @@ func TestValidateEntry(t *testing.T) {
 			},
 			set: &IPSet{
 				Name: "negative-port-number",
+			},
+			valid: false,
+		},
+		{ // case[30]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     53,
+				Net:      "192.168.3.0/0",
+			},
+			set: &IPSet{
+				Name: "net mask boundary 0",
+			},
+			valid: true,
+		},
+		{ // case[31]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     53,
+				Net:      "192.168.3.0/32",
+			},
+			set: &IPSet{
+				Name: "net mask boundary 32",
+			},
+			valid: true,
+		},
+		{ // case[32]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     53,
+				Net:      "192.168.3.1/33",
+			},
+			set: &IPSet{
+				Name: "invalid net mask",
+			},
+			valid: false,
+		},
+		{ // case[33]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     53,
+				Net:      "192.168.3.1/-1",
+			},
+			set: &IPSet{
+				Name: "invalid net mask",
 			},
 			valid: false,
 		},

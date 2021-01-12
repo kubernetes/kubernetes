@@ -78,7 +78,7 @@ type AnnotateOptions struct {
 }
 
 var (
-	annotateLong = templates.LongDesc(`
+	annotateLong = templates.LongDesc(i18n.T(`
 		Update the annotations on one or more resources
 
 		All Kubernetes objects support the ability to store additional data with the object as
@@ -88,7 +88,7 @@ var (
 
 		Attempting to set an annotation that already exists will fail unless --overwrite is set.
 		If --resource-version is specified and does not match the current resource version on
-		the server the command will fail.`)
+		the server the command will fail.`))
 
 	annotateExample = templates.Examples(i18n.T(`
     # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.

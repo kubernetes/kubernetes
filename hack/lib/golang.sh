@@ -400,19 +400,19 @@ kube::golang::set_platform_envs() {
     case "${platform}" in
       "linux/arm")
         export CGO_ENABLED=1
-        export CC=arm-linux-gnueabihf-gcc
+        export CC=${KUBE_LINUX_ARM_CC:-arm-linux-gnueabihf-gcc}
         ;;
       "linux/arm64")
         export CGO_ENABLED=1
-        export CC=aarch64-linux-gnu-gcc
+        export CC=${KUBE_LINUX_ARM64_CC:-aarch64-linux-gnu-gcc}
         ;;
       "linux/ppc64le")
         export CGO_ENABLED=1
-        export CC=powerpc64le-linux-gnu-gcc
+        export CC=${KUBE_LINUX_PPC64LE_CC:-powerpc64le-linux-gnu-gcc}
         ;;
       "linux/s390x")
         export CGO_ENABLED=1
-        export CC=s390x-linux-gnu-gcc
+        export CC=${KUBE_LINUX_S390X_CC:-s390x-linux-gnu-gcc}
         ;;
     esac
   fi

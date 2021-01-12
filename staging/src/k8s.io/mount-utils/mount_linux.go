@@ -19,6 +19,7 @@ limitations under the License.
 package mount
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
@@ -52,6 +54,8 @@ type Mounter struct {
 	mounterPath string
 	withSystemd bool
 }
+
+var _ MounterForceUnmounter = &Mounter{}
 
 // New returns a mount.Interface for the current system.
 // It provides options to override the default mounter behavior.
@@ -83,11 +87,11 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 	mounterPath := ""
 	bind, bindOpts, bindRemountOpts, bindRemountOptsSensitive := MakeBindOptsSensitive(options, sensitiveOptions)
 	if bind {
-		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive)
+		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, true)
 		if err != nil {
 			return err
 		}
-		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive)
+		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, true)
 	}
 	// The list of filesystems that require containerized mounter on GCI image cluster
 	fsTypesNeedMounter := map[string]struct{}{
@@ -99,12 +103,37 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 	if _, ok := fsTypesNeedMounter[fstype]; ok {
 		mounterPath = mounter.mounterPath
 	}
-	return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, options, sensitiveOptions)
+	return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, options, sensitiveOptions, true)
+}
+
+// MountSensitiveWithoutSystemd is the same as MountSensitive() but disable using systemd mount.
+func (mounter *Mounter) MountSensitiveWithoutSystemd(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
+	mounterPath := ""
+	bind, bindOpts, bindRemountOpts, bindRemountOptsSensitive := MakeBindOptsSensitive(options, sensitiveOptions)
+	if bind {
+		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, false)
+		if err != nil {
+			return err
+		}
+		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, false)
+	}
+	// The list of filesystems that require containerized mounter on GCI image cluster
+	fsTypesNeedMounter := map[string]struct{}{
+		"nfs":       {},
+		"glusterfs": {},
+		"ceph":      {},
+		"cifs":      {},
+	}
+	if _, ok := fsTypesNeedMounter[fstype]; ok {
+		mounterPath = mounter.mounterPath
+	}
+	return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, options, sensitiveOptions, false)
 }
 
 // doMount runs the mount command. mounterPath is the path to mounter binary if containerized mounter is used.
 // sensitiveOptions is an extension of options except they will not be logged (because they may contain sensitive material)
-func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string, sensitiveOptions []string) error {
+// systemdMountRequired is an extension of option to decide whether uses systemd mount.
+func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string, sensitiveOptions []string, systemdMountRequired bool) error {
 	mountArgs, mountArgsLogStr := MakeMountArgsSensitive(source, target, fstype, options, sensitiveOptions)
 	if len(mounterPath) > 0 {
 		mountArgs = append([]string{mountCmd}, mountArgs...)
@@ -112,7 +141,7 @@ func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source stri
 		mountCmd = mounterPath
 	}
 
-	if mounter.withSystemd {
+	if mounter.withSystemd && systemdMountRequired {
 		// Try to run mount via systemd-run --scope. This will escape the
 		// service where kubelet runs and any fuse daemons will be started in a
 		// specific scope. kubelet service than can be restarted without killing
@@ -171,8 +200,7 @@ func detectSystemd() bool {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		klog.V(2).Infof("Cannot run systemd-run, assuming non-systemd OS")
-		klog.V(4).Infof("systemd-run failed with: %v", err)
-		klog.V(4).Infof("systemd-run output: %s", string(output))
+		klog.V(4).Infof("systemd-run output: %s, failed with: %v", string(output), err)
 		return false
 	}
 	klog.V(2).Infof("Detected OS with systemd")
@@ -240,6 +268,20 @@ func (mounter *Mounter) Unmount(target string) error {
 	output, err := command.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", err, target, string(output))
+	}
+	return nil
+}
+
+// UnmountWithForce unmounts given target but will retry unmounting with force option
+// after given timeout.
+func (mounter *Mounter) UnmountWithForce(target string, umountTimeout time.Duration) error {
+	err := tryUnmount(target, umountTimeout)
+	if err != nil {
+		if err == context.DeadlineExceeded {
+			klog.V(2).Infof("Timed out waiting for unmount of %s, trying with -f", target)
+			err = forceUmount(target)
+		}
+		return err
 	}
 	return nil
 }
@@ -405,7 +447,7 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	klog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
 	dataOut, err := mounter.Exec.Command("blkid", args...).CombinedOutput()
 	output := string(dataOut)
-	klog.V(4).Infof("Output: %q, err: %v", output, err)
+	klog.V(4).Infof("Output: %q", output)
 
 	if err != nil {
 		if exit, ok := err.(utilexec.ExitError); ok {
@@ -548,4 +590,35 @@ func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
 	}
 
 	return refs, nil
+}
+
+// tryUnmount calls plain "umount" and waits for unmountTimeout for it to finish.
+func tryUnmount(path string, unmountTimeout time.Duration) error {
+	klog.V(4).Infof("Unmounting %s", path)
+	ctx, cancel := context.WithTimeout(context.Background(), unmountTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "umount", path)
+	out, cmderr := cmd.CombinedOutput()
+
+	// CombinedOutput() does not return DeadlineExceeded, make sure it's
+	// propagated on timeout.
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	if cmderr != nil {
+		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", cmderr, path, string(out))
+	}
+	return nil
+}
+
+func forceUmount(path string) error {
+	cmd := exec.Command("umount", "-f", path)
+	out, cmderr := cmd.CombinedOutput()
+
+	if cmderr != nil {
+		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", cmderr, path, string(out))
+	}
+	return nil
 }

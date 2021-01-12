@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog/v2"
 )
 
 // DeleteFlags composes common printer flag structs
@@ -79,7 +78,7 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 	}
 	if f.CascadingStrategy != nil {
 		var err error
-		options.CascadingStrategy, err = getCascadingStrategy(*f.CascadingStrategy)
+		options.CascadingStrategy, err = parseCascadingFlag(streams, *f.CascadingStrategy)
 		if err != nil {
 			return nil, err
 		}
@@ -226,8 +225,8 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 	}
 }
 
-func getCascadingStrategy(cascadingFlag string) (metav1.DeletionPropagation, error) {
-	b, err := strconv.ParseBool(cascadingFlag)
+func parseCascadingFlag(streams genericclioptions.IOStreams, cascadingFlag string) (metav1.DeletionPropagation, error) {
+	boolValue, err := strconv.ParseBool(cascadingFlag)
 	// The flag is not a boolean
 	if err != nil {
 		switch cascadingFlag {
@@ -238,14 +237,14 @@ func getCascadingStrategy(cascadingFlag string) (metav1.DeletionPropagation, err
 		case "background":
 			return metav1.DeletePropagationBackground, nil
 		default:
-			return metav1.DeletePropagationBackground, fmt.Errorf(`Invalid cascade value (%v). Must be "background", "foreground", or "orphan".`, cascadingFlag)
+			return metav1.DeletePropagationBackground, fmt.Errorf(`invalid cascade value (%v). Must be "background", "foreground", or "orphan"`, cascadingFlag)
 		}
 	}
 	// The flag was a boolean
-	if b {
-		klog.Warningf(`--cascade=%v is deprecated (boolean value) and can be replaced with --cascade=%s.`, cascadingFlag, "background")
+	if boolValue {
+		fmt.Fprintf(streams.ErrOut, "warning: --cascade=%v is deprecated (boolean value) and can be replaced with --cascade=%s.\n", cascadingFlag, "background")
 		return metav1.DeletePropagationBackground, nil
 	}
-	klog.Warningf(`--cascade=%v is deprecated (boolean value) and can be replaced with --cascade=%s.`, cascadingFlag, "orphan")
+	fmt.Fprintf(streams.ErrOut, "warning: --cascade=%v is deprecated (boolean value) and can be replaced with --cascade=%s.\n", cascadingFlag, "orphan")
 	return metav1.DeletePropagationOrphan, nil
 }

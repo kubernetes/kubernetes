@@ -1521,3 +1521,107 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 		})
 	}
 }
+
+func TestJobBackoffOnRestartPolicyNever(t *testing.T) {
+	jobConditionFailed := batch.JobFailed
+
+	testCases := map[string]struct {
+		// job setup
+		parallelism  int32
+		completions  int32
+		backoffLimit int32
+
+		// pod setup
+		activePodsPhase v1.PodPhase
+		activePods      int32
+		failedPods      int32
+
+		// expectations
+		isExpectingAnError      bool
+		jobKeyForget            bool
+		expectedActive          int32
+		expectedSucceeded       int32
+		expectedFailed          int32
+		expectedCondition       *batch.JobConditionType
+		expectedConditionReason string
+	}{
+		"not enough failures with backoffLimit 0 - single pod": {
+			1, 1, 0,
+			v1.PodRunning, 1, 0,
+			false, true, 1, 0, 0, nil, "",
+		},
+		"not enough failures with backoffLimit 1 - single pod": {
+			1, 1, 1,
+			"", 0, 1,
+			true, false, 1, 0, 1, nil, "",
+		},
+		"too many failures with backoffLimit 1 - single pod": {
+			1, 1, 1,
+			"", 0, 2,
+			false, true, 0, 0, 2, &jobConditionFailed, "BackoffLimitExceeded",
+		},
+		"not enough failures with backoffLimit 6 - multiple pods": {
+			2, 2, 6,
+			v1.PodRunning, 1, 6,
+			true, false, 2, 0, 6, nil, "",
+		},
+		"too many failures with backoffLimit 6 - multiple pods": {
+			2, 2, 6,
+			"", 0, 7,
+			false, true, 0, 0, 7, &jobConditionFailed, "BackoffLimitExceeded",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			// job manager setup
+			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+			manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+			fakePodControl := controller.FakePodControl{}
+			manager.podControl = &fakePodControl
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+			var actual *batch.Job
+			manager.updateHandler = func(job *batch.Job) error {
+				actual = job
+				return nil
+			}
+
+			// job & pods setup
+			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit)
+			job.Spec.Template.Spec.RestartPolicy = v1.RestartPolicyNever
+			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
+			for _, pod := range newPodList(tc.failedPods, v1.PodFailed, job) {
+				podIndexer.Add(&pod)
+			}
+			for _, pod := range newPodList(tc.activePods, tc.activePodsPhase, job) {
+				podIndexer.Add(&pod)
+			}
+
+			// run
+			forget, err := manager.syncJob(testutil.GetKey(job, t))
+
+			if (err != nil) != tc.isExpectingAnError {
+				t.Errorf("unexpected error syncing job. Got %#v, isExpectingAnError: %v\n", err, tc.isExpectingAnError)
+			}
+			if forget != tc.jobKeyForget {
+				t.Errorf("unexpected forget value. Expected %v, saw %v\n", tc.jobKeyForget, forget)
+			}
+			// validate status
+			if actual.Status.Active != tc.expectedActive {
+				t.Errorf("unexpected number of active pods. Expected %d, saw %d\n", tc.expectedActive, actual.Status.Active)
+			}
+			if actual.Status.Succeeded != tc.expectedSucceeded {
+				t.Errorf("unexpected number of succeeded pods. Expected %d, saw %d\n", tc.expectedSucceeded, actual.Status.Succeeded)
+			}
+			if actual.Status.Failed != tc.expectedFailed {
+				t.Errorf("unexpected number of failed pods. Expected %d, saw %d\n", tc.expectedFailed, actual.Status.Failed)
+			}
+			// validate conditions
+			if tc.expectedCondition != nil && !getCondition(actual, *tc.expectedCondition, tc.expectedConditionReason) {
+				t.Errorf("expected completion condition. Got %#v", actual.Status.Conditions)
+			}
+		})
+	}
+}

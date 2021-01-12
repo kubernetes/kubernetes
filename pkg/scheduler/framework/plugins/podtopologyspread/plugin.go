@@ -19,13 +19,14 @@ package podtopologyspread
 import (
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 const (
@@ -35,14 +36,27 @@ const (
 	ErrReasonNodeLabelNotMatch = ErrReasonConstraintsNotMatch + " (missing required label)"
 )
 
+var systemDefaultConstraints = []v1.TopologySpreadConstraint{
+	{
+		TopologyKey:       v1.LabelHostname,
+		WhenUnsatisfiable: v1.ScheduleAnyway,
+		MaxSkew:           3,
+	},
+	{
+		TopologyKey:       v1.LabelTopologyZone,
+		WhenUnsatisfiable: v1.ScheduleAnyway,
+		MaxSkew:           5,
+	},
+}
+
 // PodTopologySpread is a plugin that ensures pod's topologySpreadConstraints is satisfied.
 type PodTopologySpread struct {
-	args             config.PodTopologySpreadArgs
-	sharedLister     framework.SharedLister
-	services         corelisters.ServiceLister
-	replicationCtrls corelisters.ReplicationControllerLister
-	replicaSets      appslisters.ReplicaSetLister
-	statefulSets     appslisters.StatefulSetLister
+	defaultConstraints []v1.TopologySpreadConstraint
+	sharedLister       framework.SharedLister
+	services           corelisters.ServiceLister
+	replicationCtrls   corelisters.ReplicationControllerLister
+	replicaSets        appslisters.ReplicaSetLister
+	statefulSets       appslisters.StatefulSetLister
 }
 
 var _ framework.PreFilterPlugin = &PodTopologySpread{}
@@ -61,7 +75,7 @@ func (pl *PodTopologySpread) Name() string {
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
+func New(plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}
@@ -73,10 +87,13 @@ func New(plArgs runtime.Object, h framework.FrameworkHandle) (framework.Plugin, 
 		return nil, err
 	}
 	pl := &PodTopologySpread{
-		sharedLister: h.SnapshotSharedLister(),
-		args:         args,
+		sharedLister:       h.SnapshotSharedLister(),
+		defaultConstraints: args.DefaultConstraints,
 	}
-	if len(pl.args.DefaultConstraints) != 0 {
+	if args.DefaultingType == config.SystemDefaulting {
+		pl.defaultConstraints = systemDefaultConstraints
+	}
+	if len(pl.defaultConstraints) != 0 {
 		if h.SharedInformerFactory() == nil {
 			return nil, fmt.Errorf("SharedInformerFactory is nil")
 		}

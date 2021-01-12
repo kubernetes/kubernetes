@@ -59,7 +59,7 @@ const (
 	backendPoolIDTemplate       = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/backendAddressPools/%s"
 	loadBalancerProbeIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/probes/%s"
 
-	// InternalLoadBalancerNameSuffix is load balancer posfix
+	// InternalLoadBalancerNameSuffix is load balancer suffix
 	InternalLoadBalancerNameSuffix = "-internal"
 
 	// nodeLabelRole specifies the role of a node
@@ -71,10 +71,14 @@ const (
 	loadBalancerRuleNameMaxLength = 80
 )
 
-var errNotInVMSet = errors.New("vm is not in the vmset")
-var providerIDRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
-var backendPoolIDRE = regexp.MustCompile(`^/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Network/loadBalancers/(.+)/backendAddressPools/(?:.*)`)
-var nicResourceGroupRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Network/networkInterfaces/(?:.*)`)
+var (
+	errNotInVMSet      = errors.New("vm is not in the vmset")
+	providerIDRE       = regexp.MustCompile(`.*/subscriptions/(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
+	backendPoolIDRE    = regexp.MustCompile(`^/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Network/loadBalancers/(.+)/backendAddressPools/(?:.*)`)
+	nicResourceGroupRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Network/networkInterfaces/(?:.*)`)
+	nicIDRE            = regexp.MustCompile(`/subscriptions/(?:.*)/resourceGroups/(?:.+)/providers/Microsoft.Network/networkInterfaces/(.+)-nic-(.+)/ipConfigurations/(?:.*)`)
+	vmasIDRE           = regexp.MustCompile(`/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Compute/availabilitySets/(.+)`)
+)
 
 // getStandardMachineID returns the full identifier of a virtual machine.
 func (az *Cloud) getStandardMachineID(subscriptionID, resourceGroup, machineName string) string {
@@ -150,7 +154,11 @@ func (az *Cloud) getAzureLoadBalancerName(clusterName string, vmSetName string, 
 		clusterName = az.LoadBalancerName
 	}
 	lbNamePrefix := vmSetName
-	if strings.EqualFold(vmSetName, az.VMSet.GetPrimaryVMSetName()) || az.useStandardLoadBalancer() {
+	// The LB name prefix is set to the name of the cluster when:
+	// 1. the LB belongs to the primary agent pool.
+	// 2. using the single SLB;
+	useSingleSLB := az.useStandardLoadBalancer() && !az.EnableMultipleStandardLoadBalancers
+	if strings.EqualFold(vmSetName, az.VMSet.GetPrimaryVMSetName()) || useSingleSLB {
 		lbNamePrefix = clusterName
 	}
 	if isInternal {
@@ -211,7 +219,7 @@ func getPrimaryInterfaceID(machine compute.VirtualMachine) (string, error) {
 	}
 
 	for _, ref := range *machine.NetworkProfile.NetworkInterfaces {
-		if *ref.Primary {
+		if to.Bool(ref.Primary) {
 			return *ref.ID, nil
 		}
 	}
@@ -254,7 +262,7 @@ func getIPConfigByIPFamily(nic network.Interface, IPv6 bool) (*network.Interface
 			return &ref, nil
 		}
 	}
-	return nil, fmt.Errorf("failed to determine the ipconfig(IPv6=%v). nicname=%q", IPv6, *nic.Name)
+	return nil, fmt.Errorf("failed to determine the ipconfig(IPv6=%v). nicname=%q", IPv6, to.String(nic.Name))
 }
 
 func isInternalLoadBalancer(lb *network.LoadBalancer) bool {
@@ -262,7 +270,7 @@ func isInternalLoadBalancer(lb *network.LoadBalancer) bool {
 }
 
 // getBackendPoolName the LB BackendPool name for a service.
-// to ensure backword and forward compat:
+// to ensure backward and forward compat:
 // SingleStack -v4 (pre v1.16) => BackendPool name == clusterName
 // SingleStack -v6 => BackendPool name == <clusterName>-IPv6 (all cluster bootstrap uses this name)
 // DualStack
@@ -327,12 +335,59 @@ func (az *Cloud) serviceOwnsRule(service *v1.Service, rule string) bool {
 	return strings.HasPrefix(strings.ToUpper(rule), strings.ToUpper(prefix))
 }
 
-func (az *Cloud) serviceOwnsFrontendIP(fip network.FrontendIPConfiguration, service *v1.Service) bool {
+// There are two cases when a service owns the frontend IP config:
+// 1. The primary service, which means the frontend IP config is created after the creation of the service.
+// This means the name of the config can be tracked by the service UID.
+// 2. The secondary services must have their loadBalancer IP set if they want to share the same config as the primary
+// service. Hence, it can be tracked by the loadBalancer IP.
+func (az *Cloud) serviceOwnsFrontendIP(fip network.FrontendIPConfiguration, service *v1.Service) (bool, bool, error) {
+	var isPrimaryService bool
 	baseName := az.GetLoadBalancerName(context.TODO(), "", service)
-	return strings.HasPrefix(*fip.Name, baseName)
+	if strings.HasPrefix(to.String(fip.Name), baseName) {
+		klog.V(6).Infof("serviceOwnsFrontendIP: found primary service %s of the "+
+			"frontend IP config %s", service.Name, *fip.Name)
+		isPrimaryService = true
+		return true, isPrimaryService, nil
+	}
+
+	loadBalancerIP := service.Spec.LoadBalancerIP
+	if loadBalancerIP == "" {
+		// it is a must that the secondary services set the loadBalancer IP
+		return false, isPrimaryService, nil
+	}
+
+	// for external secondary service the public IP address should be checked
+	if !requiresInternalLoadBalancer(service) {
+		pipResourceGroup := az.getPublicIPAddressResourceGroup(service)
+		pip, err := az.findMatchedPIPByLoadBalancerIP(service, loadBalancerIP, pipResourceGroup)
+		if err != nil {
+			klog.Warningf("serviceOwnsFrontendIP: unexpected error when finding match public IP of the service %s with loadBalancerLP %s: %v", service.Name, loadBalancerIP, err)
+			return false, isPrimaryService, nil
+		}
+
+		if pip != nil && pip.ID != nil && pip.PublicIPAddressPropertiesFormat != nil && pip.IPAddress != nil {
+			if strings.EqualFold(*pip.ID, *fip.PublicIPAddress.ID) {
+				klog.V(4).Infof("serviceOwnsFrontendIP: found secondary service %s of the frontend IP config %s", service.Name, *fip.Name)
+
+				return true, isPrimaryService, nil
+			}
+			klog.V(4).Infof("serviceOwnsFrontendIP: the public IP with ID %s is being referenced by other service with public IP address %s", *pip.ID, *pip.IPAddress)
+
+			return false, isPrimaryService, nil
+		}
+
+		return false, isPrimaryService, fmt.Errorf("serviceOwnsFrontendIP: wrong parameters")
+	}
+
+	// for internal secondary service the private IP address on the frontend IP config should be checked
+	if fip.PrivateIPAddress == nil {
+		return false, isPrimaryService, nil
+	}
+
+	return strings.EqualFold(*fip.PrivateIPAddress, loadBalancerIP), isPrimaryService, nil
 }
 
-func (az *Cloud) getFrontendIPConfigName(service *v1.Service) string {
+func (az *Cloud) getDefaultFrontendIPConfigName(service *v1.Service) string {
 	baseName := az.GetLoadBalancerName(context.TODO(), "", service)
 	subnetName := subnet(service)
 	if subnetName != nil {
@@ -558,9 +613,9 @@ func (as *availabilitySet) GetPrivateIPsByNodeName(name string) ([]string, error
 	return ips, nil
 }
 
-// getAgentPoolAvailabiliySets lists the virtual machines for the resource group and then builds
+// getAgentPoolAvailabilitySets lists the virtual machines for the resource group and then builds
 // a list of availability sets that match the nodes available to k8s.
-func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentPoolAvailabilitySets *[]string, err error) {
+func (as *availabilitySet) getAgentPoolAvailabilitySets(nodes []*v1.Node) (agentPoolAvailabilitySets *[]string, err error) {
 	vms, err := as.ListVirtualMachines(as.ResourceGroup)
 	if err != nil {
 		klog.Errorf("as.getNodeAvailabilitySet - ListVirtualMachines failed, err=%v", err)
@@ -583,7 +638,7 @@ func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentP
 		asID, ok := vmNameToAvailabilitySetID[nodeName]
 		if !ok {
 			klog.Errorf("as.getNodeAvailabilitySet - Node(%s) has no availability sets", nodeName)
-			return nil, fmt.Errorf("Node (%s) - has no availability sets", nodeName)
+			return nil, fmt.Errorf("node (%s) - has no availability sets", nodeName)
 		}
 		if availabilitySetIDs.Has(asID) {
 			// already added in the list
@@ -594,7 +649,7 @@ func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentP
 			klog.Errorf("as.getNodeAvailabilitySet - Node (%s)- getLastSegment(%s), err=%v", nodeName, asID, err)
 			return nil, err
 		}
-		// AvailabilitySet ID is currently upper cased in a indeterministic way
+		// AvailabilitySet ID is currently upper cased in a non-deterministic way
 		// We want to keep it lower case, before the ID get fixed
 		asName = strings.ToLower(asName)
 
@@ -606,23 +661,26 @@ func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentP
 
 // GetVMSetNames selects all possible availability sets or scale sets
 // (depending vmType configured) for service load balancer, if the service has
-// no loadbalancer mode annotaion returns the primary VMSet. If service annotation
-// for loadbalancer exists then return the eligible VMSet.
+// no loadbalancer mode annotation returns the primary VMSet. If service annotation
+// for loadbalancer exists then returns the eligible VMSet. The mode selection
+// annotation would be ignored when using one SLB per cluster.
 func (as *availabilitySet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (availabilitySetNames *[]string, err error) {
 	hasMode, isAuto, serviceAvailabilitySetNames := getServiceLoadBalancerMode(service)
-	if !hasMode {
-		// no mode specified in service annotation default to PrimaryAvailabilitySetName
+	useSingleSLB := as.useStandardLoadBalancer() && !as.EnableMultipleStandardLoadBalancers
+	if !hasMode || useSingleSLB {
+		// no mode specified in service annotation or use single SLB mode
+		// default to PrimaryAvailabilitySetName
 		availabilitySetNames = &[]string{as.Config.PrimaryAvailabilitySetName}
 		return availabilitySetNames, nil
 	}
-	availabilitySetNames, err = as.getAgentPoolAvailabiliySets(nodes)
+	availabilitySetNames, err = as.getAgentPoolAvailabilitySets(nodes)
 	if err != nil {
-		klog.Errorf("as.GetVMSetNames - getAgentPoolAvailabiliySets failed err=(%v)", err)
+		klog.Errorf("as.GetVMSetNames - getAgentPoolAvailabilitySets failed err=(%v)", err)
 		return nil, err
 	}
 	if len(*availabilitySetNames) == 0 {
 		klog.Errorf("as.GetVMSetNames - No availability sets found for nodes in the cluster, node count(%d)", len(nodes))
-		return nil, fmt.Errorf("No availability sets found for nodes, node count(%d)", len(nodes))
+		return nil, fmt.Errorf("no availability sets found for nodes, node count(%d)", len(nodes))
 	}
 	// sort the list to have deterministic selection
 	sort.Strings(*availabilitySetNames)
@@ -653,7 +711,8 @@ func (as *availabilitySet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) 
 
 // GetPrimaryInterface gets machine primary network interface by node name.
 func (as *availabilitySet) GetPrimaryInterface(nodeName string) (network.Interface, error) {
-	return as.getPrimaryInterfaceWithVMSet(nodeName, "")
+	nic, _, err := as.getPrimaryInterfaceWithVMSet(nodeName, "")
+	return nic, err
 }
 
 // extractResourceGroupByNicID extracts the resource group name by nicID.
@@ -667,26 +726,26 @@ func extractResourceGroupByNicID(nicID string) (string, error) {
 }
 
 // getPrimaryInterfaceWithVMSet gets machine primary network interface by node name and vmSet.
-func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName string) (network.Interface, error) {
+func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName string) (network.Interface, string, error) {
 	var machine compute.VirtualMachine
 
 	machine, err := as.GetVirtualMachineWithRetry(types.NodeName(nodeName), azcache.CacheReadTypeDefault)
 	if err != nil {
 		klog.V(2).Infof("GetPrimaryInterface(%s, %s) abort backoff", nodeName, vmSetName)
-		return network.Interface{}, err
+		return network.Interface{}, "", err
 	}
 
 	primaryNicID, err := getPrimaryInterfaceID(machine)
 	if err != nil {
-		return network.Interface{}, err
+		return network.Interface{}, "", err
 	}
 	nicName, err := getLastSegment(primaryNicID, "/")
 	if err != nil {
-		return network.Interface{}, err
+		return network.Interface{}, "", err
 	}
 	nodeResourceGroup, err := as.GetNodeResourceGroup(nodeName)
 	if err != nil {
-		return network.Interface{}, err
+		return network.Interface{}, "", err
 	}
 
 	// Check availability set name. Note that vmSetName is empty string when getting
@@ -694,30 +753,43 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 	// Node's real availability set name:
 	// - For basic SKU load balancer, errNotInVMSet should be returned if the node's
 	//   availability set is mismatched with vmSetName.
-	// - For standard SKU load balancer, backend could belong to multiple VMAS, so we
+	// - For single standard SKU load balancer, backend could belong to multiple VMAS, so we
 	//   don't check vmSet for it.
-	if vmSetName != "" && !as.useStandardLoadBalancer() {
-		expectedAvailabilitySetName := as.getAvailabilitySetID(nodeResourceGroup, vmSetName)
-		if machine.AvailabilitySet == nil || !strings.EqualFold(*machine.AvailabilitySet.ID, expectedAvailabilitySetName) {
+	// - For multiple standard SKU load balancers, the behavior is similar to the basic LB.
+	needCheck := false
+	if !as.useStandardLoadBalancer() {
+		// need to check the vmSet name when using the basic LB
+		needCheck = true
+	} else if as.EnableMultipleStandardLoadBalancers {
+		// need to check the vmSet name when using multiple standard LBs
+		needCheck = true
+	}
+	if vmSetName != "" && needCheck {
+		expectedAvailabilitySetID := as.getAvailabilitySetID(nodeResourceGroup, vmSetName)
+		if machine.AvailabilitySet == nil || !strings.EqualFold(*machine.AvailabilitySet.ID, expectedAvailabilitySetID) {
 			klog.V(3).Infof(
 				"GetPrimaryInterface: nic (%s) is not in the availabilitySet(%s)", nicName, vmSetName)
-			return network.Interface{}, errNotInVMSet
+			return network.Interface{}, "", errNotInVMSet
 		}
 	}
 
 	nicResourceGroup, err := extractResourceGroupByNicID(primaryNicID)
 	if err != nil {
-		return network.Interface{}, err
+		return network.Interface{}, "", err
 	}
 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 	nic, rerr := as.InterfacesClient.Get(ctx, nicResourceGroup, nicName, "")
 	if rerr != nil {
-		return network.Interface{}, rerr.Error()
+		return network.Interface{}, "", rerr.Error()
 	}
 
-	return nic, nil
+	var availabilitySetID string
+	if machine.VirtualMachineProperties != nil && machine.AvailabilitySet != nil {
+		availabilitySetID = to.String(machine.AvailabilitySet.ID)
+	}
+	return nic, availabilitySetID, nil
 }
 
 // EnsureHostInPool ensures the given VM's Primary NIC's Primary IP Configuration is
@@ -725,7 +797,7 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string, isInternal bool) (string, string, string, *compute.VirtualMachineScaleSetVM, error) {
 	vmName := mapNodeNameToVMName(nodeName)
 	serviceName := getServiceName(service)
-	nic, err := as.getPrimaryInterfaceWithVMSet(vmName, vmSetName)
+	nic, _, err := as.getPrimaryInterfaceWithVMSet(vmName, vmSetName)
 	if err != nil {
 		if err == errNotInVMSet {
 			klog.V(3).Infof("EnsureHostInPool skips node %s because it is not in the vmSet %s", nodeName, vmSetName)
@@ -848,8 +920,121 @@ func (as *availabilitySet) EnsureHostsInPool(service *v1.Service, nodes []*v1.No
 
 // EnsureBackendPoolDeleted ensures the loadBalancer backendAddressPools deleted from the specified nodes.
 func (as *availabilitySet) EnsureBackendPoolDeleted(service *v1.Service, backendPoolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool) error {
-	// Do nothing for availability set.
+	// Returns nil if backend address pools already deleted.
+	if backendAddressPools == nil {
+		return nil
+	}
+
+	mc := metrics.NewMetricContext("services", "vmas_ensure_backend_pool_deleted", as.ResourceGroup, as.SubscriptionID, service.Name)
+	isOperationSucceeded := false
+	defer func() {
+		mc.ObserveOperationWithResult(isOperationSucceeded)
+	}()
+
+	ipConfigurationIDs := []string{}
+	for _, backendPool := range *backendAddressPools {
+		if strings.EqualFold(to.String(backendPool.ID), backendPoolID) &&
+			backendPool.BackendAddressPoolPropertiesFormat != nil &&
+			backendPool.BackendIPConfigurations != nil {
+			for _, ipConf := range *backendPool.BackendIPConfigurations {
+				if ipConf.ID == nil {
+					continue
+				}
+
+				ipConfigurationIDs = append(ipConfigurationIDs, *ipConf.ID)
+			}
+		}
+	}
+	nicUpdaters := make([]func() error, 0)
+	errors := make([]error, 0)
+	for i := range ipConfigurationIDs {
+		ipConfigurationID := ipConfigurationIDs[i]
+		nodeName, _, err := as.GetNodeNameByIPConfigurationID(ipConfigurationID)
+		if err != nil {
+			klog.Errorf("Failed to GetNodeNameByIPConfigurationID(%s): %v", ipConfigurationID, err)
+			errors = append(errors, err)
+			continue
+		}
+
+		vmName := mapNodeNameToVMName(types.NodeName(nodeName))
+		nic, vmasID, err := as.getPrimaryInterfaceWithVMSet(vmName, vmSetName)
+		if err != nil {
+			if err == errNotInVMSet {
+				klog.V(3).Infof("EnsureBackendPoolDeleted skips node %s because it is not in the vmSet %s", nodeName, vmSetName)
+				return nil
+			}
+
+			klog.Errorf("error: az.EnsureBackendPoolDeleted(%s), az.VMSet.GetPrimaryInterface.Get(%s, %s), err=%v", nodeName, vmName, vmSetName, err)
+			return err
+		}
+		vmasName, err := getAvailabilitySetNameByID(vmasID)
+		if err != nil {
+			return fmt.Errorf("EnsureBackendPoolDeleted: failed to parse the VMAS ID %s: %v", vmasID, err)
+		}
+		// Only remove nodes belonging to specified vmSet to basic LB backends.
+		if !strings.EqualFold(vmasName, vmSetName) {
+			klog.V(2).Infof("EnsureBackendPoolDeleted: skipping the node %s belonging to another vm set %s", nodeName, vmasName)
+			continue
+		}
+
+		if nic.ProvisioningState != nil && *nic.ProvisioningState == nicFailedState {
+			klog.Warningf("EnsureBackendPoolDeleted skips node %s because its primary nic %s is in Failed state", nodeName, *nic.Name)
+			return nil
+		}
+
+		if nic.InterfacePropertiesFormat != nil && nic.InterfacePropertiesFormat.IPConfigurations != nil {
+			newIPConfigs := *nic.IPConfigurations
+			for j, ipConf := range newIPConfigs {
+				if !to.Bool(ipConf.Primary) {
+					continue
+				}
+				// found primary ip configuration
+				if ipConf.LoadBalancerBackendAddressPools != nil {
+					newLBAddressPools := *ipConf.LoadBalancerBackendAddressPools
+					for k := len(newLBAddressPools) - 1; k >= 0; k-- {
+						pool := newLBAddressPools[k]
+						if strings.EqualFold(to.String(pool.ID), backendPoolID) {
+							newLBAddressPools = append(newLBAddressPools[:k], newLBAddressPools[k+1:]...)
+							break
+						}
+					}
+					newIPConfigs[j].LoadBalancerBackendAddressPools = &newLBAddressPools
+				}
+			}
+			nic.IPConfigurations = &newIPConfigs
+			nicUpdaters = append(nicUpdaters, func() error {
+				ctx, cancel := getContextWithCancel()
+				defer cancel()
+				klog.V(2).Infof("EnsureBackendPoolDeleted begins to CreateOrUpdate for NIC(%s, %s) with backendPoolID %s", as.resourceGroup, to.String(nic.Name), backendPoolID)
+				rerr := as.InterfacesClient.CreateOrUpdate(ctx, as.ResourceGroup, to.String(nic.Name), nic)
+				if rerr != nil {
+					klog.Errorf("EnsureBackendPoolDeleted CreateOrUpdate for NIC(%s, %s) failed with error %v", as.resourceGroup, to.String(nic.Name), rerr.Error())
+					return rerr.Error()
+				}
+				return nil
+			})
+		}
+	}
+	errs := utilerrors.AggregateGoroutines(nicUpdaters...)
+	if errs != nil {
+		return utilerrors.Flatten(errs)
+	}
+	// Fail if there are other errors.
+	if len(errors) > 0 {
+		return utilerrors.Flatten(utilerrors.NewAggregate(errors))
+	}
+
+	isOperationSucceeded = true
 	return nil
+}
+
+func getAvailabilitySetNameByID(asID string) (string, error) {
+	matches := vmasIDRE.FindStringSubmatch(asID)
+	if len(matches) != 2 {
+		return "", fmt.Errorf("getAvailabilitySetNameByID: failed to parse the VMAS ID %s", asID)
+	}
+	vmasName := matches[1]
+	return vmasName, nil
 }
 
 // get a storage account by UUID
@@ -860,4 +1045,34 @@ func generateStorageAccountName(accountNamePrefix string) string {
 		return accountName[:storageAccountNameMaxLength-1]
 	}
 	return accountName
+}
+
+// GetNodeNameByIPConfigurationID gets the node name and the availabilitySet name by IP configuration ID.
+func (as *availabilitySet) GetNodeNameByIPConfigurationID(ipConfigurationID string) (string, string, error) {
+	matches := nicIDRE.FindStringSubmatch(ipConfigurationID)
+	if len(matches) != 3 {
+		klog.V(4).Infof("Can not extract VM name from ipConfigurationID (%s)", ipConfigurationID)
+		return "", "", fmt.Errorf("invalid ip config ID %s", ipConfigurationID)
+	}
+
+	prefix := matches[1]
+	suffix := matches[2]
+	nodeName := fmt.Sprintf("%s-%s", prefix, suffix)
+
+	vm, err := as.getVirtualMachine(types.NodeName(nodeName), azcache.CacheReadTypeDefault)
+	if err != nil {
+		return "", "", fmt.Errorf("cannot get the virtual machine by node name %s", nodeName)
+	}
+	asID := ""
+	if vm.VirtualMachineProperties != nil && vm.AvailabilitySet != nil {
+		asID = to.String(vm.AvailabilitySet.ID)
+	}
+	if asID == "" {
+		return "", "", fmt.Errorf("cannot get the availability set ID from the virtual machine with node name %s", nodeName)
+	}
+	asName, err := getAvailabilitySetNameByID(asID)
+	if err != nil {
+		return "", "", fmt.Errorf("cannot get the availability set name by the availability set ID %s", asID)
+	}
+	return nodeName, strings.ToLower(asName), nil
 }

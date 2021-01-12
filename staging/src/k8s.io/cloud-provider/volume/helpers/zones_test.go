@@ -417,7 +417,7 @@ func TestChooseZonesForVolume(t *testing.T) {
 func TestSelectZoneForVolume(t *testing.T) {
 
 	nodeWithZoneLabels := &v1.Node{}
-	nodeWithZoneLabels.Labels = map[string]string{v1.LabelZoneFailureDomain: "zoneX"}
+	nodeWithZoneLabels.Labels = map[string]string{v1.LabelFailureDomainBetaZone: "zoneX"}
 
 	nodeWithNoLabels := &v1.Node{}
 
@@ -499,7 +499,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -521,7 +521,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -530,7 +530,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 			Reject: true,
 		},
 
-		// Key specified in AllowedTopologies is not LabelZoneFailureDomain [Fail]
+		// Key specified in AllowedTopologies is not LabelFailureDomainBetaZone [Fail]
 		// [1] nil Node
 		// [2] no Zone/Zones parameter
 		// [3] AllowedTopologies with invalid key specified
@@ -545,7 +545,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 							Values: []string{"zoneX"},
 						},
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -554,7 +554,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 			Reject: true,
 		},
 
-		// AllowedTopologies without keys specifying LabelZoneFailureDomain [Fail]
+		// AllowedTopologies without keys specifying LabelFailureDomainBetaZone [Fail]
 		// [1] nil Node
 		// [2] no Zone/Zones parameter
 		// [3] Invalid AllowedTopologies
@@ -633,7 +633,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneZ", "zoneY"},
 						},
 					},
@@ -655,7 +655,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX", "zoneY"},
 						},
 					},
@@ -676,7 +676,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -684,7 +684,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -706,7 +706,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -771,7 +771,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 func TestSelectZonesForVolume(t *testing.T) {
 
 	nodeWithZoneLabels := &v1.Node{}
-	nodeWithZoneLabels.Labels = map[string]string{v1.LabelZoneFailureDomain: "zoneX"}
+	nodeWithZoneLabels.Labels = map[string]string{v1.LabelFailureDomainBetaZone: "zoneX"}
 
 	nodeWithNoLabels := &v1.Node{}
 
@@ -865,7 +865,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -889,7 +889,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -898,7 +898,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 			Reject: true,
 		},
 
-		// Key specified in AllowedTopologies is not LabelZoneFailureDomain [Fail]
+		// Key specified in AllowedTopologies is not LabelFailureDomainBetaZone [Fail]
 		// [1] nil Node
 		// [2] no Zone/Zones parameter
 		// [3] AllowedTopologies with invalid key specified
@@ -915,7 +915,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 							Values: []string{"zoneX"},
 						},
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -924,7 +924,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 			Reject: true,
 		},
 
-		// AllowedTopologies without keys specifying LabelZoneFailureDomain [Fail]
+		// AllowedTopologies without keys specifying LabelFailureDomainBetaZone [Fail]
 		// [1] nil Node
 		// [2] no Zone/Zones parameter
 		// [3] Invalid AllowedTopologies
@@ -999,7 +999,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1123,7 +1123,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneV", "zoneW", "zoneX", "zoneY", "zoneZ"},
 						},
 					},
@@ -1149,7 +1149,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX", "zoneY"},
 						},
 					},
@@ -1176,7 +1176,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX", "zoneY", "zoneZ"},
 						},
 					},
@@ -1200,7 +1200,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX", "zoneY"},
 						},
 					},
@@ -1228,7 +1228,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneV"},
 						},
 					},
@@ -1236,7 +1236,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneW"},
 						},
 					},
@@ -1244,7 +1244,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1252,7 +1252,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -1260,7 +1260,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneZ"},
 						},
 					},
@@ -1286,7 +1286,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1294,7 +1294,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -1321,7 +1321,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1329,7 +1329,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -1337,7 +1337,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneZ"},
 						},
 					},
@@ -1361,7 +1361,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1369,7 +1369,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneY"},
 						},
 					},

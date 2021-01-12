@@ -55,7 +55,8 @@ var _ volume.PersistentVolumePlugin = &azureFilePlugin{}
 var _ volume.ExpandableVolumePlugin = &azureFilePlugin{}
 
 const (
-	azureFilePluginName = "kubernetes.io/azure-file"
+	azureFilePluginName    = "kubernetes.io/azure-file"
+	defaultSecretNamespace = "default"
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -86,7 +87,7 @@ func (plugin *azureFilePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.AzureFile != nil)
 }
 
-func (plugin *azureFilePlugin) RequiresRemount() bool {
+func (plugin *azureFilePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -115,7 +116,7 @@ func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 	if err != nil {
 		return nil, err
 	}
-	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, pod.Namespace)
+	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, defaultSecretNamespace)
 	if err != nil {
 		// Log-and-continue instead of returning an error for now
 		// due to unspecified backwards compatibility concerns (a subject to revise)
@@ -173,7 +174,7 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 		resourceGroup = spec.PersistentVolume.ObjectMeta.Annotations[resourceGroupAnnotation]
 	}
 
-	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, spec.PersistentVolume.Spec.ClaimRef.Namespace)
+	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, defaultSecretNamespace)
 	if err != nil {
 		return oldSize, err
 	}
@@ -305,7 +306,7 @@ func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 
 	mountComplete := false
 	err = wait.PollImmediate(1*time.Second, 2*time.Minute, func() (bool, error) {
-		err := b.mounter.MountSensitive(source, dir, "cifs", mountOptions, sensitiveMountOptions)
+		err := b.mounter.MountSensitiveWithoutSystemd(source, dir, "cifs", mountOptions, sensitiveMountOptions)
 		mountComplete = true
 		return true, err
 	})

@@ -33,18 +33,40 @@ type DialFunc func(ctx context.Context, network, address string) (net.Conn, erro
 // Dialer opens connections through Dial and tracks them.
 type Dialer struct {
 	dial DialFunc
+	*ConnectionTracker
+}
 
+// NewDialer creates a new Dialer instance.
+// Equivalent to NewDialerWithTracker(dial, nil).
+func NewDialer(dial DialFunc) *Dialer {
+	return NewDialerWithTracker(dial, nil)
+}
+
+// NewDialerWithTracker creates a new Dialer instance.
+//
+// If dial is not nil, it will be used to create new underlying connections.
+// Otherwise net.DialContext is used.
+// If tracker is not nil, it will be used to track new underlying connections.
+// Otherwise NewConnectionTracker() is used.
+func NewDialerWithTracker(dial DialFunc, tracker *ConnectionTracker) *Dialer {
+	if tracker == nil {
+		tracker = NewConnectionTracker()
+	}
+	return &Dialer{
+		dial:              dial,
+		ConnectionTracker: tracker,
+	}
+}
+
+// ConnectionTracker keeps track of opened connections
+type ConnectionTracker struct {
 	mu    sync.Mutex
 	conns map[*closableConn]struct{}
 }
 
-// NewDialer creates a new Dialer instance.
-//
-// If dial is not nil, it will be used to create new underlying connections.
-// Otherwise net.DialContext is used.
-func NewDialer(dial DialFunc) *Dialer {
-	return &Dialer{
-		dial:  dial,
+// NewConnectionTracker returns a connection tracker for use with NewDialerWithTracker
+func NewConnectionTracker() *ConnectionTracker {
+	return &ConnectionTracker{
 		conns: make(map[*closableConn]struct{}),
 	}
 }
@@ -52,15 +74,38 @@ func NewDialer(dial DialFunc) *Dialer {
 // CloseAll forcibly closes all tracked connections.
 //
 // Note: new connections may get created before CloseAll returns.
-func (d *Dialer) CloseAll() {
-	d.mu.Lock()
-	conns := d.conns
-	d.conns = make(map[*closableConn]struct{})
-	d.mu.Unlock()
+func (c *ConnectionTracker) CloseAll() {
+	c.mu.Lock()
+	conns := c.conns
+	c.conns = make(map[*closableConn]struct{})
+	c.mu.Unlock()
 
 	for conn := range conns {
 		conn.Close()
 	}
+}
+
+// Track adds the connection to the list of tracked connections,
+// and returns a wrapped copy of the connection that stops tracking the connection
+// when it is closed.
+func (c *ConnectionTracker) Track(conn net.Conn) net.Conn {
+	closable := &closableConn{Conn: conn}
+
+	// When the connection is closed, remove it from the map. This will
+	// be no-op if the connection isn't in the map, e.g. if CloseAll()
+	// is called.
+	closable.onClose = func() {
+		c.mu.Lock()
+		delete(c.conns, closable)
+		c.mu.Unlock()
+	}
+
+	// Start tracking the connection
+	c.mu.Lock()
+	c.conns[closable] = struct{}{}
+	c.mu.Unlock()
+
+	return closable
 }
 
 // Dial creates a new tracked connection.
@@ -74,24 +119,7 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (net.
 	if err != nil {
 		return nil, err
 	}
-
-	closable := &closableConn{Conn: conn}
-
-	// When the connection is closed, remove it from the map. This will
-	// be no-op if the connection isn't in the map, e.g. if CloseAll()
-	// is called.
-	closable.onClose = func() {
-		d.mu.Lock()
-		delete(d.conns, closable)
-		d.mu.Unlock()
-	}
-
-	// Start tracking the connection
-	d.mu.Lock()
-	d.conns[closable] = struct{}{}
-	d.mu.Unlock()
-
-	return closable, nil
+	return d.ConnectionTracker.Track(conn), nil
 }
 
 type closableConn struct {

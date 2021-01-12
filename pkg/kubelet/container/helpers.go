@@ -191,10 +191,11 @@ type innerEventRecorder struct {
 }
 
 func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*v1.ObjectReference, bool) {
-	if object == nil {
-		return nil, false
-	}
 	if ref, ok := object.(*v1.ObjectReference); ok {
+		// this check is needed AFTER the cast. See https://github.com/kubernetes/kubernetes/issues/95552
+		if ref == nil {
+			return nil, false
+		}
 		if !strings.HasPrefix(ref.FieldPath, ImplicitContainerPrefix) {
 			return ref, true
 		}

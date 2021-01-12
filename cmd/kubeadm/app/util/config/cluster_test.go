@@ -303,7 +303,7 @@ func TestGetNodeRegistration(t *testing.T) {
 					},
 				},
 				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{kubeadmconstants.ControlPlaneTaint},
+					Taints: []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
 				},
 			},
 		},
@@ -583,7 +583,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					},
 				},
 				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{kubeadmconstants.ControlPlaneTaint},
+					Taints: []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
 				},
 			},
 		},
@@ -660,7 +660,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					},
 				},
 				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{kubeadmconstants.ControlPlaneTaint},
+					Taints: []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
 				},
 			},
 		},

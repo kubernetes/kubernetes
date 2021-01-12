@@ -140,6 +140,15 @@ func Migrate(fromCoreDNSVersion, toCoreDNSVersion, corefileStr string, deprecati
 	v := fromCoreDNSVersion
 	for {
 		v = Versions[v].nextVersion
+
+		// apply any global corefile level pre-processing
+		if Versions[v].preProcess != nil {
+			cf, err = Versions[v].preProcess(cf)
+			if err != nil {
+				return "", err
+			}
+		}
+
 		newSrvs := []*corefile.Server{}
 		for _, s := range cf.Servers {
 			newPlugs := []*corefile.Plugin{}

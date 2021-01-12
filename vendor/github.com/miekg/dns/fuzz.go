@@ -2,6 +2,8 @@
 
 package dns
 
+import "strings"
+
 func Fuzz(data []byte) int {
 	msg := new(Msg)
 
@@ -16,7 +18,14 @@ func Fuzz(data []byte) int {
 }
 
 func FuzzNewRR(data []byte) int {
-	if _, err := NewRR(string(data)); err != nil {
+	str := string(data)
+	// Do not fuzz lines that include the $INCLUDE keyword and hint the fuzzer
+	// at avoiding them.
+	// See GH#1025 for context.
+	if strings.Contains(strings.ToUpper(str), "$INCLUDE") {
+		return -1
+	}
+	if _, err := NewRR(str); err != nil {
 		return 0
 	}
 	return 1

@@ -95,6 +95,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/dynamiccertificates:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/healthz:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/authentication/v1:go_default_library",
@@ -124,6 +125,7 @@ go_library(
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/k8s.io/utils/inotify:go_default_library",
@@ -133,6 +135,7 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/windows/service:go_default_library",
+            "//vendor/golang.org/x/sys/windows:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -141,6 +144,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "init_windows_test.go",
         "server_bootstrap_test.go",
         "server_test.go",
     ],

@@ -170,6 +170,8 @@ spec:
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
+      - key: {{ .OldControlPlaneTaintKey }}
+        effect: NoSchedule
       - key: {{ .ControlPlaneTaintKey }}
         effect: NoSchedule
 `
@@ -238,6 +240,8 @@ spec:
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
+      - key: {{ .OldControlPlaneTaintKey }}
+        effect: NoSchedule
       - key: {{ .ControlPlaneTaintKey }}
         effect: NoSchedule
       nodeSelector:

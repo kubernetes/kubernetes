@@ -192,7 +192,7 @@ func NewDockerClientFromConfig(config *ClientConfig) libdocker.Interface {
 // NewDockerService creates a new `DockerService` struct.
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(config *ClientConfig, podSandboxImage string, streamingConfig *streaming.Config, pluginSettings *NetworkPluginSettings,
-	cgroupsName string, kubeCgroupDriver string, dockershimRootDir string, startLocalStreamingServer bool) (DockerService, error) {
+	cgroupsName string, kubeCgroupDriver string, dockershimRootDir string) (DockerService, error) {
 
 	client := NewDockerClientFromConfig(config)
 
@@ -211,11 +211,10 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 			client:      client,
 			execHandler: &NativeExecHandler{},
 		},
-		containerManager:          cm.NewContainerManager(cgroupsName, client),
-		checkpointManager:         checkpointManager,
-		startLocalStreamingServer: startLocalStreamingServer,
-		networkReady:              make(map[string]bool),
-		containerCleanupInfos:     make(map[string]*containerCleanupInfo),
+		containerManager:      cm.NewContainerManager(cgroupsName, client),
+		checkpointManager:     checkpointManager,
+		networkReady:          make(map[string]bool),
+		containerCleanupInfos: make(map[string]*containerCleanupInfo),
 	}
 
 	// check docker version compatibility.
@@ -307,9 +306,6 @@ type dockerService struct {
 	// version checking for some operations. Use this cache to avoid querying
 	// the docker daemon every time we need to do such checks.
 	versionCache *cache.ObjectCache
-	// startLocalStreamingServer indicates whether dockershim should start a
-	// streaming server on localhost.
-	startLocalStreamingServer bool
 
 	// containerCleanupInfos maps container IDs to the `containerCleanupInfo` structs
 	// needed to clean up after containers have been removed.
@@ -409,14 +405,12 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 func (ds *dockerService) Start() error {
 	ds.initCleanup()
 
-	// Initialize the legacy cleanup flag.
-	if ds.startLocalStreamingServer {
-		go func() {
-			if err := ds.streamingServer.Start(true); err != nil {
-				klog.Fatalf("Streaming server stopped unexpectedly: %v", err)
-			}
-		}()
-	}
+	go func() {
+		if err := ds.streamingServer.Start(true); err != nil {
+			klog.Fatalf("Streaming server stopped unexpectedly: %v", err)
+		}
+	}()
+
 	return ds.containerManager.Start()
 }
 

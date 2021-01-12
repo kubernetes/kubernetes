@@ -32,8 +32,6 @@ import (
 	autoscalingv1client "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
 	"k8s.io/client-go/scale"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/generate"
-	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -55,7 +53,7 @@ var (
 		kubectl autoscale rc foo --max=5 --cpu-percent=80`))
 )
 
-// AutoscaleOptions declare the arguments accepted by the Autoscale command
+// AutoscaleOptions declares the arguments accepted by the Autoscale command
 type AutoscaleOptions struct {
 	FilenameOptions *resource.FilenameOptions
 
@@ -66,7 +64,6 @@ type AutoscaleOptions struct {
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
 	Name       string
-	Generator  string
 	Min        int32
 	Max        int32
 	CPUPercent int32
@@ -78,7 +75,6 @@ type AutoscaleOptions struct {
 	dryRunStrategy   cmdutil.DryRunStrategy
 	dryRunVerifier   *resource.DryRunVerifier
 	builder          *resource.Builder
-	generatorFunc    func(name, refName string, mapping *meta.RESTMapping) (generate.StructuredGenerator, error)
 	fieldManager     string
 
 	HPAClient         autoscalingv1client.HorizontalPodAutoscalersGetter
@@ -122,8 +118,8 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	// bind flag structs
 	o.RecordFlags.AddFlags(cmd)
 	o.PrintFlags.AddFlags(cmd)
-
-	cmd.Flags().StringVar(&o.Generator, "generator", generateversioned.HorizontalPodAutoscalerV1GeneratorName, i18n.T("The name of the API generator to use. Currently there is only 1 generator."))
+	cmd.Flags().String("generator", "horizontalpodautoscaler/v1", i18n.T("The name of the API generator to use. Currently there is only 1 generator."))
+	cmd.Flags().MarkDeprecated("generator", "has no effect and will be removed in the future.")
 	cmd.Flags().Int32Var(&o.Min, "min", -1, "The lower limit for the number of pods that can be set by the autoscaler. If it's not specified or negative, the server will apply a default value.")
 	cmd.Flags().Int32Var(&o.Max, "max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
 	cmd.MarkFlagRequired("max")
@@ -168,27 +164,6 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		return err
 	}
 	o.HPAClient = kubeClient.AutoscalingV1()
-
-	// get the generator
-	o.generatorFunc = func(name, refName string, mapping *meta.RESTMapping) (generate.StructuredGenerator, error) {
-		if len(name) == 0 {
-			name = refName
-		}
-		switch o.Generator {
-		case generateversioned.HorizontalPodAutoscalerV1GeneratorName:
-			return &generateversioned.HorizontalPodAutoscalerGeneratorV1{
-				Name:               name,
-				MinReplicas:        o.Min,
-				MaxReplicas:        o.Max,
-				CPUPercent:         o.CPUPercent,
-				ScaleRefName:       refName,
-				ScaleRefKind:       mapping.GroupVersionKind.Kind,
-				ScaleRefAPIVersion: mapping.GroupVersionKind.GroupVersion().String(),
-			}, nil
-		default:
-			return nil, cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", o.Generator)
-		}
-	}
 
 	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -243,20 +218,7 @@ func (o *AutoscaleOptions) Run() error {
 			return fmt.Errorf("cannot autoscale a %v: %v", mapping.GroupVersionKind.Kind, err)
 		}
 
-		generator, err := o.generatorFunc(o.Name, info.Name, mapping)
-		if err != nil {
-			return err
-		}
-
-		// Generate new object
-		object, err := generator.StructuredGenerate()
-		if err != nil {
-			return err
-		}
-		hpa, ok := object.(*autoscalingv1.HorizontalPodAutoscaler)
-		if !ok {
-			return fmt.Errorf("generator made %T, not autoscalingv1.HorizontalPodAutoscaler", object)
-		}
+		hpa := o.createHorizontalPodAutoscaler(info.Name, mapping)
 
 		if err := o.Recorder.Record(hpa); err != nil {
 			klog.V(4).Infof("error recording current command: %v", err)
@@ -305,4 +267,36 @@ func (o *AutoscaleOptions) Run() error {
 		return fmt.Errorf("no objects passed to autoscale")
 	}
 	return nil
+}
+
+func (o *AutoscaleOptions) createHorizontalPodAutoscaler(refName string, mapping *meta.RESTMapping) *autoscalingv1.HorizontalPodAutoscaler {
+	name := o.Name
+	if len(name) == 0 {
+		name = refName
+	}
+
+	scaler := autoscalingv1.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
+				APIVersion: mapping.GroupVersionKind.GroupVersion().String(),
+				Kind:       mapping.GroupVersionKind.Kind,
+				Name:       refName,
+			},
+			MaxReplicas: o.Max,
+		},
+	}
+
+	if o.Min > 0 {
+		v := int32(o.Min)
+		scaler.Spec.MinReplicas = &v
+	}
+	if o.CPUPercent >= 0 {
+		c := int32(o.CPUPercent)
+		scaler.Spec.TargetCPUUtilizationPercentage = &c
+	}
+
+	return &scaler
 }

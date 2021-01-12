@@ -1112,19 +1112,42 @@ var _ = SIGDescribe("Ingress API", func() {
 
 		// Ingress resource delete operations
 		ginkgo.By("deleting")
+
+		expectFinalizer := func(ing *networkingv1.Ingress, msg string) {
+			framework.ExpectNotEqual(ing.DeletionTimestamp, nil, fmt.Sprintf("expected deletionTimestamp, got nil on step: %q, ingress: %+v", msg, ing))
+			framework.ExpectEqual(len(ing.Finalizers) > 0, true, fmt.Sprintf("expected finalizers on ingress, got none on step: %q, ingress: %+v", msg, ing))
+		}
+
 		err = ingClient.Delete(context.TODO(), createdIngress.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
-		_, err = ingClient.Get(context.TODO(), createdIngress.Name, metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %#v", err))
+		ing, err := ingClient.Get(context.TODO(), createdIngress.Name, metav1.GetOptions{})
+		// If ingress controller does not support finalizers, we expect a 404.  Otherwise we validate finalizer behavior.
+		if err == nil {
+			expectFinalizer(ing, "deleting createdIngress")
+		} else {
+			framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %v", err))
+		}
 		ings, err = ingClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(ings.Items), 2, "filtered list should have 2 items")
+		// Should have <= 3 items since some ingresses might not have been deleted yet due to finalizers
+		framework.ExpectEqual(len(ings.Items) <= 3, true, "filtered list should have <= 3 items")
+		// Validate finalizer on the deleted ingress
+		for _, ing := range ings.Items {
+			if ing.Namespace == createdIngress.Namespace && ing.Name == createdIngress.Name {
+				expectFinalizer(&ing, "listing after deleting createdIngress")
+			}
+		}
 
 		ginkgo.By("deleting a collection")
 		err = ingClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		ings, err = ingClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(ings.Items), 0, "filtered list should have 0 items")
+		// Should have <= 3 items since some ingresses might not have been deleted yet due to finalizers
+		framework.ExpectEqual(len(ings.Items) <= 3, true, "filtered list should have <= 3 items")
+		// Validate finalizers
+		for _, ing := range ings.Items {
+			expectFinalizer(&ing, "deleting ingress collection")
+		}
 	})
 })

@@ -76,8 +76,8 @@ var (
 		# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the deployment
 		kubectl port-forward deployment/mydeployment 5000 6000
 
-		# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the service
-		kubectl port-forward service/myservice 5000 6000
+		# Listen on port 8443 locally, forwarding to the targetPort of the service's port named "https" in a pod selected by the service
+		kubectl port-forward service/myservice 8443:https
 
 		# Listen on port 8888 locally, forwarding to 5000 in the pod
 		kubectl port-forward pod/mypod 8888:5000
@@ -110,15 +110,9 @@ func NewCmdPortForward(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		Long:                  portforwardLong,
 		Example:               portforwardExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := opts.Complete(f, cmd, args); err != nil {
-				cmdutil.CheckErr(err)
-			}
-			if err := opts.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err.Error()))
-			}
-			if err := opts.RunPortForward(); err != nil {
-				cmdutil.CheckErr(err)
-			}
+			cmdutil.CheckErr(opts.Complete(f, cmd, args))
+			cmdutil.CheckErr(opts.Validate())
+			cmdutil.CheckErr(opts.RunPortForward())
 		},
 	}
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodPortForwardWaitTimeout)

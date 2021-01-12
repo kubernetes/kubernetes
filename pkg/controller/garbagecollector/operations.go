@@ -65,7 +65,13 @@ func (gc *GarbageCollector) getObject(item objectReference) (*metav1.PartialObje
 	if err != nil {
 		return nil, err
 	}
-	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Get(context.TODO(), item.Name, metav1.GetOptions{})
+	namespace := resourceDefaultNamespace(namespaced, item.Namespace)
+	if namespaced && len(namespace) == 0 {
+		// the type is namespaced, but we have no namespace coordinate.
+		// the only way this can happen is if a cluster-scoped object referenced this type as an owner.
+		return nil, namespacedOwnerOfClusterScopedObjectErr
+	}
+	return gc.metadataClient.Resource(resource).Namespace(namespace).Get(context.TODO(), item.Name, metav1.GetOptions{})
 }
 
 func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt types.PatchType) (*metav1.PartialObjectMetadata, error) {

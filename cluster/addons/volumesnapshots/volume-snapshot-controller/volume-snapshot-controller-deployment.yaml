@@ -22,6 +22,6 @@ spec:
       serviceAccount: volume-snapshot-controller
       containers:
         - name: volume-snapshot-controller
-          image: k8s.gcr.io/sig-storage/snapshot-controller:v2.1.1
+          image: k8s.gcr.io/sig-storage/snapshot-controller:v3.0.2
           args:
             - "--v=5"

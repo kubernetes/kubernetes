@@ -123,7 +123,7 @@ func (v *validatingObjectWalker) visitListItems(t *schema.List, list value.List)
 			pe.Index = &i
 		} else {
 			var err error
-			pe, err = listItemToPathElement(v.allocator, t, i, child)
+			pe, err = listItemToPathElement(v.allocator, v.schema, t, i, child)
 			if err != nil {
 				errs = append(errs, errorf("element %v: %v", i, err.Error())...)
 				// If we can't construct the path element, we can't

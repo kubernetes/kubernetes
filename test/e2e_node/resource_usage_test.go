@@ -105,7 +105,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 				podsNr: 35,
 			},
 			{
-				podsNr: 105,
+				podsNr: 90,
 			},
 		}
 

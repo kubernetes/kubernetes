@@ -108,9 +108,8 @@ func (rcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 // Validate validates a new replication controller.
 func (rcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	controller := obj.(*api.ReplicationController)
-	allErrs := validation.ValidateReplicationController(controller)
-	allErrs = append(allErrs, validation.ValidateConditionalPodTemplate(controller.Spec.Template, nil, field.NewPath("spec.template"))...)
-	return allErrs
+	opts := pod.GetValidationOptionsFromPodTemplate(controller.Spec.Template, nil)
+	return validation.ValidateReplicationController(controller, opts)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -128,9 +127,9 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	oldRc := old.(*api.ReplicationController)
 	newRc := obj.(*api.ReplicationController)
 
-	validationErrorList := validation.ValidateReplicationController(newRc)
-	updateErrorList := validation.ValidateReplicationControllerUpdate(newRc, oldRc)
-	updateErrorList = append(updateErrorList, validation.ValidateConditionalPodTemplate(newRc.Spec.Template, oldRc.Spec.Template, field.NewPath("spec.template"))...)
+	opts := pod.GetValidationOptionsFromPodTemplate(newRc.Spec.Template, oldRc.Spec.Template)
+	validationErrorList := validation.ValidateReplicationController(newRc, opts)
+	updateErrorList := validation.ValidateReplicationControllerUpdate(newRc, oldRc, opts)
 	errs := append(validationErrorList, updateErrorList...)
 
 	for key, value := range helper.NonConvertibleFields(oldRc.Annotations) {
@@ -170,7 +169,7 @@ func ControllerToSelectableFields(controller *api.ReplicationController) fields.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	rc, ok := obj.(*api.ReplicationController)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a replication controller.")
+		return nil, nil, fmt.Errorf("given object is not a replication controller")
 	}
 	return labels.Set(rc.ObjectMeta.Labels), ControllerToSelectableFields(rc), nil
 }
@@ -190,6 +189,7 @@ type rcStatusStrategy struct {
 	rcStrategy
 }
 
+// StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = rcStatusStrategy{Strategy}
 
 func (rcStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

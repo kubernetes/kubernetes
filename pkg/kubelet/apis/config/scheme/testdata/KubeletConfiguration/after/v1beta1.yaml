@@ -67,8 +67,11 @@ registryPullQPS: 5
 resolvConf: /etc/resolv.conf
 runtimeRequestTimeout: 2m0s
 serializeImagePulls: true
+shutdownGracePeriod: 0s
+shutdownGracePeriodCriticalPods: 0s
 streamingConnectionIdleTimeout: 4h0m0s
 syncFrequency: 1m0s
 topologyManagerPolicy: none
+topologyManagerScope: container
 volumePluginDir: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/
 volumeStatsAggPeriod: 1m0s

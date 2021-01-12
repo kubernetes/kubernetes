@@ -25,15 +25,17 @@ import (
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
-	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // daemonSetStrategy implements verification logic for daemon sets.
@@ -76,6 +78,7 @@ func (daemonSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 		daemonSet.Spec.TemplateGeneration = 1
 	}
 
+	dropDaemonSetDisabledFields(daemonSet, nil)
 	pod.DropDisabledTemplateFields(&daemonSet.Spec.Template, nil)
 }
 
@@ -84,6 +87,7 @@ func (daemonSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	newDaemonSet := obj.(*apps.DaemonSet)
 	oldDaemonSet := old.(*apps.DaemonSet)
 
+	dropDaemonSetDisabledFields(newDaemonSet, oldDaemonSet)
 	pod.DropDisabledTemplateFields(&newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template)
 
 	// update is not allowed to set status
@@ -113,12 +117,40 @@ func (daemonSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	}
 }
 
+// dropDaemonSetDisabledFields drops fields that are not used if their associated feature gates
+// are not enabled.  The typical pattern is:
+//     if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
+//         newSvc.Spec.MyFeature = nil
+//     }
+func dropDaemonSetDisabledFields(newDS *apps.DaemonSet, oldDS *apps.DaemonSet) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DaemonSetUpdateSurge) {
+		if r := newDS.Spec.UpdateStrategy.RollingUpdate; r != nil {
+			if daemonSetSurgeFieldsInUse(oldDS) {
+				// we need to ensure that MaxUnavailable is non-zero to preserve previous behavior
+				if r.MaxUnavailable.IntVal == 0 && r.MaxUnavailable.StrVal == "0%" {
+					r.MaxUnavailable = intstr.FromInt(1)
+				}
+			} else {
+				// clear the MaxSurge field and let validation deal with MaxUnavailable
+				r.MaxSurge = intstr.IntOrString{}
+			}
+		}
+	}
+}
+
+// daemonSetSurgeFieldsInUse returns true if fields related to daemonset update surge are set
+func daemonSetSurgeFieldsInUse(ds *apps.DaemonSet) bool {
+	if ds == nil {
+		return false
+	}
+	return ds.Spec.UpdateStrategy.RollingUpdate != nil && (ds.Spec.UpdateStrategy.RollingUpdate.MaxSurge.IntVal != 0 || ds.Spec.UpdateStrategy.RollingUpdate.MaxSurge.StrVal != "")
+}
+
 // Validate validates a new daemon set.
 func (daemonSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	daemonSet := obj.(*apps.DaemonSet)
-	allErrs := validation.ValidateDaemonSet(daemonSet)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&daemonSet.Spec.Template, nil, field.NewPath("spec.template"))...)
-	return allErrs
+	opts := pod.GetValidationOptionsFromPodTemplate(&daemonSet.Spec.Template, nil)
+	return validation.ValidateDaemonSet(daemonSet, opts)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -135,9 +167,10 @@ func (daemonSetStrategy) AllowCreateOnUpdate() bool {
 func (daemonSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newDaemonSet := obj.(*apps.DaemonSet)
 	oldDaemonSet := old.(*apps.DaemonSet)
-	allErrs := validation.ValidateDaemonSet(obj.(*apps.DaemonSet))
-	allErrs = append(allErrs, validation.ValidateDaemonSetUpdate(newDaemonSet, oldDaemonSet)...)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template, field.NewPath("spec.template"))...)
+
+	opts := pod.GetValidationOptionsFromPodTemplate(&newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template)
+	allErrs := validation.ValidateDaemonSet(obj.(*apps.DaemonSet), opts)
+	allErrs = append(allErrs, validation.ValidateDaemonSetUpdate(newDaemonSet, oldDaemonSet, opts)...)
 
 	// Update is not allowed to set Spec.Selector for apps/v1 and apps/v1beta2 (allowed for extensions/v1beta1).
 	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)

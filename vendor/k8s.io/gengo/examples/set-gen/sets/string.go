@@ -28,7 +28,7 @@ type String map[string]Empty
 
 // NewString creates a String from a list of values.
 func NewString(items ...string) String {
-	ss := String{}
+	ss := make(String, len(items))
 	ss.Insert(items...)
 	return ss
 }

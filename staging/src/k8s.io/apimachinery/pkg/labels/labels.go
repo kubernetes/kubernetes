@@ -79,7 +79,7 @@ func (ls Set) AsSelectorPreValidated() Selector {
 	return SelectorFromValidatedSet(ls)
 }
 
-// FormatLabels convert label map into plain string
+// FormatLabels converts label map into plain string
 func FormatLabels(labelMap map[string]string) string {
 	l := Set(labelMap).String()
 	if l == "" {
@@ -131,25 +131,6 @@ func Equals(labels1, labels2 Set) bool {
 
 	for k, v := range labels1 {
 		value, ok := labels2[k]
-		if !ok {
-			return false
-		}
-		if value != v {
-			return false
-		}
-	}
-	return true
-}
-
-// AreLabelsInWhiteList verifies if the provided label list
-// is in the provided whitelist and returns true, otherwise false.
-func AreLabelsInWhiteList(labels, whitelist Set) bool {
-	if len(whitelist) == 0 {
-		return true
-	}
-
-	for k, v := range labels {
-		value, ok := whitelist[k]
 		if !ok {
 			return false
 		}

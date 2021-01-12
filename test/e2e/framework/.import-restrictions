@@ -182,14 +182,16 @@ rules:
       - k8s.io/kubernetes/pkg/registry/core/service/allocator
       - k8s.io/kubernetes/pkg/registry/core/service/portallocator
       - k8s.io/kubernetes/pkg/scheduler/api
+      - k8s.io/kubernetes/pkg/scheduler/framework
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources
-      - k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1
       - k8s.io/kubernetes/pkg/scheduler/framework/runtime
+      - k8s.io/kubernetes/pkg/scheduler/internal/heap
       - k8s.io/kubernetes/pkg/scheduler/internal/parallelize
+      - k8s.io/kubernetes/pkg/scheduler/internal/queue
       - k8s.io/kubernetes/pkg/scheduler/listers
       - k8s.io/kubernetes/pkg/scheduler/metrics
       - k8s.io/kubernetes/pkg/scheduler/nodeinfo
@@ -243,6 +245,7 @@ rules:
       - k8s.io/kubernetes/pkg/apis/authentication
       - k8s.io/kubernetes/pkg/apis/authentication/v1
       - k8s.io/kubernetes/pkg/apis/certificates/v1beta1
+      - k8s.io/kubernetes/pkg/apis/storage/v1
       - k8s.io/kubernetes/pkg/scheduler/internal/cache
   - selectorRegexp: k8s[.]io/kubernetes/test/
     allowedPrefixes:

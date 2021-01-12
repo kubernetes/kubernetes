@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -44,6 +44,12 @@ var (
 	}
 	allowSpecificLocalhost = map[string]string{
 		AllowedProfilesAnnotationKey: v1.SeccompLocalhostProfileNamePrefix + "foo",
+	}
+	allowSpecificDockerDefault = map[string]string{
+		AllowedProfilesAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
+	}
+	allowSpecificRuntimeDefault = map[string]string{
+		AllowedProfilesAnnotationKey: v1.SeccompProfileRuntimeDefault,
 	}
 )
 
@@ -253,6 +259,20 @@ func TestValidatePod(t *testing.T) {
 			seccompProfile: &api.SeccompProfile{
 				Type:             api.SeccompProfileTypeLocalhost,
 				LocalhostProfile: &foo,
+			},
+			expectedError: "",
+		},
+		"docker/default PSP annotation automatically allows runtime/default pods": {
+			pspAnnotations: allowSpecificDockerDefault,
+			podAnnotations: map[string]string{
+				api.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
+			},
+			expectedError: "",
+		},
+		"runtime/default PSP annotation automatically allows docker/default pods": {
+			pspAnnotations: allowSpecificRuntimeDefault,
+			podAnnotations: map[string]string{
+				api.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
 			},
 			expectedError: "",
 		},

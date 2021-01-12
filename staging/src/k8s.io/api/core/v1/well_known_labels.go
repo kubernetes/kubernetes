@@ -19,10 +19,21 @@ package v1
 const (
 	LabelHostname = "kubernetes.io/hostname"
 
-	LabelZoneFailureDomain       = "failure-domain.beta.kubernetes.io/zone"
-	LabelZoneRegion              = "failure-domain.beta.kubernetes.io/region"
-	LabelZoneFailureDomainStable = "topology.kubernetes.io/zone"
-	LabelZoneRegionStable        = "topology.kubernetes.io/region"
+	LabelTopologyZone   = "topology.kubernetes.io/zone"
+	LabelTopologyRegion = "topology.kubernetes.io/region"
+
+	// These label have been deprecated since 1.17, but will be supported for
+	// the foreseeable future, to accommodate things like long-lived PVs that
+	// use them.  New users should prefer the "topology.kubernetes.io/*"
+	// equivalents.
+	LabelFailureDomainBetaZone   = "failure-domain.beta.kubernetes.io/zone"   // deprecated
+	LabelFailureDomainBetaRegion = "failure-domain.beta.kubernetes.io/region" // deprecated
+
+	// Retained for compat when vendored.  Do not use these consts in new code.
+	LabelZoneFailureDomain       = LabelFailureDomainBetaZone   // deprecated
+	LabelZoneRegion              = LabelFailureDomainBetaRegion // deprecated
+	LabelZoneFailureDomainStable = LabelTopologyZone            // deprecated
+	LabelZoneRegionStable        = LabelTopologyRegion          // deprecated
 
 	LabelInstanceType       = "beta.kubernetes.io/instance-type"
 	LabelInstanceTypeStable = "node.kubernetes.io/instance-type"

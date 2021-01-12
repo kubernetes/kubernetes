@@ -89,6 +89,15 @@ func (err *Error) IsThrottled() bool {
 	return err.HTTPStatusCode == http.StatusTooManyRequests || err.RetryAfter.After(now())
 }
 
+// IsNotFound returns true the if the requested object wasn't found
+func (err *Error) IsNotFound() bool {
+	if err == nil {
+		return false
+	}
+
+	return err.HTTPStatusCode == http.StatusNotFound
+}
+
 // NewError creates a new Error.
 func NewError(retriable bool, err error) *Error {
 	return &Error{
@@ -170,7 +179,7 @@ func getRawError(resp *http.Response, err error) error {
 		return fmt.Errorf("empty HTTP response")
 	}
 
-	// return the http status if unabled to get response body.
+	// return the http status if it is unable to get response body.
 	defer resp.Body.Close()
 	respBody, _ := ioutil.ReadAll(resp.Body)
 	resp.Body = ioutil.NopCloser(bytes.NewReader(respBody))

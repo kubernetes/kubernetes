@@ -6,6 +6,7 @@ go_library(
         "admin.go",
         "backup.go",
         "block_volume.go",
+        "brick.go",
         "client.go",
         "cluster.go",
         "db.go",

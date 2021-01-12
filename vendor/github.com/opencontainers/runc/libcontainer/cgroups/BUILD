@@ -12,16 +12,17 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/cgroups",
     importpath = "github.com/opencontainers/runc/libcontainer/cgroups",
     visibility = ["//visibility:public"],
-    deps = select({
+    deps = [
+        "//vendor/github.com/cyphar/filepath-securejoin:go_default_library",
+        "//vendor/golang.org/x/sys/unix:go_default_library",
+    ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/github.com/docker/go-units:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
-            "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/docker/go-units:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
-            "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],
     }),

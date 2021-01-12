@@ -23,7 +23,7 @@ import (
 	"testing"
 )
 
-func TestUrlsMatch(t *testing.T) {
+func TestURLsMatch(t *testing.T) {
 	tests := []struct {
 		globURL       string
 		targetURL     string
@@ -112,7 +112,7 @@ func TestUrlsMatch(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		matched, _ := urlsMatchStr(test.globURL, test.targetURL)
+		matched, _ := URLsMatchStr(test.globURL, test.targetURL)
 		if matched != test.matchExpected {
 			t.Errorf("Expected match result of %s and %s to be %t, but was %t",
 				test.globURL, test.targetURL, test.matchExpected, matched)

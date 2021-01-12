@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	explainLong = templates.LongDesc(`
+	explainLong = templates.LongDesc(i18n.T(`
 		List the fields for supported resources
 
 		This command describes the fields associated with each supported API resource.
@@ -41,7 +41,7 @@ var (
 			<type>.<fieldName>[.<fieldName>]
 
 		Add the --recursive flag to display all of the fields at once without descriptions.
-		Information about each field is retrieved from the server in OpenAPI format.`)
+		Information about each field is retrieved from the server in OpenAPI format.`))
 
 	explainExamples = templates.Examples(i18n.T(`
 		# Get the documentation of the resource and its fields
@@ -86,7 +86,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 		},
 	}
 	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "Print the fields of fields (Currently only 1 level deep)")
-	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Get different explanations for particular API version")
+	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Get different explanations for particular API version (API group/version)")
 	return cmd
 }
 
