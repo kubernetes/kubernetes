@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -2541,6 +2542,139 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 			}
 			if tc.criPodIPs == nil && status.HostIP != status.PodIPs[0].IP {
 				t.Fatalf("Expected HostIP %q to equal PodIPs[0].IP %q", status.HostIP, status.PodIPs[0].IP)
+			}
+		})
+	}
+}
+
+func TestGenerateAPIPodStatusPodIPs(t *testing.T) {
+	testcases := []struct {
+		name      string
+		nodeIP    string
+		criPodIPs []string
+		podIPs    []v1.PodIP
+	}{
+		{
+			name:      "Simple",
+			nodeIP:    "",
+			criPodIPs: []string{"10.0.0.1"},
+			podIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+			},
+		},
+		{
+			name:      "Dual-stack",
+			nodeIP:    "",
+			criPodIPs: []string{"10.0.0.1", "fd01::1234"},
+			podIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+				{IP: "fd01::1234"},
+			},
+		},
+		{
+			name:      "Dual-stack with explicit node IP",
+			nodeIP:    "192.168.1.1",
+			criPodIPs: []string{"10.0.0.1", "fd01::1234"},
+			podIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+				{IP: "fd01::1234"},
+			},
+		},
+		{
+			name:      "Dual-stack with CRI returning wrong family first",
+			nodeIP:    "",
+			criPodIPs: []string{"fd01::1234", "10.0.0.1"},
+			podIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+				{IP: "fd01::1234"},
+			},
+		},
+		{
+			name:      "Dual-stack with explicit node IP with CRI returning wrong family first",
+			nodeIP:    "192.168.1.1",
+			criPodIPs: []string{"fd01::1234", "10.0.0.1"},
+			podIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+				{IP: "fd01::1234"},
+			},
+		},
+		{
+			name:      "Dual-stack with IPv6 node IP",
+			nodeIP:    "fd00::5678",
+			criPodIPs: []string{"10.0.0.1", "fd01::1234"},
+			podIPs: []v1.PodIP{
+				{IP: "fd01::1234"},
+				{IP: "10.0.0.1"},
+			},
+		},
+		{
+			name:      "Dual-stack with IPv6 node IP, other CRI order",
+			nodeIP:    "fd00::5678",
+			criPodIPs: []string{"fd01::1234", "10.0.0.1"},
+			podIPs: []v1.PodIP{
+				{IP: "fd01::1234"},
+				{IP: "10.0.0.1"},
+			},
+		},
+		{
+			name:      "No Pod IP matching Node IP",
+			nodeIP:    "fd00::5678",
+			criPodIPs: []string{"10.0.0.1"},
+			podIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+			},
+		},
+		{
+			name:      "No Pod IP matching (unspecified) Node IP",
+			nodeIP:    "",
+			criPodIPs: []string{"fd01::1234"},
+			podIPs: []v1.PodIP{
+				{IP: "fd01::1234"},
+			},
+		},
+		{
+			name:      "Multiple IPv4 IPs",
+			nodeIP:    "",
+			criPodIPs: []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"},
+			podIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+			},
+		},
+		{
+			name:      "Multiple Dual-Stack IPs",
+			nodeIP:    "",
+			criPodIPs: []string{"10.0.0.1", "10.0.0.2", "fd01::1234", "10.0.0.3", "fd01::5678"},
+			podIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+				{IP: "fd01::1234"},
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			if tc.nodeIP != "" {
+				kl.nodeIPs = []net.IP{net.ParseIP(tc.nodeIP)}
+			}
+
+			pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+
+			criStatus := &kubecontainer.PodStatus{
+				ID:        pod.UID,
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+				IPs:       tc.criPodIPs,
+			}
+
+			status := kl.generateAPIPodStatus(pod, criStatus)
+			if !reflect.DeepEqual(status.PodIPs, tc.podIPs) {
+				t.Fatalf("Expected PodIPs %#v, got %#v", tc.podIPs, status.PodIPs)
+			}
+			if status.PodIP != status.PodIPs[0].IP {
+				t.Fatalf("Expected PodIP %q to equal PodIPs[0].IP %q", status.PodIP, status.PodIPs[0].IP)
 			}
 		})
 	}
