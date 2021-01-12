@@ -342,7 +342,7 @@ We expect this implementation to progress from alpha to beta and GA in coming re
 
 ### go1.15.5
 
-go1.15.5 has been integrated to Kubernets project as of this release, [including other infrastructure related updates on this effort](https://github.com/kubernetes/kubernetes/pull/95776).
+go1.15.5 has been integrated to Kubernetes project as of this release, [including other infrastructure related updates on this effort](https://github.com/kubernetes/kubernetes/pull/95776).
 
 ### CSI Volume Snapshot graduates to General Availability
 
@@ -2124,7 +2124,7 @@ filename | sha512 hash
   
   - bazel: output go_binary rule directly from go_binary_conditional_pure
     
-    From: @mikedanese:
+    From: [@mikedanese](https://github.com/mikedanese):
     Instead of aliasing. Aliases are annoying in a number of ways. This is
     specifically bugging me now because they make the action graph harder to
     analyze programmatically. By using aliases here, we would need to handle
