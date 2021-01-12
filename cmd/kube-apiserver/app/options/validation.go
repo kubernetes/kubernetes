@@ -139,7 +139,7 @@ func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
 		testConfigs := []string{"flowcontrol.apiserver.k8s.io/v1beta1", "api/beta", "api/all"} // in the order of precedence
 		for _, testConfig := range testConfigs {
 			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=false", testConfig)) {
-				return []error{fmt.Errorf("%s=false conflicts with APIPriorityAndFairness feature gate", testConfig)}
+				return []error{fmt.Errorf("--runtime-config=%s=false conflicts with --enable-priority-and-fairness=true and --feature-gates=APIPriorityAndFairness=true", testConfig)}
 			}
 			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=true", testConfig)) {
 				return nil
