@@ -104,8 +104,11 @@ func (s *DelegatingAuthorizationOptions) WithCustomRetryBackoff(backoff wait.Bac
 }
 
 func (s *DelegatingAuthorizationOptions) Validate() []error {
-	allErrors := []error{}
+	if s == nil {
+		return nil
+	}
 
+	allErrors := []error{}
 	if s.WebhookRetryBackoff != nil && s.WebhookRetryBackoff.Steps <= 0 {
 		allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 1, but is: %d", s.WebhookRetryBackoff.Steps))
 	}
