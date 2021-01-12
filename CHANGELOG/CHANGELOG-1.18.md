@@ -719,7 +719,9 @@ filename | sha512 hash
 ### Bug or Regression
 
 - "unbound immediate PersistentVolumeClaims" causes UnschedulableAndUnresolvable status rather than an Error in the scheduler. ([#93892](https://github.com/kubernetes/kubernetes/pull/93892), [@ahg-g](https://github.com/ahg-g)) [SIG Apps and Storage]
-- $ kubectl get event
+- Fix kubectl printer to correctly handle timestamps of events emitted using events.k8s.io API ([#94226](https://github.com/kubernetes/kubernetes/pull/94226), [@ingvagabund](https://github.com/ingvagabund)) [SIG CLI]
+  ```sh
+  $ kubectl get event
   LAST SEEN   TYPE     REASON              OBJECT                        MESSAGE
   <unknown>   Normal   Scheduled           pod/nginx-6c975b59f8-gvmjr    Successfully assigned default/nginx-6c975b59f8-gvmjr to minikube
   
@@ -729,7 +731,7 @@ filename | sha512 hash
     Type    Reason     Age        From               Message
     ----    ------     ----       ----               -------
     Normal  Scheduled  <unknown>  default-scheduler  Successfully assigned default/nginx-6c975b59f8-gvmjr to minikube
-  ...... ([#94226](https://github.com/kubernetes/kubernetes/pull/94226), [@ingvagabund](https://github.com/ingvagabund)) [SIG CLI]
+  ......
 - Azure: fix a bug that kube-controller-manager would panic if wrong Azure VMSS name is configured ([#94306](https://github.com/kubernetes/kubernetes/pull/94306), [@knight42](https://github.com/knight42)) [SIG Cloud Provider]
 - Fix a concurrent map writes error in kubelet ([#93773](https://github.com/kubernetes/kubernetes/pull/93773), [@knight42](https://github.com/knight42)) [SIG Node]
 - Fix calling AttachDisk on a previously attached EBS volume ([#93567](https://github.com/kubernetes/kubernetes/pull/93567), [@gnufied](https://github.com/gnufied)) [SIG Cloud Provider, Storage and Testing]
@@ -2267,9 +2269,7 @@ filename | sha512 hash
 - The StreamingProxyRedirects feature and `--redirect-container-streaming` flag are deprecated, and will be removed in a future release. The default behavior (proxy streaming requests through the kubelet) will be the only supported option.
   If you are setting `--redirect-container-streaming=true`, then you must migrate off this configuration. The flag will no longer be able to be enabled starting in v1.20. If you are not setting the flag, no action is necessary. ([#88290](https://github.com/kubernetes/kubernetes/pull/88290), [@tallclair](https://github.com/tallclair)) [SIG API Machinery and Node]
 
-- Yes.
-  
-  Feature Name: Support using network resources (VNet, LB, IP, etc.) in different AAD Tenant and Subscription than those for the cluster.
+- Feature Name: Support using network resources (VNet, LB, IP, etc.) in different AAD Tenant and Subscription than those for the cluster.
   
   Changes in Pull Request:
   
@@ -2278,7 +2278,6 @@ filename | sha512 hash
     3. Add function `GetNetworkResourceServicePrincipalToken` to fetch network resource service principal token, which will be used by Azure Network Resource (Load Balancer, Public IP, Route Table, Network Security Group and their sub level resources) Clients in this feature.
     4. Related unit tests.
   
-  None.
   
   User Documentation: In PR https://github.com/kubernetes-sigs/cloud-provider-azure/pull/301 ([#88384](https://github.com/kubernetes/kubernetes/pull/88384), [@bowen5](https://github.com/bowen5)) [SIG Cloud Provider]
 
@@ -2511,7 +2510,7 @@ filename | sha512 hash
 - The aggregation API will have alpha support for network proxy ([#87515](https://github.com/kubernetes/kubernetes/pull/87515), [@Sh4d1](https://github.com/Sh4d1)) [SIG API Machinery]
 - API request throttling (due to a high rate of requests) is now reported in client-go logs at log level 2.  The messages are of the form
   
-  Throttling request took 1.50705208s, request: GET:<URL>
+  Throttling request took 1.50705208s, request: GET:\<URL\>
   
   The presence of these messages, may indicate to the administrator the need to tune the cluster accordingly. ([#87740](https://github.com/kubernetes/kubernetes/pull/87740), [@jennybuckley](https://github.com/jennybuckley)) [SIG API Machinery]
 - kubeadm: reject a node joining the cluster if a node with the same name already exists ([#81056](https://github.com/kubernetes/kubernetes/pull/81056), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]
@@ -2615,16 +2614,16 @@ filename | sha512 hash
 * provider/azure: Network security groups can now be in a separate resource group. ([#87035](https://github.com/kubernetes/kubernetes/pull/87035), [@CecileRobertMichon](https://github.com/CecileRobertMichon))
 * Cleaned up the output from `kubectl describe CSINode <name>`. ([#85283](https://github.com/kubernetes/kubernetes/pull/85283), [@huffmanca](https://github.com/huffmanca))
 * Fixed the following  ([#84265](https://github.com/kubernetes/kubernetes/pull/84265), [@bhagwat070919](https://github.com/bhagwat070919))
-    * -  AWS Cloud Provider attempts to delete LoadBalancer security group it didn’t provision
-    * -  AWS Cloud Provider creates default LoadBalancer security group even if annotation [service.beta.kubernetes.io/aws-load-balancer-security-groups] is present
+    * AWS Cloud Provider attempts to delete LoadBalancer security group it didn’t provision
+    * AWS Cloud Provider creates default LoadBalancer security group even if annotation [service.beta.kubernetes.io/aws-load-balancer-security-groups] is present
 * kubelet: resource metrics endpoint `/metrics/resource/v1alpha1` as well as all metrics under this endpoint have been deprecated. ([#86282](https://github.com/kubernetes/kubernetes/pull/86282), [@RainbowMango](https://github.com/RainbowMango))
-    * Please convert to the following metrics emitted by endpoint `/metrics/resource`:
-    * - scrape_error --> scrape_error
-    * - node_cpu_usage_seconds_total --> node_cpu_usage_seconds
-    * - node_memory_working_set_bytes --> node_memory_working_set_bytes
-    * - container_cpu_usage_seconds_total --> container_cpu_usage_seconds
-    * - container_memory_working_set_bytes --> container_memory_working_set_bytes
-    * - scrape_error --> scrape_error
+  Please convert to the following metrics emitted by endpoint `/metrics/resource`:
+    * scrape_error --> scrape_error
+    * node_cpu_usage_seconds_total --> node_cpu_usage_seconds
+    * node_memory_working_set_bytes --> node_memory_working_set_bytes
+    * container_cpu_usage_seconds_total --> container_cpu_usage_seconds
+    * container_memory_working_set_bytes --> container_memory_working_set_bytes
+    * scrape_error --> scrape_error
 * You can now pass "--node-ip ::" to kubelet to indicate that it should autodetect an IPv6 address to use as the node's primary address. ([#85850](https://github.com/kubernetes/kubernetes/pull/85850), [@danwinship](https://github.com/danwinship))
 * kubeadm: support automatic retry after failing to pull image ([#86899](https://github.com/kubernetes/kubernetes/pull/86899), [@SataQiu](https://github.com/SataQiu))
 * TODO ([#87044](https://github.com/kubernetes/kubernetes/pull/87044), [@jennybuckley](https://github.com/jennybuckley))
@@ -2726,10 +2725,10 @@ filename | sha512 hash
 ### Action Required
 
 * action required ([#85363](https://github.com/kubernetes/kubernetes/pull/85363), [@immutableT](https://github.com/immutableT))
-    * 1. Currently, if users were to explicitly specify CacheSize of 0 for KMS provider, they would end-up with a provider that caches up to 1000 keys. This PR changes this behavior.
-    * Post this PR, when users supply 0 for CacheSize this will result in a validation error.
-    * 2. CacheSize type was changed from int32 to *int32. This allows defaulting logic to differentiate between cases where users explicitly supplied 0 vs. not supplied any value.
-    * 3. KMS Provider's endpoint (path to Unix socket) is now validated when the EncryptionConfiguration files is loaded. This used to be handled by the GRPCService.
+   1. Currently, if users were to explicitly specify CacheSize of 0 for KMS provider, they would end-up with a provider that caches up to 1000 keys. This PR changes this behavior.
+      Post this PR, when users supply 0 for CacheSize this will result in a validation error.
+   2. CacheSize type was changed from int32 to *int32. This allows defaulting logic to differentiate between cases where users explicitly supplied 0 vs. not supplied any value.
+   3. KMS Provider's endpoint (path to Unix socket) is now validated when the EncryptionConfiguration files is loaded. This used to be handled by the GRPCService.
 
 ### Other notable changes
 
@@ -2744,21 +2743,21 @@ filename | sha512 hash
 * kubernetes will try to acquire the iptables lock every 100 msec during 5 seconds instead of every second. This specially useful for environments using kube-proxy in iptables mode with a high churn rate of services. ([#85771](https://github.com/kubernetes/kubernetes/pull/85771), [@aojea](https://github.com/aojea))
 * Fixed a panic in the kubelet cleaning up pod volumes ([#86277](https://github.com/kubernetes/kubernetes/pull/86277), [@tedyu](https://github.com/tedyu))
 * azure cloud provider cache TTL is configurable, list of the azure cloud provider is as following: ([#86266](https://github.com/kubernetes/kubernetes/pull/86266), [@zqingqing1](https://github.com/zqingqing1))
-    * - "availabilitySetNodesCacheTTLInSeconds"
-    * - "vmssCacheTTLInSeconds"
-    * - "vmssVirtualMachinesCacheTTLInSeconds"
-    * - "vmCacheTTLInSeconds"
-    * - "loadBalancerCacheTTLInSeconds"
-    * - "nsgCacheTTLInSeconds"
-    * - "routeTableCacheTTLInSeconds"
+  * "availabilitySetNodesCacheTTLInSeconds"
+  * "vmssCacheTTLInSeconds"
+  * "vmssVirtualMachinesCacheTTLInSeconds"
+  * "vmCacheTTLInSeconds"
+  * "loadBalancerCacheTTLInSeconds"
+  * "nsgCacheTTLInSeconds"
+  * "routeTableCacheTTLInSeconds"
 * Fixes kube-proxy when EndpointSlice feature gate is enabled on Windows. ([#86016](https://github.com/kubernetes/kubernetes/pull/86016), [@robscott](https://github.com/robscott))
 * Fixes wrong validation result of NetworkPolicy PolicyTypes ([#85747](https://github.com/kubernetes/kubernetes/pull/85747), [@tnqn](https://github.com/tnqn))
 * Fixes an issue with kubelet-reported pod status on deleted/recreated pods. ([#86320](https://github.com/kubernetes/kubernetes/pull/86320), [@liggitt](https://github.com/liggitt))
 * kube-apiserver no longer serves the following deprecated APIs: ([#85903](https://github.com/kubernetes/kubernetes/pull/85903), [@liggitt](https://github.com/liggitt))
-        * All resources under `apps/v1beta1` and `apps/v1beta2` - use `apps/v1` instead
-        * `daemonsets`, `deployments`, `replicasets` resources under `extensions/v1beta1` - use `apps/v1` instead
-        * `networkpolicies` resources under `extensions/v1beta1` - use `networking.k8s.io/v1` instead
-        * `podsecuritypolicies` resources under `extensions/v1beta1` - use `policy/v1beta1` instead
+  * All resources under `apps/v1beta1` and `apps/v1beta2` - use `apps/v1` instead
+  * `daemonsets`, `deployments`, `replicasets` resources under `extensions/v1beta1` - use `apps/v1` instead
+  * `networkpolicies` resources under `extensions/v1beta1` - use `networking.k8s.io/v1` instead
+  * `podsecuritypolicies` resources under `extensions/v1beta1` - use `policy/v1beta1` instead
 * kubeadm: fix potential panic when executing "kubeadm reset" with a corrupted kubelet.conf file ([#86216](https://github.com/kubernetes/kubernetes/pull/86216), [@neolit123](https://github.com/neolit123))
 * Fix a bug in port-forward: named port not working with service ([#85511](https://github.com/kubernetes/kubernetes/pull/85511), [@oke-py](https://github.com/oke-py))
 * kube-proxy no longer modifies shared EndpointSlices. ([#86092](https://github.com/kubernetes/kubernetes/pull/86092), [@robscott](https://github.com/robscott))
@@ -2770,7 +2769,7 @@ filename | sha512 hash
 * SafeSysctlWhitelist: add net.ipv4.ping_group_range ([#85463](https://github.com/kubernetes/kubernetes/pull/85463), [@AkihiroSuda](https://github.com/AkihiroSuda))
 * kubelet: the metric process_start_time_seconds be marked as with the ALPHA stability level. ([#85446](https://github.com/kubernetes/kubernetes/pull/85446), [@RainbowMango](https://github.com/RainbowMango))
 * API request throttling (due to a high rate of requests) is now reported in the kubelet (and other component) logs by default.  The messages are of the form ([#80649](https://github.com/kubernetes/kubernetes/pull/80649), [@RobertKrawitz](https://github.com/RobertKrawitz))
-    * Throttling request took 1.50705208s, request: GET:<URL>
+    * Throttling request took 1.50705208s, request: GET:\<URL\>
     * The presence of large numbers of these messages, particularly with long delay times, may indicate to the administrator the need to tune the cluster accordingly.
 * Fix API Server potential memory leak issue in processing watch request. ([#85410](https://github.com/kubernetes/kubernetes/pull/85410), [@answer1991](https://github.com/answer1991))
 * Verify kubelet & kube-proxy can recover after being killed on Windows nodes ([#84886](https://github.com/kubernetes/kubernetes/pull/84886), [@YangLu1031](https://github.com/YangLu1031))
@@ -2778,25 +2777,26 @@ filename | sha512 hash
 * kubectl/drain: add skip-wait-for-delete-timeout option. ([#85577](https://github.com/kubernetes/kubernetes/pull/85577), [@michaelgugino](https://github.com/michaelgugino))
     * If pod DeletionTimestamp older than N seconds, skip waiting for the pod.  Seconds must be greater than 0 to skip.
 * Following metrics have been turned off: ([#83841](https://github.com/kubernetes/kubernetes/pull/83841), [@RainbowMango](https://github.com/RainbowMango))
-    * - kubelet_pod_worker_latency_microseconds
-    * - kubelet_pod_start_latency_microseconds
-    * - kubelet_cgroup_manager_latency_microseconds
-    * - kubelet_pod_worker_start_latency_microseconds
-    * - kubelet_pleg_relist_latency_microseconds
-    * - kubelet_pleg_relist_interval_microseconds
-    * - kubelet_eviction_stats_age_microseconds
-    * - kubelet_runtime_operations
-    * - kubelet_runtime_operations_latency_microseconds
-    * - kubelet_runtime_operations_errors
-    * - kubelet_device_plugin_registration_count
-    * - kubelet_device_plugin_alloc_latency_microseconds
-    * - kubelet_docker_operations
-    * - kubelet_docker_operations_latency_microseconds
-    * - kubelet_docker_operations_errors
-    * - kubelet_docker_operations_timeout
-    * - network_plugin_operations_latency_microseconds
-* - Renamed Kubelet metric certificate_manager_server_expiration_seconds to certificate_manager_server_ttl_seconds and changed to report the second until expiration at read time rather than absolute time of expiry. ([#85874](https://github.com/kubernetes/kubernetes/pull/85874), [@sambdavidson](https://github.com/sambdavidson))
-    * - Improved accuracy of Kubelet metric rest_client_exec_plugin_ttl_seconds.
+    * kubelet_pod_worker_latency_microseconds
+    * kubelet_pod_start_latency_microseconds
+    * kubelet_cgroup_manager_latency_microseconds
+    * kubelet_pod_worker_start_latency_microseconds
+    * kubelet_pleg_relist_latency_microseconds
+    * kubelet_pleg_relist_interval_microseconds
+    * kubelet_eviction_stats_age_microseconds
+    * kubelet_runtime_operations
+    * kubelet_runtime_operations_latency_microseconds
+    * kubelet_runtime_operations_errors
+    * kubelet_device_plugin_registration_count
+    * kubelet_device_plugin_alloc_latency_microseconds
+    * kubelet_docker_operations
+    * kubelet_docker_operations_latency_microseconds
+    * kubelet_docker_operations_errors
+    * kubelet_docker_operations_timeout
+    * network_plugin_operations_latency_microseconds
+* Kubelet cert TTL via GaugeFunc: ([#85874](https://github.com/kubernetes/kubernetes/pull/85874), [@sambdavidson](https://github.com/sambdavidson))
+  * Renamed Kubelet metric certificate_manager_server_expiration_seconds to certificate_manager_server_ttl_seconds and changed to report the second until expiration at read time rather than absolute time of expiry. 
+  * Improved accuracy of Kubelet metric rest_client_exec_plugin_ttl_seconds.
 * Bind metadata-agent containers to linux nodes to avoid Windows scheduling on kubernetes cluster includes linux nodes and windows nodes ([#83363](https://github.com/kubernetes/kubernetes/pull/83363), [@wawa0210](https://github.com/wawa0210))
 * Bind metrics-server containers to linux nodes to avoid Windows scheduling on kubernetes cluster includes linux nodes and windows nodes ([#83362](https://github.com/kubernetes/kubernetes/pull/83362), [@wawa0210](https://github.com/wawa0210))
 * During initialization phase (preflight), kubeadm now verifies the presence of the conntrack executable ([#85857](https://github.com/kubernetes/kubernetes/pull/85857), [@hnanni](https://github.com/hnanni))
