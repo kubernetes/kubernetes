@@ -145,6 +145,9 @@ func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interf
 }
 
 // NewFromKubeconfig will create a lock of a given type according to the input parameters.
+// Timeout set for a client used to contact to Kubernetes should be lower than
+// RenewDeadline to keep a single hung request from forcing a leader loss.
+// Setting it to max(time.Second, RenewDeadline/2) as a reasonable heuristic.
 func NewFromKubeconfig(lockType string, ns string, name string, rlc ResourceLockConfig, kubeconfig *restclient.Config, renewDeadline time.Duration) (Interface, error) {
 	// shallow copy, do not modify the kubeconfig
 	config := *kubeconfig
