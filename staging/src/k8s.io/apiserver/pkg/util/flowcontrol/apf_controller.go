@@ -234,13 +234,6 @@ func (cfgCtlr *configController) updateObservations() {
 	}
 }
 
-// used from the unit tests only.
-func (cfgCtlr *configController) getPriorityLevelState(plName string) *priorityLevelState {
-	cfgCtlr.lock.Lock()
-	defer cfgCtlr.lock.Unlock()
-	return cfgCtlr.priorityLevelStates[plName]
-}
-
 func (cfgCtlr *configController) Run(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 

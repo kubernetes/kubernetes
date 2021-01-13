@@ -54,6 +54,13 @@ var mandPLs = func() map[string]*flowcontrol.PriorityLevelConfiguration {
 	return ans
 }()
 
+// in general usage, the boolean returned may be inaccurate by the time the caller examines it.
+func (cfgCtlr *configController) hasPriorityLevelState(plName string) bool {
+	cfgCtlr.lock.Lock()
+	defer cfgCtlr.lock.Unlock()
+	return cfgCtlr.priorityLevelStates[plName] != nil
+}
+
 type ctlrTestState struct {
 	t               *testing.T
 	cfgCtlr         *configController
@@ -380,10 +387,7 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 
 	// ensure that the controller has run its first loop.
 	err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
-		if controller.getPriorityLevelState(plName) == nil {
-			return false, nil
-		}
-		return true, nil
+		return controller.hasPriorityLevelState(plName), nil
 	})
 	if err != nil {
 		t.Errorf("expected the controller to reconcile the priority level configuration object: %s, error: %s", plName, err)
