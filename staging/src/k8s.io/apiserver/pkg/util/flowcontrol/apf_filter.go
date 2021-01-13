@@ -110,7 +110,7 @@ type TestableInterface interface {
 	// method is public so that integration tests can exercise
 	// controller functionality synchronously rather than having to
 	// sleep and hope the sleep was long enough.
-	SyncOne(flowSchemaRVs map[string]string) SyncReport
+	SyncOne(flowSchemaRVs map[string]string) (specificDelay time.Duration, err error)
 }
 
 // TestableConfig carries the parameters to an implementation that is testable

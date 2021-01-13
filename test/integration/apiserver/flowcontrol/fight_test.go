@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,6 +46,29 @@ import (
 
 const timeFmt = "2006-01-02T15:04:05.999"
 
+/* fightTest configures a test of how API Priority and Fairness config
+   controllers fight when they disagree on how to set FlowSchemaStatus.
+   In particular, they set the condition that indicates integrity of
+   the reference to the PriorityLevelConfiguration.  The scenario tested is
+   `2*size` controllers, half of which set the condition normally and half of
+   which set the condition to the opposite value.
+
+   This is a behavioral test: it instantiates these controllers and runs them
+   almost normally.  But instead of running all the controllers concurrently,
+   with their informers connected to their workers through their workqueues,
+   the informers and workers are decoupled.  The test synchronously invokes
+   the workers one at a time.  Before advancing to the next iteration,
+   the test waits in real time for each informer to deliver notifications
+   of what the workers wrote.  The workers read a fake clock, so that the
+   test can exactly control how that time advances.  After every worker run,
+   the test evaluates whether that worker has been sufficiently reticent
+   about updating FlowSchemaStatus.
+
+   This test disables the usual controller in the kube-apiserver so that
+   it does not modify FlowSchemaStatus; such modifications could confuse
+   the test logic that waits for notifications of the ResourceVersions
+   created by the test workers.
+*/
 type fightTest struct {
 	t              *testing.T
 	ctx            context.Context
@@ -55,10 +78,16 @@ type fightTest struct {
 	now            time.Time
 	clk            *clock.FakeClock
 	ctlrs          map[bool][]utilfc.TestableInterface
-	lastRVs        map[string]string // FlowSchema key to ResourceVersion
-	rvMutex        sync.Mutex        // hold when accessing notifiedRVs
-	// maps invert -> i -> FS key -> last notified ResourceVersion
-	notifiedRVs  map[bool][]map[string]string
+
+	// lastRVs maps FlowSchema name to the ResourceVersion
+	// most recently created by a controller.
+	lastRVs map[string]string
+
+	rvMutex sync.Mutex // hold when accessing notifiedRVs
+
+	// notifiedRVs maps invert -> i -> FS name -> last notified ResourceVersion
+	notifiedRVs map[bool][]map[string]string
+
 	someTimedOut bool
 	iteration    int
 	// maps invert -> i -> FS name -> write times (oldest first)
@@ -211,6 +240,7 @@ func TestConfigConsumerFight(t *testing.T) {
 		ft.waitForLastRVs()
 		ft.now = nextTime
 		ft.clk.SetTime(ft.now)
+		// Log both ways, so that the separate logs can be correlated
 		t.Logf("Syncing[size=%d, iteration=%d] at %s", ft.size, ft.iteration, ft.now.Format(timeFmt))
 		klog.V(3).Infof("Syncing size=%d, iteration=%d at %s", ft.size, ft.iteration, ft.now.Format(timeFmt))
 		ft.lastRVs = make(map[string]string)
@@ -219,14 +249,14 @@ func TestConfigConsumerFight(t *testing.T) {
 		ft.foreach(func(invert bool, i int) {
 			ctlr := ft.ctlrs[invert][i]
 			ctlrRVs := make(map[string]string)
-			report := ctlr.SyncOne(ctlrRVs)
+			specificDelay, err := ctlr.SyncOne(ctlrRVs)
 			nWrites := ft.updateAndCheckHistories(invert, i, ctlrRVs)
-			if report.NeedRetry {
-				t.Errorf("Error for invert=%v, i=%d", invert, i)
+			if err != nil {
+				t.Errorf("Error for invert=%v, i=%d: %v", invert, i, err)
 			}
-			t.Logf("For invert=%v, i=%d: nWrites=%d, NeededSpecificWait=%s", invert, i, nWrites, report.NeededSpecificWait)
-			if report.NeededSpecificWait > 0 {
-				wait = durationMin(wait, report.NeededSpecificWait)
+			t.Logf("For invert=%v, i=%d: nWrites=%d, specificDelay=%s", invert, i, nWrites, specificDelay)
+			if specificDelay > 0 {
+				wait = durationMin(wait, specificDelay)
 			}
 		})
 		t.Logf("For size=%d, iteration=%d at %s, lastRVs = %v", size, ft.iteration, ft.now.Format(timeFmt), ft.lastRVs)

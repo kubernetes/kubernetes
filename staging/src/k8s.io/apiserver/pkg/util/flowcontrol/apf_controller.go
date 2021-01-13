@@ -271,7 +271,7 @@ func newTestableController(config TestableConfig) *configController {
 // the config objects and is the normal way to respond to a
 // notification about a config object.  Put this in
 // TestableConfig.FinishHandlingNotification to get normal behavior.
-func enqueueEverything(wq workqueue.RateLimitingInterface, obj interface{}) {
+func enqueueEverything(wq workqueue.RateLimitingInterface, _ interface{}) {
 	wq.Add(0)
 }
 
@@ -333,12 +333,13 @@ func (cfgCtlr *configController) processNextWorkItem() bool {
 
 	func(obj interface{}) {
 		defer cfgCtlr.configQueue.Done(obj)
-		report := cfgCtlr.SyncOne(map[string]string{})
+		specificDelay, err := cfgCtlr.SyncOne(map[string]string{})
 		switch {
-		case report.NeedRetry:
+		case err != nil:
+			klog.Error(err)
 			cfgCtlr.configQueue.AddRateLimited(obj)
-		case report.NeededSpecificWait > 0:
-			cfgCtlr.configQueue.AddAfter(obj, report.NeededSpecificWait)
+		case specificDelay > 0:
+			cfgCtlr.configQueue.AddAfter(obj, specificDelay)
 		default:
 			cfgCtlr.configQueue.Forget(obj)
 		}
@@ -347,39 +348,22 @@ func (cfgCtlr *configController) processNextWorkItem() bool {
 	return true
 }
 
-// SyncReport describes the outcome of a call to SyncOne
-type SyncReport struct {
-	// Need to wait this much time for the sake of rate limiting
-	// controller fights
-	NeededSpecificWait time.Duration
-
-	// NeedRetry indicates whether to requeue with exponential backoff
-	NeedRetry bool
-}
-
 // SyncOne does one full synchronization.  It reads all the API
 // objects that configure API Priority and Fairness and updates the
 // local configController accordingly.
 // Only invoke this in the one and only worker goroutine
-func (cfgCtlr *configController) SyncOne(flowSchemaRVs map[string]string) SyncReport {
+func (cfgCtlr *configController) SyncOne(flowSchemaRVs map[string]string) (specificDelay time.Duration, err error) {
 	klog.V(5).Infof("%s SyncOne at %s", cfgCtlr.name, cfgCtlr.clock.Now().Format(timeFmt))
 	all := labels.Everything()
 	newPLs, err := cfgCtlr.plLister.List(all)
 	if err != nil {
-		klog.Errorf("Unable to list PriorityLevelConfiguration objects: %s", err.Error())
-		return SyncReport{NeedRetry: true}
+		return 0, fmt.Errorf("Unable to list PriorityLevelConfiguration objects: %w", err)
 	}
 	newFSs, err := cfgCtlr.fsLister.List(all)
 	if err != nil {
-		klog.Errorf("Unable to list FlowSchema objects: %s", err.Error())
-		return SyncReport{NeedRetry: true}
+		return 0, fmt.Errorf("Unable to list FlowSchema objects: %w", err)
 	}
-	suggestedDelay, err := cfgCtlr.digestConfigObjects(newPLs, newFSs, flowSchemaRVs)
-	if err == nil {
-		return SyncReport{NeededSpecificWait: suggestedDelay}
-	}
-	klog.Error(err)
-	return SyncReport{NeedRetry: true}
+	return cfgCtlr.digestConfigObjects(newPLs, newFSs, flowSchemaRVs)
 }
 
 // cfgMeal is the data involved in the process of digesting the API
@@ -487,7 +471,7 @@ func (cfgCtlr *configController) shouldDelayUpdate(flowSchemaName string) bool {
 	return false
 }
 
-// addUpdateResult adds the result and keeps the only the most recent 10. It isn't a ring buffer because I'm lazy and
+// addUpdateResult adds the result. It isn't a ring buffer because
 // this is small and rate limited.
 // Only invoke this in the one and only worker goroutine
 func (cfgCtlr *configController) addUpdateResult(result updateAttempt) {
