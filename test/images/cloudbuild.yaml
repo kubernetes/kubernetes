@@ -28,6 +28,8 @@ steps:
       gcloud auth configure-docker \
       && ../../third_party/multiarch/qemu-user-static/register/register.sh --reset -p yes \
       && export DOCKER_CLI_EXPERIMENTAL=enabled \
+      && docker version \
+      && docker buildx version \
       && docker buildx create --name img-builder --use \
       && docker buildx inspect --bootstrap \
       && make all-build-and-push
