@@ -77,8 +77,17 @@ const (
 	zonesKey = "zones"
 )
 
-// replaceTopology overwrites an existing topology key by a new one.
+// replaceTopology overwrites an existing key in NodeAffinity by a new one.
+// If there are any newKey already exist in an expression of a term, we will
+// not combine the replaced key Values with the existing ones.
+// So there might be duplication if there is any newKey expression
+// already in the terms.
 func replaceTopology(pv *v1.PersistentVolume, oldKey, newKey string) error {
+	// Make sure the necessary fields exist
+	if pv == nil || pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil ||
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms == nil || len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
+		return nil
+	}
 	for i := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
 		for j, r := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions {
 			if r.Key == oldKey {
@@ -86,10 +95,14 @@ func replaceTopology(pv *v1.PersistentVolume, oldKey, newKey string) error {
 			}
 		}
 	}
+
 	return nil
 }
 
-// getTopologyValues returns all unique topology values with the given key found in the PV.
+// getTopologyValues returns all unique topology values with the given key found in
+// the PV NodeAffinity. Sort by alphabetical order.
+// This function collapses multiple zones into a list that is ORed. This assumes that
+// the plugin does not support a constraint like key in "zone1" AND "zone2"
 func getTopologyValues(pv *v1.PersistentVolume, key string) []string {
 	if pv.Spec.NodeAffinity == nil ||
 		pv.Spec.NodeAffinity.Required == nil ||
@@ -107,6 +120,7 @@ func getTopologyValues(pv *v1.PersistentVolume, key string) []string {
 			}
 		}
 	}
+	// remove duplication and sort them in order for better usage
 	var re []string
 	for k := range values {
 		re = append(re, k)
@@ -115,7 +129,7 @@ func getTopologyValues(pv *v1.PersistentVolume, key string) []string {
 	return re
 }
 
-// addTopology appends the topology to the given PV.
+// addTopology appends the topology to the given PV to all Terms.
 func addTopology(pv *v1.PersistentVolume, topologyKey string, zones []string) error {
 	// Make sure there are no duplicate or empty strings
 	filteredZones := sets.String{}
@@ -161,125 +175,67 @@ func addTopology(pv *v1.PersistentVolume, topologyKey string, zones []string) er
 	return nil
 }
 
-// removeTopology removes the topology from the given PV. Return false
-// if the topology key is not found
-func removeTopology(pv *v1.PersistentVolume, topologyKey string) bool {
-	// Make sure the necessary fields exist
-	if pv == nil || pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil ||
-		pv.Spec.NodeAffinity.Required.NodeSelectorTerms == nil || len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
-		return false
-	}
-
-	found := true
-	succeed := false
-	for found == true {
-		found = false
-		var termIndexRemoved []int
-		for termIndex, nodeSelectorTerms := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
-			nsrequirements := nodeSelectorTerms.MatchExpressions
-
-			index := -1
-			for i, nodeSelectorRequirement := range nsrequirements {
-				if nodeSelectorRequirement.Key == topologyKey {
-					index = i
-					break
-				}
-			}
-			// We found the key that need to be removed
-			if index != -1 {
-				nsrequirements[len(nsrequirements)-1], nsrequirements[index] = nsrequirements[index], nsrequirements[len(nsrequirements)-1]
-				pv.Spec.NodeAffinity.Required.NodeSelectorTerms[termIndex].MatchExpressions = nsrequirements[:len(nsrequirements)-1]
-				if len(nsrequirements)-1 == 0 {
-					// No other expression left, the whole term should be removed
-					termIndexRemoved = append(termIndexRemoved, termIndex)
-				}
-				succeed = true
-				found = true
-			}
-		}
-
-		if len(termIndexRemoved) > 0 {
-			for i, index := range termIndexRemoved {
-				index = index - i
-				nodeSelectorTerms := pv.Spec.NodeAffinity.Required.NodeSelectorTerms
-				nodeSelectorTerms[len(nodeSelectorTerms)-1], nodeSelectorTerms[index] = nodeSelectorTerms[index], nodeSelectorTerms[len(nodeSelectorTerms)-1]
-				pv.Spec.NodeAffinity.Required.NodeSelectorTerms = nodeSelectorTerms[:len(nodeSelectorTerms)-1]
-			}
-		}
-	}
-
-	return succeed
-}
-
 // translateTopologyFromInTreeToCSI converts existing zone labels or in-tree topology to CSI topology.
-// In-tree topology has precedence over zone labels.
-func translateTopologyFromInTreeToCSI(pv *v1.PersistentVolume, topologyKey string) error {
-	// If topology is already set, assume the content is accurate
-	if len(getTopologyValues(pv, topologyKey)) > 0 {
-		return nil
-	}
+// In-tree topology has precedence over zone labels. When both in-tree topology and zone labels exist
+// for a particular CSI topology, in-tree topology will be used.
+// This function will remove the Beta version Kubernetes topology label in case the node upgrade to a
+// newer version where it does not have any Beta topology label anymore
+func translateTopologyFromInTreeToCSI(pv *v1.PersistentVolume, csiTopologyKey string) error {
 
-	_, zoneLabel, _ := getTopologyLabel(pv)
+	zoneLabel, regionLabel := getTopologyLabel(pv)
 
-	// migrate topology node affinity
+	// If Zone kubernetes topology exist, replace it to use csiTopologyKey
 	zones := getTopologyValues(pv, zoneLabel)
 	if len(zones) > 0 {
-		return replaceTopology(pv, zoneLabel, topologyKey)
+		replaceTopology(pv, zoneLabel, csiTopologyKey)
+	} else {
+		// if nothing is in the NodeAffinity, try to fetch the topology from PV labels
+		if label, ok := pv.Labels[zoneLabel]; ok {
+			zones = strings.Split(label, labelMultiZoneDelimiter)
+			if len(zones) > 0 {
+				addTopology(pv, csiTopologyKey, zones)
+			}
+		}
 	}
 
-	// if nothing is in the NodeAffinity, try to fetch the topology from PV labels
-	label, ok := pv.Labels[zoneLabel]
-	if ok {
-		zones = strings.Split(label, labelMultiZoneDelimiter)
-		if len(zones) > 0 {
-			return addTopology(pv, topologyKey, zones)
+	// if the in-tree PV has beta region label, replace it with GA label to ensure
+	// the scheduler is able to schedule it on new nodes with only GA kubernetes label
+	// No need to check it for zone label because it has already been replaced if exist
+	if regionLabel == v1.LabelFailureDomainBetaRegion {
+		regions := getTopologyValues(pv, regionLabel)
+		if len(regions) > 0 {
+			replaceTopology(pv, regionLabel, v1.LabelTopologyRegion)
 		}
 	}
 
 	return nil
 }
 
-// getTopologyLabel checks if the kubernetes topology used in this PV is GA
-// and return the zone/region label used.
-// It first check the NodeAffinity to find topology. If nothing is found,
-// It checks the PV labels. If it is empty in both places, it will return
-// GA label by default
-func getTopologyLabel(pv *v1.PersistentVolume) (bool, string, string) {
+// getTopologyLabel checks if the kubernetes topology label used in this
+// PV is GA and return the zone/region label used.
+// The version checking follows the following orders
+// 1. Check NodeAffinity
+//   1.1 Check if zoneGA exists, if yes return GA labels
+//   1.2 Check if zoneBeta exists, if yes return Beta labels
+// 2. Check PV labels
+//   2.1 Check if zoneGA exists, if yes return GA labels
+//   2.2 Check if zoneBeta exists, if yes return Beta labels
+func getTopologyLabel(pv *v1.PersistentVolume) (zoneLabel string, regionLabel string) {
 
-	// Check the NodeAffinity first for the topology version
-	zoneGA := TopologyKeyExist(v1.LabelTopologyZone, pv.Spec.NodeAffinity)
-	regionGA := TopologyKeyExist(v1.LabelTopologyRegion, pv.Spec.NodeAffinity)
-	if zoneGA || regionGA {
-		// GA NodeAffinity exists
-		return true, v1.LabelTopologyZone, v1.LabelTopologyRegion
+	if zoneGA := TopologyKeyExist(v1.LabelTopologyZone, pv.Spec.NodeAffinity); zoneGA {
+		return v1.LabelTopologyZone, v1.LabelTopologyRegion
 	}
-
-	// If no GA topology in NodeAffinity, check the beta one
-	zoneBeta := TopologyKeyExist(v1.LabelFailureDomainBetaZone, pv.Spec.NodeAffinity)
-	regionBeta := TopologyKeyExist(v1.LabelFailureDomainBetaRegion, pv.Spec.NodeAffinity)
-	if zoneBeta || regionBeta {
-		// Beta NodeAffinity exists, GA NodeAffinity not exist
-		return false, v1.LabelFailureDomainBetaZone, v1.LabelFailureDomainBetaRegion
+	if zoneBeta := TopologyKeyExist(v1.LabelFailureDomainBetaZone, pv.Spec.NodeAffinity); zoneBeta {
+		return v1.LabelFailureDomainBetaZone, v1.LabelFailureDomainBetaRegion
 	}
-
-	// If nothing is in the NodeAfinity, we should check pv labels
-	_, zoneGA = pv.Labels[v1.LabelTopologyZone]
-	_, regionGA = pv.Labels[v1.LabelTopologyRegion]
-	if zoneGA || regionGA {
-		// NodeAffinity not exist, GA label exists
-		return true, v1.LabelTopologyZone, v1.LabelTopologyRegion
+	if _, zoneGA := pv.Labels[v1.LabelTopologyZone]; zoneGA {
+		return v1.LabelTopologyZone, v1.LabelTopologyRegion
 	}
-
-	// If GA label not exists, check beta version
-	_, zoneBeta = pv.Labels[v1.LabelFailureDomainBetaZone]
-	_, regionBeta = pv.Labels[v1.LabelFailureDomainBetaRegion]
-	if zoneBeta || regionBeta {
-		// Beta label exists, NodeAffinity not exist, GA label not exists
-		return false, v1.LabelFailureDomainBetaZone, v1.LabelFailureDomainBetaRegion
+	if _, zoneBeta := pv.Labels[v1.LabelFailureDomainBetaZone]; zoneBeta {
+		return v1.LabelFailureDomainBetaZone, v1.LabelFailureDomainBetaRegion
 	}
-
 	// No labels or NodeAffinity exist, default to GA version
-	return true, v1.LabelTopologyZone, v1.LabelTopologyRegion
+	return v1.LabelTopologyZone, v1.LabelTopologyRegion
 }
 
 // TopologyKeyExist checks if a certain key exists in a VolumeNodeAffinity
@@ -299,91 +255,50 @@ func TopologyKeyExist(key string, vna *v1.VolumeNodeAffinity) bool {
 	return false
 }
 
-type regionParser func(pv *v1.PersistentVolume) (string, error)
+type regionTopologyHandler func(pv *v1.PersistentVolume) error
 
-// translateTopologyFromCSIToInTree translate a CSI PV topology to
-// Kubernetes topology and add labels to it. Note that this function
-// will only work for plugin with single topologyKey. If a plugin has
-// more than one topologyKey, it will need to be processed separately
-// by the plugin.
-// regionParser is a function to generate region val based on PV
-// if the function is not set, we will not set region topology.
-// 1. Remove any existing CSI topologyKey from NodeAffinity
-// 2. Add Kubernetes Topology in the NodeAffinity if it does not exist
-//    2.1 Try to use CSI topology values to recover the Kubernetes topology first
-//    2.2 If CSI topology values does not exist, try to use PV label
-// 3. Add Kubernetes Topology labels(zone and region)
-func translateTopologyFromCSIToInTree(pv *v1.PersistentVolume, topologyKey string, regionParser regionParser) error {
+// translateTopologyFromCSIToInTree translate a CSI topology to
+// Kubernetes topology and add topology labels to it. Note that this function
+// will only work for plugin with a single topologyKey that translates to
+// Kubernetes zone(and region if regionTopologyHandler is passed in).
+// If a plugin has more than one topologyKey, it will need to be processed
+// separately by the plugin.
+// regionTopologyHandler is a function to add region topology NodeAffinity
+// and labels for the given PV. It assumes the Zone NodeAffinity already exists
+// If regionTopologyHandler is nil, no region NodeAffinity will be added
+//
+// 1. Replace all CSI topology to Kubernetes Zone topology label
+// 2. Process and generate region topology if a regionTopologyHandler is passed
+// 3. Add Kubernetes Topology labels(zone) if they do not exist
+func translateTopologyFromCSIToInTree(pv *v1.PersistentVolume, csiTopologyKey string, regionTopologyHandler regionTopologyHandler) error {
 
-	csiTopologyZoneValues := getTopologyValues(pv, topologyKey)
+	zoneLabel, _ := getTopologyLabel(pv)
 
-	// 1. Frist remove the CSI topology Key
-	removeTopology(pv, topologyKey)
+	// 1. Replace all CSI topology to Kubernetes Zone label
+	err := replaceTopology(pv, csiTopologyKey, zoneLabel)
+	if err != nil {
+		return fmt.Errorf("Failed to replace CSI topology to Kubernetes topology, error: %v", err)
+	}
 
-	_, zoneLabel, regionLabel := getTopologyLabel(pv)
-	zoneLabelVal, zoneOK := pv.Labels[zoneLabel]
-	regionLabelVal, regionOK := pv.Labels[regionLabel]
-
-	// 2. Add Kubernetes Topology in the NodeAffinity if it does not exist
-	// Check if Kubernetes Zone Topology already exist
-	topologyZoneValue := getTopologyValues(pv, zoneLabel)
-	if len(topologyZoneValue) == 0 {
-		// No Kubernetes Topology exist in the current PV, we need to add it
-		// 2.1 Let's try to use CSI topology to recover the zone topology first
-		if len(csiTopologyZoneValues) > 0 {
-			err := addTopology(pv, zoneLabel, csiTopologyZoneValues)
-			if err != nil {
-				return fmt.Errorf("Failed to add Kubernetes topology zone to PV NodeAffinity. %v", err)
-			}
-		} else if zoneOK {
-			// 2.2 If no CSI topology values exist, try to search PV labels for zone labels
-			zones := strings.Split(zoneLabelVal, labelMultiZoneDelimiter)
-			if len(zones) > 0 {
-				err := addTopology(pv, zoneLabel, zones)
-				if err != nil {
-					return fmt.Errorf("Failed to add Kubernetes topology zone to PV NodeAffinity. %v", err)
-				}
-			}
+	// 2. Take care of region topology if a regionTopologyHandler is passed
+	if regionTopologyHandler != nil {
+		// let's make less strict on this one. Even if there is an error in the region processing, just ignore it
+		err = regionTopologyHandler(pv)
+		if err != nil {
+			return fmt.Errorf("Failed to handle region topology. error: %v", err)
 		}
 	}
 
-	// Check if Kubernetes Region Topology already exist
-	topologyRegionValue := getTopologyValues(pv, regionLabel)
-	if len(topologyRegionValue) == 0 {
-		// 2.1 Let's try to use CSI topology to recover the region topology first
-		if len(csiTopologyZoneValues) > 0 && regionParser != nil {
-			regionVal, err := regionParser(pv)
-			if err != nil {
-				return fmt.Errorf("Failed to parse zones value(%v) to region label %v", csiTopologyZoneValues, err)
-			}
-			err = addTopology(pv, regionLabel, []string{regionVal})
-			if err != nil {
-				return fmt.Errorf("Failed to add Kubernetes topology region to PV NodeAffinity. %v", err)
-			}
-		} else if regionOK {
-			// 2.2 If no CSI topology values exist, try to search PV labels for region labels
-			err := addTopology(pv, regionLabel, []string{regionLabelVal})
-			if err != nil {
-				return fmt.Errorf("Failed to add Kubernetes topology region to PV NodeAffinity. %v", err)
-			}
-		}
-	}
-
-	// 3. Add Kubernetes Topology labels, if it already exists, we trust it
-	if len(csiTopologyZoneValues) > 0 {
+	// 3. Add labels about Kubernetes Topology
+	zoneVals := getTopologyValues(pv, zoneLabel)
+	if len(zoneVals) > 0 {
 		if pv.Labels == nil {
 			pv.Labels = make(map[string]string)
 		}
+		_, zoneOK := pv.Labels[zoneLabel]
 		if !zoneOK {
-			csiTopologyZoneValStr := strings.Join(csiTopologyZoneValues, labelMultiZoneDelimiter)
-			pv.Labels[zoneLabel] = csiTopologyZoneValStr
-		}
-		if !regionOK && regionParser != nil {
-			regionVal, err := regionParser(pv)
-			if err != nil {
-				return fmt.Errorf("Failed to parse zones value(%v) to region label %v", csiTopologyZoneValues, err)
-			}
-			pv.Labels[regionLabel] = regionVal
+			zoneValStr := strings.Join(zoneVals, labelMultiZoneDelimiter)
+			pv.Labels[zoneLabel] = zoneValStr
 		}
 	}
 

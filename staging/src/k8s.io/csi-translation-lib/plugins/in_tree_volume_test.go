@@ -29,7 +29,7 @@ var (
 		v1.LabelTopologyZone:   "us-east1-a",
 		v1.LabelTopologyRegion: "us-east1",
 	}
-	useast1aGANodeSelectorTerm = []v1.NodeSelectorTerm{
+	useast1aGANodeSelectorTermZoneFirst = []v1.NodeSelectorTerm{
 		{
 			MatchExpressions: []v1.NodeSelectorRequirement{
 				{
@@ -46,12 +46,29 @@ var (
 		},
 	}
 
+	useast1aGANodeSelectorTermRegionFirst = []v1.NodeSelectorTerm{
+		{
+			MatchExpressions: []v1.NodeSelectorRequirement{
+				{
+					Key:      v1.LabelTopologyRegion,
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{"us-east1"},
+				},
+				{
+					Key:      v1.LabelTopologyZone,
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{"us-east1-a"},
+				},
+			},
+		},
+	}
+
 	uswest2bBetaLabels = map[string]string{
 		v1.LabelFailureDomainBetaZone:   "us-west2-b",
 		v1.LabelFailureDomainBetaRegion: "us-west2",
 	}
 
-	uswest2bBetaNodeSelectorTerm = []v1.NodeSelectorTerm{
+	uswest2bBetaNodeSelectorTermZoneFirst = []v1.NodeSelectorTerm{
 		{
 			MatchExpressions: []v1.NodeSelectorRequirement{
 				{
@@ -67,6 +84,23 @@ var (
 			},
 		},
 	}
+
+	uswest2bBetaNodeSelectorTermRegionFirst = []v1.NodeSelectorTerm{
+		{
+			MatchExpressions: []v1.NodeSelectorRequirement{
+				{
+					Key:      v1.LabelFailureDomainBetaRegion,
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{"us-west2"},
+				},
+				{
+					Key:      v1.LabelFailureDomainBetaZone,
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{"us-west2-b"},
+				},
+			},
+		},
+	}
 )
 
 func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
@@ -74,16 +108,16 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 		name                      string
 		key                       string
 		expErr                    bool
-		regionParser              regionParser
+		regionTopologyHandler     regionTopologyHandler
 		pv                        *v1.PersistentVolume
 		expectedNodeSelectorTerms []v1.NodeSelectorTerm
 		expectedLabels            map[string]string
 	}{
 		{
-			name:         "Remove CSI Topology Key and do not change existing GA Kubernetes topology",
-			key:          GCEPDTopologyKey,
-			expErr:       false,
-			regionParser: gceRegionParser,
+			name:                  "Remove CSI Topology Key and do not change existing GA Kubernetes topology",
+			key:                   GCEPDTopologyKey,
+			expErr:                false,
+			regionTopologyHandler: gceRegionTopologyHandler,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -96,11 +130,6 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 								{
 									MatchExpressions: []v1.NodeSelectorRequirement{
 										{
-											Key:      v1.LabelTopologyZone,
-											Operator: v1.NodeSelectorOpIn,
-											Values:   []string{"us-east1-a"},
-										},
-										{
 											Key:      v1.LabelTopologyRegion,
 											Operator: v1.NodeSelectorOpIn,
 											Values:   []string{"us-east1"},
@@ -108,7 +137,7 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 										{
 											Key:      GCEPDTopologyKey,
 											Operator: v1.NodeSelectorOpIn,
-											Values:   []string{"whatever"},
+											Values:   []string{"us-east1-a"},
 										},
 									},
 								},
@@ -117,14 +146,14 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 					},
 				},
 			},
-			expectedNodeSelectorTerms: useast1aGANodeSelectorTerm,
+			expectedNodeSelectorTerms: useast1aGANodeSelectorTermRegionFirst,
 			expectedLabels:            useast1aGALabels,
 		},
 		{
-			name:         "Remove CSI Topology Key and do not change existing Beta Kubernetes topology",
-			key:          GCEPDTopologyKey,
-			expErr:       false,
-			regionParser: gceRegionParser,
+			name:                  "Remove CSI Topology Key and do not change existing Beta Kubernetes topology",
+			key:                   GCEPDTopologyKey,
+			expErr:                false,
+			regionTopologyHandler: gceRegionTopologyHandler,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -137,11 +166,6 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 								{
 									MatchExpressions: []v1.NodeSelectorRequirement{
 										{
-											Key:      v1.LabelFailureDomainBetaZone,
-											Operator: v1.NodeSelectorOpIn,
-											Values:   []string{"us-west2-b"},
-										},
-										{
 											Key:      v1.LabelFailureDomainBetaRegion,
 											Operator: v1.NodeSelectorOpIn,
 											Values:   []string{"us-west2"},
@@ -149,7 +173,7 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 										{
 											Key:      GCEPDTopologyKey,
 											Operator: v1.NodeSelectorOpIn,
-											Values:   []string{"whatever"},
+											Values:   []string{"us-west2-b"},
 										},
 									},
 								},
@@ -158,14 +182,14 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 					},
 				},
 			},
-			expectedNodeSelectorTerms: uswest2bBetaNodeSelectorTerm,
+			expectedNodeSelectorTerms: uswest2bBetaNodeSelectorTermRegionFirst,
 			expectedLabels:            uswest2bBetaLabels,
 		},
 		{
-			name:         "Remove CSI Topology Key and add Kubernetes topology from NodeAffinity, ignore labels",
-			key:          GCEPDTopologyKey,
-			expErr:       false,
-			regionParser: gceRegionParser,
+			name:                  "Remove CSI Topology Key and add Kubernetes topology from NodeAffinity, ignore labels",
+			key:                   GCEPDTopologyKey,
+			expErr:                false,
+			regionTopologyHandler: gceRegionTopologyHandler,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -192,17 +216,17 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 					},
 				},
 			},
-			expectedNodeSelectorTerms: useast1aGANodeSelectorTerm,
+			expectedNodeSelectorTerms: useast1aGANodeSelectorTermZoneFirst,
 			expectedLabels: map[string]string{
 				v1.LabelTopologyRegion: "existingRegion",
 				v1.LabelTopologyZone:   "existingZone",
 			},
 		},
 		{
-			name:         "Add GA Kubernetes topology from labels",
-			key:          GCEPDTopologyKey,
-			expErr:       false,
-			regionParser: gceRegionParser,
+			name:                  "No CSI topology label exists and no change to the NodeAffinity",
+			key:                   GCEPDTopologyKey,
+			expErr:                false,
+			regionTopologyHandler: gceRegionTopologyHandler,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -211,33 +235,25 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 						v1.LabelTopologyRegion: "existingRegion",
 					},
 				},
-			},
-			expectedNodeSelectorTerms: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelTopologyZone,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"existingZone"},
-						},
-						{
-							Key:      v1.LabelTopologyRegion,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"existingRegion"},
+				Spec: v1.PersistentVolumeSpec{
+					NodeAffinity: &v1.VolumeNodeAffinity{
+						Required: &v1.NodeSelector{
+							NodeSelectorTerms: []v1.NodeSelectorTerm{},
 						},
 					},
 				},
 			},
+			expectedNodeSelectorTerms: []v1.NodeSelectorTerm{},
 			expectedLabels: map[string]string{
 				v1.LabelTopologyZone:   "existingZone",
 				v1.LabelTopologyRegion: "existingRegion",
 			},
 		},
 		{
-			name:         "Generate GA labels and kubernetes topology only from CSI topology",
-			key:          GCEPDTopologyKey,
-			expErr:       false,
-			regionParser: gceRegionParser,
+			name:                  "Generate GA labels and kubernetes topology only from CSI topology",
+			key:                   GCEPDTopologyKey,
+			expErr:                false,
+			regionTopologyHandler: gceRegionTopologyHandler,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -260,14 +276,14 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 					},
 				},
 			},
-			expectedNodeSelectorTerms: useast1aGANodeSelectorTerm,
+			expectedNodeSelectorTerms: useast1aGANodeSelectorTermZoneFirst,
 			expectedLabels:            useast1aGALabels,
 		},
 		{
-			name:         "Generate Beta labels and kubernetes topology from CSI topology with partial Beta NodeAffinity",
-			key:          GCEPDTopologyKey,
-			expErr:       false,
-			regionParser: gceRegionParser,
+			name:                  "Generate Beta labels and kubernetes topology from Beta NodeAffinity",
+			key:                   GCEPDTopologyKey,
+			expErr:                false,
+			regionTopologyHandler: gceRegionTopologyHandler,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -278,11 +294,6 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 							NodeSelectorTerms: []v1.NodeSelectorTerm{
 								{
 									MatchExpressions: []v1.NodeSelectorRequirement{
-										{
-											Key:      GCEPDTopologyKey,
-											Operator: v1.NodeSelectorOpIn,
-											Values:   []string{"us-west2-b"},
-										},
 										{
 											Key:      v1.LabelFailureDomainBetaZone,
 											Operator: v1.NodeSelectorOpIn,
@@ -295,14 +306,14 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 					},
 				},
 			},
-			expectedNodeSelectorTerms: uswest2bBetaNodeSelectorTerm,
+			expectedNodeSelectorTerms: uswest2bBetaNodeSelectorTermZoneFirst,
 			expectedLabels:            uswest2bBetaLabels,
 		},
 		{
-			name:         "regionParser is missing and only zone labels get generated",
-			key:          GCEPDTopologyKey,
-			expErr:       false,
-			regionParser: nil,
+			name:                  "regionParser is missing and only zone labels get generated",
+			key:                   GCEPDTopologyKey,
+			expErr:                false,
+			regionTopologyHandler: nil,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -341,10 +352,10 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 			},
 		},
 		{
-			name:         "Remove multi-term CSI Topology Key and add GA Kubernetes topology",
-			key:          GCEPDTopologyKey,
-			expErr:       false,
-			regionParser: gceRegionParser,
+			name:                  "Replace multi-term CSI Topology Key and add Region Kubernetes topology for both",
+			key:                   GCEPDTopologyKey,
+			expErr:                false,
+			regionTopologyHandler: gceRegionTopologyHandler,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -382,7 +393,21 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 						{
 							Key:      v1.LabelTopologyZone,
 							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"us-east1-a", "us-east1-c"},
+							Values:   []string{"us-east1-a"},
+						},
+						{
+							Key:      v1.LabelTopologyRegion,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"us-east1"},
+						},
+					},
+				},
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      v1.LabelTopologyZone,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"us-east1-c"},
 						},
 						{
 							Key:      v1.LabelTopologyRegion,
@@ -401,7 +426,7 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("Running test: %v", tc.name)
-		err := translateTopologyFromCSIToInTree(tc.pv, tc.key, tc.regionParser)
+		err := translateTopologyFromCSIToInTree(tc.pv, tc.key, tc.regionTopologyHandler)
 		if err != nil && !tc.expErr {
 			t.Errorf("Did not expect an error, got: %v", err)
 		}
@@ -414,6 +439,99 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 		}
 		if !reflect.DeepEqual(tc.pv.Labels, tc.expectedLabels) {
 			t.Errorf("Expected labels: %v, but got: %v", tc.expectedLabels, tc.pv.Labels)
+		}
+	}
+}
+
+func TestTranslateTopologyFromInTreeToCSI(t *testing.T) {
+	testCases := []struct {
+		name                      string
+		key                       string
+		expErr                    bool
+		pv                        *v1.PersistentVolume
+		expectedNodeSelectorTerms []v1.NodeSelectorTerm
+	}{
+		{
+			name:   "Replace GA Kubernetes Zone Topology to GCE CSI Topology",
+			key:    GCEPDTopologyKey,
+			expErr: false,
+			pv: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gcepd", Namespace: "myns",
+					Labels: useast1aGALabels,
+				},
+				Spec: v1.PersistentVolumeSpec{
+					NodeAffinity: &v1.VolumeNodeAffinity{
+						Required: &v1.NodeSelector{
+							NodeSelectorTerms: useast1aGANodeSelectorTermZoneFirst,
+						},
+					},
+				},
+			},
+			expectedNodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      GCEPDTopologyKey,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"us-east1-a"},
+						},
+						{
+							Key:      v1.LabelTopologyRegion,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"us-east1"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:   "Replace Beta Kubernetes Topology to GCE CSI Topology and upgrade region label",
+			key:    GCEPDTopologyKey,
+			expErr: false,
+			pv: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gcepd", Namespace: "myns",
+					Labels: useast1aGALabels,
+				},
+				Spec: v1.PersistentVolumeSpec{
+					NodeAffinity: &v1.VolumeNodeAffinity{
+						Required: &v1.NodeSelector{
+							NodeSelectorTerms: uswest2bBetaNodeSelectorTermZoneFirst,
+						},
+					},
+				},
+			},
+			expectedNodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      GCEPDTopologyKey,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"us-west2-b"},
+						},
+						{
+							Key:      v1.LabelTopologyRegion,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"us-west2"},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Logf("Running test: %v", tc.name)
+		err := translateTopologyFromInTreeToCSI(tc.pv, tc.key)
+		if err != nil && !tc.expErr {
+			t.Errorf("Did not expect an error, got: %v", err)
+		}
+		if err == nil && tc.expErr {
+			t.Errorf("Expected an error but did not get one")
+		}
+
+		if !reflect.DeepEqual(tc.pv.Spec.NodeAffinity.Required.NodeSelectorTerms, tc.expectedNodeSelectorTerms) {
+			t.Errorf("Expected topology: %v, but got: %v", tc.expectedNodeSelectorTerms, tc.pv.Spec.NodeAffinity.Required.NodeSelectorTerms)
 		}
 	}
 }
@@ -608,17 +726,19 @@ func TestAddTopology(t *testing.T) {
 	}
 }
 
-func TestRemoveTopology(t *testing.T) {
+func TestReplaceTopology(t *testing.T) {
 	testCases := []struct {
 		name             string
-		topologyKey      string
+		oldKey           string
+		newKey           string
 		pv               *v1.PersistentVolume
 		expOk            bool
 		expectedAffinity *v1.VolumeNodeAffinity
 	}{
 		{
-			name:        "Remove single csi topology from PV",
-			topologyKey: GCEPDTopologyKey,
+			name:   "Replace single csi topology from PV",
+			oldKey: GCEPDTopologyKey,
+			newKey: v1.LabelTopologyZone,
 			pv: makePVWithNodeSelectorTerms([]v1.NodeSelectorTerm{
 				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
@@ -633,13 +753,24 @@ func TestRemoveTopology(t *testing.T) {
 			expOk: true,
 			expectedAffinity: &v1.VolumeNodeAffinity{
 				Required: &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{},
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelTopologyZone,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"us-east1-a"},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		{
-			name:        "Not found the topology key so do nothing",
-			topologyKey: GCEPDTopologyKey,
+			name:   "Not found the topology key so do nothing",
+			oldKey: GCEPDTopologyKey,
+			newKey: v1.LabelTopologyZone,
 			pv: makePVWithNodeSelectorTerms([]v1.NodeSelectorTerm{
 				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
@@ -669,8 +800,9 @@ func TestRemoveTopology(t *testing.T) {
 			},
 		},
 		{
-			name:        "Remove the topology key from multiple terms",
-			topologyKey: GCEPDTopologyKey,
+			name:   "Replace the topology key from multiple terms",
+			oldKey: GCEPDTopologyKey,
+			newKey: v1.LabelTopologyZone,
 			pv: makePVWithNodeSelectorTerms([]v1.NodeSelectorTerm{
 				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
@@ -694,13 +826,33 @@ func TestRemoveTopology(t *testing.T) {
 			expOk: true,
 			expectedAffinity: &v1.VolumeNodeAffinity{
 				Required: &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{},
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelTopologyZone,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"us-east1-a"},
+								},
+							},
+						},
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelTopologyZone,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"us-east1-c"},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		{
-			name:        "Remove the topology key from single term duplicate expression",
-			topologyKey: GCEPDTopologyKey,
+			name:   "Replace the topology key from single term and not combine topology key",
+			oldKey: GCEPDTopologyKey,
+			newKey: v1.LabelTopologyZone,
 			pv: makePVWithNodeSelectorTerms([]v1.NodeSelectorTerm{
 				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
@@ -710,9 +862,9 @@ func TestRemoveTopology(t *testing.T) {
 							Values:   []string{"us-east1-a"},
 						},
 						{
-							Key:      GCEPDTopologyKey,
+							Key:      v1.LabelTopologyZone,
 							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"us-east1-a"},
+							Values:   []string{"us-east1-c"},
 						},
 					},
 				},
@@ -720,7 +872,22 @@ func TestRemoveTopology(t *testing.T) {
 			expOk: true,
 			expectedAffinity: &v1.VolumeNodeAffinity{
 				Required: &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{},
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      v1.LabelTopologyZone,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"us-east1-a"},
+								},
+								{
+									Key:      v1.LabelTopologyZone,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"us-east1-c"},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -728,9 +895,9 @@ func TestRemoveTopology(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("Running test: %v", tc.name)
-		ok := removeTopology(tc.pv, tc.topologyKey)
-		if tc.expOk != ok {
-			t.Errorf("Expected ok: %v, but got: %v", tc.expOk, ok)
+		err := replaceTopology(tc.pv, tc.oldKey, tc.newKey)
+		if err != nil && tc.expOk {
+			t.Errorf("Expected no err: %v, but got err: %v", tc.expOk, err)
 		}
 		if !reflect.DeepEqual(tc.pv.Spec.NodeAffinity, tc.expectedAffinity) {
 			t.Errorf("Expected affinity: %v, but got: %v", tc.expectedAffinity, tc.pv.Spec.NodeAffinity)
