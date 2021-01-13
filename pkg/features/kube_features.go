@@ -600,6 +600,7 @@ const (
 	// owner: @zshihang
 	// alpha: v1.13
 	// beta: v1.20
+	// ga: v1.21
 	//
 	// Allows kube-controller-manager to publish kube-root-ca.crt configmap to
 	// every namespace. This feature is a prerequisite of BoundServiceAccountTokenVolume.
@@ -751,7 +752,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WinDSR:                                         {Default: false, PreRelease: featuregate.Alpha},
 	DisableAcceleratorUsageMetrics:                 {Default: true, PreRelease: featuregate.Beta},
 	HPAContainerMetrics:                            {Default: false, PreRelease: featuregate.Alpha},
-	RootCAConfigMap:                                {Default: true, PreRelease: featuregate.Beta},
+	RootCAConfigMap:                                {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	SizeMemoryBackedVolumes:                        {Default: false, PreRelease: featuregate.Alpha},
 	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default in v1.21 and remove in v1.22
 	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
