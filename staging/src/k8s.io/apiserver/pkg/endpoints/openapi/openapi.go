@@ -150,6 +150,8 @@ func typeName(t reflect.Type) string {
 	path := t.PkgPath()
 	if strings.Contains(path, "/vendor/") {
 		path = path[strings.Index(path, "/vendor/")+len("/vendor/"):]
+	} else if strings.HasPrefix(path, "vendor/") {
+		path = strings.TrimPrefix(path, "vendor/")
 	}
 	return fmt.Sprintf("%s.%s", path, t.Name())
 }
