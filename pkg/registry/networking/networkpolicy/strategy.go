@@ -59,7 +59,7 @@ func (networkPolicyStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	newNetworkPolicy := obj.(*networking.NetworkPolicy)
 	oldNetworkPolicy := old.(*networking.NetworkPolicy)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.NetworkPolicyEndPort) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.NetworkPolicyEndPort) && !endPortInUse(oldNetworkPolicy) {
 		dropNetworkPolicyEndPort(newNetworkPolicy)
 	}
 
@@ -115,4 +115,23 @@ func dropNetworkPolicyEndPort(netPol *networking.NetworkPolicy) {
 			}
 		}
 	}
+}
+
+func endPortInUse(netPol *networking.NetworkPolicy) bool {
+	for _, ingressSpec := range netPol.Spec.Ingress {
+		for _, port := range ingressSpec.Ports {
+			if port.EndPort != nil {
+				return true
+			}
+		}
+	}
+
+	for _, egressSpec := range netPol.Spec.Egress {
+		for _, port := range egressSpec.Ports {
+			if port.EndPort != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
