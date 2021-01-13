@@ -80,6 +80,9 @@ func ToRESTFriendlyName(name string) string {
 // Example for vendored Go type:
 //     Original full path:  k8s.io/kubernetes/vendor/k8s.io/api/core/v1.Pod
 //     Canonical name:      k8s.io/api/core/v1.Pod
+//
+//     Original full path:  vendor/k8s.io/api/core/v1.Pod
+//     Canonical name:      k8s.io/api/core/v1.Pod
 type OpenAPICanonicalTypeNamer interface {
 	OpenAPICanonicalTypeName() string
 }
@@ -100,6 +103,8 @@ func GetCanonicalTypeName(model interface{}) string {
 	path := t.PkgPath()
 	if strings.Contains(path, "/vendor/") {
 		path = path[strings.Index(path, "/vendor/")+len("/vendor/"):]
+	} else if strings.HasPrefix(path, "vendor/") {
+		path = strings.TrimPrefix(path, "vendor/")
 	}
 	return path + "." + t.Name()
 }
