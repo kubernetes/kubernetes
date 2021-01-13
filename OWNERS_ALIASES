@@ -149,7 +149,9 @@ aliases:
     - saschagrunert # Release Manager / SIG Chair
     - xmudrii # Release Manager
   changelog-approvers:
+    - wilsonehusin # 1.21 Release Notes Lead
   changelog-reviewers:
+    - wilsonehusin # 1.21 Release Notes Lead
 
   sig-storage-approvers:
     - saad-ali
