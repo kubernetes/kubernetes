@@ -2782,6 +2782,239 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 	}
 }
 
+// TestApplyNoExecuteTaintsToNodesEnqueueTwice ensures we taint every node with NoExecute even if enqueued twice
+func TestApplyNoExecuteTaintsToNodesEnqueueTwice(t *testing.T) {
+	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
+	evictionTimeout := 10 * time.Minute
+
+	fakeNodeHandler := &testutil.FakeNodeHandler{
+		Existing: []*v1.Node{
+			// Unreachable Taint with effect 'NoExecute' should be applied to this node.
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						v1.LabelZoneRegionStable:        "region1",
+						v1.LabelZoneFailureDomainStable: "zone1",
+						v1.LabelZoneRegion:              "region1",
+						v1.LabelZoneFailureDomain:       "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			// Because of the logic that prevents NC from evicting anything when all Nodes are NotReady
+			// we need second healthy node in tests.
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node1",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						v1.LabelZoneRegionStable:        "region1",
+						v1.LabelZoneFailureDomainStable: "zone1",
+						v1.LabelZoneRegion:              "region1",
+						v1.LabelZoneFailureDomain:       "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			// NotReady Taint with NoExecute effect should be applied to this node.
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node2",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						v1.LabelZoneRegionStable:        "region1",
+						v1.LabelZoneFailureDomainStable: "zone1",
+						v1.LabelZoneRegion:              "region1",
+						v1.LabelZoneFailureDomain:       "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+		},
+		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+	}
+	healthyNodeNewStatus := v1.NodeStatus{
+		Conditions: []v1.NodeCondition{
+			{
+				Type:               v1.NodeReady,
+				Status:             v1.ConditionTrue,
+				LastHeartbeatTime:  metav1.Date(2017, 1, 1, 12, 10, 0, 0, time.UTC),
+				LastTransitionTime: metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+	nodeController, _ := newNodeLifecycleControllerFromClient(
+		fakeNodeHandler,
+		evictionTimeout,
+		testRateLimiterQPS,
+		testRateLimiterQPS,
+		testLargeClusterThreshold,
+		testUnhealthyThreshold,
+		testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod,
+		testNodeMonitorPeriod,
+		true)
+	nodeController.now = func() metav1.Time { return fakeNow }
+	nodeController.recorder = testutil.NewFakeRecorder()
+	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// 1. monitor node health twice, add untainted node once
+	if err := nodeController.monitorNodeHealth(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := nodeController.monitorNodeHealth(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// 2. mark node0 healthy
+	node0, err := fakeNodeHandler.Get(context.TODO(), "node0", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Can't get current node0...")
+		return
+	}
+	node0.Status = healthyNodeNewStatus
+	_, err = fakeNodeHandler.UpdateStatus(context.TODO(), node0, metav1.UpdateOptions{})
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	// add other notReady nodes
+	fakeNodeHandler.Existing = append(fakeNodeHandler.Existing, []*v1.Node{
+		// Unreachable Taint with effect 'NoExecute' should be applied to this node.
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "node3",
+				CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				Labels: map[string]string{
+					v1.LabelZoneRegionStable:        "region1",
+					v1.LabelZoneFailureDomainStable: "zone1",
+					v1.LabelZoneRegion:              "region1",
+					v1.LabelZoneFailureDomain:       "zone1",
+				},
+			},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:               v1.NodeReady,
+						Status:             v1.ConditionUnknown,
+						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+		},
+		// Because of the logic that prevents NC from evicting anything when all Nodes are NotReady
+		// we need second healthy node in tests.
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "node4",
+				CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				Labels: map[string]string{
+					v1.LabelZoneRegionStable:        "region1",
+					v1.LabelZoneFailureDomainStable: "zone1",
+					v1.LabelZoneRegion:              "region1",
+					v1.LabelZoneFailureDomain:       "zone1",
+				},
+			},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:               v1.NodeReady,
+						Status:             v1.ConditionTrue,
+						LastHeartbeatTime:  metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+		},
+		// NotReady Taint with NoExecute effect should be applied to this node.
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "node5",
+				CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				Labels: map[string]string{
+					v1.LabelZoneRegionStable:        "region1",
+					v1.LabelZoneFailureDomainStable: "zone1",
+					v1.LabelZoneRegion:              "region1",
+					v1.LabelZoneFailureDomain:       "zone1",
+				},
+			},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:               v1.NodeReady,
+						Status:             v1.ConditionFalse,
+						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+		},
+	}...)
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// 3. start monitor node health again, add untainted node twice, construct UniqueQueue with duplicated node cache
+	if err := nodeController.monitorNodeHealth(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// 4. do NoExecute taint pass
+	// when processing with node0, condition.Status is NodeReady, and return true with default case
+	// then remove the set value and queue value both, the taint job never stuck
+	nodeController.doNoExecuteTaintingPass()
+
+	// 5. get node3 and node5, see if it has ready got NoExecute taint
+	node3, err := fakeNodeHandler.Get(context.TODO(), "node3", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Can't get current node3...")
+		return
+	}
+	if !taintutils.TaintExists(node3.Spec.Taints, UnreachableTaintTemplate) || len(node3.Spec.Taints) == 0 {
+		t.Errorf("Not found taint %v in %v, which should be present in %s", UnreachableTaintTemplate, node3.Spec.Taints, node3.Name)
+	}
+	node5, err := fakeNodeHandler.Get(context.TODO(), "node5", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Can't get current node5...")
+		return
+	}
+	if !taintutils.TaintExists(node5.Spec.Taints, NotReadyTaintTemplate) || len(node5.Spec.Taints) == 0 {
+		t.Errorf("Not found taint %v in %v, which should be present in %s", NotReadyTaintTemplate, node5.Spec.Taints, node5.Name)
+	}
+}
+
 func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
 	evictionTimeout := 10 * time.Minute
