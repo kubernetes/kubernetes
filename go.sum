@@ -402,8 +402,8 @@ github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.0.1 h1:JMemWkRwHx4Zj+fVxWoMCFm/8sYGGrUVojFA6h/TRcI=
 github.com/opencontainers/image-spec v1.0.1/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
-github.com/opencontainers/runc v1.0.0-rc92 h1:+IczUKCRzDzFDnw99O/PAqrcBBCoRp9xN3cB1SYSNS4=
-github.com/opencontainers/runc v1.0.0-rc92/go.mod h1:X1zlU4p7wOlX4+WRCz+hvlRv8phdL7UqbYD+vQwNMmE=
+github.com/opencontainers/runc v1.0.0-rc92.0.20200818041331-a5847db387ae h1:8DPtiK5oOmvl3GhYxFjbVNXGRYkzkObPN+35AnFdcSg=
+github.com/opencontainers/runc v1.0.0-rc92.0.20200818041331-a5847db387ae/go.mod h1:CKKZIDxUf3PWz86JeXHNZ9esuCkGWUQqx5KL1e7tKu4=
 github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6 h1:NhsM2gc769rVWDqJvapK37r+7+CBXI8xHhnfnt8uQsg=
 github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
 github.com/opencontainers/selinux v1.6.0 h1:+bIAS/Za3q5FTwWym4fTB0vObnfCf3G/NC7K6Jx62mY=
@@ -478,8 +478,8 @@ github.com/stretchr/testify v1.6.1 h1:hDPOHmpOpP40lSULcqw7IrRb/u7w6RpDC9399XyoNd
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/subosito/gotenv v1.2.0 h1:Slr1R9HxAlEKefgq5jn9U+DnETlIUa6HfgEzj0g5d7s=
 github.com/subosito/gotenv v1.2.0/go.mod h1:N0PQaV/YGNqwC0u51sEeR/aUtSLEXKX9iv69rRypqCw=
-github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 h1:b6uOv7YOFK0TYG7HtkIgExQo+2RdLuwRft63jn2HWj8=
-github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
+github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 h1:kdXcSzyDtseVEc4yCz2qF8ZrQvIDBJLl4S1c3GCXmoI=
+github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
 github.com/thecodeteam/goscaleio v0.1.0 h1:SB5tO98lawC+UK8ds/U2jyfOCH7GTcFztcF5x9gbut4=
 github.com/thecodeteam/goscaleio v0.1.0/go.mod h1:68sdkZAsK8bvEwBlbQnlLS+xU+hvLYM/iQ8KXej1AwM=
 github.com/tidwall/pretty v1.0.0 h1:HsD+QiTn7sK6flMKIvNmpqz1qrpP3Ps6jOKIKMooyg4=

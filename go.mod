@@ -76,7 +76,7 @@ require (
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.7.0
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/runc v1.0.0-rc92
+	github.com/opencontainers/runc v1.0.0-rc92.0.20200818041331-a5847db387ae
 	github.com/opencontainers/selinux v1.6.0
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
@@ -388,7 +388,7 @@ replace (
 	github.com/onsi/gomega => github.com/onsi/gomega v1.7.0
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc92
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc92.0.20200818041331-a5847db387ae
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6
 	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.6.0
 	github.com/pascaldekloe/goe => github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c
@@ -430,7 +430,7 @@ replace (
 	github.com/stretchr/objx => github.com/stretchr/objx v0.2.0
 	github.com/stretchr/testify => github.com/stretchr/testify v1.6.1
 	github.com/subosito/gotenv => github.com/subosito/gotenv v1.2.0
-	github.com/syndtr/gocapability => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
+	github.com/syndtr/gocapability => github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
 	github.com/thecodeteam/goscaleio => github.com/thecodeteam/goscaleio v0.1.0
 	github.com/tidwall/pretty => github.com/tidwall/pretty v1.0.0
 	github.com/tmc/grpc-websocket-proxy => github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5

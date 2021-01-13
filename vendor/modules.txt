@@ -900,9 +900,9 @@ github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.0.0-rc92 => github.com/opencontainers/runc v1.0.0-rc92
+# github.com/opencontainers/runc v1.0.0-rc92.0.20200818041331-a5847db387ae => github.com/opencontainers/runc v1.0.0-rc92.0.20200818041331-a5847db387ae
 ## explicit
-# github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc92
+# github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc92.0.20200818041331-a5847db387ae
 github.com/opencontainers/runc/libcontainer
 github.com/opencontainers/runc/libcontainer/apparmor
 github.com/opencontainers/runc/libcontainer/cgroups
@@ -1060,8 +1060,8 @@ github.com/stretchr/testify/require
 # github.com/subosito/gotenv v1.2.0 => github.com/subosito/gotenv v1.2.0
 github.com/subosito/gotenv
 # github.com/subosito/gotenv => github.com/subosito/gotenv v1.2.0
-# github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
-# github.com/syndtr/gocapability => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
+# github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 => github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
+# github.com/syndtr/gocapability => github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
 github.com/syndtr/gocapability/capability
 # github.com/thecodeteam/goscaleio v0.1.0 => github.com/thecodeteam/goscaleio v0.1.0
 ## explicit

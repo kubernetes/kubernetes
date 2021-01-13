@@ -16,6 +16,7 @@ import (
 	"time"
 
 	units "github.com/docker/go-units"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -207,20 +208,66 @@ func EnterPid(cgroupPaths map[string]string, pid int) error {
 	return nil
 }
 
+func rmdir(path string) error {
+	err := unix.Rmdir(path)
+	if err == nil || err == unix.ENOENT {
+		return nil
+	}
+	return &os.PathError{Op: "rmdir", Path: path, Err: err}
+}
+
+// RemovePath aims to remove cgroup path. It does so recursively,
+// by removing any subdirectories (sub-cgroups) first.
+func RemovePath(path string) error {
+	// try the fast path first
+	if err := rmdir(path); err == nil {
+		return nil
+	}
+
+	infos, err := ioutil.ReadDir(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = nil
+		}
+		return err
+	}
+	for _, info := range infos {
+		if info.IsDir() {
+			// We should remove subcgroups dir first
+			if err = RemovePath(filepath.Join(path, info.Name())); err != nil {
+				break
+			}
+		}
+	}
+	if err == nil {
+		err = rmdir(path)
+	}
+	return err
+}
+
 // RemovePaths iterates over the provided paths removing them.
 // We trying to remove all paths five times with increasing delay between tries.
 // If after all there are not removed cgroups - appropriate error will be
 // returned.
 func RemovePaths(paths map[string]string) (err error) {
+	const retries = 5
 	delay := 10 * time.Millisecond
-	for i := 0; i < 5; i++ {
+	for i := 0; i < retries; i++ {
 		if i != 0 {
 			time.Sleep(delay)
 			delay *= 2
 		}
 		for s, p := range paths {
-			os.RemoveAll(p)
-			// TODO: here probably should be logging
+			if err := RemovePath(p); err != nil {
+				// do not log intermediate iterations
+				switch i {
+				case 0:
+					logrus.WithError(err).Warnf("Failed to remove cgroup (will retry)")
+				case retries - 1:
+					logrus.WithError(err).Error("Failed to remove cgroup")
+				}
+
+			}
 			_, err := os.Stat(p)
 			// We need this strange way of checking cgroups existence because
 			// RemoveAll almost always returns error, even on already removed
@@ -230,6 +277,7 @@ func RemovePaths(paths map[string]string) (err error) {
 			}
 		}
 		if len(paths) == 0 {
+			paths = make(map[string]string)
 			return nil
 		}
 	}

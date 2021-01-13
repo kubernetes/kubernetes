@@ -274,11 +274,7 @@ func (m *manager) Destroy() error {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if err := cgroups.RemovePaths(m.paths); err != nil {
-		return err
-	}
-	m.paths = make(map[string]string)
-	return nil
+	return cgroups.RemovePaths(m.paths)
 }
 
 func (m *manager) Path(subsys string) string {

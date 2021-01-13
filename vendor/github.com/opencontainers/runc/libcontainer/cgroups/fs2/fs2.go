@@ -4,14 +4,12 @@ package fs2
 
 import (
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/pkg/errors"
-	"golang.org/x/sys/unix"
 )
 
 type manager struct {
@@ -157,45 +155,8 @@ func (m *manager) Freeze(state configs.FreezerState) error {
 	return nil
 }
 
-func rmdir(path string) error {
-	err := unix.Rmdir(path)
-	if err == nil || err == unix.ENOENT {
-		return nil
-	}
-	return &os.PathError{Op: "rmdir", Path: path, Err: err}
-}
-
-// removeCgroupPath aims to remove cgroup path recursively
-// Because there may be subcgroups in it.
-func removeCgroupPath(path string) error {
-	// try the fast path first
-	if err := rmdir(path); err == nil {
-		return nil
-	}
-
-	infos, err := ioutil.ReadDir(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			err = nil
-		}
-		return err
-	}
-	for _, info := range infos {
-		if info.IsDir() {
-			// We should remove subcgroups dir first
-			if err = removeCgroupPath(filepath.Join(path, info.Name())); err != nil {
-				break
-			}
-		}
-	}
-	if err == nil {
-		err = rmdir(path)
-	}
-	return err
-}
-
 func (m *manager) Destroy() error {
-	return removeCgroupPath(m.dirPath)
+	return cgroups.RemovePath(m.dirPath)
 }
 
 func (m *manager) Path(_ string) string {

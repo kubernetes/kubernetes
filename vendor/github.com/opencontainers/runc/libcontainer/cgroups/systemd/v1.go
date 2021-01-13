@@ -212,17 +212,14 @@ func (m *legacyManager) Destroy() error {
 	}
 	unitName := getUnitName(m.cgroups)
 
-	err = stopUnit(dbusConnection, unitName)
+	stopErr := stopUnit(dbusConnection, unitName)
 	// Both on success and on error, cleanup all the cgroups we are aware of.
 	// Some of them were created directly by Apply() and are not managed by systemd.
 	if err := cgroups.RemovePaths(m.paths); err != nil {
 		return err
 	}
-	if err != nil {
-		return err
-	}
-	m.paths = make(map[string]string)
-	return nil
+
+	return stopErr
 }
 
 func (m *legacyManager) Path(subsys string) string {
