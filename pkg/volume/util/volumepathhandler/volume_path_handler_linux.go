@@ -131,6 +131,11 @@ func parseLosetupOutputForDevice(output []byte, path string) (string, error) {
 		return "", errors.New(ErrDeviceNotFound)
 	}
 
+	realPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to evaluate path %s: %s", path, err)
+	}
+
 	// losetup -j {path} returns device in the format:
 	// /dev/loop1: [0073]:148662 ({path})
 	// /dev/loop2: [0073]:148662 (/dev/sdX)
@@ -143,6 +148,12 @@ func parseLosetupOutputForDevice(output []byte, path string) (string, error) {
 	var matched string
 	scanner := bufio.NewScanner(strings.NewReader(s))
 	for scanner.Scan() {
+		// losetup output has symlinks expanded
+		if strings.HasSuffix(scanner.Text(), "("+realPath+")") {
+			matched = scanner.Text()
+			break
+		}
+		// Just in case losetup changes, check for the original path too
 		if strings.HasSuffix(scanner.Text(), "("+path+")") {
 			matched = scanner.Text()
 			break
