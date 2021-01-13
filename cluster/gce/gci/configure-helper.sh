@@ -3182,7 +3182,8 @@ function main() {
       # And if somebody will start docker to build or pull something, logging will also be set up
       assemble-docker-flags
       # stop docker if it is present as we want to use just containerd
-      systemctl stop docker || echo "unable to stop docker"
+      # (b/174523058) stopping docker breaks COS toolbox and some other scripts
+      # systemctl stop docker || echo "unable to stop docker"
     fi
     if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
       gke-setup-containerd
