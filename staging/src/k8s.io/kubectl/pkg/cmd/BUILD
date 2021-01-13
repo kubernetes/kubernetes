@@ -7,7 +7,7 @@ go_library(
         "cmd.go",
         "profiling.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd",
+    importmap = "vendor/k8s.io/kubectl/pkg/cmd",
     importpath = "k8s.io/kubectl/pkg/cmd",
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_CONSUMERS",

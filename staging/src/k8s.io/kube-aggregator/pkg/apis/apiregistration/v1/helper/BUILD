@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["helpers.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper",
+    importmap = "vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper",
     importpath = "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper",
     visibility = ["//visibility:public"],
     deps = [

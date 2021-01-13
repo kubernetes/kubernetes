@@ -12,7 +12,7 @@ go_library(
         "options.go",
         "registry.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/logs",
+    importmap = "vendor/k8s.io/component-base/logs",
     importpath = "k8s.io/component-base/logs",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",

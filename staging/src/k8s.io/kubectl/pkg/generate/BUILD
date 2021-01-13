@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["generate.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/generate",
+    importmap = "vendor/k8s.io/kubectl/pkg/generate",
     importpath = "k8s.io/kubectl/pkg/generate",
     visibility = ["//visibility:public"],
     deps = [

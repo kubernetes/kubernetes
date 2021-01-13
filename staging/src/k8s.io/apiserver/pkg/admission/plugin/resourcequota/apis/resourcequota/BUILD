@@ -13,7 +13,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota",
+    importmap = "vendor/k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota",
     importpath = "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

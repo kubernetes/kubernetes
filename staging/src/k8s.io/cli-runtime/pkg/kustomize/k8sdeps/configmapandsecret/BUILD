@@ -7,7 +7,7 @@ go_library(
         "kv.go",
         "secretfactory.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cli-runtime/pkg/kustomize/k8sdeps/configmapandsecret",
+    importmap = "vendor/k8s.io/cli-runtime/pkg/kustomize/k8sdeps/configmapandsecret",
     importpath = "k8s.io/cli-runtime/pkg/kustomize/k8sdeps/configmapandsecret",
     visibility = ["//visibility:public"],
     deps = [

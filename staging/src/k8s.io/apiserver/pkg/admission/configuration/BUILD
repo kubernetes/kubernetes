@@ -31,7 +31,7 @@ go_library(
         "mutating_webhook_manager.go",
         "validating_webhook_manager.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/configuration",
+    importmap = "vendor/k8s.io/apiserver/pkg/admission/configuration",
     importpath = "k8s.io/apiserver/pkg/admission/configuration",
     deps = [
         "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",

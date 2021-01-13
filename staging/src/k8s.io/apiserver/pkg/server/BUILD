@@ -69,7 +69,7 @@ go_library(
         "signal_posix.go",
         "signal_windows.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server",
+    importmap = "vendor/k8s.io/apiserver/pkg/server",
     importpath = "k8s.io/apiserver/pkg/server",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

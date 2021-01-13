@@ -15,7 +15,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["diff.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/diff",
+    importmap = "vendor/k8s.io/apimachinery/pkg/util/diff",
     importpath = "k8s.io/apimachinery/pkg/util/diff",
     deps = [
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",

@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["controller.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-helpers/apimachinery/lease",
+    importmap = "vendor/k8s.io/component-helpers/apimachinery/lease",
     importpath = "k8s.io/component-helpers/apimachinery/lease",
     visibility = ["//visibility:public"],
     deps = [

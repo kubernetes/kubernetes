@@ -8,7 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["codec.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/api/apitesting",
+    importmap = "vendor/k8s.io/apimachinery/pkg/api/apitesting",
     importpath = "k8s.io/apimachinery/pkg/api/apitesting",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

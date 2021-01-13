@@ -8,7 +8,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubelet/pkg/apis/credentialprovider",
+    importmap = "vendor/k8s.io/kubelet/pkg/apis/credentialprovider",
     importpath = "k8s.io/kubelet/pkg/apis/credentialprovider",
     visibility = ["//visibility:public"],
     deps = [

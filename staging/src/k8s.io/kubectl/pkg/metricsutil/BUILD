@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["metrics_printer.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/metricsutil",
+    importmap = "vendor/k8s.io/kubectl/pkg/metricsutil",
     importpath = "k8s.io/kubectl/pkg/metricsutil",
     visibility = ["//visibility:public"],
     deps = [

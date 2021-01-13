@@ -7,7 +7,7 @@ go_library(
         "doc.go",
         "interface.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/azure/clients/routetableclient",
+    importmap = "vendor/k8s.io/legacy-cloud-providers/azure/clients/routetableclient",
     importpath = "k8s.io/legacy-cloud-providers/azure/clients/routetableclient",
     visibility = ["//visibility:public"],
     deps = [

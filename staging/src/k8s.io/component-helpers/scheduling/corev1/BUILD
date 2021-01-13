@@ -6,7 +6,7 @@ go_library(
         "doc.go",
         "helpers.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-helpers/scheduling/corev1",
+    importmap = "vendor/k8s.io/component-helpers/scheduling/corev1",
     importpath = "k8s.io/component-helpers/scheduling/corev1",
     visibility = ["//visibility:public"],
     deps = [

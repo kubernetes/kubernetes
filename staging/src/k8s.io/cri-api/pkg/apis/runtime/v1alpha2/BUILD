@@ -6,7 +6,7 @@ go_library(
         "api.pb.go",
         "constants.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cri-api/pkg/apis/runtime/v1alpha2",
+    importmap = "vendor/k8s.io/cri-api/pkg/apis/runtime/v1alpha2",
     importpath = "k8s.io/cri-api/pkg/apis/runtime/v1alpha2",
     visibility = ["//visibility:public"],
     deps = [

@@ -10,7 +10,7 @@ go_library(
         "patcher.go",
         "prune.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/apply",
+    importmap = "vendor/k8s.io/kubectl/pkg/cmd/apply",
     importpath = "k8s.io/kubectl/pkg/cmd/apply",
     visibility = ["//visibility:public"],
     deps = [

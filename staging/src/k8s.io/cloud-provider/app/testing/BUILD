@@ -17,7 +17,7 @@ filegroup(
 go_library(
     name = "go_default_library",
     srcs = ["testserver.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/app/testing",
+    importmap = "vendor/k8s.io/cloud-provider/app/testing",
     importpath = "k8s.io/cloud-provider/app/testing",
     visibility = ["//visibility:public"],
     deps = [

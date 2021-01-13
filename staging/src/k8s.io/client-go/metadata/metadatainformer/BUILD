@@ -6,7 +6,7 @@ go_library(
         "informer.go",
         "interface.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/metadata/metadatainformer",
+    importmap = "vendor/k8s.io/client-go/metadata/metadatainformer",
     importpath = "k8s.io/client-go/metadata/metadatainformer",
     visibility = ["//visibility:public"],
     deps = [

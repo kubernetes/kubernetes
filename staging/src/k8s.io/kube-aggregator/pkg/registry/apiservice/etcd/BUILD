@@ -8,7 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["etcd.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/registry/apiservice/etcd",
+    importmap = "vendor/k8s.io/kube-aggregator/pkg/registry/apiservice/etcd",
     importpath = "k8s.io/kube-aggregator/pkg/registry/apiservice/etcd",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",

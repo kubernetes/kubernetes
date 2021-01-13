@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["plugin.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/plugin",
+    importmap = "vendor/k8s.io/kubectl/pkg/cmd/plugin",
     importpath = "k8s.io/kubectl/pkg/cmd/plugin",
     visibility = ["//visibility:public"],
     deps = [

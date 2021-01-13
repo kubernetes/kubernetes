@@ -9,7 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["config.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/options/encryptionconfig",
+    importmap = "vendor/k8s.io/apiserver/pkg/server/options/encryptionconfig",
     importpath = "k8s.io/apiserver/pkg/server/options/encryptionconfig",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

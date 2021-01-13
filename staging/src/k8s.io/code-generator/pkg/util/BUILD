@@ -6,7 +6,7 @@ go_library(
         "build.go",
         "plural_exceptions.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/pkg/util",
+    importmap = "vendor/k8s.io/code-generator/pkg/util",
     importpath = "k8s.io/code-generator/pkg/util",
     visibility = ["//visibility:public"],
 )

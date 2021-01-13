@@ -12,7 +12,7 @@ go_library(
         "azure_auth.go",
         "doc.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/azure/auth",
+    importmap = "vendor/k8s.io/legacy-cloud-providers/azure/auth",
     importpath = "k8s.io/legacy-cloud-providers/azure/auth",
     visibility = ["//visibility:public"],
     deps = [

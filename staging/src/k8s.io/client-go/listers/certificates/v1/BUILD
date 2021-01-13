@@ -6,7 +6,7 @@ go_library(
         "certificatesigningrequest.go",
         "expansion_generated.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/certificates/v1",
+    importmap = "vendor/k8s.io/client-go/listers/certificates/v1",
     importpath = "k8s.io/client-go/listers/certificates/v1",
     visibility = ["//visibility:public"],
     deps = [

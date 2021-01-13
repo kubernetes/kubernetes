@@ -6,7 +6,7 @@ go_library(
         "builder.go",
         "merge.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder",
+    importmap = "vendor/k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder",
     importpath = "k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder",
     visibility = ["//visibility:public"],
     deps = [

@@ -8,7 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["doc.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/controller-manager",
+    importmap = "vendor/k8s.io/controller-manager",
     importpath = "k8s.io/controller-manager",
 )
 

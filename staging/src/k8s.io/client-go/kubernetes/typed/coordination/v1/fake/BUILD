@@ -7,7 +7,7 @@ go_library(
         "fake_coordination_client.go",
         "fake_lease.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/coordination/v1/fake",
+    importmap = "vendor/k8s.io/client-go/kubernetes/typed/coordination/v1/fake",
     importpath = "k8s.io/client-go/kubernetes/typed/coordination/v1/fake",
     visibility = ["//visibility:public"],
     deps = [

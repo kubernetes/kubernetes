@@ -6,7 +6,7 @@ go_library(
         "controller.go",
         "doc.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/controllers/service",
+    importmap = "vendor/k8s.io/cloud-provider/controllers/service",
     importpath = "k8s.io/cloud-provider/controllers/service",
     visibility = ["//visibility:public"],
     deps = [

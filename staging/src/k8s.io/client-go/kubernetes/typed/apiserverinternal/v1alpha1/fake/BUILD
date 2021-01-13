@@ -7,7 +7,7 @@ go_library(
         "fake_apiserverinternal_client.go",
         "fake_storageversion.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/apiserverinternal/v1alpha1/fake",
+    importmap = "vendor/k8s.io/client-go/kubernetes/typed/apiserverinternal/v1alpha1/fake",
     importpath = "k8s.io/client-go/kubernetes/typed/apiserverinternal/v1alpha1/fake",
     visibility = ["//visibility:public"],
     deps = [

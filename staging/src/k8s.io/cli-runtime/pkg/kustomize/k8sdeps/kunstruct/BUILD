@@ -7,7 +7,7 @@ go_library(
         "helper.go",
         "kunstruct.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cli-runtime/pkg/kustomize/k8sdeps/kunstruct",
+    importmap = "vendor/k8s.io/cli-runtime/pkg/kustomize/k8sdeps/kunstruct",
     importpath = "k8s.io/cli-runtime/pkg/kustomize/k8sdeps/kunstruct",
     visibility = ["//visibility:public"],
     deps = [

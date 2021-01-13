@@ -31,7 +31,7 @@ go_library(
         "etcd3.go",
         "factory.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/storagebackend/factory",
+    importmap = "vendor/k8s.io/apiserver/pkg/storage/storagebackend/factory",
     importpath = "k8s.io/apiserver/pkg/storage/storagebackend/factory",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

@@ -15,7 +15,7 @@ go_library(
         "template.go",
         "typesetter.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cli-runtime/pkg/printers",
+    importmap = "vendor/k8s.io/cli-runtime/pkg/printers",
     importpath = "k8s.io/cli-runtime/pkg/printers",
     visibility = ["//visibility:public"],
     deps = [

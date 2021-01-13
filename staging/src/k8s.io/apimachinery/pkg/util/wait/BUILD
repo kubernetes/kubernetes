@@ -22,7 +22,7 @@ go_library(
         "doc.go",
         "wait.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/wait",
+    importmap = "vendor/k8s.io/apimachinery/pkg/util/wait",
     importpath = "k8s.io/apimachinery/pkg/util/wait",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",

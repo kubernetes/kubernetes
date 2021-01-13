@@ -40,7 +40,7 @@ go_library(
         "priority.go",
         "restmapper.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/api/meta",
+    importmap = "vendor/k8s.io/apimachinery/pkg/api/meta",
     importpath = "k8s.io/apimachinery/pkg/api/meta",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

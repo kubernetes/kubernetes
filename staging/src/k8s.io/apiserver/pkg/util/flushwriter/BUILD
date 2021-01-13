@@ -18,7 +18,7 @@ go_library(
         "doc.go",
         "writer.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/flushwriter",
+    importmap = "vendor/k8s.io/apiserver/pkg/util/flushwriter",
     importpath = "k8s.io/apiserver/pkg/util/flushwriter",
 )
 

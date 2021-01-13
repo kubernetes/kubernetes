@@ -28,7 +28,7 @@ go_library(
         "token_source.go",
         "transport.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/transport",
+    importmap = "vendor/k8s.io/client-go/transport",
     importpath = "k8s.io/client-go/transport",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",

@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["shufflesharding.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/shufflesharding",
+    importmap = "vendor/k8s.io/apiserver/pkg/util/shufflesharding",
     importpath = "k8s.io/apiserver/pkg/util/shufflesharding",
     visibility = ["//visibility:public"],
 )

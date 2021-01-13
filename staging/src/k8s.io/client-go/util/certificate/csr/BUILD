@@ -5,7 +5,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["csr.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/certificate/csr",
+    importmap = "vendor/k8s.io/client-go/util/certificate/csr",
     importpath = "k8s.io/client-go/util/certificate/csr",
     deps = [
         "//staging/src/k8s.io/api/certificates/v1:go_default_library",

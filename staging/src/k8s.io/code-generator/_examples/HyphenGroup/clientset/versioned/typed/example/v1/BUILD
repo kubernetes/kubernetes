@@ -9,7 +9,7 @@ go_library(
         "generated_expansion.go",
         "testtype.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/_examples/HyphenGroup/clientset/versioned/typed/example/v1",
+    importmap = "vendor/k8s.io/code-generator/_examples/HyphenGroup/clientset/versioned/typed/example/v1",
     importpath = "k8s.io/code-generator/_examples/HyphenGroup/clientset/versioned/typed/example/v1",
     visibility = ["//visibility:public"],
     deps = [

@@ -6,7 +6,7 @@ go_library(
         "exec.go",
         "metrics.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/plugin/pkg/client/auth/exec",
+    importmap = "vendor/k8s.io/client-go/plugin/pkg/client/auth/exec",
     importpath = "k8s.io/client-go/plugin/pkg/client/auth/exec",
     visibility = ["//visibility:public"],
     deps = [

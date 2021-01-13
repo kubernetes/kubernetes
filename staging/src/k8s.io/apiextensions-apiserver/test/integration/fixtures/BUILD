@@ -11,7 +11,7 @@ go_library(
         "resources.go",
         "server.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/test/integration/fixtures",
+    importmap = "vendor/k8s.io/apiextensions-apiserver/test/integration/fixtures",
     importpath = "k8s.io/apiextensions-apiserver/test/integration/fixtures",
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1:go_default_library",

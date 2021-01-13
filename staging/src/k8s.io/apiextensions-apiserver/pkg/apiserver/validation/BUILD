@@ -12,7 +12,7 @@ go_library(
         "formats.go",
         "validation.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/validation",
+    importmap = "vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/validation",
     importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver/validation",
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",

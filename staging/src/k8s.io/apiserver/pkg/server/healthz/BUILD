@@ -25,7 +25,7 @@ go_library(
         "doc.go",
         "healthz.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/healthz",
+    importmap = "vendor/k8s.io/apiserver/pkg/server/healthz",
     importpath = "k8s.io/apiserver/pkg/server/healthz",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",

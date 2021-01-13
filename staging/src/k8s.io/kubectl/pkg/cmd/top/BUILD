@@ -7,7 +7,7 @@ go_library(
         "top_node.go",
         "top_pod.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/top",
+    importmap = "vendor/k8s.io/kubectl/pkg/cmd/top",
     importpath = "k8s.io/kubectl/pkg/cmd/top",
     visibility = ["//visibility:public"],
     deps = [

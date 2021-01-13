@@ -31,7 +31,7 @@ filegroup(
 go_library(
     name = "go_default_library",
     srcs = ["doc.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/examples/fake-client",
+    importmap = "vendor/k8s.io/client-go/examples/fake-client",
     importpath = "k8s.io/client-go/examples/fake-client",
     visibility = ["//visibility:public"],
 )

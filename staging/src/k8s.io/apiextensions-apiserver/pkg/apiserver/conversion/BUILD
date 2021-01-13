@@ -8,7 +8,7 @@ go_library(
         "nop_converter.go",
         "webhook_converter.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion",
+    importmap = "vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion",
     importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver/conversion",
     visibility = ["//visibility:public"],
     deps = [

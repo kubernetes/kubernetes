@@ -12,7 +12,7 @@ go_library(
         "virtualdisk.go",
         "vmdm.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/vsphere/vclib/diskmanagers",
+    importmap = "vendor/k8s.io/legacy-cloud-providers/vsphere/vclib/diskmanagers",
     importpath = "k8s.io/legacy-cloud-providers/vsphere/vclib/diskmanagers",
     deps = [
         "//staging/src/k8s.io/legacy-cloud-providers/vsphere/vclib:go_default_library",

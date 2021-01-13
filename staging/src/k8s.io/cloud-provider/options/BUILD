@@ -8,7 +8,7 @@ go_library(
         "options.go",
         "servicecontroller.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/options",
+    importmap = "vendor/k8s.io/cloud-provider/options",
     importpath = "k8s.io/cloud-provider/options",
     visibility = ["//visibility:public"],
     deps = [

@@ -6,7 +6,7 @@ go_library(
         "patch.go",
         "patchconflictdetector.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cli-runtime/pkg/kustomize/k8sdeps/transformer/patch",
+    importmap = "vendor/k8s.io/cli-runtime/pkg/kustomize/k8sdeps/transformer/patch",
     importpath = "k8s.io/cli-runtime/pkg/kustomize/k8sdeps/transformer/patch",
     visibility = ["//visibility:public"],
     deps = [

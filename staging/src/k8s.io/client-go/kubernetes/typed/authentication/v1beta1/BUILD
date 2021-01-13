@@ -13,7 +13,7 @@ go_library(
         "generated_expansion.go",
         "tokenreview.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
+    importmap = "vendor/k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
     importpath = "k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
     deps = [
         "//staging/src/k8s.io/api/authentication/v1beta1:go_default_library",

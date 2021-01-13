@@ -9,7 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = ["server.go"],
     data = glob(["testdata/**"]),
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/cmd/server",
+    importmap = "vendor/k8s.io/apiextensions-apiserver/pkg/cmd/server",
     importpath = "k8s.io/apiextensions-apiserver/pkg/cmd/server",
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server/options:go_default_library",

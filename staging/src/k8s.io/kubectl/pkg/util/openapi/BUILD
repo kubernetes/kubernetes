@@ -8,7 +8,7 @@ go_library(
         "openapi.go",
         "openapi_getter.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/util/openapi",
+    importmap = "vendor/k8s.io/kubectl/pkg/util/openapi",
     importpath = "k8s.io/kubectl/pkg/util/openapi",
     visibility = ["//visibility:public"],
     deps = [

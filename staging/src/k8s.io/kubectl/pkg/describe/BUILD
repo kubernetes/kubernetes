@@ -6,7 +6,7 @@ go_library(
         "describe.go",
         "interface.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/describe",
+    importmap = "vendor/k8s.io/kubectl/pkg/describe",
     importpath = "k8s.io/kubectl/pkg/describe",
     visibility = ["//visibility:public"],
     deps = [

@@ -6,7 +6,7 @@ go_library(
         "endpointslice.go",
         "interface.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/informers/discovery/v1beta1",
+    importmap = "vendor/k8s.io/client-go/informers/discovery/v1beta1",
     importpath = "k8s.io/client-go/informers/discovery/v1beta1",
     visibility = ["//visibility:public"],
     deps = [

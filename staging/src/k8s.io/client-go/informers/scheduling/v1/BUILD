@@ -6,7 +6,7 @@ go_library(
         "interface.go",
         "priorityclass.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/informers/scheduling/v1",
+    importmap = "vendor/k8s.io/client-go/informers/scheduling/v1",
     importpath = "k8s.io/client-go/informers/scheduling/v1",
     visibility = ["//visibility:public"],
     deps = [

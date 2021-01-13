@@ -7,7 +7,7 @@ go_library(
         "doc.go",
         "interface.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/azure/clients/publicipclient",
+    importmap = "vendor/k8s.io/legacy-cloud-providers/azure/clients/publicipclient",
     importpath = "k8s.io/legacy-cloud-providers/azure/clients/publicipclient",
     visibility = ["//visibility:public"],
     deps = [

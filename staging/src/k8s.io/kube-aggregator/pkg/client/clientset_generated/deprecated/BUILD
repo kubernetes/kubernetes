@@ -6,7 +6,7 @@ go_library(
         "clientset.go",
         "doc.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/client/clientset_generated/deprecated",
+    importmap = "vendor/k8s.io/kube-aggregator/pkg/client/clientset_generated/deprecated",
     importpath = "k8s.io/kube-aggregator/pkg/client/clientset_generated/deprecated",
     visibility = [":__subpackages__"],
     deps = [

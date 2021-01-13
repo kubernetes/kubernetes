@@ -7,7 +7,7 @@ go_library(
         "fake_apiextensions_client.go",
         "fake_customresourcedefinition.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/deprecated/typed/apiextensions/v1/fake",
+    importmap = "vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/deprecated/typed/apiextensions/v1/fake",
     importpath = "k8s.io/apiextensions-apiserver/pkg/client/clientset/deprecated/typed/apiextensions/v1/fake",
     visibility = ["//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/deprecated:__subpackages__"],
     deps = [

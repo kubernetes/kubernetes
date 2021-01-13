@@ -8,7 +8,7 @@ go_library(
         "events_client.go",
         "generated_expansion.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/events/v1",
+    importmap = "vendor/k8s.io/client-go/kubernetes/typed/events/v1",
     importpath = "k8s.io/client-go/kubernetes/typed/events/v1",
     visibility = ["//visibility:public"],
     deps = [

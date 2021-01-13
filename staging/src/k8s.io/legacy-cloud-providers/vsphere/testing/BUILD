@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["testing.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/vsphere/testing",
+    importmap = "vendor/k8s.io/legacy-cloud-providers/vsphere/testing",
     importpath = "k8s.io/legacy-cloud-providers/vsphere/testing",
     visibility = ["//visibility:public"],
     deps = [

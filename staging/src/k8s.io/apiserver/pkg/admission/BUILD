@@ -15,7 +15,7 @@ go_library(
         "reinvocation.go",
         "util.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission",
+    importmap = "vendor/k8s.io/apiserver/pkg/admission",
     importpath = "k8s.io/apiserver/pkg/admission",
     visibility = ["//visibility:public"],
     deps = [

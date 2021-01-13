@@ -6,7 +6,7 @@ go_library(
         "doc.go",
         "errors.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cri-api/pkg/errors",
+    importmap = "vendor/k8s.io/cri-api/pkg/errors",
     importpath = "k8s.io/cri-api/pkg/errors",
     visibility = ["//visibility:public"],
     deps = [

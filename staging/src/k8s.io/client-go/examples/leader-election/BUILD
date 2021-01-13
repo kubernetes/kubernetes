@@ -14,7 +14,7 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/examples/leader-election",
+    importmap = "vendor/k8s.io/client-go/examples/leader-election",
     importpath = "k8s.io/client-go/examples/leader-election",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

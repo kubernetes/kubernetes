@@ -43,7 +43,7 @@ go_library(
         "overrides.go",
         "validation.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/clientcmd",
+    importmap = "vendor/k8s.io/client-go/tools/clientcmd",
     importpath = "k8s.io/client-go/tools/clientcmd",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

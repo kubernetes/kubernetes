@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["objectreader.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/test/integration/storage",
+    importmap = "vendor/k8s.io/apiextensions-apiserver/test/integration/storage",
     importpath = "k8s.io/apiextensions-apiserver/test/integration/storage",
     visibility = ["//visibility:public"],
     deps = [

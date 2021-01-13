@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["install.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubelet/pkg/apis/credentialprovider/install",
+    importmap = "vendor/k8s.io/kubelet/pkg/apis/credentialprovider/install",
     importpath = "k8s.io/kubelet/pkg/apis/credentialprovider/install",
     visibility = ["//visibility:public"],
     deps = [

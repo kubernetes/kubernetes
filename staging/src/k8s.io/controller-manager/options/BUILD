@@ -6,7 +6,7 @@ go_library(
         "debugging.go",
         "generic.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/controller-manager/options",
+    importmap = "vendor/k8s.io/controller-manager/options",
     importpath = "k8s.io/controller-manager/options",
     visibility = ["//visibility:public"],
     deps = [

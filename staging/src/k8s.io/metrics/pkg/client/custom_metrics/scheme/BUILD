@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["register.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/client/custom_metrics/scheme",
+    importmap = "vendor/k8s.io/metrics/pkg/client/custom_metrics/scheme",
     importpath = "k8s.io/metrics/pkg/client/custom_metrics/scheme",
     visibility = ["//visibility:public"],
     deps = [

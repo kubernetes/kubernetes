@@ -22,7 +22,7 @@ go_library(
         "service_basic.go",
         "serviceaccount.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/generate/versioned",
+    importmap = "vendor/k8s.io/kubectl/pkg/generate/versioned",
     importpath = "k8s.io/kubectl/pkg/generate/versioned",
     visibility = ["//visibility:public"],
     deps = [

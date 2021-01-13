@@ -10,7 +10,7 @@ go_library(
         "managedfields.go",
         "pathelement.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal",
+    importmap = "vendor/k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal",
     importpath = "k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal",
     visibility = ["//visibility:public"],
     deps = [

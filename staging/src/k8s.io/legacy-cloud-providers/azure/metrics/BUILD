@@ -6,7 +6,7 @@ go_library(
         "azure_metrics.go",
         "doc.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/azure/metrics",
+    importmap = "vendor/k8s.io/legacy-cloud-providers/azure/metrics",
     importpath = "k8s.io/legacy-cloud-providers/azure/metrics",
     visibility = ["//visibility:public"],
     deps = [

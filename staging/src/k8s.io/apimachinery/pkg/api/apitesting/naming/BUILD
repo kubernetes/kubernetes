@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["naming.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/api/apitesting/naming",
+    importmap = "vendor/k8s.io/apimachinery/pkg/api/apitesting/naming",
     importpath = "k8s.io/apimachinery/pkg/api/apitesting/naming",
     visibility = ["//visibility:public"],
     deps = [

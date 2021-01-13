@@ -10,7 +10,7 @@ go_library(
         "retain_keys_visitor.go",
         "strategic_visitor.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/apply/strategy",
+    importmap = "vendor/k8s.io/kubectl/pkg/apply/strategy",
     importpath = "k8s.io/kubectl/pkg/apply/strategy",
     visibility = ["//visibility:public"],
     deps = ["//staging/src/k8s.io/kubectl/pkg/apply:go_default_library"],

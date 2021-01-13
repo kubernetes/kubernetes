@@ -16,7 +16,7 @@ go_library(
         "profiling.go",
         "version.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/routes",
+    importmap = "vendor/k8s.io/apiserver/pkg/server/routes",
     importpath = "k8s.io/apiserver/pkg/server/routes",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

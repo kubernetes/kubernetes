@@ -7,7 +7,7 @@ go_library(
         "mutatingwebhookconfiguration.go",
         "validatingwebhookconfiguration.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/admissionregistration/v1",
+    importmap = "vendor/k8s.io/client-go/listers/admissionregistration/v1",
     importpath = "k8s.io/client-go/listers/admissionregistration/v1",
     visibility = ["//visibility:public"],
     deps = [

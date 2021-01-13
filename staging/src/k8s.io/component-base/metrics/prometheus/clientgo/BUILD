@@ -5,7 +5,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["metrics.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/metrics/prometheus/clientgo",
+    importmap = "vendor/k8s.io/component-base/metrics/prometheus/clientgo",
     importpath = "k8s.io/component-base/metrics/prometheus/clientgo",
     deps = [
         "//staging/src/k8s.io/component-base/metrics/prometheus/clientgo/leaderelection:go_default_library",

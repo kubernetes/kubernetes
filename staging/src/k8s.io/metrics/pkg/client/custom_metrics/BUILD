@@ -9,7 +9,7 @@ go_library(
         "multi_client.go",
         "versioned_client.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/client/custom_metrics",
+    importmap = "vendor/k8s.io/metrics/pkg/client/custom_metrics",
     importpath = "k8s.io/metrics/pkg/client/custom_metrics",
     visibility = ["//visibility:public"],
     deps = [

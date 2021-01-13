@@ -20,7 +20,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["memcache.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/discovery/cached/memory",
+    importmap = "vendor/k8s.io/client-go/discovery/cached/memory",
     importpath = "k8s.io/client-go/discovery/cached/memory",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

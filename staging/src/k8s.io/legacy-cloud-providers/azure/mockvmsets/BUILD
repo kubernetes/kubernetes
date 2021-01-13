@@ -6,7 +6,7 @@ go_library(
         "azure_mock_vmsets.go",
         "doc.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/azure/mockvmsets",
+    importmap = "vendor/k8s.io/legacy-cloud-providers/azure/mockvmsets",
     importpath = "k8s.io/legacy-cloud-providers/azure/mockvmsets",
     visibility = ["//visibility:public"],
     deps = [

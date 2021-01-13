@@ -8,7 +8,7 @@ go_library(
         "util.go",
         "zz_generated.deepcopy.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/testing",
+    importmap = "vendor/k8s.io/kubectl/pkg/cmd/testing",
     importpath = "k8s.io/kubectl/pkg/cmd/testing",
     visibility = ["//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS"],
     deps = [

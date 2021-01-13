@@ -6,7 +6,7 @@ go_library(
         "clientset.go",
         "doc.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/_examples/HyphenGroup/clientset/versioned",
+    importmap = "vendor/k8s.io/code-generator/_examples/HyphenGroup/clientset/versioned",
     importpath = "k8s.io/code-generator/_examples/HyphenGroup/clientset/versioned",
     visibility = ["//visibility:public"],
     deps = [

@@ -11,7 +11,7 @@ go_library(
         "expansion.go",
         "lister.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/lister-gen/generators",
+    importmap = "vendor/k8s.io/code-generator/cmd/lister-gen/generators",
     importpath = "k8s.io/code-generator/cmd/lister-gen/generators",
     deps = [
         "//staging/src/k8s.io/code-generator/cmd/client-gen/generators/util:go_default_library",

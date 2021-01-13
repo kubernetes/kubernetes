@@ -14,7 +14,7 @@ go_library(
         "doc.go",
         "zz_generated.openapi.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/generated/openapi",
+    importmap = "vendor/k8s.io/apiextensions-apiserver/pkg/generated/openapi",
     importpath = "k8s.io/apiextensions-apiserver/pkg/generated/openapi",
     deps = openapi_deps(),  # keep
 )

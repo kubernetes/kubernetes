@@ -8,7 +8,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-scheduler/config/v1",
+    importmap = "vendor/k8s.io/kube-scheduler/config/v1",
     importpath = "k8s.io/kube-scheduler/config/v1",
     visibility = ["//visibility:public"],
     deps = [

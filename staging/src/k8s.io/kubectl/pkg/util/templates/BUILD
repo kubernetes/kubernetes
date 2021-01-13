@@ -9,7 +9,7 @@ go_library(
         "templater.go",
         "templates.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/util/templates",
+    importmap = "vendor/k8s.io/kubectl/pkg/util/templates",
     importpath = "k8s.io/kubectl/pkg/util/templates",
     visibility = ["//visibility:public"],
     deps = [

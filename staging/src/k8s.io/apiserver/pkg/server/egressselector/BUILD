@@ -6,7 +6,7 @@ go_library(
         "config.go",
         "egress_selector.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/egressselector",
+    importmap = "vendor/k8s.io/apiserver/pkg/server/egressselector",
     importpath = "k8s.io/apiserver/pkg/server/egressselector",
     visibility = ["//visibility:public"],
     deps = [

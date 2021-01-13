@@ -9,7 +9,7 @@ go_library(
         "status.go",
         "taints.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/node/helpers",
+    importmap = "vendor/k8s.io/cloud-provider/node/helpers",
     importpath = "k8s.io/cloud-provider/node/helpers",
     visibility = ["//visibility:public"],
     deps = [

@@ -9,7 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["configz.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/configz",
+    importmap = "vendor/k8s.io/component-base/configz",
     importpath = "k8s.io/component-base/configz",
 )
 

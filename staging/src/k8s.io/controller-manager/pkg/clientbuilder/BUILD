@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["client_builder.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/controller-manager/pkg/clientbuilder",
+    importmap = "vendor/k8s.io/controller-manager/pkg/clientbuilder",
     importpath = "k8s.io/controller-manager/pkg/clientbuilder",
     visibility = ["//visibility:public"],
     deps = [

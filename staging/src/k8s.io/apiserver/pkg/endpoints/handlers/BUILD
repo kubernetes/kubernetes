@@ -63,7 +63,7 @@ go_library(
         "update.go",
         "watch.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/handlers",
+    importmap = "vendor/k8s.io/apiserver/pkg/endpoints/handlers",
     importpath = "k8s.io/apiserver/pkg/endpoints/handlers",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",

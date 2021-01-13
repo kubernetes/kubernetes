@@ -13,7 +13,7 @@ go_library(
         "grpc_service.go",
         "metrics.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope",
+    importmap = "vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope",
     importpath = "k8s.io/apiserver/pkg/storage/value/encrypt/envelope",
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library",

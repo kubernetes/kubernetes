@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["metrics.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/metrics/prometheus/workqueue",
+    importmap = "vendor/k8s.io/component-base/metrics/prometheus/workqueue",
     importpath = "k8s.io/component-base/metrics/prometheus/workqueue",
     visibility = ["//visibility:public"],
     deps = [

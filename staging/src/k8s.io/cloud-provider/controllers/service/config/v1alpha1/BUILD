@@ -11,7 +11,7 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/controllers/service/config/v1alpha1",
+    importmap = "vendor/k8s.io/cloud-provider/controllers/service/config/v1alpha1",
     importpath = "k8s.io/cloud-provider/controllers/service/config/v1alpha1",
     visibility = ["//visibility:public"],
     deps = [

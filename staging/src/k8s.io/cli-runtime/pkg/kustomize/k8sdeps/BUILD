@@ -6,7 +6,7 @@ go_library(
         "doc.go",
         "factory.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cli-runtime/pkg/kustomize/k8sdeps",
+    importmap = "vendor/k8s.io/cli-runtime/pkg/kustomize/k8sdeps",
     importpath = "k8s.io/cli-runtime/pkg/kustomize/k8sdeps",
     visibility = ["//visibility:public"],
     deps = [

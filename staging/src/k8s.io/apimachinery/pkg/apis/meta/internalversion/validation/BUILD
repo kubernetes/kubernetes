@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/internalversion/validation",
+    importmap = "vendor/k8s.io/apimachinery/pkg/apis/meta/internalversion/validation",
     importpath = "k8s.io/apimachinery/pkg/apis/meta/internalversion/validation",
     visibility = ["//visibility:public"],
     deps = [

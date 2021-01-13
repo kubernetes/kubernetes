@@ -6,7 +6,7 @@ go_library(
         "manager.go",
         "updater.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storageversion",
+    importmap = "vendor/k8s.io/apiserver/pkg/storageversion",
     importpath = "k8s.io/apiserver/pkg/storageversion",
     visibility = ["//visibility:public"],
     deps = [

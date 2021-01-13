@@ -31,7 +31,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["webhook.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/plugin/pkg/authorizer/webhook",
+    importmap = "vendor/k8s.io/apiserver/plugin/pkg/authorizer/webhook",
     importpath = "k8s.io/apiserver/plugin/pkg/authorizer/webhook",
     deps = [
         "//staging/src/k8s.io/api/authorization/v1:go_default_library",

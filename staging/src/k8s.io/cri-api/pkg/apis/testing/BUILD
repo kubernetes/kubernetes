@@ -7,7 +7,7 @@ go_library(
         "fake_runtime_service.go",
         "utils.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cri-api/pkg/apis/testing",
+    importmap = "vendor/k8s.io/cri-api/pkg/apis/testing",
     importpath = "k8s.io/cri-api/pkg/apis/testing",
     visibility = ["//visibility:public"],
     deps = [

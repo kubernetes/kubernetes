@@ -9,7 +9,7 @@ go_library(
         "kubectl_match_version.go",
         "printing.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/util",
+    importmap = "vendor/k8s.io/kubectl/pkg/cmd/util",
     importpath = "k8s.io/kubectl/pkg/cmd/util",
     visibility = ["//visibility:public"],
     deps = [

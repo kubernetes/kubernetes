@@ -6,7 +6,7 @@ go_library(
         "well_known_annotations.go",
         "well_known_taints.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/api",
+    importmap = "vendor/k8s.io/cloud-provider/api",
     importpath = "k8s.io/cloud-provider/api",
     visibility = ["//visibility:public"],
 )

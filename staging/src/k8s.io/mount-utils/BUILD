@@ -13,7 +13,7 @@ go_library(
         "mount_unsupported.go",
         "mount_windows.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/mount-utils",
+    importmap = "vendor/k8s.io/mount-utils",
     importpath = "k8s.io/mount-utils",
     visibility = ["//visibility:public"],
     deps = [

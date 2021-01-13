@@ -9,7 +9,7 @@ go_library(
         "surroundingobject.go",
         "validation.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting",
+    importmap = "vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting",
     importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting",
     visibility = ["//visibility:public"],
     deps = [

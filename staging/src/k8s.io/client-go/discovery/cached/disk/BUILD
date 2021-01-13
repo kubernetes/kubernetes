@@ -6,7 +6,7 @@ go_library(
         "cached_discovery.go",
         "round_tripper.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/discovery/cached/disk",
+    importmap = "vendor/k8s.io/client-go/discovery/cached/disk",
     importpath = "k8s.io/client-go/discovery/cached/disk",
     visibility = ["//visibility:public"],
     deps = [

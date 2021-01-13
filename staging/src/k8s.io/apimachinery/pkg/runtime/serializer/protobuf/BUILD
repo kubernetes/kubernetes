@@ -8,7 +8,7 @@ go_library(
         "doc.go",
         "protobuf.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/runtime/serializer/protobuf",
+    importmap = "vendor/k8s.io/apimachinery/pkg/runtime/serializer/protobuf",
     importpath = "k8s.io/apimachinery/pkg/runtime/serializer/protobuf",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

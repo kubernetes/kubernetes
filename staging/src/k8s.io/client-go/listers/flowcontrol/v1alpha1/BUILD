@@ -7,7 +7,7 @@ go_library(
         "flowschema.go",
         "prioritylevelconfiguration.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/flowcontrol/v1alpha1",
+    importmap = "vendor/k8s.io/client-go/listers/flowcontrol/v1alpha1",
     importpath = "k8s.io/client-go/listers/flowcontrol/v1alpha1",
     visibility = ["//visibility:public"],
     deps = [

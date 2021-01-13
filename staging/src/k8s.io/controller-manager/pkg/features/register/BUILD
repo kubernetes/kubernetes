@@ -8,7 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["register.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/controller-manager/pkg/features/register",
+    importmap = "vendor/k8s.io/controller-manager/pkg/features/register",
     importpath = "k8s.io/controller-manager/pkg/features/register",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",

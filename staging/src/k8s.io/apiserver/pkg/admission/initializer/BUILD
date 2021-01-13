@@ -12,7 +12,7 @@ go_library(
         "initializer.go",
         "interfaces.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/initializer",
+    importmap = "vendor/k8s.io/apiserver/pkg/admission/initializer",
     importpath = "k8s.io/apiserver/pkg/admission/initializer",
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",

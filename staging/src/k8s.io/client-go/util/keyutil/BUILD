@@ -15,7 +15,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["key.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/keyutil",
+    importmap = "vendor/k8s.io/client-go/util/keyutil",
     importpath = "k8s.io/client-go/util/keyutil",
 )
 

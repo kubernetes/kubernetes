@@ -6,7 +6,7 @@ go_library(
         "editoptions.go",
         "editor.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/util/editor",
+    importmap = "vendor/k8s.io/kubectl/pkg/cmd/util/editor",
     importpath = "k8s.io/kubectl/pkg/cmd/util/editor",
     visibility = ["//visibility:public"],
     deps = [

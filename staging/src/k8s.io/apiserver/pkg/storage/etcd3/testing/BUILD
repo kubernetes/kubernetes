@@ -11,7 +11,7 @@ go_library(
         "test_server.go",
         "utils.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/etcd3/testing",
+    importmap = "vendor/k8s.io/apiserver/pkg/storage/etcd3/testing",
     importpath = "k8s.io/apiserver/pkg/storage/etcd3/testing",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",

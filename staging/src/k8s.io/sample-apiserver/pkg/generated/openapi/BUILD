@@ -17,7 +17,7 @@ gen_openapi(
 go_library(
     name = "go_default_library",
     srcs = ["zz_generated.openapi.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-apiserver/pkg/generated/openapi",
+    importmap = "vendor/k8s.io/sample-apiserver/pkg/generated/openapi",
     importpath = "k8s.io/sample-apiserver/pkg/generated/openapi",
     visibility = ["//visibility:public"],
     deps = openapi_deps(),  # keep

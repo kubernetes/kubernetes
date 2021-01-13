@@ -6,7 +6,7 @@ go_library(
         "customresourcedefinition.go",
         "expansion_generated.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1",
+    importmap = "vendor/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1",
     importpath = "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1",
     visibility = ["//visibility:public"],
     deps = [

@@ -6,7 +6,7 @@ go_library(
         "doc.go",
         "statuserror.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/errors",
+    importmap = "vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/errors",
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/errors",
     visibility = ["//visibility:public"],
     deps = [

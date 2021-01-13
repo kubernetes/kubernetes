@@ -6,7 +6,7 @@ go_library(
         "available_controller.go",
         "metrics.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/controllers/status",
+    importmap = "vendor/k8s.io/kube-aggregator/pkg/controllers/status",
     importpath = "k8s.io/kube-aggregator/pkg/controllers/status",
     visibility = ["//visibility:public"],
     deps = [

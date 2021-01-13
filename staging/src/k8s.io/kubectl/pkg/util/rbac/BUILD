@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["rbac.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/util/rbac",
+    importmap = "vendor/k8s.io/kubectl/pkg/util/rbac",
     importpath = "k8s.io/kubectl/pkg/util/rbac",
     visibility = ["//visibility:public"],
     deps = [

@@ -6,7 +6,7 @@ go_library(
         "interface.go",
         "noop.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/flowcontrol/counter",
+    importmap = "vendor/k8s.io/apiserver/pkg/util/flowcontrol/counter",
     importpath = "k8s.io/apiserver/pkg/util/flowcontrol/counter",
     visibility = ["//visibility:public"],
 )

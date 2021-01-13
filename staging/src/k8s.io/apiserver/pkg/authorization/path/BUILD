@@ -6,7 +6,7 @@ go_library(
         "doc.go",
         "path.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authorization/path",
+    importmap = "vendor/k8s.io/apiserver/pkg/authorization/path",
     importpath = "k8s.io/apiserver/pkg/authorization/path",
     visibility = ["//visibility:public"],
     deps = [

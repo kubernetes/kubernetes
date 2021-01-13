@@ -6,7 +6,7 @@ go_library(
         "packages.go",
         "register_external.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/register-gen/generators",
+    importmap = "vendor/k8s.io/code-generator/cmd/register-gen/generators",
     importpath = "k8s.io/code-generator/cmd/register-gen/generators",
     visibility = ["//visibility:public"],
     deps = [

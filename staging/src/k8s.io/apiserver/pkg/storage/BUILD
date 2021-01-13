@@ -30,7 +30,7 @@ go_library(
         "selection_predicate.go",
         "util.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage",
+    importmap = "vendor/k8s.io/apiserver/pkg/storage",
     importpath = "k8s.io/apiserver/pkg/storage",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

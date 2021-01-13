@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["legacy.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/discovery/cached",
+    importmap = "vendor/k8s.io/client-go/discovery/cached",
     importpath = "k8s.io/client-go/discovery/cached",
     visibility = ["//visibility:public"],
     deps = [

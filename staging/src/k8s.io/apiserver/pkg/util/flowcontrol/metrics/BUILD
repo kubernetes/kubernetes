@@ -7,7 +7,7 @@ go_library(
         "sample_and_watermark.go",
         "timed_observer.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/flowcontrol/metrics",
+    importmap = "vendor/k8s.io/apiserver/pkg/util/flowcontrol/metrics",
     importpath = "k8s.io/apiserver/pkg/util/flowcontrol/metrics",
     visibility = ["//visibility:public"],
     deps = [

@@ -9,7 +9,7 @@ go_library(
         "evaluator.go",
         "registry.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/quota/v1/generic",
+    importmap = "vendor/k8s.io/apiserver/pkg/quota/v1/generic",
     importpath = "k8s.io/apiserver/pkg/quota/v1/generic",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

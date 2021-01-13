@@ -7,7 +7,7 @@ go_library(
         "retrywatcher.go",
         "until.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/watch",
+    importmap = "vendor/k8s.io/client-go/tools/watch",
     importpath = "k8s.io/client-go/tools/watch",
     visibility = ["//visibility:public"],
     deps = [

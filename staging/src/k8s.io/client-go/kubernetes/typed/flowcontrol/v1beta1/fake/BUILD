@@ -8,7 +8,7 @@ go_library(
         "fake_flowschema.go",
         "fake_prioritylevelconfiguration.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1/fake",
+    importmap = "vendor/k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1/fake",
     importpath = "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1/fake",
     visibility = ["//visibility:public"],
     deps = [

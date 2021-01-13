@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["proxy_server.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/proxy",
+    importmap = "vendor/k8s.io/kubectl/pkg/proxy",
     importpath = "k8s.io/kubectl/pkg/proxy",
     visibility = ["//visibility:public"],
     deps = [

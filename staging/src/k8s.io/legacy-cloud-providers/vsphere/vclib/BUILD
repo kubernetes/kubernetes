@@ -22,7 +22,7 @@ go_library(
         "volumeoptions.go",
         "vsphere_metrics.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/vsphere/vclib",
+    importmap = "vendor/k8s.io/legacy-cloud-providers/vsphere/vclib",
     importpath = "k8s.io/legacy-cloud-providers/vsphere/vclib",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

@@ -8,7 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["openstack_stub.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/plugin/pkg/client/auth/openstack",
+    importmap = "vendor/k8s.io/client-go/plugin/pkg/client/auth/openstack",
     importpath = "k8s.io/client-go/plugin/pkg/client/auth/openstack",
     deps = [
         "//staging/src/k8s.io/client-go/rest:go_default_library",

@@ -16,7 +16,7 @@ go_library(
         "validation.go",
         "webhook.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/webhook",
+    importmap = "vendor/k8s.io/apiserver/pkg/util/webhook",
     importpath = "k8s.io/apiserver/pkg/util/webhook",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

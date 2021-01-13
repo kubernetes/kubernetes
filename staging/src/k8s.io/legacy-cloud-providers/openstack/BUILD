@@ -18,7 +18,7 @@ go_library(
         "openstack_routes.go",
         "openstack_volumes.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/openstack",
+    importmap = "vendor/k8s.io/legacy-cloud-providers/openstack",
     importpath = "k8s.io/legacy-cloud-providers/openstack",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

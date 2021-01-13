@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["install.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/config/install",
+    importmap = "vendor/k8s.io/cloud-provider/config/install",
     importpath = "k8s.io/cloud-provider/config/install",
     visibility = ["//visibility:public"],
     deps = [

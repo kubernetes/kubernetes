@@ -8,7 +8,7 @@ go_library(
         "fake_mutatingwebhookconfiguration.go",
         "fake_validatingwebhookconfiguration.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/admissionregistration/v1/fake",
+    importmap = "vendor/k8s.io/client-go/kubernetes/typed/admissionregistration/v1/fake",
     importpath = "k8s.io/client-go/kubernetes/typed/admissionregistration/v1/fake",
     visibility = ["//visibility:public"],
     deps = [

@@ -8,7 +8,7 @@ go_library(
         "events_cache.go",
         "fake.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/record",
+    importmap = "vendor/k8s.io/client-go/tools/record",
     importpath = "k8s.io/client-go/tools/record",
     visibility = ["//visibility:public"],
     deps = [

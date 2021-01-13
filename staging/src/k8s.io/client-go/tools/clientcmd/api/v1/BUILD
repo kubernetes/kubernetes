@@ -15,7 +15,7 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/clientcmd/api/v1",
+    importmap = "vendor/k8s.io/client-go/tools/clientcmd/api/v1",
     importpath = "k8s.io/client-go/tools/clientcmd/api/v1",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",

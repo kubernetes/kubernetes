@@ -9,7 +9,7 @@ go_library(
         "nodemetrics.go",
         "podmetrics.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1alpha1",
+    importmap = "vendor/k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1alpha1",
     importpath = "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1alpha1",
     visibility = ["//visibility:public"],
     deps = [

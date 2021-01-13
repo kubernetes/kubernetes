@@ -6,7 +6,7 @@ go_library(
         "admissionreview.go",
         "doc.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/request",
+    importmap = "vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/request",
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/request",
     visibility = ["//visibility:public"],
     deps = [

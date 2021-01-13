@@ -7,7 +7,7 @@ go_library(
         "fake_discovery_client.go",
         "fake_endpointslice.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/discovery/v1alpha1/fake",
+    importmap = "vendor/k8s.io/client-go/kubernetes/typed/discovery/v1alpha1/fake",
     importpath = "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1/fake",
     visibility = ["//visibility:public"],
     deps = [

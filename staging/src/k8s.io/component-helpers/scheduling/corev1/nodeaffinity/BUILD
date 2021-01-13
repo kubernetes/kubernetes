@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["nodeaffinity.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-helpers/scheduling/corev1/nodeaffinity",
+    importmap = "vendor/k8s.io/component-helpers/scheduling/corev1/nodeaffinity",
     importpath = "k8s.io/component-helpers/scheduling/corev1/nodeaffinity",
     visibility = ["//visibility:public"],
     deps = [

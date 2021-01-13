@@ -19,7 +19,7 @@ go_library(
         "record_flags.go",
         "template_flags.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cli-runtime/pkg/genericclioptions",
+    importmap = "vendor/k8s.io/cli-runtime/pkg/genericclioptions",
     importpath = "k8s.io/cli-runtime/pkg/genericclioptions",
     visibility = ["//visibility:public"],
     deps = [

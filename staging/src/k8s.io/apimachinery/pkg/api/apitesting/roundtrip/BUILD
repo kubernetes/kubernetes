@@ -11,7 +11,7 @@ go_library(
         "compatibility.go",
         "roundtrip.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/api/apitesting/roundtrip",
+    importmap = "vendor/k8s.io/apimachinery/pkg/api/apitesting/roundtrip",
     importpath = "k8s.io/apimachinery/pkg/api/apitesting/roundtrip",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/apitesting:go_default_library",

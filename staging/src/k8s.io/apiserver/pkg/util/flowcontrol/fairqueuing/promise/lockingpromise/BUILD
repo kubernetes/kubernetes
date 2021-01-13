@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["lockingpromise.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise/lockingpromise",
+    importmap = "vendor/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise/lockingpromise",
     importpath = "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise/lockingpromise",
     visibility = ["//visibility:public"],
     deps = [

@@ -8,7 +8,7 @@ go_library(
         "generated_expansion.go",
         "horizontalpodautoscaler.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2",
+    importmap = "vendor/k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2",
     importpath = "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2",
     visibility = ["//visibility:public"],
     deps = [

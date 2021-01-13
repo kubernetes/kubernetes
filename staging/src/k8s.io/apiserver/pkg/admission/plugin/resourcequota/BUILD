@@ -15,7 +15,7 @@ go_library(
         "doc.go",
         "resource_access.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/plugin/resourcequota",
+    importmap = "vendor/k8s.io/apiserver/pkg/admission/plugin/resourcequota",
     importpath = "k8s.io/apiserver/pkg/admission/plugin/resourcequota",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

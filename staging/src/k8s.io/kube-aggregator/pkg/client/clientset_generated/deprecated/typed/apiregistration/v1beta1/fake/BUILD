@@ -7,7 +7,7 @@ go_library(
         "fake_apiregistration_client.go",
         "fake_apiservice.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/client/clientset_generated/deprecated/typed/apiregistration/v1beta1/fake",
+    importmap = "vendor/k8s.io/kube-aggregator/pkg/client/clientset_generated/deprecated/typed/apiregistration/v1beta1/fake",
     importpath = "k8s.io/kube-aggregator/pkg/client/clientset_generated/deprecated/typed/apiregistration/v1beta1/fake",
     visibility = ["//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/deprecated:__subpackages__"],
     deps = [

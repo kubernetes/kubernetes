@@ -6,7 +6,7 @@ go_library(
         "doc.go",
         "interface.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/azure/clients/diskclient/mockdiskclient",
+    importmap = "vendor/k8s.io/legacy-cloud-providers/azure/clients/diskclient/mockdiskclient",
     importpath = "k8s.io/legacy-cloud-providers/azure/clients/diskclient/mockdiskclient",
     visibility = ["//visibility:public"],
     deps = [

@@ -6,7 +6,7 @@ go_library(
         "expansion_generated.go",
         "testtype.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/_examples/apiserver/listers/example3.io/internalversion",
+    importmap = "vendor/k8s.io/code-generator/_examples/apiserver/listers/example3.io/internalversion",
     importpath = "k8s.io/code-generator/_examples/apiserver/listers/example3.io/internalversion",
     visibility = ["//visibility:public"],
     deps = [

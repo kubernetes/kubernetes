@@ -6,7 +6,7 @@ go_library(
         "interface.go",
         "lease.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/informers/coordination/v1",
+    importmap = "vendor/k8s.io/client-go/informers/coordination/v1",
     importpath = "k8s.io/client-go/informers/coordination/v1",
     visibility = ["//visibility:public"],
     deps = [

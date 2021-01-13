@@ -12,7 +12,7 @@ go_library(
         "zz_generated.deepcopy.go",
         "zz_generated.prerelease-lifecycle.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/api/discovery/v1beta1",
+    importmap = "vendor/k8s.io/api/discovery/v1beta1",
     importpath = "k8s.io/api/discovery/v1beta1",
     visibility = ["//visibility:public"],
     deps = [

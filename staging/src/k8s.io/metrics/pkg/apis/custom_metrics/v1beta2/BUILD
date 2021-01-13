@@ -10,7 +10,7 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2",
+    importmap = "vendor/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2",
     importpath = "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2",
     visibility = ["//visibility:public"],
     deps = [

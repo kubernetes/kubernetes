@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["kms_plugin_mock.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing",
+    importmap = "vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing",
     importpath = "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing",
     visibility = ["//visibility:public"],
     deps = select({

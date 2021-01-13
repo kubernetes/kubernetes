@@ -36,7 +36,7 @@ go_library(
         "queue.go",
         "rate_limiting_queue.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/workqueue",
+    importmap = "vendor/k8s.io/client-go/util/workqueue",
     importpath = "k8s.io/client-go/util/workqueue",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",

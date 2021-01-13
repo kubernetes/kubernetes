@@ -7,7 +7,7 @@ go_library(
         "coerce.go",
         "validation.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta",
+    importmap = "vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta",
     importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta",
     visibility = ["//visibility:public"],
     deps = [

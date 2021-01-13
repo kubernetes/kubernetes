@@ -34,7 +34,7 @@ go_library(
         "codec_factory.go",
         "negotiated_codec.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/runtime/serializer",
+    importmap = "vendor/k8s.io/apimachinery/pkg/runtime/serializer",
     importpath = "k8s.io/apimachinery/pkg/runtime/serializer",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

@@ -14,7 +14,7 @@ go_library(
         "generator_for_group.go",
         "generator_for_type.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/client-gen/generators",
+    importmap = "vendor/k8s.io/code-generator/cmd/client-gen/generators",
     importpath = "k8s.io/code-generator/cmd/client-gen/generators",
     deps = [
         "//staging/src/k8s.io/code-generator/cmd/client-gen/args:go_default_library",

@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["config.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/controller-manager/pkg/leadermigration/config",
+    importmap = "vendor/k8s.io/controller-manager/pkg/leadermigration/config",
     importpath = "k8s.io/controller-manager/pkg/leadermigration/config",
     visibility = ["//visibility:public"],
     deps = [

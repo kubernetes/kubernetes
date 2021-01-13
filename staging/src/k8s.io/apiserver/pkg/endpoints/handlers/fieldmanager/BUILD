@@ -15,7 +15,7 @@ go_library(
         "typeconverter.go",
         "versionconverter.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager",
+    importmap = "vendor/k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager",
     importpath = "k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager",
     visibility = ["//visibility:public"],
     deps = [

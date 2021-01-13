@@ -22,7 +22,7 @@ go_library(
         "serving_windows.go",
         "serving_with_loopback.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/options",
+    importmap = "vendor/k8s.io/apiserver/pkg/server/options",
     importpath = "k8s.io/apiserver/pkg/server/options",
     visibility = ["//visibility:public"],
     deps = [

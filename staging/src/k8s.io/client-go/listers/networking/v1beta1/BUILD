@@ -7,7 +7,7 @@ go_library(
         "ingress.go",
         "ingressclass.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/networking/v1beta1",
+    importmap = "vendor/k8s.io/client-go/listers/networking/v1beta1",
     importpath = "k8s.io/client-go/listers/networking/v1beta1",
     visibility = ["//visibility:public"],
     deps = [

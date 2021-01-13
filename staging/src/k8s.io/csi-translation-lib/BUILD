@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["translate.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/csi-translation-lib",
+    importmap = "vendor/k8s.io/csi-translation-lib",
     importpath = "k8s.io/csi-translation-lib",
     visibility = ["//visibility:public"],
     deps = [

@@ -6,7 +6,7 @@ go_library(
         "clusterinfo.go",
         "clusterinfo_dump.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/clusterinfo",
+    importmap = "vendor/k8s.io/kubectl/pkg/cmd/clusterinfo",
     importpath = "k8s.io/kubectl/pkg/cmd/clusterinfo",
     visibility = ["//visibility:public"],
     deps = [

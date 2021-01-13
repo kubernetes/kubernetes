@@ -6,7 +6,7 @@ go_library(
         "install.go",
         "scheme.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/scheme",
+    importmap = "vendor/k8s.io/kubectl/pkg/scheme",
     importpath = "k8s.io/kubectl/pkg/scheme",
     visibility = ["//visibility:public"],
     deps = [

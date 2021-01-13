@@ -17,7 +17,7 @@ go_library(
         "types.go",
         "union.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/audit",
+    importmap = "vendor/k8s.io/apiserver/pkg/audit",
     importpath = "k8s.io/apiserver/pkg/audit",
     deps = [
         "//staging/src/k8s.io/api/authentication/v1:go_default_library",

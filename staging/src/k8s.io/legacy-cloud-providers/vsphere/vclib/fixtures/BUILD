@@ -7,7 +7,7 @@ go_library(
         "*.pem",
         "*.key",
     ]),
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/vsphere/vclib/fixtures",
+    importmap = "vendor/k8s.io/legacy-cloud-providers/vsphere/vclib/fixtures",
     importpath = "k8s.io/legacy-cloud-providers/vsphere/vclib/fixtures",
     visibility = ["//visibility:public"],
 )

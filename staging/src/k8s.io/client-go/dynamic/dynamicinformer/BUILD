@@ -6,7 +6,7 @@ go_library(
         "informer.go",
         "interface.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/dynamic/dynamicinformer",
+    importmap = "vendor/k8s.io/client-go/dynamic/dynamicinformer",
     importpath = "k8s.io/client-go/dynamic/dynamicinformer",
     visibility = ["//visibility:public"],
     deps = [

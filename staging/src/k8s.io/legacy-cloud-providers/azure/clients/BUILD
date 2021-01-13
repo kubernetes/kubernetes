@@ -6,7 +6,7 @@ go_library(
         "azure_client_config.go",
         "doc.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/azure/clients",
+    importmap = "vendor/k8s.io/legacy-cloud-providers/azure/clients",
     importpath = "k8s.io/legacy-cloud-providers/azure/clients",
     visibility = ["//visibility:public"],
     deps = [

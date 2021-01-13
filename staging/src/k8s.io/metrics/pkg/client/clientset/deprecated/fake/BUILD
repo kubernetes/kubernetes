@@ -7,7 +7,7 @@ go_library(
         "doc.go",
         "register.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/client/clientset/deprecated/fake",
+    importmap = "vendor/k8s.io/metrics/pkg/client/clientset/deprecated/fake",
     importpath = "k8s.io/metrics/pkg/client/clientset/deprecated/fake",
     visibility = ["//staging/src/k8s.io/metrics/pkg/client/clientset/deprecated:__subpackages__"],
     deps = [

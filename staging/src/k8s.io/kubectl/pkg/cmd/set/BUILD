@@ -16,7 +16,7 @@ go_library(
         "set_serviceaccount.go",
         "set_subject.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/set",
+    importmap = "vendor/k8s.io/kubectl/pkg/cmd/set",
     importpath = "k8s.io/kubectl/pkg/cmd/set",
     visibility = ["//build/visible_to:pkg_kubectl_cmd_set_CONSUMERS"],
     deps = [

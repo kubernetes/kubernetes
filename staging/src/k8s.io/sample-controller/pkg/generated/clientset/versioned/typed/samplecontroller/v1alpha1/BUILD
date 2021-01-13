@@ -8,7 +8,7 @@ go_library(
         "generated_expansion.go",
         "samplecontroller_client.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-controller/pkg/generated/clientset/versioned/typed/samplecontroller/v1alpha1",
+    importmap = "vendor/k8s.io/sample-controller/pkg/generated/clientset/versioned/typed/samplecontroller/v1alpha1",
     importpath = "k8s.io/sample-controller/pkg/generated/clientset/versioned/typed/samplecontroller/v1alpha1",
     visibility = ["//visibility:public"],
     deps = [

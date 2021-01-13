@@ -14,7 +14,7 @@ go_library(
         "fake_deployment.go",
         "fake_statefulset.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/apps/v1beta1/fake",
+    importmap = "vendor/k8s.io/client-go/kubernetes/typed/apps/v1beta1/fake",
     importpath = "k8s.io/client-go/kubernetes/typed/apps/v1beta1/fake",
     deps = [
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",

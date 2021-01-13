@@ -19,7 +19,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/serviceaccount",
+    importmap = "vendor/k8s.io/apiserver/pkg/authentication/serviceaccount",
     importpath = "k8s.io/apiserver/pkg/authentication/serviceaccount",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

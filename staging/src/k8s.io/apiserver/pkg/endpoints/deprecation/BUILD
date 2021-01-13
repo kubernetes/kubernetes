@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["deprecation.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/deprecation",
+    importmap = "vendor/k8s.io/apiserver/pkg/endpoints/deprecation",
     importpath = "k8s.io/apiserver/pkg/endpoints/deprecation",
     visibility = ["//visibility:public"],
     deps = [

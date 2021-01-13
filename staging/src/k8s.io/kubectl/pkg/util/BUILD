@@ -10,7 +10,7 @@ go_library(
         "umask_windows.go",
         "util.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/util",
+    importmap = "vendor/k8s.io/kubectl/pkg/util",
     importpath = "k8s.io/kubectl/pkg/util",
     visibility = ["//visibility:public"],
     deps = [

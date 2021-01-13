@@ -27,7 +27,7 @@ go_library(
         "metrics.go",
         "transformer.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/value",
+    importmap = "vendor/k8s.io/apiserver/pkg/storage/value",
     importpath = "k8s.io/apiserver/pkg/storage/value",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",

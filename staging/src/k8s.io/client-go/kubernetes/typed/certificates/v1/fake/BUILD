@@ -7,7 +7,7 @@ go_library(
         "fake_certificates_client.go",
         "fake_certificatesigningrequest.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/certificates/v1/fake",
+    importmap = "vendor/k8s.io/client-go/kubernetes/typed/certificates/v1/fake",
     importpath = "k8s.io/client-go/kubernetes/typed/certificates/v1/fake",
     visibility = ["//visibility:public"],
     deps = [

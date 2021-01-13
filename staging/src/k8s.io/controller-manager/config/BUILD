@@ -25,7 +25,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/controller-manager/config",
+    importmap = "vendor/k8s.io/controller-manager/config",
     importpath = "k8s.io/controller-manager/config",
     visibility = ["//visibility:public"],
     deps = [

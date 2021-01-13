@@ -31,7 +31,7 @@ go_library(
         "table.go",
         "update.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/registry/rest",
+    importmap = "vendor/k8s.io/apiserver/pkg/registry/rest",
     importpath = "k8s.io/apiserver/pkg/registry/rest",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

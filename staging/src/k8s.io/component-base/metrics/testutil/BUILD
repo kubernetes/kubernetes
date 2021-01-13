@@ -7,7 +7,7 @@ go_library(
         "promlint.go",
         "testutil.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/metrics/testutil",
+    importmap = "vendor/k8s.io/component-base/metrics/testutil",
     importpath = "k8s.io/component-base/metrics/testutil",
     visibility = ["//visibility:public"],
     deps = [

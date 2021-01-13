@@ -8,7 +8,7 @@ go_library(
         "helpers.go",
         "roundtrip.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/config/testing",
+    importmap = "vendor/k8s.io/component-base/config/testing",
     importpath = "k8s.io/component-base/config/testing",
     visibility = ["//visibility:public"],
     deps = [

@@ -13,7 +13,7 @@ go_library(
         "plugins.go",
         "ports.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider",
+    importmap = "vendor/k8s.io/cloud-provider",
     importpath = "k8s.io/cloud-provider",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

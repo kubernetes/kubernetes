@@ -8,7 +8,7 @@ go_library(
         "doc.go",
         "generated_expansion.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/deprecated/typed/apiextensions/v1beta1",
+    importmap = "vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/deprecated/typed/apiextensions/v1beta1",
     importpath = "k8s.io/apiextensions-apiserver/pkg/client/clientset/deprecated/typed/apiextensions/v1beta1",
     visibility = ["//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/deprecated:__subpackages__"],
     deps = [

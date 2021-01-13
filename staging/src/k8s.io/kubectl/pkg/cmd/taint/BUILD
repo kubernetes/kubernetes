@@ -6,7 +6,7 @@ go_library(
         "taint.go",
         "utils.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/taint",
+    importmap = "vendor/k8s.io/kubectl/pkg/cmd/taint",
     importpath = "k8s.io/kubectl/pkg/cmd/taint",
     visibility = ["//visibility:public"],
     deps = [

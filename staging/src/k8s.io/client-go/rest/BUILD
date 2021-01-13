@@ -65,7 +65,7 @@ go_library(
         "warnings.go",
         "zz_generated.deepcopy.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/rest",
+    importmap = "vendor/k8s.io/client-go/rest",
     importpath = "k8s.io/client-go/rest",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

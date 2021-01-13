@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["codec.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/codec",
+    importmap = "vendor/k8s.io/component-base/codec",
     importpath = "k8s.io/component-base/codec",
     visibility = ["//visibility:public"],
     deps = [

@@ -6,7 +6,7 @@ go_library(
         "controller.go",
         "metrics.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/controller/openapi",
+    importmap = "vendor/k8s.io/apiextensions-apiserver/pkg/controller/openapi",
     importpath = "k8s.io/apiextensions-apiserver/pkg/controller/openapi",
     visibility = ["//visibility:public"],
     deps = [

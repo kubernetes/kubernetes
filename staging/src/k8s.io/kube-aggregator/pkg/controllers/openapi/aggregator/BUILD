@@ -8,7 +8,7 @@ go_library(
         "metrics.go",
         "priority.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator",
+    importmap = "vendor/k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator",
     importpath = "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator",
     visibility = ["//visibility:public"],
     deps = [

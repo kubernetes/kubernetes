@@ -9,7 +9,7 @@ go_library(
         "term.go",
         "term_writer.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/util/term",
+    importmap = "vendor/k8s.io/kubectl/pkg/util/term",
     importpath = "k8s.io/kubectl/pkg/util/term",
     visibility = ["//visibility:public"],
     deps = [

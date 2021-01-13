@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/examples/dynamic-create-update-delete-deployment",
+    importmap = "vendor/k8s.io/client-go/examples/dynamic-create-update-delete-deployment",
     importpath = "k8s.io/client-go/examples/dynamic-create-update-delete-deployment",
     visibility = ["//visibility:private"],
     deps = [

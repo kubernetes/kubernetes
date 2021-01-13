@@ -15,7 +15,7 @@ go_library(
         "rollout_status.go",
         "rollout_undo.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/rollout",
+    importmap = "vendor/k8s.io/kubectl/pkg/cmd/rollout",
     importpath = "k8s.io/kubectl/pkg/cmd/rollout",
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_rollout_CONSUMERS",

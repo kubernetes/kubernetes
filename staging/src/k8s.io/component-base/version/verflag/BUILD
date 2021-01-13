@@ -9,7 +9,7 @@ load("//staging/src/k8s.io/component-base/version:def.bzl", "version_x_defs")
 go_library(
     name = "go_default_library",
     srcs = ["verflag.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/version/verflag",
+    importmap = "vendor/k8s.io/component-base/version/verflag",
     importpath = "k8s.io/component-base/version/verflag",
     deps = [
         "//staging/src/k8s.io/component-base/version:go_default_library",

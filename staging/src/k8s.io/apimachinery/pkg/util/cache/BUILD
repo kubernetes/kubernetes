@@ -26,7 +26,7 @@ go_library(
         "expiring.go",
         "lruexpirecache.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/cache",
+    importmap = "vendor/k8s.io/apimachinery/pkg/util/cache",
     importpath = "k8s.io/apimachinery/pkg/util/cache",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",

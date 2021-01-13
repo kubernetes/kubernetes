@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["expose.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/expose",
+    importmap = "vendor/k8s.io/kubectl/pkg/cmd/expose",
     importpath = "k8s.io/kubectl/pkg/cmd/expose",
     visibility = ["//visibility:public"],
     deps = [

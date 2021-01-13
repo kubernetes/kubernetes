@@ -7,7 +7,7 @@ go_library(
         "helper.go",
         "serve.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/controller-manager/app",
+    importmap = "vendor/k8s.io/controller-manager/app",
     importpath = "k8s.io/controller-manager/app",
     visibility = ["//visibility:public"],
     deps = [

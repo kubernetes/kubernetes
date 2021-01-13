@@ -8,7 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["semantic.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/api/equality",
+    importmap = "vendor/k8s.io/apimachinery/pkg/api/equality",
     importpath = "k8s.io/apimachinery/pkg/api/equality",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",

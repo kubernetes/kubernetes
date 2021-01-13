@@ -7,7 +7,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/config",
+    importmap = "vendor/k8s.io/component-base/config",
     importpath = "k8s.io/component-base/config",
     visibility = ["//visibility:public"],
     deps = ["//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],

@@ -6,7 +6,7 @@ go_library(
         "base.go",
         "version.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/version",
+    importmap = "vendor/k8s.io/component-base/version",
     importpath = "k8s.io/component-base/version",
     visibility = ["//visibility:public"],
     deps = ["//staging/src/k8s.io/apimachinery/pkg/version:go_default_library"],

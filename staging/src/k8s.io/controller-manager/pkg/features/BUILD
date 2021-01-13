@@ -8,7 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["kube_features.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/controller-manager/pkg/features",
+    importmap = "vendor/k8s.io/controller-manager/pkg/features",
     importpath = "k8s.io/controller-manager/pkg/features",
     deps = ["//staging/src/k8s.io/component-base/featuregate:go_default_library"],
 )

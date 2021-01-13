@@ -14,7 +14,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/apis/custom_metrics",
+    importmap = "vendor/k8s.io/metrics/pkg/apis/custom_metrics",
     importpath = "k8s.io/metrics/pkg/apis/custom_metrics",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

@@ -32,7 +32,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["webhook.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook",
+    importmap = "vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook",
     importpath = "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook",
     deps = [
         "//staging/src/k8s.io/api/authentication/v1:go_default_library",

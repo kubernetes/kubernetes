@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["event_clock.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/clock",
+    importmap = "vendor/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/clock",
     importpath = "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/clock",
     visibility = ["//visibility:public"],
     deps = [

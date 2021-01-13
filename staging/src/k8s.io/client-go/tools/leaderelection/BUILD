@@ -7,7 +7,7 @@ go_library(
         "leaderelection.go",
         "metrics.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/leaderelection",
+    importmap = "vendor/k8s.io/client-go/tools/leaderelection",
     importpath = "k8s.io/client-go/tools/leaderelection",
     visibility = ["//visibility:public"],
     deps = [

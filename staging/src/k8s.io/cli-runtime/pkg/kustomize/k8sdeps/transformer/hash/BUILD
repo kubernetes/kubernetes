@@ -6,7 +6,7 @@ go_library(
         "hash.go",
         "namehash.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cli-runtime/pkg/kustomize/k8sdeps/transformer/hash",
+    importmap = "vendor/k8s.io/cli-runtime/pkg/kustomize/k8sdeps/transformer/hash",
     importpath = "k8s.io/cli-runtime/pkg/kustomize/k8sdeps/transformer/hash",
     visibility = ["//visibility:public"],
     deps = [

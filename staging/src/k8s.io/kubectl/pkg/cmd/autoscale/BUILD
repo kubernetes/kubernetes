@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["autoscale.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/autoscale",
+    importmap = "vendor/k8s.io/kubectl/pkg/cmd/autoscale",
     importpath = "k8s.io/kubectl/pkg/cmd/autoscale",
     visibility = ["//visibility:public"],
     deps = [

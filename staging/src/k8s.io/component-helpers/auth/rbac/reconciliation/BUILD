@@ -33,7 +33,7 @@ go_library(
         "rolebinding_interfaces.go",
         "zz_generated.deepcopy.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-helpers/auth/rbac/reconciliation",
+    importmap = "vendor/k8s.io/component-helpers/auth/rbac/reconciliation",
     importpath = "k8s.io/component-helpers/auth/rbac/reconciliation",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",

@@ -7,7 +7,7 @@ go_library(
         "doc.go",
         "interface.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/azure/clients/deploymentclient",
+    importmap = "vendor/k8s.io/legacy-cloud-providers/azure/clients/deploymentclient",
     importpath = "k8s.io/legacy-cloud-providers/azure/clients/deploymentclient",
     visibility = ["//visibility:public"],
     deps = [

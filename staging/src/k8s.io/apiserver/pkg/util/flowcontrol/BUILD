@@ -9,7 +9,7 @@ go_library(
         "formatting.go",
         "rule.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/flowcontrol",
+    importmap = "vendor/k8s.io/apiserver/pkg/util/flowcontrol",
     importpath = "k8s.io/apiserver/pkg/util/flowcontrol",
     visibility = ["//visibility:public"],
     deps = [

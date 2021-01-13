@@ -8,7 +8,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/_examples/apiserver/apis/example",
+    importmap = "vendor/k8s.io/code-generator/_examples/apiserver/apis/example",
     importpath = "k8s.io/code-generator/_examples/apiserver/apis/example",
     visibility = ["//visibility:public"],
     deps = [

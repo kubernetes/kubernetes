@@ -7,7 +7,7 @@ go_library(
         "lister.go",
         "shim.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/dynamic/dynamiclister",
+    importmap = "vendor/k8s.io/client-go/dynamic/dynamiclister",
     importpath = "k8s.io/client-go/dynamic/dynamiclister",
     visibility = ["//visibility:public"],
     deps = [

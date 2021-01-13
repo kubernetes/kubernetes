@@ -16,7 +16,7 @@ go_library(
         "watch.go",
         "zz_generated.deepcopy.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/watch",
+    importmap = "vendor/k8s.io/apimachinery/pkg/watch",
     importpath = "k8s.io/apimachinery/pkg/watch",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
