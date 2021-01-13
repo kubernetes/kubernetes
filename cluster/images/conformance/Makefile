@@ -34,6 +34,13 @@ CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 BASEIMAGE=debian:stretch-slim
 TEMP_DIR:=$(shell mktemp -d -t conformanceXXXXXX)
 
+# The BASEIMAGE does not support s390x right now.
+ifeq ($(ARCH),s390x)
+FROM_ARCH=amd64
+else
+FROM_ARCH=$(ARCH)
+endif
+
 all: build
 
 build:
@@ -54,7 +61,9 @@ endif
 	chmod a+rx ${TEMP_DIR}/e2e.test
 	chmod a+rx ${TEMP_DIR}/gorunner
 
-	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
+	cd ${TEMP_DIR} && \
+		sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile && \
+		sed -i.back "s|ARCH|${FROM_ARCH}|g" Dockerfile
 
 	docker build --pull -t ${REGISTRY}/conformance-${ARCH}:${VERSION} ${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
