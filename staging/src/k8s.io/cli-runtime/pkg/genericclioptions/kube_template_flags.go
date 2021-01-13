@@ -33,6 +33,7 @@ type KubeTemplatePrintFlags struct {
 	TemplateArgument *string
 }
 
+// AllowedFormats returns slice of string of allowed GoTemplete and JSONPathPrint printing formats
 func (f *KubeTemplatePrintFlags) AllowedFormats() []string {
 	if f == nil {
 		return []string{}
@@ -40,6 +41,10 @@ func (f *KubeTemplatePrintFlags) AllowedFormats() []string {
 	return append(f.GoTemplatePrintFlags.AllowedFormats(), f.JSONPathPrintFlags.AllowedFormats()...)
 }
 
+// ToPrinter receives an outputFormat and returns a printer capable of
+// handling --template printing.
+// Returns false if the specified outputFormat does not match a supported format.
+// Supported Format types can be found in pkg/printers/printers.go
 func (f *KubeTemplatePrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, error) {
 	if f == nil {
 		return nil, NoCompatiblePrinterError{}
