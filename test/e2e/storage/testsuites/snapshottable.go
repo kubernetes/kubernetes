@@ -116,6 +116,7 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 			sc                  *storagev1.StorageClass
 			claimSize           string
 			originalMntTestData string
+			nodeName            string
 		)
 		init := func() {
 			sDriver, _ = driver.(storageframework.SnapshottableTestDriver)
@@ -138,24 +139,6 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 			pvc = volumeResource.Pvc
 			sc = volumeResource.Sc
 			claimSize = pvc.Spec.Resources.Requests.Storage().String()
-
-			ginkgo.By("starting a pod to use the claim")
-			originalMntTestData = fmt.Sprintf("hello from %s namespace", pvc.GetNamespace())
-			command := fmt.Sprintf("echo '%s' > %s", originalMntTestData, datapath)
-
-			RunInPodWithVolume(cs, f.Timeouts, pvc.Namespace, pvc.Name, "pvc-snapshottable-tester", command, config.ClientNodeSelection)
-
-			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, f.Timeouts.ClaimProvision)
-			framework.ExpectNoError(err)
-			ginkgo.By("checking the claim")
-			// Get new copy of the claim
-			pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-
-			// Get the bound PV
-			ginkgo.By("checking the PV")
-			_, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
 		}
 
 		cleanup := func() {
@@ -180,6 +163,37 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 			cleanup()
 		})
 
+		// createAndTestPodClaimPV creates a pod, checks the claim and the PV.
+		// The pod is cleaned up if keepPodAlive is set to false.
+		// otherwise it is added to the cleanup steps and is cleaned up at the end of the test.
+		createAndTestPodClaimPV := func(keepPodAlive bool) {
+			ginkgo.By("starting a pod to use the claim")
+			originalMntTestData = fmt.Sprintf("hello from %s namespace", pvc.GetNamespace())
+			command := fmt.Sprintf("echo '%s' > %s", originalMntTestData, datapath)
+
+			if keepPodAlive {
+				alivePod := StartInPodWithVolume(cs, pvc.Namespace, pvc.Name, "pvc-snapshottable-tester", command, config.ClientNodeSelection)
+				nodeName = alivePod.Spec.NodeName
+				cleanupSteps = append(cleanupSteps, func() {
+					StopPod(cs, alivePod)
+				})
+			} else {
+				RunInPodWithVolume(cs, f.Timeouts, pvc.Namespace, pvc.Name, "pvc-snapshottable-tester", command, config.ClientNodeSelection)
+			}
+
+			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, f.Timeouts.ClaimProvision)
+			framework.ExpectNoError(err)
+			ginkgo.By("checking the claim")
+			// Get new copy of the claim
+			pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			// Get the bound PV
+			ginkgo.By("checking the PV")
+			_, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+		}
+
 		ginkgo.Context("", func() {
 			var (
 				vs        *unstructured.Unstructured
@@ -187,17 +201,10 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 				vsc       *unstructured.Unstructured
 			)
 
-			ginkgo.BeforeEach(func() {
-				var sr *storageframework.SnapshotResource
-				cleanupSteps = append(cleanupSteps, func() {
-					framework.ExpectNoError(sr.CleanupResource(f.Timeouts))
-				})
-				sr = storageframework.CreateSnapshotResource(sDriver, config, pattern, pvc.GetName(), pvc.GetNamespace(), f.Timeouts)
-				vs = sr.Vs
-				vscontent = sr.Vscontent
-				vsc = sr.Vsclass
-			})
-			ginkgo.It("should check snapshot fields, check restore correctly works after modifying source data, check deletion", func() {
+			ginkgo.It("should start pod, check the claim, check pv, check snapshot fields, check restore correctly works after modifying source data, check deletion", func() {
+				createAndTestPodClaimPV(false)
+				vs, vscontent, vsc = createSnapshot(f, config, pattern, pvc, cleanupSteps)
+
 				ginkgo.By("checking the snapshot")
 				// Get new copy of the snapshot
 				vs, err = dc.Resource(storageutils.SnapshotGVR).Namespace(vs.GetNamespace()).Get(context.TODO(), vs.GetName(), metav1.GetOptions{})
@@ -282,6 +289,88 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 					framework.ExpectError(err)
 				}
 			})
+
+			ginkgo.It("while original volume is still in use, create snapshot, create new pvc from snapshot, create new pod to use the pvc on the same node, validate data on volume", func() {
+				testSnapshotWithOriginalVolumeInUse(pattern, f, cs, dc, pvc, config, sc, claimSize,
+					createAndTestPodClaimPV, originalMntTestData, nodeName, true, /* sameNode */
+					config.ClientNodeSelection, cleanupSteps)
+			})
+
+			ginkgo.It("while original volume is still in use, create snapshot, create new pvc from snapshot, create new pod to use the pvc on a different node, validate data on volume", func() {
+				testSnapshotWithOriginalVolumeInUse(pattern, f, cs, dc, pvc, config, sc, claimSize,
+					createAndTestPodClaimPV, originalMntTestData, nodeName, false, /* sameNode */
+					config.ClientNodeSelection, cleanupSteps)
+			})
 		})
 	})
+}
+
+func createSnapshot(f *framework.Framework, config *storageframework.PerTestConfig, pattern storageframework.TestPattern, pvc *v1.PersistentVolumeClaim, cleanupSteps []func()) (vs, vscontent, vsc *unstructured.Unstructured) {
+	var sr *storageframework.SnapshotResource
+	cleanupSteps = append(cleanupSteps, func() {
+		framework.ExpectNoError(sr.CleanupResource(f.Timeouts))
+	})
+	sr = storageframework.CreateSnapshotResource(sDriver, config, pattern, pvc.GetName(), pvc.GetNamespace(), f.Timeouts)
+	return sr.Vs, sr.Vscontent, sr.Vsclass
+}
+
+func testSnapshotWithOriginalVolumeInUse(pattern storageframework.TestPattern, f *framework.Framework, cs clientset.Interface, dc dynamic.Interface, pvc *v1.PersistentVolumeClaim,
+	config *storageframework.PerTestConfig, sc *storagev1.StorageClass, claimSize string, createAndTestPodClaimPV func(bool),
+	originalMntTestData string, nodeName string, requireSameNode bool, node e2epod.NodeSelection, cleanupSteps []func()) {
+
+	createAndTestPodClaimPV(true)
+	vs, _, _ := createSnapshot(f, config, pattern, pvc, cleanupSteps)
+
+	ginkgo.By("checking the snapshot")
+	// Get new copy of the snapshot
+	vs, err := dc.Resource(storageutils.SnapshotGVR).Namespace(vs.GetNamespace()).Get(context.TODO(), vs.GetName(), metav1.GetOptions{})
+	framework.ExpectNoError(err)
+
+	var secondPVC *v1.PersistentVolumeClaim
+	var secondPod *v1.Pod
+
+	ginkgo.By("creating a pvc from the snapshot")
+	secondPVC = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+		ClaimSize:        claimSize,
+		StorageClassName: &(sc.Name),
+	}, config.Framework.Namespace.Name)
+
+	group := "snapshot.storage.k8s.io"
+
+	secondPVC.Spec.DataSource = &v1.TypedLocalObjectReference{
+		APIGroup: &group,
+		Kind:     "VolumeSnapshot",
+		Name:     vs.GetName(),
+	}
+
+	secondPVC, err = cs.CoreV1().PersistentVolumeClaims(secondPVC.Namespace).Create(context.TODO(), secondPVC, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+	cleanupSteps = append(cleanupSteps, func() {
+		framework.Logf("deleting claim %q/%q", secondPVC.Namespace, secondPVC.Name)
+		// typically this claim has already been deleted
+		err = cs.CoreV1().PersistentVolumeClaims(secondPVC.Namespace).Delete(context.TODO(), secondPVC.Name, metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			framework.Failf("Error deleting claim %q. Error: %v", secondPVC.Name, err)
+		}
+	})
+
+	if requireSameNode {
+		e2epod.SetAffinity(&node, nodeName)
+	} else {
+		e2epod.SetAntiAffinity(&node, nodeName)
+	}
+
+	ginkgo.By("starting pod2 to use the claim on the same node")
+
+	secondPod = StartInPodWithVolume(cs, secondPVC.Namespace, secondPVC.Name, "second-pvc-tester", "sleep 300", node)
+	cleanupSteps = append(cleanupSteps, func() {
+		StopPod(cs, secondPod)
+	})
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(cs, secondPod.Name, secondPod.Namespace, f.Timeouts.PodStartSlow))
+
+	ginkgo.By("validating data on the volume")
+
+	commands := e2evolume.GenerateReadFileCmd(datapath)
+	_, err = framework.LookForStringInPodExec(secondPod.Namespace, secondPod.Name, commands, originalMntTestData, time.Minute)
+	framework.ExpectNoError(err)
 }
