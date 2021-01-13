@@ -159,6 +159,10 @@ kube::version::ldflags() {
     ldflags+=(
       "-X '${KUBE_GO_PACKAGE}/vendor/k8s.io/client-go/pkg/version.${key}=${val}'"
       "-X '${KUBE_GO_PACKAGE}/vendor/k8s.io/component-base/version.${key}=${val}'"
+      "-X 'vendor/k8s.io/client-go/pkg/version.${key}=${val}'"
+      "-X 'vendor/k8s.io/component-base/version.${key}=${val}'"
+      "-X 'k8s.io/client-go/pkg/version.${key}=${val}'"
+      "-X 'k8s.io/component-base/version.${key}=${val}'"
     )
   }
 

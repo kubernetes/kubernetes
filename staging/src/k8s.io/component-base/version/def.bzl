@@ -18,6 +18,10 @@ def version_x_defs():
     stamp_pkgs = [
         "k8s.io/kubernetes/vendor/k8s.io/component-base/version",
         "k8s.io/kubernetes/vendor/k8s.io/client-go/pkg/version",
+        "vendor/k8s.io/component-base/version",
+        "vendor/k8s.io/client-go/pkg/version",
+        "k8s.io/component-base/version",
+        "k8s.io/client-go/pkg/version",
     ]
 
     # This should match the list of vars in kube::version::ldflags
