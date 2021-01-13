@@ -26,7 +26,17 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
+)
+
+var (
+	validRequirementOperators = []string{
+		string(selection.In), string(selection.NotIn),
+		string(selection.Equals), string(selection.DoubleEquals), string(selection.NotEquals),
+		string(selection.Exists), string(selection.DoesNotExist),
+		string(selection.GreaterThan), string(selection.LessThan),
+	}
 )
 
 // Requirements is AND of all requirements.
@@ -139,42 +149,47 @@ type Requirement struct {
 //     of characters. See validateLabelKey for more details.
 //
 // The empty string is a valid value in the input values set.
-func NewRequirement(key string, op selection.Operator, vals []string) (*Requirement, error) {
-	if err := validateLabelKey(key); err != nil {
-		return nil, err
+// Returned error, if not nil, is guaranteed to be an aggregated field.ErrorList
+func NewRequirement(key string, op selection.Operator, vals []string, opts ...field.PathOption) (*Requirement, error) {
+	var allErrs field.ErrorList
+	path := field.ToPath(opts...)
+	if err := validateLabelKey(key, path.Child("key")); err != nil {
+		allErrs = append(allErrs, err)
 	}
+
+	valuePath := path.Child("values")
 	switch op {
 	case selection.In, selection.NotIn:
 		if len(vals) == 0 {
-			return nil, fmt.Errorf("for 'in', 'notin' operators, values set can't be empty")
+			allErrs = append(allErrs, field.Invalid(valuePath, vals, "for 'in', 'notin' operators, values set can't be empty"))
 		}
 	case selection.Equals, selection.DoubleEquals, selection.NotEquals:
 		if len(vals) != 1 {
-			return nil, fmt.Errorf("exact-match compatibility requires one single value")
+			allErrs = append(allErrs, field.Invalid(valuePath, vals, "exact-match compatibility requires one single value"))
 		}
 	case selection.Exists, selection.DoesNotExist:
 		if len(vals) != 0 {
-			return nil, fmt.Errorf("values set must be empty for exists and does not exist")
+			allErrs = append(allErrs, field.Invalid(valuePath, vals, "values set must be empty for exists and does not exist"))
 		}
 	case selection.GreaterThan, selection.LessThan:
 		if len(vals) != 1 {
-			return nil, fmt.Errorf("for 'Gt', 'Lt' operators, exactly one value is required")
+			allErrs = append(allErrs, field.Invalid(valuePath, vals, "for 'Gt', 'Lt' operators, exactly one value is required"))
 		}
 		for i := range vals {
 			if _, err := strconv.ParseInt(vals[i], 10, 64); err != nil {
-				return nil, fmt.Errorf("for 'Gt', 'Lt' operators, the value must be an integer")
+				allErrs = append(allErrs, field.Invalid(valuePath.Index(i), vals[i], "for 'Gt', 'Lt' operators, the value must be an integer"))
 			}
 		}
 	default:
-		return nil, fmt.Errorf("operator '%v' is not recognized", op)
+		allErrs = append(allErrs, field.NotSupported(path.Child("operator"), op, validRequirementOperators))
 	}
 
 	for i := range vals {
-		if err := validateLabelValue(key, vals[i]); err != nil {
-			return nil, err
+		if err := validateLabelValue(key, vals[i], valuePath.Index(i)); err != nil {
+			allErrs = append(allErrs, err)
 		}
 	}
-	return &Requirement{key: key, operator: op, strValues: vals}, nil
+	return &Requirement{key: key, operator: op, strValues: vals}, allErrs.ToAggregate()
 }
 
 func (r *Requirement) hasValue(value string) bool {
@@ -560,6 +575,7 @@ type Parser struct {
 	l            *Lexer
 	scannedItems []ScannedItem
 	position     int
+	path         *field.Path
 }
 
 // ParserContext represents context during parsing:
@@ -653,7 +669,7 @@ func (p *Parser) parseRequirement() (*Requirement, error) {
 		return nil, err
 	}
 	if operator == selection.Exists || operator == selection.DoesNotExist { // operator found lookahead set checked
-		return NewRequirement(key, operator, []string{})
+		return NewRequirement(key, operator, []string{}, field.WithPath(p.path))
 	}
 	operator, err = p.parseOperator()
 	if err != nil {
@@ -669,7 +685,7 @@ func (p *Parser) parseRequirement() (*Requirement, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewRequirement(key, operator, values.List())
+	return NewRequirement(key, operator, values.List(), field.WithPath(p.path))
 
 }
 
@@ -687,7 +703,7 @@ func (p *Parser) parseKeyAndInferOperator() (string, selection.Operator, error) 
 		err := fmt.Errorf("found '%s', expected: identifier", literal)
 		return "", "", err
 	}
-	if err := validateLabelKey(literal); err != nil {
+	if err := validateLabelKey(literal, p.path); err != nil {
 		return "", "", err
 	}
 	if t, _ := p.lookahead(Values); t == EndOfStringToken || t == CommaToken {
@@ -833,8 +849,8 @@ func (p *Parser) parseExactValue() (sets.String, error) {
 //      the KEY exists and can be any VALUE.
 //  (5) A requirement with just !KEY requires that the KEY not exist.
 //
-func Parse(selector string) (Selector, error) {
-	parsedSelector, err := parse(selector)
+func Parse(selector string, opts ...field.PathOption) (Selector, error) {
+	parsedSelector, err := parse(selector, field.ToPath(opts...))
 	if err == nil {
 		return parsedSelector, nil
 	}
@@ -845,8 +861,8 @@ func Parse(selector string) (Selector, error) {
 // The callers of this method can then decide how to return the internalSelector struct to their
 // callers. This function has two callers now, one returns a Selector interface and the other
 // returns a list of requirements.
-func parse(selector string) (internalSelector, error) {
-	p := &Parser{l: &Lexer{s: selector, pos: 0}}
+func parse(selector string, path *field.Path) (internalSelector, error) {
+	p := &Parser{l: &Lexer{s: selector, pos: 0}, path: path}
 	items, err := p.parse()
 	if err != nil {
 		return nil, err
@@ -855,16 +871,16 @@ func parse(selector string) (internalSelector, error) {
 	return internalSelector(items), err
 }
 
-func validateLabelKey(k string) error {
+func validateLabelKey(k string, path *field.Path) *field.Error {
 	if errs := validation.IsQualifiedName(k); len(errs) != 0 {
-		return fmt.Errorf("invalid label key %q: %s", k, strings.Join(errs, "; "))
+		return field.Invalid(path, k, strings.Join(errs, "; "))
 	}
 	return nil
 }
 
-func validateLabelValue(k, v string) error {
+func validateLabelValue(k, v string, path *field.Path) *field.Error {
 	if errs := validation.IsValidLabelValue(v); len(errs) != 0 {
-		return fmt.Errorf("invalid label value: %q: at key: %q: %s", v, k, strings.Join(errs, "; "))
+		return field.Invalid(path.Key(k), v, strings.Join(errs, "; "))
 	}
 	return nil
 }
@@ -918,6 +934,6 @@ func SelectorFromValidatedSet(ls Set) Selector {
 // processing on selector requirements.
 // See the documentation for Parse() function for more details.
 // TODO: Consider exporting the internalSelector type instead.
-func ParseToRequirements(selector string) ([]Requirement, error) {
-	return parse(selector)
+func ParseToRequirements(selector string, opts ...field.PathOption) ([]Requirement, error) {
+	return parse(selector, field.ToPath(opts...))
 }

@@ -82,8 +82,8 @@ func TestNodeSelectorMatch(t *testing.T) {
 				},
 				&field.Error{
 					Type:   field.ErrorTypeInvalid,
-					Field:  "nodeSelectorTerms[2].matchExpressions[0]",
-					Detail: `invalid label key "invalid key": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+					Field:  "nodeSelectorTerms[2].matchExpressions[0].key",
+					Detail: `name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
 				},
 			}.ToAggregate(),
 		},
@@ -150,7 +150,7 @@ func TestNodeSelectorMatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeSelector, err := NewNodeSelector(&tt.nodeSelector)
 			if diff := cmp.Diff(tt.wantErr, err, ignoreBadValue); diff != "" {
-				t.Fatalf("NewNodeSelector returned unexpected error (-want,+got):\n%s", diff)
+				t.Errorf("NewNodeSelector returned unexpected error (-want,+got):\n%s", diff)
 			}
 			if tt.wantErr != nil {
 				return
@@ -218,8 +218,8 @@ func TestPreferredSchedulingTermsScore(t *testing.T) {
 				},
 				&field.Error{
 					Type:   field.ErrorTypeInvalid,
-					Field:  "[2].matchExpressions[0]",
-					Detail: `invalid label key "invalid key": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+					Field:  "[2].matchExpressions[0].key",
+					Detail: `name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
 				},
 			}.ToAggregate(),
 		},
@@ -281,7 +281,7 @@ func TestPreferredSchedulingTermsScore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			prefSchedTerms, err := NewPreferredSchedulingTerms(tt.prefSchedTerms)
 			if diff := cmp.Diff(tt.wantErr, err, ignoreBadValue); diff != "" {
-				t.Fatalf("NewPreferredSchedulingTerms returned unexpected error (-want,+got):\n%s", diff)
+				t.Errorf("NewPreferredSchedulingTerms returned unexpected error (-want,+got):\n%s", diff)
 			}
 			if tt.wantErr != nil {
 				return
@@ -308,9 +308,9 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 		return out
 	}
 	tc := []struct {
-		in       []v1.NodeSelectorRequirement
-		out      labels.Selector
-		wantErrs field.ErrorList
+		in      []v1.NodeSelectorRequirement
+		out     labels.Selector
+		wantErr []error
 	}{
 		{in: nil, out: labels.Nothing()},
 		{in: []v1.NodeSelectorRequirement{}, out: labels.Nothing()},
@@ -324,7 +324,11 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 				Operator: v1.NodeSelectorOpExists,
 				Values:   []string{"bar", "baz"},
 			}},
-			wantErrs: field.ErrorList{field.Invalid(field.NewPath("root").Index(0), nil, "values set must be empty for exists and does not exist")},
+			wantErr: []error{
+				field.ErrorList{
+					field.Invalid(field.NewPath("root").Index(0).Child("values"), nil, "values set must be empty for exists and does not exist"),
+				}.ToAggregate(),
+			},
 		},
 		{
 			in: []v1.NodeSelectorRequirement{{
@@ -346,7 +350,7 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 
 	for i, tc := range tc {
 		out, err := nodeSelectorRequirementsAsSelector(tc.in, field.NewPath("root"))
-		if diff := cmp.Diff(tc.wantErrs, err, ignoreBadValue); diff != "" {
+		if diff := cmp.Diff(tc.wantErr, err, ignoreBadValue); diff != "" {
 			t.Errorf("nodeSelectorRequirementsAsSelector returned unexpected error (-want,+got):\n%s", diff)
 		}
 		if !reflect.DeepEqual(out, tc.out) {
