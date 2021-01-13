@@ -357,11 +357,11 @@ func (cfgCtlr *configController) SyncOne(flowSchemaRVs map[string]string) (speci
 	all := labels.Everything()
 	newPLs, err := cfgCtlr.plLister.List(all)
 	if err != nil {
-		return 0, fmt.Errorf("Unable to list PriorityLevelConfiguration objects: %w", err)
+		return 0, fmt.Errorf("unable to list PriorityLevelConfiguration objects: %w", err)
 	}
 	newFSs, err := cfgCtlr.fsLister.List(all)
 	if err != nil {
-		return 0, fmt.Errorf("Unable to list FlowSchema objects: %w", err)
+		return 0, fmt.Errorf("unable to list FlowSchema objects: %w", err)
 	}
 	return cfgCtlr.digestConfigObjects(newPLs, newFSs, flowSchemaRVs)
 }
