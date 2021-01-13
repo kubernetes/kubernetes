@@ -32,6 +32,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
@@ -335,5 +336,26 @@ func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.K
 			recorder.Eventf(pod, v1.EventTypeWarning, events.ExceededGracePeriod, "Container runtime did not kill the pod within specified grace period.")
 			return fmt.Errorf("timeout waiting to kill pod")
 		}
+	}
+}
+
+// shutdownPodNow returns a KillPodFunc that can be used to delete a pod.
+// Use only on shutdown node.
+func shutdownPodNow(podWorkers PodWorkers, recorder record.EventRecorder, manager kubepod.Manager) eviction.KillPodFunc {
+	killFunc := killPodNow(podWorkers, recorder)
+
+	return func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+		err := killFunc(pod, status, gracePeriodOverride)
+		if err != nil {
+			return err
+		}
+		podFullName := kubecontainer.GetPodFullName(pod)
+		deleted, err := manager.DeleteMirrorPod(podFullName, nil)
+		if deleted {
+			klog.Warningf("Deleted pod %q because it is outdated", podFullName)
+		} else if err != nil {
+			klog.Errorf("Failed deleting pod %q: %v", podFullName, err)
+		}
+		return err
 	}
 }
