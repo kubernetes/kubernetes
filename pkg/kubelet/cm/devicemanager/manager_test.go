@@ -983,12 +983,12 @@ func TestDevicePreStartContainer(t *testing.T) {
 	podsStub.updateActivePods(activePods)
 	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
 	as.Nil(err)
-	runContainerOpts, err = testManager.GetDeviceRunContainerOptions(pod2, &pod2.Spec.Containers[0])
+	_, err = testManager.GetDeviceRunContainerOptions(pod2, &pod2.Spec.Containers[0])
 	as.Nil(err)
 	select {
 	case <-time.After(time.Millisecond):
 		t.Log("When pod resourceQuantity is 0,  PreStartContainer RPC stub will be skipped")
-	case initializedDevs = <-ch:
+	case <-ch:
 		break
 	}
 }
