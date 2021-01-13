@@ -27,17 +27,19 @@ import (
 	"testing"
 )
 
-const sourceVip = "192.168.1.2"
-const serviceVip = "11.0.0.1"
-const addressPrefix = "192.168.1.0/24"
-const gatewayAddress = "192.168.1.1"
-const epMacAddress = "00-11-22-33-44-55"
-const epIpAddress = "192.168.1.3"
-const epIpAddressRemote = "192.168.2.3"
-const epPaAddress = "10.0.0.3"
-const protocol = 6
-const internalPort = 80
-const externalPort = 32440
+const (
+	sourceVip         = "192.168.1.2"
+	serviceVip        = "11.0.0.1"
+	addressPrefix     = "192.168.1.0/24"
+	gatewayAddress    = "192.168.1.1"
+	epMacAddress      = "00-11-22-33-44-55"
+	epIpAddress       = "192.168.1.3"
+	epIpAddressRemote = "192.168.2.3"
+	epPaAddress       = "10.0.0.3"
+	protocol          = 6
+	internalPort      = 80
+	externalPort      = 32440
+)
 
 func TestGetNetworkByName(t *testing.T) {
 	hnsV1 := hnsV1{}
@@ -484,7 +486,7 @@ func mustTestNetwork(t *testing.T) *hcn.HostComputeNetwork {
 }
 func createTestNetwork() (*hcn.HostComputeNetwork, error) {
 	network := &hcn.HostComputeNetwork{
-		Type: "Overlay",
+		Type: NETWORK_TYPE_OVERLAY,
 		Name: "TestOverlay",
 		MacPool: hcn.MacPool{
 			Ranges: []hcn.MacRange{
