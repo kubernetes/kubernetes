@@ -478,10 +478,10 @@ func (n *NodeInfo) String() string {
 		podKeys, n.Requested, n.NonZeroRequested, n.UsedPorts, n.Allocatable)
 }
 
-// AddPod adds pod information to this NodeInfo.
-func (n *NodeInfo) AddPod(pod *v1.Pod) {
-	podInfo := NewPodInfo(pod)
-	res, non0CPU, non0Mem := calculateResource(pod)
+// AddPodInfo adds pod information to this NodeInfo.
+// Consider using this instead of AddPod if a PodInfo is already computed.
+func (n *NodeInfo) AddPodInfo(podInfo *PodInfo) {
+	res, non0CPU, non0Mem := calculateResource(podInfo.Pod)
 	n.Requested.MilliCPU += res.MilliCPU
 	n.Requested.Memory += res.Memory
 	n.Requested.EphemeralStorage += res.EphemeralStorage
@@ -494,10 +494,10 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	n.NonZeroRequested.MilliCPU += non0CPU
 	n.NonZeroRequested.Memory += non0Mem
 	n.Pods = append(n.Pods, podInfo)
-	if podWithAffinity(pod) {
+	if podWithAffinity(podInfo.Pod) {
 		n.PodsWithAffinity = append(n.PodsWithAffinity, podInfo)
 	}
-	if podWithRequiredAntiAffinity(pod) {
+	if podWithRequiredAntiAffinity(podInfo.Pod) {
 		n.PodsWithRequiredAntiAffinity = append(n.PodsWithRequiredAntiAffinity, podInfo)
 	}
 
@@ -505,6 +505,11 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	n.updateUsedPorts(podInfo.Pod, true)
 
 	n.Generation = nextGeneration()
+}
+
+// AddPod is a wrapper around AddPodInfo.
+func (n *NodeInfo) AddPod(pod *v1.Pod) {
+	n.AddPodInfo(NewPodInfo(pod))
 }
 
 func podWithAffinity(p *v1.Pod) bool {
