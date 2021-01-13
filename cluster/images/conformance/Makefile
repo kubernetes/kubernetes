@@ -31,7 +31,7 @@ E2E_GO_RUNNER_BIN?=$(shell test -f $(LOCAL_OUTPUT_PATH)/go-runner && echo $(LOCA
 
 CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 
-BASEIMAGE=debian:stretch-slim
+BASEIMAGE=debian:stable-slim
 TEMP_DIR:=$(shell mktemp -d -t conformanceXXXXXX)
 
 all: build
@@ -54,7 +54,7 @@ endif
 	chmod a+rx ${TEMP_DIR}/e2e.test
 	chmod a+rx ${TEMP_DIR}/gorunner
 
-	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
+	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g; s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
 
 	docker build --pull -t ${REGISTRY}/conformance-${ARCH}:${VERSION} ${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
