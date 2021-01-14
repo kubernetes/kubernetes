@@ -588,7 +588,7 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 		},
 
 		// expected errors
-		"invalide node name set": {
+		"invalid node name set": {
 			oldEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
