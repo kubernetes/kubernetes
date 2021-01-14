@@ -31,22 +31,28 @@ import (
 	authorizationutil "k8s.io/kubernetes/pkg/registry/authorization/util"
 )
 
+// REST implements RESTStorage for LocalSubjectAccessReview resources against etcd.
 type REST struct {
 	authorizer authorizer.Authorizer
 }
 
+// NewREST returns a RESTStorage object that will work against LocalSubjectAccessReview.
 func NewREST(authorizer authorizer.Authorizer) *REST {
 	return &REST{authorizer}
 }
 
+// NamespaceScoped implements rest.Scoper. It returns true if the storage is namespaced.
 func (r *REST) NamespaceScoped() bool {
 	return true
 }
 
+// New returns an empty LocalSubjectAccessReview object that can be used with Create
+// after request data has been put into it.
 func (r *REST) New() runtime.Object {
 	return &authorizationapi.LocalSubjectAccessReview{}
 }
 
+// Create creates a new instance of LocalSubjectAccessReview using the given RESTStorage.
 func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	localSubjectAccessReview, ok := obj.(*authorizationapi.LocalSubjectAccessReview)
 	if !ok {

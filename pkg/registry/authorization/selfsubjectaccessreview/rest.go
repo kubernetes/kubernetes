@@ -31,22 +31,28 @@ import (
 	authorizationutil "k8s.io/kubernetes/pkg/registry/authorization/util"
 )
 
+// REST implements RESTStorage for SelfSubjectAccessReview resources against etcd.
 type REST struct {
 	authorizer authorizer.Authorizer
 }
 
+// NewREST returns a RESTStorage object that will work against SelfSubjectAccessReview.
 func NewREST(authorizer authorizer.Authorizer) *REST {
 	return &REST{authorizer}
 }
 
+// NamespaceScoped implements rest.Scoper. It returns true if the storage is namespaced.
 func (r *REST) NamespaceScoped() bool {
 	return false
 }
 
+// New returns an empty SelfSubjectAccessReview object that can be used with Create
+// after request data has been put into it.
 func (r *REST) New() runtime.Object {
 	return &authorizationapi.SelfSubjectAccessReview{}
 }
 
+// Create creates a new instance of SelfSubjectAccessReview using the given RESTStorage.
 func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	selfSAR, ok := obj.(*authorizationapi.SelfSubjectAccessReview)
 	if !ok {

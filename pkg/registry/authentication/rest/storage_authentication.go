@@ -29,11 +29,13 @@ import (
 	"k8s.io/kubernetes/pkg/registry/authentication/tokenreview"
 )
 
+// RESTStorageProvider is a REST storage provider for authentication.k8s.io.
 type RESTStorageProvider struct {
 	Authenticator authenticator.Request
 	APIAudiences  authenticator.Audiences
 }
 
+// NewRESTStorage returns a RESTStorageProvider.
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
 	// TODO figure out how to make the swagger generation stable, while allowing this endpoint to be disabled.
 	// if p.Authenticator == nil {
@@ -72,6 +74,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	return storage
 }
 
+// GroupName returns the group name for the given storage provider.
 func (p RESTStorageProvider) GroupName() string {
 	return authentication.GroupName
 }

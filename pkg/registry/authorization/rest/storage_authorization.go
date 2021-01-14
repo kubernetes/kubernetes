@@ -32,11 +32,13 @@ import (
 	"k8s.io/kubernetes/pkg/registry/authorization/subjectaccessreview"
 )
 
+// RESTStorageProvider is a REST storage provider for authorization.k8s.io.
 type RESTStorageProvider struct {
 	Authorizer   authorizer.Authorizer
 	RuleResolver authorizer.RuleResolver
 }
 
+// NewRESTStorage returns a RESTStorageProvider.
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
 	if p.Authorizer == nil {
 		return genericapiserver.APIGroupInfo{}, false, nil
@@ -85,6 +87,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	return storage
 }
 
+// GroupName returns the group name for the given storage provider.
 func (p RESTStorageProvider) GroupName() string {
 	return authorization.GroupName
 }

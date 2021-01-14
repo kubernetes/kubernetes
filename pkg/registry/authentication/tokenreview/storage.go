@@ -34,11 +34,13 @@ import (
 
 var badAuthenticatorAuds = apierrors.NewInternalError(errors.New("error validating audiences"))
 
+// REST implements RESTStorage for TokenReview resources against etcd.
 type REST struct {
 	tokenAuthenticator authenticator.Request
 	apiAudiences       []string
 }
 
+// NewREST returns a RESTStorage object that will work against TokenReview.
 func NewREST(tokenAuthenticator authenticator.Request, apiAudiences []string) *REST {
 	return &REST{
 		tokenAuthenticator: tokenAuthenticator,
@@ -46,14 +48,18 @@ func NewREST(tokenAuthenticator authenticator.Request, apiAudiences []string) *R
 	}
 }
 
+// NamespaceScoped implements rest.Scoper. It returns true if the storage is namespaced.
 func (r *REST) NamespaceScoped() bool {
 	return false
 }
 
+// New returns an empty TokenReview object that can be used with Create
+// after request data has been put into it.
 func (r *REST) New() runtime.Object {
 	return &authentication.TokenReview{}
 }
 
+// Create creates a new instance of TokenReview using the given RESTStorage.
 func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	tokenReview, ok := obj.(*authentication.TokenReview)
 	if !ok {
