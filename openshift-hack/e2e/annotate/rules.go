@@ -77,9 +77,6 @@ var (
 			"should reject a Pod requesting a RuntimeClass with conflicting node selector",
 			"should run a Pod requesting a RuntimeClass with scheduling",
 
-			// A fix is in progress: https://github.com/openshift/origin/pull/24709
-			`Multi-AZ Clusters should spread the pods of a replication controller across zones`,
-
 			// NFS umount is broken in kernels 5.7+
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1854379
 			`\[sig-storage\].*\[Driver: nfs\] \[Testpattern: Dynamic PV \(default fs\)\].*subPath should be able to unmount after the subpath directory is deleted`,
