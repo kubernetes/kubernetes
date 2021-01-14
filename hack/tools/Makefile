@@ -18,7 +18,6 @@ GOBIN ?= $(shell go env GOPATH)/bin
 DEP_PROGS=\
 	$(GOBIN)/buildozer\
 	$(GOBIN)/gazelle\
-	$(GOBIN)/golint\
 	$(GOBIN)/gotestsum\
 	$(GOBIN)/kazel\
 	$(GOBIN)/misspell\
@@ -45,9 +44,6 @@ $(GOBIN)/buildozer: deps
 
 $(GOBIN)/gazelle: deps
 	go install github.com/bazelbuild/bazel-gazelle/cmd/gazelle
-
-$(GOBIN)/golint: deps
-	go install golang.org/x/lint/golint
 
 $(GOBIN)/gotestsum: deps
 	go install gotest.tools/gotestsum
