@@ -1982,7 +1982,9 @@ func TestConflictingData(t *testing.T) {
 						makeNode(pod2ns1, withOwners(pod1ns1)),
 						makeNode(pod1nonamespace, virtual)},
 					pendingAttemptToDelete: []*node{
-						makeNode(pod1nonamespace, virtual)}, // virtual parent queued for deletion
+						makeNode(pod1nonamespace, virtual),     // virtual parent queued for deletion
+						makeNode(pod2ns1, withOwners(pod1ns1)), // mismatched child queued for deletion
+					},
 				}),
 
 				// 6,7: process attemptToDelete of bad virtual parent coordinates
@@ -1992,14 +1994,115 @@ func TestConflictingData(t *testing.T) {
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
 						makeNode(pod1nonamespace, virtual)},
+					pendingAttemptToDelete: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1))}, // mismatched child queued for deletion
 				}),
 
+				// 8,9: process attemptToDelete of good child
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions: []string{
+						"get /v1, Resource=pods ns=ns1 name=podname2",    // get good child, returns 200
+						"get /v1, Resource=pods ns=ns1 name=podname1",    // get missing parent, returns 404
+						"delete /v1, Resource=pods ns=ns1 name=podname2", // delete good child
+					},
+					graphNodes: []*node{
+						makeNode(node1, withOwners(pod1nonamespace)),
+						makeNode(pod2ns1, withOwners(pod1ns1)),
+						makeNode(pod1nonamespace, virtual)},
+					absentOwnerCache: []objectReference{pod1ns1}, // missing parent cached
+				}),
+
+				// 10,11: observe deletion of good child
 				// steady-state is bad cluster child and bad virtual parent coordinates, with no retries
+				processEvent(makeDeleteEvent(pod2ns1, pod1ns1)),
 				assertState(state{
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod1nonamespace, virtual)},
 					absentOwnerCache: []objectReference{pod1ns1},
+				}),
+			},
+		},
+		{
+			// https://github.com/kubernetes/kubernetes/issues/98040
+			name: "cluster-scoped bad child, namespaced good child, late observed parent",
+			steps: []step{
+				// setup
+				createObjectInClient("", "v1", "pods", "ns1", makeMetadataObj(pod1ns1)),              // good parent
+				createObjectInClient("", "v1", "pods", "ns1", makeMetadataObj(pod2ns1, pod1ns1)),     // good child
+				createObjectInClient("", "v1", "nodes", "", makeMetadataObj(node1, pod1nonamespace)), // bad child
+
+				// 3,4: observe bad child
+				processEvent(makeAddEvent(node1, pod1nonamespace)),
+				assertState(state{
+					graphNodes: []*node{
+						makeNode(node1, withOwners(pod1nonamespace)),
+						makeNode(pod1nonamespace, virtual)},
+					pendingAttemptToDelete: []*node{
+						makeNode(pod1nonamespace, virtual)}, // virtual parent queued for deletion
+				}),
+
+				// 5,6: observe good child
+				processEvent(makeAddEvent(pod2ns1, pod1ns1)),
+				assertState(state{
+					graphNodes: []*node{
+						makeNode(node1, withOwners(pod1nonamespace)),
+						makeNode(pod2ns1, withOwners(pod1ns1)),
+						makeNode(pod1nonamespace, virtual)},
+					pendingAttemptToDelete: []*node{
+						makeNode(pod1nonamespace, virtual),      // virtual parent queued for deletion
+						makeNode(pod2ns1, withOwners(pod1ns1))}, // mismatched child queued for deletion
+				}),
+
+				// 7,8: process attemptToDelete of bad virtual parent coordinates
+				processAttemptToDelete(1),
+				assertState(state{
+					graphNodes: []*node{
+						makeNode(node1, withOwners(pod1nonamespace)),
+						makeNode(pod2ns1, withOwners(pod1ns1)),
+						makeNode(pod1nonamespace, virtual)},
+					pendingAttemptToDelete: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1))}, // mismatched child queued for deletion
+				}),
+
+				// 9,10: process attemptToDelete of good child
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions: []string{
+						"get /v1, Resource=pods ns=ns1 name=podname2", // get good child, returns 200
+						"get /v1, Resource=pods ns=ns1 name=podname1", // get late-observed parent, returns 200
+					},
+					graphNodes: []*node{
+						makeNode(node1, withOwners(pod1nonamespace)),
+						makeNode(pod2ns1, withOwners(pod1ns1)),
+						makeNode(pod1nonamespace, virtual)},
+				}),
+
+				// 11,12: late observe good parent
+				processEvent(makeAddEvent(pod1ns1)),
+				assertState(state{
+					graphNodes: []*node{
+						makeNode(node1, withOwners(pod1nonamespace)),
+						makeNode(pod2ns1, withOwners(pod1ns1)),
+						makeNode(pod1ns1)},
+					// warn about bad node reference
+					events: []string{`Warning OwnerRefInvalidNamespace ownerRef [v1/Pod, namespace: , name: podname1, uid: poduid1] does not exist in namespace "" involvedObject{kind=Node,apiVersion=v1}`},
+					pendingAttemptToDelete: []*node{
+						makeNode(node1, withOwners(pod1nonamespace))}, // queue bad cluster-scoped child for delete attempt
+				}),
+
+				// 13,14: process attemptToDelete of bad child
+				// steady state is bad cluster-scoped child remaining with no retries, good parent and good child in graph
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions: []string{
+						"get /v1, Resource=nodes name=nodename", // get bad child, returns 200
+					},
+					graphNodes: []*node{
+						makeNode(node1, withOwners(pod1nonamespace)),
+						makeNode(pod2ns1, withOwners(pod1ns1)),
+						makeNode(pod1ns1)},
 				}),
 			},
 		},
