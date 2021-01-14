@@ -77,6 +77,15 @@ const (
 // This list should be exactly the same as the codes iota defined above in the same order.
 var codes = []string{"Success", "Error", "Unschedulable", "UnschedulableAndUnresolvable", "Wait", "Skip"}
 
+// statusPrecedence defines a map from status to its precedence, larger value means higher precedent.
+var statusPrecedence = map[Code]int{
+	Error:                        3,
+	UnschedulableAndUnresolvable: 2,
+	Unschedulable:                1,
+	// Any other statuses we know today, `Skip` or `Wait`, will take precedence over `Success`.
+	Success: -1,
+}
+
 func (c Code) String() string {
 	return codes[c]
 }
@@ -184,28 +193,19 @@ func (p PluginToStatus) Merge() *Status {
 	}
 
 	finalStatus := NewStatus(Success)
-	var hasUnschedulableAndUnresolvable, hasUnschedulable bool
 	for _, s := range p {
 		if s.Code() == Error {
 			finalStatus.err = s.AsError()
-		} else if s.Code() == UnschedulableAndUnresolvable {
-			hasUnschedulableAndUnresolvable = true
-		} else if s.Code() == Unschedulable {
-			hasUnschedulable = true
 		}
-		finalStatus.code = s.Code()
+		if statusPrecedence[s.Code()] > statusPrecedence[finalStatus.code] {
+			finalStatus.code = s.Code()
+		}
+
 		for _, r := range s.reasons {
 			finalStatus.AppendReason(r)
 		}
 	}
 
-	if finalStatus.err != nil {
-		finalStatus.code = Error
-	} else if hasUnschedulableAndUnresolvable {
-		finalStatus.code = UnschedulableAndUnresolvable
-	} else if hasUnschedulable {
-		finalStatus.code = Unschedulable
-	}
 	return finalStatus
 }
 
