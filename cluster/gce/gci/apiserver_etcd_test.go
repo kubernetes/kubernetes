@@ -52,7 +52,7 @@ func TestServerOverride(t *testing.T) {
 			},
 		},
 		{
-			desc: "ETCD-SERVERS and ETCD_SERVERS_OVERRIDES iare set",
+			desc: "ETCD-SERVERS and ETCD_SERVERS_OVERRIDES are set",
 			env: kubeAPIServeETCDEnv{
 				ETCDServers:         "ETCDServers",
 				ETCDServersOverride: "ETCDServersOverrides",
@@ -109,7 +109,7 @@ func TestStorageOptions(t *testing.T) {
 			},
 		},
 		{
-			desc: "storage options not not supplied",
+			desc: "storage options are not supplied",
 			env:  kubeAPIServeETCDEnv{},
 			dontWant: []string{
 				"--storage-backend",
