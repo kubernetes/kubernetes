@@ -36,7 +36,6 @@ FOCUS="${FOCUS%/}" # Remove the ending "/"
 CHECKS=(
   "all"
   "-S1*"   # Omit code simplifications for now.
-  "-ST1*"  # Mostly stylistic, redundant w/ golint
 )
 export IFS=','; checks="${CHECKS[*]}"; unset IFS
 
