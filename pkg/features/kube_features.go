@@ -298,7 +298,7 @@ const (
 	SCTPSupport featuregate.Feature = "SCTPSupport"
 
 	// owner: @rikatz
-	// alpha: v1.20
+	// alpha: v1.21
 	//
 	// Enables the endPort field in NetworkPolicy to enable a Port Range behavior in Network Policies.
 	NetworkPolicyEndPort featuregate.Feature = "NetworkPolicyEndPort"

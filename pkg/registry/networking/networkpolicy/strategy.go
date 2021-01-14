@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/networking/validation"
 	"k8s.io/kubernetes/pkg/features"
-
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
@@ -49,6 +48,7 @@ func (networkPolicyStrategy) NamespaceScoped() bool {
 func (networkPolicyStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	networkPolicy := obj.(*networking.NetworkPolicy)
 	networkPolicy.Generation = 1
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.NetworkPolicyEndPort) {
 		dropNetworkPolicyEndPort(networkPolicy)
 	}
