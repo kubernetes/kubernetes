@@ -13,6 +13,7 @@ go_test(
         "path_test.go",
     ],
     embed = [":go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library"],
 )
 
 go_library(
