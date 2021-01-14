@@ -680,7 +680,7 @@ message Container {
 
   // Compute Resources required by this container.
   // Cannot be updated.
-  // More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
   // +optional
   optional ResourceRequirements resources = 8;
 
@@ -2003,7 +2003,7 @@ message LimitRangeList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of LimitRange objects.
-  // More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
   repeated LimitRange items = 2;
 }
 
@@ -4236,14 +4236,14 @@ message ResourceQuotaStatus {
 // ResourceRequirements describes the compute resource requirements.
 message ResourceRequirements {
   // Limits describes the maximum amount of compute resources allowed.
-  // More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> limits = 1;
 
   // Requests describes the minimum amount of compute resources required.
   // If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
   // otherwise to an implementation-defined value.
-  // More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> requests = 2;
 }

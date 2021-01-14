@@ -334,7 +334,7 @@ var map_Container = map[string]string{
 	"ports":                    "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
 	"envFrom":                  "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
 	"env":                      "List of environment variables to set in the container. Cannot be updated.",
-	"resources":                "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/",
+	"resources":                "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
 	"volumeMounts":             "Pod volumes to mount into the container's filesystem. Cannot be updated.",
 	"volumeDevices":            "volumeDevices is the list of block devices to be used by the container.",
 	"livenessProbe":            "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
@@ -933,7 +933,7 @@ func (LimitRangeItem) SwaggerDoc() map[string]string {
 var map_LimitRangeList = map[string]string{
 	"":         "LimitRangeList is a list of LimitRange items.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-	"items":    "Items is a list of LimitRange objects. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/",
+	"items":    "Items is a list of LimitRange objects. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
 }
 
 func (LimitRangeList) SwaggerDoc() map[string]string {
@@ -1971,8 +1971,8 @@ func (ResourceQuotaStatus) SwaggerDoc() map[string]string {
 
 var map_ResourceRequirements = map[string]string{
 	"":         "ResourceRequirements describes the compute resource requirements.",
-	"limits":   "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/",
-	"requests": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/",
+	"limits":   "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+	"requests": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
 }
 
 func (ResourceRequirements) SwaggerDoc() map[string]string {

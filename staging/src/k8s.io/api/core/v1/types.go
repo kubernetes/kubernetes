@@ -2169,13 +2169,13 @@ type Capabilities struct {
 // ResourceRequirements describes the compute resource requirements.
 type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources allowed.
-	// More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	// +optional
 	Limits ResourceList `json:"limits,omitempty" protobuf:"bytes,1,rep,name=limits,casttype=ResourceList,castkey=ResourceName"`
 	// Requests describes the minimum amount of compute resources required.
 	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
 	// otherwise to an implementation-defined value.
-	// More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	// +optional
 	Requests ResourceList `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=ResourceList,castkey=ResourceName"`
 }
@@ -2253,7 +2253,7 @@ type Container struct {
 	Env []EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=env"`
 	// Compute Resources required by this container.
 	// Cannot be updated.
-	// More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	// +optional
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
 	// Pod volumes to mount into the container's filesystem.
@@ -5561,7 +5561,7 @@ type LimitRangeList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is a list of LimitRange objects.
-	// More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	Items []LimitRange `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
