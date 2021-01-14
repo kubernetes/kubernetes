@@ -52,7 +52,6 @@ go_library(
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
-        "//vendor/golang.org/x/oauth2/google:go_default_library",
         "//vendor/google.golang.org/api/monitoring/v3:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
