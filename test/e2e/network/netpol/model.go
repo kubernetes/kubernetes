@@ -49,7 +49,12 @@ type Model struct {
 // The total number of pods is the number of namespaces x the number of pods per namespace.
 // The number of containers per pod is the number of ports x the number of protocols.
 // The *total* number of containers is namespaces x pods x ports x protocols.
-func NewModel(namespaces []string, podNames []string, ports []int32, protocols []v1.Protocol, dnsDomain string) *Model {
+func NewModel(namespaces []string, podNames []string, ports []int32, protocols []v1.Protocol, dnsDomain string, enableWindows bool) *Model {
+	// only enabling TCP for windows nodes
+	if enableWindows {
+		protocols = []v1.Protocol{v1.ProtocolTCP}
+	}
+
 	model := &Model{
 		NamespaceNames: namespaces,
 		PodNames:       podNames,
@@ -74,9 +79,10 @@ func NewModel(namespaces []string, podNames []string, ports []int32, protocols [
 				}
 			}
 			pods = append(pods, &Pod{
-				Namespace:  ns,
-				Name:       podName,
-				Containers: containers,
+				Namespace:     ns,
+				Name:          podName,
+				Containers:    containers,
+				enableWindows: enableWindows,
 			})
 		}
 		model.Namespaces = append(model.Namespaces, &Namespace{Name: ns, Pods: pods})
@@ -155,9 +161,10 @@ func (ns *Namespace) LabelSelector() map[string]string {
 // Pod is the abstract representation of what matters to network policy tests for
 // a pod; i.e. it ignores kube implementation details
 type Pod struct {
-	Namespace  string
-	Name       string
-	Containers []*Container
+	Namespace     string
+	Name          string
+	Containers    []*Container
+	enableWindows bool
 }
 
 // PodString returns a corresponding pod string
@@ -193,7 +200,7 @@ func (p *Pod) LabelSelector() map[string]string {
 // KubePod returns the kube pod
 func (p *Pod) KubePod() *v1.Pod {
 	zero := int64(0)
-	return &v1.Pod{
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      p.Name,
 			Labels:    p.LabelSelector(),
@@ -204,6 +211,13 @@ func (p *Pod) KubePod() *v1.Pod {
 			Containers:                    p.ContainerSpecs(),
 		},
 	}
+	// add node windows node selector flag
+	if p.enableWindows {
+		pod.Spec.NodeSelector = map[string]string{
+			"kubernetes.io/os": "windows",
+		}
+	}
+	return pod
 }
 
 // QualifiedServiceAddress returns the address that can be used to hit a service from

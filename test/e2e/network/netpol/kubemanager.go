@@ -113,10 +113,23 @@ func (k *kubeManager) probeConnectivity(nsFrom string, podFrom string, container
 	switch protocol {
 	case v1.ProtocolSCTP:
 		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=1s", "--protocol=sctp"}
+		// no SCTP support for windows nodes
+		if framework.NodeOSDistroIs("windows") {
+			framework.Failf("not supported sctp tests for windows")
+			return false, "no sctp for windows", fmt.Errorf("sctp on windows unsupported")
+		}
+
 	case v1.ProtocolTCP:
-		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=1s", "--protocol=tcp"}
+		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=3s", "--protocol=tcp"}
+
 	case v1.ProtocolUDP:
 		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=1s", "--protocol=udp"}
+		// no UDP support for windows nodes
+		if framework.NodeOSDistroIs("windows") {
+			framework.Failf("not supported udp tests for windows")
+			return false, "no udp for windows", fmt.Errorf("udp on windows unsupported")
+		}
+
 	default:
 		framework.Failf("protocol %s not supported", protocol)
 	}

@@ -1170,7 +1170,9 @@ func defaultModel(namespaces []string, dnsDomain string) *Model {
 	if addSCTPContainers {
 		protocols = append(protocols, v1.ProtocolSCTP)
 	}
-	return NewModel(namespaces, []string{"a", "b", "c"}, []int32{80, 81}, protocols, dnsDomain)
+
+	enableWindows := framework.NodeOSDistroIs("windows")
+	return NewModel(namespaces, []string{"a", "b", "c"}, []int32{80, 81}, protocols, dnsDomain, enableWindows)
 }
 
 // getK8sModel generates a network policy model using the framework's root namespace and cluster DNS domain.
