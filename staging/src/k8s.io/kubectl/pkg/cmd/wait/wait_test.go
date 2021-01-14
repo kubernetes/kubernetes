@@ -791,7 +791,7 @@ func TestWaitForCondition(t *testing.T) {
 			},
 		},
 		{
-			name: "times out due to observedGeneration",
+			name: "times out due to stale .status.conditions[0].observedGeneration",
 			infos: []*resource.Info{
 				{
 					Mapping: &meta.RESTMapping{
@@ -827,7 +827,7 @@ func TestWaitForCondition(t *testing.T) {
 			},
 		},
 		{
-			name: "handles watch observedGeneration change",
+			name: "handles watch .status.conditions[0].observedGeneration change",
 			infos: []*resource.Info{
 				{
 					Mapping: &meta.RESTMapping{
@@ -848,6 +848,88 @@ func TestWaitForCondition(t *testing.T) {
 						newUnstructuredWithGeneration("group/version", "TheKind", "ns-foo", "name-foo", 2),
 						"the-condition", "status-value", 2,
 					))
+					return true, fakeWatch, nil
+				})
+				return fakeClient
+			},
+			timeout: 10 * time.Second,
+
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Fatal(spew.Sdump(actions))
+				}
+				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+					t.Error(spew.Sdump(actions))
+				}
+				if !actions[1].Matches("watch", "theresource") {
+					t.Error(spew.Sdump(actions))
+				}
+			},
+		},
+		{
+			name: "times out due to stale .status.observedGeneration",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "name-foo",
+					Namespace: "ns-foo",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					instance := addCondition(
+						newUnstructuredWithGeneration("group/version", "TheKind", "ns-foo", "name-foo", 2),
+						"the-condition", "status-value")
+					unstructured.SetNestedField(instance.Object, int64(1), "status", "observedGeneration")
+					return true, instance, nil
+				})
+				return fakeClient
+			},
+			timeout: 1 * time.Second,
+
+			expectedErr: "timed out waiting for the condition on theresource/name-foo",
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Fatal(spew.Sdump(actions))
+				}
+				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+					t.Error(spew.Sdump(actions))
+				}
+				if !actions[1].Matches("watch", "theresource") {
+					t.Error(spew.Sdump(actions))
+				}
+			},
+		},
+		{
+			name: "handles watch .status.observedGeneration change",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "name-foo",
+					Namespace: "ns-foo",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					instance := addCondition(
+						newUnstructuredWithGeneration("group/version", "TheKind", "ns-foo", "name-foo", 2),
+						"the-condition", "status-value")
+					unstructured.SetNestedField(instance.Object, int64(1), "status", "observedGeneration")
+					return true, newUnstructuredList(instance), nil
+				})
+				fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+					instance := addCondition(
+						newUnstructuredWithGeneration("group/version", "TheKind", "ns-foo", "name-foo", 2),
+						"the-condition", "status-value")
+					unstructured.SetNestedField(instance.Object, int64(2), "status", "observedGeneration")
+					fakeWatch := watch.NewRaceFreeFake()
+					fakeWatch.Action(watch.Modified, instance)
 					return true, fakeWatch, nil
 				})
 				return fakeClient
