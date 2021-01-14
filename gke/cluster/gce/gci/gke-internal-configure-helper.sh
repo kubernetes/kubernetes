@@ -599,3 +599,11 @@ EOF
   systemctl daemon-reload
   systemctl start inplace.service
 }
+
+function deploy-kube-scheduler-via-kube-up {
+  [[ "${KUBE_SCHEDULER_CRP:-}" != "true" ]]
+}
+
+function deploy-kube-controller-manager-via-kube-up {
+  [[ "${KUBE_CONTROLLER_MANAGER_CRP:-}" != "true" ]]
+}
