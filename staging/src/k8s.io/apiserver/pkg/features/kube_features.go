@@ -69,6 +69,7 @@ const (
 	// owner: @smarterclayton
 	// alpha: v1.8
 	// beta: v1.9
+	// stable: v1.21
 	//
 	// Allow API clients to retrieve resource lists in chunks rather than
 	// all at once.
@@ -174,7 +175,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ValidateProxyRedirects:   {Default: true, PreRelease: featuregate.Beta},
 	AdvancedAuditing:         {Default: true, PreRelease: featuregate.GA},
 	APIResponseCompression:   {Default: true, PreRelease: featuregate.Beta},
-	APIListChunking:          {Default: true, PreRelease: featuregate.Beta},
+	APIListChunking:          {Default: true, PreRelease: featuregate.GA},
 	DryRun:                   {Default: true, PreRelease: featuregate.GA},
 	RemainingItemCount:       {Default: true, PreRelease: featuregate.Beta},
 	ServerSideApply:          {Default: true, PreRelease: featuregate.Beta},
