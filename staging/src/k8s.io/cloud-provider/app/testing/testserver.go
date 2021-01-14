@@ -124,7 +124,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 
 	errCh := make(chan error)
 	go func(stopCh <-chan struct{}) {
-		if err := app.Run(config.Complete(), app.DefaultControllerInitializers(config.Complete(), cloud), stopCh); err != nil {
+		if err := app.Run(config.Complete(), app.ConstructControllerInitializers(app.DefaultInitFuncConstructors, config.Complete(), cloud), stopCh); err != nil {
 			errCh <- err
 		}
 	}(stopCh)
