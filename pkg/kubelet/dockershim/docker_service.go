@@ -353,8 +353,8 @@ func (ds *dockerService) UpdateRuntimeConfig(_ context.Context, r *runtimeapi.Up
 	klog.Infof("docker cri received runtime config %+v", runtimeConfig)
 	if ds.network != nil && runtimeConfig.NetworkConfig.PodCidr != "" {
 		event := make(map[string]interface{})
-		event[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = runtimeConfig.NetworkConfig.PodCidr
-		ds.network.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, event)
+		event[network.NetPluginEventPodCIDRChangeDetailCIDR] = runtimeConfig.NetworkConfig.PodCidr
+		ds.network.Event(network.NetPluginEventPodCIDRChange, event)
 	}
 
 	return &runtimeapi.UpdateRuntimeConfigResponse{}, nil

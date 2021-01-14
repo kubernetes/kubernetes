@@ -30,49 +30,57 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 )
 
-// Mock of NetworkPlugin interface
+// MockNetworkPlugin is the Mock of NetworkPlugin interface
 type MockNetworkPlugin struct {
 	ctrl     *gomock.Controller
-	recorder *_MockNetworkPluginRecorder
+	recorder *MockNetworkPluginRecorder
 }
 
-// Recorder for MockNetworkPlugin (not exported)
-type _MockNetworkPluginRecorder struct {
+// MockNetworkPluginRecorder is the recorder for MockNetworkPlugin
+type MockNetworkPluginRecorder struct {
 	mock *MockNetworkPlugin
 }
 
+// NewMockNetworkPlugin returns empty MockNetworkPlugin
 func NewMockNetworkPlugin(ctrl *gomock.Controller) *MockNetworkPlugin {
 	mock := &MockNetworkPlugin{ctrl: ctrl}
-	mock.recorder = &_MockNetworkPluginRecorder{mock}
+	mock.recorder = &MockNetworkPluginRecorder{mock}
 	return mock
 }
 
-func (_m *MockNetworkPlugin) EXPECT() *_MockNetworkPluginRecorder {
+// EXPECT returns the recorder for MockNetworkPlugin
+func (_m *MockNetworkPlugin) EXPECT() *MockNetworkPluginRecorder {
 	return _m.recorder
 }
 
+// Capabilities returns the mock of a set of NET_PLUGIN_CAPABILITY_*
 func (_m *MockNetworkPlugin) Capabilities() sets.Int {
 	ret := _m.ctrl.Call(_m, "Capabilities")
 	ret0, _ := ret[0].(sets.Int)
 	return ret0
 }
 
+// Finish checks to see if all the methods that were expected to be called were called
 func (_m *MockNetworkPlugin) Finish() {
 	_m.ctrl.Finish()
 }
 
-func (_mr *_MockNetworkPluginRecorder) Capabilities() *gomock.Call {
+// Capabilities returns the mock of a set of NET_PLUGIN_CAPABILITY_* by MockNetworkPluginRecorder
+func (_mr *MockNetworkPluginRecorder) Capabilities() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Capabilities")
 }
 
+// Event executed by gomock Call()
 func (_m *MockNetworkPlugin) Event(_param0 string, _param1 map[string]interface{}) {
 	_m.ctrl.Call(_m, "Event", _param0, _param1)
 }
 
-func (_mr *_MockNetworkPluginRecorder) Event(arg0, arg1 interface{}) *gomock.Call {
+// Event executed by gomock RecordCall()
+func (_mr *MockNetworkPluginRecorder) Event(arg0, arg1 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Event", arg0, arg1)
 }
 
+// GetPodNetworkStatus is the mock to obtain the ipv4 or ipv6 addresses of the container
 func (_m *MockNetworkPlugin) GetPodNetworkStatus(_param0 string, _param1 string, _param2 container.ContainerID) (*network.PodNetworkStatus, error) {
 	ret := _m.ctrl.Call(_m, "GetPodNetworkStatus", _param0, _param1, _param2)
 	ret0, _ := ret[0].(*network.PodNetworkStatus)
@@ -80,56 +88,69 @@ func (_m *MockNetworkPlugin) GetPodNetworkStatus(_param0 string, _param1 string,
 	return ret0, ret1
 }
 
-func (_mr *_MockNetworkPluginRecorder) GetPodNetworkStatus(arg0, arg1, arg2 interface{}) *gomock.Call {
+// GetPodNetworkStatus executed by gomock RecordCall()
+func (_mr *MockNetworkPluginRecorder) GetPodNetworkStatus(arg0, arg1, arg2 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetPodNetworkStatus", arg0, arg1, arg2)
 }
 
+// Init initializes the plugin of MockNetworkPlugin
 func (_m *MockNetworkPlugin) Init(_param0 network.Host, _param1 kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
 	ret := _m.ctrl.Call(_m, "Init", _param0, _param1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-func (_mr *_MockNetworkPluginRecorder) Init(arg0, arg1 interface{}) *gomock.Call {
+// Init initializes the plugin of MockNetworkPluginRecorder
+func (_mr *MockNetworkPluginRecorder) Init(arg0, arg1 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Init", arg0, arg1)
 }
 
+// Name returns the plugin's name of MockNetworkPlugin
 func (_m *MockNetworkPlugin) Name() string {
 	ret := _m.ctrl.Call(_m, "Name")
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
-func (_mr *_MockNetworkPluginRecorder) Name() *gomock.Call {
+// Name returns the plugin's name of MockNetworkPluginRecorder
+func (_mr *MockNetworkPluginRecorder) Name() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Name")
 }
 
+// SetUpPod is the mock method of MockNetworkPlugin called after the infra container of
+// the pod has been created
 func (_m *MockNetworkPlugin) SetUpPod(_param0 string, _param1 string, _param2 container.ContainerID, annotations, options map[string]string) error {
 	ret := _m.ctrl.Call(_m, "SetUpPod", _param0, _param1, _param2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-func (_mr *_MockNetworkPluginRecorder) SetUpPod(arg0, arg1, arg2 interface{}) *gomock.Call {
+// SetUpPod is the mock method of MockNetworkPluginRecorder called after the infra container of
+// the pod has been created
+func (_mr *MockNetworkPluginRecorder) SetUpPod(arg0, arg1, arg2 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "SetUpPod", arg0, arg1, arg2)
 }
 
+// Status is called by gomock, it will returns error if the network plugin is in error state
 func (_m *MockNetworkPlugin) Status() error {
 	ret := _m.ctrl.Call(_m, "Status")
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-func (_mr *_MockNetworkPluginRecorder) Status() *gomock.Call {
+// Status is called by gomock RecordCall() function
+func (_mr *MockNetworkPluginRecorder) Status() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Status")
 }
 
+// TearDownPod is the mock method called before a pod's infra container will be deleted
 func (_m *MockNetworkPlugin) TearDownPod(_param0 string, _param1 string, _param2 container.ContainerID) error {
 	ret := _m.ctrl.Call(_m, "TearDownPod", _param0, _param1, _param2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-func (_mr *_MockNetworkPluginRecorder) TearDownPod(arg0, arg1, arg2 interface{}) *gomock.Call {
+// TearDownPod is the mock method called by gomock RecordCall()
+func (_mr *MockNetworkPluginRecorder) TearDownPod(arg0, arg1, arg2 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "TearDownPod", arg0, arg1, arg2)
 }

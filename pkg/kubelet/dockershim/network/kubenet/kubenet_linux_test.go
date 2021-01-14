@@ -182,8 +182,8 @@ func TestTeardownCallsShaper(t *testing.T) {
 	mockcni.On("DelNetwork", mock.AnythingOfType("*context.timerCtx"), mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
 
 	details := make(map[string]interface{})
-	details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = "10.0.0.1/24"
-	kubenet.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
+	details[network.NetPluginEventPodCIDRChangeDetailCIDR] = "10.0.0.1/24"
+	kubenet.Event(network.NetPluginEventPodCIDRChange, details)
 
 	existingContainerID := kubecontainer.BuildContainerID("docker", "123")
 	kubenet.podIPs[existingContainerID] = utilsets.NewString("10.0.0.1")
@@ -290,8 +290,8 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 		kubenet.iptables = ipttest.NewFake()
 
 		details := make(map[string]interface{})
-		details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = strings.Join(tc.podCIDR, ",")
-		kubenet.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
+		details[network.NetPluginEventPodCIDRChangeDetailCIDR] = strings.Join(tc.podCIDR, ",")
+		kubenet.Event(network.NetPluginEventPodCIDRChange, details)
 
 		if len(kubenet.podCIDRs) != len(tc.podCIDR) {
 			t.Errorf("generated podCidr: %q, expecting: %q are not of the same length", kubenet.podCIDRs, tc.podCIDR)

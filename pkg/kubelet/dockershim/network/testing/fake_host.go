@@ -27,28 +27,33 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport"
 )
 
-type fakeNetworkHost struct {
+// FakeNetworkHost is the struct for testing
+type FakeNetworkHost struct {
 	fakeNamespaceGetter
 	FakePortMappingGetter
 	kubeClient clientset.Interface
 	Legacy     bool
 }
 
-func NewFakeHost(kubeClient clientset.Interface) *fakeNetworkHost {
-	host := &fakeNetworkHost{kubeClient: kubeClient, Legacy: true}
+// NewFakeHost returns a struct that implements the FakeNetworkHost interface
+func NewFakeHost(kubeClient clientset.Interface) *FakeNetworkHost {
+	host := &FakeNetworkHost{kubeClient: kubeClient, Legacy: true}
 	return host
 }
 
-func (fnh *fakeNetworkHost) GetPodByName(name, namespace string) (*v1.Pod, bool) {
+// GetPodByName returns empty pod struct
+func (fnh *FakeNetworkHost) GetPodByName(name, namespace string) (*v1.Pod, bool) {
 	return nil, false
 }
 
-func (fnh *fakeNetworkHost) GetKubeClient() clientset.Interface {
+// GetKubeClient returns nil for testing
+func (fnh *FakeNetworkHost) GetKubeClient() clientset.Interface {
 	return nil
 }
 
-func (nh *fakeNetworkHost) SupportsLegacyFeatures() bool {
-	return nh.Legacy
+// SupportsLegacyFeatures returns the Legacy value of FakeNetworkHost struct
+func (fnh *FakeNetworkHost) SupportsLegacyFeatures() bool {
+	return fnh.Legacy
 }
 
 type fakeNamespaceGetter struct {
@@ -59,10 +64,12 @@ func (nh *fakeNamespaceGetter) GetNetNS(containerID string) (string, error) {
 	return nh.ns, nil
 }
 
+// FakePortMappingGetter returns the record of port mapping for testing
 type FakePortMappingGetter struct {
 	PortMaps map[string][]*hostport.PortMapping
 }
 
+// GetPodPortMappings returns the port by containerID for testing
 func (pm *FakePortMappingGetter) GetPodPortMappings(containerID string) ([]*hostport.PortMapping, error) {
 	return pm.PortMaps[containerID], nil
 }

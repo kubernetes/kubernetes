@@ -231,16 +231,16 @@ func findMinMTU() (*net.Interface, error) {
 
 func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interface{}) {
 	var err error
-	if name != network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE {
+	if name != network.NetPluginEventPodCIDRChange {
 		return
 	}
 
 	plugin.mu.Lock()
 	defer plugin.mu.Unlock()
 
-	podCIDR, ok := details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR].(string)
+	podCIDR, ok := details[network.NetPluginEventPodCIDRChangeDetailCIDR].(string)
 	if !ok {
-		klog.Warningf("%s event didn't contain pod CIDR", network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE)
+		klog.Warningf("%s event didn't contain pod CIDR", network.NetPluginEventPodCIDRChange)
 		return
 	}
 

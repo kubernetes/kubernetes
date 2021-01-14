@@ -236,8 +236,8 @@ func TestCNIPlugin(t *testing.T) {
 		t.Fatalf("cniPlugin returned non-err with no podCidr")
 	}
 
-	cniPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, map[string]interface{}{
-		network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR: "10.0.2.0/24",
+	cniPlugin.Event(network.NetPluginEventPodCIDRChange, map[string]interface{}{
+		network.NetPluginEventPodCIDRChangeDetailCIDR: "10.0.2.0/24",
 	})
 
 	if err := cniPlugin.Status(); err != nil {

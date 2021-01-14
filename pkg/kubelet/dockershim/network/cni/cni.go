@@ -269,16 +269,16 @@ func (plugin *cniNetworkPlugin) checkInitialized() error {
 // Event handles any change events. The only event ever sent is the PodCIDR change.
 // No network plugins support changing an already-set PodCIDR
 func (plugin *cniNetworkPlugin) Event(name string, details map[string]interface{}) {
-	if name != network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE {
+	if name != network.NetPluginEventPodCIDRChange {
 		return
 	}
 
 	plugin.Lock()
 	defer plugin.Unlock()
 
-	podCIDR, ok := details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR].(string)
+	podCIDR, ok := details[network.NetPluginEventPodCIDRChangeDetailCIDR].(string)
 	if !ok {
-		klog.Warningf("%s event didn't contain pod CIDR", network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE)
+		klog.Warningf("%s event didn't contain pod CIDR", network.NetPluginEventPodCIDRChange)
 		return
 	}
 

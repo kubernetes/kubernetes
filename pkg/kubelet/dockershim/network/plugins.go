@@ -46,8 +46,8 @@ const (
 
 	// Called when the node's Pod CIDR is known when using the
 	// controller manager's --allocate-node-cidrs=true option
-	NET_PLUGIN_EVENT_POD_CIDR_CHANGE             = "pod-cidr-change"
-	NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR = "pod-cidr"
+	NetPluginEventPodCIDRChange           = "pod-cidr-change"
+	NetPluginEventPodCIDRChangeDetailCIDR = "pod-cidr"
 )
 
 // NetworkPlugin is an interface to network plugins for the kubelet

@@ -101,7 +101,6 @@ pkg/kubelet/dockershim/network
 pkg/kubelet/dockershim/network/cni/testing
 pkg/kubelet/dockershim/network/hostport
 pkg/kubelet/dockershim/network/kubenet
-pkg/kubelet/dockershim/network/testing
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
