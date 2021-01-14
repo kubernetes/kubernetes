@@ -1515,9 +1515,6 @@ EOF
 function start-kubelet {
   echo "Start kubelet"
 
-  # TODO(#60123): The kubelet should create the cert-dir directory if it doesn't exist
-  mkdir -p /var/lib/kubelet/pki/
-
   local kubelet_bin="${KUBE_HOME}/bin/kubelet"
   local -r version="$("${kubelet_bin}" --version=true | cut -f2 -d " ")"
   local -r builtin_kubelet="/usr/bin/kubelet"
@@ -2765,6 +2762,16 @@ function setup-kubelet-dir {
     echo "Making /var/lib/kubelet executable for kubelet"
     mount -B /var/lib/kubelet /var/lib/kubelet/
     mount -B -o remount,exec,suid,dev /var/lib/kubelet
+
+    # TODO(#60123): The kubelet should create the cert-dir directory if it doesn't exist
+    mkdir -p /var/lib/kubelet/pki/
+
+    # Mount /var/lib/kubelet/pki on a tmpfs so it doesn't persist across
+    # reboots. This can help avoid some rare instances of corrupt cert files
+    # (e.g. created but not written during a shutdown). Kubelet crash-loops
+    # in these cases. Do this after above mount calls so it isn't overwritten.
+    echo "Mounting /var/lib/kubelet/pki on tmpfs"
+    mount -t tmpfs tmpfs /var/lib/kubelet/pki
 }
 
 # Override for GKE custom master setup scripts (no-op outside of GKE).
