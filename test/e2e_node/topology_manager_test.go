@@ -416,7 +416,7 @@ func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttr
 		pods = append(pods, pod)
 	}
 
-	// per https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/0035-20190130-topology-manager.md#multi-numa-systems-tests
+	// per https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/693-topology-manager/README.md#multi-numa-systems-tests
 	// we can do a menaingful validation only when using the single-numa node policy
 	if envInfo.policy == topologymanager.PolicySingleNumaNode {
 		for podID := 0; podID < numPods; podID++ {

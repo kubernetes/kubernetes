@@ -1563,8 +1563,8 @@ The main themes of this release are:
 
 - [Topology Manager](https://github.com/kubernetes/enhancements/issues/693), a new Kubelet component, aims to co-ordinate resource assignment decisions to provide optimized resource allocations.
 - [IPv4/IPv6 dual-stack](https://kubernetes.io/docs/concepts/services-networking/dual-stack) enables the allocation of both IPv4 and IPv6 addresses to Pods and Services.
-- [API Server Network Proxy](https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190226-network-proxy.md) going alpha in 1.16.
-- [Extensions](https://github.com/kubernetes/enhancements/blob/master/keps/sig-cloud-provider/20190422-cloud-controller-manager-migration.md) for Cloud Controller Manager Migration.
+- [API Server Network Proxy](https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/1281-network-proxy/README.md) going alpha in 1.16.
+- [Extensions](https://github.com/kubernetes/enhancements/blob/master/keps/sig-cloud-provider/991-cloud-controller-migration/README.md) for Cloud Controller Manager Migration.
 - Continued deprecation of extensions/v1beta1, apps/v1beta1, and apps/v1beta2 APIs; these extensions will be retired in 1.16!
 
 ## Known Issues
@@ -1682,7 +1682,7 @@ The main themes of this release are:
   - the `--containerized` flag was deprecated in 1.14 and has been removed ([#80043](https://github.com/kubernetes/kubernetes/pull/80043), [@dims](https://github.com/dims))
   - the `beta.kubernetes.io/os` and `beta.kubernetes.io/arch` labels, deprecated since v1.14, are targeted for removal in v1.18.
   - cAdvisor json endpoints have been deprecated since 1.15. ([#78504](https://github.com/kubernetes/kubernetes/pull/78504), [@dashpole](https://github.com/dashpole))
-  - removed the ability to set `kubernetes.io`- or `k8s.io`-prefixed labels via `--node-labels`, other than the [specifically allowed labels/prefixes](https://github.com/kubernetes/enhancements/blob/master/keps/sig-auth/0000-20170814-bounding-self-labeling-kubelets.md#proposal). ([#79305](https://github.com/kubernetes/kubernetes/pull/79305), [@paivagustavo](https://github.com/paivagustavo))
+  - removed the ability to set `kubernetes.io`- or `k8s.io`-prefixed labels via `--node-labels`, other than the [specifically allowed labels/prefixes](https://github.com/kubernetes/enhancements/blob/master/keps/sig-auth/279-limit-node-access/README.md#proposal). ([#79305](https://github.com/kubernetes/kubernetes/pull/79305), [@paivagustavo](https://github.com/paivagustavo))
 
 - client-go
   - Remove `DirectCodecFactory` (replaced with `serializer.WithoutConversionCodecFactory`), `DirectEncoder` (replaced with `runtime.WithVersionEncoder`) and `DirectDecoder` (replaced with `runtime.WithoutVersionDecoder`). ([#79263](https://github.com/kubernetes/kubernetes/pull/79263), [@draveness](https://github.com/draveness))
@@ -2895,7 +2895,7 @@ filename | sha512 hash
         * ip-mask-agent addon starts to use the label `node.kubernetes.io/masq-agent-ds-ready` instead of `beta.kubernetes.io/masq-agent-ds-ready` as its node selector.
         * kube-proxy addon starts to use the label `node.kubernetes.io/kube-proxy-ds-ready` instead of `beta.kubernetes.io/kube-proxy-ds-ready` as its node selector.
         * metadata-proxy addon starts to use the label `cloud.google.com/metadata-proxy-ready` instead of `beta.kubernetes.io/metadata-proxy-ready` as its node selector.
-        * Kubelet removes the ability to set `kubernetes.io` or `k8s.io` labels via --node-labels other than the [specifically allowed labels/prefixes](https://github.com/kubernetes/enhancements/blob/master/keps/sig-auth/0000-20170814-bounding-self-labeling-kubelets.md#proposal).
+        * Kubelet removes the ability to set `kubernetes.io` or `k8s.io` labels via --node-labels other than the [specifically allowed labels/prefixes](https://github.com/kubernetes/enhancements/blob/master/keps/sig-auth/279-limit-node-access/README.md#proposal).
 * The following APIs are no longer served by default: ([#70672](https://github.com/kubernetes/kubernetes/pull/70672), [@liggitt](https://github.com/liggitt))
         * All resources under `apps/v1beta1` and `apps/v1beta2` - use `apps/v1` instead
         * `daemonsets`, `deployments`, `replicasets` resources under `extensions/v1beta1` - use `apps/v1` instead

@@ -47,7 +47,7 @@ type EgressSelector struct {
 }
 
 // EgressType is an indicator of which egress selection should be used for sending traffic.
-// See https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190226-network-proxy.md#network-context
+// See https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/1281-network-proxy/README.md#network-context
 type EgressType int
 
 const (

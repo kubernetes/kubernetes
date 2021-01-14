@@ -31,7 +31,7 @@ var (
 )
 
 // verifyRunAsNonRoot verifies RunAsNonRoot on windows.
-// https://github.com/kubernetes/enhancements/blob/master/keps/sig-windows/20190103-windows-node-support.md#v1container
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-windows/116-windows-node-support#v1container
 // Windows does not have a root user, we cannot judge the root identity of the windows container by the way to judge the root(uid=0) of the linux container.
 // According to the discussion of sig-windows, at present, we assume that ContainerAdministrator is the windows container root user,
 // and then optimize this logic according to the best time.

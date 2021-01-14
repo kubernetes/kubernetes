@@ -574,7 +574,7 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 }
 
 // applySeccompVersionSkew implements the version skew behavior described in:
-// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/20190717-seccomp-ga.md#version-skew-strategy
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/135-seccomp#version-skew-strategy
 func applySeccompVersionSkew(pod *api.Pod) {
 	// get possible annotation and field
 	annotation, hasAnnotation := pod.Annotations[v1.SeccompPodAnnotationKey]

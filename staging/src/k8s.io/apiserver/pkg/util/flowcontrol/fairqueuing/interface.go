@@ -46,7 +46,7 @@ type QueueSetCompleter interface {
 // functionality of one non-exempt priority level.  It covers the
 // functionality described in the "Assignment to a Queue", "Queuing",
 // and "Dispatching" sections of
-// https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190228-priority-and-fairness.md
+// https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/1040-priority-and-fairness/README.md
 // .  Some day we may have connections between priority levels, but
 // today is not that day.
 type QueueSet interface {
