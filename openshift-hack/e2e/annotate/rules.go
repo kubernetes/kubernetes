@@ -15,8 +15,6 @@ var (
 
 			// BETA features in 1.20, enabled by default
 			// Their enablement is tracked via bz's targeted at 4.8.
-			`\[Feature:SCTPConnectivity\]`, // https://bugzilla.redhat.com/show_bug.cgi?id=1861606
-
 			`\[Feature:CrossNamespacePodAffinity\]`,
 
 			`\[Feature:DaemonSetUpdateSurge\]`,
@@ -28,14 +26,13 @@ var (
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
-			`\[Feature:Networking-IPv6\]`, // openshift-sdn doesn't support yet
-			`Monitoring`,                  // Not installed, should be
-			`Cluster level logging`,       // Not installed yet
-			`Kibana`,                      // Not installed
-			`Ubernetes`,                   // Can't set zone labels today
-			`kube-ui`,                     // Not installed by default
-			`Kubernetes Dashboard`,        // Not installed by default (also probably slow image pull)
-			`should proxy to cadvisor`,    // we don't expose cAdvisor port directly for security reasons
+			`Monitoring`,               // Not installed, should be
+			`Cluster level logging`,    // Not installed yet
+			`Kibana`,                   // Not installed
+			`Ubernetes`,                // Can't set zone labels today
+			`kube-ui`,                  // Not installed by default
+			`Kubernetes Dashboard`,     // Not installed by default (also probably slow image pull)
+			`should proxy to cadvisor`, // we don't expose cAdvisor port directly for security reasons
 		},
 		// tests that rely on special configuration that we do not yet support
 		"[Disabled:SpecialConfig]": {
@@ -99,9 +96,6 @@ var (
 			// NFS umount is broken in kernels 5.7+
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1854379
 			`\[sig-storage\].*\[Driver: nfs\] \[Testpattern: Dynamic PV \(default fs\)\].*subPath should be able to unmount after the subpath directory is deleted`,
-
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1945091
-			`\[Feature:IPv6DualStack\]`,
 
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1945329
 			`should drop INVALID conntrack entries`,
