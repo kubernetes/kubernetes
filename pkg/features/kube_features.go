@@ -191,20 +191,6 @@ const (
 	HyperVContainer featuregate.Feature = "HyperVContainer"
 
 	// owner: @mikedanese
-	// beta: v1.12
-	// ga: v1.20
-	//
-	// Implement TokenRequest endpoint on service account resources.
-	TokenRequest featuregate.Feature = "TokenRequest"
-
-	// owner: @mikedanese
-	// beta: v1.12
-	// ga: v1.20
-	//
-	// Enable ServiceAccountTokenVolumeProjection support in ProjectedVolumes.
-	TokenRequestProjection featuregate.Feature = "TokenRequestProjection"
-
-	// owner: @mikedanese
 	// alpha: v1.13
 	//
 	// Migrate ServiceAccount volumes to use a projected volume consisting of a
@@ -724,8 +710,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SupportPodPidsLimit:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	SupportNodePidsLimit:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	HyperVContainer:                {Default: false, PreRelease: featuregate.Deprecated},
-	TokenRequest:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
-	TokenRequestProjection:         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	BoundServiceAccountTokenVolume: {Default: false, PreRelease: featuregate.Alpha},
 	ServiceAccountIssuerDiscovery:  {Default: true, PreRelease: featuregate.Beta},
 	CRIContainerLogRotation:        {Default: true, PreRelease: featuregate.Beta},
