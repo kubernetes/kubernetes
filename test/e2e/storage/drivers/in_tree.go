@@ -1129,6 +1129,8 @@ func (c *cinderDriver) GetDynamicProvisionStorageClass(config *storageframework.
 	parameters := map[string]string{}
 	if fsType != "" {
 		parameters["fsType"] = fsType
+	} else {
+		parameters["fsType"] = "ext4"
 	}
 	ns := config.Framework.Namespace.Name
 
