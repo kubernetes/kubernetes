@@ -270,15 +270,15 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
 
-	rl, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+	rl, err := resourcelock.NewFromKubeconfig(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
 		c.ComponentConfig.Generic.LeaderElection.ResourceName,
-		c.LeaderElectionClient.CoreV1(),
-		c.LeaderElectionClient.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: c.EventRecorder,
-		})
+		},
+		c.Kubeconfig,
+		c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration)
 	if err != nil {
 		klog.Fatalf("error creating lock: %v", err)
 	}
