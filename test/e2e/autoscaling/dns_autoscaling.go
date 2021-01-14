@@ -237,13 +237,13 @@ func getExpectReplicasFuncLinear(c clientset.Interface, params *DNSParamsLinear)
 	return func(c clientset.Interface) int {
 		var replicasFromNodes float64
 		var replicasFromCores float64
-		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		nodes, err := e2enode.Nodes().WhereSchedulable().Items(c)
 		framework.ExpectNoError(err)
 		if params.nodesPerReplica > 0 {
-			replicasFromNodes = math.Ceil(float64(len(nodes.Items)) / params.nodesPerReplica)
+			replicasFromNodes = math.Ceil(float64(len(nodes)) / params.nodesPerReplica)
 		}
 		if params.coresPerReplica > 0 {
-			replicasFromCores = math.Ceil(float64(getSchedulableCores(nodes.Items)) / params.coresPerReplica)
+			replicasFromCores = math.Ceil(float64(getSchedulableCores(nodes)) / params.coresPerReplica)
 		}
 		return int(math.Max(1.0, math.Max(replicasFromNodes, replicasFromCores)))
 	}

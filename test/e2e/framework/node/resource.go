@@ -327,6 +327,50 @@ func GetPublicIps(c clientset.Interface) ([]string, error) {
 	return ips, nil
 }
 
+// FluentNodes presents a fluent interface for querying nodes, convenient for tests
+type FluentNodes struct {
+	filters []func(*v1.Node) bool
+}
+
+// Count queries for matching nodes and returns the count.
+func (n *FluentNodes) Count(client clientset.Interface) (int, error) {
+	nodes, err := n.Items(client)
+	if err != nil {
+		return 0, err
+	}
+	return len(nodes), nil
+}
+
+// Items queries and returns matching nodes.
+func (n *FluentNodes) Items(client clientset.Interface) ([]v1.Node, error) {
+	var opt metav1.ListOptions
+	nodes, err := checkWaitListNodes(client, opt)
+	if err != nil {
+		return nil, fmt.Errorf("listing nodes error: %w", err)
+	}
+	Filter(nodes, func(node v1.Node) bool {
+		for _, fn := range n.filters {
+			if !fn(&node) {
+				return false
+			}
+		}
+		return true
+	})
+	return nodes.Items, nil
+}
+
+// WhereSchedulable filters so we only consider nodes where spec.schedulable is not false.
+// Note that these nodes may still be tainted.
+func (n *FluentNodes) WhereSchedulable() *FluentNodes {
+	n.filters = append(n.filters, IsNodeSchedulable)
+	return n
+}
+
+// Nodes returns the fluent interface for querying nodes.
+func Nodes() *FluentNodes {
+	return &FluentNodes{}
+}
+
 // GetReadySchedulableNodes addresses the common use case of getting nodes you can do work on.
 // 1) Needs to be schedulable.
 // 2) Needs to be ready.
