@@ -263,7 +263,7 @@ func testNvidiaGPUsJob(f *framework.Framework) {
 // StartJob starts a simple CUDA job that requests gpu and the specified number of completions
 func StartJob(f *framework.Framework, completions int32) {
 	var activeSeconds int64 = 3600
-	testJob := e2ejob.NewTestJob("succeed", "cuda-add", v1.RestartPolicyAlways, 1, completions, &activeSeconds, 6)
+	testJob := e2ejob.NewTestJob("succeed", "cuda-add", v1.RestartPolicyAlways, false, 1, completions, &activeSeconds, 6)
 	testJob.Spec.Template.Spec = v1.PodSpec{
 		RestartPolicy: v1.RestartPolicyOnFailure,
 		Containers: []v1.Container{

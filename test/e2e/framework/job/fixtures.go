@@ -30,14 +30,14 @@ import (
 // first time it is run and succeeds subsequently. name is the Name of the Job. RestartPolicy indicates the restart
 // policy of the containers in which the Pod is running. Parallelism is the Job's parallelism, and completions is the
 // Job's required number of completions.
-func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, completions int32, activeDeadlineSeconds *int64, backoffLimit int32) *batchv1.Job {
+func NewTestJob(behavior, name string, rPol v1.RestartPolicy, stopped bool, parallelism, completions int32, activeDeadlineSeconds *int64, backoffLimit int32) *batchv1.Job {
 	anyNode := ""
-	return NewTestJobOnNode(behavior, name, rPol, parallelism, completions, activeDeadlineSeconds, backoffLimit, anyNode)
+	return NewTestJobOnNode(behavior, name, rPol, stopped, parallelism, completions, activeDeadlineSeconds, backoffLimit, anyNode)
 }
 
 // NewTestJobOnNode is similar to NewTestJob but supports specifying a Node on which the Job's Pods will run.
 // Empty nodeName means no node selection constraints.
-func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism, completions int32, activeDeadlineSeconds *int64, backoffLimit int32, nodeName string) *batchv1.Job {
+func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, stopped bool, parallelism, completions int32, activeDeadlineSeconds *int64, backoffLimit int32, nodeName string) *batchv1.Job {
 	manualSelector := false
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -47,6 +47,7 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 			Kind: "Job",
 		},
 		Spec: batchv1.JobSpec{
+			Stopped:               &stopped,
 			ActiveDeadlineSeconds: activeDeadlineSeconds,
 			Parallelism:           &parallelism,
 			Completions:           &completions,

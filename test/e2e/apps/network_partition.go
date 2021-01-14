@@ -435,12 +435,13 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		ginkgo.It("should create new pods when node is partitioned", func() {
 			e2eskipper.SkipUnlessSSHKeyPresent()
 
+			isStopped := false
 			parallelism := int32(2)
 			completions := int32(4)
 			backoffLimit := int32(6) // default value
 
 			job := e2ejob.NewTestJob("notTerminate", "network-partition", v1.RestartPolicyNever,
-				parallelism, completions, nil, backoffLimit)
+				isStopped, parallelism, completions, nil, backoffLimit)
 			job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 			framework.ExpectNoError(err)
 			label := labels.SelectorFromSet(labels.Set(map[string]string{e2ejob.JobSelectorKey: job.Name}))

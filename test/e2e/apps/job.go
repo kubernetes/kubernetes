@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	utilpointer "k8s.io/utils/pointer"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,6 +41,7 @@ import (
 
 var _ = SIGDescribe("Job", func() {
 	f := framework.NewDefaultFramework("job")
+	isStopped := false
 	parallelism := int32(2)
 	completions := int32(4)
 	backoffLimit := int32(6) // default value
@@ -47,7 +49,7 @@ var _ = SIGDescribe("Job", func() {
 	// Simplest case: N pods succeed
 	ginkgo.It("should run a job to completion when tasks succeed", func() {
 		ginkgo.By("Creating a job")
-		job := e2ejob.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job := e2ejob.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, isStopped, parallelism, completions, nil, backoffLimit)
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
@@ -67,6 +69,31 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectEqual(successes, completions, "epected %d successful job pods, but got  %d", completions, successes)
 	})
 
+	ginkgo.It("should not create pods when stopped", func() {
+		ginkgo.By("Creating a job with stopped=true")
+		job := e2ejob.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, true, parallelism, completions, nil, backoffLimit)
+		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring pods aren't created for job")
+		framework.ExpectEqual(wait.Poll(framework.Poll, wait.ForeverTestTimeout, func() (bool, error) {
+			pods, err := e2ejob.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
+			if err != nil {
+				return false, err
+			}
+			return len(pods.Items) > 0, nil
+		}), wait.ErrWaitTimeout)
+
+		ginkgo.By("Updating the job with stopped=false")
+		job.Spec.Stopped = utilpointer.BoolPtr(false)
+		job, err = e2ejob.UpdateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to update job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensure pods equal to paralellism count is attached to the job")
+		err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
+		framework.ExpectNoError(err, "failed to ensure number of pods associated with job %s is equal to parallelism count in namespace: %s", job.Name, f.Namespace.Name)
+	})
+
 	/*
 		Testcase: Ensure that the pods associated with the job are removed once the job is deleted
 		Description: Create a job and ensure the associated pod count is equal to paralellism count. Delete the
@@ -74,7 +101,7 @@ var _ = SIGDescribe("Job", func() {
 	*/
 	ginkgo.It("should remove pods when job is deleted", func() {
 		ginkgo.By("Creating a job")
-		job := e2ejob.NewTestJob("notTerminate", "all-pods-removed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job := e2ejob.NewTestJob("notTerminate", "all-pods-removed", v1.RestartPolicyNever, isStopped, parallelism, completions, nil, backoffLimit)
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
@@ -104,7 +131,7 @@ var _ = SIGDescribe("Job", func() {
 		// throttle frequently failing containers in a given pod, ramping
 		// up to 5 minutes between restarts, making test timeout due to
 		// successive failures too likely with a reasonable test timeout.
-		job := e2ejob.NewTestJob("failOnce", "fail-once-local", v1.RestartPolicyOnFailure, parallelism, completions, nil, backoffLimit)
+		job := e2ejob.NewTestJob("failOnce", "fail-once-local", v1.RestartPolicyOnFailure, isStopped, parallelism, completions, nil, backoffLimit)
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
@@ -127,7 +154,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a job")
-		job := e2ejob.NewTestJobOnNode("failOnce", "fail-once-non-local", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)
+		job := e2ejob.NewTestJobOnNode("failOnce", "fail-once-non-local", v1.RestartPolicyNever, isStopped, parallelism, completions, nil, backoffLimit, node.Name)
 		job, err = e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
@@ -139,7 +166,7 @@ var _ = SIGDescribe("Job", func() {
 	ginkgo.It("should fail when exceeds active deadline", func() {
 		ginkgo.By("Creating a job")
 		var activeDeadlineSeconds int64 = 1
-		job := e2ejob.NewTestJob("notTerminate", "exceed-active-deadline", v1.RestartPolicyNever, parallelism, completions, &activeDeadlineSeconds, backoffLimit)
+		job := e2ejob.NewTestJob("notTerminate", "exceed-active-deadline", v1.RestartPolicyNever, isStopped, parallelism, completions, &activeDeadlineSeconds, backoffLimit)
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 		ginkgo.By("Ensuring job past active deadline")
@@ -154,7 +181,7 @@ var _ = SIGDescribe("Job", func() {
 	*/
 	framework.ConformanceIt("should delete a job", func() {
 		ginkgo.By("Creating a job")
-		job := e2ejob.NewTestJob("notTerminate", "foo", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job := e2ejob.NewTestJob("notTerminate", "foo", v1.RestartPolicyNever, isStopped, parallelism, completions, nil, backoffLimit)
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
@@ -180,7 +207,7 @@ var _ = SIGDescribe("Job", func() {
 	*/
 	framework.ConformanceIt("should adopt matching orphans and release non-matching pods", func() {
 		ginkgo.By("Creating a job")
-		job := e2ejob.NewTestJob("notTerminate", "adopt-release", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job := e2ejob.NewTestJob("notTerminate", "adopt-release", v1.RestartPolicyNever, isStopped, parallelism, completions, nil, backoffLimit)
 		// Replace job with the one returned from Create() so it has the UID.
 		// Save Kind since it won't be populated in the returned job.
 		kind := job.Kind
@@ -235,7 +262,7 @@ var _ = SIGDescribe("Job", func() {
 	ginkgo.It("should fail to exceed backoffLimit", func() {
 		ginkgo.By("Creating a job")
 		backoff := 1
-		job := e2ejob.NewTestJob("fail", "backofflimit", v1.RestartPolicyNever, 1, 1, nil, int32(backoff))
+		job := e2ejob.NewTestJob("fail", "backofflimit", v1.RestartPolicyNever, false, 1, 1, nil, int32(backoff))
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 		ginkgo.By("Ensuring job exceed backofflimit")

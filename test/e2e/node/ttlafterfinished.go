@@ -68,12 +68,13 @@ func testFinishedJob(f *framework.Framework) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
 
+	isStopped := false
 	parallelism := int32(1)
 	completions := int32(1)
 	backoffLimit := int32(2)
 	ttl := int32(10)
 
-	job := e2ejob.NewTestJob("randomlySucceedOrFail", "rand-non-local", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+	job := e2ejob.NewTestJob("randomlySucceedOrFail", "rand-non-local", v1.RestartPolicyNever, isStopped, parallelism, completions, nil, backoffLimit)
 	job.Spec.TTLSecondsAfterFinished = &ttl
 	job.ObjectMeta.Finalizers = []string{dummyFinalizer}
 	defer cleanupJob(f, job)

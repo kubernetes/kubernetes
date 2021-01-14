@@ -920,51 +920,49 @@ func TestAddPodOrphan(t *testing.T) {
 }
 
 func TestStoppedJob(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
-	receiveChan := make(chan struct{})
-	defer close(receiveChan)
-	origSyncHandler := jm.syncHandler
-	jm.syncHandler = func(key string) (bool, error) {
-		ret, err := origSyncHandler(key)
-		receiveChan <- struct{}{}
-		return ret, err
-	}
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informer.Start(stopCh)
-	go jm.Run(1, stopCh)
+	jm.updateHandler = func(job *batch.Job) error { return nil }
 
 	job1 := newJob(false, 1, 1, 6)
 	job1.Name = "job1"
 	informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
-	<-receiveChan
-
+	if _, err := jm.syncJob(testutil.GetKey(job1, t)); err != nil {
+		t.Fatalf("syncJob: %v", err)
+	}
 	pod1 := newPod("pod1", job1)
 	informer.Core().V1().Pods().Informer().GetIndexer().Add(pod1)
-
-	pods, err := jm.getPodsForJob(job1)
-	if err != nil {
-		t.Fatalf("getPodsForJob() error: %v", err)
+	jm.addPod(pod1)
+	if got, want := jm.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %d, want %d", got, want)
 	}
-	if got, want := len(pods), 1; got != want {
-		t.Errorf("len(pods) = %v, want %v", got, want)
+	key, quit := jm.queue.Get()
+	if key == nil || quit {
+		t.Fatalf("failed to get from queue: %v", pod1.Name)
 	}
+	expectedKey, _ := controller.KeyFunc(job1)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+	jm.queue.Done(key)
 
 	job1Update1 := *job1
 	job1Update1.Spec.Stopped = utilpointer.BoolPtr(true)
-	// informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1Update1)
 	jm.updateJob(job1, &job1Update1)
-
-	pods, err = jm.getPodsForJob(&job1Update1)
-	if err != nil {
-		t.Fatalf("getPodsForJob() error: %v", err)
+	if got, want := jm.queue.Len(), 1; got != want {
+		t.Fatalf("queue.Len() = %d, want %d", got, want)
 	}
-	if got, want := len(pods), 0; got != want {
-		t.Errorf("len(pods) = %v, want %v", got, want)
+	key, quit = jm.queue.Get()
+	if key == nil || quit {
+		t.Fatalf("failed to get from queue: %v", pod1.Name)
 	}
+	expectedKey, _ = controller.KeyFunc(job1)
+	if got, want := key.(string), expectedKey; got != want {
+		t.Errorf("queue.Get() = %v, want %v", got, want)
+	}
+	jm.queue.Done(key)
 }
 
 func TestUpdatePod(t *testing.T) {
