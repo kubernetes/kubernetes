@@ -188,8 +188,6 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 		return err
 	}
 
-	c.LeaderElectionClient = clientset.NewForConfigOrDie(restclient.AddUserAgent(c.Kubeconfig, "leader-election"))
-
 	c.EventRecorder = createRecorder(c.Client, userAgent)
 
 	rootClientBuilder := clientbuilder.SimpleControllerClientBuilder{
