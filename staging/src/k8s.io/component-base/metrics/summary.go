@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -72,6 +73,11 @@ func (s *Summary) initializeMetric() {
 func (s *Summary) initializeDeprecatedMetric() {
 	s.SummaryOpts.markDeprecated()
 	s.initializeMetric()
+}
+
+// WithContext allows the normal Summary metric to pass in context. The context is no-op now.
+func (s *Summary) WithContext(ctx context.Context) ObserverMetric {
+	return s.ObserverMetric
 }
 
 // SummaryVec is the internal representation of our wrapping struct around prometheus
@@ -168,4 +174,28 @@ func (v *SummaryVec) Reset() {
 	}
 
 	v.SummaryVec.Reset()
+}
+
+// WithContext returns wrapped SummaryVec with context
+func (v *SummaryVec) WithContext(ctx context.Context) *SummaryVecWithContext {
+	return &SummaryVecWithContext{
+		ctx:        ctx,
+		SummaryVec: *v,
+	}
+}
+
+// SummaryVecWithContext is the wrapper of SummaryVec with context.
+type SummaryVecWithContext struct {
+	SummaryVec
+	ctx context.Context
+}
+
+// WithLabelValues is the wrapper of SummaryVec.WithLabelValues.
+func (vc *SummaryVecWithContext) WithLabelValues(lvs ...string) ObserverMetric {
+	return vc.SummaryVec.WithLabelValues(lvs...)
+}
+
+// With is the wrapper of SummaryVec.With.
+func (vc *SummaryVecWithContext) With(labels map[string]string) ObserverMetric {
+	return vc.SummaryVec.With(labels)
 }
