@@ -54,7 +54,7 @@ func generateTestKubeadmConfig(dir, id, certDir, clusterName string) (string, er
 		},
 		CertificatesDir:   certDir,
 		ClusterName:       clusterName,
-		KubernetesVersion: "v1.19.0",
+		KubernetesVersion: kubeadmconstants.MinimumControlPlaneVersion.String(),
 	}
 
 	var buf bytes.Buffer
