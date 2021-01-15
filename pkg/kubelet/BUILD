@@ -29,7 +29,6 @@ go_library(
         "kubelet_server_journal_windows.go",
         "kubelet_volumes.go",
         "pod_container_deletor.go",
-        "pod_sandbox_deleter.go",
         "pod_workers.go",
         "reason_cache.go",
         "runonce.go",
@@ -191,7 +190,6 @@ go_test(
         "kubelet_volumes_linux_test.go",
         "kubelet_volumes_test.go",
         "pod_container_deletor_test.go",
-        "pod_sandbox_deleter_test.go",
         "pod_workers_test.go",
         "reason_cache_test.go",
         "runonce_test.go",
@@ -269,14 +267,21 @@ go_test(
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
-        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//staging/src/k8s.io/mount-utils:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
