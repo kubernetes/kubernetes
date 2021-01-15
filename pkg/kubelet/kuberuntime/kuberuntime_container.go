@@ -685,6 +685,12 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 				gracePeriod = *containerSpec.LivenessProbe.TerminationGracePeriodSeconds
 			}
 		}
+
+		if annotationGracePeriod, found := pod.ObjectMeta.Annotations["unsupported.do-not-use.openshift.io/override-liveness-grace-period-seconds"]; found {
+			if val, err := strconv.ParseUint(annotationGracePeriod, 10, 64); err == nil && val > 0 {
+				gracePeriod = int64(val)
+			}
+		}
 	}
 
 	if len(message) == 0 {
