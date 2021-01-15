@@ -50,8 +50,9 @@ const timeFmt = "2006-01-02T15:04:05.999"
    controllers fight when they disagree on how to set FlowSchemaStatus.
    In particular, they set the condition that indicates integrity of
    the reference to the PriorityLevelConfiguration.  The scenario tested is
-   `2*size` controllers, half of which set the condition normally and half of
-   which set the condition to the opposite value.
+   two teams of controllers, where the controllers in one team set the
+   condition normally and the controllers in the other team set the condition
+   to the opposite value.
 
    This is a behavioral test: it instantiates these controllers and runs them
    almost normally.  But instead of running all the controllers concurrently,
@@ -73,7 +74,7 @@ type fightTest struct {
 	t              *testing.T
 	ctx            context.Context
 	loopbackConfig *rest.Config
-	size           int
+	teamSize       int
 	stopCh         chan struct{}
 	now            time.Time
 	clk            *clock.FakeClock
@@ -94,25 +95,25 @@ type fightTest struct {
 	writeHistories map[bool][]map[string][]time.Time
 }
 
-func newFightTest(t *testing.T, loopbackConfig *rest.Config, size int) *fightTest {
+func newFightTest(t *testing.T, loopbackConfig *rest.Config, teamSize int) *fightTest {
 	now := time.Now()
 	ft := &fightTest{
 		t:              t,
 		ctx:            context.Background(),
 		loopbackConfig: loopbackConfig,
-		size:           size,
+		teamSize:       teamSize,
 		stopCh:         make(chan struct{}),
 		now:            now,
 		clk:            clock.NewFakeClock(now),
 		ctlrs: map[bool][]utilfc.TestableInterface{
-			false: make([]utilfc.TestableInterface, size),
-			true:  make([]utilfc.TestableInterface, size)},
+			false: make([]utilfc.TestableInterface, teamSize),
+			true:  make([]utilfc.TestableInterface, teamSize)},
 		notifiedRVs: map[bool][]map[string]string{
-			false: make([]map[string]string, size),
-			true:  make([]map[string]string, size)},
+			false: make([]map[string]string, teamSize),
+			true:  make([]map[string]string, teamSize)},
 		writeHistories: map[bool][]map[string][]time.Time{
-			false: make([]map[string][]time.Time, size),
-			true:  make([]map[string][]time.Time, size)},
+			false: make([]map[string][]time.Time, teamSize),
+			true:  make([]map[string][]time.Time, teamSize)},
 	}
 	ft.foreach(func(invert bool, i int) {
 		ft.rvMutex.Lock()
@@ -167,36 +168,29 @@ func (ft *fightTest) createController(invert bool, i int) {
 	})
 	ft.ctlrs[invert][i] = ctlr
 	informerFactory.Start(ft.stopCh)
-	if ctlr.WaitForCacheSync(ft.stopCh) {
-		ft.t.Logf("Achieved initial sync for invert=%v, i=%v", invert, i)
-	} else {
+	if !ctlr.WaitForCacheSync(ft.stopCh) {
 		ft.t.Fatalf("Never achieved initial sync for invert=%v, i=%v", invert, i)
 	}
 }
 
 func (ft *fightTest) waitForLastRVs() {
-	AOK := false
-	// wait until notifiedRVs[invert][i] covers lastRVs for all invert, i
-	for k := 1; k < 11 && !AOK; k++ {
-		ft.t.Logf("For size=%d, iteration=%d, k=%d, starting to wait for lastRVs=%v", ft.size, ft.iteration, k, ft.lastRVs)
-		time.Sleep(time.Millisecond * time.Duration(k*100))
-		AOK = true
+	ft.t.Logf("For teamSize=%d, iteration=%d, starting to wait for lastRVs=%v", ft.teamSize, ft.iteration, ft.lastRVs)
+	// wait until notifiedRVs[invert][i] equals lastRVs for all invert, i
+	err := wait.Poll(100*time.Millisecond, 5*time.Second, func() (bool, error) {
+		ft.rvMutex.Lock()
+		defer ft.rvMutex.Unlock()
+		allFound := true
 		ft.foreach(func(invert bool, i int) {
-			ft.rvMutex.Lock()
-			defer ft.rvMutex.Unlock()
 			for key, rv := range ft.lastRVs {
-				if ft.notifiedRVs[invert][i][key] != rv {
-					AOK = false
-				}
+				allFound = allFound && (ft.notifiedRVs[invert][i][key] == rv)
 			}
 		})
-	}
-	if !AOK {
-		func() {
-			ft.rvMutex.Lock()
-			defer ft.rvMutex.Unlock()
-			ft.t.Logf("For size=%d, iteration=%d, lastRVs=%v but notifiedRVs=%#+v", ft.size, ft.iteration, ft.lastRVs, ft.notifiedRVs)
-		}()
+		return allFound, nil
+	})
+	if err != nil {
+		ft.rvMutex.Lock()
+		defer ft.rvMutex.Unlock()
+		ft.t.Logf("For teamSize=%d, iteration=%d, lastRVs=%v but notifiedRVs=%#+v", ft.teamSize, ft.iteration, ft.lastRVs, ft.notifiedRVs)
 		ft.someTimedOut = true
 	}
 }
@@ -230,8 +224,8 @@ func TestConfigConsumerFight(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, false)()
 	_, loopbackConfig, closeFn := setup(t, 100, 100)
 	defer closeFn()
-	const size = 3
-	ft := newFightTest(t, loopbackConfig, size)
+	const teamSize = 3
+	ft := newFightTest(t, loopbackConfig, teamSize)
 	ft.foreach(ft.createController)
 	t.Logf("After initial sync, lastRVs=%v", ft.lastRVs)
 	nextTime := ft.clk.Now()
@@ -241,8 +235,8 @@ func TestConfigConsumerFight(t *testing.T) {
 		ft.now = nextTime
 		ft.clk.SetTime(ft.now)
 		// Log both ways, so that the separate logs can be correlated
-		t.Logf("Syncing[size=%d, iteration=%d] at %s", ft.size, ft.iteration, ft.now.Format(timeFmt))
-		klog.V(3).Infof("Syncing size=%d, iteration=%d at %s", ft.size, ft.iteration, ft.now.Format(timeFmt))
+		t.Logf("Syncing[teamSize=%d, iteration=%d] at %s", ft.teamSize, ft.iteration, ft.now.Format(timeFmt))
+		klog.V(3).Infof("Syncing teamSize=%d, iteration=%d at %s", ft.teamSize, ft.iteration, ft.now.Format(timeFmt))
 		ft.lastRVs = make(map[string]string)
 		const highTime = 2 * time.Minute
 		wait := highTime
@@ -252,14 +246,14 @@ func TestConfigConsumerFight(t *testing.T) {
 			specificDelay, err := ctlr.SyncOne(ctlrRVs)
 			nWrites := ft.updateAndCheckHistories(invert, i, ctlrRVs)
 			if err != nil {
-				t.Errorf("Error for invert=%v, i=%d: %v", invert, i, err)
+				t.Errorf("Error for invert=%v, i=%d, iteration=%d: %v", invert, i, ft.iteration, err)
 			}
-			t.Logf("For invert=%v, i=%d: nWrites=%d, specificDelay=%s", invert, i, nWrites, specificDelay)
+			t.Logf("For invert=%v, i=%d, iteration=%d: nWrites=%d, specificDelay=%s", invert, i, ft.iteration, nWrites, specificDelay)
 			if specificDelay > 0 {
 				wait = durationMin(wait, specificDelay)
 			}
 		})
-		t.Logf("For size=%d, iteration=%d at %s, lastRVs = %v", size, ft.iteration, ft.now.Format(timeFmt), ft.lastRVs)
+		t.Logf("For teamSize=%d, iteration=%d at %s, lastRVs = %v", teamSize, ft.iteration, ft.now.Format(timeFmt), ft.lastRVs)
 		if wait == highTime {
 			wait = time.Second * 4
 		}
@@ -272,8 +266,8 @@ func TestConfigConsumerFight(t *testing.T) {
 }
 
 func (ft *fightTest) foreach(visit func(invert bool, i int)) {
-	for i := 0; i < ft.size; i++ {
-		// The order of the following iteration is not deterministic,
+	for i := 0; i < ft.teamSize; i++ {
+		// The order of the following enumeration is not deterministic,
 		// and that is good.
 		invert := rand.Intn(2) == 0
 		visit(invert, i)

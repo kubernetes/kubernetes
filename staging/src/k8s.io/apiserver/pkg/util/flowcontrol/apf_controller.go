@@ -433,10 +433,10 @@ func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.Prior
 		fsIfc := cfgCtlr.flowcontrolClient.FlowSchemas()
 		patchBytes := []byte(fmt.Sprintf(`{"status": {"conditions": [ %s ] } }`, string(enc)))
 		patchOptions := metav1.PatchOptions{FieldManager: cfgCtlr.asFieldManager}
-		fs2, err := fsIfc.Patch(context.TODO(), fsu.flowSchema.Name, apitypes.StrategicMergePatchType, patchBytes, patchOptions, "status")
+		patchedFlowSchema, err := fsIfc.Patch(context.TODO(), fsu.flowSchema.Name, apitypes.StrategicMergePatchType, patchBytes, patchOptions, "status")
 		if err == nil {
-			key, _ := cache.MetaNamespaceKeyFunc(fs2)
-			flowSchemaRVs[key] = fs2.ResourceVersion
+			key, _ := cache.MetaNamespaceKeyFunc(patchedFlowSchema)
+			flowSchemaRVs[key] = patchedFlowSchema.ResourceVersion
 		} else if apierrors.IsNotFound(err) {
 			// This object has been deleted.  A notification is coming
 			// and nothing more needs to be done here.
