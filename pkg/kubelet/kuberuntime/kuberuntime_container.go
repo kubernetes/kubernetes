@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -630,6 +631,12 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 				if containerSpec.LivenessProbe != nil && containerSpec.LivenessProbe.TerminationGracePeriodSeconds != nil {
 					gracePeriod = *containerSpec.LivenessProbe.TerminationGracePeriodSeconds
 				}
+			}
+		}
+
+		if annotationGracePeriod, found := pod.ObjectMeta.Annotations["unsupported.do-not-use.openshift.io/override-liveness-grace-period-seconds"]; found {
+			if val, err := strconv.ParseUint(annotationGracePeriod, 10, 64); err == nil && val > 0 {
+				gracePeriod = int64(val)
 			}
 		}
 	}
