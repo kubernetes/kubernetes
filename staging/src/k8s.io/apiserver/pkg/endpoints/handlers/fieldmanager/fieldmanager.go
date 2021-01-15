@@ -183,9 +183,8 @@ func (f *FieldManager) UpdateNoErrors(liveObj, newObj runtime.Object, manager st
 	obj, err := f.Update(liveObj, newObj, manager)
 	if err != nil {
 		atMostEverySecond.Do(func() {
-			klog.Errorf("[SHOULD NOT HAPPEN] failed to update managedFields for %v: %v",
-				newObj.GetObjectKind().GroupVersionKind(),
-				err)
+			klog.ErrorS(err, "[SHOULD NOT HAPPEN] failed to update managedFields", "VersionKind",
+				newObj.GetObjectKind().GroupVersionKind())
 		})
 		// Explicitly remove managedFields on failure, so that
 		// we can't have garbage in it.
