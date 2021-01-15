@@ -318,7 +318,7 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 		pod := podInfo.Pod
 		if err == core.ErrNoNodesAvailable {
 			klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
-		} else if _, ok := err.(*core.FitError); ok {
+		} else if _, ok := err.(*framework.FitError); ok {
 			klog.V(2).InfoS("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", err)
 		} else if apierrors.IsNotFound(err) {
 			klog.V(2).InfoS("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", err)

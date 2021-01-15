@@ -289,7 +289,7 @@ func TestGenericScheduler(t *testing.T) {
 			nodes: []string{"machine1", "machine2"},
 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 			name:  "test 1",
-			wErr: &FitError{
+			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 2,
 				FilteredNodesStatuses: framework.NodeToStatusMap{
@@ -374,7 +374,7 @@ func TestGenericScheduler(t *testing.T) {
 			nodes: []string{"3", "2", "1"},
 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 			name:  "test 7",
-			wErr: &FitError{
+			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 3,
 				FilteredNodesStatuses: framework.NodeToStatusMap{
@@ -406,7 +406,7 @@ func TestGenericScheduler(t *testing.T) {
 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 			nodes: []string{"1", "2"},
 			name:  "test 8",
-			wErr: &FitError{
+			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 2,
 				FilteredNodesStatuses: framework.NodeToStatusMap{
@@ -640,7 +640,7 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:         []string{"3"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
 			expectedHosts: nil,
-			wErr: &FitError{
+			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
 				NumAllNodes: 1,
 				FilteredNodesStatuses: framework.NodeToStatusMap{
@@ -662,7 +662,7 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:         []string{"3"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
 			expectedHosts: nil,
-			wErr: &FitError{
+			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
 				NumAllNodes: 1,
 				FilteredNodesStatuses: framework.NodeToStatusMap{
@@ -699,7 +699,7 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:         []string{"1", "2"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
 			expectedHosts: nil,
-			wErr: &FitError{
+			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
 				NumAllNodes: 2,
 				FilteredNodesStatuses: framework.NodeToStatusMap{

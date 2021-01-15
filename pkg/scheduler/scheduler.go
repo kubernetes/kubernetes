@@ -457,7 +457,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		// will fit due to the preemption. It is also possible that a different pod will schedule
 		// into the resources that were preempted, but this is harmless.
 		nominatedNode := ""
-		if fitError, ok := err.(*core.FitError); ok {
+		if fitError, ok := err.(*framework.FitError); ok {
 			if !fwk.HasPostFilterPlugins() {
 				klog.V(3).InfoS("No PostFilter plugins are registered, so no preemption will be performed")
 			} else {

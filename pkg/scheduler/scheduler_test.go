@@ -633,7 +633,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	scheduler.scheduleOne(context.Background())
 	select {
 	case err := <-errChan:
-		expectErr := &core.FitError{
+		expectErr := &framework.FitError{
 			Pod:         secondPod,
 			NumAllNodes: 1,
 			FilteredNodesStatuses: framework.NodeToStatusMap{
@@ -777,7 +777,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	scheduler.scheduleOne(context.Background())
 	select {
 	case err := <-errChan:
-		expectErr := &core.FitError{
+		expectErr := &framework.FitError{
 			Pod:                   podWithTooBigResourceRequests,
 			NumAllNodes:           len(nodes),
 			FilteredNodesStatuses: failedNodeStatues,
