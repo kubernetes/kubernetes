@@ -999,6 +999,11 @@ func setTerminationGracePeriod(pod *v1.Pod, containerSpec *v1.Container, contain
 				return *containerSpec.LivenessProbe.TerminationGracePeriodSeconds
 			}
 		}
+		if annotationGracePeriod, found := pod.ObjectMeta.Annotations["unsupported.do-not-use.openshift.io/override-liveness-grace-period-seconds"]; found {
+			if val, err := strconv.ParseUint(annotationGracePeriod, 10, 64); err == nil && val > 0 {
+				return int64(val)
+			}
+		}
 		return *pod.Spec.TerminationGracePeriodSeconds
 	}
 	return gracePeriod
