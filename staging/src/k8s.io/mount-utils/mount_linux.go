@@ -90,8 +90,8 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, true)
 	}
 	// The list of filesystems that require containerized mounter on GCI image cluster
+	// nfs is removed from this list because nfs utils are available on COS 85 which is available from GKE 1.18. See b/162946348
 	fsTypesNeedMounter := map[string]struct{}{
-		"nfs":       {},
 		"glusterfs": {},
 		"ceph":      {},
 		"cifs":      {},
