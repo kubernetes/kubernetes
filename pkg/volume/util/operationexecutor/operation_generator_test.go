@@ -82,7 +82,7 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 			t.Fatalf("Error occurred while generating unmapVolumeFunc: %v", e)
 		}
 
-		metricFamilyName := "storage_operation_status_count"
+		metricFamilyName := "storage_operation_status_total"
 		labelFilter := map[string]string{
 			"status":         "success",
 			"operation_name": "unmap_volume",

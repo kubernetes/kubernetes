@@ -641,7 +641,7 @@ func getControllerStorageMetrics(ms e2emetrics.ControllerManagerMetrics, pluginN
 				}
 				result.latencyMetrics[operation] = count
 			}
-		case "storage_operation_status_count":
+		case "storage_operation_status_total":
 			for _, sample := range samples {
 				count := int64(sample.Value)
 				operation := string(sample.Metric["operation_name"])

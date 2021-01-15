@@ -61,7 +61,7 @@ var storageOperationErrorMetric = metrics.NewCounterVec(
 
 var storageOperationStatusMetric = metrics.NewCounterVec(
 	&metrics.CounterOpts{
-		Name:           "storage_operation_status_count",
+		Name:           "storage_operation_status_total",
 		Help:           "Storage operation return statuses count",
 		StabilityLevel: metrics.ALPHA,
 	},

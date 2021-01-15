@@ -17,10 +17,15 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
+	"k8s.io/component-base/metrics/testutil"
+
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -85,6 +90,66 @@ func TestGetFullQualifiedPluginNameForVolume(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			if fullPluginName := GetFullQualifiedPluginNameForVolume(test.pluginName, test.spec); fullPluginName != test.wantFullName {
 				t.Errorf("Case name: %s, GetFullQualifiedPluginNameForVolume, pluginName:%s, spec: %v, return:%s, want:%s", test.name, test.pluginName, test.spec, fullPluginName, test.wantFullName)
+			}
+		})
+	}
+}
+
+func TestOperationCompleteHook(t *testing.T) {
+
+	var (
+		fakeFullPluginName = "kubernetes.io/fakePlugin"
+		fakeOperationName  = "volume_fake_operation_name"
+	)
+
+	opComplete := OperationCompleteHook(fakeFullPluginName, fakeOperationName)
+
+	testCase := []struct {
+		name    string
+		err     error
+		metrics []string
+		want    string
+	}{
+		{
+			name: "operation complete without error",
+			metrics: []string{
+				"storage_operation_status_total",
+			},
+			want: `
+				# HELP storage_operation_status_total [ALPHA] Storage operation return statuses count
+				# TYPE storage_operation_status_total counter
+				storage_operation_status_total{operation_name="volume_fake_operation_name",status="success",volume_plugin="kubernetes.io/fakePlugin"} 1
+				`,
+		},
+		{
+			name: "operation complete with error",
+			err:  errors.New("fake error"),
+			metrics: []string{
+				"storage_operation_errors_total",
+				"storage_operation_status_total",
+			},
+			want: `
+				# HELP storage_operation_errors_total [ALPHA] Storage operation errors
+				# TYPE storage_operation_errors_total counter
+				storage_operation_errors_total{operation_name="volume_fake_operation_name",volume_plugin="kubernetes.io/fakePlugin"} 1
+				# HELP storage_operation_status_total [ALPHA] Storage operation return statuses count
+				# TYPE storage_operation_status_total counter
+				storage_operation_status_total{operation_name="volume_fake_operation_name",status="fail-unknown",volume_plugin="kubernetes.io/fakePlugin"} 1
+				`,
+		},
+	}
+
+	// Excluding storage_operation_duration_seconds because it is hard to predict its values.
+	storageOperationStatusMetric.Reset()
+	storageOperationErrorMetric.Reset()
+
+	for _, test := range testCase {
+		t.Run(test.name, func(t *testing.T) {
+			defer storageOperationStatusMetric.Reset()
+			defer storageOperationErrorMetric.Reset()
+			opComplete(&test.err)
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(test.want), test.metrics...); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

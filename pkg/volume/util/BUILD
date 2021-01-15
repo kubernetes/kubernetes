@@ -75,6 +75,8 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/testutil:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
