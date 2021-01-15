@@ -165,7 +165,7 @@ func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node)
 		if !supportedHugePageResources.Has(string(resourceName)) {
 			delete(existingNode.Status.Capacity, resourceName)
 			delete(existingNode.Status.Allocatable, resourceName)
-			klog.Infof("Removing now unsupported huge page resource named: %s", resourceName)
+			klog.Infof("Removing unsupported huge page resource at present,named: %s", resourceName)
 			requiresUpdate = true
 		}
 	}
