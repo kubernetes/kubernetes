@@ -1,13 +1,12 @@
 package app
 
 import (
+	"io/ioutil"
 	"path"
 
-	"github.com/spf13/cobra"
-
+	"k8s.io/apimachinery/pkg/util/json"
+	kyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/informers"
-	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 )
@@ -36,6 +35,10 @@ func ShimForOpenShift(controllerManagerOptions *options.KubeControllerManagerOpt
 		return err
 	}
 
+	if err := applyOpenShiftConfigDefaultProjectSelector(controllerManagerOptions, openshiftConfig); err != nil {
+		return err
+	}
+
 	// Overwrite the informers, because we have our custom generic informers for quota.
 	// TODO update quota to create its own informer like garbage collection
 	if informers, err := newInformerFactory(controllerManager.Kubeconfig); err != nil {
@@ -47,24 +50,35 @@ func ShimForOpenShift(controllerManagerOptions *options.KubeControllerManagerOpt
 	return nil
 }
 
-func ShimFlagsForOpenShift(controllerManagerOptions *options.KubeControllerManagerOptions, cmd *cobra.Command) error {
-	if len(controllerManagerOptions.OpenShiftContext.OpenShiftConfig) == 0 {
+func getOpenShiftConfig(configFile string) (map[string]interface{}, error) {
+	configBytes, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		return nil, err
+	}
+	jsonBytes, err := kyaml.ToJSON(configBytes)
+	if err != nil {
+		return nil, err
+	}
+	config := map[string]interface{}{}
+	if err := json.Unmarshal(jsonBytes, &config); err != nil {
+		return nil, err
+	}
+
+	return config, nil
+}
+
+func applyOpenShiftConfigDefaultProjectSelector(controllerManagerOptions *options.KubeControllerManagerOptions, openshiftConfig map[string]interface{}) error {
+	projectConfig, ok := openshiftConfig["projectConfig"]
+	if !ok {
 		return nil
 	}
 
-	// TODO this gets removed when no longer take flags and no longer build a recycler template
-	openshiftConfig, err := getOpenShiftConfig(controllerManagerOptions.OpenShiftContext.OpenShiftConfig)
-	if err != nil {
-		return err
+	castProjectConfig := projectConfig.(map[string]interface{})
+	defaultNodeSelector, ok := castProjectConfig["defaultNodeSelector"]
+	if !ok {
+		return nil
 	}
-	// apply the config based controller manager flags.  They will override.
-	// TODO this should be replaced by the installer setting up the flags for us
-	if err := applyOpenShiftConfigFlags(controllerManagerOptions, openshiftConfig, cmd); err != nil {
-		return err
-	}
-
-	klog.V(1).Infof("Flags after OpenShift shims:")
-	cliflag.PrintFlags(cmd.Flags())
+	controllerManagerOptions.OpenShiftContext.OpenShiftDefaultProjectNodeSelector = defaultNodeSelector.(string)
 
 	return nil
 }
