@@ -1022,7 +1022,7 @@ func getNodeEvents(c clientset.Interface, nodeName string) []v1.Event {
 }
 
 // WaitForAllNodesSchedulable waits up to timeout for all
-// (but TestContext.AllowedNotReadyNodes) to become scheduable.
+// (but TestContext.AllowedNotReadyNodes) to become schedulable.
 func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
 	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
 

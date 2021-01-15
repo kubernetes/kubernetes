@@ -959,7 +959,7 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 	// Disruptive test run serially, we can cache all voluem global mount
 	// points and verify after the test that we do not leak any global mount point.
 	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-	framework.ExpectNoError(err, "while listing scheduable nodes")
+	framework.ExpectNoError(err, "while listing schedulable nodes")
 	globalMountPointsByNode := make(map[string]sets.String, len(nodeList.Items))
 	for _, node := range nodeList.Items {
 		globalMountPointsByNode[node.Name] = utils.FindVolumeGlobalMountPoints(hostExec, &node)
@@ -993,7 +993,7 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 			podNode = &nodeList.Items[i]
 		}
 	}
-	framework.ExpectNotEqual(podNode, nil, "pod node should exist in scheduable nodes")
+	framework.ExpectNotEqual(podNode, nil, "pod node should exist in schedulable nodes")
 
 	utils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true)
 
