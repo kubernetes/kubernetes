@@ -138,7 +138,7 @@ func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.Cycle
 	}
 
 	// 2) Find all preemption candidates.
-	candidates, evaluatedNodeNum, status, err := pl.FindCandidates(ctx, state, pod, m)
+	candidates, nodeToStautsMap, err := pl.FindCandidates(ctx, state, pod, m)
 	if err != nil {
 		return "", err
 	}
@@ -147,9 +147,9 @@ func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.Cycle
 	if len(candidates) == 0 {
 		return "", &framework.FitError{
 			Pod:         pod,
-			NumAllNodes: len(evaluatedNodeNum),
+			NumAllNodes: len(nodeToStautsMap),
 			Diagnosis: framework.Diagnosis{
-				NodeToStatusMap: status,
+				NodeToStatusMap: nodeToStautsMap,
 				// Leave FailedPlugins as nil as it won't be used on moving Pods.
 			},
 		}
@@ -198,15 +198,15 @@ func (pl *DefaultPreemption) getOffsetAndNumCandidates(numNodes int32) (int32, i
 
 // FindCandidates calculates a slice of preemption candidates.
 // Each candidate is executable to make the given <pod> schedulable.
-func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framework.CycleState, pod *v1.Pod, m framework.NodeToStatusMap) ([]Candidate, []*framework.NodeInfo, framework.NodeToStatusMap, error) {
+func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framework.CycleState, pod *v1.Pod, m framework.NodeToStatusMap) ([]Candidate, framework.NodeToStatusMap, error) {
 	allNodes, err := pl.fh.SnapshotSharedLister().NodeInfos().List()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	if len(allNodes) == 0 {
-		return nil, nil, nil, fmt.Errorf("no nodes available")
+		return nil, nil, fmt.Errorf("no nodes available")
 	}
-	potentialNodes := nodesWherePreemptionMightHelp(allNodes, m)
+	potentialNodes, unschedulableNodeStatus := nodesWherePreemptionMightHelp(allNodes, m)
 	if len(potentialNodes) == 0 {
 		klog.V(3).Infof("Preemption will not help schedule pod %v/%v on any node.", pod.Namespace, pod.Name)
 		// In this case, we should clean-up any existing nominated node name of the pod.
@@ -214,12 +214,12 @@ func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framewor
 			klog.Errorf("Cannot clear 'NominatedNodeName' field of pod %v/%v: %v", pod.Namespace, pod.Name, err)
 			// We do not return as this error is not critical.
 		}
-		return nil, nil, nil, nil
+		return nil, unschedulableNodeStatus, nil
 	}
 
 	pdbs, err := getPodDisruptionBudgets(pl.pdbLister)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	offset, numCandidates := pl.getOffsetAndNumCandidates(int32(len(potentialNodes)))
@@ -231,7 +231,10 @@ func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framewor
 		klog.Infof("from a pool of %d nodes (offset: %d, sample %d nodes: %v), ~%d candidates will be chosen", len(potentialNodes), offset, len(sample), sample, numCandidates)
 	}
 	candidates, nodeStatuses := dryRunPreemption(ctx, pl.fh, state, pod, potentialNodes, pdbs, offset, numCandidates)
-	return candidates, potentialNodes, nodeStatuses, nil
+	for node, status := range unschedulableNodeStatus {
+		nodeStatuses[node] = status
+	}
+	return candidates, nodeStatuses, nil
 }
 
 // PodEligibleToPreemptOthers determines whether this pod should be considered
@@ -268,18 +271,20 @@ func PodEligibleToPreemptOthers(pod *v1.Pod, nodeInfos framework.NodeInfoLister,
 
 // nodesWherePreemptionMightHelp returns a list of nodes with failed predicates
 // that may be satisfied by removing pods from the node.
-func nodesWherePreemptionMightHelp(nodes []*framework.NodeInfo, m framework.NodeToStatusMap) []*framework.NodeInfo {
+func nodesWherePreemptionMightHelp(nodes []*framework.NodeInfo, m framework.NodeToStatusMap) ([]*framework.NodeInfo, framework.NodeToStatusMap) {
 	var potentialNodes []*framework.NodeInfo
+	nodeStatuses := make(framework.NodeToStatusMap)
 	for _, node := range nodes {
 		name := node.Node().Name
-		// We reply on the status by each plugin - 'Unschedulable' or 'UnschedulableAndUnresolvable'
+		// We rely on the status by each plugin - 'Unschedulable' or 'UnschedulableAndUnresolvable'
 		// to determine whether preemption may help or not on the node.
 		if m[name].Code() == framework.UnschedulableAndUnresolvable {
+			nodeStatuses[node.Node().Name] = framework.NewStatus(framework.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling")
 			continue
 		}
 		potentialNodes = append(potentialNodes, node)
 	}
-	return potentialNodes
+	return potentialNodes, nodeStatuses
 }
 
 type candidateList struct {
