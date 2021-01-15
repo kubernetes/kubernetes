@@ -330,7 +330,7 @@ func TestRunGenCSR(t *testing.T) {
 					ServiceSubnet: "192.0.2.0/24",
 				},
 				CertificatesDir:   certDir,
-				KubernetesVersion: "v1.19.0",
+				KubernetesVersion: kubeadmconstants.MinimumControlPlaneVersion.String(),
 			},
 		},
 	}
@@ -378,7 +378,7 @@ func TestGenCSRConfig(t *testing.T) {
 
 	// A minimal kubeadm config with just enough values to avoid triggering
 	// auto-detection of config values at runtime.
-	const kubeadmConfig = `
+	var kubeadmConfig = `
 apiVersion: kubeadm.k8s.io/v1beta2
 kind: InitConfiguration
 localAPIEndpoint:
@@ -389,8 +389,7 @@ nodeRegistration:
 apiVersion: kubeadm.k8s.io/v1beta2
 kind: ClusterConfiguration
 certificatesDir: /custom/config/certificates-dir
-kubernetesVersion: v1.19.0
-`
+kubernetesVersion: ` + kubeadmconstants.MinimumControlPlaneVersion.String()
 
 	tmpDir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpDir)
