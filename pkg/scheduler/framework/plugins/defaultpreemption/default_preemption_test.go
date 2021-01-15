@@ -154,7 +154,9 @@ func TestPostFilter(t *testing.T) {
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable),
 			},
 			wantResult: nil,
-			wantStatus: framework.NewStatus(framework.Unschedulable),
+			// node1 is not actually been evaluated, it will not be processed by preemption, the status here is an internal status, the final message that is going to be written in
+			// the log will be looks like "Status after running PostFilter plugins for pod" pod="default/p" status=&{code:2 reasons:[0/0 nodes are available: .] err:<nil>}
+			wantStatus: framework.NewStatus(framework.Unschedulable, "0/0 nodes are available: ."),
 		},
 		{
 			name: "pod can be made schedulable on one node",

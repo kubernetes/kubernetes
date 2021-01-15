@@ -138,9 +138,21 @@ func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.Cycle
 	}
 
 	// 2) Find all preemption candidates.
-	candidates, err := pl.FindCandidates(ctx, state, pod, m)
-	if err != nil || len(candidates) == 0 {
+	candidates, evaluatedNodeNum, status, err := pl.FindCandidates(ctx, state, pod, m)
+	if err != nil {
 		return "", err
+	}
+
+	// Return a FitError only when there are no candidates that fit the pod.
+	if len(candidates) == 0 {
+		return "", &framework.FitError{
+			Pod:         pod,
+			NumAllNodes: len(evaluatedNodeNum),
+			Diagnosis: framework.Diagnosis{
+				NodeToStatusMap: status,
+				// Leave FailedPlugins as nil as it won't be used on moving Pods.
+			},
+		}
 	}
 
 	// 3) Interact with registered Extenders to filter out some candidates if needed.
@@ -186,15 +198,14 @@ func (pl *DefaultPreemption) getOffsetAndNumCandidates(numNodes int32) (int32, i
 
 // FindCandidates calculates a slice of preemption candidates.
 // Each candidate is executable to make the given <pod> schedulable.
-func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framework.CycleState, pod *v1.Pod, m framework.NodeToStatusMap) ([]Candidate, error) {
+func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framework.CycleState, pod *v1.Pod, m framework.NodeToStatusMap) ([]Candidate, []*framework.NodeInfo, framework.NodeToStatusMap, error) {
 	allNodes, err := pl.fh.SnapshotSharedLister().NodeInfos().List()
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	if len(allNodes) == 0 {
-		return nil, fmt.Errorf("no nodes available")
+		return nil, nil, nil, fmt.Errorf("no nodes available")
 	}
-
 	potentialNodes := nodesWherePreemptionMightHelp(allNodes, m)
 	if len(potentialNodes) == 0 {
 		klog.V(3).Infof("Preemption will not help schedule pod %v/%v on any node.", pod.Namespace, pod.Name)
@@ -203,12 +214,12 @@ func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framewor
 			klog.Errorf("Cannot clear 'NominatedNodeName' field of pod %v/%v: %v", pod.Namespace, pod.Name, err)
 			// We do not return as this error is not critical.
 		}
-		return nil, nil
+		return nil, nil, nil, nil
 	}
 
 	pdbs, err := getPodDisruptionBudgets(pl.pdbLister)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	offset, numCandidates := pl.getOffsetAndNumCandidates(int32(len(potentialNodes)))
@@ -220,18 +231,7 @@ func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framewor
 		klog.Infof("from a pool of %d nodes (offset: %d, sample %d nodes: %v), ~%d candidates will be chosen", len(potentialNodes), offset, len(sample), sample, numCandidates)
 	}
 	candidates, nodeStatuses := dryRunPreemption(ctx, pl.fh, state, pod, potentialNodes, pdbs, offset, numCandidates)
-	// Return a FitError only when there are no candidates that fit the pod.
-	if len(candidates) == 0 {
-		return candidates, &framework.FitError{
-			Pod:         pod,
-			NumAllNodes: len(potentialNodes),
-			Diagnosis: framework.Diagnosis{
-				NodeToStatusMap: nodeStatuses,
-				// Leave FailedPlugins as nil as it won't be used on moving Pods.
-			},
-		}
-	}
-	return candidates, nil
+	return candidates, potentialNodes, nodeStatuses, nil
 }
 
 // PodEligibleToPreemptOthers determines whether this pod should be considered
