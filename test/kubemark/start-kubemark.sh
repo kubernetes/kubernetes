@@ -234,6 +234,9 @@ function resize-node-objects {
     return 0
   fi
 
+  echo "Hollow nodes' images:"
+  "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get nodes  -o custom-columns='NAME:.metadata.name,IMAGES:.status.images[*].names' | head -n 6
+
   annotation_size_bytes="${KUBEMARK_NODE_OBJECT_SIZE_BYTES}"
   echo "Annotating node objects with ${annotation_size_bytes} byte label"
   label=$( (< /dev/urandom tr -dc 'a-zA-Z0-9' | fold -w "$annotation_size_bytes"; true) | head -n 1)
