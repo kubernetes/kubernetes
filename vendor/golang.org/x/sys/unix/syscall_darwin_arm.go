@@ -4,9 +4,7 @@
 
 package unix
 
-import (
-	"syscall"
-)
+import "syscall"
 
 func ptrace(request int, pid int, addr uintptr, data uintptr) error {
 	return ENOTSUP
@@ -43,10 +41,6 @@ func (cmsg *Cmsghdr) SetLen(length int) {
 }
 
 func Syscall9(num, a1, a2, a3, a4, a5, a6, a7, a8, a9 uintptr) (r1, r2 uintptr, err syscall.Errno) // sic
-
-// SYS___SYSCTL is used by syscall_bsd.go for all BSDs, but in modern versions
-// of darwin/arm the syscall is called sysctl instead of __sysctl.
-const SYS___SYSCTL = SYS_SYSCTL
 
 //sys	Fstat(fd int, stat *Stat_t) (err error)
 //sys	Fstatat(fd int, path string, stat *Stat_t, flags int) (err error)

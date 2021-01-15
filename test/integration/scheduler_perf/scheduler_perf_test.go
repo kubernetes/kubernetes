@@ -51,9 +51,7 @@ var (
 		Metrics: []string{
 			"scheduler_scheduling_algorithm_predicate_evaluation_seconds",
 			"scheduler_scheduling_algorithm_priority_evaluation_seconds",
-			"scheduler_binding_duration_seconds",
 			"scheduler_e2e_scheduling_duration_seconds",
-			"scheduler_scheduling_algorithm_preemption_evaluation_seconds",
 			"scheduler_pod_scheduling_duration_seconds",
 		},
 	}
@@ -173,8 +171,8 @@ func (cno *createNodesOp) isValid(allowParameterization bool) error {
 	if cno.Opcode != createNodesOpcode {
 		return fmt.Errorf("invalid opcode")
 	}
-	ok := (cno.Count > 0 ||
-		(cno.CountParam != "" && allowParameterization && isValidParameterizable(cno.CountParam)))
+	ok := cno.Count > 0 ||
+		(cno.CountParam != "" && allowParameterization && isValidParameterizable(cno.CountParam))
 	if !ok {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", cno.Count, cno.CountParam)
 	}
@@ -226,8 +224,8 @@ func (cpo *createPodsOp) isValid(allowParameterization bool) error {
 	if cpo.Opcode != createPodsOpcode {
 		return fmt.Errorf("invalid opcode")
 	}
-	ok := (cpo.Count > 0 ||
-		(cpo.CountParam != "" && allowParameterization && isValidParameterizable(cpo.CountParam)))
+	ok := cpo.Count > 0 ||
+		(cpo.CountParam != "" && allowParameterization && isValidParameterizable(cpo.CountParam))
 	if !ok {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", cpo.Count, cpo.CountParam)
 	}

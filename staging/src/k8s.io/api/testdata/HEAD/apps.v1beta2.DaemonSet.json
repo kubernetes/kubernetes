@@ -1468,7 +1468,8 @@
     "updateStrategy": {
       "type": "翘ǼZ熝Ʊ宷泐ɻvŰ`Ǧɝ憑ǖ菐u",
       "rollingUpdate": {
-        "maxUnavailable": 2
+        "maxUnavailable": 2,
+        "maxSurge": 3
       }
     },
     "minReadySeconds": -985724127,

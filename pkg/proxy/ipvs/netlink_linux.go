@@ -150,7 +150,7 @@ func (h *netlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, e
 	if dev != "" {
 		link, err := h.LinkByName(dev)
 		if err != nil {
-			return nil, fmt.Errorf("error get device %s, err: %v", filterDev, err)
+			return nil, fmt.Errorf("error get device %s, err: %v", dev, err)
 		}
 		chosenLinkIndex = link.Attrs().Index
 	} else if filterDev != "" {

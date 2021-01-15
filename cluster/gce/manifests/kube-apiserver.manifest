@@ -37,7 +37,7 @@
     "livenessProbe": {
       "httpGet": {
         "scheme": "HTTPS",
-        "host": "127.0.0.1",
+        "host": "{{healthcheck_ip}}",
         "port": {{secure_port}},
         "path": "/livez?exclude=etcd&exclude=kms-provider-0&exclude=kms-provider-1"
       },
@@ -47,7 +47,7 @@
     "readinessProbe": {
       "httpGet": {
         "scheme": "HTTPS",
-        "host": "127.0.0.1",
+        "host": "{{healthcheck_ip}}",
         "port": {{secure_port}},
         "path": "/readyz"
       },

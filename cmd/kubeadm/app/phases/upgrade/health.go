@@ -24,7 +24,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	apps "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,11 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	utilpointer "k8s.io/utils/pointer"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 // healthCheck is a helper struct for easily performing healthchecks against the cluster and printing the output
@@ -208,21 +208,34 @@ func deleteHealthCheckJob(client clientset.Interface, ns, jobName string) error 
 
 // controlPlaneNodesReady checks whether all control-plane Nodes in the cluster are in the Running state
 func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterConfiguration) error {
-	selector := labels.SelectorFromSet(labels.Set(map[string]string{
-		constants.LabelNodeRoleMaster: "",
+	// list nodes labeled with a "master" node-role
+	selectorOldControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
+		constants.LabelNodeRoleOldControlPlane: "",
 	}))
-	controlPlanes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-		LabelSelector: selector.String(),
+	nodesWithOldLabel, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+		LabelSelector: selectorOldControlPlane.String(),
 	})
 	if err != nil {
-		return errors.Wrap(err, "couldn't list control-planes in cluster")
+		return errors.Wrapf(err, "could not list nodes labeled with %q", constants.LabelNodeRoleOldControlPlane)
 	}
 
-	if len(controlPlanes.Items) == 0 {
+	// list nodes labeled with a "control-plane" node-role
+	selectorControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
+		constants.LabelNodeRoleControlPlane: "",
+	}))
+	nodesControlPlane, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+		LabelSelector: selectorControlPlane.String(),
+	})
+	if err != nil {
+		return errors.Wrapf(err, "could not list nodes labeled with %q", constants.LabelNodeRoleControlPlane)
+	}
+
+	nodes := append(nodesWithOldLabel.Items, nodesControlPlane.Items...)
+	if len(nodes) == 0 {
 		return errors.New("failed to find any nodes with a control-plane role")
 	}
 
-	notReadyControlPlanes := getNotReadyNodes(controlPlanes.Items)
+	notReadyControlPlanes := getNotReadyNodes(nodes)
 	if len(notReadyControlPlanes) != 0 {
 		return errors.Errorf("there are NotReady control-planes in the cluster: %v", notReadyControlPlanes)
 	}
@@ -242,49 +255,6 @@ func staticPodManifestHealth(_ clientset.Interface, _ *kubeadmapi.ClusterConfigu
 		return nil
 	}
 	return errors.Errorf("The control plane seems to be Static Pod-hosted, but some of the manifests don't seem to exist on disk. This probably means you're running 'kubeadm upgrade' on a remote machine, which is not supported for a Static Pod-hosted cluster. Manifest files not found: %v", nonExistentManifests)
-}
-
-// IsControlPlaneSelfHosted returns whether the control plane is self hosted or not
-func IsControlPlaneSelfHosted(client clientset.Interface) bool {
-	notReadyDaemonSets, err := getNotReadyDaemonSets(client)
-	if err != nil {
-		return false
-	}
-
-	// If there are no NotReady DaemonSets, we are using selfhosting
-	return len(notReadyDaemonSets) == 0
-}
-
-// getNotReadyDaemonSets gets the amount of Ready control plane DaemonSets
-func getNotReadyDaemonSets(client clientset.Interface) ([]error, error) {
-	notReadyDaemonSets := []error{}
-	for _, component := range constants.ControlPlaneComponents {
-		dsName := constants.AddSelfHostedPrefix(component)
-		ds, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Get(context.TODO(), dsName, metav1.GetOptions{})
-		if err != nil {
-			return nil, errors.Errorf("couldn't get daemonset %q in the %s namespace", dsName, metav1.NamespaceSystem)
-		}
-
-		if err := daemonSetHealth(&ds.Status); err != nil {
-			notReadyDaemonSets = append(notReadyDaemonSets, errors.Wrapf(err, "DaemonSet %q not healthy", dsName))
-		}
-	}
-	return notReadyDaemonSets, nil
-}
-
-// daemonSetHealth is a helper function for getting the health of a DaemonSet's status
-func daemonSetHealth(dsStatus *apps.DaemonSetStatus) error {
-	if dsStatus.CurrentNumberScheduled != dsStatus.DesiredNumberScheduled {
-		return errors.Errorf("current number of scheduled Pods ('%d') doesn't match the amount of desired Pods ('%d')",
-			dsStatus.CurrentNumberScheduled, dsStatus.DesiredNumberScheduled)
-	}
-	if dsStatus.NumberAvailable == 0 {
-		return errors.New("no available Pods for DaemonSet")
-	}
-	if dsStatus.NumberReady == 0 {
-		return errors.New("no ready Pods for DaemonSet")
-	}
-	return nil
 }
 
 // getNotReadyNodes returns a string slice of nodes in the cluster that are NotReady

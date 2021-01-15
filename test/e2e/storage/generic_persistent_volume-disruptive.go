@@ -93,6 +93,7 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 	var err error
 	test := testsuites.StorageClassTest{
 		Name:      "default",
+		Timeouts:  f.Timeouts,
 		ClaimSize: "2Gi",
 	}
 	pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
@@ -112,7 +113,7 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 		PVCs:         pvcClaims,
 		SeLinuxLabel: e2epv.SELinuxLabel,
 	}
-	pod, err := e2epod.CreateSecPod(c, &podConfig, framework.PodStartTimeout)
+	pod, err := e2epod.CreateSecPod(c, &podConfig, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "While creating pods for kubelet restart test")
 	return pod, pvc, pvs[0]
 }

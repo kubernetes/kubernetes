@@ -369,7 +369,7 @@ func (o *openAPI) findCommonParameters(routes []restful.Route) (map[interface{}]
 }
 
 func (o *openAPI) toSchema(name string) (_ *spec.Schema, err error) {
-	if openAPIType, openAPIFormat := common.GetOpenAPITypeFormat(name); openAPIType != "" {
+	if openAPIType, openAPIFormat := common.OpenAPITypeFormat(name); openAPIType != "" {
 		return &spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Type:   []string{openAPIType},
@@ -423,7 +423,7 @@ func (o *openAPI) buildParameter(restParam restful.ParameterData, bodySample int
 	default:
 		return ret, fmt.Errorf("unknown restful operation kind : %v", restParam.Kind)
 	}
-	openAPIType, openAPIFormat := common.GetOpenAPITypeFormat(restParam.DataType)
+	openAPIType, openAPIFormat := common.OpenAPITypeFormat(restParam.DataType)
 	if openAPIType == "" {
 		return ret, fmt.Errorf("non-body Restful parameter type should be a simple type, but got : %v", restParam.DataType)
 	}

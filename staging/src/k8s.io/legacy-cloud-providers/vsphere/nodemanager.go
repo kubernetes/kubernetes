@@ -203,8 +203,8 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 						node.Name, vm, res.vc, res.datacenter.Name())
 
 					// Get the node zone information
-					nodeFd := node.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
-					nodeRegion := node.ObjectMeta.Labels[v1.LabelZoneRegion]
+					nodeFd := node.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
+					nodeRegion := node.ObjectMeta.Labels[v1.LabelFailureDomainBetaRegion]
 					nodeZone := &cloudprovider.Zone{FailureDomain: nodeFd, Region: nodeRegion}
 					nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc, vmUUID: nodeUUID, zone: nodeZone}
 					nm.addNodeInfo(node.ObjectMeta.Name, nodeInfo)
@@ -309,6 +309,17 @@ func (nm *NodeManager) GetNodeDetails() ([]NodeDetails, error) {
 		nodeDetails = append(nodeDetails, NodeDetails{nodeName, nodeInfo.vm, nodeInfo.vmUUID, nodeInfo.zone})
 	}
 	return nodeDetails, nil
+}
+
+// GetNodeNames returns list of nodes that are known to vsphere cloudprovider.
+// These are typically nodes that make up k8s cluster.
+func (nm *NodeManager) GetNodeNames() []k8stypes.NodeName {
+	nodes := nm.getNodes()
+	var nodeNameList []k8stypes.NodeName
+	for _, node := range nodes {
+		nodeNameList = append(nodeNameList, k8stypes.NodeName(node.Name))
+	}
+	return nodeNameList
 }
 
 func (nm *NodeManager) refreshNodes() (errList []error) {

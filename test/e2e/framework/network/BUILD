@@ -22,9 +22,9 @@ go_library(
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
-        "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 

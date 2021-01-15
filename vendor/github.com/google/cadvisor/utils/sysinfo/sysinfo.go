@@ -377,7 +377,7 @@ func getNodeMemInfo(sysFs sysfs.SysFs, nodeDir string) (uint64, error) {
 	return uint64(memory), nil
 }
 
-// getCoresInfo retruns infromation about physical cores
+// getCoresInfo returns information about physical cores
 func getCoresInfo(sysFs sysfs.SysFs, cpuDirs []string) ([]info.Core, error) {
 	cores := make([]info.Core, 0, len(cpuDirs))
 	for _, cpuDir := range cpuDirs {
@@ -522,4 +522,15 @@ func GetSocketFromCPU(topology []info.Node, cpu int) int {
 		}
 	}
 	return -1
+}
+
+// GetOnlineCPUs returns available cores.
+func GetOnlineCPUs(topology []info.Node) []int {
+	onlineCPUs := make([]int, 0)
+	for _, node := range topology {
+		for _, core := range node.Cores {
+			onlineCPUs = append(onlineCPUs, core.Threads...)
+		}
+	}
+	return onlineCPUs
 }

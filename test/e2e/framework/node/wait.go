@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const sleepTime = 20 * time.Second
@@ -40,8 +39,7 @@ var requiredPerNodePods = []*regexp.Regexp{
 }
 
 // WaitForReadyNodes waits up to timeout for cluster to has desired size and
-// there is no not-ready nodes in it. By cluster size we mean number of Nodes
-// excluding Master Node.
+// there is no not-ready nodes in it. By cluster size we mean number of schedulable Nodes.
 func WaitForReadyNodes(c clientset.Interface, size int, timeout time.Duration) error {
 	_, err := CheckReady(c, size, timeout)
 	return err
@@ -58,9 +56,6 @@ func WaitForTotalHealthy(c clientset.Interface, timeout time.Duration) error {
 		// It should be OK to list unschedulable Nodes here.
 		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		for _, node := range nodes.Items {
@@ -149,8 +144,7 @@ func WaitForNodeToBeReady(c clientset.Interface, name string, timeout time.Durat
 }
 
 // CheckReady waits up to timeout for cluster to has desired size and
-// there is no not-ready nodes in it. By cluster size we mean number of Nodes
-// excluding Master Node.
+// there is no not-ready nodes in it. By cluster size we mean number of schedulable Nodes.
 func CheckReady(c clientset.Interface, size int, timeout time.Duration) ([]v1.Node, error) {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(sleepTime) {
 		nodes, err := waitListSchedulableNodes(c)
@@ -186,9 +180,6 @@ func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		return true, nil
@@ -221,9 +212,6 @@ func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowed
 		allNodes, err := c.CoreV1().Nodes().List(context.TODO(), opts)
 		if err != nil {
 			e2elog.Logf("Unexpected error listing nodes: %v", err)
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		for _, node := range allNodes.Items {

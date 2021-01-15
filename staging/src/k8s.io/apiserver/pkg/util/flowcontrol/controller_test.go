@@ -21,12 +21,15 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
 
-	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
@@ -34,7 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	fcclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
+	fcclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
 	"k8s.io/klog/v2"
 )
 
@@ -43,20 +46,27 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-var mandPLs = func() map[string]*fcv1a1.PriorityLevelConfiguration {
-	ans := make(map[string]*fcv1a1.PriorityLevelConfiguration)
+var mandPLs = func() map[string]*flowcontrol.PriorityLevelConfiguration {
+	ans := make(map[string]*flowcontrol.PriorityLevelConfiguration)
 	for _, mand := range fcboot.MandatoryPriorityLevelConfigurations {
 		ans[mand.Name] = mand
 	}
 	return ans
 }()
 
+// in general usage, the boolean returned may be inaccurate by the time the caller examines it.
+func (cfgCtlr *configController) hasPriorityLevelState(plName string) bool {
+	cfgCtlr.lock.Lock()
+	defer cfgCtlr.lock.Unlock()
+	return cfgCtlr.priorityLevelStates[plName] != nil
+}
+
 type ctlrTestState struct {
 	t               *testing.T
 	cfgCtlr         *configController
-	fcIfc           fcclient.FlowcontrolV1alpha1Interface
-	existingPLs     map[string]*fcv1a1.PriorityLevelConfiguration
-	existingFSs     map[string]*fcv1a1.FlowSchema
+	fcIfc           fcclient.FlowcontrolV1beta1Interface
+	existingPLs     map[string]*flowcontrol.PriorityLevelConfiguration
+	existingFSs     map[string]*flowcontrol.FlowSchema
 	heldRequestsMap map[string][]heldRequest
 	requestWG       sync.WaitGroup
 	lock            sync.Mutex
@@ -206,7 +216,7 @@ var mandQueueSetNames, exclQueueSetNames = func() (sets.String, sets.String) {
 	mandQueueSetNames := sets.NewString()
 	exclQueueSetNames := sets.NewString()
 	for _, mpl := range fcboot.MandatoryPriorityLevelConfigurations {
-		if mpl.Spec.Type == fcv1a1.PriorityLevelEnablementExempt {
+		if mpl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt {
 			exclQueueSetNames.Insert(mpl.Name)
 		} else {
 			mandQueueSetNames.Insert(mpl.Name)
@@ -222,22 +232,22 @@ func TestConfigConsumer(t *testing.T) {
 		t.Run(fmt.Sprintf("trial%d:", i), func(t *testing.T) {
 			clientset := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(clientset, 0)
-			flowcontrolClient := clientset.FlowcontrolV1alpha1()
+			flowcontrolClient := clientset.FlowcontrolV1beta1()
 			cts := &ctlrTestState{t: t,
 				fcIfc:           flowcontrolClient,
-				existingFSs:     map[string]*fcv1a1.FlowSchema{},
-				existingPLs:     map[string]*fcv1a1.PriorityLevelConfiguration{},
+				existingFSs:     map[string]*flowcontrol.FlowSchema{},
+				existingPLs:     map[string]*flowcontrol.PriorityLevelConfiguration{},
 				heldRequestsMap: map[string][]heldRequest{},
 				queues:          map[string]*ctlrTestQueueSet{},
 			}
-			ctlr := newTestableController(
-				informerFactory,
-				flowcontrolClient,
-				100,         // server concurrency limit
-				time.Minute, // request wait limit
-				metrics.PriorityLevelConcurrencyObserverPairGenerator,
-				cts,
-			)
+			ctlr := newTestableController(TestableConfig{
+				InformerFactory:        informerFactory,
+				FlowcontrolClient:      flowcontrolClient,
+				ServerConcurrencyLimit: 100,
+				RequestWaitLimit:       time.Minute,
+				ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
+				QueueSetFactory:        cts,
+			})
 			cts.cfgCtlr = ctlr
 			persistingPLNames := sets.NewString()
 			trialStep := fmt.Sprintf("trial%d-0", i)
@@ -284,8 +294,8 @@ func TestConfigConsumer(t *testing.T) {
 
 				// Now create a new config and digest it
 				trialStep = fmt.Sprintf("trial%d-%d", i, j)
-				var newPLs []*fcv1a1.PriorityLevelConfiguration
-				var newFSs []*fcv1a1.FlowSchema
+				var newPLs []*flowcontrol.PriorityLevelConfiguration
+				var newFSs []*flowcontrol.FlowSchema
 				newPLs, _, desiredPLNames, newBadPLNames = genPLs(rng, trialStep, persistingPLNames, 1+rng.Intn(4))
 				newFSs, _, newFTRs, newCatchAlls = genFSs(t, rng, trialStep, desiredPLNames, newBadPLNames, 1+rng.Intn(6))
 
@@ -307,7 +317,104 @@ func TestConfigConsumer(t *testing.T) {
 	}
 }
 
-func checkNewFS(cts *ctlrTestState, rng *rand.Rand, trialName string, ftr *fsTestingRecord, catchAlls map[bool]*fcv1a1.FlowSchema) {
+func TestAPFControllerWithGracefulShutdown(t *testing.T) {
+	const plName = "test-ps"
+	fs := &flowcontrol.FlowSchema{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-fs",
+		},
+		Spec: flowcontrol.FlowSchemaSpec{
+			MatchingPrecedence: 100,
+			PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+				Name: plName,
+			},
+			DistinguisherMethod: &flowcontrol.FlowDistinguisherMethod{
+				Type: flowcontrol.FlowDistinguisherMethodByUserType,
+			},
+		},
+	}
+
+	pl := &flowcontrol.PriorityLevelConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: plName,
+		},
+		Spec: flowcontrol.PriorityLevelConfigurationSpec{
+			Type: flowcontrol.PriorityLevelEnablementLimited,
+			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+				AssuredConcurrencyShares: 10,
+				LimitResponse: flowcontrol.LimitResponse{
+					Type: flowcontrol.LimitResponseTypeReject,
+				},
+			},
+		},
+	}
+
+	clientset := clientsetfake.NewSimpleClientset(fs, pl)
+	informerFactory := informers.NewSharedInformerFactory(clientset, time.Second)
+	flowcontrolClient := clientset.FlowcontrolV1beta1()
+	cts := &ctlrTestState{t: t,
+		fcIfc:           flowcontrolClient,
+		existingFSs:     map[string]*flowcontrol.FlowSchema{},
+		existingPLs:     map[string]*flowcontrol.PriorityLevelConfiguration{},
+		heldRequestsMap: map[string][]heldRequest{},
+		queues:          map[string]*ctlrTestQueueSet{},
+	}
+	controller := newTestableController(TestableConfig{
+		informerFactory,
+		flowcontrolClient,
+		100,
+		time.Minute,
+		metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		cts,
+	})
+
+	stopCh, controllerCompletedCh := make(chan struct{}), make(chan struct{})
+	var controllerErr error
+
+	informerFactory.Start(stopCh)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	status := informerFactory.WaitForCacheSync(ctx.Done())
+	if names := unsynced(status); len(names) > 0 {
+		t.Fatalf("WaitForCacheSync did not successfully complete, resources=%#v", names)
+	}
+
+	go func() {
+		defer close(controllerCompletedCh)
+		controllerErr = controller.Run(stopCh)
+	}()
+
+	// ensure that the controller has run its first loop.
+	err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
+		return controller.hasPriorityLevelState(plName), nil
+	})
+	if err != nil {
+		t.Errorf("expected the controller to reconcile the priority level configuration object: %s, error: %s", plName, err)
+	}
+
+	close(stopCh)
+	t.Log("waiting for the controller Run function to shutdown gracefully")
+	<-controllerCompletedCh
+
+	if controllerErr != nil {
+		t.Errorf("expected nil error from controller Run function, but got: %#v", controllerErr)
+	}
+}
+
+func unsynced(status map[reflect.Type]bool) []string {
+	names := make([]string, 0)
+
+	for objType, synced := range status {
+		if !synced {
+			names = append(names, objType.Name())
+		}
+	}
+
+	return names
+}
+
+func checkNewFS(cts *ctlrTestState, rng *rand.Rand, trialName string, ftr *fsTestingRecord, catchAlls map[bool]*flowcontrol.FlowSchema) {
 	t := cts.t
 	ctlr := cts.cfgCtlr
 	fs := ftr.fs
@@ -325,8 +432,8 @@ func checkNewFS(cts *ctlrTestState, rng *rand.Rand, trialName string, ftr *fsTes
 				startWG.Add(1)
 				go func(matches, isResource bool, rdu RequestDigest) {
 					expectedMatch := matches && ftr.wellFormed && (fsPrecedes(fs, catchAlls[isResource]) || fs.Name == catchAlls[isResource].Name)
-					ctlr.Handle(ctx, rdu, func(matchFS *fcv1a1.FlowSchema, matchPL *fcv1a1.PriorityLevelConfiguration) {
-						matchIsExempt := matchPL.Spec.Type == fcv1a1.PriorityLevelEnablementExempt
+					ctlr.Handle(ctx, rdu, func(matchFS *flowcontrol.FlowSchema, matchPL *flowcontrol.PriorityLevelConfiguration) {
+						matchIsExempt := matchPL.Spec.Type == flowcontrol.PriorityLevelEnablementExempt
 						t.Logf("Considering FlowSchema %s, expectedMatch=%v, isResource=%v: Handle(%#+v) => note(fs=%s, pl=%s, isExempt=%v)", fs.Name, expectedMatch, isResource, rdu, matchFS.Name, matchPL.Name, matchIsExempt)
 						if a := matchFS.Name == fs.Name; expectedMatch != a {
 							t.Errorf("Fail at %s/%s: rd=%#+v, expectedMatch=%v, actualMatch=%v, matchFSName=%q, catchAlls=%#+v", trialName, fs.Name, rdu, expectedMatch, a, matchFS.Name, catchAlls)
@@ -355,12 +462,12 @@ func checkNewFS(cts *ctlrTestState, rng *rand.Rand, trialName string, ftr *fsTes
 	startWG.Wait()
 }
 
-func genPLs(rng *rand.Rand, trial string, oldPLNames sets.String, n int) (pls []*fcv1a1.PriorityLevelConfiguration, plMap map[string]*fcv1a1.PriorityLevelConfiguration, goodNames, badNames sets.String) {
-	pls = make([]*fcv1a1.PriorityLevelConfiguration, 0, n)
-	plMap = make(map[string]*fcv1a1.PriorityLevelConfiguration, n)
+func genPLs(rng *rand.Rand, trial string, oldPLNames sets.String, n int) (pls []*flowcontrol.PriorityLevelConfiguration, plMap map[string]*flowcontrol.PriorityLevelConfiguration, goodNames, badNames sets.String) {
+	pls = make([]*flowcontrol.PriorityLevelConfiguration, 0, n)
+	plMap = make(map[string]*flowcontrol.PriorityLevelConfiguration, n)
 	goodNames = sets.NewString()
 	badNames = sets.NewString(trial+"-nopl1", trial+"-nopl2")
-	addGood := func(pl *fcv1a1.PriorityLevelConfiguration) {
+	addGood := func(pl *flowcontrol.PriorityLevelConfiguration) {
 		pls = append(pls, pl)
 		plMap[pl.Name] = pl
 		goodNames.Insert(pl.Name)
@@ -386,12 +493,12 @@ func genPLs(rng *rand.Rand, trial string, oldPLNames sets.String, n int) (pls []
 	return
 }
 
-func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames sets.String, n int) (newFSs []*fcv1a1.FlowSchema, newFSMap map[string]*fcv1a1.FlowSchema, newFTRs map[string]*fsTestingRecord, catchAlls map[bool]*fcv1a1.FlowSchema) {
+func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames sets.String, n int) (newFSs []*flowcontrol.FlowSchema, newFSMap map[string]*flowcontrol.FlowSchema, newFTRs map[string]*fsTestingRecord, catchAlls map[bool]*flowcontrol.FlowSchema) {
 	newFTRs = map[string]*fsTestingRecord{}
-	catchAlls = map[bool]*fcv1a1.FlowSchema{
+	catchAlls = map[bool]*flowcontrol.FlowSchema{
 		false: fcboot.MandatoryFlowSchemaCatchAll,
 		true:  fcboot.MandatoryFlowSchemaCatchAll}
-	newFSMap = map[string]*fcv1a1.FlowSchema{}
+	newFSMap = map[string]*flowcontrol.FlowSchema{}
 	add := func(ftr *fsTestingRecord) {
 		newFSs = append(newFSs, ftr.fs)
 		newFSMap[ftr.fs.Name] = ftr.fs
@@ -419,7 +526,7 @@ func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames 
 	return
 }
 
-func fsPrecedes(a, b *fcv1a1.FlowSchema) bool {
+func fsPrecedes(a, b *flowcontrol.FlowSchema) bool {
 	if a.Spec.MatchingPrecedence < b.Spec.MatchingPrecedence {
 		return true
 	}

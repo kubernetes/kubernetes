@@ -40,7 +40,7 @@ var (
 	image = imageutils.GetE2EImage(imageutils.Pause)
 )
 
-var _ = SIGDescribe("Windows volume mounts ", func() {
+var _ = SIGDescribe("[Feature:Windows] Windows volume mounts ", func() {
 	f := framework.NewDefaultFramework("windows-volumes")
 	var (
 		emptyDirSource = v1.VolumeSource{
@@ -90,14 +90,19 @@ func doReadOnlyTest(f *framework.Framework, source v1.VolumeSource, volumePath s
 		podName  = "pod-" + string(uuid.NewUUID())
 		pod      = testPodWithROVolume(podName, source, volumePath)
 	)
+	pod.Spec.NodeSelector = map[string]string{
+		"kubernetes.io/os": "windows",
+	}
 
-	f.PodClient().CreateSync(pod)
+	pod = f.PodClient().CreateSync(pod)
+	ginkgo.By("verifying that pod has the correct nodeSelector")
+	framework.ExpectEqual(pod.Spec.NodeSelector["kubernetes.io/os"], "windows")
+
 	cmd := []string{"cmd", "/c", "echo windows-volume-test", ">", filePath}
 
 	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
 
 	framework.ExpectEqual(stderr, "Access is denied.")
-
 }
 
 func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, volumePath string) {
@@ -107,6 +112,9 @@ func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, vol
 		pod             = testPodWithROVolume(podName, source, volumePath)
 		rwcontainerName = containerName + "-rw"
 	)
+	pod.Spec.NodeSelector = map[string]string{
+		"kubernetes.io/os": "windows",
+	}
 
 	rwcontainer := v1.Container{
 		Name:  containerName + "-rw",
@@ -120,7 +128,10 @@ func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, vol
 	}
 
 	pod.Spec.Containers = append(pod.Spec.Containers, rwcontainer)
-	f.PodClient().CreateSync(pod)
+	pod = f.PodClient().CreateSync(pod)
+
+	ginkgo.By("verifying that pod has the correct nodeSelector")
+	framework.ExpectEqual(pod.Spec.NodeSelector["kubernetes.io/os"], "windows")
 
 	cmd := []string{"cmd", "/c", "echo windows-volume-test", ">", filePath}
 
@@ -138,6 +149,8 @@ func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, vol
 	framework.ExpectNoError(err, readmsg)
 }
 
+// testPodWithROVolume makes a minimal pod defining a volume input source. Similarly to
+// other tests for sig-windows this should append a nodeSelector for windows.
 func testPodWithROVolume(podName string, source v1.VolumeSource, path string) *v1.Pod {
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{

@@ -23,8 +23,11 @@ import (
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -278,6 +281,69 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 			},
 		}
 
+		ginkgo.By("Creating Pod")
+		pod = f.PodClient().CreateSync(pod)
+
+		ginkgo.By("Reading file content from the nginx-container")
+		result := f.ExecShellInContainer(pod.Name, busyBoxMainContainerName, fmt.Sprintf("cat %s", busyBoxMainVolumeFilePath))
+		framework.ExpectEqual(result, message, "failed to match expected string %s with %s", message, resultString)
+	})
+
+	/*
+		Release: v1.20
+		Testname: EmptyDir, Memory backed volume is sized to specified limit
+		Description: A Pod created with an 'emptyDir' Volume backed by memory should be sized to user provided value.
+	*/
+	ginkgo.It("pod should support memory backed volumes of specified size", func() {
+		// skip if feature gate is not enabled, this could be elevated to conformance in future if on Linux.
+		if !utilfeature.DefaultFeatureGate.Enabled(features.SizeMemoryBackedVolumes) {
+			return
+		}
+
+		var (
+			volumeName                 = "shared-data"
+			busyBoxMainVolumeMountPath = "/usr/share/volumeshare"
+			busyBoxMainContainerName   = "busybox-main-container"
+			expectedResult             = "10240" // equal to 10Mi
+			deletionGracePeriod        = int64(0)
+			sizeLimit                  = resource.MustParse("10Mi")
+		)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-size-memory-volume-" + string(uuid.NewUUID()),
+			},
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						Name: volumeName,
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium:    v1.StorageMediumMemory,
+								SizeLimit: &sizeLimit,
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:    busyBoxMainContainerName,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"/bin/sh"},
+						Args:    []string{"-c", "sleep 100000"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      volumeName,
+								MountPath: busyBoxMainVolumeMountPath,
+							},
+						},
+					},
+				},
+				TerminationGracePeriodSeconds: &deletionGracePeriod,
+				RestartPolicy:                 v1.RestartPolicyNever,
+			},
+		}
+
 		var err error
 		ginkgo.By("Creating Pod")
 		pod = f.PodClient().CreateSync(pod)
@@ -286,13 +352,13 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err, "failed to deploy pod %s", pod.Name)
 
-		ginkgo.By("Geting the pod")
+		ginkgo.By("Getting the pod")
 		pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get pod %s", pod.Name)
 
-		ginkgo.By("Reading file content from the nginx-container")
-		result := f.ExecShellInContainer(pod.Name, busyBoxMainContainerName, fmt.Sprintf("cat %s", busyBoxMainVolumeFilePath))
-		framework.ExpectEqual(result, message, "failed to match expected string %s with %s", message, resultString)
+		ginkgo.By("Reading empty dir size")
+		result := f.ExecShellInContainer(pod.Name, busyBoxMainContainerName, fmt.Sprintf("df | grep %s | awk '{print $2}'", busyBoxMainVolumeMountPath))
+		framework.ExpectEqual(result, expectedResult, "failed to match expected string %s with %s", expectedResult, result)
 	})
 })
 

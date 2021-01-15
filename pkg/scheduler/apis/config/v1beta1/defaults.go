@@ -44,6 +44,11 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
 func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfiguration) {
+
+	if obj.Parallelism == nil {
+		obj.Parallelism = pointer.Int32Ptr(16)
+	}
+
 	if len(obj.Profiles) == 0 {
 		obj.Profiles = append(obj.Profiles, v1beta1.KubeSchedulerProfile{})
 	}
@@ -158,6 +163,15 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 	}
 }
 
+func SetDefaults_DefaultPreemptionArgs(obj *v1beta1.DefaultPreemptionArgs) {
+	if obj.MinCandidateNodesPercentage == nil {
+		obj.MinCandidateNodesPercentage = pointer.Int32Ptr(10)
+	}
+	if obj.MinCandidateNodesAbsolute == nil {
+		obj.MinCandidateNodesAbsolute = pointer.Int32Ptr(100)
+	}
+}
+
 func SetDefaults_InterPodAffinityArgs(obj *v1beta1.InterPodAffinityArgs) {
 	// Note that an object is created manually in cmd/kube-scheduler/app/options/deprecated.go
 	// DeprecatedOptions#ApplyTo.
@@ -195,23 +209,18 @@ func SetDefaults_VolumeBindingArgs(obj *v1beta1.VolumeBindingArgs) {
 }
 
 func SetDefaults_PodTopologySpreadArgs(obj *v1beta1.PodTopologySpreadArgs) {
-	if !feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
-		// When feature is disabled, the default spreading is done by legacy
-		// SelectorSpread plugin.
+	if feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
+		if obj.DefaultingType == "" {
+			// TODO(#94008): Always default to System in v1beta2.
+			if len(obj.DefaultConstraints) != 0 {
+				obj.DefaultingType = v1beta1.ListDefaulting
+			} else {
+				obj.DefaultingType = v1beta1.SystemDefaulting
+			}
+		}
 		return
 	}
-	if obj.DefaultConstraints == nil {
-		obj.DefaultConstraints = []corev1.TopologySpreadConstraint{
-			{
-				TopologyKey:       corev1.LabelHostname,
-				WhenUnsatisfiable: corev1.ScheduleAnyway,
-				MaxSkew:           3,
-			},
-			{
-				TopologyKey:       corev1.LabelZoneFailureDomainStable,
-				WhenUnsatisfiable: corev1.ScheduleAnyway,
-				MaxSkew:           5,
-			},
-		}
+	if obj.DefaultingType == "" {
+		obj.DefaultingType = v1beta1.ListDefaulting
 	}
 }

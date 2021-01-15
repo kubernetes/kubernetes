@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"k8s.io/klog/v2"
-	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v4/merge"
 )
@@ -79,12 +78,7 @@ func NewFieldManager(f Manager, ignoreManagedFieldsFromRequestObject bool) *Fiel
 
 // NewDefaultFieldManager creates a new FieldManager that merges apply requests
 // and update managed fields for other types of requests.
-func NewDefaultFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, ignoreManagedFieldsFromRequestObject bool) (*FieldManager, error) {
-	typeConverter, err := internal.NewTypeConverter(models, false)
-	if err != nil {
-		return nil, err
-	}
-
+func NewDefaultFieldManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, ignoreManagedFieldsFromRequestObject bool) (*FieldManager, error) {
 	f, err := NewStructuredMergeManager(typeConverter, objectConverter, objectDefaulter, kind.GroupVersion(), hub)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field manager: %v", err)
@@ -95,15 +89,8 @@ func NewDefaultFieldManager(models openapiproto.Models, objectConverter runtime.
 // NewDefaultCRDFieldManager creates a new FieldManager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
-func NewDefaultCRDFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, preserveUnknownFields, ignoreManagedFieldsFromRequestObject bool) (_ *FieldManager, err error) {
-	var typeConverter internal.TypeConverter = internal.DeducedTypeConverter{}
-	if models != nil {
-		typeConverter, err = internal.NewTypeConverter(models, preserveUnknownFields)
-		if err != nil {
-			return nil, err
-		}
-	}
-	f, err := NewCRDStructuredMergeManager(typeConverter, objectConverter, objectDefaulter, kind.GroupVersion(), hub, preserveUnknownFields)
+func NewDefaultCRDFieldManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, ignoreManagedFieldsFromRequestObject bool) (_ *FieldManager, err error) {
+	f, err := NewCRDStructuredMergeManager(typeConverter, objectConverter, objectDefaulter, kind.GroupVersion(), hub)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field manager: %v", err)
 	}
@@ -111,7 +98,7 @@ func NewDefaultCRDFieldManager(models openapiproto.Models, objectConverter runti
 }
 
 // newDefaultFieldManager is a helper function which wraps a Manager with certain default logic.
-func newDefaultFieldManager(f Manager, typeConverter internal.TypeConverter, objectConverter runtime.ObjectConvertor, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, ignoreManagedFieldsFromRequestObject bool) *FieldManager {
+func newDefaultFieldManager(f Manager, typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, ignoreManagedFieldsFromRequestObject bool) *FieldManager {
 	f = NewStripMetaManager(f)
 	f = NewManagedFieldsUpdater(f)
 	f = NewBuildManagerInfoManager(f, kind.GroupVersion())

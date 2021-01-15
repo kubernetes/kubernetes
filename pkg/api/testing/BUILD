@@ -98,6 +98,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/api/pod:go_default_library",
         "//pkg/api/testing/compat:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/v1:go_default_library",

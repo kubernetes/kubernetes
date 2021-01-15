@@ -17,7 +17,8 @@ type VolumeListOKBody struct {
 	// Required: true
 	Volumes []*types.Volume `json:"Volumes"`
 
-	// Warnings that occurred when fetching the list of volumes
+	// Warnings that occurred when fetching the list of volumes.
+	//
 	// Required: true
 	Warnings []string `json:"Warnings"`
 }

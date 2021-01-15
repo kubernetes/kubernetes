@@ -192,8 +192,14 @@ func (c *Client) listVMSS(ctx context.Context, resourceGroupName string) ([]comp
 		return result, retry.GetError(resp, err)
 	}
 
-	for page.NotDone() {
-		result = append(result, *page.Response().Value...)
+	for {
+		result = append(result, page.Values()...)
+
+		// Abort the loop when there's no nextLink in the response.
+		if to.String(page.Response().NextLink) == "" {
+			break
+		}
+
 		if err = page.NextWithContext(ctx); err != nil {
 			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmss.list.next", resourceID, err)
 			return result, retry.GetError(page.Response().Response.Response, err)
@@ -270,6 +276,38 @@ func (c *Client) CreateOrUpdateAsync(ctx context.Context, resourceGroupName stri
 	}
 
 	return future, nil
+}
+
+// WaitForCreateOrUpdateResult waits for the response of the create or update request
+func (c *Client) WaitForCreateOrUpdateResult(ctx context.Context, future *azure.Future, resourceGroupName string) (*http.Response, error) {
+	mc := metrics.NewMetricContext("vmss", "wait_for_create_or_update_result", resourceGroupName, c.subscriptionID, "")
+	res, err := c.armClient.WaitForAsyncOperationResult(ctx, future, "VMSSWaitForCreateOrUpdateResult")
+	mc.Observe(err)
+	return res, err
+}
+
+// WaitForDeleteInstancesResult waits for the response of the delete instance request
+func (c *Client) WaitForDeleteInstancesResult(ctx context.Context, future *azure.Future, resourceGroupName string) (*http.Response, error) {
+	mc := metrics.NewMetricContext("vmss", "wait_for_delete_instances_result", resourceGroupName, c.subscriptionID, "")
+	res, err := c.armClient.WaitForAsyncOperationResult(ctx, future, "VMSSWaitForDeleteInstancesResult")
+	mc.Observe(err)
+	return res, err
+}
+
+// WaitForDeallocateInstancesResult waits for the response of the delete instance request
+func (c *Client) WaitForDeallocateInstancesResult(ctx context.Context, future *azure.Future, resourceGroupName string) (*http.Response, error) {
+	mc := metrics.NewMetricContext("vmss", "wait_for_deallocate_instances_result", resourceGroupName, c.subscriptionID, "")
+	res, err := c.armClient.WaitForAsyncOperationResult(ctx, future, "VMSSWaitForDeallocateInstancesResult")
+	mc.Observe(err)
+	return res, err
+}
+
+// WaitForStartInstancesResult waits for the response of the delete instance request
+func (c *Client) WaitForStartInstancesResult(ctx context.Context, future *azure.Future, resourceGroupName string) (*http.Response, error) {
+	mc := metrics.NewMetricContext("vmss", "wait_for_start_instances_result", resourceGroupName, c.subscriptionID, "")
+	res, err := c.armClient.WaitForAsyncOperationResult(ctx, future, "VMSSWaitForStartInstancesResult")
+	mc.Observe(err)
+	return res, err
 }
 
 // WaitForAsyncOperationResult waits for the response of the request
@@ -473,8 +511,105 @@ func (c *Client) DeleteInstancesAsync(ctx context.Context, resourceGroupName str
 	}
 
 	future, err := azure.NewFutureFromResponse(response)
+	mc.Observe(err)
 	if err != nil {
 		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmss.deletevms.future", resourceID, rerr.Error())
+		return nil, retry.NewError(false, err)
+	}
+
+	return &future, nil
+}
+
+// DeallocateInstancesAsync sends the deallocate request to ARM client and DOEST NOT wait on the future
+func (c *Client) DeallocateInstancesAsync(ctx context.Context, resourceGroupName string, vmScaleSetName string, vmInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) (*azure.Future, *retry.Error) {
+	mc := metrics.NewMetricContext("vmss", "deallocate_instances_async", resourceGroupName, c.subscriptionID, "")
+
+	// Report errors if the client is rate limited.
+	if !c.rateLimiterWriter.TryAccept() {
+		mc.RateLimitedCount()
+		return nil, retry.GetRateLimitError(true, "VMSSDeallocateInstancesAsync")
+	}
+
+	// Report errors if the client is throttled.
+	if c.RetryAfterWriter.After(time.Now()) {
+		mc.ThrottledCount()
+		rerr := retry.GetThrottlingError("VMSSDeallocateInstancesAsync", "client throttled", c.RetryAfterWriter)
+		return nil, rerr
+	}
+
+	resourceID := armclient.GetResourceID(
+		c.subscriptionID,
+		resourceGroupName,
+		"Microsoft.Compute/virtualMachineScaleSets",
+		vmScaleSetName,
+	)
+
+	response, rerr := c.armClient.PostResource(ctx, resourceID, "deallocate", vmInstanceIDs)
+	defer c.armClient.CloseResponse(ctx, response)
+
+	if rerr != nil {
+		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmss.deallocatevms.request", resourceID, rerr.Error())
+		return nil, rerr
+	}
+
+	err := autorest.Respond(response, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	if err != nil {
+		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmss.deallocatevms.respond", resourceID, rerr.Error())
+		return nil, retry.GetError(response, err)
+	}
+
+	future, err := azure.NewFutureFromResponse(response)
+	mc.Observe(err)
+	if err != nil {
+		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmss.deallocatevms.future", resourceID, rerr.Error())
+		return nil, retry.NewError(false, err)
+	}
+
+	return &future, nil
+}
+
+// StartInstancesAsync sends the start request to ARM client and DOEST NOT wait on the future
+func (c *Client) StartInstancesAsync(ctx context.Context, resourceGroupName string, vmScaleSetName string, vmInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) (*azure.Future, *retry.Error) {
+	mc := metrics.NewMetricContext("vmss", "start_instances_async", resourceGroupName, c.subscriptionID, "")
+
+	// Report errors if the client is rate limited.
+	if !c.rateLimiterWriter.TryAccept() {
+		mc.RateLimitedCount()
+		return nil, retry.GetRateLimitError(true, "VMSSStartInstancesAsync")
+	}
+
+	// Report errors if the client is throttled.
+	if c.RetryAfterWriter.After(time.Now()) {
+		mc.ThrottledCount()
+		rerr := retry.GetThrottlingError("VMSSStartInstancesAsync", "client throttled", c.RetryAfterWriter)
+		return nil, rerr
+	}
+
+	resourceID := armclient.GetResourceID(
+		c.subscriptionID,
+		resourceGroupName,
+		"Microsoft.Compute/virtualMachineScaleSets",
+		vmScaleSetName,
+	)
+
+	response, rerr := c.armClient.PostResource(ctx, resourceID, "start", vmInstanceIDs)
+	defer c.armClient.CloseResponse(ctx, response)
+
+	if rerr != nil {
+		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmss.startvms.request", resourceID, rerr.Error())
+		return nil, rerr
+	}
+
+	err := autorest.Respond(response, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	if err != nil {
+		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmss.startvms.respond", resourceID, rerr.Error())
+		return nil, retry.GetError(response, err)
+	}
+
+	future, err := azure.NewFutureFromResponse(response)
+	mc.Observe(err)
+	if err != nil {
+		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmss.startvms.future", resourceID, rerr.Error())
 		return nil, retry.NewError(false, err)
 	}
 

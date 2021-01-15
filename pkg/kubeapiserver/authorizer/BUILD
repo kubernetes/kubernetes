@@ -17,6 +17,7 @@ go_library(
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizerfactory:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/union:go_default_library",

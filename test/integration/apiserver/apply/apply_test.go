@@ -2231,6 +2231,115 @@ func TestApplyCanRemoveMapItemsContributedToByControllers(t *testing.T) {
 	}
 }
 
+// TestDefaultMissingKeys makes sure that the missing keys default is used when merging.
+func TestDefaultMissingKeys(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	// Applier creates a deployment with containerPort but no protocol
+	apply := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-map-item-removal",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest",
+						"ports": [{
+							"name": "foo",
+							"containerPort": 80
+						}]
+					}]
+				}
+			}
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-shared-map-item-removal").
+		Param("fieldManager", "test_applier").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// Applier updates the name, and uses the protocol, we should get a conflict.
+	apply = []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-map-item-removal",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest",
+						"ports": [{
+							"name": "bar",
+							"containerPort": 80,
+							"protocol": "TCP"
+						}]
+					}]
+				}
+			}
+		}
+	}`)
+	patched, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-shared-map-item-removal").
+		Param("fieldManager", "test_applier_conflict").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err == nil {
+		t.Fatalf("Expecting to get conflicts when a different applier updates existing list item, got no error: %s", patched)
+	}
+	status, ok := err.(*apierrors.StatusError)
+	if !ok {
+		t.Fatalf("Expecting to get conflicts as API error")
+	}
+	if len(status.Status().Details.Causes) != 1 {
+		t.Fatalf("Expecting to get one conflict when a different applier updates existing list item, got: %v", status.Status().Details.Causes)
+	}
+}
+
 var podBytes = []byte(`
 apiVersion: v1
 kind: Pod

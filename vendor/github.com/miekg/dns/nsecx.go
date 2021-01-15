@@ -43,7 +43,7 @@ func HashName(label string, ha uint8, iter uint16, salt string) string {
 	return toBase32(nsec3)
 }
 
-// Cover returns true if a name is covered by the NSEC3 record
+// Cover returns true if a name is covered by the NSEC3 record.
 func (rr *NSEC3) Cover(name string) bool {
 	nameHash := HashName(name, rr.Hash, rr.Iterations, rr.Salt)
 	owner := strings.ToUpper(rr.Hdr.Name)

@@ -3,7 +3,6 @@ package dns
 import (
 	"bufio"
 	"crypto"
-	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"io"
@@ -44,26 +43,7 @@ func (k *DNSKEY) ReadPrivateKey(q io.Reader, file string) (crypto.PrivateKey, er
 		return nil, ErrPrivKey
 	}
 	switch uint8(algo) {
-	case DSA:
-		priv, err := readPrivateKeyDSA(m)
-		if err != nil {
-			return nil, err
-		}
-		pub := k.publicKeyDSA()
-		if pub == nil {
-			return nil, ErrKey
-		}
-		priv.PublicKey = *pub
-		return priv, nil
-	case RSAMD5:
-		fallthrough
-	case RSASHA1:
-		fallthrough
-	case RSASHA1NSEC3SHA1:
-		fallthrough
-	case RSASHA256:
-		fallthrough
-	case RSASHA512:
+	case RSASHA1, RSASHA1NSEC3SHA1, RSASHA256, RSASHA512:
 		priv, err := readPrivateKeyRSA(m)
 		if err != nil {
 			return nil, err
@@ -74,11 +54,7 @@ func (k *DNSKEY) ReadPrivateKey(q io.Reader, file string) (crypto.PrivateKey, er
 		}
 		priv.PublicKey = *pub
 		return priv, nil
-	case ECCGOST:
-		return nil, ErrPrivKey
-	case ECDSAP256SHA256:
-		fallthrough
-	case ECDSAP384SHA384:
+	case ECDSAP256SHA256, ECDSAP384SHA384:
 		priv, err := readPrivateKeyECDSA(m)
 		if err != nil {
 			return nil, err
@@ -92,7 +68,7 @@ func (k *DNSKEY) ReadPrivateKey(q io.Reader, file string) (crypto.PrivateKey, er
 	case ED25519:
 		return readPrivateKeyED25519(m)
 	default:
-		return nil, ErrPrivKey
+		return nil, ErrAlg
 	}
 }
 
@@ -109,21 +85,16 @@ func readPrivateKeyRSA(m map[string]string) (*rsa.PrivateKey, error) {
 			}
 			switch k {
 			case "modulus":
-				p.PublicKey.N = big.NewInt(0)
-				p.PublicKey.N.SetBytes(v1)
+				p.PublicKey.N = new(big.Int).SetBytes(v1)
 			case "publicexponent":
-				i := big.NewInt(0)
-				i.SetBytes(v1)
+				i := new(big.Int).SetBytes(v1)
 				p.PublicKey.E = int(i.Int64()) // int64 should be large enough
 			case "privateexponent":
-				p.D = big.NewInt(0)
-				p.D.SetBytes(v1)
+				p.D = new(big.Int).SetBytes(v1)
 			case "prime1":
-				p.Primes[0] = big.NewInt(0)
-				p.Primes[0].SetBytes(v1)
+				p.Primes[0] = new(big.Int).SetBytes(v1)
 			case "prime2":
-				p.Primes[1] = big.NewInt(0)
-				p.Primes[1].SetBytes(v1)
+				p.Primes[1] = new(big.Int).SetBytes(v1)
 			}
 		case "exponent1", "exponent2", "coefficient":
 			// not used in Go (yet)
@@ -134,27 +105,9 @@ func readPrivateKeyRSA(m map[string]string) (*rsa.PrivateKey, error) {
 	return p, nil
 }
 
-func readPrivateKeyDSA(m map[string]string) (*dsa.PrivateKey, error) {
-	p := new(dsa.PrivateKey)
-	p.X = big.NewInt(0)
-	for k, v := range m {
-		switch k {
-		case "private_value(x)":
-			v1, err := fromBase64([]byte(v))
-			if err != nil {
-				return nil, err
-			}
-			p.X.SetBytes(v1)
-		case "created", "publish", "activate":
-			/* not used in Go (yet) */
-		}
-	}
-	return p, nil
-}
-
 func readPrivateKeyECDSA(m map[string]string) (*ecdsa.PrivateKey, error) {
 	p := new(ecdsa.PrivateKey)
-	p.D = big.NewInt(0)
+	p.D = new(big.Int)
 	// TODO: validate that the required flags are present
 	for k, v := range m {
 		switch k {
@@ -320,6 +273,11 @@ func (kl *klexer) Next() (lex, bool) {
 			if commt {
 				// Reset a comment
 				commt = false
+			}
+
+			if kl.key && str.Len() == 0 {
+				// ignore empty lines
+				break
 			}
 
 			kl.key = true

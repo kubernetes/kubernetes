@@ -41,6 +41,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientretry "k8s.io/client-go/util/retry"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	netutil "k8s.io/utils/net"
 )
 
 const (
@@ -191,7 +192,7 @@ func Filter(nodeList *v1.NodeList, fn func(node v1.Node) bool) {
 	nodeList.Items = l
 }
 
-// TotalRegistered returns number of registered Nodes excluding Master Node.
+// TotalRegistered returns number of schedulable Nodes.
 func TotalRegistered(c clientset.Interface) (int, error) {
 	nodes, err := waitListSchedulableNodes(c)
 	if err != nil {
@@ -201,7 +202,7 @@ func TotalRegistered(c clientset.Interface) (int, error) {
 	return len(nodes.Items), nil
 }
 
-// TotalReady returns number of ready Nodes excluding Master Node.
+// TotalReady returns number of ready schedulable Nodes.
 func TotalReady(c clientset.Interface) (int, error) {
 	nodes, err := waitListSchedulableNodes(c)
 	if err != nil {
@@ -246,6 +247,37 @@ func GetInternalIP(node *v1.Node) (string, error) {
 		return "", fmt.Errorf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
 	return host, nil
+}
+
+// FirstAddressByTypeAndFamily returns the first address that matches the given type and family of the list of nodes
+func FirstAddressByTypeAndFamily(nodelist *v1.NodeList, addrType v1.NodeAddressType, family v1.IPFamily) string {
+	for _, n := range nodelist.Items {
+		addresses := GetAddressesByTypeAndFamily(&n, addrType, family)
+		if len(addresses) > 0 {
+			return addresses[0]
+		}
+	}
+	return ""
+}
+
+// GetAddressesByTypeAndFamily returns a list of addresses of the given addressType for the given node
+// and filtered by IPFamily
+func GetAddressesByTypeAndFamily(node *v1.Node, addressType v1.NodeAddressType, family v1.IPFamily) (ips []string) {
+	for _, nodeAddress := range node.Status.Addresses {
+		if nodeAddress.Type != addressType {
+			continue
+		}
+		if nodeAddress.Address == "" {
+			continue
+		}
+		if family == v1.IPv6Protocol && netutil.IsIPv6String(nodeAddress.Address) {
+			ips = append(ips, nodeAddress.Address)
+		}
+		if family == v1.IPv4Protocol && !netutil.IsIPv6String(nodeAddress.Address) {
+			ips = append(ips, nodeAddress.Address)
+		}
+	}
+	return
 }
 
 // GetAddresses returns a list of addresses of the given addressType for the given node
@@ -518,11 +550,11 @@ func GetClusterZones(c clientset.Interface) (sets.String, error) {
 	// collect values of zone label from all nodes
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
-		if zone, found := node.Labels[v1.LabelZoneFailureDomain]; found {
+		if zone, found := node.Labels[v1.LabelFailureDomainBetaZone]; found {
 			zones.Insert(zone)
 		}
 
-		if zone, found := node.Labels[v1.LabelZoneFailureDomainStable]; found {
+		if zone, found := node.Labels[v1.LabelTopologyZone]; found {
 			zones.Insert(zone)
 		}
 	}

@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/exec"
 	utilnet "k8s.io/utils/net"
 )
@@ -62,10 +63,12 @@ func Exec(execer exec.Interface, parameters ...string) error {
 	if err != nil {
 		return fmt.Errorf("error looking for path of conntrack: %v", err)
 	}
+	klog.V(4).Infof("Clearing conntrack entries %v", parameters)
 	output, err := execer.Command(conntrackPath, parameters...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("conntrack command returned: %q, error message: %s", string(output), err)
 	}
+	klog.V(4).Infof("Conntrack entries deleted %s", string(output))
 	return nil
 }
 
@@ -108,7 +111,7 @@ func ClearEntriesForNAT(execer exec.Interface, origin, dest string, protocol v1.
 	return nil
 }
 
-// ClearEntriesForPortNAT uses the conntrack tool to delete the contrack entries
+// ClearEntriesForPortNAT uses the conntrack tool to delete the conntrack entries
 // for connections specified by the {dest IP, port} pair.
 // Known issue:
 // https://github.com/kubernetes/kubernetes/issues/59368

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 const (
@@ -53,6 +54,7 @@ type stateData struct {
 	// phase for each node
 	// it's initialized in the PreFilter phase
 	podVolumesByNode map[string]*scheduling.PodVolumes
+	sync.Mutex
 }
 
 func (d *stateData) Clone() framework.StateData {
@@ -205,9 +207,10 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 		return status
 	}
 
-	cs.Lock()
+	// multiple goroutines call `Filter` on different nodes simultaneously and the `CycleState` may be duplicated, so we must use a local lock here
+	state.Lock()
 	state.podVolumesByNode[node.Name] = podVolumes
-	cs.Unlock()
+	state.Unlock()
 	return nil
 }
 
@@ -278,7 +281,7 @@ func (pl *VolumeBinding) Unreserve(ctx context.Context, cs *framework.CycleState
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
+func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 	args, ok := plArgs.(*config.VolumeBindingArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type VolumeBindingArgs, got %T", plArgs)

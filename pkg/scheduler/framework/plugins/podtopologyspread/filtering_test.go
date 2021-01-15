@@ -29,8 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -518,10 +517,8 @@ func TestPreFilterState(t *testing.T) {
 			ctx := context.Background()
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
 			pl := PodTopologySpread{
-				sharedLister: cache.NewSnapshot(tt.existingPods, tt.nodes),
-				args: config.PodTopologySpreadArgs{
-					DefaultConstraints: tt.defaultConstraints,
-				},
+				sharedLister:       cache.NewSnapshot(tt.existingPods, tt.nodes),
+				defaultConstraints: tt.defaultConstraints,
 			}
 			pl.setListers(informerFactory)
 			informerFactory.Start(ctx.Done())
@@ -1079,7 +1076,7 @@ func BenchmarkFilter(b *testing.B) {
 		{
 			name: "1000nodes/single-constraint-zone",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, v1.LabelZoneFailureDomain, v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelTopologyZone, v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
 			allNodesNum:      1000,
@@ -1097,7 +1094,7 @@ func BenchmarkFilter(b *testing.B) {
 		{
 			name: "1000nodes/two-Constraints-zone-node",
 			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
-				SpreadConstraint(1, v1.LabelZoneFailureDomain, v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelTopologyZone, v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
 				SpreadConstraint(1, v1.LabelHostname, v1.DoNotSchedule, st.MakeLabelSelector().Exists("bar").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
@@ -1262,6 +1259,20 @@ func TestSingleConstraint(t *testing.T) {
 				"node-b": framework.UnschedulableAndUnresolvable,
 				"node-x": framework.Unschedulable,
 				"node-y": framework.Unschedulable,
+			},
+		},
+		{
+			name: "pod cannot be scheduled as all nodes don't have label 'rack'",
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				1, "rack", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+			},
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.UnschedulableAndUnresolvable,
+				"node-x": framework.UnschedulableAndUnresolvable,
 			},
 		},
 		{

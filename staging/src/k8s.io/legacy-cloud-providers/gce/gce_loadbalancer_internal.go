@@ -28,6 +28,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
+	"github.com/google/go-cmp/cmp"
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -90,12 +91,6 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		g.eventRecorder.Event(svc, v1.EventTypeWarning, "ILBOptionsIgnored", "Internal LoadBalancer options are not supported with Legacy Networks.")
 		options = ILBOptions{}
 	}
-	if !g.AlphaFeatureGate.Enabled(AlphaFeatureILBCustomSubnet) {
-		if options.SubnetName != "" {
-			g.eventRecorder.Event(svc, v1.EventTypeWarning, "ILBCustomSubnetOptionIgnored", "Internal LoadBalancer CustomSubnet options ignored as the feature gate is disabled.")
-			options.SubnetName = ""
-		}
-	}
 
 	sharedBackend := shareBackendService(svc)
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, sharedBackend, scheme, protocol, svc.Spec.SessionAffinity)
@@ -136,20 +131,12 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	}
 
 	subnetworkURL := g.SubnetworkURL()
-	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBCustomSubnet) {
-		// If this feature is enabled, changes to subnet annotation will be
-		// picked up and reflected in the forwarding rule.
-		// Removing the annotation will set the forwarding rule to use the default subnet.
-		if options.SubnetName != "" {
-			subnetworkURL = gceSubnetworkURL("", g.networkProjectID, g.region, options.SubnetName)
-		}
-	} else {
-		// TODO(84885) remove this once ILBCustomSubnet goes beta.
-		if existingFwdRule != nil && existingFwdRule.Subnetwork != "" {
-			// If the ILB already exists, continue using the subnet that it's already using.
-			// This is to support existing ILBs that were setup using the wrong subnet - https://github.com/kubernetes/kubernetes/pull/57861
-			subnetworkURL = existingFwdRule.Subnetwork
-		}
+	// Any subnet specified using the subnet annotation will be picked up and reflected in the forwarding rule.
+	// Removing the annotation will set the forwarding rule to use the default subnet and result in a VIP change.
+	// In order to support existing ILBs that were setup using the wrong subnet - https://github.com/kubernetes/kubernetes/pull/57861,
+	// users will need to specify that subnet with the annotation.
+	if options.SubnetName != "" {
+		subnetworkURL = gceSubnetworkURL("", g.networkProjectID, g.region, options.SubnetName)
 	}
 	// Determine IP which will be used for this LB. If no forwarding rule has been established
 	// or specified in the Service spec, then requestedIP = "".
@@ -166,6 +153,12 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 			return nil, err
 		}
 		klog.V(2).Infof("ensureInternalLoadBalancer(%v): reserved IP %q for the forwarding rule", loadBalancerName, ipToUse)
+		defer func() {
+			// Release the address if all resources were created successfully, or if we error out.
+			if err := addrMgr.ReleaseAddress(); err != nil {
+				klog.Errorf("ensureInternalLoadBalancer: failed to release address reservation, possibly causing an orphan: %v", err)
+			}
+		}()
 	}
 
 	// Ensure firewall rules if necessary
@@ -200,7 +193,8 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		// Delete existing forwarding rule before making changes to the backend service. For example - changing protocol
 		// of backend service without first deleting forwarding rule will throw an error since the linked forwarding
 		// rule would show the old protocol.
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): deleting existing forwarding rule with IP address %v", loadBalancerName, existingFwdRule.IPAddress)
+		frDiff := cmp.Diff(existingFwdRule, newFwdRule)
+		klog.V(2).Infof("ensureInternalLoadBalancer(%v): forwarding rule changed - Existing - %+v\n, New - %+v\n, Diff(-existing, +new) - %s\n. Deleting existing forwarding rule.", loadBalancerName, existingFwdRule, newFwdRule, frDiff)
 		if err = ignoreNotFound(g.DeleteRegionForwardingRule(loadBalancerName, g.region)); err != nil {
 			return nil, err
 		}
@@ -214,7 +208,8 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	}
 
 	if fwdRuleDeleted || existingFwdRule == nil {
-		if err := g.ensureInternalForwardingRule(existingFwdRule, newFwdRule); err != nil {
+		// existing rule has been deleted, pass in nil
+		if err := g.ensureInternalForwardingRule(nil, newFwdRule); err != nil {
 			return nil, err
 		}
 	}
@@ -222,13 +217,6 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	// Delete the previous internal load balancer resources if necessary
 	if existingBackendService != nil {
 		g.clearPreviousInternalResources(svc, loadBalancerName, existingBackendService, backendServiceName, hcName)
-	}
-
-	if addrMgr != nil {
-		// Now that the controller knows the forwarding rule exists, we can release the address.
-		if err := addrMgr.ReleaseAddress(); err != nil {
-			klog.Errorf("ensureInternalLoadBalancer: failed to release address reservation, possibly causing an orphan: %v", err)
-		}
 	}
 
 	// Get the most recent forwarding rule for the address.
@@ -979,11 +967,16 @@ func (g *Cloud) ensureInternalForwardingRule(existingFwdRule, newFwdRule *comput
 }
 
 func forwardingRulesEqual(old, new *compute.ForwardingRule) bool {
+	// basepath could have differences like compute.googleapis.com vs www.googleapis.com, compare resourceIDs
+	oldResourceID, err := cloud.ParseResourceURL(old.BackendService)
+	klog.Errorf("forwardingRulesEqual(): failed to parse backend resource URL from existing FR, err - %v", err)
+	newResourceID, err := cloud.ParseResourceURL(new.BackendService)
+	klog.Errorf("forwardingRulesEqual(): failed to parse resource URL from new FR, err - %v", err)
 	return (old.IPAddress == "" || new.IPAddress == "" || old.IPAddress == new.IPAddress) &&
 		old.IPProtocol == new.IPProtocol &&
 		old.LoadBalancingScheme == new.LoadBalancingScheme &&
 		equalStringSets(old.Ports, new.Ports) &&
-		old.BackendService == new.BackendService &&
+		oldResourceID.Equal(newResourceID) &&
 		old.AllowGlobalAccess == new.AllowGlobalAccess &&
 		old.Subnetwork == new.Subnetwork
 }

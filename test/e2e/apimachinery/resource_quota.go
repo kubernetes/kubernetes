@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
 )
@@ -100,23 +101,37 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a Service")
-		service := newTestServiceForQuota("test-service", v1.ServiceTypeClusterIP)
+		service := newTestServiceForQuota("test-service", v1.ServiceTypeClusterIP, false)
 		service, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), service, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a NodePort Service")
+		nodeport := newTestServiceForQuota("test-service-np", v1.ServiceTypeNodePort, false)
+		nodeport, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), nodeport, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Not allowing a LoadBalancer Service with NodePort to be created that exceeds remaining quota")
+		loadbalancer := newTestServiceForQuota("test-service-lb", v1.ServiceTypeLoadBalancer, false)
+		_, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), loadbalancer, metav1.CreateOptions{})
+		framework.ExpectError(err)
 
 		ginkgo.By("Ensuring resource quota status captures service creation")
 		usedResources = v1.ResourceList{}
 		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
-		usedResources[v1.ResourceServices] = resource.MustParse("1")
+		usedResources[v1.ResourceServices] = resource.MustParse("2")
+		usedResources[v1.ResourceServicesNodePorts] = resource.MustParse("1")
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("Deleting a Service")
+		ginkgo.By("Deleting Services")
 		err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), service.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+		err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), nodeport.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released usage")
 		usedResources[v1.ResourceServices] = resource.MustParse("0")
+		usedResources[v1.ResourceServicesNodePorts] = resource.MustParse("0")
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		framework.ExpectNoError(err)
 	})
@@ -297,14 +312,14 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	framework.ConformanceIt("should create a ResourceQuota and capture the life of a configMap.", func() {
 		found, unchanged := 0, 0
 		// On contended servers the service account controller can slow down, leading to the count changing during a run.
-		// Wait up to 5s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
-		wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+		// Wait up to 15s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
+		wait.Poll(1*time.Second, time.Minute, func() (bool, error) {
 			configmaps, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			if len(configmaps.Items) == found {
-				// loop until the number of configmaps has stabilized for 5 seconds
+				// loop until the number of configmaps has stabilized for 15 seconds
 				unchanged++
-				return unchanged > 4, nil
+				return unchanged > 15, nil
 			}
 			unchanged = 0
 			found = len(configmaps.Items)
@@ -1558,7 +1573,6 @@ func newTestPersistentVolumeClaimForQuota(name string) *v1.PersistentVolumeClaim
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 				v1.ReadOnlyMany,
-				v1.ReadWriteMany,
 			},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
@@ -1626,7 +1640,7 @@ func newTestReplicaSetForQuota(name, image string, replicas int32) *appsv1.Repli
 }
 
 // newTestServiceForQuota returns a simple service
-func newTestServiceForQuota(name string, serviceType v1.ServiceType) *v1.Service {
+func newTestServiceForQuota(name string, serviceType v1.ServiceType, allocateLoadBalancerNodePorts bool) *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -1637,6 +1651,7 @@ func newTestServiceForQuota(name string, serviceType v1.ServiceType) *v1.Service
 				Port:       80,
 				TargetPort: intstr.FromInt(80),
 			}},
+			AllocateLoadBalancerNodePorts: pointer.BoolPtr(allocateLoadBalancerNodePorts),
 		},
 	}
 }

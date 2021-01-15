@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -18,7 +19,6 @@ go_library(
         "//pkg/registry/rbac/clusterrolebinding:go_default_library",
         "//pkg/registry/rbac/clusterrolebinding/policybased:go_default_library",
         "//pkg/registry/rbac/clusterrolebinding/storage:go_default_library",
-        "//pkg/registry/rbac/reconciliation:go_default_library",
         "//pkg/registry/rbac/role:go_default_library",
         "//pkg/registry/rbac/role/policybased:go_default_library",
         "//pkg/registry/rbac/role/storage:go_default_library",
@@ -40,9 +40,10 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
+        "//staging/src/k8s.io/component-helpers/auth/rbac/reconciliation:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
@@ -58,4 +59,14 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["storage_rbac_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+    ],
 )

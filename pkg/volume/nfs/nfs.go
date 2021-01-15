@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -61,7 +62,8 @@ var _ volume.PersistentVolumePlugin = &nfsPlugin{}
 var _ volume.RecyclableVolumePlugin = &nfsPlugin{}
 
 const (
-	nfsPluginName = "kubernetes.io/nfs"
+	nfsPluginName  = "kubernetes.io/nfs"
+	unMountTimeout = time.Minute
 )
 
 func (plugin *nfsPlugin) Init(host volume.VolumeHost) error {
@@ -90,7 +92,7 @@ func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.NFS != nil)
 }
 
-func (plugin *nfsPlugin) RequiresRemount() bool {
+func (plugin *nfsPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -259,7 +261,7 @@ func (nfsMounter *nfsMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 		options = append(options, "ro")
 	}
 	mountOptions := util.JoinMountOptions(nfsMounter.mountOptions, options)
-	err = nfsMounter.mounter.Mount(source, dir, "nfs", mountOptions)
+	err = nfsMounter.mounter.MountSensitiveWithoutSystemd(source, dir, "nfs", mountOptions, nil)
 	if err != nil {
 		notMnt, mntErr := mount.IsNotMountPoint(nfsMounter.mounter, dir)
 		if mntErr != nil {
@@ -302,6 +304,11 @@ func (c *nfsUnmounter) TearDownAt(dir string) error {
 	// Use extensiveMountPointCheck to consult /proc/mounts. We can't use faster
 	// IsLikelyNotMountPoint (lstat()), since there may be root_squash on the
 	// NFS server and kubelet may not be able to do lstat/stat() there.
+	forceUmounter, ok := c.mounter.(mount.MounterForceUnmounter)
+	if ok {
+		klog.V(4).Infof("Using force unmounter interface")
+		return mount.CleanupMountWithForce(dir, forceUmounter, true /* extensiveMountPointCheck */, unMountTimeout)
+	}
 	return mount.CleanupMountPoint(dir, c.mounter, true /* extensiveMountPointCheck */)
 }
 

@@ -17,9 +17,12 @@ limitations under the License.
 package image
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"strings"
 
 	yaml "gopkg.in/yaml.v2"
@@ -40,6 +43,7 @@ type RegistryList struct {
 	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
+	MicrosoftRegistry       string `yaml:"microsoftRegistry"`
 }
 
 // Config holds an images registry, name, and version
@@ -79,6 +83,7 @@ func initReg() RegistryList {
 		GcrReleaseRegistry:      "gcr.io/gke-release",
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
+		MicrosoftRegistry:       "mcr.microsoft.com",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
@@ -98,7 +103,12 @@ func initReg() RegistryList {
 }
 
 var (
-	registry                = initReg()
+	registry = initReg()
+
+	// PrivateRegistry is an image repository that requires authentication
+	PrivateRegistry = registry.PrivateRegistry
+
+	// Preconfigured image configs
 	dockerLibraryRegistry   = registry.DockerLibraryRegistry
 	dockerGluster           = registry.DockerGluster
 	e2eRegistry             = registry.E2eRegistry
@@ -110,12 +120,10 @@ var (
 	sigStorageRegistry      = registry.SigStorageRegistry
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
 	invalidRegistry         = registry.InvalidRegistry
-	// PrivateRegistry is an image repository that requires authentication
-	PrivateRegistry = registry.PrivateRegistry
-	sampleRegistry  = registry.SampleRegistry
+	sampleRegistry          = registry.SampleRegistry
+	microsoftRegistry       = registry.MicrosoftRegistry
 
-	// Preconfigured image configs
-	imageConfigs = initImageConfigs()
+	imageConfigs, originalImageConfigs = initImageConfigs()
 )
 
 const (
@@ -198,9 +206,11 @@ const (
 	VolumeGlusterServer
 	// VolumeRBDServer image
 	VolumeRBDServer
+	// WindowsServer image
+	WindowsServer
 )
 
-func initImageConfigs() map[int]Config {
+func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs := map[int]Config{}
 	configs[Agnhost] = Config{promoterE2eRegistry, "agnhost", "2.21"}
 	configs[AgnhostPrivate] = Config{PrivateRegistry, "agnhost", "2.6"}
@@ -241,7 +251,82 @@ func initImageConfigs() map[int]Config {
 	configs[VolumeISCSIServer] = Config{e2eVolumeRegistry, "iscsi", "2.0"}
 	configs[VolumeGlusterServer] = Config{e2eVolumeRegistry, "gluster", "1.0"}
 	configs[VolumeRBDServer] = Config{e2eVolumeRegistry, "rbd", "1.0.1"}
+	configs[WindowsServer] = Config{microsoftRegistry, "windows", "1809"}
+
+	// if requested, map all the SHAs into a known format based on the input
+	originalImageConfigs := configs
+	if repo := os.Getenv("KUBE_TEST_REPO"); len(repo) > 0 {
+		configs = GetMappedImageConfigs(originalImageConfigs, repo)
+	}
+
+	return configs, originalImageConfigs
+}
+
+// GetMappedImageConfigs returns the images if they were mapped to the provided
+// image repository.
+func GetMappedImageConfigs(originalImageConfigs map[int]Config, repo string) map[int]Config {
+	configs := make(map[int]Config)
+	for i, config := range originalImageConfigs {
+		switch i {
+		case InvalidRegistryImage, AuthenticatedAlpine,
+			AuthenticatedWindowsNanoServer, AgnhostPrivate:
+			// These images are special and can't be run out of the cloud - some because they
+			// are authenticated, and others because they are not real images. Tests that depend
+			// on these images can't be run without access to the public internet.
+			configs[i] = config
+			continue
+		}
+
+		// Build a new tag with a the index, a hash of the image spec (to be unique) and
+		// shorten and make the pull spec "safe" so it will fit in the tag
+		configs[i] = getRepositoryMappedConfig(i, config, repo)
+	}
 	return configs
+}
+
+var (
+	reCharSafe = regexp.MustCompile(`[^\w]`)
+	reDashes   = regexp.MustCompile(`-+`)
+)
+
+// getRepositoryMappedConfig maps an existing image to the provided repo, generating a
+// tag that is unique with the input config. The tag will contain the index, a hash of
+// the image spec (to be unique) and shorten and make the pull spec "safe" so it will
+// fit in the tag to allow a human to recognize the value. If index is -1, then no
+// index will be added to the tag.
+func getRepositoryMappedConfig(index int, config Config, repo string) Config {
+	parts := strings.SplitN(repo, "/", 2)
+	registry, name := parts[0], parts[1]
+
+	pullSpec := config.GetE2EImage()
+
+	h := sha256.New()
+	h.Write([]byte(pullSpec))
+	hash := base64.RawURLEncoding.EncodeToString(h.Sum(nil)[:16])
+
+	shortName := reCharSafe.ReplaceAllLiteralString(pullSpec, "-")
+	shortName = reDashes.ReplaceAllLiteralString(shortName, "-")
+	maxLength := 127 - 16 - 6 - 10
+	if len(shortName) > maxLength {
+		shortName = shortName[len(shortName)-maxLength:]
+	}
+	var version string
+	if index == -1 {
+		version = fmt.Sprintf("e2e-%s-%s", shortName, hash)
+	} else {
+		version = fmt.Sprintf("e2e-%d-%s-%s", index, shortName, hash)
+	}
+
+	return Config{
+		registry: registry,
+		name:     name,
+		version:  version,
+	}
+}
+
+// GetOriginalImageConfigs returns the configuration before any mapping rules.
+func GetOriginalImageConfigs() map[int]Config {
+	return originalImageConfigs
 }
 
 // GetImageConfigs returns the map of imageConfigs
@@ -274,6 +359,23 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 	parts := strings.Split(imageURL, "/")
 	countParts := len(parts)
 	registryAndUser := strings.Join(parts[:countParts-1], "/")
+
+	if repo := os.Getenv("KUBE_TEST_REPO"); len(repo) > 0 {
+		index := -1
+		for i, v := range originalImageConfigs {
+			if v.GetE2EImage() == imageURL {
+				index = i
+				break
+			}
+		}
+		last := strings.SplitN(parts[countParts-1], ":", 2)
+		config := getRepositoryMappedConfig(index, Config{
+			registry: parts[0],
+			name:     strings.Join([]string{strings.Join(parts[1:countParts-1], "/"), last[0]}, "/"),
+			version:  last[1],
+		}, repo)
+		return config.GetE2EImage(), nil
+	}
 
 	switch registryAndUser {
 	case "gcr.io/kubernetes-e2e-test-images":

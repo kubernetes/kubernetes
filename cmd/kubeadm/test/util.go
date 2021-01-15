@@ -17,14 +17,10 @@ limitations under the License.
 package test
 
 import (
-	"fmt"
-	"html/template"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/lithammer/dedent"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
@@ -43,45 +39,6 @@ func SetupTempDir(t *testing.T) string {
 	}
 
 	return tmpdir
-}
-
-// SetupInitConfigurationFile is a utility function for kubeadm testing that writes a InitConfiguration file
-// into /config subfolder of a given temporary directory.
-// The function returns the path of the created InitConfiguration file.
-func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.InitConfiguration) string {
-
-	cfgPath := filepath.Join(tmpdir, "config/masterconfig.yaml")
-	if err := os.MkdirAll(filepath.Dir(cfgPath), os.FileMode(0755)); err != nil {
-		t.Fatalf("Couldn't create cfgDir")
-	}
-
-	cfgTemplate := template.Must(template.New("init").Parse(dedent.Dedent(fmt.Sprintf(`
-		apiVersion: kubeadm.k8s.io/v1beta2
-		kind: InitConfiguration
-		apiEndpoint:
-		  advertiseAddress: {{.LocalAPIEndpoint.AdvertiseAddress}}
-		  bindPort: {{.LocalAPIEndpoint.BindPort}}
-		nodeRegistration:
-		  name: {{.NodeRegistration.Name}}
-		---
-		apiVersion: kubeadm.k8s.io/v1beta2
-		kind: ClusterConfiguration
-		certificatesDir: {{.CertificatesDir}}
-		kubernetesVersion: %s
-		`, kubeadmconstants.MinimumControlPlaneVersion))))
-
-	f, err := os.Create(cfgPath)
-	if err != nil {
-		t.Fatalf("error creating masterconfig file %s: %v", cfgPath, err)
-	}
-
-	err = cfgTemplate.Execute(f, cfg)
-	if err != nil {
-		t.Fatalf("error generating masterconfig file %s: %v", cfgPath, err)
-	}
-	f.Close()
-
-	return cfgPath
 }
 
 // SetupEmptyFiles is a utility function for kubeadm testing that creates one or more empty files (touch)

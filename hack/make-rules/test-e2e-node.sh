@@ -140,6 +140,10 @@ if [ "${remote}" = true ] ; then
        done
   fi
 
+  # Use cluster.local as default dns-domain
+  test_args='--dns-domain="'${KUBE_DNS_DOMAIN:-cluster.local}'" '${test_args}
+  test_args='--kubelet-flags="--cluster-domain='${KUBE_DNS_DOMAIN:-cluster.local}'" '${test_args}
+
   # Output the configuration we will try to run
   echo "Running tests remotely using"
   echo "Project: ${project}"
@@ -183,6 +187,9 @@ else
   # Runtime flags
   test_args='--kubelet-flags="--container-runtime='${runtime}'" '${test_args}
 
+  # Use cluster.local as default dns-domain
+  test_args='--dns-domain="'${KUBE_DNS_DOMAIN:-cluster.local}'" '${test_args}
+  test_args='--kubelet-flags="--cluster-domain='${KUBE_DNS_DOMAIN:-cluster.local}'" '${test_args}
   # Test using the host the script was run on
   # Provided for backwards compatibility
   go run test/e2e_node/runner/local/run_local.go \

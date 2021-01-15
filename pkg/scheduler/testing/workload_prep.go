@@ -19,7 +19,7 @@ package testing
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 type keyVal struct {
@@ -44,7 +44,7 @@ func MakeNodesAndPodsForEvenPodsSpread(labels map[string]string, existingPodsNum
 	// build nodes
 	for i := 0; i < allNodesNum; i++ {
 		node := MakeNode().Name(fmt.Sprintf("node%d", i)).
-			Label(v1.LabelZoneFailureDomain, fmt.Sprintf("zone%d", i%zones)).
+			Label(v1.LabelTopologyZone, fmt.Sprintf("zone%d", i%zones)).
 			Label(v1.LabelHostname, fmt.Sprintf("node%d", i)).Obj()
 		allNodes = append(allNodes, node)
 	}

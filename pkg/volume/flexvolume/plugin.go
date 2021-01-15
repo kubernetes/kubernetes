@@ -148,7 +148,7 @@ func (plugin *flexVolumePlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 // RequiresRemount is part of the volume.VolumePlugin interface.
-func (plugin *flexVolumePlugin) RequiresRemount() bool {
+func (plugin *flexVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

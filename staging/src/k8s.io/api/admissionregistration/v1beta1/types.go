@@ -63,6 +63,7 @@ type Rule struct {
 	Scope *ScopeType `json:"scope,omitempty" protobuf:"bytes,4,rep,name=scope"`
 }
 
+// ScopeType specifies a scope for a Rule.
 type ScopeType string
 
 const (
@@ -75,6 +76,7 @@ const (
 	AllScopes ScopeType = "*"
 )
 
+// FailurePolicyType specifies a failure policy that defines how unrecognized errors from the admission endpoint are handled.
 type FailurePolicyType string
 
 const (
@@ -94,6 +96,7 @@ const (
 	Equivalent MatchPolicyType = "Equivalent"
 )
 
+// SideEffectClass specifies the types of side effects a webhook may have.
 type SideEffectClass string
 
 const (
@@ -496,6 +499,7 @@ type RuleWithOperations struct {
 	Rule `json:",inline" protobuf:"bytes,2,opt,name=rule"`
 }
 
+// OperationType specifies an operation for a request.
 type OperationType string
 
 // The constants should be kept in sync with those defined in k8s.io/kubernetes/pkg/admission/interface.go.

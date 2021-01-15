@@ -21,6 +21,8 @@ go_library(
         "//vendor/github.com/spf13/cast:go_default_library",
         "//vendor/github.com/spf13/jwalterweatherman:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/github.com/subosito/gotenv:go_default_library",
+        "//vendor/gopkg.in/ini.v1:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
 )

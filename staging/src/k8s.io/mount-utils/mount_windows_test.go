@@ -361,3 +361,29 @@ func TestIsValidPath(t *testing.T) {
 		}
 	}
 }
+
+func TestIsAccessDeniedError(t *testing.T) {
+	tests := []struct {
+		err            error
+		expectedResult bool
+	}{
+		{
+			nil,
+			false,
+		},
+		{
+			fmt.Errorf("other error message"),
+			false,
+		},
+		{
+			fmt.Errorf(`PathValid(\\xxx\share) failed with returned output: Test-Path : Access is denied`),
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		result := isAccessDeniedError(test.err)
+		assert.Equal(t, result, test.expectedResult, "Expect result not equal with isAccessDeniedError(%v) return: %q, expected: %q",
+			test.err, result, test.expectedResult)
+	}
+}

@@ -1,7 +1,0 @@
-suite: pod/readinessGates
-description: Suite for pod readiness gates
-behaviors:
-- id: pod/readinessGates/single
-  description: If a readinessGate is specified and the corresponding condition is not "True", then the Pod Ready condition MUST be "False", even if all containers are Ready.
-- id: pod/readinessGates/multiple
-  description: If multiple readinessGates are specified and the corresponding condition is not "True" for one or more of these, then the Pod Ready condition MUST be "False", even if all containers are Ready.

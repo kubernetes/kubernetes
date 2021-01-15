@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,11 +30,12 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
@@ -130,6 +132,7 @@ type frameworkOptions struct {
 	podNominator         framework.PodNominator
 	extenders            []framework.Extender
 	runAllFilters        bool
+	captureProfile       CaptureProfile
 }
 
 // Option for the frameworkImpl.
@@ -199,6 +202,16 @@ func WithExtenders(extenders []framework.Extender) Option {
 	}
 }
 
+// CaptureProfile is a callback to capture a finalized profile.
+type CaptureProfile func(config.KubeSchedulerProfile)
+
+// WithCaptureProfile sets a callback to capture the finalized profile.
+func WithCaptureProfile(c CaptureProfile) Option {
+	return func(o *frameworkOptions) {
+		o.captureProfile = c
+	}
+}
+
 var defaultFrameworkOptions = frameworkOptions{
 	metricsRecorder: newMetricsRecorder(1000, time.Second),
 }
@@ -258,6 +271,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		}
 		pluginConfig[name] = args[i].Args
 	}
+	outputProfile := config.KubeSchedulerProfile{
+		SchedulerName: f.profileName,
+		Plugins:       plugins,
+		PluginConfig:  make([]config.PluginConfig, 0, len(pg)),
+	}
 
 	pluginsMap := make(map[string]framework.Plugin)
 	var totalPriority int64
@@ -270,6 +288,12 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		args, err := getPluginArgsOrDefault(pluginConfig, name)
 		if err != nil {
 			return nil, fmt.Errorf("getting args for Plugin %q: %w", name, err)
+		}
+		if args != nil {
+			outputProfile.PluginConfig = append(outputProfile.PluginConfig, config.PluginConfig{
+				Name: name,
+				Args: args,
+			})
 		}
 		p, err := factory(args, f)
 		if err != nil {
@@ -312,6 +336,17 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	}
 	if len(f.bindPlugins) == 0 {
 		return nil, fmt.Errorf("at least one bind plugin is needed")
+	}
+
+	if options.captureProfile != nil {
+		if len(outputProfile.PluginConfig) != 0 {
+			sort.Slice(outputProfile.PluginConfig, func(i, j int) bool {
+				return outputProfile.PluginConfig[i].Name < outputProfile.PluginConfig[j].Name
+			})
+		} else {
+			outputProfile.PluginConfig = nil
+		}
+		options.captureProfile(outputProfile)
 	}
 
 	return f, nil
@@ -558,6 +593,90 @@ func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl framework.Po
 	r, s := pl.PostFilter(ctx, state, pod, filteredNodeStatusMap)
 	f.metricsRecorder.observePluginDurationAsync(postFilter, pl.Name(), s, metrics.SinceInSeconds(startTime))
 	return r, s
+}
+
+// RunFilterPluginsWithNominatedPods runs the set of configured filter plugins
+// for nominated pod on the given node.
+// This function is called from two different places: Schedule and Preempt.
+// When it is called from Schedule, we want to test whether the pod is
+// schedulable on the node with all the existing pods on the node plus higher
+// and equal priority pods nominated to run on the node.
+// When it is called from Preempt, we should remove the victims of preemption
+// and add the nominated pods. Removal of the victims is done by
+// SelectVictimsOnNode(). Preempt removes victims from PreFilter state and
+// NodeInfo before calling this function.
+func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, state *framework.CycleState, pod *v1.Pod, info *framework.NodeInfo) *framework.Status {
+	var status *framework.Status
+
+	ph := f.PreemptHandle()
+	podsAdded := false
+	// We run filters twice in some cases. If the node has greater or equal priority
+	// nominated pods, we run them when those pods are added to PreFilter state and nodeInfo.
+	// If all filters succeed in this pass, we run them again when these
+	// nominated pods are not added. This second pass is necessary because some
+	// filters such as inter-pod affinity may not pass without the nominated pods.
+	// If there are no nominated pods for the node or if the first run of the
+	// filters fail, we don't run the second pass.
+	// We consider only equal or higher priority pods in the first pass, because
+	// those are the current "pod" must yield to them and not take a space opened
+	// for running them. It is ok if the current "pod" take resources freed for
+	// lower priority pods.
+	// Requiring that the new pod is schedulable in both circumstances ensures that
+	// we are making a conservative decision: filters like resources and inter-pod
+	// anti-affinity are more likely to fail when the nominated pods are treated
+	// as running, while filters like pod affinity are more likely to fail when
+	// the nominated pods are treated as not running. We can't just assume the
+	// nominated pods are running because they are not running right now and in fact,
+	// they may end up getting scheduled to a different node.
+	for i := 0; i < 2; i++ {
+		stateToUse := state
+		nodeInfoToUse := info
+		if i == 0 {
+			var err error
+			podsAdded, stateToUse, nodeInfoToUse, err = addNominatedPods(ctx, ph, pod, state, info)
+			if err != nil {
+				return framework.NewStatus(framework.Error, err.Error())
+			}
+		} else if !podsAdded || !status.IsSuccess() {
+			break
+		}
+
+		statusMap := ph.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
+		status = statusMap.Merge()
+		if !status.IsSuccess() && !status.IsUnschedulable() {
+			return status
+		}
+	}
+
+	return status
+}
+
+// addNominatedPods adds pods with equal or greater priority which are nominated
+// to run on the node. It returns 1) whether any pod was added, 2) augmented cycleState,
+// 3) augmented nodeInfo.
+func addNominatedPods(ctx context.Context, ph framework.PreemptHandle, pod *v1.Pod, state *framework.CycleState, nodeInfo *framework.NodeInfo) (bool, *framework.CycleState, *framework.NodeInfo, error) {
+	if ph == nil || nodeInfo.Node() == nil {
+		// This may happen only in tests.
+		return false, state, nodeInfo, nil
+	}
+	nominatedPods := ph.NominatedPodsForNode(nodeInfo.Node().Name)
+	if len(nominatedPods) == 0 {
+		return false, state, nodeInfo, nil
+	}
+	nodeInfoOut := nodeInfo.Clone()
+	stateOut := state.Clone()
+	podsAdded := false
+	for _, p := range nominatedPods {
+		if corev1.PodPriority(p) >= corev1.PodPriority(pod) && p.UID != pod.UID {
+			nodeInfoOut.AddPod(p)
+			status := ph.RunPreFilterExtensionAddPod(ctx, stateOut, pod, p, nodeInfoOut)
+			if !status.IsSuccess() {
+				return false, state, nodeInfo, status.AsError()
+			}
+			podsAdded = true
+		}
+	}
+	return podsAdded, stateOut, nodeInfoOut, nil
 }
 
 // RunPreScorePlugins runs the set of configured pre-score plugins. If any
@@ -1026,4 +1145,9 @@ func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) map[string]config
 // PreemptHandle returns the internal preemptHandle object.
 func (f *frameworkImpl) PreemptHandle() framework.PreemptHandle {
 	return f.preemptHandle
+}
+
+// ProfileName returns the profile name associated to this framework.
+func (f *frameworkImpl) ProfileName() string {
+	return f.profileName
 }

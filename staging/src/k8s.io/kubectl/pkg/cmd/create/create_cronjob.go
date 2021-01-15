@@ -33,12 +33,13 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
-	cronjobLong = templates.LongDesc(`
-		Create a cronjob with the specified name.`)
+	cronjobLong = templates.LongDesc(i18n.T(`
+		Create a cronjob with the specified name.`))
 
 	cronjobExample = templates.Examples(`
 		# Create a cronjob
@@ -48,6 +49,7 @@ var (
 		kubectl create cronjob my-job --image=busybox --schedule="*/1 * * * *" -- date`)
 )
 
+// CreateCronJobOptions is returned by NewCreateCronJobOptions
 type CreateCronJobOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 
@@ -71,6 +73,7 @@ type CreateCronJobOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewCreateCronJobOptions returns an initialized CreateCronJobOptions instance
 func NewCreateCronJobOptions(ioStreams genericclioptions.IOStreams) *CreateCronJobOptions {
 	return &CreateCronJobOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
@@ -109,6 +112,7 @@ func NewCmdCreateCronJob(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -164,6 +168,7 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	return nil
 }
 
+// Run performs the execution of 'create cronjob' sub command
 func (o *CreateCronJobOptions) Run() error {
 	cronjob := o.createCronJob()
 

@@ -26,16 +26,16 @@ _CNI_TARBALL_ARCH_SHA256 = {
     "s390x": "3a0008f98ea5b4b6fd367cac3d8096f19bc080a779cf81fd0bcbc5bd1396ace7",
 }
 
-CRI_TOOLS_VERSION = "1.19.0"
+CRI_TOOLS_VERSION = "1.20.0"
 _CRI_TARBALL_ARCH_SHA256 = {
-    "linux-386": "fd0247b81a46adeca69ef3b7bbcf7d0e776df63195918236887243773b98a0c0",
-    "linux-amd64": "87d8ef70b61f2fe3d8b4a48f6f712fd798c6e293ed3723c1e4bbb5052098f0ae",
-    "linux-arm": "b72fd3c4b35f60f5db2cfcd8e932f6000cf9c2978b54adfcf60ee5e2d452e92f",
-    "linux-arm64": "ec040d14ca03e8e4e504a85dae5353e04b5d9d8aea3df68699258992c0eb8d88",
-    "linux-ppc64le": "72107c58960ee9405829c3366dbfcd86f163a990ea2102f3ed63a709096bc7ba",
-    "linux-s390x": "20ec106c307c9d56c2ecae1560b244f8ac26450b9704682f24bfb5f468b06776",
-    "windows-386": "3b7a41b556e3eae1fb56d17edc990ccd4839c8ab554249a8991155ee266dac4b",
-    "windows-amd64": "df60ff65ab71c5cf1d8c38f51db6f05e3d60a45d3a3293c3248c925c25375921",
+    "linux-386": "13ab9493cefca1d1ac5848ed52572e2ee5518a5bf2c527c0e5ed75b0e5c42c39",
+    "linux-amd64": "44d5f550ef3f41f9b53155906e0229ffdbee4b19452b4df540265e29572b899c",
+    "linux-arm": "ed5ffdd386261ec1146731421d4ac9c5c7f91e08486fee409452a3364bef792a",
+    "linux-arm64": "eda6879710eb046d335162d4afe8494c6f8161142ad3188022852f64b92806a8",
+    "linux-ppc64le": "da0c052983ba884f9605b14bf627664df67fcdb41c7f6908368bf4745f889b26",
+    "linux-s390x": "88e1e41502e6f649e1a9dd0392d6ddec1854d6cd9d826b69d092e80d74fc4aca",
+    "windows-386": "b37edede7e4eb11247f5677f4cab1a8bca4ea1bc26a5c6b3ee599adddc01f926",
+    "windows-amd64": "cc909108ee84d39b2e9d7ac0cb9599b6fa7fc51f5a7da7014052684cd3e3f65e",
 }
 
 ETCD_VERSION = "3.4.13"
@@ -102,15 +102,15 @@ _DEBIAN_IPTABLES_DIGEST = {
 # Use skopeo to find these values: https://github.com/containers/skopeo
 #
 # Example
-# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/go-runner:buster-v2.0.1
-# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/go-runner:buster-v2.0.1
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/go-runner:buster-v2.2.2
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/go-runner:buster-v2.2.2
 _GO_RUNNER_DIGEST = {
-    "manifest": "sha256:687c17db2f5cd4aea13faa7ae56bee639a5b11f380c431a9800205624f53541c",
-    "amd64": "sha256:b02bdb3444b1e7fb14cb5b60174f0e8f0a087ff4c294352e6c31c17da99a4ee2",
-    "arm": "sha256:0d7563c814c0cd88bc5937b6e606d266409b5b7cee2deb6c04c6dcb6d7daaa5d",
-    "arm64": "sha256:78f42645ddfd2ab9dfc4053834aa0042c82c8c550f9f61a2a76fd9f1791e5308",
-    "ppc64le": "sha256:93e3ca63df801a5c1ad15bdbb9c50fa38e5db3479a92d8f4516c00dfd736f227",
-    "s390x": "sha256:d7ed7bd8d58a6570504f14a50d502c2df97f944378f9f5306519f3379cb92fe2",
+    "manifest": "sha256:384e84aa715aed583798a77b92b78747f786f238a3bf9a43419d80029ecb3cf8",
+    "amd64": "sha256:38f0621075389afe17c29f60715123469b5ee9aa18a34532eca3613e945486cb",
+    "arm": "sha256:2e70823f577cb81a22f5974d276171568bd71dd0407b0bd46f4c66d8fc46a3b7",
+    "arm64": "sha256:c69c669947d5b60ce4e64069b24c9021799f8354521a7d0cbff68adc96db8726",
+    "ppc64le": "sha256:1a794556fafbc240a3ea5c8a0b42b63c6a3f4ef157b5120c6c10e934b70a6d63",
+    "s390x": "sha256:ff594a58928755e3fdb1c8e25d453515adfce01b6c9035f9ffc01015c886f82d",
 }
 
 def _digest(d, arch):
@@ -127,7 +127,7 @@ def image_dependencies():
             digest = _digest(_GO_RUNNER_DIGEST, arch),
             registry = "k8s.gcr.io/build-image",
             repository = "go-runner",
-            tag = "buster-v2.0.1",  # ignored, but kept here for documentation
+            tag = "buster-v2.2.2",  # ignored, but kept here for documentation
         )
 
         container_pull(

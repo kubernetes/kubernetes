@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "policy_compact_test.go",
-        "policy_comparator_test.go",
         "rule_test.go",
     ],
     embed = [":go_default_library"],
@@ -20,6 +19,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/component-helpers/auth/rbac/validation:go_default_library",
     ],
 )
 
@@ -28,7 +28,6 @@ go_library(
     srcs = [
         "internal_version_adapter.go",
         "policy_compact.go",
-        "policy_comparator.go",
         "rule.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/rbac/validation",
@@ -41,6 +40,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
+        "//staging/src/k8s.io/component-helpers/auth/rbac/validation:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )

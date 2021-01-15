@@ -295,6 +295,35 @@ func TestListByResourceGroupWithListResponderError(t *testing.T) {
 	assert.Equal(t, 0, len(result))
 }
 
+func TestListWithNextPage(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Compute/snapshots"
+	armClient := mockarmclient.NewMockInterface(ctrl)
+	snList := []compute.Snapshot{getTestSnapshot("sn1"), getTestSnapshot("sn2"), getTestSnapshot("sn3")}
+	partialResponse, err := json.Marshal(compute.SnapshotList{Value: &snList, NextLink: to.StringPtr("nextLink")})
+	assert.NoError(t, err)
+	pagedResponse, err := json.Marshal(compute.SnapshotList{Value: &snList})
+	assert.NoError(t, err)
+	armClient.EXPECT().PrepareGetRequest(gomock.Any(), gomock.Any()).Return(&http.Request{}, nil)
+	armClient.EXPECT().Send(gomock.Any(), gomock.Any()).Return(
+		&http.Response{
+			StatusCode: http.StatusOK,
+			Body:       ioutil.NopCloser(bytes.NewReader(pagedResponse)),
+		}, nil)
+	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
+		&http.Response{
+			StatusCode: http.StatusOK,
+			Body:       ioutil.NopCloser(bytes.NewReader(partialResponse)),
+		}, nil).Times(1)
+	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(2)
+	snClient := getTestSnapshotClient(armClient)
+	result, rerr := snClient.ListByResourceGroup(context.TODO(), "rg")
+	assert.Nil(t, rerr)
+	assert.Equal(t, 6, len(result))
+}
+
 func TestListByResourceGroupNeverRateLimiter(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

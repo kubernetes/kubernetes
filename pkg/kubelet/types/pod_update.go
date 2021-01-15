@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
+// Annotation keys for annotations used in this package.
 const (
 	ConfigSourceAnnotationKey    = "kubernetes.io/config.source"
 	ConfigMirrorAnnotationKey    = v1.MirrorPodAnnotationKey
@@ -34,33 +35,37 @@ const (
 // PodOperation defines what changes will be made on a pod configuration.
 type PodOperation int
 
+// These constants identify the PodOperations that can be made on a pod configuration.
 const (
-	// This is the current pod configuration
+	// SET is the current pod configuration.
 	SET PodOperation = iota
-	// Pods with the given ids are new to this source
+	// ADD signifies pods that are new to this source.
 	ADD
-	// Pods with the given ids are gracefully deleted from this source
+	// DELETE signifies pods that are gracefully deleted from this source.
 	DELETE
-	// Pods with the given ids have been removed from this source
+	// REMOVE signifies pods that have been removed from this source.
 	REMOVE
-	// Pods with the given ids have been updated in this source
+	// UPDATE signifies pods have been updated in this source.
 	UPDATE
-	// Pods with the given ids have unexpected status in this source,
-	// kubelet should reconcile status with this source
+	// RECONCILE signifies pods that have unexpected status in this source,
+	// kubelet should reconcile status with this source.
 	RECONCILE
-
-	// These constants identify the sources of pods
-	// Updates from a file
-	FileSource = "file"
-	// Updates from querying a web page
-	HTTPSource = "http"
-	// Updates from Kubernetes API Server
-	ApiserverSource = "api"
-	// Updates from all sources
-	AllSource = "*"
-
-	NamespaceDefault = metav1.NamespaceDefault
 )
+
+// These constants identify the sources of pods.
+const (
+	// Filesource idenitified updates from a file.
+	FileSource = "file"
+	// HTTPSource identifies updates from querying a web page.
+	HTTPSource = "http"
+	// ApiserverSource identifies updates from Kubernetes API Server.
+	ApiserverSource = "api"
+	// AllSource identifies updates from all sources.
+	AllSource = "*"
+)
+
+// NamespaceDefault is a string representing the default namespace.
+const NamespaceDefault = metav1.NamespaceDefault
 
 // PodUpdate defines an operation sent on the channel. You can add or remove single services by
 // sending an array of size one and Op == ADD|REMOVE (with REMOVE, only the ID is required).
@@ -77,7 +82,7 @@ type PodUpdate struct {
 	Source string
 }
 
-// Gets all validated sources from the specified sources.
+// GetValidatedSources gets all validated sources from the specified sources.
 func GetValidatedSources(sources []string) ([]string, error) {
 	validated := make([]string, 0, len(sources))
 	for _, source := range sources {

@@ -21,21 +21,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
+	"time"
 
+	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+
+	// synthetic import of netpol suite, until these tests are replaced entirely, so that its included properly
+	_ "k8s.io/kubernetes/test/e2e/network/netpol"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilnet "k8s.io/utils/net"
-
-	"github.com/onsi/ginkgo"
 )
 
 /*
@@ -698,7 +704,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 
 		ginkgo.It("should allow egress access on one named port [Feature:NetworkPolicy]", func() {
 			clientPodName := "client-a"
-			protocolUDP := v1.ProtocolUDP
 			policy := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "allow-client-a-via-named-port-egress-rule",
@@ -715,11 +720,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 						Ports: []networkingv1.NetworkPolicyPort{
 							{
 								Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80"},
-							},
-							// Allow DNS look-ups
-							{
-								Protocol: &protocolUDP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
 							},
 						},
 					}},
@@ -964,7 +964,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 		ginkgo.It("should work with Ingress,Egress specified together [Feature:NetworkPolicy]", func() {
 			const allowedPort = 80
 			const notAllowedPort = 81
-			protocolUDP := v1.ProtocolUDP
 
 			nsBName := f.BaseName + "-b"
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
@@ -1000,15 +999,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 						}},
 					}},
 					Egress: []networkingv1.NetworkPolicyEgressRule{
-						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
 						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
@@ -1046,7 +1036,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			ginkgo.By("client-b should not be able to communicate with server port 81 in namespace-a", func() {
 				testCannotConnect(f, nsB, "client-b", service, notAllowedPort)
 			})
-
 		})
 
 		ginkgo.It("should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func() {
@@ -1079,7 +1068,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
 
 			ginkgo.By("Creating a network policy for the server which allows traffic only to a server in different namespace.")
-			protocolUDP := v1.ProtocolUDP
 			policyAllowToServerInNSB := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: nsA.Name,
@@ -1095,15 +1083,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeEgress},
 					// Allow traffic only to server-a in namespace-b
 					Egress: []networkingv1.NetworkPolicyEgressRule{
-						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
 						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
@@ -1181,7 +1160,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			ginkgo.By("Creating a network policy for the server which allows traffic from all clients.")
 			policyIngressAllowAll := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
-					//Namespace: f.Namespace.Name,
+					// Namespace: f.Namespace.Name,
 					Name: "allow-all",
 				},
 				Spec: networkingv1.NetworkPolicySpec{
@@ -1215,8 +1194,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 
-			protocolUDP := v1.ProtocolUDP
-
 			ginkgo.By("Creating client-a which should be able to contact the server before applying policy.", func() {
 				testCanConnect(f, f.Namespace, "client-a", serviceB, 80)
 			})
@@ -1237,15 +1214,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeEgress},
 					// Allow traffic only to "server-a"
 					Egress: []networkingv1.NetworkPolicyEgressRule{
-						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
 						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
@@ -1367,14 +1335,11 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			ginkgo.By("Creating client-a which should be able to contact the server.", func() {
 				testCanConnect(f, f.Namespace, "client-a", service, 80)
 			})
-
 		})
 
 		ginkgo.It("should allow egress access to server in CIDR block [Feature:NetworkPolicy]", func() {
 			var serviceB *v1.Service
 			var podServerB *v1.Pod
-
-			protocolUDP := v1.ProtocolUDP
 
 			// Getting podServer's status to get podServer's IP, to create the CIDR
 			podServerStatus, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podServer.Name, metav1.GetOptions{})
@@ -1419,15 +1384,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					// Allow traffic to only one CIDR block.
 					Egress: []networkingv1.NetworkPolicyEgressRule{
 						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
-						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
 									IPBlock: &networkingv1.IPBlock{
@@ -1453,8 +1409,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 		})
 
 		ginkgo.It("should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy]", func() {
-			protocolUDP := v1.ProtocolUDP
-
 			// Getting podServer's status to get podServer's IP, to create the CIDR with except clause
 			podServerStatus, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podServer.Name, metav1.GetOptions{})
 			if err != nil {
@@ -1495,15 +1449,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					// Allow traffic to only one CIDR block except subnet which includes Server.
 					Egress: []networkingv1.NetworkPolicyEgressRule{
 						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
-						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
 									IPBlock: &networkingv1.IPBlock{
@@ -1527,8 +1472,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 		})
 
 		ginkgo.It("should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy]", func() {
-			protocolUDP := v1.ProtocolUDP
-
 			// Getting podServer's status to get podServer's IP, to create the CIDR with except clause
 			podServerStatus, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podServer.Name, metav1.GetOptions{})
 			if err != nil {
@@ -1565,15 +1508,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeEgress},
 					// Allow traffic to only one CIDR block except subnet which includes Server.
 					Egress: []networkingv1.NetworkPolicyEgressRule{
-						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
 						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
@@ -1612,15 +1546,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					// Allow traffic to only one CIDR block which includes Server.
 					Egress: []networkingv1.NetworkPolicyEgressRule{
 						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
-						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
 									IPBlock: &networkingv1.IPBlock{
@@ -1656,15 +1581,12 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			ginkgo.By("Creating client-a which should still be able to contact the server after recreating the network policy with except clause.", func() {
 				testCanConnect(f, f.Namespace, "client-a", service, 80)
 			})
-
 		})
 
 		ginkgo.It("should enforce policies to check ingress and egress policies can be controlled independently based on PodSelector [Feature:NetworkPolicy]", func() {
 			var serviceA, serviceB *v1.Service
 			var podA, podB *v1.Pod
 			var err error
-
-			protocolUDP := v1.ProtocolUDP
 
 			// Before applying policy, communication should be successful between pod-a and pod-b
 			podA, serviceA = createServerPodAndService(f, f.Namespace, "pod-a", []protocolPort{{80, v1.ProtocolTCP}})
@@ -1702,15 +1624,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeEgress},
 					// Allow traffic to server on pod-b
 					Egress: []networkingv1.NetworkPolicyEgressRule{
-						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
 						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
@@ -2231,7 +2144,7 @@ func createNetworkClientPodWithRestartPolicy(f *framework.Framework, namespace *
 					Command: []string{"/bin/sh"},
 					Args: []string{
 						"-c",
-						fmt.Sprintf("for i in $(seq 1 5); do /agnhost connect %s.%s:%d --protocol %s --timeout 8s && exit 0 || sleep 1; done; exit 1", targetService.Name, targetService.Namespace, targetPort, connectProtocol),
+						fmt.Sprintf("for i in $(seq 1 5); do /agnhost connect %s --protocol %s --timeout 8s && exit 0 || sleep 1; done; exit 1", net.JoinHostPort(targetService.Spec.ClusterIP, strconv.Itoa(targetPort)), connectProtocol),
 					},
 				},
 			},
@@ -2268,3 +2181,181 @@ func cleanupNetworkPolicy(f *framework.Framework, policy *networkingv1.NetworkPo
 		framework.Failf("unable to cleanup policy %v: %v", policy.Name, err)
 	}
 }
+
+var _ = SIGDescribe("NetworkPolicy API", func() {
+	f := framework.NewDefaultFramework("networkpolicies")
+	/*
+		Release: v1.20
+		Testname: NetworkPolicies API
+		Description:
+		- The networking.k8s.io API group MUST exist in the /apis discovery document.
+		- The networking.k8s.io/v1 API group/version MUST exist in the /apis/networking.k8s.io discovery document.
+		- The NetworkPolicies resources MUST exist in the /apis/networking.k8s.io/v1 discovery document.
+		- The NetworkPolicies resource must support create, get, list, watch, update, patch, delete, and deletecollection.
+	*/
+
+	ginkgo.It("should support creating NetworkPolicy API operations", func() {
+		// Setup
+		ns := f.Namespace.Name
+		npVersion := "v1"
+		npClient := f.ClientSet.NetworkingV1().NetworkPolicies(ns)
+		npTemplate := &networkingv1.NetworkPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "e2e-example-netpol",
+				Labels: map[string]string{
+					"special-label": f.UniqueName,
+				},
+			},
+			Spec: networkingv1.NetworkPolicySpec{
+				// Apply this policy to the Server
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"pod-name": "test-pod",
+					},
+				},
+				// Allow traffic only from client-a in namespace-b
+				Ingress: []networkingv1.NetworkPolicyIngressRule{{
+					From: []networkingv1.NetworkPolicyPeer{{
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"ns-name": "pod-b",
+							},
+						},
+						PodSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"pod-name": "client-a",
+							},
+						},
+					}},
+				}},
+			},
+		}
+		// Discovery
+		ginkgo.By("getting /apis")
+		{
+			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
+			framework.ExpectNoError(err)
+			found := false
+			for _, group := range discoveryGroups.Groups {
+				if group.Name == networkingv1.GroupName {
+					for _, version := range group.Versions {
+						if version.Version == npVersion {
+							found = true
+							break
+						}
+					}
+				}
+			}
+			framework.ExpectEqual(found, true, fmt.Sprintf("expected networking API group/version, got %#v", discoveryGroups.Groups))
+		}
+		ginkgo.By("getting /apis/networking.k8s.io")
+		{
+			group := &metav1.APIGroup{}
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/networking.k8s.io").Do(context.TODO()).Into(group)
+			framework.ExpectNoError(err)
+			found := false
+			for _, version := range group.Versions {
+				if version.Version == npVersion {
+					found = true
+					break
+				}
+			}
+			framework.ExpectEqual(found, true, fmt.Sprintf("expected networking API version, got %#v", group.Versions))
+		}
+		ginkgo.By("getting /apis/networking.k8s.io" + npVersion)
+		{
+			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(networkingv1.SchemeGroupVersion.String())
+			framework.ExpectNoError(err)
+			foundNetPol := false
+			for _, resource := range resources.APIResources {
+				switch resource.Name {
+				case "networkpolicies":
+					foundNetPol = true
+				}
+			}
+			framework.ExpectEqual(foundNetPol, true, fmt.Sprintf("expected networkpolicies, got %#v", resources.APIResources))
+		}
+		// NetPol resource create/read/update/watch verbs
+		ginkgo.By("creating")
+		_, err := npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		_, err = npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		createdNetPol, err := npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("getting")
+		gottenNetPol, err := npClient.Get(context.TODO(), createdNetPol.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(gottenNetPol.UID, createdNetPol.UID)
+
+		ginkgo.By("listing")
+		nps, err := npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(nps.Items), 3, "filtered list should have 3 items")
+
+		ginkgo.By("watching")
+		framework.Logf("starting watch")
+		npWatch, err := npClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: nps.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		// Test cluster-wide list and watch
+		clusterNPClient := f.ClientSet.NetworkingV1().NetworkPolicies("")
+		ginkgo.By("cluster-wide listing")
+		clusterNPs, err := clusterNPClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(clusterNPs.Items), 3, "filtered list should have 3 items")
+
+		ginkgo.By("cluster-wide watching")
+		framework.Logf("starting watch")
+		_, err = clusterNPClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: nps.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("patching")
+		patchedNetPols, err := npClient.Patch(context.TODO(), createdNetPol.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(patchedNetPols.Annotations["patched"], "true", "patched object should have the applied annotation")
+
+		ginkgo.By("updating")
+		npToUpdate := patchedNetPols.DeepCopy()
+		npToUpdate.Annotations["updated"] = "true"
+		updatedNetPols, err := npClient.Update(context.TODO(), npToUpdate, metav1.UpdateOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(updatedNetPols.Annotations["updated"], "true", "updated object should have the applied annotation")
+
+		framework.Logf("waiting for watch events with expected annotations")
+		for sawAnnotations := false; !sawAnnotations; {
+			select {
+			case evt, ok := <-npWatch.ResultChan():
+				framework.ExpectEqual(ok, true, "watch channel should not close")
+				framework.ExpectEqual(evt.Type, watch.Modified)
+				watchedNetPol, isNetPol := evt.Object.(*networkingv1.NetworkPolicy)
+				framework.ExpectEqual(isNetPol, true, fmt.Sprintf("expected NetworkPolicy, got %T", evt.Object))
+				if watchedNetPol.Annotations["patched"] == "true" && watchedNetPol.Annotations["updated"] == "true" {
+					framework.Logf("saw patched and updated annotations")
+					sawAnnotations = true
+					npWatch.Stop()
+				} else {
+					framework.Logf("missing expected annotations, waiting: %#v", watchedNetPol.Annotations)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				framework.Fail("timed out waiting for watch event")
+			}
+		}
+		// NetPol resource delete operations
+		ginkgo.By("deleting")
+		err = npClient.Delete(context.TODO(), createdNetPol.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+		_, err = npClient.Get(context.TODO(), createdNetPol.Name, metav1.GetOptions{})
+		framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %#v", err))
+		nps, err = npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(nps.Items), 2, "filtered list should have 2 items")
+
+		ginkgo.By("deleting a collection")
+		err = npClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		nps, err = npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(nps.Items), 0, "filtered list should have 0 items")
+	})
+})

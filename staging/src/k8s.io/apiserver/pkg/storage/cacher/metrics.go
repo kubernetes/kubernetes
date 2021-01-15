@@ -39,6 +39,15 @@ var (
 		[]string{"resource"},
 	)
 
+	terminatedWatchersCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "apiserver_terminated_watchers_total",
+			Help:           "Counter of watchers closed due to unresponsiveness broken by resource type.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+
 	watchCacheCapacityIncreaseTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Name:           "watch_cache_capacity_increase_total",
@@ -56,12 +65,23 @@ var (
 		},
 		[]string{"resource"},
 	)
+
+	watchCacheCapacity = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Name:           "watch_cache_capacity",
+			Help:           "Total capacity of watch cache broken by resource type.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
 )
 
 func init() {
 	legacyregistry.MustRegister(initCounter)
+	legacyregistry.MustRegister(terminatedWatchersCounter)
 	legacyregistry.MustRegister(watchCacheCapacityIncreaseTotal)
 	legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
+	legacyregistry.MustRegister(watchCacheCapacity)
 }
 
 // recordsWatchCacheCapacityChange record watchCache capacity resize(increase or decrease) operations.
@@ -71,4 +91,5 @@ func recordsWatchCacheCapacityChange(objType string, old, new int) {
 		return
 	}
 	watchCacheCapacityDecreaseTotal.WithLabelValues(objType).Inc()
+	watchCacheCapacity.WithLabelValues(objType).Set(float64(new))
 }

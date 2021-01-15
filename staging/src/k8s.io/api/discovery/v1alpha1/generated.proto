@@ -67,8 +67,15 @@ message Endpoint {
   //   endpoint is located. This should match the corresponding node label.
   // * topology.kubernetes.io/region: the value indicates the region where the
   //   endpoint is located. This should match the corresponding node label.
+  // This field is deprecated and will be removed in future api versions.
   // +optional
   map<string, string> topology = 5;
+
+  // nodeName represents the name of the Node hosting this endpoint. This can
+  // be used to determine endpoints local to a Node. This field can be enabled
+  // with the EndpointSliceNodeName feature gate.
+  // +optional
+  optional string nodeName = 6;
 }
 
 // EndpointConditions represents the current condition of an endpoint.
@@ -76,9 +83,25 @@ message EndpointConditions {
   // ready indicates that this endpoint is prepared to receive traffic,
   // according to whatever system is managing the endpoint. A nil value
   // indicates an unknown state. In most cases consumers should interpret this
-  // unknown state as ready.
+  // unknown state as ready. For compatibility reasons, ready should never be
+  // "true" for terminating endpoints.
   // +optional
   optional bool ready = 1;
+
+  // serving is identical to ready except that it is set regardless of the
+  // terminating state of endpoints. This condition should be set to true for
+  // a ready endpoint that is terminating. If nil, consumers should defer to
+  // the ready condition. This field can be enabled with the
+  // EndpointSliceTerminatingCondition feature gate.
+  // +optional
+  optional bool serving = 2;
+
+  // terminating indicates that this endpoint is terminating. A nil value
+  // indicates an unknown state. Consumers should interpret this unknown state
+  // to mean that the endpoint is not terminating. This field can be enabled
+  // with the EndpointSliceTerminatingCondition feature gate.
+  // +optional
+  optional bool terminating = 3;
 }
 
 // EndpointPort represents a Port used by an EndpointSlice

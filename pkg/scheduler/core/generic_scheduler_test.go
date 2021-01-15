@@ -37,6 +37,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
@@ -44,10 +45,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/selectorspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -72,14 +71,14 @@ func (pl *noPodsFilterPlugin) Filter(_ context.Context, _ *framework.CycleState,
 }
 
 // NewNoPodsFilterPlugin initializes a noPodsFilterPlugin and returns it.
-func NewNoPodsFilterPlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func NewNoPodsFilterPlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &noPodsFilterPlugin{}, nil
 }
 
 type numericMapPlugin struct{}
 
 func newNumericMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &numericMapPlugin{}, nil
 	}
 }
@@ -103,7 +102,7 @@ func (pl *numericMapPlugin) ScoreExtensions() framework.ScoreExtensions {
 type reverseNumericMapPlugin struct{}
 
 func newReverseNumericMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &reverseNumericMapPlugin{}, nil
 	}
 }
@@ -144,7 +143,7 @@ func (pl *reverseNumericMapPlugin) NormalizeScore(_ context.Context, _ *framewor
 type trueMapPlugin struct{}
 
 func newTrueMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &trueMapPlugin{}, nil
 	}
 }
@@ -173,7 +172,7 @@ func (pl *trueMapPlugin) NormalizeScore(_ context.Context, _ *framework.CycleSta
 type falseMapPlugin struct{}
 
 func newFalseMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &falseMapPlugin{}, nil
 	}
 }
@@ -759,9 +758,6 @@ func TestGenericScheduler(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			prof := &profile.Profile{
-				Framework: fwk,
-			}
 
 			scheduler := NewGenericScheduler(
 				cache,
@@ -772,7 +768,7 @@ func TestGenericScheduler(t *testing.T) {
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
-			result, err := scheduler.Schedule(ctx, prof, framework.NewCycleState(), test.pod)
+			result, err := scheduler.Schedule(ctx, fwk, framework.NewCycleState(), test.pod)
 			if err != test.wErr && !strings.Contains(err.Error(), test.wErr.Error()) {
 				t.Errorf("Unexpected error: %v, expected: %v", err.Error(), test.wErr)
 			}
@@ -817,9 +813,8 @@ func TestFindFitAllError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	prof := &profile.Profile{Framework: fwk}
 
-	_, nodeToStatusMap, err := scheduler.findNodesThatFitPod(context.Background(), prof, framework.NewCycleState(), &v1.Pod{})
+	_, nodeToStatusMap, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -858,10 +853,9 @@ func TestFindFitSomeError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	prof := &profile.Profile{Framework: fwk}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-	_, nodeToStatusMap, err := scheduler.findNodesThatFitPod(context.Background(), prof, framework.NewCycleState(), pod)
+	_, nodeToStatusMap, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), pod)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -912,7 +906,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 		plugin := st.FakeFilterPlugin{}
 		registerFakeFilterFunc := st.RegisterFilterPlugin(
 			"FakeFilter",
-			func(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
+			func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 				return &plugin, nil
 			},
 		)
@@ -928,7 +922,6 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		prof := &profile.Profile{Framework: fwk}
 
 		scheduler := makeScheduler(nodes)
 		if err := scheduler.cache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {
@@ -936,7 +929,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 		}
 		fwk.PreemptHandle().AddNominatedPod(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "nominated"}, Spec: v1.PodSpec{Priority: &midPriority}}, "1")
 
-		_, _, err = scheduler.findNodesThatFitPod(context.Background(), prof, framework.NewCycleState(), test.pod)
+		_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
 
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -1084,7 +1077,6 @@ func TestZeroRequest(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error creating framework: %+v", err)
 			}
-			prof := &profile.Profile{Framework: fwk}
 
 			scheduler := NewGenericScheduler(
 				nil,
@@ -1095,12 +1087,12 @@ func TestZeroRequest(t *testing.T) {
 
 			ctx := context.Background()
 			state := framework.NewCycleState()
-			_, _, err = scheduler.findNodesThatFitPod(ctx, prof, state, test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, state, test.pod)
 			if err != nil {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
-			prof.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
-			list, err := scheduler.prioritizeNodes(ctx, prof, state, test.pod, test.nodes)
+			fwk.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
+			list, err := scheduler.prioritizeNodes(ctx, fwk, state, test.pod, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1187,14 +1179,14 @@ func TestFairEvaluationForNodes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	prof := &profile.Profile{Framework: fwk}
+
 	// To make numAllNodes % nodesToFind != 0
 	g.percentageOfNodesToScore = 30
 	nodesToFind := int(g.numFeasibleNodesToFind(int32(numAllNodes)))
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
-		nodesThatFit, _, err := g.findNodesThatFitPod(context.Background(), prof, framework.NewCycleState(), &v1.Pod{})
+		nodesThatFit, _, err := g.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

@@ -239,15 +239,6 @@ const (
 	Poststop = "poststop"
 )
 
-// TODO move this to runtime-spec
-// See: https://github.com/opencontainers/runtime-spec/pull/1046
-const (
-	Creating = "creating"
-	Created  = "created"
-	Running  = "running"
-	Stopped  = "stopped"
-)
-
 type Capabilities struct {
 	// Bounding is the set of capabilities checked by the kernel.
 	Bounding []string

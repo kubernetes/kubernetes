@@ -35,7 +35,7 @@ import (
 )
 
 var (
-	describeLong = templates.LongDesc(`
+	describeLong = templates.LongDesc(i18n.T(`
 		Show details of a specific resource or group of resources
 
 		Print a detailed description of the selected resources, including related resources such
@@ -45,7 +45,7 @@ var (
 		    $ kubectl describe TYPE NAME_PREFIX
 
 		will first check for an exact match on TYPE and NAME_PREFIX. If no such resource
-		exists, it will output details for every resource that has a name prefixed with NAME_PREFIX.`)
+		exists, it will output details for every resource that has a name prefixed with NAME_PREFIX.`))
 
 	describeExample = templates.Examples(i18n.T(`
 		# Describe a node

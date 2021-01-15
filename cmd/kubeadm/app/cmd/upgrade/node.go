@@ -49,7 +49,7 @@ type nodeOptions struct {
 // compile-time assert that the local data object satisfies the phases data interface.
 var _ phases.Data = &nodeData{}
 
-// nodeData defines all the runtime information used when running the kubeadm upgrade node worklow;
+// nodeData defines all the runtime information used when running the kubeadm upgrade node workflow;
 // this data is shared across all the phases that are included in the workflow.
 type nodeData struct {
 	etcdUpgrade           bool
@@ -62,8 +62,8 @@ type nodeData struct {
 	ignorePreflightErrors sets.String
 }
 
-// NewCmdNode returns the cobra command for `kubeadm upgrade node`
-func NewCmdNode() *cobra.Command {
+// newCmdNode returns the cobra command for `kubeadm upgrade node`
+func newCmdNode() *cobra.Command {
 	nodeOptions := newNodeOptions()
 	nodeRunner := workflow.NewRunner()
 

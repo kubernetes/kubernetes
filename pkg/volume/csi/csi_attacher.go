@@ -46,9 +46,9 @@ const (
 )
 
 type csiAttacher struct {
-	plugin        *csiPlugin
-	k8s           kubernetes.Interface
-	waitSleepTime time.Duration
+	plugin       *csiPlugin
+	k8s          kubernetes.Interface
+	watchTimeout time.Duration
 
 	csiClient csiClient
 }
@@ -121,7 +121,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		klog.V(4).Info(log("attachment [%v] for volume [%v] created successfully", attachID, pvSrc.VolumeHandle))
 	}
 
-	if _, err := c.waitForVolumeAttachment(pvSrc.VolumeHandle, attachID, csiTimeout); err != nil {
+	if _, err := c.waitForVolumeAttachment(pvSrc.VolumeHandle, attachID, c.watchTimeout); err != nil {
 		return "", err
 	}
 
@@ -239,23 +239,6 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		return errors.New(log("attacher.MountDevice failed, deviceMountPath is empty"))
 	}
 
-	corruptedDir := false
-	mounted, err := isDirMounted(c.plugin, deviceMountPath)
-	if err != nil {
-		klog.Error(log("attacher.MountDevice failed while checking mount status for dir [%s]", deviceMountPath))
-		if isCorruptedDir(deviceMountPath) {
-			corruptedDir = true // leave to CSI driver to handle corrupted mount
-			klog.Warning(log("attacher.MountDevice detected corrupted mount for dir [%s]", deviceMountPath))
-		} else {
-			return err
-		}
-	}
-
-	if mounted && !corruptedDir {
-		klog.V(4).Info(log("attacher.MountDevice skipping mount, dir already mounted [%s]", deviceMountPath))
-		return nil
-	}
-
 	// Setup
 	if spec == nil {
 		return errors.New(log("attacher.MountDevice failed, spec is nil"))
@@ -274,7 +257,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 	csi := c.csiClient
 
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.watchTimeout)
 	defer cancel()
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
 	stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
@@ -304,7 +287,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// Store volume metadata for UnmountDevice. Keep it around even if the
 	// driver does not support NodeStage, UnmountDevice still needs it.
-	if err = os.MkdirAll(deviceMountPath, 0750); err != nil && !corruptedDir {
+	if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
 		return errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
 	}
 	klog.V(4).Info(log("created target path successfully [%s]", deviceMountPath))
@@ -415,7 +398,7 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 	}
 
 	klog.V(4).Info(log("detacher deleted ok VolumeAttachment.ID=%s", attachID))
-	err := c.waitForVolumeDetachment(volID, attachID, csiTimeout)
+	err := c.waitForVolumeDetachment(volID, attachID, c.watchTimeout)
 	return err
 }
 
@@ -532,7 +515,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	}
 	csi := c.csiClient
 
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.watchTimeout)
 	defer cancel()
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
 	stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)

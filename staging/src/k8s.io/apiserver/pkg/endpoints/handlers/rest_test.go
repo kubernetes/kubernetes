@@ -123,7 +123,7 @@ func TestStrategicMergePatchInvalid(t *testing.T) {
 	if !apierrors.IsBadRequest(err) {
 		t.Errorf("expected HTTP status: BadRequest, got: %#v", apierrors.ReasonForError(err))
 	}
-	if err.Error() != expectedError {
+	if !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("expected %#v, got %#v", expectedError, err.Error())
 	}
 }
@@ -171,7 +171,7 @@ func TestJSONPatch(t *testing.T) {
 				t.Errorf("%s: expect no error when applying json patch, but got %v", test.name, err)
 				continue
 			}
-			if err.Error() != test.expectedError {
+			if !strings.Contains(err.Error(), test.expectedError) {
 				t.Errorf("%s: expected error %v, but got %v", test.name, test.expectedError, err)
 			}
 			if test.expectedErrorType != apierrors.ReasonForError(err) {
@@ -1101,6 +1101,233 @@ want: %#+v`, got, converted)
 					}
 
 				})
+			}
+		})
+	}
+}
+
+func TestDedupOwnerReferences(t *testing.T) {
+	falseA := false
+	falseB := false
+	testCases := []struct {
+		name            string
+		ownerReferences []metav1.OwnerReference
+		expected        []metav1.OwnerReference
+	}{
+		{
+			name: "simple multiple duplicates",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "2",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "2",
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "2",
+				},
+			},
+		},
+		{
+			name: "don't dedup same uid different name entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name1",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name2",
+					UID:        "1",
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name1",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name2",
+					UID:        "1",
+				},
+			},
+		},
+		{
+			name: "don't dedup same uid different API version entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion1",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion2",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion1",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion2",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+		},
+		{
+			name: "dedup memory-equal entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+			},
+		},
+		{
+			name: "dedup semantic-equal entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseB,
+					BlockOwnerDeletion: &falseB,
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+			},
+		},
+		{
+			name: "don't dedup semantic-different entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			deduped, _ := dedupOwnerReferences(tc.ownerReferences)
+			if !apiequality.Semantic.DeepEqual(deduped, tc.expected) {
+				t.Errorf("diff: %v", diff.ObjectReflectDiff(deduped, tc.expected))
 			}
 		})
 	}

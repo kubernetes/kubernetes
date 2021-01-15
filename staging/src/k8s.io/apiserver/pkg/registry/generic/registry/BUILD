@@ -46,6 +46,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend/factory:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/testing:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/github.com/google/gofuzz:go_default_library",
     ],
 )
 

@@ -53,7 +53,7 @@ type clientCertAuth struct {
 
 // tokenAuth struct holds info required to use a token to provide authentication info in a kubeconfig object
 type tokenAuth struct {
-	Token string
+	Token string `datapolicy:"token"`
 }
 
 // kubeConfigSpec struct holds info required to build a KubeConfig object
@@ -61,8 +61,8 @@ type kubeConfigSpec struct {
 	CACert         *x509.Certificate
 	APIServer      string
 	ClientName     string
-	TokenAuth      *tokenAuth
-	ClientCertAuth *clientCertAuth
+	TokenAuth      *tokenAuth      `datapolicy:"token"`
+	ClientCertAuth *clientCertAuth `datapolicy:"security-key"`
 }
 
 // CreateJoinControlPlaneKubeConfigFiles will create and write to disk the kubeconfig files required by kubeadm
@@ -508,14 +508,20 @@ func createKubeConfigAndCSR(kubeConfigDir string, kubeadmConfig *kubeadmapi.Init
 
 // CreateDefaultKubeConfigsAndCSRFiles is used in ExternalCA mode to create
 // kubeconfig files and adjacent CSR files.
-func CreateDefaultKubeConfigsAndCSRFiles(kubeConfigDir string, kubeadmConfig *kubeadmapi.InitConfiguration) error {
+func CreateDefaultKubeConfigsAndCSRFiles(out io.Writer, kubeConfigDir string, kubeadmConfig *kubeadmapi.InitConfiguration) error {
 	kubeConfigs, err := getKubeConfigSpecsBase(kubeadmConfig)
 	if err != nil {
 		return err
 	}
+	if out != nil {
+		fmt.Fprintf(out, "generating keys and CSRs in %s\n", kubeConfigDir)
+	}
 	for name, spec := range kubeConfigs {
 		if err := createKubeConfigAndCSR(kubeConfigDir, kubeadmConfig, name, spec); err != nil {
 			return err
+		}
+		if out != nil {
+			fmt.Fprintf(out, "  %s\n", name)
 		}
 	}
 	return nil

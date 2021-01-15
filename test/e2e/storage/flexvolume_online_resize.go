@@ -79,6 +79,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 
 		test := testsuites.StorageClassTest{
 			Name:                 "flexvolume-resize",
+			Timeouts:             f.Timeouts,
 			ClaimSize:            "2Gi",
 			AllowVolumeExpansion: true,
 			Provisioner:          "flex-expand",

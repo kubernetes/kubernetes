@@ -58,16 +58,12 @@ func GenMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 	buf := new(bytes.Buffer)
 	name := cmd.CommandPath()
 
-	short := cmd.Short
-	long := cmd.Long
-	if len(long) == 0 {
-		long = short
-	}
-
 	buf.WriteString("## " + name + "\n\n")
-	buf.WriteString(short + "\n\n")
-	buf.WriteString("### Synopsis\n\n")
-	buf.WriteString(long + "\n\n")
+	buf.WriteString(cmd.Short + "\n\n")
+	if len(cmd.Long) > 0 {
+		buf.WriteString("### Synopsis\n\n")
+		buf.WriteString(cmd.Long + "\n\n")
+	}
 
 	if cmd.Runnable() {
 		buf.WriteString(fmt.Sprintf("```\n%s\n```\n\n", cmd.UseLine()))

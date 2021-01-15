@@ -443,7 +443,7 @@ func pv(name, zone string) *v1.PersistentVolume {
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				v1.LabelZoneFailureDomain: zone,
+				v1.LabelFailureDomainBetaZone: zone,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -484,12 +484,12 @@ func TestGetLabelsForVolume_Basic(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if labels[v1.LabelZoneFailureDomain] != zone {
+	if labels[v1.LabelFailureDomainBetaZone] != zone {
 		t.Errorf("Failure domain is '%v', but zone is '%v'",
-			labels[v1.LabelZoneFailureDomain], zone)
+			labels[v1.LabelFailureDomainBetaZone], zone)
 	}
-	if labels[v1.LabelZoneRegion] != gceRegion {
-		t.Errorf("Region is '%v', but region is 'us-central1'", labels[v1.LabelZoneRegion])
+	if labels[v1.LabelFailureDomainBetaRegion] != gceRegion {
+		t.Errorf("Region is '%v', but region is 'us-central1'", labels[v1.LabelFailureDomainBetaRegion])
 	}
 }
 
@@ -515,7 +515,7 @@ func TestGetLabelsForVolume_NoZone(t *testing.T) {
 	gce.CreateDisk(diskName, diskType, zone, sizeGb, nil)
 
 	pv := pv(diskName, zone)
-	delete(pv.Labels, v1.LabelZoneFailureDomain)
+	delete(pv.Labels, v1.LabelFailureDomainBetaZone)
 
 	/* Act */
 	labels, err := gce.GetLabelsForVolume(ctx, pv)
@@ -524,12 +524,12 @@ func TestGetLabelsForVolume_NoZone(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if labels[v1.LabelZoneFailureDomain] != zone {
+	if labels[v1.LabelFailureDomainBetaZone] != zone {
 		t.Errorf("Failure domain is '%v', but zone is '%v'",
-			labels[v1.LabelZoneFailureDomain], zone)
+			labels[v1.LabelFailureDomainBetaZone], zone)
 	}
-	if labels[v1.LabelZoneRegion] != gceRegion {
-		t.Errorf("Region is '%v', but region is 'europe-west1'", labels[v1.LabelZoneRegion])
+	if labels[v1.LabelFailureDomainBetaRegion] != gceRegion {
+		t.Errorf("Region is '%v', but region is 'europe-west1'", labels[v1.LabelFailureDomainBetaRegion])
 	}
 }
 
@@ -575,7 +575,7 @@ func TestGetLabelsForVolume_DiskNotFoundAndNoZone(t *testing.T) {
 	}
 
 	pv := pv(diskName, zone)
-	delete(pv.Labels, v1.LabelZoneFailureDomain)
+	delete(pv.Labels, v1.LabelFailureDomainBetaZone)
 
 	/* Act */
 	_, err := gce.GetLabelsForVolume(ctx, pv)
@@ -617,12 +617,12 @@ func TestGetLabelsForVolume_DupDisk(t *testing.T) {
 	if err != nil {
 		t.Error("Disk name and zone uniquely identifies a disk, yet an error is returned.")
 	}
-	if labels[v1.LabelZoneFailureDomain] != zone {
+	if labels[v1.LabelFailureDomainBetaZone] != zone {
 		t.Errorf("Failure domain is '%v', but zone is '%v'",
-			labels[v1.LabelZoneFailureDomain], zone)
+			labels[v1.LabelFailureDomainBetaZone], zone)
 	}
-	if labels[v1.LabelZoneRegion] != gceRegion {
-		t.Errorf("Region is '%v', but region is 'us-west1'", labels[v1.LabelZoneRegion])
+	if labels[v1.LabelFailureDomainBetaRegion] != gceRegion {
+		t.Errorf("Region is '%v', but region is 'us-west1'", labels[v1.LabelFailureDomainBetaRegion])
 	}
 }
 
@@ -651,7 +651,7 @@ func TestGetLabelsForVolume_DupDiskNoZone(t *testing.T) {
 	}
 
 	pv := pv(diskName, zone)
-	delete(pv.Labels, v1.LabelZoneFailureDomain)
+	delete(pv.Labels, v1.LabelFailureDomainBetaZone)
 
 	/* Act */
 	_, err := gce.GetLabelsForVolume(ctx, pv)
@@ -746,13 +746,13 @@ func TestGetAutoLabelsForPD(t *testing.T) {
 				return
 			}
 
-			if got := labels[v1.LabelZoneFailureDomain]; !tc.wantZoneLabel.Has(got) {
-				t.Errorf("labels[v1.LabelZoneFailureDomain] = %v; want one of: %v", got, tc.wantZoneLabel.List())
+			if got := labels[v1.LabelFailureDomainBetaZone]; !tc.wantZoneLabel.Has(got) {
+				t.Errorf("labels[v1.LabelFailureDomainBetaZone] = %v; want one of: %v", got, tc.wantZoneLabel.List())
 			}
 
 			// Validate labels
-			if got := labels[v1.LabelZoneRegion]; got != gceRegion {
-				t.Errorf("labels[v1.LabelZoneRegion] = %v; want: %v", got, gceRegion)
+			if got := labels[v1.LabelFailureDomainBetaRegion]; got != gceRegion {
+				t.Errorf("labels[v1.LabelFailureDomainBetaRegion] = %v; want: %v", got, gceRegion)
 			}
 		})
 	}

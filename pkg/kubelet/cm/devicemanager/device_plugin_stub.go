@@ -26,6 +26,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
@@ -123,11 +124,21 @@ func (m *Stub) Start() error {
 		defer m.wg.Done()
 		m.server.Serve(sock)
 	}()
-	_, conn, err := dial(m.socket)
-	if err != nil {
-		return err
+
+	var lastDialErr error
+	wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+		var conn *grpc.ClientConn
+		_, conn, lastDialErr = dial(m.socket)
+		if lastDialErr != nil {
+			return false, nil
+		}
+		conn.Close()
+		return true, nil
+	})
+	if lastDialErr != nil {
+		return lastDialErr
 	}
-	conn.Close()
+
 	klog.Infof("Starting to serve on %v", m.socket)
 
 	return nil

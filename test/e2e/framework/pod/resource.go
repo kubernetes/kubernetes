@@ -476,9 +476,6 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 	err = wait.PollImmediate(poll, 5*time.Minute, func() (bool, error) {
 		retrievedPod, err := client.CoreV1().Pods(execPod.Namespace).Get(context.TODO(), execPod.Name, metav1.GetOptions{})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		return retrievedPod.Status.Phase == v1.PodRunning, nil
@@ -585,6 +582,17 @@ func GetPodsInNamespace(c clientset.Interface, ns string, ignoreLabels map[strin
 		filtered = append(filtered, &p)
 	}
 	return filtered, nil
+}
+
+// GetPods return the label matched pods in the given ns
+func GetPods(c clientset.Interface, ns string, matchLabels map[string]string) ([]v1.Pod, error) {
+	label := labels.SelectorFromSet(matchLabels)
+	listOpts := metav1.ListOptions{LabelSelector: label.String()}
+	pods, err := c.CoreV1().Pods(ns).List(context.TODO(), listOpts)
+	if err != nil {
+		return []v1.Pod{}, err
+	}
+	return pods.Items, nil
 }
 
 // GetPodSecretUpdateTimeout returns the timeout duration for updating pod secret.

@@ -28,11 +28,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // strategy implements behavior for ConfigMap objects
@@ -86,14 +84,7 @@ func (strategy) ValidateUpdate(ctx context.Context, newObj, oldObj runtime.Objec
 	return validation.ValidateConfigMapUpdate(newCfg, oldCfg)
 }
 
-func isImmutableInUse(configMap *api.ConfigMap) bool {
-	return configMap != nil && configMap.Immutable != nil
-}
-
 func dropDisabledFields(configMap *api.ConfigMap, oldConfigMap *api.ConfigMap) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ImmutableEphemeralVolumes) && !isImmutableInUse(oldConfigMap) {
-		configMap.Immutable = nil
-	}
 }
 
 func (strategy) AllowUnconditionalUpdate() bool {

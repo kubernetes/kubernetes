@@ -453,7 +453,9 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 
 		// 3. Wait to see if both pods get evicted in between [5, 25] seconds
 		ginkgo.By("Waiting for Pod1 and Pod2 to be deleted")
-		timeoutChannel := time.NewTimer(time.Duration(kubeletPodDeletionDelaySeconds+3*additionalWaitPerDeleteSeconds) * time.Second).C
+		// On Windows hosts, we're noticing that the pods are taking more time to get deleted, so having larger timeout
+		// is good
+		timeoutChannel := time.NewTimer(time.Duration(kubeletPodDeletionDelaySeconds+10*additionalWaitPerDeleteSeconds) * time.Second).C
 		var evicted int
 		for evicted != 2 {
 			select {

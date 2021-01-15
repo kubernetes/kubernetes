@@ -25,8 +25,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 )
 
@@ -209,7 +209,7 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 			return nil, fmt.Errorf("obtaining pod's hard topology spread constraints: %v", err)
 		}
 	} else {
-		constraints, err = pl.defaultConstraints(pod, v1.DoNotSchedule)
+		constraints, err = pl.buildDefaultConstraints(pod, v1.DoNotSchedule)
 		if err != nil {
 			return nil, fmt.Errorf("setting default hard topology spread constraints: %v", err)
 		}
@@ -285,7 +285,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 	}
 
 	// However, "empty" preFilterState is legit which tolerates every toSchedule Pod.
-	if len(s.TpPairToMatchNum) == 0 || len(s.Constraints) == 0 {
+	if len(s.Constraints) == 0 {
 		return nil
 	}
 

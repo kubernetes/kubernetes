@@ -171,6 +171,28 @@ func TestAuthPluginPersist(t *testing.T) {
 
 }
 
+func Test_WhenNilPersister_NoOpPersisterIsAssigned(t *testing.T) {
+
+	if err := RegisterAuthProviderPlugin("anyPlugin", pluginPersistProvider); err != nil {
+		t.Errorf("unexpected error: failed to register 'anyPlugin': %v", err)
+	}
+	cfg := &clientcmdapi.AuthProviderConfig{
+		Name:   "anyPlugin",
+		Config: nil,
+	}
+	plugin, err := GetAuthProvider("127.0.0.1", cfg, nil)
+	if err != nil {
+		t.Errorf("unexpected error: failed to get 'anyPlugin': %v", err)
+	}
+
+	anyPlugin := plugin.(*pluginPersist)
+
+	if _, ok := anyPlugin.persister.(*noopPersister); !ok {
+		t.Errorf("expected to be No Operation persister")
+	}
+
+}
+
 // emptyTransport provides an empty http.Response with an initialized header
 // to allow wrapping RoundTrippers to set header values.
 type emptyTransport struct{}
