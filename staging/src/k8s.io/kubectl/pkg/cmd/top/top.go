@@ -24,7 +24,6 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 )
 
 const (
@@ -55,13 +54,14 @@ func NewCmdTop(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	// create subcommands
 	cmd.AddCommand(NewCmdTopNode(f, nil, streams))
 	cmd.AddCommand(NewCmdTopPod(f, nil, streams))
+	cmd.AddCommand(NewCmdTopMetrics(f, nil, streams))
 
 	return cmd
 }
 
-func SupportedMetricsAPIVersionAvailable(discoveredAPIGroups *metav1.APIGroupList) bool {
+func SupportedAPIVersionAvailable(discoveredAPIGroups *metav1.APIGroupList, apiGroup string) bool {
 	for _, discoveredAPIGroup := range discoveredAPIGroups.Groups {
-		if discoveredAPIGroup.Name != metricsapi.GroupName {
+		if discoveredAPIGroup.Name != apiGroup {
 			continue
 		}
 		for _, version := range discoveredAPIGroup.Versions {

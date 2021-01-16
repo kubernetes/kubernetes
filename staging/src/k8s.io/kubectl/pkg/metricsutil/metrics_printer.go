@@ -19,7 +19,9 @@ package metricsutil
 import (
 	"fmt"
 	"io"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sort"
+	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -28,12 +30,7 @@ import (
 )
 
 var (
-	MeasuredResources = []v1.ResourceName{
-		v1.ResourceCPU,
-		v1.ResourceMemory,
-	}
 	NodeColumns     = []string{"NAME", "CPU(cores)", "CPU%", "MEMORY(bytes)", "MEMORY%"}
-	PodColumns      = []string{"NAME", "CPU(cores)", "MEMORY(bytes)"}
 	NamespaceColumn = "NAMESPACE"
 	PodColumn       = "POD"
 )
@@ -113,22 +110,6 @@ func (p *PodMetricsSorter) Less(i, j int) bool {
 	}
 }
 
-func NewPodMetricsSorter(metrics []metricsapi.PodMetrics, withNamespace bool, sortBy string) *PodMetricsSorter {
-	var podMetrics = make([]v1.ResourceList, len(metrics))
-	if len(sortBy) > 0 {
-		for i, v := range metrics {
-			podMetrics[i] = getPodMetrics(&v)
-		}
-	}
-
-	return &PodMetricsSorter{
-		metrics:       metrics,
-		sortBy:        sortBy,
-		withNamespace: withNamespace,
-		podMetrics:    podMetrics,
-	}
-}
-
 type ContainerMetricsSorter struct {
 	metrics []metricsapi.ContainerMetrics
 	sortBy  string
@@ -170,32 +151,42 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 	sort.Sort(NewNodeMetricsSorter(metrics, sortBy))
 
 	if !noHeaders {
-		printColumnNames(w, NodeColumns)
+		// TODO: reimplement node columns
+		// printColumnNames(w, NodeColumns)
 	}
 	var usage v1.ResourceList
 	for _, m := range metrics {
 		m.Usage.DeepCopyInto(&usage)
-		printMetricsLine(w, &ResourceMetricsInfo{
-			Name:      m.Name,
-			Metrics:   usage,
-			Available: availableResources[m.Name],
-		})
+		// TODO:
+		//printMetricsLine(w, NodeColumns, &ResourceMetricsInfo{
+		//	Name:      m.Name,
+		//	Metrics:   usage,
+		//	Available: availableResources[m.Name],
+		//})
 		delete(availableResources, m.Name)
 	}
 
 	// print lines for nodes of which the metrics is unreachable.
 	for nodeName := range availableResources {
-		printMissingMetricsNodeLine(w, nodeName)
+		printMissingMetricsNodeLine(w, NodeColumns, nodeName)
 	}
 	return nil
 }
 
-func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool, noHeaders bool, sortBy string) error {
+func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool, noHeaders bool, sortBy string, customMetrics string) error {
 	if len(metrics) == 0 {
 		return nil
 	}
 	w := printers.GetNewTabWriter(printer.out)
 	defer w.Flush()
+
+	columnList := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory}
+	for _, column := range strings.Split(customMetrics, ",") {
+		if column != v1.ResourceCPU.String() && column != v1.ResourceMemory.String() {
+			columnList = append(columnList, v1.ResourceName(column))
+		}
+	}
+
 	if !noHeaders {
 		if withNamespace {
 			printValue(w, NamespaceColumn)
@@ -203,48 +194,98 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 		if printContainers {
 			printValue(w, PodColumn)
 		}
-		printColumnNames(w, PodColumns)
+		printColumnNames(w, columnList)
 	}
-
-	sort.Sort(NewPodMetricsSorter(metrics, withNamespace, sortBy))
 
 	for _, m := range metrics {
 		if printContainers {
 			sort.Sort(NewContainerMetricsSorter(m.Containers, sortBy))
-			printSinglePodContainerMetrics(w, &m, withNamespace)
+			printSinglePodContainerMetrics(w, columnList, &m, withNamespace)
 		} else {
-			printSinglePodMetrics(w, &m, withNamespace)
+			printSinglePodMetrics(w, columnList, &m, withNamespace)
 		}
 	}
 	return nil
 }
 
-func printColumnNames(out io.Writer, names []string) {
-	for _, name := range names {
-		printValue(out, name)
+func (printer *TopCmdPrinter) PrintMetrics(metrics []metav1.APIResource, noHeaders bool, kind string) error {
+	w := printers.GetNewTabWriter(printer.out)
+	defer w.Flush()
+
+	mgks := []MetricGroupKind{}
+	if kind == "" || kind == "pods" {
+		mgks = append(mgks,
+			MetricGroupKind{GroupKind: metav1.GroupKind{Kind: "pods"}, Metric: "cpu"},
+			MetricGroupKind{GroupKind: metav1.GroupKind{Kind: "pods"}, Metric: "memory"},
+			)
+	}
+	if kind == "" || kind == "nodes" {
+		mgks = append(mgks,
+			MetricGroupKind{GroupKind: metav1.GroupKind{Kind: "nodes"}, Metric: "cpu"},
+			MetricGroupKind{GroupKind: metav1.GroupKind{Kind: "nodes"}, Metric: "memory"},
+		)
+	}
+
+	for _, m := range metrics {
+		mgk := metricGroupKind(m)
+		if kind == "" || mgk.Kind == kind {
+			mgks = append(mgks, mgk)
+		}
+	}
+	sort.Slice(mgks, func(i, j int) bool {
+		return mgks[i].Group < mgks[j].Group || (
+			mgks[i].Group == mgks[j].Group && (mgks[i].Kind < mgks[j].Kind || (
+				mgks[i].Kind == mgks[j].Kind && mgks[i].Metric < mgks[j].Metric)))
+	})
+
+	if !noHeaders {
+		printValue(w, "GROUP")
+		printValue(w, "KIND")
+		printValue(w, "METRIC")
+		fmt.Fprint(w, "\n")
+	}
+
+	for _, mk := range mgks {
+		printValue(w, mk.Group)
+		printValue(w, mk.Kind)
+		printValue(w, mk.Metric)
+		fmt.Fprint(w, "\n")
+	}
+	return nil
+}
+
+func printMetricHeaders() {
+
+}
+
+
+func printColumnNames(out io.Writer, resourceType []v1.ResourceName) {
+	printValue(out, "NAME")
+	for _, r := range resourceType {
+		printResource(out, r)
 	}
 	fmt.Fprint(out, "\n")
 }
 
-func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool) {
-	podMetrics := getPodMetrics(m)
+func printSinglePodMetrics(out io.Writer, columnList []v1.ResourceName, m *metricsapi.PodMetrics, withNamespace bool) {
+	podMetrics := getPodMetrics(m, columnList)
 	if withNamespace {
 		printValue(out, m.Namespace)
 	}
-	printMetricsLine(out, &ResourceMetricsInfo{
+	printMetricsLine(out, columnList, &ResourceMetricsInfo{
 		Name:      m.Name,
 		Metrics:   podMetrics,
 		Available: v1.ResourceList{},
 	})
 }
 
-func printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool) {
+func printSinglePodContainerMetrics(out io.Writer, columnList []v1.ResourceName, m *metricsapi.PodMetrics, withNamespace bool) {
 	for _, c := range m.Containers {
 		if withNamespace {
 			printValue(out, m.Namespace)
 		}
 		printValue(out, m.Name)
-		printMetricsLine(out, &ResourceMetricsInfo{
+		printMetricsLine(out, columnList, &ResourceMetricsInfo{
 			Name:      c.Name,
 			Metrics:   c.Usage,
 			Available: v1.ResourceList{},
@@ -252,14 +293,14 @@ func printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, wit
 	}
 }
 
-func getPodMetrics(m *metricsapi.PodMetrics) v1.ResourceList {
+func getPodMetrics(m *metricsapi.PodMetrics, columnList []v1.ResourceName) v1.ResourceList {
 	podMetrics := make(v1.ResourceList)
-	for _, res := range MeasuredResources {
+	for _, res := range columnList {
 		podMetrics[res], _ = resource.ParseQuantity("0")
 	}
 
 	for _, c := range m.Containers {
-		for _, res := range MeasuredResources {
+		for _, res := range columnList {
 			quantity := podMetrics[res]
 			quantity.Add(c.Usage[res])
 			podMetrics[res] = quantity
@@ -268,16 +309,16 @@ func getPodMetrics(m *metricsapi.PodMetrics) v1.ResourceList {
 	return podMetrics
 }
 
-func printMetricsLine(out io.Writer, metrics *ResourceMetricsInfo) {
+func printMetricsLine(out io.Writer, columnList []v1.ResourceName, metrics *ResourceMetricsInfo) {
 	printValue(out, metrics.Name)
-	printAllResourceUsages(out, metrics)
+	printAllResourceUsages(out, columnList, metrics)
 	fmt.Fprint(out, "\n")
 }
 
-func printMissingMetricsNodeLine(out io.Writer, nodeName string) {
+func printMissingMetricsNodeLine(out io.Writer, columnName []string, nodeName string) {
 	printValue(out, nodeName)
 	unknownMetricsStatus := "<unknown>"
-	for i := 0; i < len(MeasuredResources); i++ {
+	for i := 0; i < len(columnName); i++ {
 		printValue(out, unknownMetricsStatus)
 		printValue(out, "\t")
 		printValue(out, unknownMetricsStatus)
@@ -290,8 +331,8 @@ func printValue(out io.Writer, value interface{}) {
 	fmt.Fprintf(out, "%v\t", value)
 }
 
-func printAllResourceUsages(out io.Writer, metrics *ResourceMetricsInfo) {
-	for _, res := range MeasuredResources {
+func printAllResourceUsages(out io.Writer, columnList []v1.ResourceName, metrics *ResourceMetricsInfo) {
+	for _, res := range columnList {
 		quantity := metrics.Metrics[res]
 		printSingleResourceUsage(out, res, quantity)
 		fmt.Fprint(out, "\t")
@@ -302,13 +343,60 @@ func printAllResourceUsages(out io.Writer, metrics *ResourceMetricsInfo) {
 	}
 }
 
-func printSingleResourceUsage(out io.Writer, resourceType v1.ResourceName, quantity resource.Quantity) {
+func printResource(out io.Writer, resourceType v1.ResourceName) {
 	switch resourceType {
 	case v1.ResourceCPU:
-		fmt.Fprintf(out, "%vm", quantity.MilliValue())
+		fmt.Fprint(out, "CPU(cores)\t")
 	case v1.ResourceMemory:
-		fmt.Fprintf(out, "%vMi", quantity.Value()/(1024*1024))
+		fmt.Fprint(out, "MEMORY(bytes)\t")
 	default:
-		fmt.Fprintf(out, "%v", quantity.Value())
+		fmt.Fprintf(out, "%v\t", resourceType)
+	}
+}
+
+func printSingleResourceUsage(out io.Writer, resourceType v1.ResourceName, quantity resource.Quantity) {
+	switch {
+	case resourceType == v1.ResourceCPU:
+		fmt.Fprintf(out, "%vm", quantity.MilliValue())
+	case resourceType == v1.ResourceMemory:
+		fmt.Fprintf(out, "%vMi", quantity.Value()/(1024*1024))
+	case strings.HasSuffix(resourceType.String(), "bytes"):
+		value := quantity.Value()
+		if value > 1024 * 1024 {
+			fmt.Fprintf(out, "%.2fMi", float64(value / 1024)/1024 )
+			break
+		}
+		if value > 1024 {
+			fmt.Fprintf(out, "%.2fKi", float64(value)/1024 )
+			break
+		}
+		fmt.Fprintf(out, "%v", value )
+	default:
+		fmt.Fprintf(out, "%s", quantity.String())
+	}
+}
+
+type MetricGroupKind struct {
+	metav1.GroupKind
+	Metric string
+}
+
+func metricGroupKind(m metav1.APIResource) MetricGroupKind {
+	GroupKindAndMetric := strings.SplitN(m.Name, "/", 2)
+	metric := ""
+	if len(GroupKindAndMetric) == 2 {
+		metric = GroupKindAndMetric[1]
+	}
+	KindAndGroup := strings.SplitN(GroupKindAndMetric[0], ".", 2)
+	group := ""
+	if len(KindAndGroup) == 2 {
+		group = KindAndGroup[1]
+	}
+	return MetricGroupKind{
+		Metric: metric,
+		GroupKind: metav1.GroupKind{
+			Group: group,
+			Kind:  KindAndGroup[0],
+		},
 	}
 }

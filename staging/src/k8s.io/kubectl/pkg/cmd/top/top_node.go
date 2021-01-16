@@ -160,7 +160,7 @@ func (o TopNodeOptions) RunTopNode() error {
 		return err
 	}
 
-	metricsAPIAvailable := SupportedMetricsAPIVersionAvailable(apiGroups)
+	metricsAPIAvailable := SupportedAPIVersionAvailable(apiGroups, metricsapi.GroupName)
 
 	if !metricsAPIAvailable {
 		return errors.New("Metrics API not available")
