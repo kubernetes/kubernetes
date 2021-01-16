@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -196,9 +197,14 @@ func (r *reconciler) reconcileByPortMapping(
 		// if >0 existing slices, mark all but 1 for deletion.
 		slices.toDelete = existingSlices[1:]
 
-		// Return early if first slice matches desired endpoints.
+		// generated slices must mirror all endpoints annotations but EndpointsLastChangeTriggerTime
+		compareAnnotations := cloneAndRemoveKeys(endpoints.Annotations, corev1.EndpointsLastChangeTriggerTime)
+		compareLabels := cloneAndRemoveKeys(existingSlices[0].Labels, discovery.LabelManagedBy, discovery.LabelServiceName)
+		// Return early if first slice matches desired endpoints, labels and annotations
 		totals = totalChanges(existingSlices[0], desiredSet)
-		if totals.added == 0 && totals.updated == 0 && totals.removed == 0 {
+		if totals.added == 0 && totals.updated == 0 && totals.removed == 0 &&
+			apiequality.Semantic.DeepEqual(endpoints.Labels, compareLabels) &&
+			apiequality.Semantic.DeepEqual(compareAnnotations, existingSlices[0].Annotations) {
 			return slices, totals
 		}
 	}
