@@ -125,8 +125,6 @@ func NewManager(
 func (m *manager) Start() {
 	// Start syncing readiness.
 	go wait.Forever(m.updateReadiness, 0)
-	// Start syncing startup.
-	go wait.Forever(m.updateStartup, 0)
 }
 
 // Key uniquely identifying container probes
@@ -308,11 +306,4 @@ func (m *manager) updateReadiness() {
 
 	ready := update.Result == results.Success
 	m.statusManager.SetContainerReadiness(update.PodUID, update.ContainerID, ready)
-}
-
-func (m *manager) updateStartup() {
-	update := <-m.startupManager.Updates()
-
-	started := update.Result == results.Success
-	m.statusManager.SetContainerStartup(update.PodUID, update.ContainerID, started)
 }

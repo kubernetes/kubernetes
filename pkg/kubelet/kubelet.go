@@ -1902,8 +1902,8 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 // * plegCh: update the runtime cache; sync pod
 // * syncCh: sync all pods waiting for sync
 // * housekeepingCh: trigger cleanup of pods
-// * liveness manager: sync pods that have failed or in which one or more
-//                     containers have failed liveness checks
+// * liveness/startup manager: sync pods that have failed or in which one or more
+//                     containers have failed liveness/startup checks
 func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handler SyncHandler,
 	syncCh <-chan time.Time, housekeepingCh <-chan time.Time, plegCh <-chan *pleg.PodLifecycleEvent) bool {
 	select {
@@ -1979,18 +1979,12 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 	case update := <-kl.livenessManager.Updates():
 		if update.Result == proberesults.Failure {
 			// The liveness manager detected a failure; sync the pod.
-
-			// We should not use the pod from livenessManager, because it is never updated after
-			// initialization.
-			pod, ok := kl.podManager.GetPodByUID(update.PodUID)
-			if !ok {
-				// If the pod no longer exists, ignore the update.
-				klog.V(4).Infof("SyncLoop (container unhealthy): ignore irrelevant update: %#v", update)
-				break
-			}
-			klog.V(1).Infof("SyncLoop (container unhealthy): %q", format.Pod(pod))
-			handler.HandlePodSyncs([]*v1.Pod{pod})
+			syncPod(kl, update, handler)
 		}
+	case update := <-kl.startupManager.Updates():
+		started := update.Result == proberesults.Success
+		kl.statusManager.SetContainerStartup(update.PodUID, update.ContainerID, started)
+		syncPod(kl, update, handler)
 	case <-housekeepingCh:
 		if !kl.sourcesReady.AllReady() {
 			// If the sources aren't ready or volume manager has not yet synced the states,
@@ -2004,6 +1998,18 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		}
 	}
 	return true
+}
+
+func syncPod(kl *Kubelet, update proberesults.Update, handler SyncHandler) {
+	// We should not use the pod from manager, because it is never updated after initialization.
+	pod, ok := kl.podManager.GetPodByUID(update.PodUID)
+	if !ok {
+		// If the pod no longer exists, ignore the update.
+		klog.V(4).Infof("SyncLoop: ignore irrelevant update: %#v", update)
+		return
+	}
+	klog.V(1).Infof("SyncLoop: %q", format.Pod(pod))
+	handler.HandlePodSyncs([]*v1.Pod{pod})
 }
 
 // dispatchWork starts the asynchronous sync of the pod in a pod worker.
