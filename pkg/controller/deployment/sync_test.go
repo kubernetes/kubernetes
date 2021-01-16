@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	clienttesting "k8s.io/client-go/testing"
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller"
@@ -570,7 +569,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 
 		deletedRSs := sets.String{}
 		for _, action := range fake.Actions() {
-			deleteAction, ok := action.(clienttesting.DeleteActionImpl)
+			deleteAction, ok := action.(testclient.DeleteActionImpl)
 			if !ok {
 				t.Logf("Found not-delete action with verb %v. Ignoring.", action.GetVerb())
 				continue
