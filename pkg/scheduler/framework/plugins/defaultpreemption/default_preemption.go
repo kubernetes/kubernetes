@@ -246,7 +246,7 @@ func PodEligibleToPreemptOthers(pod *v1.Pod, nodeInfos framework.NodeInfoLister,
 	if len(nomNodeName) > 0 {
 		// If the pod's nominated node is considered as UnschedulableAndUnresolvable by the filters,
 		// then the pod should be considered for preempting again.
-		if nominatedNodeStatus.Code() == framework.UnschedulableAndUnresolvable {
+		if nominatedNodeStatus.GetCode() == framework.UnschedulableAndUnresolvable {
 			return true
 		}
 
@@ -271,7 +271,7 @@ func nodesWherePreemptionMightHelp(nodes []*framework.NodeInfo, m framework.Node
 		name := node.Node().Name
 		// We reply on the status by each plugin - 'Unschedulable' or 'UnschedulableAndUnresolvable'
 		// to determine whether preemption may help or not on the node.
-		if m[name].Code() == framework.UnschedulableAndUnresolvable {
+		if m[name].GetCode() == framework.UnschedulableAndUnresolvable {
 			continue
 		}
 		potentialNodes = append(potentialNodes, node)

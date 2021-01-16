@@ -53,8 +53,8 @@ func TestStatus(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		if test.status.Code() != test.expectedCode {
-			t.Errorf("test #%v, expect status.Code() returns %v, but %v", i, test.expectedCode, test.status.Code())
+		if test.status.GetCode() != test.expectedCode {
+			t.Errorf("test #%v, expect status.Code() returns %v, but %v", i, test.expectedCode, test.status.GetCode())
 		}
 
 		if test.status.Message() != test.expectedMessage {
@@ -115,8 +115,8 @@ func TestPluginToStatusMerge(t *testing.T) {
 
 	for i, test := range tests {
 		gotStatus := test.statusMap.Merge()
-		if test.wantCode != gotStatus.Code() {
-			t.Errorf("test #%v, wantCode %v, gotCode %v", i, test.wantCode, gotStatus.Code())
+		if test.wantCode != gotStatus.GetCode() {
+			t.Errorf("test #%v, wantCode %v, gotCode %v", i, test.wantCode, gotStatus.GetCode())
 		}
 	}
 }

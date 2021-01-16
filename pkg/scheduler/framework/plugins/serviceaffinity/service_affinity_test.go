@@ -177,8 +177,8 @@ func TestServiceAffinity(t *testing.T) {
 			}
 			nodeInfo := mustGetNodeInfo(t, snapshot, test.node.Name)
 			status := p.Filter(context.Background(), state, test.pod, nodeInfo)
-			if status.Code() != test.res {
-				t.Errorf("Status mismatch. got: %v, want: %v", status.Code(), test.res)
+			if status.GetCode() != test.res {
+				t.Errorf("Status mismatch. got: %v, want: %v", status.GetCode(), test.res)
 			}
 		})
 	}

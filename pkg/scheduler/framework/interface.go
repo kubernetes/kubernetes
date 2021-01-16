@@ -106,17 +106,17 @@ const (
 // the reasons should explain why.
 // NOTE: A nil Status is also considered as Success.
 type Status struct {
-	code    Code
-	reasons []string
-	err     error
+	Code    Code
+	Reasons []string
+	Err     error
 }
 
-// Code returns code of the Status.
-func (s *Status) Code() Code {
+// GetCode returns code of the Status.
+func (s *Status) GetCode() Code {
 	if s == nil {
 		return Success
 	}
-	return s.code
+	return s.Code
 }
 
 // Message returns a concatenated message on reasons of the Status.
@@ -124,27 +124,22 @@ func (s *Status) Message() string {
 	if s == nil {
 		return ""
 	}
-	return strings.Join(s.reasons, ", ")
-}
-
-// Reasons returns reasons of the Status.
-func (s *Status) Reasons() []string {
-	return s.reasons
+	return strings.Join(s.Reasons, ", ")
 }
 
 // AppendReason appends given reason to the Status.
 func (s *Status) AppendReason(reason string) {
-	s.reasons = append(s.reasons, reason)
+	s.Reasons = append(s.Reasons, reason)
 }
 
 // IsSuccess returns true if and only if "Status" is nil or Code is "Success".
 func (s *Status) IsSuccess() bool {
-	return s.Code() == Success
+	return s.GetCode() == Success
 }
 
 // IsUnschedulable returns true if "Status" is Unschedulable (Unschedulable or UnschedulableAndUnresolvable).
 func (s *Status) IsUnschedulable() bool {
-	code := s.Code()
+	code := s.GetCode()
 	return code == Unschedulable || code == UnschedulableAndUnresolvable
 }
 
@@ -154,8 +149,8 @@ func (s *Status) AsError() error {
 	if s.IsSuccess() {
 		return nil
 	}
-	if s.err != nil {
-		return s.err
+	if s.Err != nil {
+		return s.Err
 	}
 	return errors.New(s.Message())
 }
@@ -163,11 +158,11 @@ func (s *Status) AsError() error {
 // NewStatus makes a Status out of the given arguments and returns its pointer.
 func NewStatus(code Code, reasons ...string) *Status {
 	s := &Status{
-		code:    code,
-		reasons: reasons,
+		Code:    code,
+		Reasons: reasons,
 	}
 	if code == Error {
-		s.err = errors.New(s.Message())
+		s.Err = errors.New(s.Message())
 	}
 	return s
 }
@@ -175,9 +170,9 @@ func NewStatus(code Code, reasons ...string) *Status {
 // AsStatus wraps an error in a Status.
 func AsStatus(err error) *Status {
 	return &Status{
-		code:    Error,
-		reasons: []string{err.Error()},
-		err:     err,
+		Code:    Error,
+		Reasons: []string{err.Error()},
+		Err:     err,
 	}
 }
 
@@ -194,14 +189,14 @@ func (p PluginToStatus) Merge() *Status {
 
 	finalStatus := NewStatus(Success)
 	for _, s := range p {
-		if s.Code() == Error {
-			finalStatus.err = s.AsError()
+		if s.GetCode() == Error {
+			finalStatus.Err = s.AsError()
 		}
-		if statusPrecedence[s.Code()] > statusPrecedence[finalStatus.code] {
-			finalStatus.code = s.Code()
+		if statusPrecedence[s.GetCode()] > statusPrecedence[finalStatus.Code] {
+			finalStatus.Code = s.GetCode()
 		}
 
-		for _, r := range s.reasons {
+		for _, r := range s.Reasons {
 			finalStatus.AppendReason(r)
 		}
 	}

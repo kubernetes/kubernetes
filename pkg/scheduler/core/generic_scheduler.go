@@ -262,7 +262,7 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, fwk fra
 		// this is to make sure all nodes have the same chance of being examined across pods.
 		nodeInfo := allNodes[(g.nextStartNodeIndex+i)%len(allNodes)]
 		status := fwk.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
-		if status.Code() == framework.Error {
+		if status.GetCode() == framework.Error {
 			errCh.SendErrorWithCancel(status.AsError(), cancel)
 			return
 		}

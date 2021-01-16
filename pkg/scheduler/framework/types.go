@@ -107,7 +107,7 @@ const (
 func (f *FitError) Error() string {
 	reasons := make(map[string]int)
 	for _, status := range f.FilteredNodesStatuses {
-		for _, reason := range status.Reasons() {
+		for _, reason := range status.Reasons {
 			reasons[reason]++
 		}
 	}

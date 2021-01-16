@@ -66,7 +66,7 @@ func newMetricsRecorder(bufferSize int, interval time.Duration) *metricsRecorder
 func (r *metricsRecorder) observePluginDurationAsync(extensionPoint, pluginName string, status *framework.Status, value float64) {
 	newMetric := &frameworkMetric{
 		metric:      metrics.PluginExecutionDuration,
-		labelValues: []string{pluginName, extensionPoint, status.Code().String()},
+		labelValues: []string{pluginName, extensionPoint, status.GetCode().String()},
 		value:       value,
 	}
 	select {

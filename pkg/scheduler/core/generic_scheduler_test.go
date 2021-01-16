@@ -830,7 +830,7 @@ func TestFindFitAllError(t *testing.T) {
 			if !found {
 				t.Errorf("failed to find node %v in %v", node.Name, nodeToStatusMap)
 			}
-			reasons := status.Reasons()
+			reasons := status.Reasons
 			if len(reasons) != 1 || reasons[0] != st.ErrReasonFake {
 				t.Errorf("unexpected failure reasons: %v", reasons)
 			}
@@ -874,7 +874,7 @@ func TestFindFitSomeError(t *testing.T) {
 			if !found {
 				t.Errorf("failed to find node %v in %v", node.Name, nodeToStatusMap)
 			}
-			reasons := status.Reasons()
+			reasons := status.Reasons
 			if len(reasons) != 1 || reasons[0] != st.ErrReasonFake {
 				t.Errorf("unexpected failures: %v", reasons)
 			}

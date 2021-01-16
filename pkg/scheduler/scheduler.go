@@ -391,10 +391,10 @@ func (sched *Scheduler) bind(ctx context.Context, fwk framework.Framework, assum
 	if bindStatus.IsSuccess() {
 		return nil
 	}
-	if bindStatus.Code() == framework.Error {
+	if bindStatus.GetCode() == framework.Error {
 		return bindStatus.AsError()
 	}
-	return fmt.Errorf("bind status: %s, %v", bindStatus.Code().String(), bindStatus.Message())
+	return fmt.Errorf("bind status: %s, %v", bindStatus.GetCode().String(), bindStatus.Message())
 }
 
 // TODO(#87159): Move this to a Plugin.
@@ -463,7 +463,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			} else {
 				// Run PostFilter plugins to try to make the pod schedulable in a future scheduling cycle.
 				result, status := fwk.RunPostFilterPlugins(ctx, state, pod, fitError.FilteredNodesStatuses)
-				if status.Code() == framework.Error {
+				if status.GetCode() == framework.Error {
 					klog.ErrorS(nil, "Status after running PostFilter plugins for pod", klog.KObj(pod), "status", status)
 				} else {
 					klog.V(5).InfoS("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
@@ -518,7 +518,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 
 	// Run "permit" plugins.
 	runPermitStatus := fwk.RunPermitPlugins(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-	if runPermitStatus.Code() != framework.Wait && !runPermitStatus.IsSuccess() {
+	if runPermitStatus.GetCode() != framework.Wait && !runPermitStatus.IsSuccess() {
 		var reason string
 		if runPermitStatus.IsUnschedulable() {
 			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))

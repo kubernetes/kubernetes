@@ -1421,8 +1421,8 @@ func TestSingleConstraint(t *testing.T) {
 			for _, node := range tt.nodes {
 				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
 				status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
-				if len(tt.wantStatusCode) != 0 && status.Code() != tt.wantStatusCode[node.Name] {
-					t.Errorf("[%s]: expected status code %v got %v", node.Name, tt.wantStatusCode[node.Name], status.Code())
+				if len(tt.wantStatusCode) != 0 && status.GetCode() != tt.wantStatusCode[node.Name] {
+					t.Errorf("[%s]: expected status code %v got %v", node.Name, tt.wantStatusCode[node.Name], status.GetCode())
 				}
 			}
 		})
@@ -1647,8 +1647,8 @@ func TestMultipleConstraints(t *testing.T) {
 			for _, node := range tt.nodes {
 				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
 				status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
-				if len(tt.wantStatusCode) != 0 && status.Code() != tt.wantStatusCode[node.Name] {
-					t.Errorf("[%s]: expected error code %v got %v", node.Name, tt.wantStatusCode[node.Name], status.Code())
+				if len(tt.wantStatusCode) != 0 && status.GetCode() != tt.wantStatusCode[node.Name] {
+					t.Errorf("[%s]: expected error code %v got %v", node.Name, tt.wantStatusCode[node.Name], status.GetCode())
 				}
 			}
 		})

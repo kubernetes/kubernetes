@@ -124,8 +124,8 @@ func TestNodeLabelFilter(t *testing.T) {
 			}
 
 			status := p.(framework.FilterPlugin).Filter(context.TODO(), nil, pod, nodeInfo)
-			if status.Code() != test.res {
-				t.Errorf("Status mismatch. got: %v, want: %v", status.Code(), test.res)
+			if status.GetCode() != test.res {
+				t.Errorf("Status mismatch. got: %v, want: %v", status.GetCode(), test.res)
 			}
 		})
 	}
@@ -263,8 +263,8 @@ func TestNodeLabelFilterWithoutNode(t *testing.T) {
 			t.Fatalf("Failed to create plugin: %v", err)
 		}
 		status := p.(framework.FilterPlugin).Filter(context.TODO(), nil, pod, nodeInfo)
-		if status.Code() != framework.Error {
-			t.Errorf("Status mismatch. got: %v, want: %v", status.Code(), framework.Error)
+		if status.GetCode() != framework.Error {
+			t.Errorf("Status mismatch. got: %v, want: %v", status.GetCode(), framework.Error)
 		}
 	})
 }
@@ -277,8 +277,8 @@ func TestNodeLabelScoreWithoutNode(t *testing.T) {
 			t.Fatalf("Failed to create plugin: %+v", err)
 		}
 		_, status := p.(framework.ScorePlugin).Score(context.Background(), nil, nil, "")
-		if status.Code() != framework.Error {
-			t.Errorf("Status mismatch. got: %v, want: %v", status.Code(), framework.Error)
+		if status.GetCode() != framework.Error {
+			t.Errorf("Status mismatch. got: %v, want: %v", status.GetCode(), framework.Error)
 		}
 	})
 }

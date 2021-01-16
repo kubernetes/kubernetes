@@ -812,7 +812,7 @@ func TestRunScorePlugins(t *testing.T) {
 
 			if tt.err {
 				if status.IsSuccess() {
-					t.Errorf("Expected status to be non-success. got: %v", status.Code().String())
+					t.Errorf("Expected status to be non-success. got: %v", status.GetCode().String())
 				}
 				return
 			}
@@ -2003,8 +2003,8 @@ func TestRunBindPlugins(t *testing.T) {
 			}
 
 			st := fwk.RunBindPlugins(context.Background(), state, pod, "")
-			if st.Code() != tt.wantStatus {
-				t.Errorf("got status code %s, want %s", st.Code(), tt.wantStatus)
+			if st.GetCode() != tt.wantStatus {
+				t.Errorf("got status code %s, want %s", st.GetCode(), tt.wantStatus)
 			}
 
 			// Stop the goroutine which records metrics and ensure it's stopped.
@@ -2113,17 +2113,17 @@ func TestWaitOnPermit(t *testing.T) {
 			}
 
 			runPermitPluginsStatus := f.RunPermitPlugins(context.Background(), nil, pod, "")
-			if runPermitPluginsStatus.Code() != framework.Wait {
+			if runPermitPluginsStatus.GetCode() != framework.Wait {
 				t.Fatalf("Expected RunPermitPlugins to return status %v, but got %v",
-					framework.Wait, runPermitPluginsStatus.Code())
+					framework.Wait, runPermitPluginsStatus.GetCode())
 			}
 
 			go tt.action(f)
 
 			waitOnPermitStatus := f.WaitOnPermit(context.Background(), pod)
-			if waitOnPermitStatus.Code() != tt.wantStatus {
+			if waitOnPermitStatus.GetCode() != tt.wantStatus {
 				t.Fatalf("Expected WaitOnPermit to return status %v, but got %v",
-					tt.wantStatus, waitOnPermitStatus.Code())
+					tt.wantStatus, waitOnPermitStatus.GetCode())
 			}
 			if waitOnPermitStatus.Message() != tt.wantMessage {
 				t.Fatalf("Expected WaitOnPermit to return status with message %q, but got %q",
