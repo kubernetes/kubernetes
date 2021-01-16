@@ -565,7 +565,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.configMapManager = configMapManager
 
 	if klet.experimentalHostUserNamespaceDefaulting {
-		klog.Infof("Experimental host user namespace defaulting is enabled.")
+		klog.Info("Experimental host user namespace defaulting is enabled.")
 	}
 
 	machineInfo, err := klet.cadvisor.MachineInfo()

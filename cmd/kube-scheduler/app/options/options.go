@@ -335,7 +335,7 @@ func makeLeaderElectionConfig(config componentbaseconfig.LeaderElectionConfigura
 // TODO remove masterOverride when CLI flags are removed.
 func createKubeConfig(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string) (*restclient.Config, error) {
 	if len(config.Kubeconfig) == 0 && len(masterOverride) == 0 {
-		klog.Warningf("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
+		klog.Warning("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
 	}
 
 	// This creates a client, first loading any specified kubeconfig
