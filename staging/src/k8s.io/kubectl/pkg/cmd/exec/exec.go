@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/url"
 	"time"
+	"strings"
 
 	dockerterm "github.com/moby/term"
 	"github.com/spf13/cobra"
