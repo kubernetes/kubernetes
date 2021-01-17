@@ -22,6 +22,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -152,6 +153,120 @@ func TestEndpointUpdates(t *testing.T) {
 	}
 	if resVersion != endpoints.ObjectMeta.ResourceVersion {
 		t.Fatalf("endpoints resource version does not match, expected %s received %s", resVersion, endpoints.ObjectMeta.ResourceVersion)
+	}
+
+}
+
+func TestEndpointExternalUpdates(t *testing.T) {
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	_, server, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
+
+	config := restclient.Config{Host: server.URL}
+	client, err := clientset.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	informers := informers.NewSharedInformerFactory(client, 0)
+
+	epController := endpoint.NewEndpointController(
+		informers.Core().V1().Pods(),
+		informers.Core().V1().Services(),
+		informers.Core().V1().Endpoints(),
+		client,
+		0)
+
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go epController.Run(1, stopCh)
+
+	// Create namespace
+	ns := framework.CreateTestingNamespace("test-endpoints-external-updates", server, t)
+	defer framework.DeleteTestingNamespace(ns, server, t)
+
+	// Create a pod with labels
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: ns.Name,
+			Labels:    labelMap(),
+		},
+		Spec: v1.PodSpec{
+			NodeName: "fakenode",
+			Containers: []v1.Container{
+				{
+					Name:  "fake-name",
+					Image: "fakeimage",
+				},
+			},
+		},
+	}
+
+	createdPod, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
+	}
+
+	// Set pod IPs
+	createdPod.Status = v1.PodStatus{
+		Phase:  v1.PodRunning,
+		PodIPs: []v1.PodIP{{IP: "1.1.1.1"}, {IP: "2001:db8::"}},
+	}
+	_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), createdPod, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update status of pod %s: %v", pod.Name, err)
+	}
+
+	// Create a service associated to the pod
+	svc := newService(ns.Name, "foo1")
+	_, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), svc, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create service %s: %v", svc.Name, err)
+	}
+
+	// Obtain the new endpoint created
+	var endpoints *v1.Endpoints
+	if err := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		endpoints, err = client.CoreV1().Endpoints(ns.Name).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error fetching endpoints: %v", err)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("endpoints not found: %v", err)
+	}
+
+	// Update the endpoint with new IPs that are not present
+	updateEps := endpoints.DeepCopy()
+	updateEps.Subsets[0].Addresses = []v1.EndpointAddress{{IP: "1.2.3.4"}, {IP: "1.2.3.6"}}
+	_, err = client.CoreV1().Endpoints(ns.Name).Update(context.TODO(), updateEps, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update endpoint %s: %v", endpoints.Name, err)
+	}
+
+	// The endpoints controller should process the External Endpoint Update and fix the IP addresses
+	if err := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		newEps, err := client.CoreV1().Endpoints(ns.Name).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error fetching endpoints: %v", err)
+			return false, nil
+		}
+		if newEps.ObjectMeta.ResourceVersion == endpoints.ObjectMeta.ResourceVersion {
+			t.Logf("endpoints resource has not been updated, expected %s != received %s", newEps.ObjectMeta.ResourceVersion, endpoints.ObjectMeta.ResourceVersion)
+			return false, nil
+		}
+
+		// check that the controller recoverd the right IPs
+		if !apiequality.Semantic.DeepEqual(endpoints.Subsets, newEps.Subsets) {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("endpoints were modified: %v", err)
 	}
 
 }

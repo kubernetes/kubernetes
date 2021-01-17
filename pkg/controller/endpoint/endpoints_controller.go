@@ -111,6 +111,7 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	e.podsSynced = podInformer.Informer().HasSynced
 
 	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: e.onEndpointsUpdate,
 		DeleteFunc: e.onEndpointsDelete,
 	})
 	e.endpointsLister = endpointsInformer.Lister()
@@ -315,6 +316,24 @@ func (e *Controller) onServiceDelete(obj interface{}) {
 
 	e.serviceSelectorCache.Delete(key)
 	e.queue.Add(key)
+}
+
+func (e *Controller) onEndpointsUpdate(old, cur interface{}) {
+	newEps := cur.(*v1.Endpoints)
+	oldEps := old.(*v1.Endpoints)
+	if newEps == nil || oldEps == nil {
+		utilruntime.HandleError(fmt.Errorf("Invalid Endpoint provided to onEndpointsUpdate()"))
+		return
+	}
+	key, err := controller.KeyFunc(newEps)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", newEps, err))
+		return
+	}
+	// only process the endpoint update if it has been tracked by this controller
+	if _, exists := e.serviceSelectorCache.Get(key); exists {
+		e.queue.Add(key)
+	}
 }
 
 func (e *Controller) onEndpointsDelete(obj interface{}) {
