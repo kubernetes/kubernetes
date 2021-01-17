@@ -77,6 +77,9 @@ const (
 
 	// the kubernetes forward chain
 	kubeForwardChain utiliptables.Chain = "KUBE-FORWARD"
+
+	// kube proxy canary chain is used for monitoring rule reload
+	kubeProxyCanaryChain utiliptables.Chain = "KUBE-PROXY-CANARY"
 )
 
 // KernelCompatTester tests whether the required kernel capabilities are
@@ -338,8 +341,7 @@ func NewProxier(ipt utiliptables.Interface,
 	// time.Hour is arbitrary.
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, time.Hour, burstSyncs)
 
-	go ipt.Monitor(utiliptables.Chain("KUBE-PROXY-CANARY"),
-		[]utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
+	go ipt.Monitor(kubeProxyCanaryChain, []utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
 		proxier.syncProxyRules, syncPeriod, wait.NeverStop)
 
 	if ipt.HasRandomFully() {
@@ -1364,7 +1366,7 @@ func (proxier *Proxier) syncProxyRules() {
 			endpointChains = append(endpointChains, endpointChain)
 
 			// Create the endpoint chain, retaining counters if possible.
-			if chain, ok := existingNATChains[utiliptables.Chain(endpointChain)]; ok {
+			if chain, ok := existingNATChains[endpointChain]; ok {
 				utilproxy.WriteBytesLine(proxier.natChains, chain)
 			} else {
 				utilproxy.WriteLine(proxier.natChains, utiliptables.MakeChainLine(endpointChain))
