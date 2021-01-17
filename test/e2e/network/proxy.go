@@ -21,6 +21,7 @@ package network
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
@@ -58,6 +59,11 @@ const (
 	podRetryPeriod       = 1 * time.Second
 	podRetryTimeout      = 1 * time.Minute
 )
+
+type jsonResponse struct {
+	Method string
+	Body   string
+}
 
 var _ = SIGDescribe("Proxy", func() {
 	version := "v1"
@@ -280,7 +286,7 @@ var _ = SIGDescribe("Proxy", func() {
 					Containers: []v1.Container{{
 						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 						Name:    "agnhost",
-						Command: []string{"/agnhost", "porter"},
+						Command: []string{"/agnhost", "porter", "--json-response"},
 						Env: []v1.EnvVar{{
 							Name:  "SERVE_PORT_80",
 							Value: msg,
@@ -327,7 +333,7 @@ var _ = SIGDescribe("Proxy", func() {
 			}
 
 			// All methods for Pod ProxyWithPath return 200
-			// response body returns 'foo' for all methods but HEAD
+			// For all methods other than HEAD the response body returns 'foo' with the received http method
 			httpVerbs := []string{"DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"}
 			for _, httpVerb := range httpVerbs {
 
@@ -344,16 +350,25 @@ var _ = SIGDescribe("Proxy", func() {
 				buf.ReadFrom(resp.Body)
 				response := buf.String()
 
-				framework.Logf("http.Client request:%s | StatusCode:%d | Response: %s", httpVerb, resp.StatusCode, response)
-				framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
+				switch httpVerb {
+				case "HEAD":
+					framework.Logf("http.Client request:%s | StatusCode:%d", httpVerb, resp.StatusCode)
+					framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
+				default:
+					var jr *jsonResponse
+					err = json.Unmarshal([]byte(response), &jr)
+					framework.ExpectNoError(err, "Failed to process jsonResponse: %v | err: %v ", buf.String(), err)
 
-				if httpVerb != "HEAD" {
-					framework.ExpectEqual(response, msg, "The resp.Body returned: %v", resp.Body)
+					framework.Logf("http.Client request:%s | StatusCode:%d | Response: %s | Method: %s", httpVerb, resp.StatusCode, jr.Body, jr.Method)
+					framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
+
+					framework.ExpectEqual(msg, jr.Body, "The resp.Body returned: %v", jr.Body)
+					framework.ExpectEqual(httpVerb, jr.Method, "The resp.Body returned: %v", jr.Body)
 				}
 			}
 
 			// All methods for Service ProxyWithPath return 200
-			// response body returns 'foo' for all methods but HEAD
+			// For all methods other than HEAD the response body returns 'foo' with the received http method
 			for _, httpVerb := range httpVerbs {
 
 				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/services/test-service/proxy/some/path/with/" + httpVerb
@@ -369,11 +384,20 @@ var _ = SIGDescribe("Proxy", func() {
 				buf.ReadFrom(resp.Body)
 				response := buf.String()
 
-				framework.Logf("http.Client request:%s | StatusCode:%d | Response: %s", httpVerb, resp.StatusCode, response)
-				framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
+				switch httpVerb {
+				case "HEAD":
+					framework.Logf("http.Client request:%s | StatusCode:%d", httpVerb, resp.StatusCode)
+					framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
+				default:
+					var jr *jsonResponse
+					err = json.Unmarshal([]byte(response), &jr)
+					framework.ExpectNoError(err, "Failed to process jsonResponse: %v | err: %v ", buf.String(), err)
 
-				if httpVerb != "HEAD" {
-					framework.ExpectEqual(response, msg, "The resp.Body returned: %v", resp.Body)
+					framework.Logf("http.Client request:%s | StatusCode:%d | Response: %s | Method: %s", httpVerb, resp.StatusCode, jr.Body, jr.Method)
+					framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
+
+					framework.ExpectEqual(msg, jr.Body, "The resp.Body returned: %v", jr.Body)
+					framework.ExpectEqual(httpVerb, jr.Method, "The resp.Body returned: %v", jr.Body)
 				}
 			}
 		})
