@@ -60,8 +60,8 @@ var (
 		kubectl convert -f . | kubectl create -f -`))
 )
 
-// ConvertOptions have the data required to perform the convert operation
-type ConvertOptions struct {
+// Options have the data required to perform the convert operation
+type Options struct {
 	PrintFlags *genericclioptions.PrintFlags
 	Printer    printers.ResourcePrinter
 
@@ -76,8 +76,8 @@ type ConvertOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewConvertOptions(ioStreams genericclioptions.IOStreams) *ConvertOptions {
-	return &ConvertOptions{
+func newConvertOptions(ioStreams genericclioptions.IOStreams) *Options {
+	return &Options{
 		PrintFlags: genericclioptions.NewPrintFlags("converted").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml"),
 		local:      true,
 		IOStreams:  ioStreams,
@@ -87,7 +87,7 @@ func NewConvertOptions(ioStreams genericclioptions.IOStreams) *ConvertOptions {
 // NewCmdConvert creates a command object for the generic "convert" action, which
 // translates the config file into a given version.
 func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewConvertOptions(ioStreams)
+	o := newConvertOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "convert -f FILENAME",
@@ -111,7 +111,7 @@ func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 }
 
 // Complete collects information required to run Convert command from command line.
-func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err error) {
+func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) (err error) {
 	err = o.FilenameOptions.RequireFilenameOrKustomize()
 	if err != nil {
 		return err
@@ -136,7 +136,7 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err er
 }
 
 // RunConvert implements the generic Convert command
-func (o *ConvertOptions) RunConvert() error {
+func (o *Options) RunConvert() error {
 	b := o.builder().
 		WithScheme(scheme.Scheme).
 		LocalParam(o.local)
