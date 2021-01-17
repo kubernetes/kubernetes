@@ -286,6 +286,15 @@ func (o *StreamOptions) SetupTTY() term.TTY {
 	return t
 }
 
+// getContainerNames returns a formatted string containing the container names
+func getContainerNames(containers []corev1.Container) string {
+	names := []string{}
+	for _, c := range containers {
+		names = append(names, c.Name)
+	}
+	return strings.Join(names, " ")
+}
+
 // Run executes a validated remote execution against a pod.
 func (p *ExecOptions) Run() error {
 	var err error
@@ -326,7 +335,7 @@ func (p *ExecOptions) Run() error {
 	containerName := p.ContainerName
 	if len(containerName) == 0 {
 		if len(pod.Spec.Containers) > 1 {
-			containerNames := polymorphichelpers.getContainerNames(pod.Spec.Containers)
+			containerNames := getContainerNames(pod.Spec.Containers)
 			fmt.Fprintf(p.ErrOut, "Defaulting container name to %s; Available containers: [%s]\n", pod.Spec.Containers[0].Name, containerNames)
 		}
 		containerName = pod.Spec.Containers[0].Name
