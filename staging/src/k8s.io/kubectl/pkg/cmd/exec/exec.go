@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"time"
 	"strings"
+	"time"
 
 	dockerterm "github.com/moby/term"
 	"github.com/spf13/cobra"
