@@ -28,6 +28,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 
 	"github.com/onsi/ginkgo"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	utilnet "k8s.io/utils/net"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,8 +36,7 @@ import (
 )
 
 const (
-	addSCTPContainers = false
-	isVerbose         = true
+	isVerbose = true
 
 	// useFixedNamespaces is useful when working on these tests: instead of creating new pods and
 	//   new namespaces for each test run, it creates a fixed set of namespaces and pods, and then
@@ -52,6 +52,15 @@ const (
 	// Since different CNIs have different results, that causes tests including loopback to fail
 	//   on some CNIs.  So let's just ignore loopback calls for the purposes of deciding test pass/fail.
 	ignoreLoopback = true
+)
+
+var (
+	protocolTCP  = v1.ProtocolTCP
+	protocolUDP  = v1.ProtocolUDP
+	protocolSCTP = v1.ProtocolSCTP
+
+	// addSCTPContainers is a flag to enable SCTP containers on bootstrap.
+	addSCTPContainers = false
 )
 
 /*
@@ -117,26 +126,7 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {
 		ginkgo.BeforeEach(func() {
-			if useFixedNamespaces {
-				_ = initializeResources(f)
-
-				_, _, _, model, k8s := getK8SModel(f)
-				framework.ExpectNoError(k8s.cleanNetworkPolicies(model.NamespaceNames), "unable to clean network policies")
-				err := wait.Poll(waitInterval, waitTimeout, func() (done bool, err error) {
-					for _, ns := range model.NamespaceNames {
-						netpols, err := k8s.clientSet.NetworkingV1().NetworkPolicies(ns).List(context.TODO(), metav1.ListOptions{})
-						framework.ExpectNoError(err, "get network policies from ns %s", ns)
-						if len(netpols.Items) > 0 {
-							return false, nil
-						}
-					}
-					return true, nil
-				})
-				framework.ExpectNoError(err, "unable to wait for network policy deletion")
-			} else {
-				framework.Logf("Using %v as the default dns domain for this cluster... ", framework.TestContext.ClusterDNSDomain)
-				framework.ExpectNoError(initializeResources(f), "unable to initialize resources")
-			}
+			initializeResourcesByFixedNS(f)
 		})
 
 		ginkgo.AfterEach(func() {
@@ -349,7 +339,7 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 					"ns": nsY,
 				},
 			}
-			allowPort81Policy := GetAllowIngressByNamespaceAndPort("allow-client-a-via-ns-selector", map[string]string{"pod": "a"}, allowedLabels, &intstr.IntOrString{IntVal: 81})
+			allowPort81Policy := GetAllowIngressByNamespaceAndPort("allow-client-a-via-ns-selector", map[string]string{"pod": "a"}, allowedLabels, &intstr.IntOrString{IntVal: 81}, &protocolTCP)
 			CreatePolicy(k8s, allowPort81Policy, nsX)
 
 			reachability := NewReachability(model.AllPods(), true)
@@ -368,7 +358,7 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 					"ns": nsY,
 				},
 			}
-			allowPort81Policy := GetAllowIngressByNamespaceAndPort("allow-client-a-via-ns-selector", map[string]string{"pod": "a"}, allowedLabels, &intstr.IntOrString{IntVal: 81})
+			allowPort81Policy := GetAllowIngressByNamespaceAndPort("allow-client-a-via-ns-selector", map[string]string{"pod": "a"}, allowedLabels, &intstr.IntOrString{IntVal: 81}, &protocolTCP)
 			CreatePolicy(k8s, allowPort81Policy, nsX)
 
 			reachabilityALLOW := NewReachability(model.AllPods(), true)
@@ -385,7 +375,7 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 			ginkgo.By("Verifying traffic on port 80.")
 			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityDENY})
 
-			allowPort80Policy := GetAllowIngressByNamespaceAndPort("allow-client-a-via-ns-selector-80", map[string]string{"pod": "a"}, allowedLabels, &intstr.IntOrString{IntVal: 80})
+			allowPort80Policy := GetAllowIngressByNamespaceAndPort("allow-client-a-via-ns-selector-80", map[string]string{"pod": "a"}, allowedLabels, &intstr.IntOrString{IntVal: 80}, &protocolTCP)
 			CreatePolicy(k8s, allowPort80Policy, nsX)
 
 			ginkgo.By("Verifying that we can add a policy to unblock port 80")
@@ -427,7 +417,7 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 					"ns": nsY,
 				},
 			}
-			policy := GetAllowIngressByNamespaceAndPort("allow-client-a-via-ns-selector-80", map[string]string{"pod": "a"}, allowedLabels, &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80-tcp"})
+			policy := GetAllowIngressByNamespaceAndPort("allow-client-a-via-ns-selector-80", map[string]string{"pod": "a"}, allowedLabels, &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80-tcp"}, &protocolTCP)
 			CreatePolicy(k8s, policy, nsX)
 
 			reachability := NewReachability(model.AllPods(), true)
@@ -570,7 +560,7 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 			allowedPodLabels := &metav1.LabelSelector{MatchLabels: map[string]string{"pod": "b"}}
 			policy := GetAllowIngressByPod("allow-client-a-via-pod-selector", map[string]string{"pod": "a"}, allowedPodLabels)
 			// add an egress rule on to it...
-			protocolUDP := v1.ProtocolUDP
+
 			policy.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{
 				{
 					Ports: []networkingv1.NetworkPolicyPort{
@@ -926,6 +916,81 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 	})
 })
 
+var _ = SIGDescribeCopy("Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive]", func() {
+	f := framework.NewDefaultFramework("sctp-network-policy")
+
+	ginkgo.BeforeEach(func() {
+		// Windows does not support network policies.
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
+	})
+
+	ginkgo.Context("NetworkPolicy between server and client using SCTP", func() {
+		ginkgo.BeforeEach(func() {
+			addSCTPContainers = true
+			initializeResourcesByFixedNS(f)
+		})
+
+		ginkgo.AfterEach(func() {
+			if !useFixedNamespaces {
+				_, _, _, model, k8s := getK8SModel(f)
+				framework.ExpectNoError(k8s.deleteNamespaces(model.NamespaceNames), "unable to clean up SCTP netpol namespaces")
+			}
+		})
+
+		ginkgo.It("should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]", func() {
+			nsX, _, _, model, k8s := getK8SModel(f)
+			policy := GetDenyIngress("deny-all")
+			CreatePolicy(k8s, policy, nsX)
+
+			reachability := NewReachability(model.AllPods(), true)
+			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
+
+			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolSCTP, Reachability: reachability})
+		})
+
+		ginkgo.It("should enforce policy based on Ports [Feature:NetworkPolicy]", func() {
+			ginkgo.By("Creating a network allowPort81Policy which only allows allow listed namespaces (y) to connect on exactly one port (81)")
+			nsX, nsY, nsZ, model, k8s := getK8SModel(f)
+			allowedLabels := &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"ns": nsY,
+				},
+			}
+
+			allowPort81Policy := GetAllowIngressByNamespaceAndPort("allow-ingress-on-port-81-ns-x", map[string]string{"pod": "a"}, allowedLabels, &intstr.IntOrString{IntVal: 81}, &protocolSCTP)
+			CreatePolicy(k8s, allowPort81Policy, nsX)
+
+			reachability := NewReachability(model.AllPods(), true)
+			reachability.ExpectPeer(&Peer{Namespace: nsX}, &Peer{Namespace: nsX, Pod: "a"}, false)
+			reachability.ExpectPeer(&Peer{Namespace: nsZ}, &Peer{Namespace: nsX, Pod: "a"}, false)
+
+			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 81, Protocol: v1.ProtocolSCTP, Reachability: reachability})
+		})
+
+		ginkgo.It("should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func() {
+			nsX, nsY, _, model, k8s := getK8SModel(f)
+			allowedNamespaces := &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"ns": nsY,
+				},
+			}
+			allowedPods := &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"pod": "a",
+				},
+			}
+			policy := GetAllowIngressByNamespaceAndPod("allow-ns-y-pod-a-via-namespace-pod-selector", map[string]string{"pod": "a"}, allowedNamespaces, allowedPods)
+			CreatePolicy(k8s, policy, nsX)
+
+			reachability := NewReachability(model.AllPods(), true)
+			reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
+			reachability.Expect(NewPodString(nsY, "a"), NewPodString(nsX, "a"), true)
+
+			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolSCTP, Reachability: reachability})
+		})
+	})
+})
+
 // getNamespaces returns the canonical set of namespaces used by this test, taking a root ns as input.  This allows this test to run in parallel.
 func getNamespaces(rootNs string) (string, string, string, []string) {
 	if useFixedNamespaces {
@@ -959,6 +1024,30 @@ func getK8SModel(f *framework.Framework) (string, string, string, *Model, *kubeM
 	model := defaultModel(namespaces, framework.TestContext.ClusterDNSDomain)
 
 	return nsX, nsY, nsZ, model, k8s
+}
+
+// initializeResourcesByFixedNS uses the e2e framework to create all necessary namespace resources, cleaning up
+// network policies from the namespace if useFixedNamespace is set true, avoiding policies overlap of new tests.
+func initializeResourcesByFixedNS(f *framework.Framework) {
+	if useFixedNamespaces {
+		_ = initializeResources(f)
+		_, _, _, model, k8s := getK8SModel(f)
+		framework.ExpectNoError(k8s.cleanNetworkPolicies(model.NamespaceNames), "unable to clean network policies")
+		err := wait.Poll(waitInterval, waitTimeout, func() (done bool, err error) {
+			for _, ns := range model.NamespaceNames {
+				netpols, err := k8s.clientSet.NetworkingV1().NetworkPolicies(ns).List(context.TODO(), metav1.ListOptions{})
+				framework.ExpectNoError(err, "get network policies from ns %s", ns)
+				if len(netpols.Items) > 0 {
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+		framework.ExpectNoError(err, "unable to wait for network policy deletion")
+	} else {
+		framework.Logf("Using %v as the default dns domain for this cluster... ", framework.TestContext.ClusterDNSDomain)
+		framework.ExpectNoError(initializeResources(f), "unable to initialize resources")
+	}
 }
 
 // initializeResources uses the e2e framework to create all necessary namespace resources, based on the network policy

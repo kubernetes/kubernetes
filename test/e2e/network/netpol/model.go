@@ -270,6 +270,7 @@ func (c *Container) Spec() v1.Container {
 	var (
 		// agnHostImage is the image URI of AgnHost
 		agnHostImage = imageutils.GetE2EImage(imageutils.Agnhost)
+		env          = []v1.EnvVar{}
 		cmd          []string
 	)
 
@@ -279,15 +280,21 @@ func (c *Container) Spec() v1.Container {
 	case v1.ProtocolUDP:
 		cmd = []string{"/agnhost", "serve-hostname", "--udp", "--http=false", "--port", fmt.Sprintf("%d", c.Port)}
 	case v1.ProtocolSCTP:
-		cmd = []string{"/agnhost", "netexec", "--sctp-port", fmt.Sprintf("%d", c.Port)}
+		env = append(env, v1.EnvVar{
+			Name:  fmt.Sprintf("SERVE_SCTP_PORT_%d", c.Port),
+			Value: "foo",
+		})
+		cmd = []string{"/agnhost", "porter"}
 	default:
 		framework.Failf("invalid protocol %v", c.Protocol)
 	}
+
 	return v1.Container{
 		Name:            c.Name(),
 		ImagePullPolicy: v1.PullIfNotPresent,
 		Image:           agnHostImage,
 		Command:         cmd,
+		Env:             env,
 		SecurityContext: &v1.SecurityContext{},
 		Ports: []v1.ContainerPort{
 			{

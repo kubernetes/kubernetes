@@ -236,8 +236,8 @@ func GetAllowIngressByNamespace(name string, targetLabels map[string]string, pee
 	return policy
 }
 
-// GetAllowIngressByNamespaceAndPort allows ingress for namespace AND port
-func GetAllowIngressByNamespaceAndPort(name string, targetLabels map[string]string, peerNamespaceSelector *metav1.LabelSelector, port *intstr.IntOrString) *networkingv1.NetworkPolicy {
+// GetAllowIngressByNamespaceAndPort allows ingress for namespace AND port AND protocol
+func GetAllowIngressByNamespaceAndPort(name string, targetLabels map[string]string, peerNamespaceSelector *metav1.LabelSelector, port *intstr.IntOrString, protocol *v1.Protocol) *networkingv1.NetworkPolicy {
 	policy := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -251,7 +251,10 @@ func GetAllowIngressByNamespaceAndPort(name string, targetLabels map[string]stri
 					NamespaceSelector: peerNamespaceSelector,
 				}},
 				Ports: []networkingv1.NetworkPolicyPort{
-					{Port: port},
+					{
+						Port:     port,
+						Protocol: protocol,
+					},
 				},
 			}},
 		},
