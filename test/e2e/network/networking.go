@@ -52,6 +52,7 @@ func checkConnectivityToHost(f *framework.Framework, nodeName, podName, host str
 
 	pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, nil)
 	pod.Spec.Containers[0].Command = command
+	pod.Spec.Containers[0].Args = nil // otherwise 'pause` is magically an argument to nc, which causes all hell to break loose
 	pod.Spec.NodeName = nodeName
 	pod.Spec.RestartPolicy = v1.RestartPolicyNever
 
