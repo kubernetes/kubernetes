@@ -152,6 +152,11 @@ func (r *Mock) CheckpointPod(pod *v1.Pod, checkpointDir string) error {
 	return args.Error(0)
 }
 
+func (r *Mock) RestorePod(pod *v1.Pod) error {
+	args := r.Called(pod)
+	return args.Error(0)
+}
+
 func (r *Mock) ImageStats() (*kubecontainer.ImageStats, error) {
 	args := r.Called()
 	return args.Get(0).(*kubecontainer.ImageStats), args.Error(1)

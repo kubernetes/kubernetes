@@ -123,6 +123,8 @@ type Runtime interface {
 	// CheckpointPod tells the runtime to checkpoint a Pod
 	// and store the resulting archive to checkpointDir
 	CheckpointPod(pod *v1.Pod, checkpointDir string) error
+	// RestorePod tells the runtime to restore a checkpointed Pod
+	RestorePod(pod *v1.Pod) error
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
@@ -338,6 +340,8 @@ type Status struct {
 	// Message written by the container before exiting (stored in
 	// TerminationMessagePath).
 	Message string
+	// Restore is true if this container is restored
+	Restore bool
 }
 
 // FindContainerStatusByName returns container status in the pod status with the given name.

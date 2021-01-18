@@ -372,6 +372,14 @@ func (f *FakeRuntime) CheckpointPod(pod *v1.Pod, checkpointDir string) error {
 	return f.Err
 }
 
+func (f *FakeRuntime) RestorePod(pod *v1.Pod) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "RestorePod")
+	return f.Err
+}
+
 func (f *FakeRuntime) ImageStats() (*kubecontainer.ImageStats, error) {
 	f.Lock()
 	defer f.Unlock()

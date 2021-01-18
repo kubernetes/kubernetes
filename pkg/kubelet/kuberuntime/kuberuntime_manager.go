@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/component-base/logs/logreduction"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	"k8s.io/cri-api/pkg/apis/runtime/experimental"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -1031,6 +1032,32 @@ func (m *kubeGenericRuntimeManager) CheckpointPod(pod *v1.Pod, checkpointDir str
 	if err := checkpoint.UpdateMetadata(pod, sandboxIDs[0], checkpointDir, m.containerTerminationLogPathUID); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func (m *kubeGenericRuntimeManager) RestorePod(pod *v1.Pod) error {
+	klog.V(2).Infof("Calling  m.runtimeService.RestorePod %#v", pod.GenerateName)
+	req := &experimental.RestoreContainerRequest{
+		Options: &experimental.RestoreContainerOptions{
+			CommonOptions: &experimental.CheckpointRestoreOptions{
+				// Currently the archive is not yet cpmpressed, but
+				// the CRI API already contains the necessary field
+				// to tell the CRI implementation which compression
+				// to use.
+				Archive: filepath.Join(m.runtimeHelper.GetCheckpointsDir(), pod.GenerateName+".tar"),
+				Keep:    true,
+			},
+			Labels:      pod.Labels,
+			Annotations: pod.Annotations,
+		},
+	}
+
+	err, podID := m.runtimeService.RestorePod(pod.GenerateName, req)
+	if err != nil {
+		return err
+	}
+	klog.V(2).Infof("m.runtimeService.RestorePod returned %q", podID)
 
 	return nil
 }
