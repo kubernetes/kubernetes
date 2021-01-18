@@ -125,6 +125,8 @@ const (
 	SyncPodKill
 	// SyncPodCheckpoint is when the pod is checkpointed
 	SyncPodCheckpoint
+	// SyncPodRestore is when the pod is restored
+	SyncPodRestore
 )
 
 func (sp SyncPodType) String() string {
@@ -139,6 +141,8 @@ func (sp SyncPodType) String() string {
 		return "kill"
 	case SyncPodCheckpoint:
 		return "checkpoint"
+	case SyncPodRestore:
+		return "restore"
 	default:
 		return "unknown"
 	}
