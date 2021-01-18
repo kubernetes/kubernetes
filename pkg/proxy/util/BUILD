@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "endpoints.go",
         "network.go",
-        "port.go",
         "utils.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/proxy/util",
@@ -27,7 +26,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "endpoints_test.go",
-        "port_test.go",
         "utils_test.go",
     ],
     embed = [":go_default_library"],
@@ -36,6 +34,7 @@ go_test(
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 
