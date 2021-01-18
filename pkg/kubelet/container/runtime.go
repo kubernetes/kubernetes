@@ -304,6 +304,8 @@ type PodStatus struct {
 	// Status of the pod sandbox.
 	// Only for kuberuntime now, other runtime may keep it nil.
 	SandboxStatuses []*runtimeapi.PodSandboxStatus
+	// Set if this a Pod that will be restored
+	TerminationMessagePathUID map[string]string
 }
 
 // Status represents the status of a container.

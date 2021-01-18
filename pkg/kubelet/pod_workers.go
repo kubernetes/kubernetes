@@ -68,6 +68,11 @@ type UpdatePodOptions struct {
 	OnCompleteFunc OnCompleteFunc
 	// if update type is kill, use the specified options to kill the pod.
 	KillPodOptions *KillPodOptions
+	// TerminationMessagePathUID is necessary for pod restore. To restore
+	// a pod we need to know where the TerminationMessagePath is mounted
+	// from. This field is also the indicator that this is a restore and only
+	// set if UpdateType == SyncPodRestore
+	TerminationMessagePathUID map[string]string
 }
 
 // PodWorkers is an abstract interface for testability.
@@ -89,6 +94,11 @@ type syncPodOptions struct {
 	podStatus *kubecontainer.PodStatus
 	// if update type is kill, use the specified options to kill the pod.
 	killPodOptions *KillPodOptions
+	// terminationMessagePathUID is necessary for pod restore. To restore
+	// a pod we need to know where the TerminationMessagePath is mounted
+	// from. This field is also the indicator that this is a restore and only
+	// set if UpdateType == SyncPodRestore
+	terminationMessagePathUID map[string]string
 }
 
 // the function to invoke to perform a sync.
@@ -173,11 +183,12 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 				return err
 			}
 			err = p.syncPodFn(syncPodOptions{
-				mirrorPod:      update.MirrorPod,
-				pod:            update.Pod,
-				podStatus:      status,
-				killPodOptions: update.KillPodOptions,
-				updateType:     update.UpdateType,
+				mirrorPod:                 update.MirrorPod,
+				pod:                       update.Pod,
+				podStatus:                 status,
+				killPodOptions:            update.KillPodOptions,
+				updateType:                update.UpdateType,
+				terminationMessagePathUID: update.TerminationMessagePathUID,
 			})
 			lastSyncTime = time.Now()
 			return err

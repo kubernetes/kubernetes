@@ -2036,7 +2036,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 
 // dispatchWork starts the asynchronous sync of the pod in a pod worker.
 // If the pod has completed termination, dispatchWork will perform no action.
-func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mirrorPod *v1.Pod, start time.Time) {
+func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mirrorPod *v1.Pod, start time.Time, terminationMessagePathUID map[string]string) {
 	// check whether we are ready to delete the pod from the API server (all status up to date)
 	containersTerminal, podWorkerTerminal := kl.podAndContainersAreTerminal(pod)
 	if pod.DeletionTimestamp != nil && containersTerminal {
@@ -2061,6 +2061,7 @@ func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mir
 				metrics.PodWorkerDuration.WithLabelValues(syncType.String()).Observe(metrics.SinceInSeconds(start))
 			}
 		},
+		TerminationMessagePathUID: terminationMessagePathUID,
 	})
 	// Note the number of containers for new pods.
 	if syncType == kubetypes.SyncPodCreate {
@@ -2074,7 +2075,7 @@ func (kl *Kubelet) handleMirrorPod(mirrorPod *v1.Pod, start time.Time) {
 	// corresponding static pod. Send update to the pod worker if the static
 	// pod exists.
 	if pod, ok := kl.podManager.GetPodByMirrorPod(mirrorPod); ok {
-		kl.dispatchWork(pod, kubetypes.SyncPodUpdate, mirrorPod, start)
+		kl.dispatchWork(pod, kubetypes.SyncPodUpdate, mirrorPod, start, nil)
 	}
 }
 
@@ -2111,7 +2112,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			}
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
+		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start, nil)
 		kl.probeManager.AddPod(pod)
 	}
 }
@@ -2127,7 +2128,7 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 			continue
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		kl.dispatchWork(pod, kubetypes.SyncPodUpdate, mirrorPod, start)
+		kl.dispatchWork(pod, kubetypes.SyncPodUpdate, mirrorPod, start, nil)
 	}
 }
 
@@ -2162,7 +2163,7 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		// Reconcile Pod "Ready" condition if necessary. Trigger sync pod for reconciliation.
 		if status.NeedToReconcilePodReadiness(pod) {
 			mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-			kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
+			kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start, nil)
 		}
 
 		// After an evicted pod is synced, all dead containers in the pod can be removed.
@@ -2180,7 +2181,7 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
+		kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start, nil)
 	}
 }
 
@@ -2313,7 +2314,7 @@ func (kl *Kubelet) fastStatusUpdateOnce() {
 func (kl *Kubelet) checkpointContainer(pod *v1.Pod) {
 	start := kl.clock.Now()
 	mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-	kl.dispatchWork(pod, kubetypes.SyncPodCheckpoint, mirrorPod, start)
+	kl.dispatchWork(pod, kubetypes.SyncPodCheckpoint, mirrorPod, start, nil)
 }
 
 // isSyncPodWorthy filters out events that are not worthy of pod syncing
