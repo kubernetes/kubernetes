@@ -38,6 +38,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,6 +83,7 @@ import (
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/certificate/bootstrap"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -489,6 +491,28 @@ func makeEventRecorder(kubeDeps *kubelet.Dependencies, nodeName types.NodeName) 
 	}
 }
 
+func getReservedCPUs(machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.CPUSet, error) {
+	emptyCPUSet := cpuset.NewCPUSet()
+
+	if cpus == "" {
+		return emptyCPUSet, nil
+	}
+
+	topo, err := topology.Discover(machineInfo)
+	if err != nil {
+		return emptyCPUSet, fmt.Errorf("Unable to discover CPU topology info: %s", err)
+	}
+	reservedCPUSet, err := cpuset.Parse(cpus)
+	if err != nil {
+		return emptyCPUSet, fmt.Errorf("Unable to parse reserved-cpus list: %s", err)
+	}
+	allCPUSet := topo.CPUDetails.CPUs()
+	if !reservedCPUSet.IsSubsetOf(allCPUSet) {
+		return emptyCPUSet, fmt.Errorf("reserved-cpus: %s is not a subset of online-cpus: %s", cpus, allCPUSet.String())
+	}
+	return reservedCPUSet, nil
+}
+
 func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) (err error) {
 	// Set global feature gates based on the value on the initial KubeletServer
 	err = utilfeature.DefaultMutableFeatureGate.SetFromMap(s.KubeletConfiguration.FeatureGates)
@@ -661,35 +685,14 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			s.CgroupRoot = "/"
 		}
 
-		var reservedSystemCPUs cpuset.CPUSet
-		if s.ReservedSystemCPUs != "" {
-			// is it safe do use CAdvisor here ??
-			machineInfo, err := kubeDeps.CAdvisorInterface.MachineInfo()
-			if err != nil {
-				// if can't use CAdvisor here, fall back to non-explicit cpu list behavior
-				klog.InfoS("Failed to get MachineInfo, set reservedSystemCPUs to empty")
-				reservedSystemCPUs = cpuset.NewCPUSet()
-			} else {
-				var errParse error
-				reservedSystemCPUs, errParse = cpuset.Parse(s.ReservedSystemCPUs)
-				if errParse != nil {
-					// invalid cpu list is provided, set reservedSystemCPUs to empty, so it won't overwrite kubeReserved/systemReserved
-					klog.InfoS("Invalid ReservedSystemCPUs", "systemReservedCPUs", s.ReservedSystemCPUs)
-					return errParse
-				}
-				reservedList := reservedSystemCPUs.ToSlice()
-				first := reservedList[0]
-				last := reservedList[len(reservedList)-1]
-				if first < 0 || last >= machineInfo.NumCores {
-					// the specified cpuset is outside of the range of what the machine has
-					klog.InfoS("Invalid cpuset specified by --reserved-cpus")
-					return fmt.Errorf("Invalid cpuset %q specified by --reserved-cpus", s.ReservedSystemCPUs)
-				}
-			}
-		} else {
-			reservedSystemCPUs = cpuset.NewCPUSet()
+		machineInfo, err := kubeDeps.CAdvisorInterface.MachineInfo()
+		if err != nil {
+			return err
 		}
-
+		reservedSystemCPUs, err := getReservedCPUs(machineInfo, s.ReservedSystemCPUs)
+		if err != nil {
+			return err
+		}
 		if reservedSystemCPUs.Size() > 0 {
 			// at cmd option validation phase it is tested either --system-reserved-cgroup or --kube-reserved-cgroup is specified, so overwrite should be ok
 			klog.InfoS("Option --reserved-cpus is specified, it will overwrite the cpu setting in KubeReserved and SystemReserved", "kubeReservedCPUs", s.KubeReserved, "systemReservedCPUs", s.SystemReserved)
