@@ -444,7 +444,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeLister = kubeInformers.Core().V1().Nodes().Lister()
 		nodeHasSynced = func() bool {
 			if kubeInformers.Core().V1().Nodes().Informer().HasSynced() {
-				klog.Infof("kubelet nodes sync")
 				return true
 			}
 			klog.Infof("kubelet nodes not sync")
