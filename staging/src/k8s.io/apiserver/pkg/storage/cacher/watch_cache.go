@@ -60,8 +60,8 @@ const (
 	defaultUpperBoundCapacity = 100 * 1024
 )
 
-// watchCacheEvent is a single "watch event" that is send to users of
-// watchCache. Additionally to a typical "watch.Event" it contains
+// watchCacheEvent is a single "watch event" that is sent to users of
+// watchCache. In addition to a typical "watch.Event" it contains
 // the previous value of the object to enable proper filtering in the
 // upper layers.
 type watchCacheEvent struct {
@@ -153,7 +153,7 @@ type watchCache struct {
 	// getAttrsFunc is used to get labels and fields of an object.
 	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error)
 
-	// cache is used a cyclic buffer - its first element (with the smallest
+	// cache is used as a cyclic buffer - its first element (with the smallest
 	// resourceVersion) is defined by startIndex, its last element is defined
 	// by endIndex (if cache is full it will be startIndex + capacity).
 	// Both startIndex and endIndex can be greater than buffer capacity -
