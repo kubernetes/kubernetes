@@ -55,7 +55,7 @@ const (
 	instanceGroupAnnotation = "ingress.gcp.kubernetes.io/instance-groups"
 )
 
-var _ = SIGDescribe("Loadbalancing: L7", func() {
+var _ = SIGDescribe("Loadbalancing: L7 [Loadbalancer]", func() {
 	defer ginkgo.GinkgoRecover()
 	var (
 		ns               string

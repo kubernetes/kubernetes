@@ -24,7 +24,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("Loadbalancing: L7 Scalability", func() {
+var _ = SIGDescribe("Loadbalancing: L7 Scalability [Loadbalancer]", func() {
 	defer ginkgo.GinkgoRecover()
 	var (
 		ns string
