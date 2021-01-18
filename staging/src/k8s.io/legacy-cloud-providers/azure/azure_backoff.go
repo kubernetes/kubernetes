@@ -181,10 +181,39 @@ func (az *Cloud) CreateOrUpdateSecurityGroup(service *v1.Service, sg network.Sec
 	return rerr.Error()
 }
 
+func cleanupSubnetInFrontendIPConfigurations(lb *network.LoadBalancer) network.LoadBalancer {
+	if lb.LoadBalancerPropertiesFormat == nil || lb.FrontendIPConfigurations == nil {
+		return *lb
+	}
+
+	frontendIPConfigurations := *lb.FrontendIPConfigurations
+	for i := range frontendIPConfigurations {
+		config := frontendIPConfigurations[i]
+		if config.FrontendIPConfigurationPropertiesFormat != nil &&
+			config.Subnet != nil &&
+			config.Subnet.ID != nil {
+			subnet := network.Subnet{
+				ID: config.Subnet.ID,
+			}
+			if config.Subnet.Name != nil {
+				subnet.Name = config.FrontendIPConfigurationPropertiesFormat.Subnet.Name
+			}
+			config.FrontendIPConfigurationPropertiesFormat.Subnet = &subnet
+			frontendIPConfigurations[i] = config
+			continue
+		}
+	}
+
+	lb.FrontendIPConfigurations = &frontendIPConfigurations
+	return *lb
+}
+
 // CreateOrUpdateLB invokes az.LoadBalancerClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) error {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
+
+	lb = cleanupSubnetInFrontendIPConfigurations(&lb)
 
 	rgName := az.getLoadBalancerResourceGroup()
 	rerr := az.LoadBalancerClient.CreateOrUpdate(ctx, rgName, *lb.Name, lb, to.String(lb.Etag))
