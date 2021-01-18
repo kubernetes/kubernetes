@@ -105,6 +105,12 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy policy.Checker, lon
 			if ev.ResponseStatus == nil {
 				ev.ResponseStatus = fakedSuccessStatus
 			}
+			if w, ok := respWriter.(*auditResponseWriter); ok {
+				if w.writeErr != nil {
+					ev.ResponseStatus.Status = metav1.StatusFailure
+					ev.ResponseStatus.Message = fmt.Sprintf("error while sending data to the client, err = %v", w.writeErr)
+				}
+			}
 			processAuditEvent(sink, ev, omitStages)
 		}()
 		handler.ServeHTTP(respWriter, req)
@@ -190,6 +196,9 @@ type auditResponseWriter struct {
 	once       sync.Once
 	sink       audit.Sink
 	omitStages []auditinternal.Stage
+
+	// writeErr hold the last error observed from ResponseWriter.Write
+	writeErr error
 }
 
 func (a *auditResponseWriter) setHttpHeader() {
@@ -214,7 +223,18 @@ func (a *auditResponseWriter) Write(bs []byte) (int, error) {
 	// the Go library calls WriteHeader internally if no code was written yet. But this will go unnoticed for us
 	a.processCode(http.StatusOK)
 	a.setHttpHeader()
-	return a.ResponseWriter.Write(bs)
+
+	// it is worth noting that Write method stores data in memory
+	// the default buffer size is 4096 K so most of the time this method won't return any errors
+	//
+	// one way of improving it would be changing the default buffer size - not supported by the std lib at the moment.
+	n, err := a.ResponseWriter.Write(bs)
+	if err != nil {
+		a.writeErr = err
+	} else if a.writeErr != nil {
+		a.writeErr = nil
+	}
+	return n, err
 }
 
 func (a *auditResponseWriter) WriteHeader(code int) {
