@@ -1016,9 +1016,6 @@ func TestDryRunPreemption(t *testing.T) {
 				}
 				offset, numCandidates := pl.getOffsetAndNumCandidates(int32(len(nodeInfos)))
 				got, _ := dryRunPreemption(context.Background(), fwk, state, pod, nodeInfos, tt.pdbs, offset, numCandidates)
-				if err != nil {
-					t.Fatal(err)
-				}
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
 				for i := range got {
 					victims := got[i].Victims().Pods
