@@ -209,6 +209,8 @@ var standardQuotaResources = sets.NewString(
 	string(core.ResourceSecrets),
 	string(core.ResourcePersistentVolumeClaims),
 	string(core.ResourceConfigMaps),
+	string(core.ResourceServiceAccounts),
+	string(core.ResourceLimitRanges),
 	string(core.ResourceServicesNodePorts),
 	string(core.ResourceServicesLoadBalancers),
 )
@@ -236,6 +238,8 @@ var standardResources = sets.NewString(
 	string(core.ResourceSecrets),
 	string(core.ResourceConfigMaps),
 	string(core.ResourcePersistentVolumeClaims),
+	string(core.ResourceServiceAccounts),
+	string(core.ResourceLimitRanges),
 	string(core.ResourceStorage),
 	string(core.ResourceRequestsStorage),
 	string(core.ResourceServicesNodePorts),
@@ -255,6 +259,8 @@ var integerResources = sets.NewString(
 	string(core.ResourceSecrets),
 	string(core.ResourceConfigMaps),
 	string(core.ResourcePersistentVolumeClaims),
+	string(core.ResourceServiceAccounts),
+	string(core.ResourceLimitRanges),
 	string(core.ResourceServicesNodePorts),
 	string(core.ResourceServicesLoadBalancers),
 )

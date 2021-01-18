@@ -14047,6 +14047,17 @@ func TestValidateResourceQuota(t *testing.T) {
 			core.ResourceQuotas:                 resource.MustParse("10"),
 			core.ResourceConfigMaps:             resource.MustParse("10"),
 			core.ResourceSecrets:                resource.MustParse("10"),
+			core.ResourceServiceAccounts:        resource.MustParse("10"),
+			core.ResourceLimitRanges:            resource.MustParse("10"),
+		},
+	}
+
+	objectCountSpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			core.ResourceName("count/deployments.apps"): resource.MustParse("10"),
+			core.ResourceName("count/configmaps"):       resource.MustParse("10"),
+			core.ResourceName("count/serviceaccounts"):  resource.MustParse("10"),
+			core.ResourceName("count/limitranges"):      resource.MustParse("10"),
 		},
 	}
 
@@ -14108,6 +14119,8 @@ func TestValidateResourceQuota(t *testing.T) {
 			core.ResourceQuotas:                 resource.MustParse("-10"),
 			core.ResourceConfigMaps:             resource.MustParse("-10"),
 			core.ResourceSecrets:                resource.MustParse("-10"),
+			core.ResourceServiceAccounts:        resource.MustParse("-10"),
+			core.ResourceLimitRanges:            resource.MustParse("-10"),
 		},
 	}
 
@@ -14147,6 +14160,13 @@ func TestValidateResourceQuota(t *testing.T) {
 		Scopes: []core.ResourceQuotaScope{core.ResourceQuotaScope("foo")},
 	}
 
+	// resource from non-core groups must use count/<resource>.<group>
+	invalidQuotaResourceNameSpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			core.ResourceName("count/deployments"): resource.MustParse("10"),
+		},
+	}
+
 	successCases := []core.ResourceQuota{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -14154,6 +14174,13 @@ func TestValidateResourceQuota(t *testing.T) {
 				Namespace: "foo",
 			},
 			Spec: spec,
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: objectCountSpec,
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -14247,6 +14274,10 @@ func TestValidateResourceQuota(t *testing.T) {
 		"invalid-quota-scope-name": {
 			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidScopeNameSpec},
 			"unsupported scope",
+		},
+		"invalid-quota-resource-name": {
+			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidQuotaResourceNameSpec},
+			isInvalidQuotaResourceName,
 		},
 	}
 	for k, v := range errorCases {

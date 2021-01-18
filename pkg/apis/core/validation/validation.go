@@ -61,6 +61,7 @@ import (
 
 const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
 const isInvalidQuotaResource string = `must be a standard resource for quota`
+const isInvalidQuotaResourceName string = "resource from non-core groups must use count/<resource>.<group>"
 const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
 const isNotPositiveErrorMsg string = `must be greater than zero`
@@ -4965,6 +4966,12 @@ func ValidateResourceQuotaResourceName(value string, fldPath *field.Path) field.
 	if len(strings.Split(value, "/")) == 1 {
 		if !helper.IsStandardQuotaResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, isInvalidQuotaResource))
+		}
+	}
+
+	if r := strings.TrimPrefix(value, "count/"); r != value {
+		if len(strings.Split(r, ".")) == 1 && !helper.IsStandardQuotaResourceName(r) {
+			return append(allErrs, field.Invalid(fldPath, value, isInvalidQuotaResourceName))
 		}
 	}
 	return allErrs

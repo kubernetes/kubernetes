@@ -4796,6 +4796,10 @@ const (
 	ResourceSecrets ResourceName = "secrets"
 	// ResourceConfigMaps, number
 	ResourceConfigMaps ResourceName = "configmaps"
+	// ResourceServiceAccounts, number
+	ResourceServiceAccounts ResourceName = "serviceaccounts"
+	// ResourceLimitRanges, number
+	ResourceLimitRanges ResourceName = "limitranges"
 	// ResourcePersistentVolumeClaims, number
 	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
 	// ResourceServicesNodePorts, number
