@@ -222,12 +222,17 @@ func run(config *hollowNodeConfig) {
 			klog.Fatalf("Failed to init runtime service %v.", err)
 		}
 
+		remoteImageService, err := remote.NewRemoteImageService(f.RemoteImageEndpoint, 15*time.Second)
+		if err != nil {
+			klog.Fatalf("Failed to init image service %v.", err)
+		}
+
 		hollowKubelet := kubemark.NewHollowKubelet(
 			f, c,
 			client,
 			heartbeatClient,
 			cadvisorInterface,
-			fakeRemoteRuntime.ImageService,
+			remoteImageService,
 			runtimeService,
 			containerManager,
 		)
