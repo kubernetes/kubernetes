@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"math"
@@ -1407,6 +1408,18 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	}
 }
 
+func (kl *Kubelet) restorePods() {
+	pods, uids, err := checkpoint.GetPodsToRestore(kl.getCheckpointsDir())
+	if err != nil {
+		return
+	}
+
+	for i, p := range pods {
+		start := kl.clock.Now()
+		kl.dispatchWork(p, kubetypes.SyncPodRestore, nil, start, *uids[i])
+	}
+}
+
 // Run starts the kubelet reacting to config updates
 func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	if kl.logServer == nil {
@@ -1459,6 +1472,9 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	// Start the pod lifecycle event generator.
 	kl.pleg.Start()
+
+	kl.restorePods()
+
 	kl.syncLoop(updates, kl)
 }
 
@@ -1509,6 +1525,63 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 			return err
 		}
 
+		return nil
+	}
+
+	if updateType == kubetypes.SyncPodRestore {
+		if o.terminationMessagePathUID == nil {
+			return fmt.Errorf("TerminationMessagePathUID map is necessary for restoring containers")
+		}
+		klog.V(1).Infof("SyncPodRestore for %q with %#v", pod.UID, o)
+		klog.V(1).Infof("SyncPodRestore for %q with %#v", pod.UID, pod)
+		klog.V(1).Infof("SyncPodRestore for %q with %#v", pod.UID, podStatus)
+		// Make data directories for the pod
+		if err := kl.makePodDataDirs(pod); err != nil {
+			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToMakePodDataDirectories, "error making pod data directories: %v", err)
+			klog.Errorf("Unable to make pod data directories for pod %q: %v", format.Pod(pod), err)
+			return err
+		}
+		// Create /etc/hosts
+		var podIPs []string
+		for _, ip := range pod.Status.PodIPs {
+			podIPs = append(podIPs, ip.IP)
+		}
+		if err := ensureHostsFile(getEtcHostsPath(kl.getPodDir(pod.UID)), podIPs, pod.Name, "", pod.Spec.HostAliases, pod.Spec.HostNetwork); err != nil {
+			return err
+		}
+
+		kl.HandlePodAdditions([]*v1.Pod{pod})
+		// TODO: delete newPodStatus
+		newPodStatus := &kubecontainer.PodStatus{}
+		// This is the marker that it is a Pod to be restored
+		podStatus.TerminationMessagePathUID = o.terminationMessagePathUID
+		newPodStatus.TerminationMessagePathUID = o.terminationMessagePathUID
+
+		podStatus.IPs = podIPs
+		newPodStatus.IPs = podIPs
+
+		timestamp := kl.clock.Now()
+		for _, c := range pod.Spec.Containers {
+			containerStatus := &kubecontainer.Status{
+				Name:    c.Name,
+				Restore: true,
+			}
+
+			newPodStatus.ContainerStatuses = append(newPodStatus.ContainerStatuses, containerStatus)
+			podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, containerStatus)
+		}
+
+		kl.podCache.Set(pod.UID, newPodStatus, nil, timestamp)
+
+		result := kl.containerRuntime.SyncPod(pod, podStatus, nil, kl.backOff)
+		kl.reasonCache.Update(pod.UID, result)
+		if err := result.Error(); err != nil {
+			return err
+		}
+		resultPod, err := kl.kubeClient.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if resultPod.UID != pod.UID {
+			return err
+		}
 		return nil
 	}
 
@@ -1642,10 +1715,15 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 				break
 			}
 		}
+		// Do not kill pods which are currently being restored
+		restored := false
+		if pod.Annotations["kubernetes.io/restored.pod"] == "true" {
+			restored = true
+		}
 		// Don't kill containers in pod if pod's cgroups already
 		// exists or the pod is running for the first time
 		podKilled := false
-		if !pcm.Exists(pod) && !firstSync {
+		if !pcm.Exists(pod) && !firstSync && !restored {
 			if err := kl.killPod(pod, nil, podStatus, nil); err == nil {
 				podKilled = true
 			} else {
