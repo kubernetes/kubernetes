@@ -79,6 +79,12 @@ func (kl *Kubelet) getPluginDir(pluginName string) string {
 	return filepath.Join(kl.getPluginsDir(), pluginName)
 }
 
+// GetCheckpointsDir returns a data directory name for checkpoints.
+// Checkpoints can be stored in this directory for further use.
+func (kl *Kubelet) GetCheckpointsDir() string {
+	return kl.getCheckpointsDir()
+}
+
 // getCheckpointsDir returns a data directory name for checkpoints.
 // Checkpoints can be stored in this directory for further use.
 func (kl *Kubelet) getCheckpointsDir() string {
@@ -158,6 +164,13 @@ func (kl *Kubelet) getPodPluginsDir(podUID types.UID) string {
 // need to persist.  For non-per-pod plugin data, see getPluginDir.
 func (kl *Kubelet) getPodPluginDir(podUID types.UID, pluginName string) string {
 	return filepath.Join(kl.getPodPluginsDir(podUID), pluginName)
+}
+
+// GetPodContainerDir returns the full path to the per-pod data directory under
+// which container data is held for the specified pod.  This directory may not
+// exist if the pod or container does not exist.
+func (kl *Kubelet) GetPodContainerDir(podUID types.UID, ctrName string) string {
+	return kl.getPodContainerDir(podUID, ctrName)
 }
 
 // getPodContainerDir returns the full path to the per-pod data directory under
