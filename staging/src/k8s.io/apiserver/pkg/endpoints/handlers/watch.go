@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/util/wsstream"
+	"k8s.io/klog/v2"
 
 	"golang.org/x/net/websocket"
 )
@@ -159,6 +161,69 @@ type WatchServer struct {
 	TimeoutFactory TimeoutFactory
 }
 
+type entry struct {
+	start              time.Time
+	embeddedEncoderEnd time.Time
+	convertEnd         time.Time
+	encodeEnd          time.Time
+	flushEnd           time.Time
+	size               int
+}
+
+func (e entry) String() string {
+	return fmt.Sprintf("event(start: %v, latency: %v [ee: %v, c: %v, e: %v, f: %v], size: %v)",
+		e.start,
+		e.flushEnd.Sub(e.start),
+		e.embeddedEncoderEnd.Sub(e.start),
+		e.convertEnd.Sub(e.embeddedEncoderEnd),
+		e.encodeEnd.Sub(e.convertEnd),
+		e.flushEnd.Sub(e.encodeEnd),
+		e.size)
+}
+
+type cyclicBuffer struct {
+	buf        []entry
+	startIndex int
+	len        int
+	cap        int
+}
+
+func newCyclicBuffer(cap int) *cyclicBuffer {
+	return &cyclicBuffer{
+		buf:        make([]entry, cap),
+		startIndex: 0,
+		len:        0,
+		cap:        cap,
+	}
+}
+
+func (c *cyclicBuffer) add(new entry) {
+	c.buf[(c.startIndex+c.len)%c.cap] = new
+	if c.len < c.cap {
+		c.len++
+	} else {
+		c.startIndex = (c.startIndex + 1) % c.cap
+	}
+}
+
+func (c *cyclicBuffer) list() []entry {
+	res := make([]entry, 0, c.cap)
+
+	for i := 0; i < c.len; i++ {
+		res = append(res, c.buf[(c.startIndex+i)%c.cap])
+	}
+
+	return res
+}
+
+func formatTrace(entries []entry) string {
+	res := make([]string, 0, len(entries))
+	for _, e := range entries {
+		res = append(res, e.String())
+	}
+	return strings.Join(res, "\n")
+}
+
 // ServeHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked
 // or over a websocket connection.
 func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -209,6 +274,9 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
+	watchTrace := newCyclicBuffer(25)
+	var t entry
+
 	for {
 		select {
 		case <-done:
@@ -217,10 +285,20 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		case event, ok := <-ch:
 			if !ok {
+				select {
+				case <-done:
+				case <-timeoutCh:
+				default:
+					// ResultChan has been closed, but context is not cancelled yet. Most likely we were too slow to receive data -- print trace in this case.
+					klog.Infof("[%p] Watch %q from %q(%q) unexpectedly stopped. Last event trace:\n%v", s.Watching, req.RequestURI, req.UserAgent(), req.RemoteAddr, formatTrace(watchTrace.list()))
+					klog.Infof("[%p] EmbeddedEncoder: %T, Encoder: %T, ResponseWriter: %T", s.Watching, s.EmbeddedEncoder, s.Encoder, w)
+				}
 				// End of results.
 				return
 			}
 			metrics.WatchEvents.WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
+			t = entry{}
+			t.start = time.Now()
 
 			obj := s.Fixup(event.Object)
 			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
@@ -228,12 +306,14 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v", obj, err))
 				return
 			}
+			t.embeddedEncoderEnd = time.Now()
 
 			// ContentType is not required here because we are defaulting to the serializer
 			// type
 			unknown.Raw = buf.Bytes()
 			event.Object = &unknown
 			metrics.WatchEventsSizes.WithLabelValues(kind.Group, kind.Version, kind.Kind).Observe(float64(len(unknown.Raw)))
+			t.size = len(unknown.Raw)
 
 			*outEvent = metav1.WatchEvent{}
 
@@ -247,15 +327,18 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// client disconnect.
 				return
 			}
+			t.convertEnd = time.Now()
 			if err := e.Encode(outEvent); err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v (%#v)", outEvent, err, e))
 				// client disconnect.
 				return
 			}
+			t.encodeEnd = time.Now()
 			if len(ch) == 0 {
 				flusher.Flush()
 			}
-
+			t.flushEnd = time.Now()
+			watchTrace.add(t)
 			buf.Reset()
 		}
 	}
