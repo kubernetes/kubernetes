@@ -19,6 +19,7 @@ package cri
 import (
 	"time"
 
+	"k8s.io/cri-api/pkg/apis/runtime/experimental"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
@@ -78,6 +79,8 @@ type PodSandboxManager interface {
 	PortForward(*runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error)
 	// CheckpointPod checkpoints a complete Pod with all containers
 	CheckpointPod(podSandboxID, checkpointDir string) error
+	// RestorePod restores a complete Pod with all containers
+	RestorePod(podSandboxID string, req *experimental.RestoreContainerRequest) (error, string)
 }
 
 // ContainerStatsManager contains methods for retrieving the container

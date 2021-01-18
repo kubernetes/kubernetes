@@ -20,6 +20,7 @@ import (
 	"time"
 
 	internalapi "k8s.io/cri-api/pkg/apis"
+	"k8s.io/cri-api/pkg/apis/runtime/experimental"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
@@ -314,4 +315,13 @@ func (in instrumentedRuntimeService) CheckpointPod(podID, checkpointDir string) 
 	err := in.service.CheckpointPod(podID, checkpointDir)
 	recordError(operation, err)
 	return err
+}
+
+func (in instrumentedRuntimeService) RestorePod(podSandBoxID string, req *experimental.RestoreContainerRequest) (error, string) {
+	const operation = "restore_pod"
+	defer recordOperation(operation, time.Now())
+
+	err, podID := in.service.RestorePod(podSandBoxID, req)
+	recordError(operation, err)
+	return err, podID
 }

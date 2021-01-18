@@ -611,3 +611,20 @@ func (r *remoteRuntimeService) CheckpointPod(podSandBoxID, checkpointDir string)
 
 	return nil
 }
+
+func (r *remoteRuntimeService) RestorePod(podSandBoxID string, req *experimental.RestoreContainerRequest) (error, string) {
+	klog.V(1).Infof("[RemoteRuntimeService] RestorePod (podID=%v, dir=%v)", podSandBoxID, req.Options.CommonOptions.Archive)
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	// RestoreContainer can restore containers and pods. If the runtime has restored
+	// a pod it will visible in the response: response.pod == true
+	response, err := r.experimental.RestoreContainer(ctx, req)
+	if err != nil {
+		klog.Errorf("RestorePod %q from runtime service failed: %v", podSandBoxID, err)
+		return err, ""
+	}
+	klog.V(1).Infof("[RemoteRuntimeService] RestorePod Response (podID=%v)", podSandBoxID)
+
+	return nil, response.Id
+}
