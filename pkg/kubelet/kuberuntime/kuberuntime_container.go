@@ -127,6 +127,24 @@ func (s *startSpec) getTargetID(podStatus *kubecontainer.PodStatus) (*kubecontai
 	return &targetStatus.ID, nil
 }
 
+// prepareRestoreContainer creates the necessary directories to later
+// restore the pod from a checkpoint. This mainly creates directories
+// which were mounted in the original container. These directories
+// need to exist because CRIU will try to mount these directories before
+// restoring the container.
+func (m *kubeGenericRuntimeManager) prepareRestoreContainer(pod *v1.Pod, cs *v1.ContainerStatus, c *v1.Container, TerminationMessagePathUID string) error {
+	opts := &kubecontainer.RunContainerOptions{}
+	p := m.runtimeHelper.GetPodContainerDir(pod.UID, c.Name)
+	klog.V(3).Infof("Creating PodContainerDir for %q %q at %q", pod.UID, c.Name, p)
+	if err := os.MkdirAll(p, 0750); err != nil {
+		klog.Errorf("Error on creating %q: %v", p, err)
+	} else {
+		opts.PodContainerDir = p
+	}
+	m.makeMounts(opts, c, TerminationMessagePathUID)
+	return nil
+}
+
 // startContainer starts a container and returns a message indicates why it is failed on error.
 // It starts the container through the following steps:
 // * pull the image
@@ -275,7 +293,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 		Labels:      newContainerLabels(container, pod),
 		Annotations: newContainerAnnotations(container, pod, restartCount, opts),
 		Devices:     makeDevices(opts),
-		Mounts:      m.makeMounts(opts, container),
+		Mounts:      m.makeMounts(opts, container, ""),
 		LogPath:     containerLogsPath,
 		Stdin:       container.Stdin,
 		StdinOnce:   container.StdinOnce,
@@ -318,7 +336,7 @@ func makeDevices(opts *kubecontainer.RunContainerOptions) []*runtimeapi.Device {
 }
 
 // makeMounts generates container volume mounts for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerOptions, container *v1.Container) []*runtimeapi.Mount {
+func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerOptions, container *v1.Container, TerminationMessagePathUID string) []*runtimeapi.Mount {
 	volumeMounts := []*runtimeapi.Mount{}
 
 	for idx := range opts.Mounts {
@@ -344,7 +362,12 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 		// Because the PodContainerDir contains pod uid and container name which is unique enough,
 		// here we just add a random id to make the path unique for different instances
 		// of the same container.
-		cid := makeUID()
+		var cid string
+		if TerminationMessagePathUID == "" {
+			cid = makeUID()
+		} else {
+			cid = TerminationMessagePathUID
+		}
 		containerLogPath := filepath.Join(opts.PodContainerDir, cid)
 		fs, err := m.osInterface.Create(containerLogPath)
 		if err != nil {
