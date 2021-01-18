@@ -41,6 +41,7 @@ go_test(
         "//staging/src/k8s.io/component-base/metrics/testutil:go_default_library",
         "//vendor/github.com/google/uuid:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/golang.org/x/net/http2:go_default_library",
     ],
 )
 
