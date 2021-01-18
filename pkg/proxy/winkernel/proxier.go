@@ -50,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
 	utilnet "k8s.io/utils/net"
 )
@@ -446,7 +445,6 @@ type Proxier struct {
 	mu                sync.Mutex // protects the following fields
 	serviceMap        proxy.ServiceMap
 	endpointsMap      proxy.EndpointsMap
-	portsMap          map[utilproxy.LocalPort]utilproxy.Closeable
 	// endpointsSynced and servicesSynced are set to true when corresponding
 	// objects are synced after startup. This is used to avoid updating hns policies
 	// with some partial data after kube-proxy restart.
@@ -619,7 +617,6 @@ func NewProxier(
 	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.WindowsEndpointSliceProxying)
 	proxier := &Proxier{
 		endPointsRefCount:   make(endPointsReferenceCountMap),
-		portsMap:            make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		serviceMap:          make(proxy.ServiceMap),
 		endpointsMap:        make(proxy.EndpointsMap),
 		masqueradeAll:       masqueradeAll,

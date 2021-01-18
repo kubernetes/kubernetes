@@ -23,7 +23,6 @@ go_library(
             "//pkg/proxy/healthcheck:go_default_library",
             "//pkg/proxy/metaproxier:go_default_library",
             "//pkg/proxy/metrics:go_default_library",
-            "//pkg/proxy/util:go_default_library",
             "//pkg/util/async:go_default_library",
             "//staging/src/k8s.io/api/core/v1:go_default_library",
             "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",
@@ -67,7 +66,6 @@ go_test(
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/proxy:go_default_library",
             "//pkg/proxy/healthcheck:go_default_library",
-            "//pkg/proxy/util:go_default_library",
             "//staging/src/k8s.io/api/core/v1:go_default_library",
             "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
