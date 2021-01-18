@@ -35,6 +35,15 @@ const (
 	numIterations   = 100
 )
 
+/* TestSampler does a rough behavioral test of SampleAndWatermarkHistograms.
+   The test creates one and exercises it, checking that the count in the
+   sampling histogram is correct at each step.  A fake clock is used, and
+   the exercise consists of changing that fake clock by an amount of time
+   chosen uniformly at random from a range that goes from a little negative
+   to somewhat more than two sampling periods.  The negative changes are
+   included because negative changes have been observed in real monotonic
+   clock readings.
+*/
 func TestSampler(t *testing.T) {
 	t0 := time.Now()
 	clk := clock.NewFakePassiveClock(t0)
@@ -74,6 +83,7 @@ func TestSampler(t *testing.T) {
 	}
 }
 
+/* getHistogramCount returns the count of the named histogram */
 func getHistogramCount(regs Registerables, metricName string) (int64, error) {
 	considered := []string{}
 	mfs, err := legacyregistry.DefaultGatherer.Gather()
