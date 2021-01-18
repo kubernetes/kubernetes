@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	goruntime "runtime"
 	"time"
 
@@ -372,6 +373,7 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 			klog.V(4).Infof("Container does not have metadata: %+v", c)
 			continue
 		}
+		klog.V(1).Infof("Using GetPods in evictableContainers for %+v", c)
 
 		labelledInfo := getContainerInfoFromLabels(c.Labels)
 		pod, found := pods[labelledInfo.PodUID]
@@ -423,6 +425,8 @@ type podActions struct {
 	SandboxID string
 	// The attempt number of creating sandboxes for the pod.
 	Attempt uint32
+	// If this is an attempt to restore a sandbox
+	RestoreSandbox bool
 
 	// The next init container to start.
 	NextInitContainerToStart *v1.Container
@@ -440,11 +444,16 @@ type podActions struct {
 }
 
 // podSandboxChanged checks whether the spec of the pod is changed and returns
-// (changed, new attempt, original sandboxID if exist).
-func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, uint32, string) {
+// (changed, restore, new attempt, original sandboxID if exist).
+func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, bool, uint32, string) {
+	if podStatus.TerminationMessagePathUID != nil {
+		// TerminationMessagePathUID is our marker that this is a Pod restore
+		return false, true, 0, string(pod.UID)
+	}
+
 	if len(podStatus.SandboxStatuses) == 0 {
 		klog.V(2).Infof("No sandbox for pod %q can be found. Need to start a new one", format.Pod(pod))
-		return true, 0, ""
+		return true, false, 0, ""
 	}
 
 	readySandboxCount := 0
@@ -458,29 +467,34 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 	sandboxStatus := podStatus.SandboxStatuses[0]
 	if readySandboxCount > 1 {
 		klog.V(2).Infof("Multiple sandboxes are ready for Pod %q. Need to reconcile them", format.Pod(pod))
-		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
+		return true, false, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
 	}
 	if sandboxStatus.State != runtimeapi.PodSandboxState_SANDBOX_READY {
 		klog.V(2).Infof("No ready sandbox for pod %q can be found. Need to start a new one", format.Pod(pod))
-		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
+		return true, false, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
 	}
 
 	// Needs to create a new sandbox when network namespace changed.
 	if sandboxStatus.GetLinux().GetNamespaces().GetOptions().GetNetwork() != networkNamespaceForPod(pod) {
 		klog.V(2).Infof("Sandbox for pod %q has changed. Need to start a new one", format.Pod(pod))
-		return true, sandboxStatus.Metadata.Attempt + 1, ""
+		return true, false, sandboxStatus.Metadata.Attempt + 1, ""
 	}
 
 	// Needs to create a new sandbox when the sandbox does not have an IP address.
 	if !kubecontainer.IsHostNetworkPod(pod) && sandboxStatus.Network.Ip == "" {
 		klog.V(2).Infof("Sandbox for pod %q has no IP address. Need to start a new one", format.Pod(pod))
-		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
+		return true, false, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
 	}
 
-	return false, sandboxStatus.Metadata.Attempt, sandboxStatus.Id
+	return false, false, sandboxStatus.Metadata.Attempt, sandboxStatus.Id
 }
 
 func containerChanged(container *v1.Container, containerStatus *kubecontainer.Status) (uint64, uint64, bool) {
+	if containerStatus.Restore {
+		// For restored containers we need to ignore the difference in the hashes
+		// and update the hash in the container after some time to catch changes.
+		return containerStatus.Hash, containerStatus.Hash, false
+	}
 	expectedHash := kubecontainer.HashContainer(container)
 	return expectedHash, containerStatus.Hash, containerStatus.Hash != expectedHash
 }
@@ -501,14 +515,19 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
 	klog.V(5).Infof("Syncing Pod %q: %+v", format.Pod(pod), pod)
 
-	createPodSandbox, attempt, sandboxID := m.podSandboxChanged(pod, podStatus)
+	createPodSandbox, restorePodSandbox, attempt, sandboxID := m.podSandboxChanged(pod, podStatus)
 	changes := podActions{
 		KillPod:           createPodSandbox,
 		CreateSandbox:     createPodSandbox,
+		RestoreSandbox:    restorePodSandbox,
 		SandboxID:         sandboxID,
 		Attempt:           attempt,
 		ContainersToStart: []int{},
 		ContainersToKill:  make(map[kubecontainer.ContainerID]containerToKillInfo),
+	}
+
+	if restorePodSandbox {
+		return changes
 	}
 
 	// If we need to (re-)create the pod sandbox, everything will need to be
@@ -595,6 +614,10 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	// check the status of containers.
 	for idx, container := range pod.Spec.Containers {
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
+		// If the Pod is restored, initially the containers are also restored
+		if pod.Annotations["kubernetes.io/restored.pod"] == "true" {
+			containerStatus.Restore = true
+		}
 
 		// Call internal container post-stop lifecycle hook for any non-running container so that any
 		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
@@ -683,6 +706,22 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(pod, podStatus)
 	klog.V(3).Infof("computePodActions got %+v for pod %q", podContainerChanges, format.Pod(pod))
+	if podContainerChanges.RestoreSandbox {
+		if podContainerChanges.SandboxID == "" {
+			return
+		}
+		klog.V(4).Infof("SyncPod will restore pod %q", format.Pod(pod))
+		for _, cs := range pod.Status.ContainerStatuses {
+			for _, c := range pod.Spec.Containers {
+				if c.Name == cs.Name {
+					m.prepareRestoreContainer(pod, &cs, &c, podStatus.TerminationMessagePathUID[c.Name])
+				}
+			}
+		}
+		m.RestorePod(pod)
+		return
+	}
+
 	if podContainerChanges.CreateSandbox {
 		ref, err := ref.GetReference(legacyscheme.Scheme, pod)
 		if err != nil {
