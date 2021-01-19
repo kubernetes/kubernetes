@@ -142,11 +142,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 

@@ -188,11 +188,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 
 	if len(o.Raw) == 0 {
 		r := f.NewBuilder().

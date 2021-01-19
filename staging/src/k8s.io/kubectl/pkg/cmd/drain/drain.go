@@ -222,11 +222,7 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.drainer.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.drainer.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 
 	if o.drainer.Client, err = f.KubernetesClientSet(); err != nil {
 		return err
