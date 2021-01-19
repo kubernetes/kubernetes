@@ -15,11 +15,17 @@ require (
 	golang.org/x/mod v0.3.0 // indirect
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b // indirect
 	golang.org/x/text v0.3.4 // indirect
+	golang.org/x/time v0.0.0-20201208040808-7e3f01d25324 // indirect
 	golang.org/x/tools v0.0.0-20200616133436-c1934b75d054 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	k8s.io/api v0.20.2
+	k8s.io/apimachinery v0.20.2
+	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027
+	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.4.0
 	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
+	k8s.io/utils v0.0.0-20210111153108-fddb29f9d009 // indirect
 )
 
 replace k8s.io/code-generator => ../code-generator

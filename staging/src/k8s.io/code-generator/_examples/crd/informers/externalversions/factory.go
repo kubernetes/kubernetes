@@ -81,14 +81,6 @@ func NewSharedInformerFactory(client versioned.Interface, defaultResync time.Dur
 	return NewSharedInformerFactoryWithOptions(client, defaultResync)
 }
 
-// NewFilteredSharedInformerFactory constructs a new instance of sharedInformerFactory.
-// Listers obtained via this SharedInformerFactory will be subject to the same filters
-// as specified here.
-// Deprecated: Please use NewSharedInformerFactoryWithOptions instead
-func NewFilteredSharedInformerFactory(client versioned.Interface, defaultResync time.Duration, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) SharedInformerFactory {
-	return NewSharedInformerFactoryWithOptions(client, defaultResync, WithNamespace(namespace), WithTweakListOptions(tweakListOptions))
-}
-
 // NewSharedInformerFactoryWithOptions constructs a new instance of a SharedInformerFactory with additional options.
 func NewSharedInformerFactoryWithOptions(client versioned.Interface, defaultResync time.Duration, options ...SharedInformerOption) SharedInformerFactory {
 	factory := &sharedInformerFactory{
