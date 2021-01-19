@@ -32,6 +32,10 @@ endif
 # It's necessary to set this because some environments don't link sh -> bash.
 SHELL := /usr/bin/env bash
 
+# Define variables so `make --warn-undefined-variables` works.
+DBG_CODEGEN ?=
+UPDATE_API_KNOWN_VIOLATIONS ?=
+
 # This rule collects all the generated file sets into a single rule.  Other
 # rules should depend on this to ensure generated files are rebuilt.
 .PHONY: generated_files
