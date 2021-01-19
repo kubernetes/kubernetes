@@ -92,13 +92,13 @@ var (
 		},
 		[]string{NodeLabelKey},
 	)
-	// ContainersPerPodCount is a Counter that tracks the number of containers per pod.
+	// ContainersPerPodCount is a Histogram that tracks the number of containers per pod.
 	ContainersPerPodCount = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           "containers_per_pod_count",
 			Help:           "The number of containers per pod.",
-			Buckets:        metrics.DefBuckets,
+			Buckets:        metrics.ExponentialBuckets(1, 2, 5),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
