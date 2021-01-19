@@ -196,7 +196,6 @@ func (o *ServiceAccountOpts) createServiceAccount() (*corev1.ServiceAccount, err
 	if o.EnforceNamespace {
 		namespace = o.Namespace
 	}
-	fmt.Println(corev1.SchemeGroupVersion.String())
 	serviceAccount := &corev1.ServiceAccount{
 		TypeMeta: metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "ServiceAccount"},
 		ObjectMeta: metav1.ObjectMeta{
