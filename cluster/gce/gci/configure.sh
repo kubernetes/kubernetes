@@ -68,9 +68,9 @@ function download-kube-env {
 import pipes,sys,yaml
 # check version of python and call methods appropriate for that version
 if sys.version_info[0] < 3:
-    items = yaml.load(sys.stdin).iteritems()
+    items = yaml.safe_load(sys.stdin).iteritems()
 else:
-    items = yaml.load(sys.stdin, Loader=yaml.BaseLoader).items()
+    items = yaml.load(sys.stdin, Loader=yaml.SafeLoader).items()
 for k, v in items:
     print("readonly {var}={value}".format(var=k, value=pipes.quote(str(v))))
 ''' < "${tmp_kube_env}" > "${KUBE_HOME}/kube-env")
@@ -112,9 +112,9 @@ function download-kube-master-certs {
 import pipes,sys,yaml
 # check version of python and call methods appropriate for that version
 if sys.version_info[0] < 3:
-    items = yaml.load(sys.stdin).iteritems()
+    items = yaml.safe_load(sys.stdin).iteritems()
 else:
-    items = yaml.load(sys.stdin, Loader=yaml.BaseLoader).items()
+    items = yaml.load(sys.stdin, Loader=yaml.SafeLoader).items()
 for k, v in items:
     print("readonly {var}={value}".format(var=k, value=pipes.quote(str(v))))
 ''' < "${tmp_kube_master_certs}" > "${KUBE_HOME}/kube-master-certs")
