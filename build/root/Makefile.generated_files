@@ -581,7 +581,7 @@ endif
 # The Make rule fails if generated API rule violation report differs from the
 # checked-in violation file, and prints error message to request developer to
 # fix either the API source code, or the known API rule violation file.
-$$($(prefix)_OPENAPI_OUTFILE): $(OPENAPI_GEN) $($(prefix)_KNOWN_VIOLATION_FILENAME:-)
+$$($(prefix)_OPENAPI_OUTFILE): $(OPENAPI_GEN) $($(prefix)_KNOWN_VIOLATION_FILENAME)
 	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                                     \
 	    --v $(KUBE_VERBOSE)                                                                    \
 	    --logtostderr                                                                          \
