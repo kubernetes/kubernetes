@@ -76,10 +76,10 @@ func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
 		case <-interval.C:
 			err := r.client.SetEtcdVersionKeyValue(version)
 			if err != nil {
-				klog.Infof("Still waiting for etcd to start, current error: %v", err)
+				klog.InfoS("Still waiting for etcd to start", "error", err)
 				// keep waiting
 			} else {
-				klog.Infof("Etcd on port %d is up.", r.cfg.port)
+				klog.InfoS("Etcd on port is up", "port", r.cfg.port)
 				r.cmd = etcdCmd
 				return nil
 			}
@@ -115,7 +115,7 @@ func (r *EtcdMigrateServer) Stop() error {
 		case <-stopped:
 			return
 		case <-timedout:
-			klog.Infof("etcd server has not terminated gracefully after %s, killing it.", gracefulWait)
+			klog.InfoS("Etcd server has not terminated gracefully after a while, killing it", "timeout", gracefulWait)
 			r.cmd.Process.Kill()
 			return
 		}
@@ -123,11 +123,11 @@ func (r *EtcdMigrateServer) Stop() error {
 	err = r.cmd.Wait()
 	stopped <- true
 	if exiterr, ok := err.(*exec.ExitError); ok {
-		klog.Infof("etcd server stopped (signal: %s)", exiterr.Error())
+		klog.InfoS("Etcd server stopped with signal", "signal", exiterr.Error())
 		// stopped
 	} else if err != nil {
 		return fmt.Errorf("error waiting for etcd to stop: %v", err)
 	}
-	klog.Infof("Stopped etcd server %s", r.cfg.name)
+	klog.InfoS("Stopped etcd server", "etcdCfgName", r.cfg.name)
 	return nil
 }

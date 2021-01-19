@@ -140,7 +140,7 @@ func main() {
 			continue
 		}
 		addrs = flattenSubsets(endpoints.Subsets)
-		klog.Infof("Found %s", addrs)
+		klog.InfoS("Found ip address", "endpoints", addrs)
 		if len(addrs) > 0 && len(addrs) >= count {
 			break
 		}
@@ -151,7 +151,7 @@ func main() {
 		return
 	}
 
-	klog.Infof("Endpoints = %s", addrs)
+	klog.InfoS("Endpoints", "endpoints", addrs)
 	fmt.Printf("discovery.seed_hosts: [%s]\n", strings.Join(addrs, ", "))
 	fmt.Printf("cluster.initial_master_nodes: [%s]\n", strings.Join(addrs, ", "))
 }

@@ -48,7 +48,7 @@ func main() {
 	registerFlags(migrateCmd.Flags(), &opts)
 	err := migrateCmd.Execute()
 	if err != nil {
-		klog.Errorf("Failed to execute migratecmd: %s", err)
+		klog.ErrorS(err, "Failed to execute migrate cmd")
 	}
 }
 

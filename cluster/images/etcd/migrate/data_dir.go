@@ -44,7 +44,7 @@ func OpenOrCreateDataDirectory(path string) (*DataDirectory, error) {
 		return nil, err
 	}
 	if !exists {
-		klog.Infof("data directory '%s' does not exist, creating it", path)
+		klog.InfoS("Data directory does not exist, creating it", "path", path)
 		err := os.MkdirAll(path, 0777)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create data directory %s: %v", path, err)
@@ -66,7 +66,7 @@ func (d *DataDirectory) Initialize(target *EtcdVersionPair) error {
 		return err
 	}
 	if isEmpty {
-		klog.Infof("data directory '%s' is empty, writing target version '%s' to version.txt", d.path, target)
+		klog.InfoS("Data directory is empty, writing target version to version.txt", "path", d.path, "targetVersion", target)
 		err = d.versionFile.Write(target)
 		if err != nil {
 			return fmt.Errorf("failed to write version.txt to '%s': %v", d.path, err)

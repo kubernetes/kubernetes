@@ -247,7 +247,7 @@ func getVersionPeriodically(stopCh <-chan struct{}) {
 	lastSeenBinaryVersion := ""
 	for {
 		if err := getVersion(&lastSeenBinaryVersion); err != nil {
-			klog.Errorf("Failed to fetch etcd version: %v", err)
+			klog.ErrorS(err, "Failed to fetch etcd version")
 		}
 		select {
 		case <-stopCh:
@@ -397,7 +397,7 @@ func main() {
 	go getVersionPeriodically(stopCh)
 
 	// Serve our metrics on listenAddress/metricsPath.
-	klog.Infof("Listening on: %v", listenAddress)
+	klog.InfoS("Listening on endpoint", "endpoint", listenAddress)
 	http.Handle(metricsPath, metrics.HandlerFor(gatherer, metrics.HandlerOpts{}))
-	klog.Errorf("Stopped listening/serving metrics: %v", http.ListenAndServe(listenAddress, nil))
+	klog.ErrorS(http.ListenAndServe(listenAddress, nil), "Stopped listening/serving metrics")
 }

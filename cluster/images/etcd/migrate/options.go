@@ -116,7 +116,7 @@ func lookupEnv(env string) (string, error) {
 }
 
 func fallbackToEnv(flag, env string) (string, error) {
-	klog.Infof("--%s unset - falling back to %s variable", flag, env)
+	klog.InfoS("Command flag with prefix '--' unset - falling back to environment variable", "flag", flag, "envVariable", env)
 	return lookupEnv(env)
 }
 
@@ -124,7 +124,7 @@ func fallbackToEnvWithDefault(flag, env, def string) string {
 	if value, err := lookupEnv(env); err == nil {
 		return value
 	}
-	klog.Warningf("%s variable for %s flag unset - defaulting to %s", env, flag, def)
+	klog.InfoS("Environment variable for flag unset - set as default variable", "envVariable", env, "flag", flag, "defaultVariable", def)
 	return def
 }
 
@@ -132,11 +132,11 @@ func defaultName() (string, error) {
 	if etcdName, err := lookupEnv(etcdNameEnv); err == nil {
 		return etcdName, nil
 	}
-	klog.Warningf("%s variable unset - falling back to etcd-%s variable", etcdNameEnv, etcdHostnameEnv)
+	klog.InfoS("Etcd variable unset - falling back to etcd host variable", "etcdName", etcdNameEnv, "etcdHostName", etcdHostnameEnv)
 	if etcdHostname, err := lookupEnv(etcdHostnameEnv); err == nil {
 		return fmt.Sprintf("etcd-%s", etcdHostname), nil
 	}
-	klog.Warningf("%s variable unset - falling back to etcd-%s variable", etcdHostnameEnv, hostnameEnv)
+	klog.InfoS("Etcd host variable unset - falling back to host variable", "etcdHostName", etcdHostnameEnv, "hostName", hostnameEnv)
 	if hostname, err := lookupEnv(hostnameEnv); err == nil {
 		return fmt.Sprintf("etcd-%s", hostname), nil
 	}
@@ -147,7 +147,7 @@ func (opts *migrateOpts) validateAndDefault() error {
 	var err error
 
 	if opts.name == "" {
-		klog.Infof("--name unset - falling back to %s variable", etcdNameEnv)
+		klog.InfoS("Flag --name unset - falling back to environment variable", "envVariable", etcdNameEnv)
 		if opts.name, err = defaultName(); err != nil {
 			return err
 		}
@@ -166,7 +166,7 @@ func (opts *migrateOpts) validateAndDefault() error {
 		} else {
 			opts.port = 18629
 		}
-		klog.Infof("--port unset - defaulting to %d", opts.port)
+		klog.InfoS("Flag --port unset - default port set", "defaultPort", opts.port)
 	}
 	if opts.peerPort == 0 {
 		if etcdEventsRE.MatchString(opts.dataDir) {
@@ -174,7 +174,7 @@ func (opts *migrateOpts) validateAndDefault() error {
 		} else {
 			opts.peerPort = 2380
 		}
-		klog.Infof("--peer-port unset - defaulting to %d", opts.peerPort)
+		klog.InfoS("Flag --peer-port unset - default port set", "defaultPort", opts.peerPort)
 	}
 
 	if opts.initialCluster == "" {
@@ -215,7 +215,7 @@ func (opts *migrateOpts) validateAndDefault() error {
 
 	if opts.ttlKeysDirectory == "" {
 		opts.ttlKeysDirectory = fmt.Sprintf(ttlKeysDirectoryFmt, opts.etcdDataPrefix)
-		klog.Infof("--ttl-keys-directory unset - defaulting to %s", opts.ttlKeysDirectory)
+		klog.InfoS("Flag --ttl-keys-directory unset - default path set", "defaultPath", opts.ttlKeysDirectory)
 	}
 
 	if opts.etcdServerArgs == "" {

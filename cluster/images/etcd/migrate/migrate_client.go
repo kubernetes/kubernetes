@@ -208,13 +208,13 @@ func (e *CombinedEtcdClient) AttachLease(leaseDuration time.Duration) error {
 	if err != nil {
 		return fmt.Errorf("error while creating lease: %v", err)
 	}
-	klog.Infof("Lease with TTL: %v created", lease.TTL)
+	klog.InfoS("Lease with TTL created", "TTL", lease.TTL)
 
-	klog.Infof("Attaching lease to %d entries", len(objectsResp.Kvs))
+	klog.InfoS("Attaching lease to many entries", "entrySize", len(objectsResp.Kvs))
 	for _, kv := range objectsResp.Kvs {
 		putResp, err := v3client.KV.Put(ctx, string(kv.Key), string(kv.Value), clientv3.WithLease(lease.ID), clientv3.WithPrevKV())
 		if err != nil {
-			klog.Errorf("Error while attaching lease to: %s", string(kv.Key))
+			klog.ErrorS(nil, "Error while attaching lease to client", "clientName", string(kv.Key))
 		}
 		if !bytes.Equal(putResp.PrevKv.Value, kv.Value) {
 			return fmt.Errorf("concurrent access to key detected when setting lease on %s, expected previous value of %s but got %s",

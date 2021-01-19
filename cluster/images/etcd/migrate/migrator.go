@@ -63,7 +63,7 @@ type Migrator struct {
 
 // MigrateIfNeeded upgrades or downgrades the etcd data directory to the given target version.
 func (m *Migrator) MigrateIfNeeded(target *EtcdVersionPair) error {
-	klog.Infof("Starting migration to %s", target)
+	klog.InfoS("Starting migration to target version", "targetVersion", target)
 	err := m.dataDirectory.Initialize(target)
 	if err != nil {
 		return fmt.Errorf("failed to initialize data directory %s: %v", m.dataDirectory.path, err)
@@ -84,11 +84,11 @@ func (m *Migrator) MigrateIfNeeded(target *EtcdVersionPair) error {
 	}
 
 	for {
-		klog.Infof("Converging current version '%s' to target version '%s'", current, target)
+		klog.InfoS("Converging current version to target version", "currentVersion", current, "targetVersion", target)
 		currentNextMinorVersion := &EtcdVersion{Version: semver.Version{Major: current.version.Major, Minor: current.version.Minor + 1}}
 		switch {
 		case current.version.MajorMinorEquals(target.version) || currentNextMinorVersion.MajorMinorEquals(target.version):
-			klog.Infof("current version '%s' equals or is one minor version previous of target version '%s' - migration complete", current, target)
+			klog.InfoS("Current version equals or is one minor version previous of target version - migration complete", "currentVersion", current, "targetVersion", target)
 			err = m.dataDirectory.versionFile.Write(target)
 			if err != nil {
 				return fmt.Errorf("failed to write version.txt to '%s': %v", m.dataDirectory.path, err)
@@ -100,10 +100,10 @@ func (m *Migrator) MigrateIfNeeded(target *EtcdVersionPair) error {
 			return fmt.Errorf("downgrading from etcd 3.x to 2.x is not supported")
 		case current.version.Major == target.version.Major && current.version.Minor < target.version.Minor:
 			stepVersion := m.cfg.supportedVersions.NextVersionPair(current)
-			klog.Infof("upgrading etcd from %s to %s", current, stepVersion)
+			klog.InfoS("Upgrading etcd from current version to next version", "currentVersion", current, "nextVersion", stepVersion)
 			current, err = m.minorVersionUpgrade(current, stepVersion)
 		case current.version.Major == 3 && target.version.Major == 3 && current.version.Minor > target.version.Minor:
-			klog.Infof("rolling etcd back from %s to %s", current, target)
+			klog.InfoS("Rolling etcd back from current version to target version", "currentVersion", current, "targetVersion", target)
 			current, err = m.rollbackEtcd3MinorVersion(current, target)
 		}
 		if err != nil {
@@ -117,7 +117,7 @@ func (m *Migrator) rollbackEtcd3MinorVersion(current *EtcdVersionPair, target *E
 		return nil, fmt.Errorf("rollback from %s to %s not supported, only rollbacks to the previous minor version are supported", current.version, target.version)
 	}
 
-	klog.Infof("Performing etcd %s -> %s rollback", current.version, target.version)
+	klog.InfoS("Performing etcd current version -> target version, rollback", "currentVersion", current.version, "targetVersion", target.version)
 	err := m.dataDirectory.Backup()
 	if err != nil {
 		return nil, err
@@ -131,14 +131,14 @@ func (m *Migrator) rollbackEtcd3MinorVersion(current *EtcdVersionPair, target *E
 
 	// Start current version of etcd.
 	runner := m.newServer()
-	klog.Infof("Starting etcd version %s to capture rollback snapshot.", current.version)
+	klog.InfoS("Starting etcd version to capture rollback snapshot", "currentVersion", current.version)
 	err = runner.Start(current.version)
 	if err != nil {
 		klog.Fatalf("Unable to automatically downgrade etcd: starting etcd version %s to capture rollback snapshot failed: %v", current.version, err)
 		return nil, err
 	}
 
-	klog.Infof("Snapshotting etcd %s to %s", current.version, snapshotFilename)
+	klog.InfoS("Snapshotting etcd current version to snapshot file", "currentVersion", current.version, "snapshotFile", snapshotFilename)
 	err = m.client.Snapshot(current.version, snapshotFilename)
 	if err != nil {
 		return nil, err
@@ -164,7 +164,7 @@ func (m *Migrator) rollbackEtcd3MinorVersion(current *EtcdVersionPair, target *E
 		return nil, err
 	}
 
-	klog.Infof("Restoring etcd %s from %s", target.version, snapshotFilename)
+	klog.InfoS("Restoring etcd with target version from snapshot file", "targetVersion", target.version, "snapshotFile", snapshotFilename)
 	err = m.client.Restore(target.version, snapshotFilename)
 	if err != nil {
 		return nil, err
