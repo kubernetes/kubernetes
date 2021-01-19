@@ -632,7 +632,7 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 		klog.V(3).Infof("Killing container %q, but using a %d second grace period override", containerID, gracePeriod)
 	}
 
-	klog.V(2).Infof("Killing container %q with a %d second grace period", containerID.String(), gracePeriod)
+	klog.V(2).Infof("Killing container %q with a %d second(s) grace period", containerID.String(), gracePeriod)
 
 	err := m.runtimeService.StopContainer(containerID.ID, gracePeriod)
 	if err != nil {
