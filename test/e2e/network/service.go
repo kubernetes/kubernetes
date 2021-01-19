@@ -2151,10 +2151,6 @@ var _ = SIGDescribe("Services", func() {
 		// this feature currently supported only on GCE/GKE/AWS
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 
-		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutDefault
-		if framework.ProviderIs("aws") {
-			loadBalancerLagTimeout = e2eservice.LoadBalancerLagTimeoutAWS
-		}
 		loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
 
 		namespace := f.Namespace.Name
@@ -2193,17 +2189,16 @@ var _ = SIGDescribe("Services", func() {
 		svc, err = jig.WaitForLoadBalancer(loadBalancerCreateTimeout)
 		framework.ExpectNoError(err)
 
-		// timeout when we haven't just created the load balancer
-		normalReachabilityTimeout := 2 * time.Minute
-
 		ginkgo.By("check reachability from different sources")
 		svcIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
-		// Wait longer as this is our first request after creation.  We can't check using a separate method,
-		// because the LB should only be reachable from the "accept" pod
-		checkReachabilityFromPod(true, loadBalancerLagTimeout, namespace, acceptPod.Name, svcIP)
-		checkReachabilityFromPod(false, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
+		// We should wait until service changes are actually propagated in the cloud-provider,
+		// as this may take significant amount of time, especially in large clusters.
+		// However, the information whether it was already programmed isn't achievable.
+		// So we're resolving it by using loadBalancerCreateTimeout that takes cluster size into account.
+		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
+		checkReachabilityFromPod(false, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
 
-		// Make sure dropPod is running. There are certain chances that the pod might be teminated due to unexpected reasons.		dropPod, err = cs.CoreV1().Pods(namespace).Get(dropPod.Name, metav1.GetOptions{})
+		// Make sure dropPod is running. There are certain chances that the pod might be teminated due to unexpected reasons.
 		dropPod, err = cs.CoreV1().Pods(namespace).Get(context.TODO(), dropPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Unable to get pod %s", dropPod.Name)
 		framework.ExpectEqual(acceptPod.Status.Phase, v1.PodRunning)
@@ -2215,16 +2210,25 @@ var _ = SIGDescribe("Services", func() {
 			svc.Spec.LoadBalancerSourceRanges = []string{dropPod.Status.PodIP + "/32"}
 		})
 		framework.ExpectNoError(err)
-		checkReachabilityFromPod(false, normalReachabilityTimeout, namespace, acceptPod.Name, svcIP)
-		checkReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
+
+		// We should wait until service changes are actually propagates, as this may take
+		// significant amount of time, especially in large clusters.
+		// However, the information whether it was already programmed isn't achievable.
+		// So we're resolving it by using loadBalancerCreateTimeout that takes cluster size into account.
+		checkReachabilityFromPod(false, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
+		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
 
 		ginkgo.By("Delete LoadBalancerSourceRange field and check reachability")
 		_, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.LoadBalancerSourceRanges = nil
 		})
 		framework.ExpectNoError(err)
-		checkReachabilityFromPod(true, normalReachabilityTimeout, namespace, acceptPod.Name, svcIP)
-		checkReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
+		// We should wait until service changes are actually propagates, as this may take
+		// significant amount of time, especially in large clusters.
+		// However, the information whether it was already programmed isn't achievable.
+		// So we're resolving it by using loadBalancerCreateTimeout that takes cluster size into account.
+		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
+		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
 	})
 
 	ginkgo.It("should be able to create an internal type load balancer [Slow]", func() {
