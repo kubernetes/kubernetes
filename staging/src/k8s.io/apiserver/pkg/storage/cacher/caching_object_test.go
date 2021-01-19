@@ -149,7 +149,8 @@ func TestCachingObjectRaces(t *testing.T) {
 			}
 			accessor, err := meta.Accessor(object.GetObject())
 			if err != nil {
-				t.Fatalf("failed to get accessor: %v", err)
+				t.Errorf("failed to get accessor: %v", err)
+				return
 			}
 			if selfLink := accessor.GetSelfLink(); selfLink != "selfLink" {
 				t.Errorf("unexpected selfLink: %s", selfLink)
