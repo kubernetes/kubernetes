@@ -474,7 +474,6 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 				cStatus.Message += tMessage
 			}
 		}
-		cStatus.PodSandboxID = c.PodSandboxId
 		statuses[i] = cStatus
 	}
 
