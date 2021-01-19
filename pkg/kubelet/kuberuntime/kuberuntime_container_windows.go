@@ -22,7 +22,9 @@ import (
 	"runtime"
 
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -126,7 +128,13 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	if username != "" {
 		wc.SecurityContext.RunAsUsername = username
 	}
-
+	
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsGMSA) &&	
+		effectiveSc.WindowsOptions != nil &&	
+		effectiveSc.WindowsOptions.GMSACredentialSpec != nil {	
+		wc.SecurityContext.CredentialSpec = *effectiveSc.WindowsOptions.GMSACredentialSpec	
+	}
+	
 	// override with Windows options if present
 	if effectiveSc.WindowsOptions != nil && effectiveSc.WindowsOptions.RunAsUserName != nil {
 		wc.SecurityContext.RunAsUsername = *effectiveSc.WindowsOptions.RunAsUserName
