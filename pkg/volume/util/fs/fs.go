@@ -30,9 +30,9 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/fsquota"
 )
 
-// FsInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
+// Info linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
 // for the filesystem that path resides upon.
-func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+func Info(path string) (int64, int64, int64, int64, int64, int64, error) {
 	statfs := &unix.Statfs_t{}
 	err := unix.Statfs(path, statfs)
 	if err != nil {
