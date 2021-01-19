@@ -169,7 +169,7 @@ gen_prerelease_lifecycle: $(PRERELEASE_LIFECYCLE_GEN) $(META_DIR)/$(PRERELEASE_L
 # has to be done in a distinct step because wildcards don't work in static
 # pattern rules.
 #
-# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
 $(foreach dir, $(PRERELEASE_LIFECYCLE_DIRS), $(eval                     \
     $(dir)/$(PRERELEASE_LIFECYCLE_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
@@ -258,7 +258,7 @@ gen_deepcopy: $(DEEPCOPY_GEN) $(META_DIR)/$(DEEPCOPY_GEN).todo
 # has to be done in a distinct step because wildcards don't work in static
 # pattern rules.
 #
-# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
 $(foreach dir, $(DEEPCOPY_DIRS), $(eval                     \
     $(dir)/$(DEEPCOPY_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
@@ -353,7 +353,7 @@ gen_defaulter: $(DEFAULTER_GEN) $(META_DIR)/$(DEFAULTER_GEN).todo
 #
 # Note that this is a deps-only statement, not a full rule (see below for that).
 #
-# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
 $(foreach dir, $(DEFAULTER_DIRS), $(eval                     \
     $(dir)/$(DEFAULTER_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
@@ -461,7 +461,7 @@ gen_conversion: $(CONVERSION_GEN) $(META_DIR)/$(CONVERSION_GEN).todo
 #
 # Note that this is a deps-only statement, not a full rule (see below for that).
 #
-# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
 $(foreach dir, $(CONVERSION_DIRS), $(eval                     \
     $(dir)/$(CONVERSION_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
@@ -557,7 +557,7 @@ define OPENAPI_TARGETS_DEF
 # Note that this is a deps-only statement, not a full rule
 # (see below for that).
 #
-# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
 $(foreach dir, $($(prefix)_OPENAPI_DIRS), $(eval            \
     $($(prefix)_OPENAPI_OUTFILE): $($(PRJ_SRC_PATH)/$(dir)) \
