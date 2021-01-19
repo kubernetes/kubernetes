@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-// Manager manages Kubernets secrets. This includes retrieving
+// Manager manages Kubernetes secrets. This includes retrieving
 // secrets or registering/unregistering them via Pods.
 type Manager interface {
 	// Get secret by secret namespace and name.
