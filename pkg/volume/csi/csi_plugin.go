@@ -71,7 +71,7 @@ type csiPlugin struct {
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	p := &csiPlugin{
 		host:         nil,
-		blockEnabled: utilfeature.DefaultFeatureGate.Enabled(features.CSIBlockVolume),
+		blockEnabled: true,
 	}
 	return []volume.VolumePlugin{p}
 }

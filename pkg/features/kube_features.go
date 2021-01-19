@@ -690,61 +690,56 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AppArmor:             {Default: true, PreRelease: featuregate.Beta},
 	DynamicKubeletConfig: {Default: true, PreRelease: featuregate.Beta},
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
-	DevicePlugins:                  {Default: true, PreRelease: featuregate.Beta},
-	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.Beta},
-	LocalStorageCapacityIsolation:  {Default: true, PreRelease: featuregate.Beta},
-	Sysctls:                        {Default: true, PreRelease: featuregate.Beta},
-	EphemeralContainers:            {Default: false, PreRelease: featuregate.Alpha},
-	QOSReserved:                    {Default: false, PreRelease: featuregate.Alpha},
-	ExpandPersistentVolumes:        {Default: true, PreRelease: featuregate.Beta},
-	ExpandInUsePersistentVolumes:   {Default: true, PreRelease: featuregate.Beta},
-	ExpandCSIVolumes:               {Default: true, PreRelease: featuregate.Beta},
-	CPUManager:                     {Default: true, PreRelease: featuregate.Beta},
-	CPUCFSQuotaPeriod:              {Default: false, PreRelease: featuregate.Alpha},
-	TopologyManager:                {Default: true, PreRelease: featuregate.Beta},
-	ServiceNodeExclusion:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
-	NodeDisruptionExclusion:        {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
-	CSIDriverRegistry:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
-	BlockVolume:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
-	StorageObjectInUseProtection:   {Default: true, PreRelease: featuregate.GA},
-	SupportPodPidsLimit:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
-	SupportNodePidsLimit:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
-	HyperVContainer:                {Default: false, PreRelease: featuregate.Deprecated},
-	BoundServiceAccountTokenVolume: {Default: false, PreRelease: featuregate.Alpha},
-	ServiceAccountIssuerDiscovery:  {Default: true, PreRelease: featuregate.Beta},
-	CRIContainerLogRotation:        {Default: true, PreRelease: featuregate.Beta},
-	CSIMigration:                   {Default: true, PreRelease: featuregate.Beta},
-	CSIMigrationGCE:                {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires GCE PD CSI Driver)
-	CSIMigrationGCEComplete:        {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationAWS:                {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires AWS EBS CSI driver)
-	CSIMigrationAWSComplete:        {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationAzureDisk:          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Azure Disk CSI driver)
-	CSIMigrationAzureDiskComplete:  {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationAzureFile:          {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationAzureFileComplete:  {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationvSphere:            {Default: false, PreRelease: featuregate.Beta},
-	CSIMigrationvSphereComplete:    {Default: false, PreRelease: featuregate.Beta},
-	RunAsGroup:                     {Default: true, PreRelease: featuregate.Beta},
-	CSIMigrationOpenStack:          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires OpenStack Cinder CSI driver)
-	CSIMigrationOpenStackComplete:  {Default: false, PreRelease: featuregate.Alpha},
-	VolumeSubpath:                  {Default: true, PreRelease: featuregate.GA},
-	ConfigurableFSGroupPolicy:      {Default: true, PreRelease: featuregate.Beta},
-	BalanceAttachedNodeVolumes:     {Default: false, PreRelease: featuregate.Alpha},
-	CSIBlockVolume:                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
-	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},
-	CSIStorageCapacity:             {Default: false, PreRelease: featuregate.Alpha},
-	CSIServiceAccountToken:         {Default: false, PreRelease: featuregate.Alpha},
-	GenericEphemeralVolume:         {Default: false, PreRelease: featuregate.Alpha},
-	CSIVolumeFSGroupPolicy:         {Default: true, PreRelease: featuregate.Beta},
-	RuntimeClass:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
-	NodeLease:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	SCTPSupport:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
-	VolumeSnapshotDataSource:       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
-	ProcMountType:                  {Default: false, PreRelease: featuregate.Alpha},
-	TTLAfterFinished:               {Default: false, PreRelease: featuregate.Alpha},
-	KubeletPodResources:            {Default: true, PreRelease: featuregate.Beta},
-	WindowsGMSA:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
-	WindowsRunAsUserName:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
+	DevicePlugins:                                  {Default: true, PreRelease: featuregate.Beta},
+	RotateKubeletServerCertificate:                 {Default: true, PreRelease: featuregate.Beta},
+	LocalStorageCapacityIsolation:                  {Default: true, PreRelease: featuregate.Beta},
+	Sysctls:                                        {Default: true, PreRelease: featuregate.Beta},
+	EphemeralContainers:                            {Default: false, PreRelease: featuregate.Alpha},
+	QOSReserved:                                    {Default: false, PreRelease: featuregate.Alpha},
+	ExpandPersistentVolumes:                        {Default: true, PreRelease: featuregate.Beta},
+	ExpandInUsePersistentVolumes:                   {Default: true, PreRelease: featuregate.Beta},
+	ExpandCSIVolumes:                               {Default: true, PreRelease: featuregate.Beta},
+	CPUManager:                                     {Default: true, PreRelease: featuregate.Beta},
+	CPUCFSQuotaPeriod:                              {Default: false, PreRelease: featuregate.Alpha},
+	TopologyManager:                                {Default: true, PreRelease: featuregate.Beta},
+	ServiceNodeExclusion:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
+	NodeDisruptionExclusion:                        {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
+	StorageObjectInUseProtection:                   {Default: true, PreRelease: featuregate.GA},
+	SupportPodPidsLimit:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
+	SupportNodePidsLimit:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
+	HyperVContainer:                                {Default: false, PreRelease: featuregate.Deprecated},
+	BoundServiceAccountTokenVolume:                 {Default: false, PreRelease: featuregate.Alpha},
+	ServiceAccountIssuerDiscovery:                  {Default: true, PreRelease: featuregate.Beta},
+	CRIContainerLogRotation:                        {Default: true, PreRelease: featuregate.Beta},
+	CSIMigration:                                   {Default: true, PreRelease: featuregate.Beta},
+	CSIMigrationGCE:                                {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires GCE PD CSI Driver)
+	CSIMigrationGCEComplete:                        {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAWS:                                {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires AWS EBS CSI driver)
+	CSIMigrationAWSComplete:                        {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAzureDisk:                          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Azure Disk CSI driver)
+	CSIMigrationAzureDiskComplete:                  {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAzureFile:                          {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAzureFileComplete:                  {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationvSphere:                            {Default: false, PreRelease: featuregate.Beta},
+	CSIMigrationvSphereComplete:                    {Default: false, PreRelease: featuregate.Beta},
+	RunAsGroup:                                     {Default: true, PreRelease: featuregate.Beta},
+	CSIMigrationOpenStack:                          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires OpenStack Cinder CSI driver)
+	CSIMigrationOpenStackComplete:                  {Default: false, PreRelease: featuregate.Alpha},
+	VolumeSubpath:                                  {Default: true, PreRelease: featuregate.GA},
+	ConfigurableFSGroupPolicy:                      {Default: true, PreRelease: featuregate.Beta},
+	BalanceAttachedNodeVolumes:                     {Default: false, PreRelease: featuregate.Alpha},
+	CSIInlineVolume:                                {Default: true, PreRelease: featuregate.Beta},
+	CSIStorageCapacity:                             {Default: false, PreRelease: featuregate.Alpha},
+	CSIServiceAccountToken:                         {Default: false, PreRelease: featuregate.Alpha},
+	GenericEphemeralVolume:                         {Default: false, PreRelease: featuregate.Alpha},
+	CSIVolumeFSGroupPolicy:                         {Default: true, PreRelease: featuregate.Beta},
+	RuntimeClass:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
+	NodeLease:                                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	SCTPSupport:                                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
+	VolumeSnapshotDataSource:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
+	ProcMountType:                                  {Default: false, PreRelease: featuregate.Alpha},
+	TTLAfterFinished:                               {Default: false, PreRelease: featuregate.Alpha},
+	KubeletPodResources:                            {Default: true, PreRelease: featuregate.Beta},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: true, PreRelease: featuregate.Beta},
 	PodOverhead:                                    {Default: true, PreRelease: featuregate.Beta},
