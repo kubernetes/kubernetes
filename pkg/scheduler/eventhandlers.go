@@ -25,10 +25,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
@@ -169,7 +167,7 @@ func (sched *Scheduler) onCSINodeUpdate(oldObj, newObj interface{}) {
 
 func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
 	pod := obj.(*v1.Pod)
-	klog.V(3).Infof("add event for unscheduled pod %s/%s", pod.Namespace, pod.Name)
+	klog.V(3).InfoS("Add event for unscheduled pod", "pod", klog.KObj(pod))
 	if err := sched.SchedulingQueue.Add(pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to queue %T: %v", obj, err))
 	}
@@ -206,7 +204,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
 		return
 	}
-	klog.V(3).Infof("delete event for unscheduled pod %s/%s", pod.Namespace, pod.Name)
+	klog.V(3).InfoS("Delete event for unscheduled pod", "pod", klog.KObj(pod))
 	if err := sched.SchedulingQueue.Delete(pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
 	}
@@ -226,7 +224,7 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 		klog.Errorf("cannot convert to *v1.Pod: %v", obj)
 		return
 	}
-	klog.V(3).Infof("add event for scheduled pod %s/%s ", pod.Namespace, pod.Name)
+	klog.V(3).InfoS("Add event for scheduled pod", "pod", klog.KObj(pod))
 
 	if err := sched.SchedulerCache.AddPod(pod); err != nil {
 		klog.Errorf("scheduler cache AddPod failed: %v", err)
@@ -284,7 +282,7 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 		klog.Errorf("cannot convert to *v1.Pod: %v", t)
 		return
 	}
-	klog.V(3).Infof("delete event for scheduled pod %s/%s ", pod.Namespace, pod.Name)
+	klog.V(3).InfoS("Delete event for scheduled pod", "pod", klog.KObj(pod))
 	// NOTE: Updates must be written to scheduler cache before invalidating
 	// equivalence cache, because we could snapshot equivalence cache after the
 	// invalidation and then snapshot the cache itself. If the cache is
@@ -426,14 +424,12 @@ func addAllEventHandlers(
 		},
 	)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
-			cache.ResourceEventHandlerFuncs{
-				AddFunc:    sched.onCSINodeAdd,
-				UpdateFunc: sched.onCSINodeUpdate,
-			},
-		)
-	}
+	informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    sched.onCSINodeAdd,
+			UpdateFunc: sched.onCSINodeUpdate,
+		},
+	)
 
 	// On add and update of PVs.
 	informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandler(

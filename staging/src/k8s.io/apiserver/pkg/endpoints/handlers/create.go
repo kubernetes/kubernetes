@@ -49,13 +49,16 @@ var namespaceGVK = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Name
 func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
-		trace := utiltrace.New("Create", utiltrace.Field{Key: "url", Value: req.URL.Path}, utiltrace.Field{Key: "user-agent", Value: &lazyTruncatedUserAgent{req}}, utiltrace.Field{Key: "client", Value: &lazyClientIP{req}})
+		trace := utiltrace.New("Create", traceFields(req)...)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
 			scope.err(errors.NewBadRequest("the dryRun feature is disabled"), w, req)
 			return
 		}
+
+		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
+		timeout := parseTimeout(req.URL.Query().Get("timeout"))
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
@@ -73,7 +76,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			}
 		}
 
-		ctx, cancel := context.WithTimeout(req.Context(), requestTimeout)
+		ctx, cancel := context.WithTimeout(req.Context(), timeout)
 		defer cancel()
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
@@ -152,7 +155,9 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 				options,
 			)
 		}
-		result, err := finishRequest(ctx, func() (runtime.Object, error) {
+		// Dedup owner references before updating managed fields
+		dedupOwnerReferencesAndAddWarning(obj, req.Context(), false)
+		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			if scope.FieldManager != nil {
 				liveObj, err := scope.Creater.New(scope.Kind)
 				if err != nil {
@@ -165,6 +170,8 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 					return nil, err
 				}
 			}
+			// Dedup owner references again after mutating admission happens
+			dedupOwnerReferencesAndAddWarning(obj, req.Context(), true)
 			result, err := requestFunc()
 			// If the object wasn't committed to storage because it's serialized size was too large,
 			// it is safe to remove managedFields (which can be large) and try again.

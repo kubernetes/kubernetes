@@ -24,6 +24,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -135,6 +136,8 @@ type remoteSubnetInfo struct {
 	drMacAddress      string
 }
 
+const NETWORK_TYPE_OVERLAY = "overlay"
+
 func Log(v interface{}, message string, level klog.Level) {
 	klog.V(level).Infof("%s, %s", message, spewSdump(v))
 }
@@ -162,6 +165,11 @@ type endpointsInfo struct {
 	refCount        *uint16
 	providerAddress string
 	hns             HostNetworkService
+
+	// conditions
+	ready       bool
+	serving     bool
+	terminating bool
 }
 
 // String is part of proxy.Endpoint interface.
@@ -172,6 +180,21 @@ func (info *endpointsInfo) String() string {
 // GetIsLocal is part of proxy.Endpoint interface.
 func (info *endpointsInfo) GetIsLocal() bool {
 	return info.isLocal
+}
+
+// IsReady returns true if an endpoint is ready and not terminating.
+func (info *endpointsInfo) IsReady() bool {
+	return info.ready
+}
+
+// IsServing returns true if an endpoint is ready, regardless of it's terminating state.
+func (info *endpointsInfo) IsServing() bool {
+	return info.serving
+}
+
+// IsTerminating returns true if an endpoint is terminating.
+func (info *endpointsInfo) IsTerminating() bool {
+	return info.terminating
 }
 
 // GetTopology returns the topology information of the endpoint.
@@ -300,6 +323,10 @@ func (proxier *Proxier) newEndpointInfo(baseInfo *proxy.BaseEndpointInfo) proxy.
 		refCount:   new(uint16),
 		hnsID:      "",
 		hns:        proxier.hns,
+
+		ready:       baseInfo.Ready,
+		serving:     baseInfo.Serving,
+		terminating: baseInfo.Terminating,
 	}
 
 	return info
@@ -311,6 +338,10 @@ func newSourceVIP(hns HostNetworkService, network string, ip string, mac string,
 		isLocal:         true,
 		macAddress:      mac,
 		providerAddress: providerAddress,
+
+		ready:       true,
+		serving:     true,
+		terminating: false,
 	}
 	ep, err := hns.createEndpoint(hnsEndpoint, network)
 	return ep, err
@@ -535,7 +566,7 @@ func NewProxier(
 
 	// Network could have been detected before Remote Subnet Routes are applied or ManagementIP is updated
 	// Sleep and update the network to include new information
-	if hnsNetworkInfo.networkType == "Overlay" {
+	if strings.EqualFold(hnsNetworkInfo.networkType, NETWORK_TYPE_OVERLAY) {
 		time.Sleep(10 * time.Second)
 		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
 		if err != nil {
@@ -555,7 +586,7 @@ func NewProxier(
 
 	var sourceVip string
 	var hostMac string
-	if hnsNetworkInfo.networkType == "Overlay" {
+	if strings.EqualFold(hnsNetworkInfo.networkType, NETWORK_TYPE_OVERLAY) {
 		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinOverlay) {
 			return nil, fmt.Errorf("WinOverlay feature gate not enabled")
 		}
@@ -941,7 +972,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
-	serviceUpdateResult := proxy.UpdateServiceMap(proxier.serviceMap, proxier.serviceChanges)
+	serviceUpdateResult := proxier.serviceMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
 	staleServices := serviceUpdateResult.UDPStaleClusterIP
@@ -953,7 +984,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	if proxier.network.networkType == "Overlay" {
+	if strings.EqualFold(proxier.network.networkType, NETWORK_TYPE_OVERLAY) {
 		existingSourceVip, err := hns.getEndpointByIpAddress(proxier.sourceVip, hnsNetworkName)
 		if existingSourceVip == nil {
 			_, err = newSourceVIP(hns, hnsNetworkName, proxier.sourceVip, proxier.hostMac, proxier.nodeIP.String())
@@ -979,7 +1010,7 @@ func (proxier *Proxier) syncProxyRules() {
 			continue
 		}
 
-		if proxier.network.networkType == "Overlay" {
+		if strings.EqualFold(proxier.network.networkType, NETWORK_TYPE_OVERLAY) {
 			serviceVipEndpoint, _ := hns.getEndpointByIpAddress(svcInfo.ClusterIP().String(), hnsNetworkName)
 			if serviceVipEndpoint == nil {
 				klog.V(4).Infof("No existing remote endpoint for service VIP %v", svcInfo.ClusterIP().String())
@@ -1010,10 +1041,13 @@ func (proxier *Proxier) syncProxyRules() {
 		containsNodeIP := false
 
 		for _, epInfo := range proxier.endpointsMap[svcName] {
-
 			ep, ok := epInfo.(*endpointsInfo)
 			if !ok {
 				klog.Errorf("Failed to cast endpointsInfo %q", svcName.String())
+				continue
+			}
+
+			if !ep.IsReady() {
 				continue
 			}
 
@@ -1044,7 +1078,7 @@ func (proxier *Proxier) syncProxyRules() {
 					continue
 				}
 
-				if proxier.network.networkType == "Overlay" {
+				if strings.EqualFold(proxier.network.networkType, NETWORK_TYPE_OVERLAY) {
 					klog.Infof("Updating network %v to check for new remote subnet policies", proxier.network.name)
 					networkName := proxier.network.name
 					updatedNetwork, err := hns.getNetworkByName(networkName)
@@ -1099,7 +1133,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// a) Endpoints are any IP's outside the cluster ==> Choose NodeIP as the SourceVIP
 			// b) Endpoints are IP addresses of a remote node => Choose NodeIP as the SourceVIP
 			// c) Everything else (Local POD's, Remote POD's, Node IP of current node) ==> Choose the configured SourceVIP
-			if proxier.network.networkType == "Overlay" && !ep.GetIsLocal() {
+			if strings.EqualFold(proxier.network.networkType, NETWORK_TYPE_OVERLAY) && !ep.GetIsLocal() {
 				providerAddress := proxier.network.findRemoteSubnetProviderAddress(ep.IP())
 
 				isNodeIP := (ep.IP() == providerAddress)

@@ -1369,11 +1369,28 @@ func CreatePodWithPersistentVolume(client clientset.Interface, namespace string,
 			pv.Status.Phase = v1.VolumeBound
 
 			// bind pvc to "pv-$i"
-			// pvc.Spec.VolumeName = pv.Name
+			pvc.Spec.VolumeName = pv.Name
 			pvc.Status.Phase = v1.ClaimBound
 		} else {
 			pv.Status.Phase = v1.VolumeAvailable
 		}
+
+		// Create PVC first as it's referenced by the PV when the `bindVolume` is true.
+		if err := CreatePersistentVolumeClaimWithRetries(client, namespace, pvc); err != nil {
+			lock.Lock()
+			defer lock.Unlock()
+			createError = fmt.Errorf("error creating PVC: %s", err)
+			return
+		}
+
+		// We need to update statuses separately, as creating pv/pvc resets status to the default one.
+		if _, err := client.CoreV1().PersistentVolumeClaims(namespace).UpdateStatus(context.TODO(), pvc, metav1.UpdateOptions{}); err != nil {
+			lock.Lock()
+			defer lock.Unlock()
+			createError = fmt.Errorf("error updating PVC status: %s", err)
+			return
+		}
+
 		if err := CreatePersistentVolumeWithRetries(client, pv); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
@@ -1385,19 +1402,6 @@ func CreatePodWithPersistentVolume(client clientset.Interface, namespace string,
 			lock.Lock()
 			defer lock.Unlock()
 			createError = fmt.Errorf("error updating PV status: %s", err)
-			return
-		}
-
-		if err := CreatePersistentVolumeClaimWithRetries(client, namespace, pvc); err != nil {
-			lock.Lock()
-			defer lock.Unlock()
-			createError = fmt.Errorf("error creating PVC: %s", err)
-			return
-		}
-		if _, err := client.CoreV1().PersistentVolumeClaims(namespace).UpdateStatus(context.TODO(), pvc, metav1.UpdateOptions{}); err != nil {
-			lock.Lock()
-			defer lock.Unlock()
-			createError = fmt.Errorf("error updating PVC status: %s", err)
 			return
 		}
 

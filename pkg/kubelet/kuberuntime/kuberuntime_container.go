@@ -474,7 +474,6 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 				cStatus.Message += tMessage
 			}
 		}
-		cStatus.PodSandboxID = c.PodSandboxId
 		statuses[i] = cStatus
 	}
 
@@ -742,6 +741,18 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(pod *v1.Pod, podStatus *
 func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.Status, next *v1.Container, done bool) {
 	if len(pod.Spec.InitContainers) == 0 {
 		return nil, nil, true
+	}
+
+	// If any of the main containers have status and are Running, then all init containers must
+	// have been executed at some point in the past.  However, they could have been removed
+	// from the container runtime now, and if we proceed, it would appear as if they
+	// never ran and will re-execute improperly.
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status != nil && status.State == kubecontainer.ContainerStateRunning {
+			return nil, nil, true
+		}
 	}
 
 	// If there are failed containers, return the status of the last failed one.

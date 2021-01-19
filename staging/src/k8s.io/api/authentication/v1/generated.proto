@@ -36,7 +36,7 @@ message BoundObjectReference {
 
   // API version of the referent.
   // +optional
-  optional string aPIVersion = 2;
+  optional string apiVersion = 2;
 
   // Name of the referent.
   // +optional

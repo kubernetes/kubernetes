@@ -441,7 +441,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 
 	buildNodeLabels := func(failureDomain string) map[string]string {
 		labels := map[string]string{
-			v1.LabelFailureDomainBetaZone: failureDomain,
+			v1.LabelTopologyZone: failureDomain,
 		}
 		return labels
 	}

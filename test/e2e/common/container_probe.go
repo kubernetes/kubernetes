@@ -123,6 +123,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		livenessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"cat", "/tmp/health"}),
 			InitialDelaySeconds: 15,
+			TimeoutSeconds:      5, // default 1s can be pretty aggressive in CI environments with low resources
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
@@ -139,6 +140,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		livenessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"cat", "/tmp/health"}),
 			InitialDelaySeconds: 15,
+			TimeoutSeconds:      5, // default 1s can be pretty aggressive in CI environments with low resources
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
@@ -211,7 +213,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Testname: Pod liveness probe, docker exec, restart
 		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call  does not return within the timeout specified, liveness probe MUST restart the Pod.
 	*/
-	ginkgo.It("should be restarted with a docker exec liveness probe with timeout ", func() {
+	ginkgo.It("should be restarted with an exec liveness probe with timeout [NodeConformance]", func() {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		livenessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
@@ -228,7 +230,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Testname: Pod readiness probe, docker exec, not ready
 		Description: A Pod is created with readiness probe with a Exec action on the Pod. If the readiness probe call does not return within the timeout specified, readiness probe MUST not be Ready.
 	*/
-	ginkgo.It("should not be ready with a docker exec readiness probe timeout ", func() {
+	ginkgo.It("should not be ready with an exec readiness probe timeout [NodeConformance]", func() {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		readinessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"/bin/sh", "-c", "sleep 10"}),

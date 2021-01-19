@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/server/egressselector"
+	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/value"
 )
 
@@ -77,6 +78,8 @@ type Config struct {
 	DBMetricPollInterval time.Duration
 	// HealthcheckTimeout specifies the timeout used when checking health
 	HealthcheckTimeout time.Duration
+
+	LeaseManagerConfig etcd3.LeaseManagerConfig
 }
 
 func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
@@ -87,5 +90,6 @@ func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 		CompactionInterval:   DefaultCompactInterval,
 		DBMetricPollInterval: DefaultDBMetricPollInterval,
 		HealthcheckTimeout:   DefaultHealthcheckTimeout,
+		LeaseManagerConfig:   etcd3.NewDefaultLeaseManagerConfig(),
 	}
 }

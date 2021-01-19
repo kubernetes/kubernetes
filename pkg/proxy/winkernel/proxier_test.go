@@ -35,12 +35,14 @@ import (
 	"time"
 )
 
-const testHostName = "test-hostname"
-const macAddress = "00-11-22-33-44-55"
-const clusterCIDR = "192.168.1.0/24"
-const destinationPrefix = "192.168.2.0/24"
-const providerAddress = "10.0.0.3"
-const guid = "123ABC"
+const (
+	testHostName      = "test-hostname"
+	macAddress        = "00-11-22-33-44-55"
+	clusterCIDR       = "192.168.1.0/24"
+	destinationPrefix = "192.168.2.0/24"
+	providerAddress   = "10.0.0.3"
+	guid              = "123ABC"
+)
 
 type fakeHNS struct{}
 
@@ -60,7 +62,7 @@ func (hns fakeHNS) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	return &hnsNetworkInfo{
 		id:            strings.ToUpper(guid),
 		name:          name,
-		networkType:   "Overlay",
+		networkType:   NETWORK_TYPE_OVERLAY,
 		remoteSubnets: remoteSubnets,
 	}, nil
 }
@@ -142,7 +144,7 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clust
 
 func TestCreateServiceVip(t *testing.T) {
 	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "Overlay", false)
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), NETWORK_TYPE_OVERLAY, false)
 	if proxier == nil {
 		t.Error()
 	}
@@ -198,7 +200,7 @@ func TestCreateServiceVip(t *testing.T) {
 
 func TestCreateRemoteEndpointOverlay(t *testing.T) {
 	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "Overlay", false)
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), NETWORK_TYPE_OVERLAY, false)
 	if proxier == nil {
 		t.Error()
 	}
@@ -649,7 +651,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 }
 func TestCreateLoadBalancer(t *testing.T) {
 	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "Overlay", false)
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), NETWORK_TYPE_OVERLAY, false)
 	if proxier == nil {
 		t.Error()
 	}
@@ -708,7 +710,7 @@ func TestCreateLoadBalancer(t *testing.T) {
 
 func TestCreateDsrLoadBalancer(t *testing.T) {
 	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "Overlay", false)
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), NETWORK_TYPE_OVERLAY, false)
 	if proxier == nil {
 		t.Error()
 	}
@@ -770,7 +772,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 
 func TestEndpointSlice(t *testing.T) {
 	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), "Overlay", true)
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", net.ParseIP("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error()
 	}

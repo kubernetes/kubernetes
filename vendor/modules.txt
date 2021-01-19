@@ -29,10 +29,10 @@ github.com/Azure/go-ansiterm/winterm
 # github.com/Azure/go-autorest v14.2.0+incompatible => github.com/Azure/go-autorest v14.2.0+incompatible
 github.com/Azure/go-autorest
 # github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.2.0+incompatible
-# github.com/Azure/go-autorest/autorest v0.11.1 => github.com/Azure/go-autorest/autorest v0.11.1
+# github.com/Azure/go-autorest/autorest v0.11.12 => github.com/Azure/go-autorest/autorest v0.11.12
 ## explicit
 github.com/Azure/go-autorest/autorest
-# github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.11.1
+# github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.11.12
 # github.com/Azure/go-autorest/autorest/adal v0.9.5 => github.com/Azure/go-autorest/autorest/adal v0.9.5
 ## explicit
 github.com/Azure/go-autorest/autorest/adal
@@ -267,9 +267,9 @@ github.com/containernetworking/cni/pkg/types/020
 github.com/containernetworking/cni/pkg/types/current
 github.com/containernetworking/cni/pkg/utils
 github.com/containernetworking/cni/pkg/version
-# github.com/coredns/corefile-migration v1.0.10 => github.com/coredns/corefile-migration v1.0.10
+# github.com/coredns/corefile-migration v1.0.11 => github.com/coredns/corefile-migration v1.0.11
 ## explicit
-# github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.10
+# github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.11
 github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile
 # github.com/coreos/bbolt => github.com/coreos/bbolt v1.3.2
@@ -498,9 +498,9 @@ github.com/gogo/protobuf/vanity/command
 ## explicit
 # github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 github.com/golang/groupcache/lru
-# github.com/golang/mock v1.4.1 => github.com/golang/mock v1.4.1
+# github.com/golang/mock v1.4.4 => github.com/golang/mock v1.4.4
 ## explicit
-# github.com/golang/mock => github.com/golang/mock v1.4.1
+# github.com/golang/mock => github.com/golang/mock v1.4.4
 github.com/golang/mock/gomock
 # github.com/golang/protobuf v1.4.3 => github.com/golang/protobuf v1.4.3
 # github.com/golang/protobuf => github.com/golang/protobuf v1.4.3
@@ -521,9 +521,9 @@ github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.0 => github.com/google/btree v1.0.0
 github.com/google/btree
 # github.com/google/btree => github.com/google/btree v1.0.0
-# github.com/google/cadvisor v0.38.4 => github.com/google/cadvisor v0.38.4
+# github.com/google/cadvisor v0.38.7 => github.com/google/cadvisor v0.38.7
 ## explicit
-# github.com/google/cadvisor => github.com/google/cadvisor v0.38.4
+# github.com/google/cadvisor => github.com/google/cadvisor v0.38.7
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
 github.com/google/cadvisor/client/v2
@@ -686,9 +686,9 @@ github.com/hashicorp/hcl/json/token
 # github.com/hashicorp/mdns => github.com/hashicorp/mdns v1.0.0
 # github.com/hashicorp/memberlist => github.com/hashicorp/memberlist v0.1.3
 # github.com/hashicorp/serf => github.com/hashicorp/serf v0.8.2
-# github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible => github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
+# github.com/heketi/heketi v10.2.0+incompatible => github.com/heketi/heketi v10.2.0+incompatible
 ## explicit
-# github.com/heketi/heketi => github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
+# github.com/heketi/heketi => github.com/heketi/heketi v10.2.0+incompatible
 github.com/heketi/heketi/client/api/go-client
 github.com/heketi/heketi/pkg/glusterfs/api
 github.com/heketi/heketi/pkg/utils
@@ -783,10 +783,10 @@ github.com/mailru/easyjson/jwriter
 # github.com/matttproud/golang_protobuf_extensions => github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mholt/certmagic => github.com/mholt/certmagic v0.6.2-0.20190624175158-6a42ef9fe8c2
-# github.com/miekg/dns v1.1.4 => github.com/miekg/dns v1.1.4
+# github.com/miekg/dns v1.1.35 => github.com/miekg/dns v1.1.35
 ## explicit
 github.com/miekg/dns
-# github.com/miekg/dns => github.com/miekg/dns v1.1.4
+# github.com/miekg/dns => github.com/miekg/dns v1.1.35
 # github.com/mindprince/gonvml v0.0.0-20190828220739-9ebdce4bb989 => github.com/mindprince/gonvml v0.0.0-20190828220739-9ebdce4bb989
 github.com/mindprince/gonvml
 # github.com/mindprince/gonvml => github.com/mindprince/gonvml v0.0.0-20190828220739-9ebdce4bb989
@@ -2271,9 +2271,9 @@ k8s.io/cri-api/pkg/apis/testing
 k8s.io/csi-translation-lib
 # k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 k8s.io/csi-translation-lib/plugins
-# k8s.io/gengo v0.0.0-20201113003025-83324d819ded => k8s.io/gengo v0.0.0-20201113003025-83324d819ded
+# k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027 => k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027
 ## explicit
-# k8s.io/gengo => k8s.io/gengo v0.0.0-20201113003025-83324d819ded
+# k8s.io/gengo => k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027
 k8s.io/gengo/args
 k8s.io/gengo/examples/deepcopy-gen/generators
 k8s.io/gengo/examples/defaulter-gen/generators
@@ -2555,9 +2555,9 @@ k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 # k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 # k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
-# k8s.io/system-validators v1.2.0 => k8s.io/system-validators v1.2.0
+# k8s.io/system-validators v1.3.0 => k8s.io/system-validators v1.3.0
 ## explicit
-# k8s.io/system-validators => k8s.io/system-validators v1.2.0
+# k8s.io/system-validators => k8s.io/system-validators v1.3.0
 k8s.io/system-validators/validators
 # k8s.io/utils v0.0.0-20201110183641-67b214c5f920 => k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 ## explicit
@@ -2584,8 +2584,6 @@ k8s.io/utils/trace
 # modernc.org/strutil => modernc.org/strutil v1.0.0
 # modernc.org/xc => modernc.org/xc v1.0.0
 # rsc.io/pdf => rsc.io/pdf v0.1.1
-# rsc.io/quote/v3 => rsc.io/quote/v3 v3.1.0
-# rsc.io/sampler => rsc.io/sampler v1.3.0
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.14 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.14
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.14
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client

@@ -407,7 +407,7 @@ func (g *Cloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyDat
 // GetAllCurrentZones returns all the zones in which k8s nodes are currently running
 func (g *Cloud) GetAllCurrentZones() (sets.String, error) {
 	if g.nodeInformerSynced == nil {
-		klog.Warningf("Cloud object does not have informers set, should only happen in E2E binary.")
+		klog.Warning("Cloud object does not have informers set, should only happen in E2E binary.")
 		return g.GetAllZonesFromCloudProvider()
 	}
 	g.nodeZonesLock.Lock()

@@ -28,8 +28,7 @@ func TestNonePolicyName(t *testing.T) {
 
 	policyName := policy.Name()
 	if policyName != "none" {
-		t.Errorf("NonePolicy Name() error. expected: none, returned: %v",
-			policyName)
+		t.Errorf("NonePolicy Name() error. expected: none, returned: %v", policyName)
 	}
 }
 

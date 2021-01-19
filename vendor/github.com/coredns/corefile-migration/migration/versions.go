@@ -12,10 +12,11 @@ type release struct {
 	dockerImageSHA string            // the docker image SHA for this release
 	plugins        map[string]plugin // map of plugins with deprecation status and migration actions for this release
 
-	// postProcess is a post processing action to take on the corefile as a whole.  Used for complex migration
+	// pre/postProcess are processing actions to take on the corefile as a whole.  Used for complex migration
 	//   tasks that dont fit well into the modular plugin/option migration framework. For example, when the
 	//   action on a plugin would need to extend beyond the scope of that plugin (affecting other plugins, or
 	//   server blocks, etc). e.g. Splitting plugins out into separate server blocks.
+	preProcess corefileAction
 	postProcess corefileAction
 
 	// defaultConf holds the default Corefile template packaged with the corresponding k8sReleases.
@@ -29,7 +30,53 @@ type release struct {
 
 // Versions holds a map of plugin/option migrations per CoreDNS release (since 1.1.4)
 var Versions = map[string]release{
+	"1.8.0": {
+		priorVersion:   "1.7.1",
+		dockerImageSHA: "TBD",
+		plugins: map[string]plugin{
+			"errors":       plugins["errors"]["v2"],
+			"log":          plugins["log"]["v1"],
+			"health":       plugins["health"]["v1"],
+			"ready":        {},
+			"autopath":     {},
+			"kubernetes":   plugins["kubernetes"]["v8 remove transfer option"],
+			"k8s_external": plugins["k8s_external"]["v1"],
+			"prometheus":   {},
+			"forward":      plugins["forward"]["v3"],
+			"cache":        plugins["cache"]["v1"],
+			"loop":         {},
+			"reload":       {},
+			"loadbalance":  {},
+			"hosts":        plugins["hosts"]["v1"],
+			"rewrite":      plugins["rewrite"]["v2"],
+			"transfer":     plugins["transfer"]["v1"],
+		},
+		preProcess: copyKubernetesTransferOptToPlugin,
+	},
+	"1.7.1": {
+		nextVersion:    "1.8.0",
+		priorVersion:   "1.7.0",
+		dockerImageSHA: "4a6e0769130686518325b21b0c1d0688b54e7c79244d48e1b15634e98e40c6ef",
+		plugins: map[string]plugin{
+			"errors":       plugins["errors"]["v2"],
+			"log":          plugins["log"]["v1"],
+			"health":       plugins["health"]["v1"],
+			"ready":        {},
+			"autopath":     {},
+			"kubernetes":   plugins["kubernetes"]["v7"],
+			"k8s_external": plugins["k8s_external"]["v1"],
+			"prometheus":   {},
+			"forward":      plugins["forward"]["v3"],
+			"cache":        plugins["cache"]["v1"],
+			"loop":         {},
+			"reload":       {},
+			"loadbalance":  {},
+			"hosts":        plugins["hosts"]["v1"],
+			"rewrite":      plugins["rewrite"]["v2"],
+		},
+	},
 	"1.7.0": {
+		nextVersion:    "1.7.1",
 		priorVersion:   "1.6.9",
 		k8sReleases:    []string{"1.19"},
 		dockerImageSHA: "73ca82b4ce829766d4f1f10947c3a338888f876fbed0540dc849c89ff256e90c",
@@ -62,7 +109,7 @@ var Versions = map[string]release{
 			"kubernetes":   plugins["kubernetes"]["v7"],
 			"k8s_external": plugins["k8s_external"]["v1"],
 			"prometheus":   {},
-			"forward":      plugins["forward"]["v3"],
+			"forward":      plugins["forward"]["v3 add max_concurrent"],
 			"cache":        plugins["cache"]["v1"],
 			"loop":         {},
 			"reload":       {},
@@ -84,7 +131,7 @@ var Versions = map[string]release{
 			"kubernetes":   plugins["kubernetes"]["v6"],
 			"k8s_external": plugins["k8s_external"]["v1"],
 			"prometheus":   {},
-			"forward":      plugins["forward"]["v2"],
+			"forward":      plugins["forward"]["v3"],
 			"cache":        plugins["cache"]["v2"],
 			"loop":         {},
 			"reload":       {},

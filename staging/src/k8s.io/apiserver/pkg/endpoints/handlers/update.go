@@ -46,7 +46,7 @@ import (
 func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
-		trace := utiltrace.New("Update", utiltrace.Field{Key: "url", Value: req.URL.Path}, utiltrace.Field{Key: "user-agent", Value: &lazyTruncatedUserAgent{req}}, utiltrace.Field{Key: "client", Value: &lazyClientIP{req}})
+		trace := utiltrace.New("Update", traceFields(req)...)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
@@ -54,12 +54,15 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			return
 		}
 
+		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
+		timeout := parseTimeout(req.URL.Query().Get("timeout"))
+
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
-		ctx, cancel := context.WithTimeout(req.Context(), requestTimeout)
+		ctx, cancel := context.WithTimeout(req.Context(), timeout)
 		defer cancel()
 		ctx = request.WithNamespace(ctx, namespace)
 
@@ -150,6 +153,11 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 				}
 				return newObj, nil
 			})
+			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
+				// Dedup owner references again after mutating admission happens
+				dedupOwnerReferencesAndAddWarning(newObj, req.Context(), true)
+				return newObj, nil
+			})
 		}
 
 		createAuthorizerAttributes := authorizer.AttributesRecord{
@@ -185,7 +193,9 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			wasCreated = created
 			return obj, err
 		}
-		result, err := finishRequest(ctx, func() (runtime.Object, error) {
+		// Dedup owner references before updating managed fields
+		dedupOwnerReferencesAndAddWarning(obj, req.Context(), false)
+		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			result, err := requestFunc()
 			// If the object wasn't committed to storage because it's serialized size was too large,
 			// it is safe to remove managedFields (which can be large) and try again.

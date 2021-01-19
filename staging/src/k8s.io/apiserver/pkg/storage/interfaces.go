@@ -167,7 +167,12 @@ type Interface interface {
 
 	// Delete removes the specified key and returns the value that existed at that spot.
 	// If key didn't exist, it will return NotFound storage error.
-	Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions, validateDeletion ValidateObjectFunc) error
+	// If 'cachedExistingObject' is non-nil, it can be used as a suggestion about the
+	// current version of the object to avoid read operation from storage to get it.
+	// However, the implementations have to retry in case suggestion is stale.
+	Delete(
+		ctx context.Context, key string, out runtime.Object, preconditions *Preconditions,
+		validateDeletion ValidateObjectFunc, cachedExistingObject runtime.Object) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items selected by 'p' are sent down to returned watch.Interface.
@@ -215,9 +220,9 @@ type Interface interface {
 	// or zero value in 'ptrToType' parameter otherwise.
 	// If the object to update has the same value as previous, it won't do any update
 	// but will return the object in 'ptrToType' parameter.
-	// If 'suggestion' is non-nil, it can be used as a suggestion about the current version
-	// of the object to avoid read operation from storage to get it. However, the
-	// implementations have to retry in case suggestion is stale.
+	// If 'cachedExistingObject' is non-nil, it can be used as a suggestion about the
+	// current version of the object to avoid read operation from storage to get it.
+	// However, the implementations have to retry in case suggestion is stale.
 	//
 	// Example:
 	//
@@ -239,7 +244,7 @@ type Interface interface {
 	// )
 	GuaranteedUpdate(
 		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
-		precondtions *Preconditions, tryUpdate UpdateFunc, suggestion runtime.Object) error
+		precondtions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
 
 	// Count returns number of different entries under the key (generally being path prefix).
 	Count(key string) (int64, error)

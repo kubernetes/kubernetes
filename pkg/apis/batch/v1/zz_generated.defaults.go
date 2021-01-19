@@ -21,8 +21,6 @@ limitations under the License.
 package v1
 
 import (
-	"reflect"
-
 	v1 "k8s.io/api/batch/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -103,7 +101,7 @@ func SetObjectDefaults_Job(in *v1.Job) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -153,7 +151,7 @@ func SetObjectDefaults_Job(in *v1.Job) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -203,7 +201,7 @@ func SetObjectDefaults_Job(in *v1.Job) {
 		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}

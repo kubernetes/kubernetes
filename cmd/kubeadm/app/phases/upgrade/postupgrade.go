@@ -184,7 +184,7 @@ func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfigurati
 			return err
 		}
 
-		// If we're dry-running or there are no scheduable nodes available, we don't need to wait for the new DNS addon to become ready
+		// If we're dry-running or there are no schedulable nodes available, we don't need to wait for the new DNS addon to become ready
 		if !dryRun && len(nodes.Items) != 0 {
 			dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(context.TODO(), installedDeploymentName, metav1.GetOptions{})
 			if err != nil {

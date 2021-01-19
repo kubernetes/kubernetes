@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"sync"
 	"time"
@@ -126,7 +127,11 @@ func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManagerImpl creates a new manager.
 func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
-	return newManagerImpl(pluginapi.KubeletSocket, topology, topologyAffinityStore)
+	socketPath := pluginapi.KubeletSocket
+	if runtime.GOOS == "windows" {
+		socketPath = os.Getenv("SYSTEMDRIVE") + pluginapi.KubeletSocketWindows
+	}
+	return newManagerImpl(socketPath, topology, topologyAffinityStore)
 }
 
 func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
@@ -206,7 +211,10 @@ func (m *ManagerImpl) removeContents(dir string) error {
 		if filePath == m.checkpointFile() {
 			continue
 		}
-		stat, err := os.Stat(filePath)
+		// TODO: Until the bug - https://github.com/golang/go/issues/33357 is fixed, os.stat wouldn't return the
+		// right mode(socket) on windows. Hence deleting the file, without checking whether
+		// its a socket, on windows.
+		stat, err := os.Lstat(filePath)
 		if err != nil {
 			klog.Errorf("Failed to stat file %s: %v", filePath, err)
 			continue
@@ -905,6 +913,10 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		// Update internal cached podDevices state.
 		m.mutex.Lock()
 		for dev := range allocDevices {
+			if m.allDevices[resource][dev].Topology == nil || len(m.allDevices[resource][dev].Topology.Nodes) == 0 {
+				allocDevicesWithNUMA[0] = append(allocDevicesWithNUMA[0], dev)
+				continue
+			}
 			for idx := range m.allDevices[resource][dev].Topology.Nodes {
 				node := m.allDevices[resource][dev].Topology.Nodes[idx]
 				allocDevicesWithNUMA[node.ID] = append(allocDevicesWithNUMA[node.ID], dev)

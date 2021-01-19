@@ -68,14 +68,6 @@ const (
 	// certificate as expiration approaches.
 	RotateKubeletServerCertificate featuregate.Feature = "RotateKubeletServerCertificate"
 
-	// owner: @mikedanese
-	// beta: v1.8
-	// ga: v1.19
-	//
-	// Automatically renews the client certificate used for communicating with
-	// the API server as the certificate approaches expiration.
-	RotateKubeletClientCertificate featuregate.Feature = "RotateKubeletClientCertificate"
-
 	// owner: @jinxu
 	// beta: v1.10
 	//
@@ -140,13 +132,16 @@ const (
 	// owner @smarterclayton
 	// alpha: v1.16
 	// beta:  v1.19
+	// ga:  v1.21
 	//
 	// Enable legacy behavior to vary cluster functionality on the node-role.kubernetes.io labels. On by default (legacy), will be turned off in 1.18.
+	// Lock to false in v1.21 and remove in v1.22.
 	LegacyNodeRoleBehavior featuregate.Feature = "LegacyNodeRoleBehavior"
 
 	// owner @brendandburns
 	// alpha: v1.9
 	// beta:  v1.19
+	// ga:  v1.21
 	//
 	// Enable nodes to exclude themselves from service load balancers
 	ServiceNodeExclusion featuregate.Feature = "ServiceNodeExclusion"
@@ -154,6 +149,7 @@ const (
 	// owner @smarterclayton
 	// alpha: v1.16
 	// beta:  v1.19
+	// ga:  v1.21
 	//
 	// Enable nodes to exclude themselves from network disruption checks
 	NodeDisruptionExclusion featuregate.Feature = "NodeDisruptionExclusion"
@@ -164,13 +160,6 @@ const (
 	// GA:    v1.18
 	// Enable all logic related to the CSIDriver API object in storage.k8s.io
 	CSIDriverRegistry featuregate.Feature = "CSIDriverRegistry"
-
-	// owner: @verult
-	// alpha: v1.12
-	// beta:  v1.14
-	// ga:    v1.17
-	// Enable all logic related to the CSINode API object in storage.k8s.io
-	CSINodeInfo featuregate.Feature = "CSINodeInfo"
 
 	// owner: @screeley44
 	// alpha: v1.9
@@ -200,20 +189,6 @@ const (
 	// Enable Hyper-V containers on Windows
 	// Deprecated in 1.20 and removed in 1.21
 	HyperVContainer featuregate.Feature = "HyperVContainer"
-
-	// owner: @mikedanese
-	// beta: v1.12
-	// ga: v1.20
-	//
-	// Implement TokenRequest endpoint on service account resources.
-	TokenRequest featuregate.Feature = "TokenRequest"
-
-	// owner: @mikedanese
-	// beta: v1.12
-	// ga: v1.20
-	//
-	// Enable ServiceAccountTokenVolumeProjection support in ProjectedVolumes.
-	TokenRequestProjection featuregate.Feature = "TokenRequestProjection"
 
 	// owner: @mikedanese
 	// alpha: v1.13
@@ -251,15 +226,6 @@ const (
 	// Allow mounting a subpath of a volume in a container
 	// Do not remove this feature gate even though it's GA
 	VolumeSubpath featuregate.Feature = "VolumeSubpath"
-
-	// owner: @gnufied
-	// beta : v1.12
-	// GA   : v1.17
-
-	//
-	// Add support for volume plugins to report node specific
-	// volume limits
-	AttachVolumeLimit featuregate.Feature = "AttachVolumeLimit"
 
 	// owner: @ravig
 	// alpha: v1.11
@@ -494,14 +460,6 @@ const (
 	// Enables NonPreempting option for priorityClass and pod.
 	NonPreemptingPriority featuregate.Feature = "NonPreemptingPriority"
 
-	// owner: @j-griffith
-	// alpha: v1.15
-	// beta: v1.16
-	// GA: v1.18
-	//
-	// Enable support for specifying an existing PVC as a DataSource
-	VolumePVCDataSource featuregate.Feature = "VolumePVCDataSource"
-
 	// owner: @egernst
 	// alpha: v1.16
 	// beta: v1.18
@@ -534,14 +492,6 @@ const (
 	// Enable Endpoint Slice consumption by kube-proxy in Windows for improved scalability.
 	WindowsEndpointSliceProxying featuregate.Feature = "WindowsEndpointSliceProxying"
 
-	// owner: @Huang-Wei
-	// alpha: v1.16
-	// beta: v1.18
-	// GA: v1.19
-	//
-	// Schedule pods evenly across available topology domains.
-	EvenPodsSpread featuregate.Feature = "EvenPodsSpread"
-
 	// owner: @matthyx
 	// alpha: v1.16
 	// beta: v1.18
@@ -573,6 +523,12 @@ const (
 	// This feature is deprecated, and will be removed in v1.22.
 	CronJobControllerV2 featuregate.Feature = "CronJobControllerV2"
 
+	// owner: @smarterclayton
+	// alpha: v1.21
+	//
+	// DaemonSets allow workloads to maintain availability during update per node
+	DaemonSetUpdateSurge featuregate.Feature = "DaemonSetUpdateSurge"
+
 	// owner: @m1093782566
 	// alpha: v1.17
 	//
@@ -589,7 +545,8 @@ const (
 
 	// owner: @wojtek-t
 	// alpha: v1.18
-	// beta: v1.19
+	// beta:  v1.19
+	// ga:    v1.21
 	//
 	// Enables a feature to make secrets and configmaps data immutable.
 	ImmutableEphemeralVolumes featuregate.Feature = "ImmutableEphemeralVolumes"
@@ -735,7 +692,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
 	DevicePlugins:                  {Default: true, PreRelease: featuregate.Beta},
 	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.Beta},
-	RotateKubeletClientCertificate: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	LocalStorageCapacityIsolation:  {Default: true, PreRelease: featuregate.Beta},
 	Sysctls:                        {Default: true, PreRelease: featuregate.Beta},
 	EphemeralContainers:            {Default: false, PreRelease: featuregate.Alpha},
@@ -743,21 +699,17 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExpandPersistentVolumes:        {Default: true, PreRelease: featuregate.Beta},
 	ExpandInUsePersistentVolumes:   {Default: true, PreRelease: featuregate.Beta},
 	ExpandCSIVolumes:               {Default: true, PreRelease: featuregate.Beta},
-	AttachVolumeLimit:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	CPUManager:                     {Default: true, PreRelease: featuregate.Beta},
 	CPUCFSQuotaPeriod:              {Default: false, PreRelease: featuregate.Alpha},
 	TopologyManager:                {Default: true, PreRelease: featuregate.Beta},
-	ServiceNodeExclusion:           {Default: true, PreRelease: featuregate.Beta},
-	NodeDisruptionExclusion:        {Default: true, PreRelease: featuregate.Beta},
+	ServiceNodeExclusion:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
+	NodeDisruptionExclusion:        {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	CSIDriverRegistry:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
-	CSINodeInfo:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	BlockVolume:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	StorageObjectInUseProtection:   {Default: true, PreRelease: featuregate.GA},
 	SupportPodPidsLimit:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	SupportNodePidsLimit:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	HyperVContainer:                {Default: false, PreRelease: featuregate.Deprecated},
-	TokenRequest:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
-	TokenRequestProjection:         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	BoundServiceAccountTokenVolume: {Default: false, PreRelease: featuregate.Alpha},
 	ServiceAccountIssuerDiscovery:  {Default: true, PreRelease: featuregate.Beta},
 	CRIContainerLogRotation:        {Default: true, PreRelease: featuregate.Beta},
@@ -795,7 +747,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WindowsRunAsUserName:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: true, PreRelease: featuregate.Beta},
-	VolumePVCDataSource:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	PodOverhead:                                    {Default: true, PreRelease: featuregate.Beta},
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
 	EndpointSlice:                                  {Default: true, PreRelease: featuregate.Beta},
@@ -803,14 +754,14 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	EndpointSliceTerminatingCondition:              {Default: false, PreRelease: featuregate.Alpha},
 	EndpointSliceNodeName:                          {Default: false, PreRelease: featuregate.Alpha},
 	WindowsEndpointSliceProxying:                   {Default: false, PreRelease: featuregate.Alpha},
-	EvenPodsSpread:                                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	StartupProbe:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
 	CronJobControllerV2:                            {Default: false, PreRelease: featuregate.Alpha},
+	DaemonSetUpdateSurge:                           {Default: false, PreRelease: featuregate.Alpha},
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
 	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.Beta},
+	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.Beta},
 	DownwardAPIHugePages:                           {Default: false, PreRelease: featuregate.Alpha},
 	ExternalPolicyForExternalIP:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
@@ -844,5 +795,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
 	HPAScaleToZero:         {Default: false, PreRelease: featuregate.Alpha},
-	LegacyNodeRoleBehavior: {Default: true, PreRelease: featuregate.Beta},
+	LegacyNodeRoleBehavior: {Default: false, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 }

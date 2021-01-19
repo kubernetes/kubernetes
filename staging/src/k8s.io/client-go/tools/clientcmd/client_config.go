@@ -198,13 +198,13 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		if err != nil {
 			return nil, err
 		}
-		mergo.MergeWithOverwrite(clientConfig, userAuthPartialConfig)
+		mergo.Merge(clientConfig, userAuthPartialConfig, mergo.WithOverride)
 
 		serverAuthPartialConfig, err := getServerIdentificationPartialConfig(configAuthInfo, configClusterInfo)
 		if err != nil {
 			return nil, err
 		}
-		mergo.MergeWithOverwrite(clientConfig, serverAuthPartialConfig)
+		mergo.Merge(clientConfig, serverAuthPartialConfig, mergo.WithOverride)
 	}
 
 	return clientConfig, nil
@@ -225,7 +225,7 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 	configClientConfig.CAData = configClusterInfo.CertificateAuthorityData
 	configClientConfig.Insecure = configClusterInfo.InsecureSkipTLSVerify
 	configClientConfig.ServerName = configClusterInfo.TLSServerName
-	mergo.MergeWithOverwrite(mergedConfig, configClientConfig)
+	mergo.Merge(mergedConfig, configClientConfig, mergo.WithOverride)
 
 	return mergedConfig, nil
 }
@@ -294,8 +294,8 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 		promptedConfig := makeUserIdentificationConfig(*promptedAuthInfo)
 		previouslyMergedConfig := mergedConfig
 		mergedConfig = &restclient.Config{}
-		mergo.MergeWithOverwrite(mergedConfig, promptedConfig)
-		mergo.MergeWithOverwrite(mergedConfig, previouslyMergedConfig)
+		mergo.Merge(mergedConfig, promptedConfig, mergo.WithOverride)
+		mergo.Merge(mergedConfig, previouslyMergedConfig, mergo.WithOverride)
 		config.promptedCredentials.username = mergedConfig.Username
 		config.promptedCredentials.password = mergedConfig.Password
 	}
@@ -463,12 +463,12 @@ func (config *DirectClientConfig) getContext() (clientcmdapi.Context, error) {
 
 	mergedContext := clientcmdapi.NewContext()
 	if configContext, exists := contexts[contextName]; exists {
-		mergo.MergeWithOverwrite(mergedContext, configContext)
+		mergo.Merge(mergedContext, configContext, mergo.WithOverride)
 	} else if required {
 		return clientcmdapi.Context{}, fmt.Errorf("context %q does not exist", contextName)
 	}
 	if config.overrides != nil {
-		mergo.MergeWithOverwrite(mergedContext, config.overrides.Context)
+		mergo.Merge(mergedContext, config.overrides.Context, mergo.WithOverride)
 	}
 
 	return *mergedContext, nil
@@ -481,12 +481,12 @@ func (config *DirectClientConfig) getAuthInfo() (clientcmdapi.AuthInfo, error) {
 
 	mergedAuthInfo := clientcmdapi.NewAuthInfo()
 	if configAuthInfo, exists := authInfos[authInfoName]; exists {
-		mergo.MergeWithOverwrite(mergedAuthInfo, configAuthInfo)
+		mergo.Merge(mergedAuthInfo, configAuthInfo, mergo.WithOverride)
 	} else if required {
 		return clientcmdapi.AuthInfo{}, fmt.Errorf("auth info %q does not exist", authInfoName)
 	}
 	if config.overrides != nil {
-		mergo.MergeWithOverwrite(mergedAuthInfo, config.overrides.AuthInfo)
+		mergo.Merge(mergedAuthInfo, config.overrides.AuthInfo, mergo.WithOverride)
 	}
 
 	return *mergedAuthInfo, nil
@@ -499,15 +499,15 @@ func (config *DirectClientConfig) getCluster() (clientcmdapi.Cluster, error) {
 
 	mergedClusterInfo := clientcmdapi.NewCluster()
 	if config.overrides != nil {
-		mergo.MergeWithOverwrite(mergedClusterInfo, config.overrides.ClusterDefaults)
+		mergo.Merge(mergedClusterInfo, config.overrides.ClusterDefaults, mergo.WithOverride)
 	}
 	if configClusterInfo, exists := clusterInfos[clusterInfoName]; exists {
-		mergo.MergeWithOverwrite(mergedClusterInfo, configClusterInfo)
+		mergo.Merge(mergedClusterInfo, configClusterInfo, mergo.WithOverride)
 	} else if required {
 		return clientcmdapi.Cluster{}, fmt.Errorf("cluster %q does not exist", clusterInfoName)
 	}
 	if config.overrides != nil {
-		mergo.MergeWithOverwrite(mergedClusterInfo, config.overrides.ClusterInfo)
+		mergo.Merge(mergedClusterInfo, config.overrides.ClusterInfo, mergo.WithOverride)
 	}
 
 	// * An override of --insecure-skip-tls-verify=true and no accompanying CA/CA data should clear already-set CA/CA data
@@ -548,11 +548,12 @@ func (config *inClusterClientConfig) RawConfig() (clientcmdapi.Config, error) {
 }
 
 func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) {
-	if config.inClusterConfigProvider == nil {
-		config.inClusterConfigProvider = restclient.InClusterConfig
+	inClusterConfigProvider := config.inClusterConfigProvider
+	if inClusterConfigProvider == nil {
+		inClusterConfigProvider = restclient.InClusterConfig
 	}
 
-	icc, err := config.inClusterConfigProvider()
+	icc, err := inClusterConfigProvider()
 	if err != nil {
 		return nil, err
 	}
@@ -572,7 +573,7 @@ func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) 
 		}
 	}
 
-	return icc, err
+	return icc, nil
 }
 
 func (config *inClusterClientConfig) Namespace() (string, bool, error) {
@@ -611,7 +612,7 @@ func (config *inClusterClientConfig) Possible() bool {
 // to the default config.
 func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config, error) {
 	if kubeconfigPath == "" && masterUrl == "" {
-		klog.Warningf("Neither --kubeconfig nor --master was specified.  Using the inClusterConfig.  This might not work.")
+		klog.Warning("Neither --kubeconfig nor --master was specified.  Using the inClusterConfig.  This might not work.")
 		kubeconfig, err := restclient.InClusterConfig()
 		if err == nil {
 			return kubeconfig, nil

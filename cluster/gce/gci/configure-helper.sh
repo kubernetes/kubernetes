@@ -120,7 +120,7 @@ function gce-metadata-fw-helper {
 
   # Deliberately allow word split here
   # shellcheck disable=SC2086
-  iptables ${command} OUTPUT -p tcp --dport 80 -d ${METADATA_SERVER_IP} -m owner ${invert:-} --uid-owner=${METADATA_SERVER_ALLOWED_UID_RANGE:-0-2999} -j ${action}
+  iptables -w ${command} OUTPUT -p tcp --dport 80 -d ${METADATA_SERVER_IP} -m owner ${invert:-} --uid-owner=${METADATA_SERVER_ALLOWED_UID_RANGE:-0-2999} -j ${action}
 }
 
 function config-ip-firewall {
@@ -134,17 +134,17 @@ function config-ip-firewall {
   # We need to add rules to accept all TCP/UDP/ICMP/SCTP packets.
   if iptables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
     echo "Add rules to accept all inbound TCP/UDP/ICMP packets"
-    iptables -A INPUT -w -p TCP -j ACCEPT
-    iptables -A INPUT -w -p UDP -j ACCEPT
-    iptables -A INPUT -w -p ICMP -j ACCEPT
-    iptables -A INPUT -w -p SCTP -j ACCEPT
+    iptables -w -A INPUT -w -p TCP -j ACCEPT
+    iptables -w -A INPUT -w -p UDP -j ACCEPT
+    iptables -w -A INPUT -w -p ICMP -j ACCEPT
+    iptables -w -A INPUT -w -p SCTP -j ACCEPT
   fi
   if iptables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
     echo "Add rules to accept all forwarded TCP/UDP/ICMP/SCTP packets"
-    iptables -A FORWARD -w -p TCP -j ACCEPT
-    iptables -A FORWARD -w -p UDP -j ACCEPT
-    iptables -A FORWARD -w -p ICMP -j ACCEPT
-    iptables -A FORWARD -w -p SCTP -j ACCEPT
+    iptables -w -A FORWARD -w -p TCP -j ACCEPT
+    iptables -w -A FORWARD -w -p UDP -j ACCEPT
+    iptables -w -A FORWARD -w -p ICMP -j ACCEPT
+    iptables -w -A FORWARD -w -p SCTP -j ACCEPT
   fi
 
   # Flush iptables nat table
@@ -176,7 +176,7 @@ function config-ip-firewall {
     iptables -w -t nat -I PREROUTING -p tcp ! -i eth0 -d "${METADATA_SERVER_IP}" --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j REDIRECT --to-ports 988
     iptables -w -t nat -I PREROUTING -p tcp ! -i eth0 -d "${METADATA_SERVER_IP}" --dport 8080 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j REDIRECT --to-ports 987
   fi
-  iptables -w -t raw -I OUTPUT -s 169.254.169.254 -j DROP
+  iptables -w -t mangle -I OUTPUT -s 169.254.169.254 -j DROP
 
   # Log all metadata access not from approved processes.
   case "${METADATA_SERVER_FIREWALL_MODE:-off}" in
@@ -622,6 +622,7 @@ function write-pki-data {
   if [[ -n "${KUBE_PKI_READERS_GROUP:-}" ]]; then
     (umask 027; echo "${data}" | base64 --decode > "${path}")
     chgrp "${KUBE_PKI_READERS_GROUP:-}" "${path}"
+    chmod g+r "${path}"
   else
     (umask 077; echo "${data}" | base64 --decode > "${path}")
   fi
@@ -1265,18 +1266,11 @@ EOF
   fi
 }
 
-# Create kubeconfig files for control plane components.
 function create-kubeconfig {
   local component=$1
   local token=$2
   echo "Creating kubeconfig file for component ${component}"
   mkdir -p "/etc/srv/kubernetes/${component}"
-
-  local kube_apiserver="localhost"
-  if [[ ${KUBECONFIG_USE_HOST_IP:-} == "true" ]] ; then
-    kube_apiserver=$(hostname -i)
-  fi
-  
   cat <<EOF >"/etc/srv/kubernetes/${component}/kubeconfig"
 apiVersion: v1
 kind: Config
@@ -1288,7 +1282,7 @@ clusters:
 - name: local
   cluster:
     insecure-skip-tls-verify: true
-    server: https://${kube_apiserver}:443
+    server: https://localhost:443
 contexts:
 - context:
     cluster: local
@@ -1459,6 +1453,14 @@ function create-master-etcd-apiserver-auth {
    fi
 }
 
+function docker-installed {
+    if systemctl cat docker.service &> /dev/null ; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 function assemble-docker-flags {
   echo "Assemble docker command line flags"
   local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
@@ -1512,9 +1514,6 @@ EOF
 # using systemctl.
 function start-kubelet {
   echo "Start kubelet"
-
-  # TODO(#60123): The kubelet should create the cert-dir directory if it doesn't exist
-  mkdir -p /var/lib/kubelet/pki/
 
   local kubelet_bin="${KUBE_HOME}/bin/kubelet"
   local -r version="$("${kubelet_bin}" --version=true | cut -f2 -d " ")"
@@ -1702,8 +1701,8 @@ function start-kube-proxy {
 # Replaces the variables in the etcd manifest file with the real values, and then
 # copy the file to the manifest dir
 # $1: value for variable 'suffix'
-# $2: value for variable 'port', for listening to clients
-# $3: value for variable 'server_port', for etcd peering
+# $2: value for variable 'port'
+# $3: value for variable 'server_port'
 # $4: value for variable 'cpulimit'
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
@@ -1717,48 +1716,30 @@ function prepare-etcd-manifest {
   local etcd_apiserver_creds="${ETCD_APISERVER_CREDS:-}"
   local etcd_extra_args="${ETCD_EXTRA_ARGS:-}"
   local suffix="$1"
-  local etcd_livenessprobe_port="$2"
+  local etcd_listen_metrics_port="$2"
+  local etcdctl_certs=""
 
   if [[ -n "${INITIAL_ETCD_CLUSTER_STATE:-}" ]]; then
     cluster_state="${INITIAL_ETCD_CLUSTER_STATE}"
   fi
-
-  # Configure mTLS for etcd peers.
   if [[ -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
     etcd_creds=" --peer-trusted-ca-file /etc/srv/kubernetes/etcd-ca.crt --peer-cert-file /etc/srv/kubernetes/etcd-peer.crt --peer-key-file /etc/srv/kubernetes/etcd-peer.key -peer-client-cert-auth "
     etcd_protocol="https"
   fi
 
-  # host_primary_ip is the primary internal IP of the host.
-  # Override host primary IP if specifically provided.
-  local host_primary_ip
-  host_primary_ip="${HOST_PRIMARY_IP:-$(hostname -i)}"
-
-  # Configure mTLS for clients (e.g. kube-apiserver).
-  # mTLS should only be enabled for etcd server but not etcd-events. If $1 suffix is empty, it's etcd server.
-  local etcd_listen_metrics_urls=""
+  # mTLS should only be enabled for etcd server but not etcd-events. if $1 suffix is empty, it's etcd server.
   if [[ -z "${suffix}" && -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
     etcd_apiserver_creds=" --client-cert-auth --trusted-ca-file ${ETCD_APISERVER_CA_CERT_PATH} --cert-file ${ETCD_APISERVER_SERVER_CERT_PATH} --key-file ${ETCD_APISERVER_SERVER_KEY_PATH} "
+    etcdctl_certs="--cacert ${ETCD_APISERVER_CA_CERT_PATH} --cert ${ETCD_APISERVER_CLIENT_CERT_PATH} --key ${ETCD_APISERVER_CLIENT_KEY_PATH}"
     etcd_apiserver_protocol="https"
-    etcd_livenessprobe_port="2382"
-    etcd_listen_metrics_urls="http://${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}:${etcd_livenessprobe_port}"
-    if [[ ${ETCD_LISTEN_ON_HOST_IP:-} == "true" ]]; then
-      etcd_listen_metrics_urls+=",http://${host_primary_ip}:${etcd_livenessprobe_port}"
-    fi
-    etcd_extra_args+=" --listen-metrics-urls=${etcd_listen_metrics_urls} "
+    etcd_listen_metrics_port="2382"
+    etcd_extra_args+=" --listen-metrics-urls=http://${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}:${etcd_listen_metrics_port} "
   fi
 
   if [[ -n "${ETCD_PROGRESS_NOTIFY_INTERVAL:-}" ]]; then
     etcd_extra_args+=" --experimental-watch-progress-notify-interval=${ETCD_PROGRESS_NOTIFY_INTERVAL}"
   fi
 
-  # If etcd is configured to listen on host IP, an additional client listening URL is added.
-  local etcd_listen_client_urls="${etcd_apiserver_protocol}://${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}:$2"
-  if [[ ${ETCD_LISTEN_ON_HOST_IP:-} == "true" ]] ; then
-    etcd_listen_client_urls+=",${etcd_apiserver_protocol}://${host_primary_ip}:$2"
-  fi
-
-  # Generate etcd member URLs.
   for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
     etcd_host="etcd-${host}=${etcd_protocol}://${host}:$3"
     if [[ -n "${etcd_cluster}" ]]; then
@@ -1778,7 +1759,6 @@ function prepare-etcd-manifest {
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
   sed -i -e "s@{{ *liveness_probe_initial_delay *}}@${ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC:-15}@g" "${temp_file}"
   sed -i -e "s@{{ *listen_client_ip *}}@${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}@g" "${temp_file}"
-  sed -i -e "s@{{ *etcd_listen_client_urls *}}@${etcd_listen_client_urls:-}@g" "${temp_file}"
   # Get default storage backend from manifest file.
   local -r default_storage_backend=$( \
     grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" "${temp_file}" | \
@@ -1807,9 +1787,9 @@ function prepare-etcd-manifest {
   sed -i -e "s@{{ *etcd_protocol *}}@$etcd_protocol@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_apiserver_protocol *}}@$etcd_apiserver_protocol@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_creds *}}@$etcd_creds@g" "${temp_file}"
+  sed -i -e "s@{{ *etcdctl_certs *}}@$etcdctl_certs@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_apiserver_creds *}}@$etcd_apiserver_creds@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_extra_args *}}@$etcd_extra_args@g" "${temp_file}"
-  sed -i -e "s@{{ *etcd_livenessprobe_port *}}@$etcd_livenessprobe_port@g" "${temp_file}"
   if [[ -n "${ETCD_VERSION:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@${ETCD_VERSION}@g" "${temp_file}"
   else
@@ -2007,9 +1987,10 @@ function start-kube-controller-manager {
   prepare-log-file /var/log/kube-controller-manager.log
   # Calculate variables and assemble the command line.
   local params=("${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"}" "${CONTROLLER_MANAGER_TEST_ARGS:-}" "${CLOUD_CONFIG_OPT}")
+  local config_path='/etc/srv/kubernetes/kube-controller-manager/kubeconfig'
   params+=("--use-service-account-credentials")
   params+=("--cloud-provider=gce")
-  params+=("--kubeconfig=/etc/srv/kubernetes/kube-controller-manager/kubeconfig")
+  params+=("--kubeconfig=${config_path}" "--authentication-kubeconfig=${config_path}" "--authorization-kubeconfig=${config_path}")
   params+=("--root-ca-file=${CA_CERT_BUNDLE_PATH}")
   params+=("--service-account-private-key-file=${SERVICEACCOUNT_KEY_PATH}")
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
@@ -2109,6 +2090,10 @@ function start-kube-controller-manager {
 # Assumed vars (which are calculated in compute-master-manifest-variables)
 #   DOCKER_REGISTRY
 function start-kube-scheduler {
+  if [[ "${KUBE_SCHEDULER_CRP:-}" == "true" ]]; then
+    echo "kube-scheduler is configured to be deployed through CRP."
+    return
+  fi
   echo "Start kubernetes scheduler"
   create-kubeconfig "kube-scheduler" "${KUBE_SCHEDULER_TOKEN}"
   # User and group should never contain characters that need to be quoted
@@ -2136,6 +2121,10 @@ function start-kube-scheduler {
       params+=("--policy-config-file=/etc/srv/kubernetes/kube-scheduler/policy-config")
     fi
   fi
+
+  local config_path
+  config_path='/etc/srv/kubernetes/kube-scheduler/kubeconfig'
+  params+=("--authentication-kubeconfig=${config_path}" "--authorization-kubeconfig=${config_path}")
 
   local paramstring
   paramstring="$(convert-manifest-params "${params[*]}")"
@@ -2773,6 +2762,16 @@ function setup-kubelet-dir {
     echo "Making /var/lib/kubelet executable for kubelet"
     mount -B /var/lib/kubelet /var/lib/kubelet/
     mount -B -o remount,exec,suid,dev /var/lib/kubelet
+
+    # TODO(#60123): The kubelet should create the cert-dir directory if it doesn't exist
+    mkdir -p /var/lib/kubelet/pki/
+
+    # Mount /var/lib/kubelet/pki on a tmpfs so it doesn't persist across
+    # reboots. This can help avoid some rare instances of corrupt cert files
+    # (e.g. created but not written during a shutdown). Kubelet crash-loops
+    # in these cases. Do this after above mount calls so it isn't overwritten.
+    echo "Mounting /var/lib/kubelet/pki on tmpfs"
+    mount -t tmpfs tmpfs /var/lib/kubelet/pki
 }
 
 # Override for GKE custom master setup scripts (no-op outside of GKE).
@@ -3098,8 +3097,13 @@ function main() {
   if [[ "${container_runtime}" == "docker" ]]; then
     assemble-docker-flags
   elif [[ "${container_runtime}" == "containerd" ]]; then
-    # stop docker if it is present as we want to use just containerd
-    systemctl stop docker || echo "unable to stop docker"
+    if docker-installed; then
+      # We still need to configure docker so it wouldn't reserver the 172.17.0/16 subnet
+      # And if somebody will start docker to build or pull something, logging will also be set up
+      assemble-docker-flags
+      # stop docker if it is present as we want to use just containerd
+      systemctl stop docker || echo "unable to stop docker"
+    fi
     setup-containerd
   fi
 

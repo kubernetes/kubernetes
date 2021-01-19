@@ -127,14 +127,14 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 	ginkgo.It("Verify dynamically created pv with allowed zones specified in storage class, shows the right zone information on its labels", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with the following zones : %s", zoneA))
 		zones = append(zones, zoneA)
-		verifyPVZoneLabels(client, namespace, nil, zones)
+		verifyPVZoneLabels(client, f.Timeouts, namespace, nil, zones)
 	})
 
 	ginkgo.It("Verify dynamically created pv with multiple zones specified in the storage class, shows both the zones on its labels", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with the following zones : %s, %s", zoneA, zoneB))
 		zones = append(zones, zoneA)
 		zones = append(zones, zoneB)
-		verifyPVZoneLabels(client, namespace, nil, zones)
+		verifyPVZoneLabels(client, f.Timeouts, namespace, nil, zones)
 	})
 
 	ginkgo.It("Verify PVC creation with invalid zone specified in storage class fails", func() {
@@ -151,21 +151,21 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 	ginkgo.It("Verify a pod is created and attached to a dynamically created PV, based on allowed zones specified in storage class ", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with zones :%s", zoneA))
 		zones = append(zones, zoneA)
-		verifyPVCAndPodCreationSucceeds(client, namespace, nil, zones, "")
+		verifyPVCAndPodCreationSucceeds(client, f.Timeouts, namespace, nil, zones, "")
 	})
 
 	ginkgo.It("Verify a pod is created and attached to a dynamically created PV, based on multiple zones specified in storage class ", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with zones :%s, %s", zoneA, zoneB))
 		zones = append(zones, zoneA)
 		zones = append(zones, zoneB)
-		verifyPVCAndPodCreationSucceeds(client, namespace, nil, zones, "")
+		verifyPVCAndPodCreationSucceeds(client, f.Timeouts, namespace, nil, zones, "")
 	})
 
 	ginkgo.It("Verify a pod is created and attached to a dynamically created PV, based on the allowed zones and datastore specified in storage class", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with zone :%s and datastore :%s", zoneA, vsanDatastore1))
 		scParameters[Datastore] = vsanDatastore1
 		zones = append(zones, zoneA)
-		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones, "")
+		verifyPVCAndPodCreationSucceeds(client, f.Timeouts, namespace, scParameters, zones, "")
 	})
 
 	ginkgo.It("Verify PVC creation with incompatible datastore and zone combination specified in storage class fails", func() {
@@ -183,14 +183,14 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with zone :%s and storage policy :%s", zoneA, compatPolicy))
 		scParameters[SpbmStoragePolicy] = compatPolicy
 		zones = append(zones, zoneA)
-		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones, "")
+		verifyPVCAndPodCreationSucceeds(client, f.Timeouts, namespace, scParameters, zones, "")
 	})
 
 	ginkgo.It("Verify a pod is created on a non-Workspace zone and attached to a dynamically created PV, based on the allowed zones and storage policy specified in storage class", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with zone :%s and storage policy :%s", zoneB, compatPolicy))
 		scParameters[SpbmStoragePolicy] = compatPolicy
 		zones = append(zones, zoneB)
-		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones, "")
+		verifyPVCAndPodCreationSucceeds(client, f.Timeouts, namespace, scParameters, zones, "")
 	})
 
 	ginkgo.It("Verify PVC creation with incompatible storagePolicy and zone combination specified in storage class fails", func() {
@@ -209,7 +209,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		scParameters[SpbmStoragePolicy] = compatPolicy
 		scParameters[Datastore] = vsanDatastore1
 		zones = append(zones, zoneA)
-		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones, "")
+		verifyPVCAndPodCreationSucceeds(client, f.Timeouts, namespace, scParameters, zones, "")
 	})
 
 	ginkgo.It("Verify PVC creation with incompatible storage policy along with compatible zone and datastore combination specified in storage class fails", func() {
@@ -314,40 +314,40 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		scParameters[PolicyIopsLimit] = IopsLimitCapabilityVal
 		scParameters[Datastore] = vsanDatastore1
 		zones = append(zones, zoneA)
-		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones, "")
+		verifyPVCAndPodCreationSucceeds(client, f.Timeouts, namespace, scParameters, zones, "")
 	})
 
 	ginkgo.It("Verify a pod is created and attached to a dynamically created PV, based on the allowed zones specified in storage class when the datastore under the zone is present in another datacenter", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with zone :%s", zoneD))
 		zones = append(zones, zoneD)
-		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones, "")
+		verifyPVCAndPodCreationSucceeds(client, f.Timeouts, namespace, scParameters, zones, "")
 	})
 
 	ginkgo.It("Verify a pod is created and attached to a dynamically created PV, based on the allowed zones and datastore specified in storage class when there are multiple datastores with the same name under different zones across datacenters", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with zone :%s and datastore name :%s", zoneD, localDatastore))
 		scParameters[Datastore] = localDatastore
 		zones = append(zones, zoneD)
-		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones, "")
+		verifyPVCAndPodCreationSucceeds(client, f.Timeouts, namespace, scParameters, zones, "")
 	})
 
 	ginkgo.It("Verify a pod is created and attached to a dynamically created PV with storage policy specified in storage class in waitForFirstConsumer binding mode", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with waitForFirstConsumer mode and storage policy :%s", compatPolicy))
 		scParameters[SpbmStoragePolicy] = compatPolicy
-		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, nil, storagev1.VolumeBindingWaitForFirstConsumer)
+		verifyPVCAndPodCreationSucceeds(client, f.Timeouts, namespace, scParameters, nil, storagev1.VolumeBindingWaitForFirstConsumer)
 	})
 
 	ginkgo.It("Verify a pod is created and attached to a dynamically created PV with storage policy specified in storage class in waitForFirstConsumer binding mode with allowedTopologies", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with waitForFirstConsumer mode, storage policy :%s and zone :%s", compatPolicy, zoneA))
 		scParameters[SpbmStoragePolicy] = compatPolicy
 		zones = append(zones, zoneA)
-		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones, storagev1.VolumeBindingWaitForFirstConsumer)
+		verifyPVCAndPodCreationSucceeds(client, f.Timeouts, namespace, scParameters, zones, storagev1.VolumeBindingWaitForFirstConsumer)
 	})
 
 	ginkgo.It("Verify a pod is created and attached to a dynamically created PV with storage policy specified in storage class in waitForFirstConsumer binding mode with multiple allowedTopologies", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with waitForFirstConsumer mode and zones : %s, %s", zoneA, zoneB))
 		zones = append(zones, zoneA)
 		zones = append(zones, zoneB)
-		verifyPVCAndPodCreationSucceeds(client, namespace, nil, zones, storagev1.VolumeBindingWaitForFirstConsumer)
+		verifyPVCAndPodCreationSucceeds(client, f.Timeouts, namespace, nil, zones, storagev1.VolumeBindingWaitForFirstConsumer)
 	})
 
 	ginkgo.It("Verify a PVC creation fails when multiple zones are specified in the storage class without shared datastores among the zones in waitForFirstConsumer binding mode", func() {
@@ -375,7 +375,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 	})
 })
 
-func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) {
+func verifyPVCAndPodCreationSucceeds(client clientset.Interface, timeouts *framework.TimeoutContext, namespace string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode), metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
@@ -391,7 +391,7 @@ func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace strin
 	var persistentvolumes []*v1.PersistentVolume
 	// If WaitForFirstConsumer mode, verify pvc binding status after pod creation. For immediate mode, do now.
 	if volumeBindingMode != storagev1.VolumeBindingWaitForFirstConsumer {
-		persistentvolumes = waitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+		persistentvolumes = waitForPVClaimBoundPhase(client, pvclaims, timeouts.ClaimProvision)
 	}
 
 	ginkgo.By("Creating pod to attach PV to the node")
@@ -399,7 +399,7 @@ func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace strin
 	framework.ExpectNoError(err)
 
 	if volumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
-		persistentvolumes = waitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+		persistentvolumes = waitForPVClaimBoundPhase(client, pvclaims, timeouts.ClaimProvision)
 	}
 
 	if zones != nil {
@@ -499,7 +499,7 @@ func verifyPVCCreationFails(client clientset.Interface, namespace string, scPara
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
 }
 
-func verifyPVZoneLabels(client clientset.Interface, namespace string, scParameters map[string]string, zones []string) {
+func verifyPVZoneLabels(client clientset.Interface, timeouts *framework.TimeoutContext, namespace string, scParameters map[string]string, zones []string) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", nil, zones, ""), metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
@@ -512,7 +512,7 @@ func verifyPVZoneLabels(client clientset.Interface, namespace string, scParamete
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	ginkgo.By("Waiting for claim to be in bound phase")
-	persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+	persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, timeouts.ClaimProvision)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Verify zone information is present in the volume labels")

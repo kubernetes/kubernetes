@@ -175,6 +175,7 @@ aliases:
     - ravisantoshgudimetla
     - Huang-Wei
     - ahg-g
+    - damemi
   # emeritus:
   # - bsalamat
   sig-scheduling:
@@ -204,6 +205,7 @@ aliases:
     - smarterclayton
     - soltysh
     - pwittrock
+    - eddiezane
   # emeritus:
   # - adohe
   sig-cli:
@@ -220,6 +222,7 @@ aliases:
     - soltysh
     - pwittrock
     - zhouya0
+    - eddiezane
 
   sig-testing-reviewers:
     - bentheelder
@@ -251,6 +254,7 @@ aliases:
     - dchen1107
     - derekwaynecarr
     - dims
+    - ehashman
     - feiskyer
     - mtaufen
     - pmorie
@@ -264,6 +268,7 @@ aliases:
     - odinuge
     - andrewsykim
     - mrunalp
+    - SergeyKanzhelev
   sig-network-driver-approvers:
     - dcbw
     - freehan
@@ -473,9 +478,9 @@ aliases:
     - nikhita
 
   sig-docs-approvers:
+    - irvifa
     - jimangel
     - kbarnard10
-    - zacharysarah
     - kbhawkey
     - onlydole
     - sftim
@@ -504,6 +509,13 @@ aliases:
     - msau42
     - jsafrane
 
+  sig-security-approvers:
+    - IanColdwater
+    - tabbysable
+
+  sig-security-reviewers:
+    - IanColdwater
+    - tabbysable
 
   sig-windows-api-reviewers:
     - patricklang
@@ -531,12 +543,14 @@ aliases:
     - derekwaynecarr  # Node
     - dims            # Architecture
     - jdumars         # Architecture, Release
+    - jsafrane        # Storage
     - kow3ns          # Apps
     - lavalamp        # API Machinery
     - liggitt         # Auth
     - luxas           # Cluster Lifecycle
     - mattfarina      # Apps
     - michmike        # Windows
+    - msau42          # Storage
     - mwielgus        # Autoscaling
     - piosz           # Instrumentation
     - prydonius       # Apps
@@ -549,6 +563,7 @@ aliases:
     - tallclair       # Auth
     - thockin         # Network
     - timothysc       # Cluster Lifecycle, Scheduling
+    - xing-yang       # Storage
     - wojtek-t        # Scalability
 
   # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md

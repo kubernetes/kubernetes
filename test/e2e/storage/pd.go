@@ -148,7 +148,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					fmtPod = testPDPod([]string{diskName}, host0Name, false, 1)
 					_, err = podClient.Create(context.TODO(), fmtPod, metav1.CreateOptions{})
 					framework.ExpectNoError(err, "Failed to create fmtPod")
-					framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, fmtPod.Name, f.Namespace.Name))
+					framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, fmtPod.Name, f.Namespace.Name, f.Timeouts.PodStartSlow))
 
 					ginkgo.By("deleting the fmtPod")
 					framework.ExpectNoError(podClient.Delete(context.TODO(), fmtPod.Name, *metav1.NewDeleteOptions(0)), "Failed to delete fmtPod")
@@ -176,7 +176,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				ginkgo.By("creating host0Pod on node0")
 				_, err = podClient.Create(context.TODO(), host0Pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
-				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, host0Pod.Name, f.Namespace.Name))
+				framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, host0Pod.Name, f.Namespace.Name, f.Timeouts.PodStartSlow))
 				framework.Logf("host0Pod: %q, node0: %q", host0Pod.Name, host0Name)
 
 				var containerName, testFile, testFileContents string
@@ -200,7 +200,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				ginkgo.By("creating host1Pod on node1")
 				_, err = podClient.Create(context.TODO(), host1Pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "Failed to create host1Pod")
-				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, host1Pod.Name, f.Namespace.Name))
+				framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, host1Pod.Name, f.Namespace.Name, f.Timeouts.PodStartSlow))
 				framework.Logf("host1Pod: %q, node1: %q", host1Pod.Name, host1Name)
 
 				if readOnly {
@@ -282,7 +282,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					host0Pod = testPDPod(diskNames, host0Name, false /* readOnly */, numContainers)
 					_, err = podClient.Create(context.TODO(), host0Pod, metav1.CreateOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
-					framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, host0Pod.Name, f.Namespace.Name))
+					framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, host0Pod.Name, f.Namespace.Name, f.Timeouts.PodStartSlow))
 
 					ginkgo.By(fmt.Sprintf("writing %d file(s) via a container", numPDs))
 					containerName := "mycontainer"
@@ -385,7 +385,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				_, err = podClient.Create(context.TODO(), host0Pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 				ginkgo.By("waiting for host0Pod to be running")
-				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, host0Pod.Name, f.Namespace.Name))
+				framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, host0Pod.Name, f.Namespace.Name, f.Timeouts.PodStartSlow))
 
 				ginkgo.By("writing content to host0Pod")
 				testFile := "/testpd1/tracker"
@@ -474,7 +474,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 		ginkgo.By("Creating test pod with same volume")
 		_, err = podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create pod")
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStartSlow))
 
 		ginkgo.By("deleting the pod")
 		framework.ExpectNoError(podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0)), "Failed to delete pod")

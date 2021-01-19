@@ -1179,8 +1179,38 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 	})
 
-	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
-	ginkgo.It("should be able to change the type and ports of a service [Slow] [DisabledForLargeClusters]", func() {
+	/*
+		Create a ClusterIP service with an External IP that is not assigned to an interface.
+		The IP ranges here are reserved for documentation according to
+		[RFC 5737](https://tools.ietf.org/html/rfc5737) Section 3 and should not be used by any host.
+	*/
+	ginkgo.It("should be possible to connect to a service via ExternalIP when the external IP is not assigned to a node", func() {
+		serviceName := "externalip-test"
+		ns := f.Namespace.Name
+		externalIP := "203.0.113.250"
+		if framework.TestContext.ClusterIsIPv6() {
+			externalIP = "2001:DB8::cb00:71fa"
+		}
+
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+
+		ginkgo.By("creating service " + serviceName + " with type=clusterIP in namespace " + ns)
+		clusterIPService, err := jig.CreateTCPService(func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.ExternalIPs = []string{externalIP}
+			svc.Spec.Ports = []v1.ServicePort{
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(9376)},
+			}
+		})
+		framework.ExpectNoError(err)
+		err = jig.CreateServicePods(2)
+		framework.ExpectNoError(err)
+		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
+		err = jig.CheckServiceReachability(clusterIPService, execPod)
+		framework.ExpectNoError(err)
+	})
+
+	ginkgo.It("should be able to change the type and ports of a service [Slow]", func() {
 		// requires cloud load-balancer support
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 
@@ -2985,8 +3015,8 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 
 		ginkgo.By("reading clientIP using the TCP service's service port via its external VIP")
-		content := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, "/clientip")
-		clientIP := content.String()
+		clientIP, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, "/clientip")
+		framework.ExpectNoError(err)
 		framework.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIP)
 
 		ginkgo.By("checking if Source IP is preserved")
@@ -3163,8 +3193,7 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		}
 	})
 
-	// TODO(#56138): Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
-	ginkgo.It("should handle updates to ExternalTrafficPolicy field [DisabledForLargeClusters]", func() {
+	ginkgo.It("should handle updates to ExternalTrafficPolicy field", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-update"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
@@ -3269,8 +3298,10 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		ginkgo.By(fmt.Sprintf("checking source ip is NOT preserved through loadbalancer %v", ingressIP))
 		var clientIP string
 		pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
-			content := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, "/clientip")
-			clientIP = content.String()
+			clientIP, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, "/clientip")
+			if err != nil {
+				return false, nil
+			}
 			if strings.HasPrefix(clientIP, "10.") {
 				return true, nil
 			}
@@ -3294,8 +3325,10 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		})
 		framework.ExpectNoError(err)
 		pollErr = wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
-			content := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
-			clientIP = content.String()
+			clientIP, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
+			if err != nil {
+				return false, nil
+			}
 			ginkgo.By(fmt.Sprintf("Endpoint %v:%v%v returned client ip %v", ingressIP, svcTCPPort, path, clientIP))
 			if !strings.HasPrefix(clientIP, "10.") {
 				return true, nil
@@ -3799,18 +3832,10 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 	})
 
 	ginkgo.It("should create a Pod with SCTP HostPort", func() {
-		ginkgo.By("checking whether kubenet is used")
 		node, err := e2enode.GetRandomReadySchedulableNode(cs)
 		framework.ExpectNoError(err)
 		hostExec := utils.NewHostExec(f)
 		defer hostExec.Cleanup()
-		cmd := "ps -C kubelet -o cmd= | grep kubenet"
-		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
-		err = hostExec.IssueCommand(cmd, node)
-		if err != nil {
-			e2eskipper.Skipf("Interrogation of kubenet usage failed on node %s", node.Name)
-		}
-		framework.Logf("kubenet is in use")
 
 		ginkgo.By("getting the state of the sctp module on the selected node")
 		nodes := &v1.NodeList{}
@@ -3821,6 +3846,7 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 		podName := "hostport"
 		ports := []v1.ContainerPort{{Protocol: v1.ProtocolSCTP, ContainerPort: 5060, HostPort: 5060}}
 		podSpec := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, ports)
+		podSpec.Spec.NodeName = node.Name
 
 		ginkgo.By(fmt.Sprintf("Launching the pod on node %v", node.Name))
 		f.PodClient().CreateSync(podSpec)
@@ -3829,7 +3855,7 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)
 		}()
 		// wait until host port manager syncs rules
-		cmd = "iptables-save"
+		cmd := "iptables-save"
 		if framework.TestContext.ClusterIsIPv6() {
 			cmd = "ip6tables-save"
 		}

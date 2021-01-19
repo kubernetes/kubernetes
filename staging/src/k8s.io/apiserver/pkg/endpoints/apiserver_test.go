@@ -73,7 +73,6 @@ import (
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/server/filters"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
@@ -287,7 +286,6 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		// simplified long-running check
 		return requestInfo.Verb == "watch" || requestInfo.Verb == "proxy"
 	})
-	handler = genericapifilters.WithRequestDeadline(handler, testLongRunningCheck, 60*time.Second)
 	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver())
 
 	return &defaultAPIServer{handler, container}
@@ -299,11 +297,6 @@ func testRequestInfoResolver() *request.RequestInfoFactory {
 		GrouplessAPIPrefixes: sets.NewString("api"),
 	}
 }
-
-var testLongRunningCheck = filters.BasicLongRunningRequestCheck(
-	sets.NewString("watch", "proxy"),
-	sets.NewString("attach", "exec", "proxy", "log", "portforward"),
-)
 
 func TestSimpleSetupRight(t *testing.T) {
 	s := &genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "aName"}}

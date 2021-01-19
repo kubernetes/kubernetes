@@ -51,9 +51,7 @@ var (
 		Metrics: []string{
 			"scheduler_scheduling_algorithm_predicate_evaluation_seconds",
 			"scheduler_scheduling_algorithm_priority_evaluation_seconds",
-			"scheduler_binding_duration_seconds",
 			"scheduler_e2e_scheduling_duration_seconds",
-			"scheduler_scheduling_algorithm_preemption_evaluation_seconds",
 			"scheduler_pod_scheduling_duration_seconds",
 		},
 	}

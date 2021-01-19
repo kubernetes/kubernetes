@@ -426,7 +426,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 
 	}
 	if rt.levels[debugRequestHeaders] {
-		klog.Infof("Request Headers:")
+		klog.Info("Request Headers:")
 		for key, values := range reqInfo.RequestHeaders {
 			for _, value := range values {
 				value = maskValue(key, value)
@@ -448,7 +448,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 		klog.Infof("Response Status: %s in %d milliseconds", reqInfo.ResponseStatus, reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
 	}
 	if rt.levels[debugResponseHeaders] {
-		klog.Infof("Response Headers:")
+		klog.Info("Response Headers:")
 		for key, values := range reqInfo.ResponseHeaders {
 			for _, value := range values {
 				klog.Infof("    %s: %s", key, value)

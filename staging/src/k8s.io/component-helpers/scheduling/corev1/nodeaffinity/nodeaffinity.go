@@ -17,13 +17,12 @@ limitations under the License.
 package nodeaffinity
 
 import (
-	"fmt"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // NodeSelector is a runtime representation of v1.NodeSelector.
@@ -37,31 +36,34 @@ type LazyErrorNodeSelector struct {
 	terms []nodeSelectorTerm
 }
 
-// NewNodeSelector returns a NodeSelector or all parsing errors found.
-func NewNodeSelector(ns *v1.NodeSelector) (*NodeSelector, error) {
-	lazy := NewLazyErrorNodeSelector(ns)
+// NewNodeSelector returns a NodeSelector or aggregate parsing errors found.
+func NewNodeSelector(ns *v1.NodeSelector, opts ...field.PathOption) (*NodeSelector, error) {
+	lazy := NewLazyErrorNodeSelector(ns, opts...)
 	var errs []error
 	for _, term := range lazy.terms {
-		if term.parseErr != nil {
-			errs = append(errs, term.parseErr)
+		if len(term.parseErrs) > 0 {
+			errs = append(errs, term.parseErrs...)
 		}
 	}
 	if len(errs) != 0 {
-		return nil, errors.NewAggregate(errs)
+		return nil, errors.Flatten(errors.NewAggregate(errs))
 	}
 	return &NodeSelector{lazy: *lazy}, nil
 }
 
 // NewLazyErrorNodeSelector creates a NodeSelector that only reports parse
 // errors when no terms match.
-func NewLazyErrorNodeSelector(ns *v1.NodeSelector) *LazyErrorNodeSelector {
+func NewLazyErrorNodeSelector(ns *v1.NodeSelector, opts ...field.PathOption) *LazyErrorNodeSelector {
+	p := field.ToPath(opts...)
 	parsedTerms := make([]nodeSelectorTerm, 0, len(ns.NodeSelectorTerms))
-	for _, term := range ns.NodeSelectorTerms {
+	path := p.Child("nodeSelectorTerms")
+	for i, term := range ns.NodeSelectorTerms {
 		// nil or empty term selects no objects
 		if isEmptyNodeSelectorTerm(&term) {
 			continue
 		}
-		parsedTerms = append(parsedTerms, newNodeSelectorTerm(&term))
+		p := path.Index(i)
+		parsedTerms = append(parsedTerms, newNodeSelectorTerm(&term, p))
 	}
 	return &LazyErrorNodeSelector{
 		terms: parsedTerms,
@@ -88,16 +90,16 @@ func (ns *LazyErrorNodeSelector) Match(node *v1.Node) (bool, error) {
 
 	var errs []error
 	for _, term := range ns.terms {
-		match, err := term.match(nodeLabels, nodeFields)
-		if err != nil {
-			errs = append(errs, term.parseErr)
+		match, tErrs := term.match(nodeLabels, nodeFields)
+		if len(tErrs) > 0 {
+			errs = append(errs, tErrs...)
 			continue
 		}
 		if match {
 			return true, nil
 		}
 	}
-	return false, errors.NewAggregate(errs)
+	return false, errors.Flatten(errors.NewAggregate(errs))
 }
 
 // PreferredSchedulingTerms is a runtime representation of []v1.PreferredSchedulingTerms.
@@ -107,25 +109,27 @@ type PreferredSchedulingTerms struct {
 
 // NewPreferredSchedulingTerms returns a PreferredSchedulingTerms or all the parsing errors found.
 // If a v1.PreferredSchedulingTerm has a 0 weight, its parsing is skipped.
-func NewPreferredSchedulingTerms(terms []v1.PreferredSchedulingTerm) (*PreferredSchedulingTerms, error) {
+func NewPreferredSchedulingTerms(terms []v1.PreferredSchedulingTerm, opts ...field.PathOption) (*PreferredSchedulingTerms, error) {
+	p := field.ToPath(opts...)
 	var errs []error
 	parsedTerms := make([]preferredSchedulingTerm, 0, len(terms))
-	for _, term := range terms {
+	for i, term := range terms {
+		path := p.Index(i)
 		if term.Weight == 0 || isEmptyNodeSelectorTerm(&term.Preference) {
 			continue
 		}
 		parsedTerm := preferredSchedulingTerm{
-			nodeSelectorTerm: newNodeSelectorTerm(&term.Preference),
+			nodeSelectorTerm: newNodeSelectorTerm(&term.Preference, path),
 			weight:           int(term.Weight),
 		}
-		if parsedTerm.parseErr != nil {
-			errs = append(errs, parsedTerm.parseErr)
+		if len(parsedTerm.parseErrs) > 0 {
+			errs = append(errs, parsedTerm.parseErrs...)
 		} else {
 			parsedTerms = append(parsedTerms, parsedTerm)
 		}
 	}
 	if len(errs) != 0 {
-		return nil, errors.NewAggregate(errs)
+		return nil, errors.Flatten(errors.NewAggregate(errs))
 	}
 	return &PreferredSchedulingTerms{terms: parsedTerms}, nil
 }
@@ -160,26 +164,32 @@ func extractNodeFields(n *v1.Node) fields.Set {
 type nodeSelectorTerm struct {
 	matchLabels labels.Selector
 	matchFields fields.Selector
-	parseErr    error
+	parseErrs   []error
 }
 
-func newNodeSelectorTerm(term *v1.NodeSelectorTerm) nodeSelectorTerm {
+func newNodeSelectorTerm(term *v1.NodeSelectorTerm, path *field.Path) nodeSelectorTerm {
 	var parsedTerm nodeSelectorTerm
+	var errs []error
 	if len(term.MatchExpressions) != 0 {
-		parsedTerm.matchLabels, parsedTerm.parseErr = nodeSelectorRequirementsAsSelector(term.MatchExpressions)
-		if parsedTerm.parseErr != nil {
-			return parsedTerm
+		p := path.Child("matchExpressions")
+		parsedTerm.matchLabels, errs = nodeSelectorRequirementsAsSelector(term.MatchExpressions, p)
+		if errs != nil {
+			parsedTerm.parseErrs = append(parsedTerm.parseErrs, errs...)
 		}
 	}
 	if len(term.MatchFields) != 0 {
-		parsedTerm.matchFields, parsedTerm.parseErr = nodeSelectorRequirementsAsFieldSelector(term.MatchFields)
+		p := path.Child("matchFields")
+		parsedTerm.matchFields, errs = nodeSelectorRequirementsAsFieldSelector(term.MatchFields, p)
+		if errs != nil {
+			parsedTerm.parseErrs = append(parsedTerm.parseErrs, errs...)
+		}
 	}
 	return parsedTerm
 }
 
-func (t *nodeSelectorTerm) match(nodeLabels labels.Set, nodeFields fields.Set) (bool, error) {
-	if t.parseErr != nil {
-		return false, t.parseErr
+func (t *nodeSelectorTerm) match(nodeLabels labels.Set, nodeFields fields.Set) (bool, []error) {
+	if t.parseErrs != nil {
+		return false, t.parseErrs
 	}
 	if t.matchLabels != nil && !t.matchLabels.Matches(nodeLabels) {
 		return false, nil
@@ -192,12 +202,14 @@ func (t *nodeSelectorTerm) match(nodeLabels labels.Set, nodeFields fields.Set) (
 
 // nodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
 // labels.Selector.
-func nodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement) (labels.Selector, error) {
+func nodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement, path *field.Path) (labels.Selector, []error) {
 	if len(nsm) == 0 {
 		return labels.Nothing(), nil
 	}
+	var errs []error
 	selector := labels.NewSelector()
-	for _, expr := range nsm {
+	for i, expr := range nsm {
+		p := path.Index(i)
 		var op selection.Operator
 		switch expr.Operator {
 		case v1.NodeSelectorOpIn:
@@ -213,46 +225,61 @@ func nodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement) (label
 		case v1.NodeSelectorOpLt:
 			op = selection.LessThan
 		default:
-			return nil, fmt.Errorf("%q is not a valid node selector operator", expr.Operator)
+			errs = append(errs, field.NotSupported(p.Child("operator"), expr.Operator, nil))
+			continue
 		}
-		r, err := labels.NewRequirement(expr.Key, op, expr.Values)
+		r, err := labels.NewRequirement(expr.Key, op, expr.Values, field.WithPath(p))
 		if err != nil {
-			return nil, err
+			errs = append(errs, err)
+		} else {
+			selector = selector.Add(*r)
 		}
-		selector = selector.Add(*r)
+	}
+	if len(errs) != 0 {
+		return nil, errs
 	}
 	return selector, nil
 }
 
+var validFieldSelectorOperators = []string{
+	string(v1.NodeSelectorOpIn),
+	string(v1.NodeSelectorOpNotIn),
+}
+
 // nodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements
 // fields.Selector.
-func nodeSelectorRequirementsAsFieldSelector(nsr []v1.NodeSelectorRequirement) (fields.Selector, error) {
+func nodeSelectorRequirementsAsFieldSelector(nsr []v1.NodeSelectorRequirement, path *field.Path) (fields.Selector, []error) {
 	if len(nsr) == 0 {
 		return fields.Nothing(), nil
 	}
+	var errs []error
 
 	var selectors []fields.Selector
-	for _, expr := range nsr {
+	for i, expr := range nsr {
+		p := path.Index(i)
 		switch expr.Operator {
 		case v1.NodeSelectorOpIn:
 			if len(expr.Values) != 1 {
-				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
-					len(expr.Values), expr.Operator)
+				errs = append(errs, field.Invalid(p.Child("values"), expr.Values, "must have one element"))
+			} else {
+				selectors = append(selectors, fields.OneTermEqualSelector(expr.Key, expr.Values[0]))
 			}
-			selectors = append(selectors, fields.OneTermEqualSelector(expr.Key, expr.Values[0]))
 
 		case v1.NodeSelectorOpNotIn:
 			if len(expr.Values) != 1 {
-				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
-					len(expr.Values), expr.Operator)
+				errs = append(errs, field.Invalid(p.Child("values"), expr.Values, "must have one element"))
+			} else {
+				selectors = append(selectors, fields.OneTermNotEqualSelector(expr.Key, expr.Values[0]))
 			}
-			selectors = append(selectors, fields.OneTermNotEqualSelector(expr.Key, expr.Values[0]))
 
 		default:
-			return nil, fmt.Errorf("%q is not a valid node field selector operator", expr.Operator)
+			errs = append(errs, field.NotSupported(p.Child("operator"), expr.Operator, validFieldSelectorOperators))
 		}
 	}
 
+	if len(errs) != 0 {
+		return nil, errs
+	}
 	return fields.AndSelectors(selectors...), nil
 }
 

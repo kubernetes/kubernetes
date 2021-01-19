@@ -90,7 +90,7 @@ func (s *preFilterState) updateWithPod(updatedPod *v1.Pod, node *v1.Node, multip
 }
 
 // TODO(Huang-Wei): It might be possible to use "make(map[topologyPair]*int64)" so that
-// we can do atomic additions instead of using a global mutext, however we need to consider
+// we can do atomic additions instead of using a global mutex, however we need to consider
 // how to init each topologyToMatchedTermCount.
 type topologyPair struct {
 	key   string
@@ -328,7 +328,7 @@ func satisfyExistingPodsAntiAffinity(state *preFilterState, nodeInfo *framework.
 	return true
 }
 
-//  Checks if the node satisifies the incoming pod's anti-affinity rules.
+//  Checks if the node satisfies the incoming pod's anti-affinity rules.
 func satisfyPodAntiAffinity(state *preFilterState, nodeInfo *framework.NodeInfo) bool {
 	if len(state.topologyToMatchedAntiAffinityTerms) > 0 {
 		for _, term := range state.podInfo.RequiredAntiAffinityTerms {

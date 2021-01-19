@@ -100,6 +100,7 @@ func getDefaultDefaultPreemptionArgs() *config.DefaultPreemptionArgs {
 
 func TestPostFilter(t *testing.T) {
 	onePodRes := map[v1.ResourceName]string{v1.ResourcePods: "1"}
+	nodeRes := map[v1.ResourceName]string{v1.ResourceCPU: "200m", v1.ResourceMemory: "400"}
 	tests := []struct {
 		name                  string
 		pod                   *v1.Pod
@@ -138,7 +139,7 @@ func TestPostFilter(t *testing.T) {
 				"node1": framework.NewStatus(framework.Unschedulable),
 			},
 			wantResult: nil,
-			wantStatus: framework.NewStatus(framework.Unschedulable),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "0/1 nodes are available: 1 No victims found on node node1 for preemptor pod p."),
 		},
 		{
 			name: "preemption should respect filteredNodesStatuses",
@@ -193,6 +194,42 @@ func TestPostFilter(t *testing.T) {
 				NominatedNodeName: "node1",
 			},
 			wantStatus: framework.NewStatus(framework.Success),
+		},
+		{
+			name: "no candidate nodes found, no enough resource after removing low priority pods",
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Node("node2").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(nodeRes).Obj(), // no enough CPU resource
+				st.MakeNode().Name("node2").Capacity(nodeRes).Obj(), // no enough CPU resource
+			},
+			filteredNodesStatuses: framework.NodeToStatusMap{
+				"node1": framework.NewStatus(framework.Unschedulable),
+				"node2": framework.NewStatus(framework.Unschedulable),
+			},
+			wantResult: nil,
+			wantStatus: framework.NewStatus(framework.Unschedulable, "0/2 nodes are available: 2 Insufficient cpu."),
+		},
+		{
+			name: "no candidate nodes found with mixed reasons, no lower priority pod and no enough CPU resource",
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Node("node2").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(), // no pod will be preempted
+				st.MakeNode().Name("node2").Capacity(nodeRes).Obj(),   // no enough CPU resource
+			},
+			filteredNodesStatuses: framework.NodeToStatusMap{
+				"node1": framework.NewStatus(framework.Unschedulable),
+				"node2": framework.NewStatus(framework.Unschedulable),
+			},
+			wantResult: nil,
+			wantStatus: framework.NewStatus(framework.Unschedulable, "0/2 nodes are available: 1 Insufficient cpu, 1 No victims found on node node1 for preemptor pod p."),
 		},
 	}
 
@@ -978,7 +1015,7 @@ func TestDryRunPreemption(t *testing.T) {
 					t.Errorf("cycle %d: Unexpected PreFilter Status: %v", cycle, status)
 				}
 				offset, numCandidates := pl.getOffsetAndNumCandidates(int32(len(nodeInfos)))
-				got := dryRunPreemption(context.Background(), fwk.PreemptHandle(), state, pod, nodeInfos, tt.pdbs, offset, numCandidates)
+				got, _ := dryRunPreemption(context.Background(), fwk, state, pod, nodeInfos, tt.pdbs, offset, numCandidates)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1201,7 +1238,7 @@ func TestSelectBestCandidate(t *testing.T) {
 
 			pl := &DefaultPreemption{args: *getDefaultDefaultPreemptionArgs()}
 			offset, numCandidates := pl.getOffsetAndNumCandidates(int32(len(nodeInfos)))
-			candidates := dryRunPreemption(context.Background(), fwk.PreemptHandle(), state, tt.pod, nodeInfos, nil, offset, numCandidates)
+			candidates, _ := dryRunPreemption(context.Background(), fwk, state, tt.pod, nodeInfos, nil, offset, numCandidates)
 			s := SelectCandidate(candidates)
 			found := false
 			for _, nodeName := range tt.expected {

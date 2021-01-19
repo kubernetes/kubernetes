@@ -889,11 +889,12 @@ func TestNodeAffinityPriority(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod          *v1.Pod
-		nodes        []*v1.Node
-		expectedList framework.NodeScoreList
-		name         string
-		args         config.NodeAffinityArgs
+		pod             *v1.Pod
+		nodes           []*v1.Node
+		expectedList    framework.NodeScoreList
+		name            string
+		args            config.NodeAffinityArgs
+		disablePreScore bool
 	}{
 		{
 			pod: &v1.Pod{
@@ -995,6 +996,21 @@ func TestNodeAffinityPriority(t *testing.T) {
 				},
 			},
 		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: affinity2,
+				},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: label5}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+			},
+			expectedList:    []framework.NodeScore{{Name: "machine1", Score: 18}, {Name: "machine5", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 36}},
+			name:            "calculate the priorities correctly even if PreScore is not called",
+			disablePreScore: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -1006,6 +1022,13 @@ func TestNodeAffinityPriority(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)
 			}
+			var status *framework.Status
+			if !test.disablePreScore {
+				status = p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, test.nodes)
+				if !status.IsSuccess() {
+					t.Errorf("unexpected error: %v", status)
+				}
+			}
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
 				nodeName := n.ObjectMeta.Name
@@ -1016,7 +1039,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
 			}
 
-			status := p.(framework.ScorePlugin).ScoreExtensions().NormalizeScore(context.Background(), state, test.pod, gotList)
+			status = p.(framework.ScorePlugin).ScoreExtensions().NormalizeScore(context.Background(), state, test.pod, gotList)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}

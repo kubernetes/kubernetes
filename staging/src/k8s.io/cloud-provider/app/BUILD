@@ -40,6 +40,7 @@ go_library(
         "//staging/src/k8s.io/component-base/version/verflag:go_default_library",
         "//staging/src/k8s.io/controller-manager/app:go_default_library",
         "//staging/src/k8s.io/controller-manager/pkg/clientbuilder:go_default_library",
+        "//staging/src/k8s.io/controller-manager/pkg/features:go_default_library",
         "//staging/src/k8s.io/controller-manager/pkg/informerfactory:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",

@@ -62,6 +62,9 @@ var (
 		# Wait for the pod "busybox1" to contain the status condition of type "Ready".
 		kubectl wait --for=condition=Ready pod/busybox1
 
+		# The default value of status condition is true, you can set false.
+		kubectl wait --for=condition=Ready=false pod/busybox1
+
 		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command.
 		kubectl delete pod/busybox1
 		kubectl wait --for=delete pod/busybox1 --timeout=60s`)
@@ -134,7 +137,7 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 	flags.ResourceBuilderFlags.AddFlags(cmd.Flags())
 
 	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up.  Zero means check once and don't wait, negative means wait for a week.")
-	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name].")
+	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name]. The default status value of condition-name is true, you can set false with condition=condition-name=false")
 }
 
 // ToOptions converts from CLI inputs to runtime inputs

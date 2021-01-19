@@ -360,6 +360,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 		})
 	registry.registerPriorityConfigProducer(NodeAffinityPriority,
 		func(args ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
+			plugins.PreScore = appendToPluginSet(plugins.PreScore, nodeaffinity.Name, nil)
 			plugins.Score = appendToPluginSet(plugins.Score, nodeaffinity.Name, &args.Weight)
 		})
 	registry.registerPriorityConfigProducer(ImageLocalityPriority,

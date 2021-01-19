@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"strconv"
@@ -61,6 +62,7 @@ const (
 	TypeCERT       uint16 = 37
 	TypeDNAME      uint16 = 39
 	TypeOPT        uint16 = 41 // EDNS
+	TypeAPL        uint16 = 42
 	TypeDS         uint16 = 43
 	TypeSSHFP      uint16 = 44
 	TypeRRSIG      uint16 = 46
@@ -79,6 +81,8 @@ const (
 	TypeCDNSKEY    uint16 = 60
 	TypeOPENPGPKEY uint16 = 61
 	TypeCSYNC      uint16 = 62
+	TypeSVCB       uint16 = 64
+	TypeHTTPS      uint16 = 65
 	TypeSPF        uint16 = 99
 	TypeUINFO      uint16 = 100
 	TypeUID        uint16 = 101
@@ -163,11 +167,11 @@ const (
 	_RD = 1 << 8  // recursion desired
 	_RA = 1 << 7  // recursion available
 	_Z  = 1 << 6  // Z
-	_AD = 1 << 5  // authticated data
+	_AD = 1 << 5  // authenticated data
 	_CD = 1 << 4  // checking disabled
 )
 
-// Various constants used in the LOC RR, See RFC 1887.
+// Various constants used in the LOC RR. See RFC 1887.
 const (
 	LOC_EQUATOR       = 1 << 31 // RFC 1876, Section 2.
 	LOC_PRIMEMERIDIAN = 1 << 31 // RFC 1876, Section 2.
@@ -207,8 +211,11 @@ var CertTypeToString = map[uint16]string{
 
 //go:generate go run types_generate.go
 
-// Question holds a DNS question. There can be multiple questions in the
-// question section of a message. Usually there is just one.
+// Question holds a DNS question. Usually there is just one. While the
+// original DNS RFCs allow multiple questions in the question section of a
+// message, in practice it never works. Because most DNS servers see multiple
+// questions as an error, it is recommended to only have one question per
+// message.
 type Question struct {
 	Name   string `dns:"cdomain-name"` // "cdomain-name" specifies encoding (and may be compressed)
 	Qtype  uint16
@@ -229,7 +236,7 @@ func (q *Question) String() (s string) {
 	return s
 }
 
-// ANY is a wildcard record. See RFC 1035, Section 3.2.3. ANY
+// ANY is a wild card record. See RFC 1035, Section 3.2.3. ANY
 // is named "*" there.
 type ANY struct {
 	Hdr RR_Header
@@ -238,7 +245,7 @@ type ANY struct {
 
 func (rr *ANY) String() string { return rr.Hdr.String() }
 
-func (rr *ANY) parse(c *zlexer, origin, file string) *ParseError {
+func (rr *ANY) parse(c *zlexer, origin string) *ParseError {
 	panic("dns: internal error: parse should never be called on ANY")
 }
 
@@ -253,7 +260,7 @@ func (rr *NULL) String() string {
 	return ";" + rr.Hdr.String() + rr.Data
 }
 
-func (rr *NULL) parse(c *zlexer, origin, file string) *ParseError {
+func (rr *NULL) parse(c *zlexer, origin string) *ParseError {
 	panic("dns: internal error: parse should never be called on NULL")
 }
 
@@ -404,7 +411,7 @@ type RP struct {
 }
 
 func (rr *RP) String() string {
-	return rr.Hdr.String() + rr.Mbox + " " + sprintTxt([]string{rr.Txt})
+	return rr.Hdr.String() + sprintName(rr.Mbox) + " " + sprintName(rr.Txt)
 }
 
 // SOA RR. See RFC 1035.
@@ -438,24 +445,46 @@ func (rr *TXT) String() string { return rr.Hdr.String() + sprintTxt(rr.Txt) }
 
 func sprintName(s string) string {
 	var dst strings.Builder
-	dst.Grow(len(s))
+
 	for i := 0; i < len(s); {
-		if i+1 < len(s) && s[i] == '\\' && s[i+1] == '.' {
-			dst.WriteString(s[i : i+2])
-			i += 2
+		if s[i] == '.' {
+			if dst.Len() != 0 {
+				dst.WriteByte('.')
+			}
+			i++
 			continue
 		}
 
 		b, n := nextByte(s, i)
-		switch {
-		case n == 0:
-			i++ // dangling back slash
-		case b == '.':
-			dst.WriteByte('.')
-		default:
-			writeDomainNameByte(&dst, b)
+		if n == 0 {
+			// Drop "dangling" incomplete escapes.
+			if dst.Len() == 0 {
+				return s[:i]
+			}
+			break
+		}
+		if isDomainNameLabelSpecial(b) {
+			if dst.Len() == 0 {
+				dst.Grow(len(s) * 2)
+				dst.WriteString(s[:i])
+			}
+			dst.WriteByte('\\')
+			dst.WriteByte(b)
+		} else if b < ' ' || b > '~' { // unprintable, use \DDD
+			if dst.Len() == 0 {
+				dst.Grow(len(s) * 2)
+				dst.WriteString(s[:i])
+			}
+			dst.WriteString(escapeByte(b))
+		} else {
+			if dst.Len() != 0 {
+				dst.WriteByte(b)
+			}
 		}
 		i += n
+	}
+	if dst.Len() == 0 {
+		return s
 	}
 	return dst.String()
 }
@@ -472,15 +501,10 @@ func sprintTxtOctet(s string) string {
 		}
 
 		b, n := nextByte(s, i)
-		switch {
-		case n == 0:
+		if n == 0 {
 			i++ // dangling back slash
-		case b == '.':
-			dst.WriteByte('.')
-		case b < ' ' || b > '~':
-			dst.WriteString(escapeByte(b))
-		default:
-			dst.WriteByte(b)
+		} else {
+			writeTXTStringByte(&dst, b)
 		}
 		i += n
 	}
@@ -508,16 +532,6 @@ func sprintTxt(txt []string) string {
 		out.WriteByte('"')
 	}
 	return out.String()
-}
-
-func writeDomainNameByte(s *strings.Builder, b byte) {
-	switch b {
-	case '.', ' ', '\'', '@', ';', '(', ')': // additional chars to escape
-		s.WriteByte('\\')
-		s.WriteByte(b)
-	default:
-		writeTXTStringByte(s, b)
-	}
 }
 
 func writeTXTStringByte(s *strings.Builder, b byte) {
@@ -564,6 +578,17 @@ func escapeByte(b byte) string {
 	b -= '~' + 1
 	// The cast here is needed as b*4 may overflow byte.
 	return escapedByteLarge[int(b)*4 : int(b)*4+4]
+}
+
+// isDomainNameLabelSpecial returns true if
+// a domain name label byte should be prefixed
+// with an escaping backslash.
+func isDomainNameLabelSpecial(b byte) bool {
+	switch b {
+	case '.', ' ', '\'', '@', ';', '(', ')', '"', '\\':
+		return true
+	}
+	return false
 }
 
 func nextByte(s string, offset int) (byte, int) {
@@ -738,8 +763,8 @@ type LOC struct {
 	Altitude  uint32
 }
 
-// cmToM takes a cm value expressed in RFC1876 SIZE mantissa/exponent
-// format and returns a string in m (two decimals for the cm)
+// cmToM takes a cm value expressed in RFC 1876 SIZE mantissa/exponent
+// format and returns a string in m (two decimals for the cm).
 func cmToM(m, e uint8) string {
 	if e < 2 {
 		if e == 1 {
@@ -845,8 +870,8 @@ type NSEC struct {
 
 func (rr *NSEC) String() string {
 	s := rr.Hdr.String() + sprintName(rr.NextDomain)
-	for i := 0; i < len(rr.TypeBitMap); i++ {
-		s += " " + Type(rr.TypeBitMap[i]).String()
+	for _, t := range rr.TypeBitMap {
+		s += " " + Type(t).String()
 	}
 	return s
 }
@@ -854,14 +879,7 @@ func (rr *NSEC) String() string {
 func (rr *NSEC) len(off int, compression map[string]struct{}) int {
 	l := rr.Hdr.len(off, compression)
 	l += domainNameLen(rr.NextDomain, off+l, compression, false)
-	lastwindow := uint32(2 ^ 32 + 1)
-	for _, t := range rr.TypeBitMap {
-		window := t / 256
-		if uint32(window) != lastwindow {
-			l += 1 + 32
-		}
-		lastwindow = uint32(window)
-	}
+	l += typeBitMapLen(rr.TypeBitMap)
 	return l
 }
 
@@ -1011,8 +1029,8 @@ func (rr *NSEC3) String() string {
 		" " + strconv.Itoa(int(rr.Iterations)) +
 		" " + saltToString(rr.Salt) +
 		" " + rr.NextDomain
-	for i := 0; i < len(rr.TypeBitMap); i++ {
-		s += " " + Type(rr.TypeBitMap[i]).String()
+	for _, t := range rr.TypeBitMap {
+		s += " " + Type(t).String()
 	}
 	return s
 }
@@ -1020,14 +1038,7 @@ func (rr *NSEC3) String() string {
 func (rr *NSEC3) len(off int, compression map[string]struct{}) int {
 	l := rr.Hdr.len(off, compression)
 	l += 6 + len(rr.Salt)/2 + 1 + len(rr.NextDomain) + 1
-	lastwindow := uint32(2 ^ 32 + 1)
-	for _, t := range rr.TypeBitMap {
-		window := t / 256
-		if uint32(window) != lastwindow {
-			l += 1 + 32
-		}
-		lastwindow = uint32(window)
-	}
+	l += typeBitMapLen(rr.TypeBitMap)
 	return l
 }
 
@@ -1111,6 +1122,7 @@ type URI struct {
 	Target   string `dns:"octet"`
 }
 
+// rr.Target to be parsed as a sequence of character encoded octets according to RFC 3986
 func (rr *URI) String() string {
 	return rr.Hdr.String() + strconv.Itoa(int(rr.Priority)) +
 		" " + strconv.Itoa(int(rr.Weight)) + " " + sprintTxtOctet(rr.Target)
@@ -1272,6 +1284,7 @@ type CAA struct {
 	Value string `dns:"octet"`
 }
 
+// rr.Value Is the character-string encoding of the value field as specified in RFC 1035, Section 5.1.
 func (rr *CAA) String() string {
 	return rr.Hdr.String() + strconv.Itoa(int(rr.Flag)) + " " + rr.Tag + " " + sprintTxtOctet(rr.Value)
 }
@@ -1335,8 +1348,8 @@ type CSYNC struct {
 func (rr *CSYNC) String() string {
 	s := rr.Hdr.String() + strconv.FormatInt(int64(rr.Serial), 10) + " " + strconv.Itoa(int(rr.Flags))
 
-	for i := 0; i < len(rr.TypeBitMap); i++ {
-		s += " " + Type(rr.TypeBitMap[i]).String()
+	for _, t := range rr.TypeBitMap {
+		s += " " + Type(t).String()
 	}
 	return s
 }
@@ -1344,15 +1357,90 @@ func (rr *CSYNC) String() string {
 func (rr *CSYNC) len(off int, compression map[string]struct{}) int {
 	l := rr.Hdr.len(off, compression)
 	l += 4 + 2
-	lastwindow := uint32(2 ^ 32 + 1)
-	for _, t := range rr.TypeBitMap {
-		window := t / 256
-		if uint32(window) != lastwindow {
-			l += 1 + 32
-		}
-		lastwindow = uint32(window)
-	}
+	l += typeBitMapLen(rr.TypeBitMap)
 	return l
+}
+
+// APL RR. See RFC 3123.
+type APL struct {
+	Hdr      RR_Header
+	Prefixes []APLPrefix `dns:"apl"`
+}
+
+// APLPrefix is an address prefix hold by an APL record.
+type APLPrefix struct {
+	Negation bool
+	Network  net.IPNet
+}
+
+// String returns presentation form of the APL record.
+func (rr *APL) String() string {
+	var sb strings.Builder
+	sb.WriteString(rr.Hdr.String())
+	for i, p := range rr.Prefixes {
+		if i > 0 {
+			sb.WriteByte(' ')
+		}
+		sb.WriteString(p.str())
+	}
+	return sb.String()
+}
+
+// str returns presentation form of the APL prefix.
+func (p *APLPrefix) str() string {
+	var sb strings.Builder
+	if p.Negation {
+		sb.WriteByte('!')
+	}
+
+	switch len(p.Network.IP) {
+	case net.IPv4len:
+		sb.WriteByte('1')
+	case net.IPv6len:
+		sb.WriteByte('2')
+	}
+
+	sb.WriteByte(':')
+
+	switch len(p.Network.IP) {
+	case net.IPv4len:
+		sb.WriteString(p.Network.IP.String())
+	case net.IPv6len:
+		// add prefix for IPv4-mapped IPv6
+		if v4 := p.Network.IP.To4(); v4 != nil {
+			sb.WriteString("::ffff:")
+		}
+		sb.WriteString(p.Network.IP.String())
+	}
+
+	sb.WriteByte('/')
+
+	prefix, _ := p.Network.Mask.Size()
+	sb.WriteString(strconv.Itoa(prefix))
+
+	return sb.String()
+}
+
+// equals reports whether two APL prefixes are identical.
+func (a *APLPrefix) equals(b *APLPrefix) bool {
+	return a.Negation == b.Negation &&
+		bytes.Equal(a.Network.IP, b.Network.IP) &&
+		bytes.Equal(a.Network.Mask, b.Network.Mask)
+}
+
+// copy returns a copy of the APL prefix.
+func (p *APLPrefix) copy() APLPrefix {
+	return APLPrefix{
+		Negation: p.Negation,
+		Network:  copyNet(p.Network),
+	}
+}
+
+// len returns size of the prefix in wire format.
+func (p *APLPrefix) len() int {
+	// 4-byte header and the network address prefix (see Section 4 of RFC 3123)
+	prefix, _ := p.Network.Mask.Size()
+	return 4 + (prefix+7)/8
 }
 
 // TimeToString translates the RRSIG's incep. and expir. times to the
@@ -1409,6 +1497,17 @@ func copyIP(ip net.IP) net.IP {
 	p := make(net.IP, len(ip))
 	copy(p, ip)
 	return p
+}
+
+// copyNet returns a copy of a subnet.
+func copyNet(n net.IPNet) net.IPNet {
+	m := make(net.IPMask, len(n.Mask))
+	copy(m, n.Mask)
+
+	return net.IPNet{
+		IP:   copyIP(n.IP),
+		Mask: m,
+	}
 }
 
 // SplitN splits a string into N sized string chunks.

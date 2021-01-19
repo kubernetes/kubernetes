@@ -9,14 +9,20 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "remotecommand_test.go",
         "v2_test.go",
         "v4_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/httpstream/spdy:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/remotecommand:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
     ],
 )
 

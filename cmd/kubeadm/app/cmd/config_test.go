@@ -249,7 +249,7 @@ k8s.gcr.io/kube-scheduler:{{.KubeVersion}}
 k8s.gcr.io/kube-proxy:{{.KubeVersion}}
 k8s.gcr.io/pause:{{.PauseVersion}}
 k8s.gcr.io/etcd:{{.EtcdVersion}}
-k8s.gcr.io/coredns:{{.CoreDNSVersion}}
+k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 `,
 		},
 		{
@@ -268,7 +268,7 @@ k8s.gcr.io/coredns:{{.CoreDNSVersion}}
         "k8s.gcr.io/kube-proxy:{{.KubeVersion}}",
         "k8s.gcr.io/pause:{{.PauseVersion}}",
         "k8s.gcr.io/etcd:{{.EtcdVersion}}",
-        "k8s.gcr.io/coredns:{{.CoreDNSVersion}}"
+        "k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}"
     ]
 }
 `,
@@ -287,7 +287,7 @@ images:
 - k8s.gcr.io/kube-proxy:{{.KubeVersion}}
 - k8s.gcr.io/pause:{{.PauseVersion}}
 - k8s.gcr.io/etcd:{{.EtcdVersion}}
-- k8s.gcr.io/coredns:{{.CoreDNSVersion}}
+- k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 kind: Images
 `,
 		},
@@ -303,7 +303,7 @@ k8s.gcr.io/kube-scheduler:{{.KubeVersion}}
 k8s.gcr.io/kube-proxy:{{.KubeVersion}}
 k8s.gcr.io/pause:{{.PauseVersion}}
 k8s.gcr.io/etcd:{{.EtcdVersion}}
-k8s.gcr.io/coredns:{{.CoreDNSVersion}}
+k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 `,
 		},
 		{
@@ -313,7 +313,7 @@ k8s.gcr.io/coredns:{{.CoreDNSVersion}}
 			},
 			outputFormat: `jsonpath={range.images[*]}{@} {end}`,
 			expectedOutput: "k8s.gcr.io/kube-apiserver:{{.KubeVersion}} k8s.gcr.io/kube-controller-manager:{{.KubeVersion}} k8s.gcr.io/kube-scheduler:{{.KubeVersion}} " +
-				"k8s.gcr.io/kube-proxy:{{.KubeVersion}} k8s.gcr.io/pause:{{.PauseVersion}} k8s.gcr.io/etcd:{{.EtcdVersion}} k8s.gcr.io/coredns:{{.CoreDNSVersion}} ",
+				"k8s.gcr.io/kube-proxy:{{.KubeVersion}} k8s.gcr.io/pause:{{.PauseVersion}} k8s.gcr.io/etcd:{{.EtcdVersion}} k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}} ",
 		},
 	}
 

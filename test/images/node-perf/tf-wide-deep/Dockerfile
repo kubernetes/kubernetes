@@ -33,6 +33,6 @@ RUN wget https://github.com/tensorflow/models/archive/v1.9.0.tar.gz \
 && rm -f v1.9.0.tar.gz
 
 WORKDIR $HOME/models-1.9.0/official/wide_deep
-ENV PYTHONPATH $PYTHONPATH:$HOME/models-1.9.0
+ENV PYTHONPATH=$PYTHONPATH:$HOME/models-1.9.0
 
 ENTRYPOINT python ./wide_deep.py

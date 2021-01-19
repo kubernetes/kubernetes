@@ -226,6 +226,10 @@ func (s *DelegatingAuthenticationOptions) WithClientTimeout(timeout time.Duratio
 }
 
 func (s *DelegatingAuthenticationOptions) Validate() []error {
+	if s == nil {
+		return nil
+	}
+
 	allErrors := []error{}
 	allErrors = append(allErrors, s.RequestHeader.Validate()...)
 
@@ -330,8 +334,8 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 			if err != nil {
 				if s.TolerateInClusterLookupFailure {
 					klog.Warningf("Error looking up in-cluster authentication configuration: %v", err)
-					klog.Warningf("Continuing without authentication configuration. This may treat all requests as anonymous.")
-					klog.Warningf("To require authentication configuration lookup to succeed, set --authentication-tolerate-lookup-failure=false")
+					klog.Warning("Continuing without authentication configuration. This may treat all requests as anonymous.")
+					klog.Warning("To require authentication configuration lookup to succeed, set --authentication-tolerate-lookup-failure=false")
 				} else {
 					return fmt.Errorf("unable to load configmap based request-header-client-ca-file: %v", err)
 				}

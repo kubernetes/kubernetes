@@ -43,8 +43,11 @@ const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
 	Name = "NodeAffinity"
 
+	// preScoreStateKey is the key in CycleState to NodeAffinity pre-computed data for Scoring.
+	preScoreStateKey = "PreScore" + Name
+
 	// ErrReasonPod is the reason for Pod's node affinity/selector not matching.
-	ErrReasonPod = "node(s) didn't match Pod's node affinity"
+	ErrReasonPod = "node(s) didn't match Pod's node affinity/selector"
 
 	// errReasonEnforced is the reason for added node affinity not matching.
 	errReasonEnforced = "node(s) didn't match scheduler-enforced node affinity"
@@ -71,6 +74,33 @@ func (pl *NodeAffinity) Filter(ctx context.Context, state *framework.CycleState,
 	return nil
 }
 
+// preScoreState computed at PreScore and used at Score.
+type preScoreState struct {
+	preferredNodeAffinity *nodeaffinity.PreferredSchedulingTerms
+}
+
+// Clone implements the mandatory Clone interface. We don't really copy the data since
+// there is no need for that.
+func (s *preScoreState) Clone() framework.StateData {
+	return s
+}
+
+// PreScore builds and writes cycle state used by Score and NormalizeScore.
+func (pl *NodeAffinity) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+	if len(nodes) == 0 {
+		return nil
+	}
+	preferredNodeAffinity, err := getPodPreferredNodeAffinity(pod)
+	if err != nil {
+		return framework.AsStatus(err)
+	}
+	state := &preScoreState{
+		preferredNodeAffinity: preferredNodeAffinity,
+	}
+	cycleState.Write(preScoreStateKey, state)
+	return nil
+}
+
 // Score returns the sum of the weights of the terms that match the Node.
 // Terms came from the Pod .spec.affinity.nodeAffinity and from the plugin's
 // default affinity.
@@ -85,22 +115,25 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
-	affinity := pod.Spec.Affinity
-
 	var count int64
 	if pl.addedPrefSchedTerms != nil {
 		count += pl.addedPrefSchedTerms.Score(node)
 	}
-	// A nil element of PreferredDuringSchedulingIgnoredDuringExecution matches no objects.
-	// An element of PreferredDuringSchedulingIgnoredDuringExecution that refers to an
-	// empty PreferredSchedulingTerm matches all objects.
-	if affinity != nil && affinity.NodeAffinity != nil && affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
-		// TODO(#96164): Do this in PreScore to avoid computing it for all nodes.
-		preferredNodeAffinity, err := nodeaffinity.NewPreferredSchedulingTerms(affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+
+	s, err := getPreScoreState(state)
+	if err != nil {
+		// fallback to calculate preferredNodeAffinity here when PreScore is disabled
+		preferredNodeAffinity, err := getPodPreferredNodeAffinity(pod)
 		if err != nil {
 			return 0, framework.AsStatus(err)
 		}
-		count += preferredNodeAffinity.Score(node)
+		s = &preScoreState{
+			preferredNodeAffinity: preferredNodeAffinity,
+		}
+	}
+
+	if s.preferredNodeAffinity != nil {
+		count += s.preferredNodeAffinity.Score(node)
 	}
 
 	return count, nil
@@ -149,4 +182,25 @@ func getArgs(obj runtime.Object) (config.NodeAffinityArgs, error) {
 		return config.NodeAffinityArgs{}, fmt.Errorf("args are not of type NodeAffinityArgs, got %T", obj)
 	}
 	return *ptr, validation.ValidateNodeAffinityArgs(ptr)
+}
+
+func getPodPreferredNodeAffinity(pod *v1.Pod) (*nodeaffinity.PreferredSchedulingTerms, error) {
+	affinity := pod.Spec.Affinity
+	if affinity != nil && affinity.NodeAffinity != nil && affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		return nodeaffinity.NewPreferredSchedulingTerms(affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+	}
+	return nil, nil
+}
+
+func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
+	c, err := cycleState.Read(preScoreStateKey)
+	if err != nil {
+		return nil, fmt.Errorf("reading %q from cycleState: %v", preScoreStateKey, err)
+	}
+
+	s, ok := c.(*preScoreState)
+	if !ok {
+		return nil, fmt.Errorf("invalid PreScore state, got type %T", c)
+	}
+	return s, nil
 }

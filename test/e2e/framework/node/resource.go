@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	netutil "k8s.io/utils/net"
 	"net"
 	"strings"
 	"time"
@@ -42,6 +41,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientretry "k8s.io/client-go/util/retry"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	netutil "k8s.io/utils/net"
 )
 
 const (
@@ -247,6 +247,17 @@ func GetInternalIP(node *v1.Node) (string, error) {
 		return "", fmt.Errorf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
 	return host, nil
+}
+
+// FirstAddressByTypeAndFamily returns the first address that matches the given type and family of the list of nodes
+func FirstAddressByTypeAndFamily(nodelist *v1.NodeList, addrType v1.NodeAddressType, family v1.IPFamily) string {
+	for _, n := range nodelist.Items {
+		addresses := GetAddressesByTypeAndFamily(&n, addrType, family)
+		if len(addresses) > 0 {
+			return addresses[0]
+		}
+	}
+	return ""
 }
 
 // GetAddressesByTypeAndFamily returns a list of addresses of the given addressType for the given node

@@ -131,42 +131,33 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 // applies on Get, Create, and Update, but we need to distinguish between them.
 //
 // This will be called on both Service and ServiceList types.
-func (r *GenericREST) defaultOnRead(obj runtime.Object) error {
-	service, ok := obj.(*api.Service)
-	if ok {
-		return r.defaultOnReadService(service)
+func (r *GenericREST) defaultOnRead(obj runtime.Object) {
+	switch s := obj.(type) {
+	case *api.Service:
+		r.defaultOnReadService(s)
+	case *api.ServiceList:
+		r.defaultOnReadServiceList(s)
+	default:
+		// This was not an object we can default.  This is not an error, as the
+		// caching layer can pass through here, too.
 	}
-
-	serviceList, ok := obj.(*api.ServiceList)
-	if ok {
-		return r.defaultOnReadServiceList(serviceList)
-	}
-
-	// This was not an object we can default.  This is not an error, as the
-	// caching layer can pass through here, too.
-	return nil
 }
 
 // defaultOnReadServiceList defaults a ServiceList.
-func (r *GenericREST) defaultOnReadServiceList(serviceList *api.ServiceList) error {
+func (r *GenericREST) defaultOnReadServiceList(serviceList *api.ServiceList) {
 	if serviceList == nil {
-		return nil
+		return
 	}
 
 	for i := range serviceList.Items {
-		err := r.defaultOnReadService(&serviceList.Items[i])
-		if err != nil {
-			return err
-		}
+		r.defaultOnReadService(&serviceList.Items[i])
 	}
-
-	return nil
 }
 
 // defaultOnReadService defaults a single Service.
-func (r *GenericREST) defaultOnReadService(service *api.Service) error {
+func (r *GenericREST) defaultOnReadService(service *api.Service) {
 	if service == nil {
-		return nil
+		return
 	}
 
 	// We might find Services that were written before ClusterIP became plural.
@@ -176,11 +167,11 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) error {
 
 	// The rest of this does not apply unless dual-stack is enabled.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return nil
+		return
 	}
 
 	if len(service.Spec.IPFamilies) > 0 {
-		return nil // already defaulted
+		return // already defaulted
 	}
 
 	// set clusterIPs based on ClusterIP
@@ -241,6 +232,4 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) error {
 			}
 		}
 	}
-
-	return nil
 }

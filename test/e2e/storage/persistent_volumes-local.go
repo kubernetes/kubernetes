@@ -45,6 +45,7 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -54,6 +55,7 @@ type localTestConfig struct {
 	nodes        []v1.Node
 	node0        *v1.Node
 	client       clientset.Interface
+	timeouts     *framework.TimeoutContext
 	scName       string
 	discoveryDir string
 	hostExec     utils.HostExec
@@ -165,6 +167,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		config = &localTestConfig{
 			ns:           f.Namespace.Name,
 			client:       f.ClientSet,
+			timeouts:     f.Timeouts,
 			nodes:        nodes.Items,
 			node0:        node0,
 			scName:       scName,
@@ -312,7 +315,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			createLocalPVCsPVs(config, []*localTestVolume{testVol}, immediateMode)
 			pod, err := createLocalPod(config, testVol, nil)
 			framework.ExpectError(err)
-			err = e2epod.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+			err = e2epod.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, f.Timeouts.PodStartShort)
 			framework.ExpectError(err)
 			cleanupLocalPVCsPVs(config, []*localTestVolume{testVol})
 		})
@@ -329,7 +332,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
-			err = e2epod.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+			err = e2epod.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, f.Timeouts.PodStartShort)
 			framework.ExpectError(err)
 
 			cleanupLocalVolumes(config, []*localTestVolume{testVol})
@@ -530,6 +533,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			ginkgo.By(fmt.Sprintf("Creating %v pods periodically", numConcurrentPods))
 			stop := make(chan struct{})
 			go wait.Until(func() {
+				defer ginkgo.GinkgoRecover()
 				podsLock.Lock()
 				defer podsLock.Unlock()
 
@@ -854,7 +858,7 @@ func cleanupLocalVolumes(config *localTestConfig, volumes []*localTestVolume) {
 }
 
 func verifyLocalVolume(config *localTestConfig, volume *localTestVolume) {
-	framework.ExpectNoError(e2epv.WaitOnPVandPVC(config.client, config.ns, volume.pv, volume.pvc))
+	framework.ExpectNoError(e2epv.WaitOnPVandPVC(config.client, config.timeouts, config.ns, volume.pv, volume.pvc))
 }
 
 func verifyLocalPod(config *localTestConfig, volume *localTestVolume, pod *v1.Pod, expectedNodeName string) {
@@ -1031,7 +1035,7 @@ func createLocalPod(config *localTestConfig, volume *localTestVolume, fsGroup *i
 		SeLinuxLabel: selinuxLabel,
 		FsGroup:      fsGroup,
 	}
-	return e2epod.CreateSecPod(config.client, &podConfig, framework.PodStartShortTimeout)
+	return e2epod.CreateSecPod(config.client, &podConfig, config.timeouts.PodStartShort)
 }
 
 func createWriteCmd(testDir string, testFile string, writeTestFileContent string, volumeType localVolumeType) string {
@@ -1074,7 +1078,7 @@ func testReadFileContent(f *framework.Framework, testFileDir string, testFile st
 // Execute a read or write command in a pod.
 // Fail on error
 func podRWCmdExec(f *framework.Framework, pod *v1.Pod, cmd string) string {
-	stdout, stderr, err := utils.PodExec(f, pod, cmd)
+	stdout, stderr, err := e2evolume.PodExec(f, pod, cmd)
 	framework.Logf("podRWCmdExec cmd: %q, out: %q, stderr: %q, err: %v", cmd, stdout, stderr, err)
 	framework.ExpectNoError(err)
 	return stdout

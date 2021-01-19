@@ -33,7 +33,8 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	cloudprovider "k8s.io/cloud-provider"
+
+	"k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
 	"k8s.io/cloud-provider/options"
@@ -56,9 +57,6 @@ const (
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	// cloudProviderConfigFile shows an sample of parse config file from flag option
-	var flagset *pflag.FlagSet = pflag.NewFlagSet("flagSet", pflag.ContinueOnError)
-	var cloudProviderConfigFile *string = flagset.String("cloud-provider-configfile", "", "This is the sample input for cloud provider config file")
 	pflag.CommandLine.ParseErrorsWhitelist.UnknownFlags = true
 	_ = pflag.CommandLine.Parse(os.Args[1:])
 
@@ -75,7 +73,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	cloud, err := cloudprovider.InitCloudProvider(cloudProviderName, *cloudProviderConfigFile)
+	cloud, err := cloudprovider.InitCloudProvider(cloudProviderName, c.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile)
 	if err != nil {
 		klog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
@@ -105,16 +103,16 @@ func main() {
 	//delete(controllerInitializers, "cloud-node-lifecycle")
 
 	// Here is an example to add an controller(NodeIpamController) which will be used by cloud provider
-	// generate nodeipamconfig. Here is an sample code. Please pass the right parameter in your code.
+	// generate nodeIPAMConfig. Here is an sample code. Please pass the right parameter in your code.
 	// If you do not need additional controller, please ignore.
-	nodeipamconfig := nodeipamconfig.NodeIPAMControllerConfiguration{
+	nodeIPAMConfig := nodeipamconfig.NodeIPAMControllerConfiguration{
 		ServiceCIDR:          "sample",
 		SecondaryServiceCIDR: "sample",
 		NodeCIDRMaskSize:     11,
 		NodeCIDRMaskSizeIPv4: 11,
 		NodeCIDRMaskSizeIPv6: 111,
 	}
-	controllerInitializers["nodeipam"] = startNodeIpamControllerWrapper(c.Complete(), nodeipamconfig, cloud)
+	controllerInitializers["nodeipam"] = startNodeIpamControllerWrapper(c.Complete(), nodeIPAMConfig, cloud)
 
 	command := app.NewCloudControllerManagerCommand(s, c, controllerInitializers)
 
@@ -139,8 +137,8 @@ func main() {
 	}
 }
 
-func startNodeIpamControllerWrapper(ccmconfig *cloudcontrollerconfig.CompletedConfig, nodeipamconfig nodeipamconfig.NodeIPAMControllerConfiguration, cloud cloudprovider.Interface) func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
+func startNodeIpamControllerWrapper(ccmconfig *cloudcontrollerconfig.CompletedConfig, nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration, cloud cloudprovider.Interface) func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
 	return func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
-		return startNodeIpamController(ccmconfig, nodeipamconfig, ctx, cloud)
+		return startNodeIpamController(ccmconfig, nodeIPAMConfig, ctx, cloud)
 	}
 }

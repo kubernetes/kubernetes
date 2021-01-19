@@ -137,7 +137,7 @@ type PriorityQueue struct {
 	// when a pod is popped.
 	schedulingCycle int64
 	// moveRequestCycle caches the sequence number of scheduling cycle when we
-	// received a move request. Unscheduable pods in and before this scheduling
+	// received a move request. Unschedulable pods in and before this scheduling
 	// cycle will be put back to activeQueue if we were trying to schedule them
 	// when we received move request.
 	moveRequestCycle int64
@@ -302,14 +302,15 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 		return fmt.Errorf("pod: %v is already present in unschedulable queue", nsNameForPod(pod))
 	}
 
-	// Refresh the timestamp since the pod is re-added.
-	pInfo.Timestamp = p.clock.Now()
 	if _, exists, _ := p.activeQ.Get(pInfo); exists {
 		return fmt.Errorf("pod: %v is already present in the active queue", nsNameForPod(pod))
 	}
 	if _, exists, _ := p.podBackoffQ.Get(pInfo); exists {
 		return fmt.Errorf("pod %v is already present in the backoff queue", nsNameForPod(pod))
 	}
+
+	// Refresh the timestamp since the pod is re-added.
+	pInfo.Timestamp = p.clock.Now()
 
 	// If a move request has been received, move it to the BackoffQ, otherwise move
 	// it to unschedulableQ.

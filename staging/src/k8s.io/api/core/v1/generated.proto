@@ -461,7 +461,6 @@ message ConfigMap {
   // be updated (only object metadata can be modified).
   // If not set to true, the field can be modified at any time.
   // Defaulted to nil.
-  // This is a beta field enabled by ImmutableEphemeralVolumes feature gate.
   // +optional
   optional bool immutable = 4;
 
@@ -681,7 +680,7 @@ message Container {
 
   // Compute Resources required by this container.
   // Cannot be updated.
-  // More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
   // +optional
   optional ResourceRequirements resources = 8;
 
@@ -2004,7 +2003,7 @@ message LimitRangeList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of LimitRange objects.
-  // More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
   repeated LimitRange items = 2;
 }
 
@@ -4237,14 +4236,14 @@ message ResourceQuotaStatus {
 // ResourceRequirements describes the compute resource requirements.
 message ResourceRequirements {
   // Limits describes the maximum amount of compute resources allowed.
-  // More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> limits = 1;
 
   // Requests describes the minimum amount of compute resources required.
   // If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
   // otherwise to an implementation-defined value.
-  // More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> requests = 2;
 }
@@ -4419,7 +4418,6 @@ message Secret {
   // be updated (only object metadata can be modified).
   // If not set to true, the field can be modified at any time.
   // Defaulted to nil.
-  // This is a beta field enabled by ImmutableEphemeralVolumes feature gate.
   // +optional
   optional bool immutable = 5;
 
@@ -4926,7 +4924,7 @@ message ServiceSpec {
   // externalName is the external reference that discovery mechanisms will
   // return as an alias for this service (e.g. a DNS CNAME record). No
   // proxying will be involved.  Must be a lowercase RFC-1123 hostname
-  // (https://tools.ietf.org/html/rfc1123) and requires Type to be
+  // (https://tools.ietf.org/html/rfc1123) and requires `type` to be "ExternalName".
   // +optional
   optional string externalName = 10;
 
@@ -4979,6 +4977,7 @@ message ServiceSpec {
   // value, if used, only makes sense as the last value in the list.
   // If this is not specified or empty, no topology constraints will be applied.
   // This field is alpha-level and is only honored by servers that enable the ServiceTopology feature.
+  // This field is deprecated and will be removed in a future version.
   // +optional
   repeated string topologyKeys = 16;
 

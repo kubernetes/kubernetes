@@ -7,6 +7,7 @@ go_library(
     srcs = [
         "cpu_limits.go",
         "density.go",
+        "device_plugin.go",
         "dns.go",
         "framework.go",
         "gmsa_full.go",
@@ -22,6 +23,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/windows",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",

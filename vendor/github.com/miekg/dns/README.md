@@ -26,8 +26,8 @@ avoiding breaking changes wherever reasonable. We support the last two versions 
 A not-so-up-to-date-list-that-may-be-actually-current:
 
 * https://github.com/coredns/coredns
-* https://cloudflare.com
 * https://github.com/abh/geodns
+* https://github.com/baidu/bfe
 * http://www.statdns.com/
 * http://www.dnsinspect.com/
 * https://github.com/chuangbo/jianbing-dictionary-dns
@@ -41,11 +41,9 @@ A not-so-up-to-date-list-that-may-be-actually-current:
 * https://github.com/StalkR/dns-reverse-proxy
 * https://github.com/tianon/rawdns
 * https://mesosphere.github.io/mesos-dns/
-* https://pulse.turbobytes.com/
 * https://github.com/fcambus/statzone
 * https://github.com/benschw/dns-clb-go
 * https://github.com/corny/dnscheck for <http://public-dns.info/>
-* https://namesmith.io
 * https://github.com/miekg/unbound
 * https://github.com/miekg/exdns
 * https://dnslookup.org
@@ -54,20 +52,23 @@ A not-so-up-to-date-list-that-may-be-actually-current:
 * https://github.com/mehrdadrad/mylg
 * https://github.com/bamarni/dockness
 * https://github.com/fffaraz/microdns
-* http://kelda.io
 * https://github.com/ipdcode/hades <https://jd.com>
 * https://github.com/StackExchange/dnscontrol/
 * https://www.dnsperf.com/
 * https://dnssectest.net/
-* https://dns.apebits.com
 * https://github.com/oif/apex
 * https://github.com/jedisct1/dnscrypt-proxy
 * https://github.com/jedisct1/rpdns
 * https://github.com/xor-gate/sshfp
 * https://github.com/rs/dnstrace
 * https://blitiri.com.ar/p/dnss ([github mirror](https://github.com/albertito/dnss))
-* https://github.com/semihalev/sdns
 * https://render.com
+* https://github.com/peterzen/goresolver
+* https://github.com/folbricht/routedns
+* https://domainr.com/
+* https://zonedb.org/
+* https://router7.org/
+* https://github.com/fortio/dnsping
 
 Send pull request if you want to be listed here.
 
@@ -92,8 +93,8 @@ DNS Authors 2012-
 
 # Building
 
-Building is done with the `go` tool. If you have setup your GOPATH correctly, the following should
-work:
+This library uses Go modules and uses semantic versioning. Building is done with the `go` tool, so
+the following should work:
 
     go get github.com/miekg/dns
     go build github.com/miekg/dns
@@ -125,6 +126,7 @@ Example programs can be found in the `github.com/miekg/exdns` repository.
 * 2915 - NAPTR record
 * 2929 - DNS IANA Considerations
 * 3110 - RSASHA1 DNS keys
+* 3123 - APL record
 * 3225 - DO bit (DNSSEC OK)
 * 340{1,2,3} - NAPTR record
 * 3445 - Limiting the scope of (DNS)KEY
@@ -151,6 +153,7 @@ Example programs can be found in the `github.com/miekg/exdns` repository.
 * 6844 - CAA record
 * 6891 - EDNS0 update
 * 6895 - DNS IANA considerations
+* 6944 - DNSSEC DNSKEY Algorithm Status
 * 6975 - Algorithm Understanding in DNSSEC
 * 7043 - EUI48/EUI64 records
 * 7314 - DNS (EDNS) EXPIRE Option

@@ -304,9 +304,6 @@ kubectl run logs-generator \
   -- logs-generator -t 10 -d 1s
 ```
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/logs-generator/README.md?pixel)]()
-
-
 ### mounttest
 
 The `mounttest` subcommand can be used to create files with various permissions, read files,
@@ -372,8 +369,6 @@ HTTP server:
     kubectl exec test-agnhost -- curl -v -X POST localhost:8889/run/nat-closewait-server \
         -d '{"LocalAddr":"127.0.0.1:9999"}'
 ```
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/net/README.md?pixel)]()
 
 ### netexec
 
@@ -536,7 +531,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=k8s.gcr.io/e2e-test-images/agnhost:2.14 \
+      --image=k8s.gcr.io/e2e-test-images/agnhost:2.21 \
       --restart=Never \
       --env "BIND_ADDRESS=localhost" \
       --env "BIND_PORT=8080" \
@@ -570,9 +565,6 @@ Usage:
 ```console
     kubectl exec test-agnhost -- /agnhost porter
 ```
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/porter/README.md?pixel)]()
-
 
 ### resource-consumer-controller
 
@@ -612,11 +604,6 @@ Usage:
 ```console
     kubectl exec test-agnhost -- /agnhost serve-hostname [--tcp] [--udp] [--http] [--close] [--port <port>]
 ```
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/for-demos/serve_hostname/README.md?pixel)]()
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/serve_hostname/README.md?pixel)]()
-
 
 ### test-webserver
 
@@ -664,6 +651,6 @@ The Windows `agnhost` image includes a `nc` binary that is 100% compliant with i
 
 ## Image
 
-The image can be found at `k8s.gcr.io/e2e-test-images/agnhost:2.14` for both Linux and
+The image can be found at `k8s.gcr.io/e2e-test-images/agnhost:2.21` for both Linux and
 Windows containers (based on `mcr.microsoft.com/windows/servercore:ltsc2019`,
 `mcr.microsoft.com/windows/servercore:1903`, and `mcr.microsoft.com/windows/servercore:1909`).

@@ -138,8 +138,8 @@ func (c *autoRegisterController) Run(threadiness int, stopCh <-chan struct{}) {
 	// make sure the work queue is shutdown which will trigger workers to end
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting autoregister controller")
-	defer klog.Infof("Shutting down autoregister controller")
+	klog.Info("Starting autoregister controller")
+	defer klog.Info("Shutting down autoregister controller")
 
 	// wait for your secondary caches to fill before starting your work
 	if !controllers.WaitForCacheSync("autoregister", stopCh, c.apiServiceSynced) {

@@ -127,11 +127,6 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 		return nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
 
-	// Check if the cluster is self-hosted
-	if upgrade.IsControlPlaneSelfHosted(client) {
-		return nil, nil, nil, errors.New("cannot upgrade a self-hosted control plane")
-	}
-
 	// Fetch the configuration from a file or ConfigMap and validate it
 	fmt.Println("[upgrade/config] Making sure the configuration is correct:")
 

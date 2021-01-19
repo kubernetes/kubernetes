@@ -129,12 +129,6 @@ func (s *Scheme) nameFunc(t reflect.Type) string {
 	return gvks[0].Kind
 }
 
-// fromScope gets the input version, desired output version, and desired Scheme
-// from a conversion.Scope.
-func (s *Scheme) fromScope(scope conversion.Scope) *Scheme {
-	return s
-}
-
 // Converter allows access to the converter for the scheme
 func (s *Scheme) Converter() *conversion.Converter {
 	return s.converter

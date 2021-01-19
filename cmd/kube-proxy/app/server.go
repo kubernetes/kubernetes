@@ -108,8 +108,6 @@ type Options struct {
 	WriteConfigTo string
 	// CleanupAndExit, when true, makes the proxy server clean up iptables and ipvs rules, then exit.
 	CleanupAndExit bool
-	// CleanupIPVS, when true, makes the proxy server clean up ipvs rules before running.
-	CleanupIPVS bool
 	// WindowsService should be set to true if kube-proxy is running as a service on Windows.
 	// Its corresponding flag only gets registered in Windows builds
 	WindowsService bool
@@ -162,8 +160,6 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		"A string slice of values which specify the addresses to use for NodePorts. Values may be valid IP blocks (e.g. 1.2.3.0/24, 1.2.3.4/32). The default empty string slice ([]) means to use all local addresses.")
 
 	fs.BoolVar(&o.CleanupAndExit, "cleanup", o.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
-	fs.BoolVar(&o.CleanupIPVS, "cleanup-ipvs", o.CleanupIPVS, "If true and --cleanup is specified, kube-proxy will also flush IPVS rules, in addition to normal cleanup.")
-	fs.MarkDeprecated("cleanup-ipvs", "In a future release, running --cleanup will always flush IPVS rules")
 
 	fs.Var(utilflag.IPVar{Val: &o.config.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to '0.0.0.0' for all IPv4 interfaces and '::' for all IPv6 interfaces)")
 	fs.Var(utilflag.IPPortVar{Val: &o.config.HealthzBindAddress}, "healthz-bind-address", "The IP address with port for the health check server to serve on (set to '0.0.0.0:10256' for all IPv4 interfaces and '[::]:10256' for all IPv6 interfaces). Set empty to disable.")
@@ -215,7 +211,6 @@ func NewOptions() *Options {
 		config:      new(kubeproxyconfig.KubeProxyConfiguration),
 		healthzPort: ports.ProxyHealthzPort,
 		metricsPort: ports.ProxyStatusPort,
-		CleanupIPVS: true,
 		errCh:       make(chan error),
 	}
 }
@@ -535,7 +530,6 @@ type ProxyServer struct {
 	Conntracker            Conntracker // if nil, ignored
 	ProxyMode              string
 	NodeRef                *v1.ObjectReference
-	CleanupIPVS            bool
 	MetricsBindAddress     string
 	BindAddressHardFail    bool
 	EnableProfiling        bool
@@ -813,7 +807,7 @@ func (s *ProxyServer) CleanupAndExit() error {
 	for _, ipt := range ipts {
 		encounteredError = userspace.CleanupLeftovers(ipt) || encounteredError
 		encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
-		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, ipt, s.IpsetInterface, s.CleanupIPVS) || encounteredError
+		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, ipt, s.IpsetInterface) || encounteredError
 	}
 	if encounteredError {
 		return errors.New("encountered an error while tearing down rules")

@@ -104,8 +104,11 @@ func (s *DelegatingAuthorizationOptions) WithCustomRetryBackoff(backoff wait.Bac
 }
 
 func (s *DelegatingAuthorizationOptions) Validate() []error {
-	allErrors := []error{}
+	if s == nil {
+		return nil
+	}
 
+	allErrors := []error{}
 	if s.WebhookRetryBackoff != nil && s.WebhookRetryBackoff.Steps <= 0 {
 		allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 1, but is: %d", s.WebhookRetryBackoff.Steps))
 	}
@@ -170,7 +173,7 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 	}
 
 	if client == nil {
-		klog.Warningf("No authorization-kubeconfig provided, so SubjectAccessReview of authorization tokens won't work.")
+		klog.Warning("No authorization-kubeconfig provided, so SubjectAccessReview of authorization tokens won't work.")
 	} else {
 		cfg := authorizerfactory.DelegatingAuthorizerConfig{
 			SubjectAccessReviewClient: client.AuthorizationV1().SubjectAccessReviews(),

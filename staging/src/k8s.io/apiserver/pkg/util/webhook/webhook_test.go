@@ -422,7 +422,6 @@ func TestRequestTimeout(t *testing.T) {
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		<-done
-		return
 	}
 
 	// Create and start a simple HTTPS server
@@ -705,6 +704,33 @@ func TestWithExponentialBackoffWebhookErrorIsMostImportant(t *testing.T) {
 	err := WithExponentialBackoff(ctx, retryBackoff, webhookFunc, alwaysRetry)
 
 	if attemptsGot != 1 {
+		t.Errorf("expected %d webhook attempts, but got: %d", 1, attemptsGot)
+	}
+	if errExpected != err {
+		t.Errorf("expected error: %v, but got: %v", errExpected, err)
+	}
+}
+
+func TestWithExponentialBackoffWithRetryExhaustedWhileContextIsNotCanceled(t *testing.T) {
+	alwaysRetry := func(e error) bool {
+		return true
+	}
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	attemptsGot := 0
+	errExpected := errors.New("webhook not available")
+	webhookFunc := func() error {
+		attemptsGot++
+		return errExpected
+	}
+
+	// webhook err has higher priority than ctx error. we expect the webhook error to be returned.
+	retryBackoff := wait.Backoff{Steps: 5}
+	err := WithExponentialBackoff(ctx, retryBackoff, webhookFunc, alwaysRetry)
+
+	if attemptsGot != 5 {
 		t.Errorf("expected %d webhook attempts, but got: %d", 1, attemptsGot)
 	}
 	if errExpected != err {

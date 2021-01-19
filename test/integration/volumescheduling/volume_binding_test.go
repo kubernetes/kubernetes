@@ -381,7 +381,7 @@ func TestVolumeBindingRescheduling(t *testing.T) {
 		// Trigger
 		test.trigger(config)
 
-		// Wait for pod is scheduled or unscheduable.
+		// Wait for pod is scheduled or unschedulable.
 		if !test.shouldFail {
 			klog.Infof("Waiting for pod is scheduled")
 			if err := waitForPodToSchedule(config.client, test.pod); err != nil {

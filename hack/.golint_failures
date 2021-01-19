@@ -89,7 +89,6 @@ pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/config/v1alpha1
 pkg/controlplane/controller/crdregistration
 pkg/controlplane/tunneler
-pkg/credentialprovider/plugin
 pkg/features
 pkg/kubeapiserver
 pkg/kubectl/cmd/convert
@@ -107,7 +106,6 @@ pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
 pkg/kubelet/sysctl
-pkg/kubelet/types
 pkg/kubemark
 pkg/proxy/apis/config
 pkg/proxy/apis/config/v1alpha1
@@ -192,10 +190,6 @@ plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
 plugin/pkg/admission/limitranger
 plugin/pkg/auth/authorizer/node
 plugin/pkg/auth/authorizer/rbac
-staging/src/k8s.io/api/admission/v1
-staging/src/k8s.io/api/admission/v1beta1
-staging/src/k8s.io/api/admissionregistration/v1
-staging/src/k8s.io/api/admissionregistration/v1beta1
 staging/src/k8s.io/api/apiserverinternal/v1alpha1
 staging/src/k8s.io/api/apps/v1
 staging/src/k8s.io/api/apps/v1beta1
@@ -419,7 +413,6 @@ staging/src/k8s.io/kubectl/pkg/cmd/annotate
 staging/src/k8s.io/kubectl/pkg/cmd/apply
 staging/src/k8s.io/kubectl/pkg/cmd/attach
 staging/src/k8s.io/kubectl/pkg/cmd/autoscale
-staging/src/k8s.io/kubectl/pkg/cmd/certificates
 staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo
 staging/src/k8s.io/kubectl/pkg/cmd/create
 staging/src/k8s.io/kubectl/pkg/cmd/debug
@@ -463,7 +456,6 @@ staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1
 staging/src/k8s.io/metrics/pkg/apis/external_metrics
 staging/src/k8s.io/metrics/pkg/client/custom_metrics
 staging/src/k8s.io/metrics/pkg/client/custom_metrics/fake
-staging/src/k8s.io/metrics/pkg/client/custom_metrics/scheme
 staging/src/k8s.io/metrics/pkg/client/external_metrics
 staging/src/k8s.io/metrics/pkg/client/external_metrics/fake
 staging/src/k8s.io/mount-utils

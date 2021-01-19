@@ -214,7 +214,7 @@ type UpdatedObjectInfo interface {
 }
 
 // ValidateObjectFunc is a function to act on a given object. An error may be returned
-// if the hook cannot be completed. An ObjectFunc may NOT transform the provided
+// if the hook cannot be completed. A ValidateObjectFunc may NOT transform the provided
 // object.
 type ValidateObjectFunc func(ctx context.Context, obj runtime.Object) error
 
