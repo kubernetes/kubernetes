@@ -171,8 +171,8 @@ gen_prerelease_lifecycle: $(PRERELEASE_LIFECYCLE_GEN) $(META_DIR)/$(PRERELEASE_L
 #
 # The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $(PRERELEASE_LIFECYCLE_DIRS), $(eval                     \
-    $(dir)/$(PRERELEASE_LIFECYCLE_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
+$(foreach dir, $(PRERELEASE_LIFECYCLE_DIRS), $(eval                            \
+    $(dir)/$(PRERELEASE_LIFECYCLE_FILENAME): $(GODEPS_$(PRJ_SRC_PATH)/$(dir))  \
 ))
 
 # How to regenerate prerelease-lifecycle code.  This is a little slow to run,
@@ -195,7 +195,7 @@ $(PRERELEASE_LIFECYCLE_FILES): $(PRERELEASE_LIFECYCLE_GEN)
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
-$(PRERELEASE_LIFECYCLE_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/prerelease-lifecycle-gen)
+$(PRERELEASE_LIFECYCLE_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/prerelease-lifecycle-gen)
 	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/prerelease-lifecycle-gen
 	touch $@
 
@@ -260,8 +260,8 @@ gen_deepcopy: $(DEEPCOPY_GEN) $(META_DIR)/$(DEEPCOPY_GEN).todo
 #
 # The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $(DEEPCOPY_DIRS), $(eval                     \
-    $(dir)/$(DEEPCOPY_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
+$(foreach dir, $(DEEPCOPY_DIRS), $(eval                            \
+    $(dir)/$(DEEPCOPY_FILENAME): $(GODEPS_$(PRJ_SRC_PATH)/$(dir))  \
 ))
 
 # How to regenerate deep-copy code.  This is a little slow to run, so we batch
@@ -284,7 +284,7 @@ $(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
-$(DEEPCOPY_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/deepcopy-gen)
+$(DEEPCOPY_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/deepcopy-gen)
 	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/deepcopy-gen
 	touch $@
 
@@ -355,8 +355,8 @@ gen_defaulter: $(DEFAULTER_GEN) $(META_DIR)/$(DEFAULTER_GEN).todo
 #
 # The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $(DEFAULTER_DIRS), $(eval                     \
-    $(dir)/$(DEFAULTER_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
+$(foreach dir, $(DEFAULTER_DIRS), $(eval                            \
+    $(dir)/$(DEFAULTER_FILENAME): $(GODEPS_$(PRJ_SRC_PATH)/$(dir))  \
 ))
 
 # How to regenerate defaulter code.  This is a little slow to run, so we batch
@@ -379,7 +379,7 @@ $(DEFAULTER_FILES): $(DEFAULTER_GEN)
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
-$(DEFAULTER_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/defaulter-gen)
+$(DEFAULTER_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/defaulter-gen)
 	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/defaulter-gen
 	touch $@
 
@@ -463,8 +463,8 @@ gen_conversion: $(CONVERSION_GEN) $(META_DIR)/$(CONVERSION_GEN).todo
 #
 # The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $(CONVERSION_DIRS), $(eval                     \
-    $(dir)/$(CONVERSION_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
+$(foreach dir, $(CONVERSION_DIRS), $(eval                            \
+    $(dir)/$(CONVERSION_FILENAME): $(GODEPS_$(PRJ_SRC_PATH)/$(dir))  \
 ))
 
 # How to regenerate conversion code.  This is a little slow to run, so we batch
@@ -487,7 +487,7 @@ $(CONVERSION_FILES): $(CONVERSION_GEN)
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
-$(CONVERSION_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/conversion-gen)
+$(CONVERSION_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/conversion-gen)
 	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/conversion-gen
 	touch $@
 
@@ -559,8 +559,8 @@ define OPENAPI_TARGETS_DEF
 #
 # The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $($(prefix)_OPENAPI_DIRS), $(eval            \
-    $($(prefix)_OPENAPI_OUTFILE): $($(PRJ_SRC_PATH)/$(dir)) \
+$(foreach dir, $($(prefix)_OPENAPI_DIRS), $(eval                   \
+    $($(prefix)_OPENAPI_OUTFILE): $(GODEPS_$(PRJ_SRC_PATH)/$(dir)) \
 ))
 
 # Rebuild spec if the violation file changed.
@@ -610,7 +610,7 @@ gen_openapi: $(OPENAPI_GEN) $(KUBE_OPENAPI_OUTFILE) $(AGGREGATOR_OPENAPI_OUTFILE
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
-$(OPENAPI_GEN): $(k8s.io/kubernetes/vendor/k8s.io/kube-openapi/cmd/openapi-gen)
+$(OPENAPI_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/kube-openapi/cmd/openapi-gen)
 	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/kube-openapi/cmd/openapi-gen
 	touch $@
 
@@ -639,6 +639,6 @@ gen_bindata: $(BINDATA_GEN) FORCE
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
-$(BINDATA_GEN): $(k8s.io/kubernetes/vendor/github.com/go-bindata/go-bindata/go-bindata)
+$(BINDATA_GEN): $(GODEPS_k8s.io/kubernetes/vendor/github.com/go-bindata/go-bindata/go-bindata)
 	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/github.com/go-bindata/go-bindata/go-bindata
 	touch $@
