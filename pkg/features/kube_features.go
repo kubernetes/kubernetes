@@ -417,6 +417,20 @@ const (
 	// Implement support for limiting pids in nodes
 	SupportNodePidsLimit featuregate.Feature = "SupportNodePidsLimit"
 
+	// owner: @wk8	
+	// alpha: v1.14	
+	// beta: v1.16	
+	//	
+	// Enables GMSA support for Windows workloads.	
+	WindowsGMSA featuregate.Feature = "WindowsGMSA"	
+
+	// owner: @bclau	
+	// alpha: v1.16	
+	// beta: v1.17	
+	// GA: v1.18	
+	//	
+	// Enables support for running container entrypoints as different usernames than their default ones.	
+	WindowsRunAsUserName featuregate.Feature = "WindowsRunAsUserName"
 	// owner: @adisky
 	// alpha: v1.14
 	// beta: v1.18
