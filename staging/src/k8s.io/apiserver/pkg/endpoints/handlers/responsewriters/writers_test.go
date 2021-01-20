@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"testing"
 
@@ -62,9 +63,12 @@ func TestSerializeObjectParallel(t *testing.T) {
 			compressionEnabled: true,
 			out:                largePayload,
 			mediaType:          "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{"gzip"},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"gzip"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode: http.StatusOK,
 			wantHeaders: http.Header{
 				"Content-Type":     []string{"application/json"},
@@ -130,7 +134,7 @@ func TestSerializeObject(t *testing.T) {
 		{
 			name:        "serialize object",
 			out:         smallPayload,
-			req:         &http.Request{Header: http.Header{}},
+			req:         &http.Request{Header: http.Header{}, URL: &url.URL{Path: "/path"}},
 			wantCode:    http.StatusOK,
 			wantHeaders: http.Header{"Content-Type": []string{""}},
 			wantBody:    smallPayload,
@@ -140,7 +144,7 @@ func TestSerializeObject(t *testing.T) {
 			name:        "return content type",
 			out:         smallPayload,
 			mediaType:   "application/json",
-			req:         &http.Request{Header: http.Header{}},
+			req:         &http.Request{Header: http.Header{}, URL: &url.URL{Path: "/path"}},
 			wantCode:    http.StatusOK,
 			wantHeaders: http.Header{"Content-Type": []string{"application/json"}},
 			wantBody:    smallPayload,
@@ -151,7 +155,7 @@ func TestSerializeObject(t *testing.T) {
 			statusCode:  http.StatusBadRequest,
 			out:         smallPayload,
 			mediaType:   "application/json",
-			req:         &http.Request{Header: http.Header{}},
+			req:         &http.Request{Header: http.Header{}, URL: &url.URL{Path: "/path"}},
 			wantCode:    http.StatusBadRequest,
 			wantHeaders: http.Header{"Content-Type": []string{"application/json"}},
 			wantBody:    smallPayload,
@@ -162,7 +166,7 @@ func TestSerializeObject(t *testing.T) {
 			out:         smallPayload,
 			outErrs:     []error{fmt.Errorf("bad")},
 			mediaType:   "application/json",
-			req:         &http.Request{Header: http.Header{}},
+			req:         &http.Request{Header: http.Header{}, URL: &url.URL{Path: "/path"}},
 			wantCode:    http.StatusInternalServerError,
 			wantHeaders: http.Header{"Content-Type": []string{"application/json"}},
 			wantBody:    smallPayload,
@@ -173,7 +177,7 @@ func TestSerializeObject(t *testing.T) {
 			out:         smallPayload,
 			outErrs:     []error{fmt.Errorf("bad"), fmt.Errorf("bad2")},
 			mediaType:   "application/json",
-			req:         &http.Request{Header: http.Header{}},
+			req:         &http.Request{Header: http.Header{}, URL: &url.URL{Path: "/path"}},
 			wantCode:    http.StatusInternalServerError,
 			wantHeaders: http.Header{"Content-Type": []string{"text/plain"}},
 			wantBody:    []byte(": bad"),
@@ -184,7 +188,7 @@ func TestSerializeObject(t *testing.T) {
 			out:         smallPayload,
 			outErrs:     []error{kerrors.NewNotFound(schema.GroupResource{}, "test"), fmt.Errorf("bad2")},
 			mediaType:   "application/json",
-			req:         &http.Request{Header: http.Header{}},
+			req:         &http.Request{Header: http.Header{}, URL: &url.URL{Path: "/path"}},
 			statusCode:  http.StatusOK,
 			wantCode:    http.StatusNotFound,
 			wantHeaders: http.Header{"Content-Type": []string{"text/plain"}},
@@ -196,7 +200,7 @@ func TestSerializeObject(t *testing.T) {
 			out:         smallPayload,
 			outErrs:     []error{kerrors.NewNotFound(schema.GroupResource{}, "test"), fmt.Errorf("bad2")},
 			mediaType:   "application/json",
-			req:         &http.Request{Header: http.Header{}},
+			req:         &http.Request{Header: http.Header{}, URL: &url.URL{Path: "/path"}},
 			statusCode:  http.StatusNotAcceptable,
 			wantCode:    http.StatusNotAcceptable,
 			wantHeaders: http.Header{"Content-Type": []string{"text/plain"}},
@@ -207,9 +211,12 @@ func TestSerializeObject(t *testing.T) {
 			name:      "compression requires feature gate",
 			out:       largePayload,
 			mediaType: "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{"gzip"},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"gzip"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode:    http.StatusOK,
 			wantHeaders: http.Header{"Content-Type": []string{"application/json"}},
 			wantBody:    largePayload,
@@ -220,9 +227,12 @@ func TestSerializeObject(t *testing.T) {
 			compressionEnabled: true,
 			out:                largePayload,
 			mediaType:          "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{"gzip"},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"gzip"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode: http.StatusOK,
 			wantHeaders: http.Header{
 				"Content-Type":     []string{"application/json"},
@@ -237,9 +247,12 @@ func TestSerializeObject(t *testing.T) {
 			compressionEnabled: true,
 			out:                smallPayload,
 			mediaType:          "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{"gzip"},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"gzip"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode: http.StatusOK,
 			wantHeaders: http.Header{
 				"Content-Type": []string{"application/json"},
@@ -252,9 +265,12 @@ func TestSerializeObject(t *testing.T) {
 			compressionEnabled: true,
 			out:                largePayload,
 			mediaType:          "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{"deflate, , gzip,"},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"deflate, , gzip,"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode: http.StatusOK,
 			wantHeaders: http.Header{
 				"Content-Type":     []string{"application/json"},
@@ -269,9 +285,12 @@ func TestSerializeObject(t *testing.T) {
 			compressionEnabled: true,
 			out:                largePayload,
 			mediaType:          "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{"deflate"},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"deflate"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode: http.StatusOK,
 			wantHeaders: http.Header{
 				"Content-Type": []string{"application/json"},
@@ -284,9 +303,12 @@ func TestSerializeObject(t *testing.T) {
 			compressionEnabled: true,
 			out:                largePayload,
 			mediaType:          "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{", ,  other, nothing, what, "},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{", ,  other, nothing, what, "},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode: http.StatusOK,
 			wantHeaders: http.Header{
 				"Content-Type": []string{"application/json"},
@@ -301,9 +323,12 @@ func TestSerializeObject(t *testing.T) {
 			out:                smallPayload,
 			outErrs:            []error{fmt.Errorf(string(largePayload)), fmt.Errorf("bad2")},
 			mediaType:          "application/json",
-			req: &http.Request{Header: http.Header{
-				"Accept-Encoding": []string{"gzip"},
-			}},
+			req: &http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"gzip"},
+				},
+				URL: &url.URL{Path: "/path"},
+			},
 			wantCode: http.StatusInternalServerError,
 			wantHeaders: http.Header{
 				"Content-Type":     []string{"text/plain"},
