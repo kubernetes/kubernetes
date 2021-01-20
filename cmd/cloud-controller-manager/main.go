@@ -99,7 +99,7 @@ func main() {
 	// If you do not need additional controller, please ignore.
 	controllerInitializers["nodeipam"] = startNodeIpamControllerWrapper
 
-	command := app.NewCloudControllerManagerCommand(cloudProviderName, ccmOptions, cloudInitializer, controllerInitializers)
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers)
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the

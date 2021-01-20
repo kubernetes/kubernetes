@@ -64,7 +64,7 @@ const (
 )
 
 // NewCloudControllerManagerCommand creates a *cobra.Command object with default parameters
-func NewCloudControllerManagerCommand(cloudProviderName string, s *options.CloudControllerManagerOptions, cloudInitializer InitCloudFunc, initFuncConstructor map[string]InitFuncConstructor) *cobra.Command {
+func NewCloudControllerManagerCommand(s *options.CloudControllerManagerOptions, cloudInitializer InitCloudFunc, initFuncConstructor map[string]InitFuncConstructor) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "cloud-controller-manager",
@@ -72,11 +72,6 @@ func NewCloudControllerManagerCommand(cloudProviderName string, s *options.Cloud
 the cloud specific control loops shipped with Kubernetes.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
-
-			cloudProviderFlag := cmd.Flags().Lookup("cloud-provider")
-			if cloudProviderFlag.Value.String() == "" {
-				cloudProviderFlag.Value.Set(cloudProviderName)
-			}
 			cliflag.PrintFlags(cmd.Flags())
 
 			c, err := s.Config(ControllerNames(initFuncConstructor), ControllersDisabledByDefault.List())

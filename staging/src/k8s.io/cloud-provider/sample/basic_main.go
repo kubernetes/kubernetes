@@ -83,7 +83,7 @@ func main() {
 		return cloud
 	}
 
-	command := app.NewCloudControllerManagerCommand(sampleCloudProviderName, ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors)
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors)
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
