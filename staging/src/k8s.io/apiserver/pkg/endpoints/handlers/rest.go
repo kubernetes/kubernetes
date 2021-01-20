@@ -429,7 +429,7 @@ func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Reques
 		return err
 	}
 	if err := namer.SetSelfLink(obj, uri); err != nil {
-		klog.V(4).Infof("Unable to set self link on object: %v", err)
+		klog.V(4).InfoS("Unable to set self link on object", "error", err)
 	}
 	requestInfo, ok := request.RequestInfoFrom(ctx)
 	if !ok {
@@ -493,7 +493,8 @@ func parseTimeout(str string) time.Duration {
 		if err == nil {
 			return timeout
 		}
-		klog.Errorf("Failed to parse %q: %v", str, err)
+
+		klog.ErrorS(err, "Failed to parse", "time", str)
 	}
 	// 34 chose as a number close to 30 that is likely to be unique enough to jump out at me the next time I see a timeout.  Everyone chooses 30.
 	return 34 * time.Second
