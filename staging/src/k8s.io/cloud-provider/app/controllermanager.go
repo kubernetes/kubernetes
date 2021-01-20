@@ -64,7 +64,7 @@ const (
 )
 
 // NewCloudControllerManagerCommand creates a *cobra.Command object with default parameters
-func NewCloudControllerManagerCommand(s *options.CloudControllerManagerOptions, cloudInitializer InitCloudFunc, initFuncConstructor map[string]InitFuncConstructor) *cobra.Command {
+func NewCloudControllerManagerCommand(cloudProviderName string, s *options.CloudControllerManagerOptions, cloudInitializer InitCloudFunc, initFuncConstructor map[string]InitFuncConstructor) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "cloud-controller-manager",
@@ -72,6 +72,11 @@ func NewCloudControllerManagerCommand(s *options.CloudControllerManagerOptions, 
 the cloud specific control loops shipped with Kubernetes.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
+
+			cloudProviderFlag := cmd.Flags().Lookup("cloud-provider")
+			if cloudProviderFlag.Value.String() == "" {
+				cloudProviderFlag.Value.Set(cloudProviderName)
+			}
 			cliflag.PrintFlags(cmd.Flags())
 
 			c, err := s.Config(ControllerNames(initFuncConstructor), ControllersDisabledByDefault.List())
@@ -129,8 +134,6 @@ the cloud specific control loops shipped with Kubernetes.`,
 
 	return cmd
 }
-
-type InitCloudFunc func(config *cloudcontrollerconfig.CompletedConfig) cloudprovider.Interface
 
 // Run runs the ExternalCMServer.  This should never exit.
 func Run(c *cloudcontrollerconfig.CompletedConfig, controllerInitializers map[string]InitFunc, stopCh <-chan struct{}) error {
@@ -262,11 +265,15 @@ func startControllers(ctx genericcontrollermanager.ControllerContext, c *cloudco
 	select {}
 }
 
+// InitCloudFunc is used to initialize cloud
+type InitCloudFunc func(config *cloudcontrollerconfig.CompletedConfig) cloudprovider.Interface
+
 // InitFunc is used to launch a particular controller.  It may run additional "should I activate checks".
 // Any error returned will cause the controller process to `Fatal`
 // The bool indicates whether the controller was enabled.
 type InitFunc func(ctx genericcontrollermanager.ControllerContext) (debuggingHandler http.Handler, enabled bool, err error)
 
+// InitFuncConstructor is used to construct InitFunc
 type InitFuncConstructor func(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) InitFunc
 
 // ControllerNames indicate the default controller we are known.
@@ -316,6 +323,7 @@ func startRouteControllerWrapper(completedConfig *cloudcontrollerconfig.Complete
 	}
 }
 
+// DefaultInitFuncConstructors is a map of default named controller groups paired with InitFuncConstructor
 var DefaultInitFuncConstructors = map[string]InitFuncConstructor{
 	"cloud-node":           StartCloudNodeControllerWrapper,
 	"cloud-node-lifecycle": startCloudNodeLifecycleControllerWrapper,
