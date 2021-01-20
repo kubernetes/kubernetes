@@ -13,7 +13,7 @@ stability. The promotion between those channels are about six weeks.
 Starting milestone 69, for
 every 4 milestones, the last milestone will be promoted into LTS image after it
 becomes stable.
-For details, please see COS's [Release Channels](https://cloud.google.com/container-optimized-os/docs/concepts/release-channels)and [Support
+For details, please see COS's [Release Channels](https://cloud.google.com/container-optimized-os/docs/concepts/release-channels) and [Support
 Policy](https://cloud.google.com/container-optimized-os/docs/resources/support-policy).
 
 ## COS in End-to-End tests
@@ -91,7 +91,7 @@ following guidelines are proposed for image choice in E2E testing.
 To find the current COS image, use the following command:
 
 ```shell
-$ gcloud compute images list --project=cos-cloud |grep cos-cloud
+$ gcloud compute images list --project=cos-cloud | grep cos-cloud
 cos-69-10895-385-0                                    cos-cloud          cos-69-lts                                    READY
 cos-73-11647-534-0                                    cos-cloud          cos-73-lts                                    READY
 cos-77-12371-274-0                                    cos-cloud          cos-77-lts                                    READY
