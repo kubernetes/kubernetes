@@ -35,6 +35,7 @@ evictionHard:
   memory.available: 100Mi
   nodefs.available: 10%
   nodefs.inodesFree: 5%
+  pid.available: 10%
 evictionPressureTransitionPeriod: 5m0s
 failSwapOn: true
 fileCheckFrequency: 20s
