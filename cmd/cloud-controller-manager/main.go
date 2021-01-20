@@ -42,6 +42,7 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/klog/v2"
+	nodeipamcontrolleroptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 	// For existing cloud providers, the option to import legacy providers is still available.
 	// e.g. _"k8s.io/legacy-cloud-providers/<provider>"
@@ -60,35 +61,6 @@ func main() {
 		klog.Fatalf("unable to initialize command options: %v", err)
 	}
 
-	cloudInitializer := func(config *cloudcontrollerconfig.CompletedConfig) cloudprovider.Interface {
-		cloudConfigFile := config.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile
-		// initialize cloud provider with the cloud provider name and config file provided
-		cloud, err := cloudprovider.InitCloudProvider(cloudProviderName, cloudConfigFile)
-		if err != nil {
-			klog.Fatalf("Cloud provider could not be initialized: %v", err)
-		}
-		if cloud == nil {
-			klog.Fatalf("Cloud provider is nil")
-		}
-
-		if !cloud.HasClusterID() {
-			if config.ComponentConfig.KubeCloudShared.AllowUntaggedCloud {
-				klog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
-			} else {
-				klog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
-			}
-		}
-
-		// Initialize the cloud provider with a reference to the clientBuilder
-		cloud.Initialize(config.ClientBuilder, make(chan struct{}))
-		// Set the informer on the user cloud object
-		if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
-			informerUserCloud.SetInformers(config.SharedInformers)
-		}
-
-		return cloud
-	}
-
 	controllerInitializers := app.DefaultInitFuncConstructors
 	// Here is an example to remove the controller which is not needed.
 	// e.g. remove the cloud-node-lifecycle controller which current cloud provider does not need.
@@ -99,7 +71,7 @@ func main() {
 	// If you do not need additional controller, please ignore.
 	controllerInitializers["nodeipam"] = startNodeIpamControllerWrapper
 
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers)
+	command := app.NewCloudControllerManagerCommand(cloudProviderName, ccmOptions, cloudInitializer, controllerInitializers)
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
@@ -115,14 +87,46 @@ func main() {
 	}
 }
 
-func startNodeIpamControllerWrapper(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) app.InitFunc {
-	nodeIPAMConfig := nodeipamconfig.NodeIPAMControllerConfiguration{
-		ServiceCIDR:          "sample",
-		SecondaryServiceCIDR: "sample",
-		NodeCIDRMaskSize:     11,
-		NodeCIDRMaskSizeIPv4: 11,
-		NodeCIDRMaskSizeIPv6: 111,
+func cloudInitializer(config *cloudcontrollerconfig.CompletedConfig) cloudprovider.Interface {
+	cloudConfigFile := config.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile
+	// initialize cloud provider with the cloud provider name and config file provided
+	cloud, err := cloudprovider.InitCloudProvider(cloudProviderName, cloudConfigFile)
+	if err != nil {
+		klog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
+	if cloud == nil {
+		klog.Fatalf("Cloud provider is nil")
+	}
+
+	if !cloud.HasClusterID() {
+		if config.ComponentConfig.KubeCloudShared.AllowUntaggedCloud {
+			klog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
+		} else {
+			klog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
+		}
+	}
+
+	// Initialize the cloud provider with a reference to the clientBuilder
+	cloud.Initialize(config.ClientBuilder, make(chan struct{}))
+	// Set the informer on the user cloud object
+	if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
+		informerUserCloud.SetInformers(config.SharedInformers)
+	}
+
+	return cloud
+}
+
+func startNodeIpamControllerWrapper(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) app.InitFunc {
+	fs := pflag.NewFlagSet("fs", pflag.ContinueOnError)
+	var nodeIPAMControllerOptions nodeipamcontrolleroptions.NodeIPAMControllerOptions
+	nodeIPAMControllerOptions.AddFlags(fs)
+	errors := nodeIPAMControllerOptions.Validate()
+	if len(errors) > 0 {
+		klog.Fatal("NodeIPAM controller values are not properly.")
+	}
+	var nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration
+	nodeIPAMControllerOptions.ApplyTo(&nodeIPAMConfig)
+
 	return func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
 		return startNodeIpamController(completedConfig, nodeIPAMConfig, ctx, cloud)
 	}

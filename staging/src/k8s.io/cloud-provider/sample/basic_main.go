@@ -18,7 +18,7 @@ limitations under the License.
 // For an minimal working example, please refer to k8s.io/cloud-provider/sample/basic_main.go
 // For more details, please refer to k8s.io/kubernetes/cmd/cloud-controller-manager/main.go
 
-package sample
+package main
 
 import (
 	"math/rand"
@@ -54,36 +54,7 @@ func main() {
 		klog.Fatalf("unable to initialize command options: %v", err)
 	}
 
-	cloudInitializer := func(config *config.CompletedConfig) cloudprovider.Interface {
-		cloudConfigFile := config.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile
-		// initialize cloud provider with the cloud provider name and config file provided
-		cloud, err := cloudprovider.InitCloudProvider(sampleCloudProviderName, cloudConfigFile)
-		if err != nil {
-			klog.Fatalf("Cloud provider could not be initialized: %v", err)
-		}
-		if cloud == nil {
-			klog.Fatalf("Cloud provider is nil")
-		}
-
-		if !cloud.HasClusterID() {
-			if config.ComponentConfig.KubeCloudShared.AllowUntaggedCloud {
-				klog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
-			} else {
-				klog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
-			}
-		}
-
-		// Initialize the cloud provider with a reference to the clientBuilder
-		cloud.Initialize(config.ClientBuilder, make(chan struct{}))
-		// Set the informer on the user cloud object
-		if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
-			informerUserCloud.SetInformers(config.SharedInformers)
-		}
-
-		return cloud
-	}
-
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors)
+	command := app.NewCloudControllerManagerCommand(sampleCloudProviderName, ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors)
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
@@ -97,4 +68,33 @@ func main() {
 	if err := command.Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+func cloudInitializer(config *config.CompletedConfig) cloudprovider.Interface {
+	cloudConfigFile := config.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile
+	// initialize cloud provider with the cloud provider name and config file provided
+	cloud, err := cloudprovider.InitCloudProvider(sampleCloudProviderName, cloudConfigFile)
+	if err != nil {
+		klog.Fatalf("Cloud provider could not be initialized: %v", err)
+	}
+	if cloud == nil {
+		klog.Fatalf("Cloud provider is nil")
+	}
+
+	if !cloud.HasClusterID() {
+		if config.ComponentConfig.KubeCloudShared.AllowUntaggedCloud {
+			klog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
+		} else {
+			klog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
+		}
+	}
+
+	// Initialize the cloud provider with a reference to the clientBuilder
+	cloud.Initialize(config.ClientBuilder, make(chan struct{}))
+	// Set the informer on the user cloud object
+	if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
+		informerUserCloud.SetInformers(config.SharedInformers)
+	}
+
+	return cloud
 }
