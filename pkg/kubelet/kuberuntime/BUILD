@@ -87,9 +87,6 @@ go_library(
             "//pkg/kubelet/qos:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
         ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "//pkg/kubelet/apis:go_default_library",
-        ],
         "//conditions:default": [],
     }),
 )

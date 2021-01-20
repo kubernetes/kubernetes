@@ -183,13 +183,6 @@ const (
 	// Implement support for limiting pids in pods
 	SupportPodPidsLimit featuregate.Feature = "SupportPodPidsLimit"
 
-	// owner: @feiskyer
-	// alpha: v1.10
-	//
-	// Enable Hyper-V containers on Windows
-	// Deprecated in 1.20 and removed in 1.21
-	HyperVContainer featuregate.Feature = "HyperVContainer"
-
 	// owner: @mikedanese
 	// alpha: v1.13
 	//
@@ -709,7 +702,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StorageObjectInUseProtection:   {Default: true, PreRelease: featuregate.GA},
 	SupportPodPidsLimit:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	SupportNodePidsLimit:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
-	HyperVContainer:                {Default: false, PreRelease: featuregate.Deprecated},
 	BoundServiceAccountTokenVolume: {Default: false, PreRelease: featuregate.Alpha},
 	ServiceAccountIssuerDiscovery:  {Default: true, PreRelease: featuregate.Beta},
 	CRIContainerLogRotation:        {Default: true, PreRelease: featuregate.Beta},
