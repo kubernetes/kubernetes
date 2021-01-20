@@ -35,6 +35,7 @@ import (
 
 var _ framework.PreFilterPlugin = &Fit{}
 var _ framework.FilterPlugin = &Fit{}
+var _ framework.EnqueueExtensions = &Fit{}
 
 const (
 	// FitName is the name of the plugin used in the plugin registry and configurations.
@@ -187,6 +188,18 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 		return nil, fmt.Errorf("%+v  convert to NodeResourcesFit.preFilterState error", c)
 	}
 	return s, nil
+}
+
+// EventsToRegister returns the possible events that can make a Pod
+// failed by current plugin schedulable.
+func (f *Fit) EventsToRegister() *framework.ClusterEventSet {
+	return &framework.ClusterEventSet{
+		Interested: []framework.ClusterEvent{
+			{Resource: framework.Pod, ActionType: framework.All},
+			{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeAllocatable},
+		},
+		NonInterested: []framework.ClusterEvent{framework.WildCardEvent},
+	}
 }
 
 // Filter invoked at the filter extension point.

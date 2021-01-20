@@ -95,6 +95,7 @@ type ServiceAffinity struct {
 var _ framework.PreFilterPlugin = &ServiceAffinity{}
 var _ framework.FilterPlugin = &ServiceAffinity{}
 var _ framework.ScorePlugin = &ServiceAffinity{}
+var _ framework.EnqueueExtensions = &ServiceAffinity{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *ServiceAffinity) Name() string {
@@ -206,6 +207,24 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 		return nil, fmt.Errorf("%+v  convert to interpodaffinity.state error", c)
 	}
 	return s, nil
+}
+
+// EventsToRegister returns the possible events that can make a Pod
+// failed by current plugin schedulable.
+func (pl *ServiceAffinity) EventsToRegister() *framework.ClusterEventSet {
+	if len(pl.args.AffinityLabels) == 0 {
+		return nil
+	}
+
+	// A Pod failed by ServiceAffinity plugin may be made schedulable by the following events.
+	return &framework.ClusterEventSet{
+		Interested: []framework.ClusterEvent{
+			{Resource: framework.Pod, ActionType: framework.Update | framework.Delete},
+			{Resource: framework.Node, ActionType: framework.All},
+			{Resource: framework.Service, ActionType: framework.Update | framework.Delete},
+		},
+		NonInterested: []framework.ClusterEvent{framework.WildCardEvent},
+	}
 }
 
 // Filter matches nodes in such a way to force that
