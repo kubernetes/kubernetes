@@ -259,7 +259,9 @@ func (*fakeKubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) { return n
 func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool) {
 	return map[string]volume.Volume{}, true
 }
-
+func (*fakeKubelet) ListBlockVolumesForPod(podUID types.UID) (map[string]volume.BlockVolume, bool) {
+	return map[string]volume.BlockVolume{}, true
+}
 func (*fakeKubelet) RootFsStats() (*statsapi.FsStats, error)    { return nil, nil }
 func (*fakeKubelet) ListPodStats() ([]statsapi.PodStats, error) { return nil, nil }
 func (*fakeKubelet) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {

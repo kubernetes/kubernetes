@@ -88,6 +88,9 @@ type Provider interface {
 	// ListVolumesForPod returns the stats of the volume used by the pod with
 	// the podUID.
 	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
+	// ListBlockVolumesForPod returns the stats of the volume used by the
+	// pod with the podUID.
+	ListBlockVolumesForPod(podUID types.UID) (map[string]volume.BlockVolume, bool)
 	// GetPods returns the specs of all the pods running on this node.
 	GetPods() []*v1.Pod
 
