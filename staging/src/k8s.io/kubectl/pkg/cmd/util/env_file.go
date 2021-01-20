@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package versioned
+package util
 
 import (
 	"bufio"
@@ -30,9 +30,9 @@ import (
 
 var utf8bom = []byte{0xEF, 0xBB, 0xBF}
 
-// proccessEnvFileLine returns a blank key if the line is empty or a comment.
+// processEnvFileLine returns a blank key if the line is empty or a comment.
 // The value will be retrieved from the environment if necessary.
-func proccessEnvFileLine(line []byte, filePath string,
+func processEnvFileLine(line []byte, filePath string,
 	currentLine int) (key, value string, err error) {
 
 	if !utf8.Valid(line) {
@@ -69,9 +69,9 @@ func proccessEnvFileLine(line []byte, filePath string,
 	return
 }
 
-// addFromEnvFile processes an env file allows a generic addTo to handle the
+// AddFromEnvFile processes an env file allows a generic addTo to handle the
 // collection of key value pairs or returns an error.
-func addFromEnvFile(filePath string, addTo func(key, value string) error) error {
+func AddFromEnvFile(filePath string, addTo func(key, value string) error) error {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -84,7 +84,7 @@ func addFromEnvFile(filePath string, addTo func(key, value string) error) error 
 		// Process the current line, retrieving a key/value pair if
 		// possible.
 		scannedBytes := scanner.Bytes()
-		key, value, err := proccessEnvFileLine(scannedBytes, filePath, currentLine)
+		key, value, err := processEnvFileLine(scannedBytes, filePath, currentLine)
 		if err != nil {
 			return err
 		}
