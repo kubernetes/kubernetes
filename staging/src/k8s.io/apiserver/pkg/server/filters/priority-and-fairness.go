@@ -141,9 +141,9 @@ func WithPriorityAndFairness(
 		}, execute)
 		if !served {
 			if isMutatingRequest {
-				epmetrics.DroppedRequests.WithLabelValues(epmetrics.MutatingKind).Inc()
+				epmetrics.DroppedRequests.WithContext(ctx).WithLabelValues(epmetrics.MutatingKind).Inc()
 			} else {
-				epmetrics.DroppedRequests.WithLabelValues(epmetrics.ReadOnlyKind).Inc()
+				epmetrics.DroppedRequests.WithContext(ctx).WithLabelValues(epmetrics.ReadOnlyKind).Inc()
 			}
 			epmetrics.RecordRequestTermination(r, requestInfo, epmetrics.APIServerComponent, http.StatusTooManyRequests)
 			tooManyRequests(r, w)

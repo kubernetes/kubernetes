@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"bufio"
+	"context"
 	"net"
 	"net/http"
 	"net/url"
@@ -324,8 +325,8 @@ func UpdateInflightRequestMetrics(phase string, nonmutating, mutating int) {
 	}
 }
 
-func RecordFilterLatency(name string, elapsed time.Duration) {
-	requestFilterDuration.WithLabelValues(name).Observe(elapsed.Seconds())
+func RecordFilterLatency(ctx context.Context, name string, elapsed time.Duration) {
+	requestFilterDuration.WithContext(ctx).WithLabelValues(name).Observe(elapsed.Seconds())
 }
 
 // RecordRequestAbort records that the request was aborted possibly due to a timeout.
@@ -341,7 +342,7 @@ func RecordRequestAbort(req *http.Request, requestInfo *request.RequestInfo) {
 	group := requestInfo.APIGroup
 	version := requestInfo.APIVersion
 
-	requestAbortsTotal.WithLabelValues(reportedVerb, group, version, resource, subresource, scope).Inc()
+	requestAbortsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope).Inc()
 }
 
 // RecordRequestTermination records that the request was terminated early as part of a resource
@@ -361,9 +362,9 @@ func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInf
 	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
 
 	if requestInfo.IsResourceRequest {
-		requestTerminationsTotal.WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
+		requestTerminationsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
 	} else {
-		requestTerminationsTotal.WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
+		requestTerminationsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
 	}
 }
 
@@ -383,9 +384,9 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
 
 	if requestInfo.IsResourceRequest {
-		g = longRunningRequestGauge.WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
+		g = longRunningRequestGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
 	} else {
-		g = longRunningRequestGauge.WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component)
+		g = longRunningRequestGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component)
 	}
 	g.Inc()
 	defer g.Dec()
@@ -404,23 +405,23 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	dryRun := cleanDryRun(req.URL)
 	elapsedSeconds := elapsed.Seconds()
 	cleanContentType := cleanContentType(contentType)
-	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, cleanContentType, codeToString(httpCode)).Inc()
+	requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, cleanContentType, codeToString(httpCode)).Inc()
 	// MonitorRequest happens after authentication, so we can trust the username given by the request
 	info, ok := request.UserFrom(req.Context())
 	if ok && info.GetName() == user.APIServerUser {
-		apiSelfRequestCounter.WithLabelValues(reportedVerb, resource, subresource).Inc()
+		apiSelfRequestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, resource, subresource).Inc()
 	}
 	if deprecated {
-		deprecatedRequestGauge.WithLabelValues(group, version, resource, subresource, removedRelease).Set(1)
+		deprecatedRequestGauge.WithContext(req.Context()).WithLabelValues(group, version, resource, subresource, removedRelease).Set(1)
 		audit.AddAuditAnnotation(req.Context(), deprecatedAnnotationKey, "true")
 		if len(removedRelease) > 0 {
 			audit.AddAuditAnnotation(req.Context(), removedReleaseAnnotationKey, removedRelease)
 		}
 	}
-	requestLatencies.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
+	requestLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
-		responseSizes.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(float64(respSize))
+		responseSizes.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(float64(respSize))
 	}
 }
 

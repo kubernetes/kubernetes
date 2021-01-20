@@ -163,8 +163,8 @@ type WatchServer struct {
 // or over a websocket connection.
 func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	kind := s.Scope.Kind
-	metrics.RegisteredWatchers.WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
-	defer metrics.RegisteredWatchers.WithLabelValues(kind.Group, kind.Version, kind.Kind).Dec()
+	metrics.RegisteredWatchers.WithContext(req.Context()).WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
+	defer metrics.RegisteredWatchers.WithContext(req.Context()).WithLabelValues(kind.Group, kind.Version, kind.Kind).Dec()
 
 	w = httplog.Unlogged(req, w)
 
@@ -220,7 +220,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
-			metrics.WatchEvents.WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
+			metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
 
 			obj := s.Fixup(event.Object)
 			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
@@ -233,7 +233,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// type
 			unknown.Raw = buf.Bytes()
 			event.Object = &unknown
-			metrics.WatchEventsSizes.WithLabelValues(kind.Group, kind.Version, kind.Kind).Observe(float64(len(unknown.Raw)))
+			metrics.WatchEventsSizes.WithContext(req.Context()).WithLabelValues(kind.Group, kind.Version, kind.Kind).Observe(float64(len(unknown.Raw)))
 
 			*outEvent = metav1.WatchEvent{}
 
