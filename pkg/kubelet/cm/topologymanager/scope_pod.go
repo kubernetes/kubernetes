@@ -56,12 +56,7 @@ func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		klog.Infof("[topologymanager] Topology Affinity for (pod: %v container: %v): %v", format.Pod(pod), container.Name, bestHint)
-
-		if (s.podTopologyHints)[string(pod.UID)] == nil {
-			(s.podTopologyHints)[string(pod.UID)] = make(map[string]TopologyHint)
-		}
-
-		(s.podTopologyHints)[string(pod.UID)][container.Name] = bestHint
+		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
 
 		err := s.allocateAlignedResources(pod, &container)
 		if err != nil {

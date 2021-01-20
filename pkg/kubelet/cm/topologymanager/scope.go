@@ -68,8 +68,24 @@ func (s *scope) Name() string {
 	return s.name
 }
 
-func (s *scope) GetAffinity(podUID string, containerName string) TopologyHint {
+func (s *scope) getTopologyHints(podUID string, containerName string) TopologyHint {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	return s.podTopologyHints[podUID][containerName]
+}
+
+func (s *scope) setTopologyHints(podUID string, containerName string, th TopologyHint) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.podTopologyHints[podUID] == nil {
+		s.podTopologyHints[podUID] = make(map[string]TopologyHint)
+	}
+	s.podTopologyHints[podUID][containerName] = th
+}
+
+func (s *scope) GetAffinity(podUID string, containerName string) TopologyHint {
+	return s.getTopologyHints(podUID, containerName)
 }
 
 func (s *scope) AddHintProvider(h HintProvider) {
