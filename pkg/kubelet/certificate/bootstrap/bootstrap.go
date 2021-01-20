@@ -237,32 +237,32 @@ func isClientConfigStillValid(kubeconfigPath string) (bool, error) {
 	}
 	bootstrapClientConfig, err := loadRESTClientConfig(kubeconfigPath)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to read existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to read existing bootstrap client config from %s: %v", kubeconfigPath, err))
 		return false, nil
 	}
 	transportConfig, err := bootstrapClientConfig.TransportConfig()
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to load transport configuration from existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to load transport configuration from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
 		return false, nil
 	}
 	// has side effect of populating transport config data fields
 	if _, err := transport.TLSConfigFor(transportConfig); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to load TLS configuration from existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to load TLS configuration from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
 		return false, nil
 	}
 	certs, err := certutil.ParseCertsPEM(transportConfig.TLS.CertData)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to load TLS certificates from existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to load TLS certificates from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
 		return false, nil
 	}
 	if len(certs) == 0 {
-		utilruntime.HandleError(fmt.Errorf("unable to read TLS certificates from existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to read TLS certificates from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
 		return false, nil
 	}
 	now := time.Now()
 	for _, cert := range certs {
 		if now.After(cert.NotAfter) {
-			utilruntime.HandleError(fmt.Errorf("part of the existing bootstrap client certificate is expired: %s", cert.NotAfter))
+			utilruntime.HandleError(fmt.Errorf("part of the existing bootstrap client certificate in %s is expired: %v", kubeconfigPath, cert.NotAfter))
 			return false, nil
 		}
 	}
