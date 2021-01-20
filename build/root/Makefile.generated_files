@@ -563,9 +563,6 @@ $(foreach dir, $($(prefix)_OPENAPI_DIRS), $(eval                   \
     $($(prefix)_OPENAPI_OUTFILE): $(GODEPS_$(PRJ_SRC_PATH)/$(dir)) \
 ))
 
-# Rebuild spec if the violation file changed.
-$($(prefix)_OPENAPI_OUTFILE): $($(prefix)_KNOWN_VIOLATION_FILENAME)
-
 # When UPDATE_API_KNOWN_VIOLATIONS is set to be true, let the generator to write
 # updated API violations to the known API violation exceptions list.
 ifeq ($(UPDATE_API_KNOWN_VIOLATIONS),true)
