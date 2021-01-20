@@ -60,14 +60,13 @@ type JobList struct {
 // JobSpec describes how the job execution will look like.
 type JobSpec struct {
 
-	// Stopped specifies whether the job controller should create Pods or not. If
-	// a Job is created in the stopped state, no Pods are created by the job
+	// Stopped specifies whether the Job controller should create Pods or not. If
+	// a Job is created in the stopped state, no Pods are created by the Job
 	// controller. If a Job enters the stopped state (i.e. the flag goes from
-	// false to true), the job controller will delete all Pods associated with
-	// this job. This field is generally used by higher-level orchestrators that
-	// need more control over when the Pods of a Job are created.
+	// false to true), the Job controller will delete all Pods associated with
+	// this Job. Defaults to false.
 	// +optional
-	Stopped *bool `json:"stopped,omitempty"`
+	Stopped *bool `json:"stopped,omitempty" protobuf:"varint,9,opt,name=stopped"`
 
 	// Specifies the maximum desired number of pods the job should
 	// run at any given time. The actual number of pods running in steady state will
