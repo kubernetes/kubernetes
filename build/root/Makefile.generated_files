@@ -551,7 +551,7 @@ SAMPLEAPISERVER_OPENAPI_TAG_FILES := $(filter $(APIMACHINERY_DEFAULT_TAG_FILES) 
 KUBE_OPENAPI_OUTPUT_PKG := pkg/generated/openapi
 AGGREGATOR_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/kube-aggregator/pkg/generated/openapi
 APIEXTENSIONS_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi
-CODEGEN_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/code-generator/_examples/apiserver/openapi
+CODEGEN_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/code-generator/examples/apiserver/openapi
 SAMPLEAPISERVER_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/sample-apiserver/pkg/generated/openapi
 
 OPENAPI_TARGETS := KUBE AGGREGATOR APIEXTENSIONS CODEGEN SAMPLEAPISERVER

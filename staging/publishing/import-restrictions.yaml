@@ -45,7 +45,7 @@
 
 - baseImportPath: "./vendor/k8s.io/code-generator/"
   ignoredSubTrees:
-  - "./vendor/k8s.io/code-generator/_test"
+  - "./vendor/k8s.io/code-generator/examples"
   allowedImports:
   - k8s.io/gengo
   - k8s.io/code-generator
