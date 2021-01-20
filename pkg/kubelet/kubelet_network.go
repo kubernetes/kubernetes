@@ -19,7 +19,7 @@ package kubelet
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -38,6 +38,9 @@ const (
 
 	// KubeFirewallChain is kubernetes firewall rules
 	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
+
+	// KubeFirewallInChain is firewall rules only for incoming packets
+	KubeFirewallInChain utiliptables.Chain = "KUBE-FIREWALL-IN"
 )
 
 // providerRequiresNetworkingConfiguration returns whether the cloud provider

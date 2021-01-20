@@ -83,6 +83,8 @@ func (kl *Kubelet) syncNetworkUtil(iptClient utiliptables.Interface) bool {
 		klog.ErrorS(err, "Failed to ensure marking rule for KUBE-MARK-DROP chain")
 		return false
 	}
+
+	// Setup KUBE-FIREWALL, KUBE-FIREWALL-IN
 	if _, err := iptClient.EnsureChain(utiliptables.TableFilter, KubeFirewallChain); err != nil {
 		klog.ErrorS(err, "Failed to ensure that filter table exists KUBE-FIREWALL chain")
 		return false
@@ -95,13 +97,19 @@ func (kl *Kubelet) syncNetworkUtil(iptClient utiliptables.Interface) bool {
 		return false
 	}
 
+	if _, err := iptClient.EnsureChain(utiliptables.TableFilter, KubeFirewallInChain); err != nil {
+		klog.ErrorS(err, "Failed to ensure that filter chain KUBE-FIREWALL-IN exists", err)
+		return false
+	}
+
 	// drop all non-local packets to localhost if they're not part of an existing
 	// forwarded connection. See #90259
+	// Need to allow existing DNAT'd connections in case someone has redirected traffic to 127.0.0.1
 	if !iptClient.IsIPv6() { // ipv6 doesn't have this issue
-		if _, err := iptClient.EnsureRule(utiliptables.Append, utiliptables.TableFilter, KubeFirewallChain,
+		if _, err := iptClient.EnsureRule(utiliptables.Append, utiliptables.TableFilter, KubeFirewallInChain,
 			"-m", "comment", "--comment", "block incoming localnet connections",
 			"--dst", "127.0.0.0/8",
-			"!", "--src", "127.0.0.0/8",
+			"!", "-i", "lo",
 			"-m", "conntrack",
 			"!", "--ctstate", "RELATED,ESTABLISHED,DNAT",
 			"-j", "DROP"); err != nil {
@@ -110,12 +118,17 @@ func (kl *Kubelet) syncNetworkUtil(iptClient utiliptables.Interface) bool {
 		}
 	}
 
+	// Add KUBE-FIREWALL to OUTPUT and INPUT. Add KUBE-FIREWALL-IN to INPUT
 	if _, err := iptClient.EnsureRule(utiliptables.Prepend, utiliptables.TableFilter, utiliptables.ChainOutput, "-j", string(KubeFirewallChain)); err != nil {
 		klog.ErrorS(err, "Failed to ensure that filter table  from OUTPUT chain jumps to KUBE-FIREWALL chain")
 		return false
 	}
 	if _, err := iptClient.EnsureRule(utiliptables.Prepend, utiliptables.TableFilter, utiliptables.ChainInput, "-j", string(KubeFirewallChain)); err != nil {
 		klog.ErrorS(err, "Failed to ensure that filter table INPUT chain jumps to KUBE-FIREWALL chain")
+		return false
+	}
+	if _, err := iptClient.EnsureRule(utiliptables.Prepend, utiliptables.TableFilter, utiliptables.ChainInput, "-j", string(KubeFirewallInChain)); err != nil {
+		klog.ErrorS(err, "Failed to ensure that filter chain INPUT jumps to KUBE-FIREWALL-IN")
 		return false
 	}
 
