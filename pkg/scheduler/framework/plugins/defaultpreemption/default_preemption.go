@@ -603,15 +603,16 @@ func selectVictimsOnNode(
 		if err := nodeInfo.RemovePod(rp); err != nil {
 			return err
 		}
-		status := ph.RunPreFilterExtensionRemovePod(ctx, state, pod, rp, nodeInfo)
+		status := ph.RunPreFilterExtensionRemovePod(ctx, state, pod, framework.NewPodInfo(rp), nodeInfo)
 		if !status.IsSuccess() {
 			return status.AsError()
 		}
 		return nil
 	}
 	addPod := func(ap *v1.Pod) error {
-		nodeInfo.AddPod(ap)
-		status := ph.RunPreFilterExtensionAddPod(ctx, state, pod, ap, nodeInfo)
+		podInfoToAdd := framework.NewPodInfo(ap)
+		nodeInfo.AddPodInfo(podInfoToAdd)
+		status := ph.RunPreFilterExtensionAddPod(ctx, state, pod, podInfoToAdd, nodeInfo)
 		if !status.IsSuccess() {
 			return status.AsError()
 		}
