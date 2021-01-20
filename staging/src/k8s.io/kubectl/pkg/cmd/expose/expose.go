@@ -335,6 +335,9 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		}
 
 		if o.DryRunStrategy == cmdutil.DryRunClient {
+			if meta, err := meta.Accessor(object); err == nil && o.EnforceNamespace {
+				meta.SetNamespace(o.Namespace)
+			}
 			return o.PrintObj(object, o.Out)
 		}
 		if err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), object, scheme.DefaultJSONEncoder()); err != nil {
