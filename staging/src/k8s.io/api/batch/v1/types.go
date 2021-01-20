@@ -139,9 +139,9 @@ type JobSpec struct {
 
 // JobStatus represents the current state of a Job.
 type JobStatus struct {
-	// The latest available observations of an object's current state.  Exactly
-	// one of "Active", "Stopped", "Failed", or "Complete" will be a part of the
-	// Job's conditions.
+	// The latest available observations of an object's current state. Exactly
+	// one of "Stopped", "Failed", or "Complete" will be a part of the Job's
+	// conditions.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
 	// +optional
 	// +patchMergeKey=type
@@ -178,8 +178,6 @@ type JobConditionType string
 
 // These are valid conditions of a job.
 const (
-	// JobRunning means the job is currently active.
-	JobActive JobConditionType = "Active"
 	// JobStopped means the job has been stopped.
 	JobStopped JobConditionType = "Stopped"
 	// JobComplete means the job has completed its execution.

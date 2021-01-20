@@ -163,8 +163,9 @@ type JobSpec struct {
 // JobStatus represents the current state of a Job.
 type JobStatus struct {
 
-	// The latest available observations of an object's current state.
-	// When a job fails, one of the conditions will have type == "Failed".
+	// The latest available observations of an object's current state. Exactly
+	// one of "Stopped", "Failed", or "Complete" will be a part of the Job's
+	// conditions.
 	// +optional
 	Conditions []JobCondition
 
@@ -199,6 +200,8 @@ type JobConditionType string
 
 // These are valid conditions of a job.
 const (
+	// JobStopped means the job has been stopped.
+	JobStopped JobConditionType = "Stopped"
 	// JobComplete means the job has completed its execution.
 	JobComplete JobConditionType = "Complete"
 	// JobFailed means the job has failed its execution.
@@ -207,7 +210,7 @@ const (
 
 // JobCondition describes current state of a job.
 type JobCondition struct {
-	// Type of job condition, Complete or Failed.
+	// Type of job condition: Stopped, Complete, or Failed.
 	Type JobConditionType
 	// Status of the condition, one of True, False, Unknown.
 	Status api.ConditionStatus
