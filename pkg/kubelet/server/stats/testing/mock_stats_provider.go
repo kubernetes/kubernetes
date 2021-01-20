@@ -351,6 +351,29 @@ func (_m *StatsProvider) ListVolumesForPod(podUID types.UID) (map[string]volume.
 	return r0, r1
 }
 
+// ListBlockVolumesForPod provides a mock function with given fields: podUID
+func (_m *StatsProvider) ListBlockVolumesForPod(podUID types.UID) (map[string]volume.BlockVolume, bool) {
+	ret := _m.Called(podUID)
+
+	var r0 map[string]volume.BlockVolume
+	if rf, ok := ret.Get(0).(func(types.UID) map[string]volume.BlockVolume); ok {
+		r0 = rf(podUID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]volume.BlockVolume)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(types.UID) bool); ok {
+		r1 = rf(podUID)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
+}
+
 // RootFsStats provides a mock function with given fields:
 func (_m *StatsProvider) RootFsStats() (*v1alpha1.FsStats, error) {
 	ret := _m.Called()
