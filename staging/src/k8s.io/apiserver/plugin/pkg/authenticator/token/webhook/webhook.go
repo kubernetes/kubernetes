@@ -104,14 +104,14 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 	}
 	var (
 		result *authenticationv1.TokenReview
-		err    error
 		auds   authenticator.Audiences
 	)
-	webhook.WithExponentialBackoff(ctx, w.retryBackoff, func() error {
-		result, err = w.tokenReview.Create(ctx, r, metav1.CreateOptions{})
-		return err
-	}, webhook.DefaultShouldRetry)
-	if err != nil {
+	// WithExponentialBackoff will return tokenreview create error (tokenReviewErr) if any.
+	if err := webhook.WithExponentialBackoff(ctx, w.retryBackoff, func() error {
+		var tokenReviewErr error
+		result, tokenReviewErr = w.tokenReview.Create(ctx, r, metav1.CreateOptions{})
+		return tokenReviewErr
+	}, webhook.DefaultShouldRetry); err != nil {
 		// An error here indicates bad configuration or an outage. Log for debugging.
 		klog.Errorf("Failed to make webhook authenticator request: %v", err)
 		return nil, false, err

@@ -192,19 +192,17 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 	if entry, ok := w.responseCache.Get(string(key)); ok {
 		r.Status = entry.(authorizationv1.SubjectAccessReviewStatus)
 	} else {
-		var (
-			result *authorizationv1.SubjectAccessReview
-			err    error
-		)
-		webhook.WithExponentialBackoff(ctx, w.retryBackoff, func() error {
-			result, err = w.subjectAccessReview.Create(ctx, r, metav1.CreateOptions{})
-			return err
-		}, webhook.DefaultShouldRetry)
-		if err != nil {
-			// An error here indicates bad configuration or an outage. Log for debugging.
+		var result *authorizationv1.SubjectAccessReview
+		// WithExponentialBackoff will return SAR create error (sarErr) if any.
+		if err := webhook.WithExponentialBackoff(ctx, w.retryBackoff, func() error {
+			var sarErr error
+			result, sarErr = w.subjectAccessReview.Create(ctx, r, metav1.CreateOptions{})
+			return sarErr
+		}, webhook.DefaultShouldRetry); err != nil {
 			klog.Errorf("Failed to make webhook authorizer request: %v", err)
 			return w.decisionOnError, "", err
 		}
+
 		r.Status = result.Status
 		if shouldCache(attr) {
 			if r.Status.Allowed {
