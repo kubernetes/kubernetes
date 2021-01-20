@@ -28,6 +28,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 func SetDefaults_Job(obj *batchv1.Job) {
 	if obj.Spec.Stopped == nil {
 		obj.Spec.Stopped = new(bool)
+		*obj.Spec.Stopped = false
 	}
 	// For a non-parallel job, you can leave both `.spec.completions` and
 	// `.spec.parallelism` unset.  When both are unset, both are defaulted to 1.

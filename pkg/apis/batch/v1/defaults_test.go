@@ -49,6 +49,26 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
+					Stopped:      utilpointer.BoolPtr(false),
+					Completions:  utilpointer.Int32Ptr(1),
+					Parallelism:  utilpointer.Int32Ptr(1),
+					BackoffLimit: utilpointer.Int32Ptr(6),
+				},
+			},
+			expectLabels: true,
+		},
+		"stopped flag, everything else is defaulted": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Stopped:  utilpointer.BoolPtr(true),
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
+					},
+				},
+			},
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Stopped:      utilpointer.BoolPtr(true),
 					Completions:  utilpointer.Int32Ptr(1),
 					Parallelism:  utilpointer.Int32Ptr(1),
 					BackoffLimit: utilpointer.Int32Ptr(6),
@@ -69,6 +89,7 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
+					Stopped:      utilpointer.BoolPtr(false),
 					Completions:  utilpointer.Int32Ptr(1),
 					Parallelism:  utilpointer.Int32Ptr(1),
 					BackoffLimit: utilpointer.Int32Ptr(6),
@@ -86,6 +107,7 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
+					Stopped:      utilpointer.BoolPtr(false),
 					Parallelism:  utilpointer.Int32Ptr(0),
 					BackoffLimit: utilpointer.Int32Ptr(6),
 				},
@@ -103,6 +125,7 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
+					Stopped:      utilpointer.BoolPtr(false),
 					Parallelism:  utilpointer.Int32Ptr(2),
 					BackoffLimit: utilpointer.Int32Ptr(6),
 				},
@@ -120,6 +143,7 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
+					Stopped:      utilpointer.BoolPtr(false),
 					Completions:  utilpointer.Int32Ptr(2),
 					Parallelism:  utilpointer.Int32Ptr(1),
 					BackoffLimit: utilpointer.Int32Ptr(6),
@@ -138,6 +162,7 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
+					Stopped:      utilpointer.BoolPtr(false),
 					Completions:  utilpointer.Int32Ptr(1),
 					Parallelism:  utilpointer.Int32Ptr(1),
 					BackoffLimit: utilpointer.Int32Ptr(5),
@@ -148,6 +173,7 @@ func TestSetDefaultJob(t *testing.T) {
 		"All set -> no change": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
+					Stopped:      utilpointer.BoolPtr(true),
 					Completions:  utilpointer.Int32Ptr(8),
 					Parallelism:  utilpointer.Int32Ptr(9),
 					BackoffLimit: utilpointer.Int32Ptr(10),
@@ -158,6 +184,7 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
+					Stopped:      utilpointer.BoolPtr(true),
 					Completions:  utilpointer.Int32Ptr(8),
 					Parallelism:  utilpointer.Int32Ptr(9),
 					BackoffLimit: utilpointer.Int32Ptr(10),
@@ -171,6 +198,7 @@ func TestSetDefaultJob(t *testing.T) {
 		"All set, flipped -> no change": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
+					Stopped:      utilpointer.BoolPtr(true),
 					Completions:  utilpointer.Int32Ptr(11),
 					Parallelism:  utilpointer.Int32Ptr(10),
 					BackoffLimit: utilpointer.Int32Ptr(9),
@@ -181,6 +209,7 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
+					Stopped:      utilpointer.BoolPtr(true),
 					Completions:  utilpointer.Int32Ptr(11),
 					Parallelism:  utilpointer.Int32Ptr(10),
 					BackoffLimit: utilpointer.Int32Ptr(9),
@@ -200,6 +229,7 @@ func TestSetDefaultJob(t *testing.T) {
 			t.FailNow()
 		}
 
+		validateDefaultBool(t, name, "Stopped", actual.Spec.Stopped, expected.Spec.Stopped)
 		validateDefaultInt32(t, name, "Completions", actual.Spec.Completions, expected.Spec.Completions)
 		validateDefaultInt32(t, name, "Parallelism", actual.Spec.Parallelism, expected.Spec.Parallelism)
 		validateDefaultInt32(t, name, "BackoffLimit", actual.Spec.BackoffLimit, expected.Spec.BackoffLimit)
@@ -212,6 +242,17 @@ func TestSetDefaultJob(t *testing.T) {
 			}
 		}
 
+	}
+}
+
+func validateDefaultBool(t *testing.T, name string, field string, actual *bool, expected *bool) {
+	if (actual == nil) != (expected == nil) {
+		t.Errorf("%s: got different %s than expected: %v %v", name, field, actual, expected)
+	}
+	if actual != nil && expected != nil {
+		if *actual != *expected {
+			t.Errorf("%s: got different %s than expected: %v %v", name, field, *actual, *expected)
+		}
 	}
 }
 

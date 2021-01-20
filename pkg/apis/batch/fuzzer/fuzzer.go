@@ -45,6 +45,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			completions := int32(c.Rand.Int31())
 			parallelism := int32(c.Rand.Int31())
 			backoffLimit := int32(c.Rand.Int31())
+			if c.RandBool() {
+				stopped := c.RandBool()
+				j.Stopped = &stopped
+			} else {
+				j.Stopped = nil
+			}
 			j.Completions = &completions
 			j.Parallelism = &parallelism
 			j.BackoffLimit = &backoffLimit
