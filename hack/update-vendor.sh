@@ -18,6 +18,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Go tools really don't like it if you have a symlink in `pwd`.
+cd "$(pwd -P)"
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
