@@ -48,6 +48,10 @@ type BlockVolume interface {
 	// and name of a symbolic link associated to a block device.
 	// ex. pods/{podUid}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/, {volumeName}
 	GetPodDeviceMapPath() (string, string)
+
+	// MetricsProvider embeds methods for exposing metrics (e.g.
+	// used, available space).
+	MetricsProvider
 }
 
 // MetricsProvider exposes metrics (e.g. used,available space) related to a
