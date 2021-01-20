@@ -46,6 +46,10 @@ const (
 )
 
 var (
+	logsLong = templates.LongDesc(i18n.T(`
+		Print the logs for a container in a pod or specified resource. 
+		If the pod has only one container, the container name is optional.`))
+
 	logsExample = templates.Examples(i18n.T(`
 		# Return snapshot logs from pod nginx with only one container
 		kubectl logs nginx
@@ -146,7 +150,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Use:                   logsUsageStr,
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Print the logs for a container in a pod"),
-		Long:                  i18n.T("Print the logs for a container in a pod or specified resource. If the pod has only one container, the container name is optional."),
+		Long:                  logsLong,
 		Example:               logsExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
