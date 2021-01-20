@@ -313,7 +313,7 @@ func (az *Cloud) cleanBackendpoolForPrimarySLB(primarySLB *network.LoadBalancer,
 						return nil, err
 					}
 					primaryVMSetName := az.VMSet.GetPrimaryVMSetName()
-					if !strings.EqualFold(primaryVMSetName, vmSetName) {
+					if !strings.EqualFold(primaryVMSetName, vmSetName) && vmSetName != "" {
 						klog.V(2).Infof("cleanBackendpoolForPrimarySLB: found unwanted vmSet %s, decouple it from the LB", vmSetName)
 						// construct a backendPool that only contains the IP config of the node to be deleted
 						interfaceIPConfigToBeDeleted := network.InterfaceIPConfiguration{
@@ -1128,6 +1128,10 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 						nodeName, _, err := az.VMSet.GetNodeNameByIPConfigurationID(ipConfID)
 						if err != nil {
 							return nil, err
+						}
+						if nodeName == "" {
+							// VM may under deletion
+							continue
 						}
 						// If a node is not supposed to be included in the LB, it
 						// would not be in the `nodes` slice. We need to check the nodes that
