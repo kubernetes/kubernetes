@@ -173,6 +173,13 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 			}
 		}
 	}
+
+	// Drop LoadBalancerClass if LoadBalancerClass is not enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceLoadBalancerClass) {
+		if !loadBalancerClassInUse(oldSvc) {
+			newSvc.Spec.LoadBalancerClass = nil
+		}
+	}
 }
 
 // returns true if svc.Spec.AllocateLoadBalancerNodePorts field is in use
@@ -223,6 +230,14 @@ func loadBalancerPortsInUse(svc *api.Service) bool {
 		}
 	}
 	return false
+}
+
+// returns true if svc.Spec.LoadBalancerClass field is in use
+func loadBalancerClassInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	return svc.Spec.LoadBalancerClass != nil
 }
 
 type serviceStatusStrategy struct {
@@ -390,6 +405,12 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 		}
 	}
 
+	// If a user is switching to a type that doesn't need LoadBalancerClass AND they did not change
+	// this field, it is safe to drop it.
+	if canSetLoadBalancerClass(oldSvc) && !canSetLoadBalancerClass(newSvc) && sameLoadBalancerClass(oldSvc, newSvc) {
+		newSvc.Spec.LoadBalancerClass = nil
+	}
+
 	// NOTE: there are other fields like `selector` which we could wipe.
 	// Historically we did not wipe them and they are not allocated from
 	// finite pools, so we are (currently) choosing to leave them alone.
@@ -462,6 +483,20 @@ func needsHCNodePort(svc *api.Service) bool {
 
 func sameHCNodePort(oldSvc, newSvc *api.Service) bool {
 	return oldSvc.Spec.HealthCheckNodePort == newSvc.Spec.HealthCheckNodePort
+}
+
+func canSetLoadBalancerClass(svc *api.Service) bool {
+	return svc.Spec.Type == api.ServiceTypeLoadBalancer
+}
+
+func sameLoadBalancerClass(oldSvc, newSvc *api.Service) bool {
+	if (oldSvc.Spec.LoadBalancerClass == nil) != (newSvc.Spec.LoadBalancerClass == nil) {
+		return false
+	}
+	if oldSvc.Spec.LoadBalancerClass == nil {
+		return true // both are nil
+	}
+	return *oldSvc.Spec.LoadBalancerClass == *newSvc.Spec.LoadBalancerClass
 }
 
 // this func allows user to downgrade a service by just changing

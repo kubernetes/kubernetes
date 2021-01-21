@@ -682,6 +682,11 @@ const (
 	//
 	// Allow specifying NamespaceSelector in PodAffinityTerm.
 	PodAffinityNamespaceSelector featuregate.Feature = "PodAffinityNamespaceSelector"
+	// owner: @andrewsykim @xudongliuharold
+	// alpha: v1.21
+	//
+	// Enable support multiple Service "type: LoadBalancer" implementations in a cluster by specifying LoadBalancerClass
+	ServiceLoadBalancerClass featuregate.Feature = "ServiceLoadBalancerClass"
 )
 
 func init() {
@@ -785,6 +790,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RunAsGroup:                                     {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	PodDeletionCost:                                {Default: false, PreRelease: featuregate.Alpha},
 	PodAffinityNamespaceSelector:                   {Default: false, PreRelease: featuregate.Alpha},
+	ServiceLoadBalancerClass:                       {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
