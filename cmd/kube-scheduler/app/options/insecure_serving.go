@@ -44,10 +44,10 @@ func (o *CombinedInsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.StringVar(&o.BindAddress, "address", o.BindAddress, "DEPRECATED: the IP address on which to listen for the --port port (set to 0.0.0.0 or :: for listening in all interfaces and IP families). See --bind-address instead.")
+	fs.StringVar(&o.BindAddress, "address", o.BindAddress, "DEPRECATED: the IP address on which to listen for the --port port (set to 0.0.0.0 or :: for listening in all interfaces and IP families). See --bind-address instead. This parameter is ignored if a config file is specified in --config.")
 	// MarkDeprecated hides the flag from the help. We don't want that:
 	// fs.MarkDeprecated("address", "see --bind-address instead.")
-	fs.IntVar(&o.BindPort, "port", o.BindPort, "DEPRECATED: the port on which to serve HTTP insecurely without authentication and authorization. If 0, don't serve plain HTTP at all. See --secure-port instead.")
+	fs.IntVar(&o.BindPort, "port", o.BindPort, "DEPRECATED: the port on which to serve HTTP insecurely without authentication and authorization. If 0, don't serve plain HTTP at all. See --secure-port instead. This parameter is ignored if a config file is specified in --config.")
 	// MarkDeprecated hides the flag from the help. We don't want that:
 	// fs.MarkDeprecated("port", "see --secure-port instead.")
 }
