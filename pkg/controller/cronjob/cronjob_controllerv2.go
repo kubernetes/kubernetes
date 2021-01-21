@@ -482,7 +482,7 @@ func (jm *ControllerV2) syncCronJob(
 		// no unmet start time, return cj,.
 		// The only time this should happen is if queue is filled after restart.
 		// Otherwise, the queue is always suppose to trigger sync function at the time of
-		// the scheduled time, that will give atleast 1 unmet time schedule
+		// the scheduled time, that will give at least 1 unmet time schedule
 		klog.V(4).InfoS("No unmet start times", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
 		t := nextScheduledTimeDuration(sched, now)
 		return cj, t, nil
