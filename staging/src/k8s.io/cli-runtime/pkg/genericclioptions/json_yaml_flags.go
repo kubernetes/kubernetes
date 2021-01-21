@@ -24,6 +24,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 )
 
+// AllowedFormats returns slice of string of allowed JSONYaml printing format
 func (f *JSONYamlPrintFlags) AllowedFormats() []string {
 	if f == nil {
 		return []string{}
