@@ -17,8 +17,6 @@ package certreload
 
 import (
 	"context"
-	"crypto"
-	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -28,20 +26,18 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/cert"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	apiserverintegration "k8s.io/kubernetes/test/integration/apiserver"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -50,41 +46,43 @@ import (
 )
 
 func TestAggregatorCertReload(t *testing.T) {
-	proxyCA, proxyClientKey, proxyClientCert, err := newCAWithClientCert()
+
+	pkgPath, err := pkgPath(t)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	var proxyClientKeyPath string
-	var proxyClientCertPath string
-	var servingCertPath string
+	// Default testdata files locations
+	servingCertPath := filepath.Join(pkgPath, "testdata")
+	proxyClientCertPath := filepath.Join(servingCertPath, "proxy-client.pem")
+	proxyCACertPath := filepath.Join(servingCertPath, "proxy-ca.pem")
+	proxyClientKeyPath := filepath.Join(servingCertPath, "proxy-client.key")
+
+	// Loads the client certificates from the servingCertPath
+	proxyCACert, proxyClientKey, proxyClientCert, err := loadCAWithClientCert(servingCertPath, "original")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Writes original client certificates to use with kube-apiserver
+	if err := ioutil.WriteFile(proxyClientCertPath, testutil.EncodeCertPEM(proxyClientCert), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(proxyClientKeyPath, proxyClientKey, 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
 	t.Log("STEP 1: Start Kube API Server")
-	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-		servingCertPath = opts.SecureServing.ServerCert.CertDirectory
-
-		proxyClientKeyPath = filepath.Join(servingCertPath, "proxy-client.key")
-		if err := ioutil.WriteFile(proxyClientKeyPath, proxyClientKey, 0644); err != nil {
-			t.Fatal(err)
-		}
-
-		proxyClientCertPath = filepath.Join(servingCertPath, "proxy-client.pem")
-		if err := ioutil.WriteFile(proxyClientCertPath, testutil.EncodeCertPEM(proxyClientCert), 0644); err != nil {
-			t.Fatal(err)
-		}
-
-		opts.ProxyClientCertFile = proxyClientCertPath
-		opts.ProxyClientKeyFile = proxyClientKeyPath
-		opts.EnableAggregatorRouting = true
-
-		// makes the kube-apiserver very responsive.  it's normally a minute
-		dynamiccertificates.FileRefreshDuration = 1 * time.Second
-
-	}}, nil, framework.SharedEtcd())
+	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, FileRefreshDuration: 1 * time.Second},
+		[]string{"--cert-dir", servingCertPath,
+			"--proxy-client-cert-file", proxyClientCertPath,
+			"--proxy-client-key-file", proxyClientKeyPath,
+			"--enable-aggregator-routing", "true"}, framework.SharedEtcd())
 	defer testServer.TearDownFn()
+
 
 	kubeClientConfig := rest.CopyConfig(testServer.ClientConfig)
 	kubeClientConfig.ContentType = ""
@@ -93,7 +91,7 @@ func TestAggregatorCertReload(t *testing.T) {
 	aggregatorClient := aggregatorclient.NewForConfigOrDie(kubeClientConfig)
 
 	t.Log("STEP 2: Starting and waiting for an Aggregated API Server")
-	aggregatorIP, aggregatorPort, cleanUpFn, err := startAndWaitForAggregatedAPI(t, stopCh, kubeClientConfig, filepath.Join(servingCertPath, "proxy-ca.crt"), proxyCA)
+	aggregatorIP, aggregatorPort, cleanUpFn, err := startAndWaitForAggregatedAPI(t, stopCh, kubeClientConfig, proxyCACertPath, proxyCACert)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +104,7 @@ func TestAggregatorCertReload(t *testing.T) {
 
 	t.Log("STEP 4: Swapping the proxy certificate and trying to connect to the aggregated API")
 	{
-		_, newProxyClientKey, newProxyClientCert, err := newCAWithClientCert()
+		_, newProxyClientKey, newProxyClientCert, err := loadCAWithClientCert(servingCertPath, "new")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -115,14 +113,27 @@ func TestAggregatorCertReload(t *testing.T) {
 		}
 	}
 	t.Log("STEP 5: Swapping the proxy certificate back to original and connect to the aggregated API")
-	if err := swapProxyClientCertAndConnect(kubeClient, proxyClientCertPath, proxyClientKeyPath, proxyClientKey, proxyClientCert, http.StatusOK); err != nil {
-		t.Fatal(err)
+	{
+		_, proxyClientKey, proxyClientCert, err = loadCAWithClientCert(servingCertPath, "original")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := swapProxyClientCertAndConnect(kubeClient, proxyClientCertPath, proxyClientKeyPath, proxyClientKey, proxyClientCert, http.StatusOK); err != nil {
+			t.Fatal(err)
+		}
 	}
+
 }
 
-func startAndWaitForAggregatedAPI(t *testing.T, stopCh <-chan struct{}, clientConfig *rest.Config, proxyCAFilePath string, proxyCA *x509.Certificate) (string, int, func(), error) {
+func startAndWaitForAggregatedAPI(t *testing.T, stopCh <-chan struct{}, clientConfig *rest.Config, proxyCAFilePath string, proxyCACert *x509.Certificate) (string, int, func(), error) {
 	wardleToKASKubeConfigFile := apiserverintegration.WriteKubeConfigForWardleServerToKASConnection(t, rest.CopyConfig(clientConfig))
 	wardleCertDir, _ := ioutil.TempDir("", "test-integration-wardle-server")
+
+	// Writes the CA certificate to use with Aggregated API server
+	if err := ioutil.WriteFile(proxyCAFilePath, testutil.EncodeCertPEM(proxyCACert), 0644); err != nil {
+		t.Fatal(err)
+	}
+
 
 	cleanUpFn := func() {
 		os.Remove(wardleToKASKubeConfigFile)
@@ -141,10 +152,6 @@ func startAndWaitForAggregatedAPI(t *testing.T, stopCh <-chan struct{}, clientCo
 
 	wardleListener, wardlePort, err := genericapiserveroptions.CreateListener("tcp", fmt.Sprintf("%s:0", wardleIP), net.ListenConfig{})
 	if err != nil {
-		return handleErrFn(err)
-	}
-
-	if err := ioutil.WriteFile(proxyCAFilePath, testutil.EncodeCertPEM(proxyCA), 0644); err != nil {
 		return handleErrFn(err)
 	}
 
@@ -297,45 +304,57 @@ func getIPToListenOn() (string, error) {
 	return "", errors.New("didn't find suitable IP address on a local machine to listen on")
 }
 
-func newCAWithClientCert() (*x509.Certificate, []byte, *x509.Certificate, error) {
-	signingKey, signingCert, err := newCACertKey()
+func loadCAWithClientCert(servingCertPath, suffix string) (*x509.Certificate, []byte, *x509.Certificate, error) {
+
+	proxyClientCertPath := filepath.Join(servingCertPath, "proxy-client_" + suffix + ".pem")
+	proxyClientCertData, err := ioutil.ReadFile(proxyClientCertPath)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to create self signed CA, err = %v", err)
+		return nil, nil, nil, err
+	}
+	proxyClientCertBlock, _ := pem.Decode(proxyClientCertData)
+	proxyClientCert, err := x509.ParseCertificate(proxyClientCertBlock.Bytes)
+
+	proxyCACertPath := filepath.Join(servingCertPath, "proxy-ca_" + suffix + ".pem")
+	proxyCACertData, err := ioutil.ReadFile(proxyCACertPath)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	proxyCACertBlock, _ := pem.Decode(proxyCACertData)
+	proxyCACert, err := x509.ParseCertificate(proxyCACertBlock.Bytes)
+
+
+	proxyClientKeyPath := filepath.Join(servingCertPath, "proxy-client_" + suffix + ".key")
+	proxyClientKeyPEM, err := ioutil.ReadFile(proxyClientKeyPath)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	proxyClientKey, err := testutil.NewPrivateKey()
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to create the proxy client key, err = %v", err)
-	}
-	proxyClientCert, err := newSignedClientKeyCert(proxyClientKey, signingCert, signingKey)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to sign the proxy client certificate, err = %v", err)
-	}
-	proxyClientKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(proxyClientKey)})
-
-	return signingCert, proxyClientKeyPEM, proxyClientCert, nil
+	return proxyCACert, proxyClientKeyPEM, proxyClientCert, nil
 }
 
-func newCACertKey() (*rsa.PrivateKey, *x509.Certificate, error) {
-	aggregatorSigningKey, err := testutil.NewPrivateKey()
-	if err != nil {
-		return nil, nil, err
-	}
-	aggregatorSigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "aggregator-proxy-ca"}, aggregatorSigningKey)
-	if err != nil {
-		return nil, nil, err
+// use pkgPath to identify test package directory for the test
+func pkgPath(t *testing.T) (string, error) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", fmt.Errorf("failed to get current file")
 	}
 
-	return aggregatorSigningKey, aggregatorSigningCert, nil
-}
+	pkgPath := filepath.Dir(thisFile)
 
-func newSignedClientKeyCert(key crypto.Signer, signingCert *x509.Certificate, signingKey crypto.Signer) (*x509.Certificate, error) {
-	signedCert, err := testutil.NewSignedCert(
-		&cert.Config{
-			CommonName: "p0lyn0mial",
-			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-		},
-		key, signingCert, signingKey,
-	)
-	return signedCert, err
+	// If we find bazel env variables, then -trimpath was passed so we need to
+	// construct the path from the environment.
+	if testSrcdir, testWorkspace := os.Getenv("TEST_SRCDIR"), os.Getenv("TEST_WORKSPACE"); testSrcdir != "" && testWorkspace != "" {
+		t.Logf("Detected bazel env varaiables: TEST_SRCDIR=%q TEST_WORKSPACE=%q", testSrcdir, testWorkspace)
+		pkgPath = filepath.Join(testSrcdir, testWorkspace, pkgPath)
+	}
+
+	// If the path is still not absolute, something other than bazel compiled
+	// with -trimpath.
+	if !filepath.IsAbs(pkgPath) {
+		return "", fmt.Errorf("can't construct an absolute path from %q", pkgPath)
+	}
+
+	t.Logf("Resolved testserver package path to: %q", pkgPath)
+
+	return pkgPath, nil
 }

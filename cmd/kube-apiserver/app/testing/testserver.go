@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"net"
 	"os"
 	"path"
@@ -53,8 +54,8 @@ type TestServerInstanceOptions struct {
 	// Enable cert-auth for the kube-apiserver
 	EnableCertAuth bool
 
-	// ModifyServerRunOptions allows for providing a custom function to modify ServerRunOption just before running the server
-	ModifyServerRunOptions func(opts *options.ServerRunOptions)
+	// File refresh duration in kube-apiserver
+	FileRefreshDuration time.Duration
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -175,8 +176,8 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	s.Etcd.StorageConfig = *storageConfig
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
-	if instanceOptions.ModifyServerRunOptions != nil {
-		instanceOptions.ModifyServerRunOptions(s)
+	if instanceOptions.FileRefreshDuration != dynamiccertificates.FileRefreshDuration {
+		dynamiccertificates.FileRefreshDuration = instanceOptions.FileRefreshDuration
 	}
 
 	if err := fs.Parse(customFlags); err != nil {
