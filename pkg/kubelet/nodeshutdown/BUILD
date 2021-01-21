@@ -11,10 +11,12 @@ go_library(
     deps = select({
         "@io_bazel_rules_go//go/platform:aix": [
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/features:go_default_library",
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
             "//pkg/kubelet/nodeshutdown/systemd:go_default_library",
             "//pkg/kubelet/types:go_default_library",
             "//pkg/kubelet/util/format:go_default_library",
@@ -26,25 +28,32 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:dragonfly": [
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:illumos": [
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:js": [
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/features:go_default_library",
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
             "//pkg/kubelet/nodeshutdown/systemd:go_default_library",
             "//pkg/kubelet/types:go_default_library",
             "//pkg/kubelet/util/format:go_default_library",
@@ -56,21 +65,27 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:netbsd": [
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:openbsd": [
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:plan9": [
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:solaris": [
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/kubelet/eviction:go_default_library",
+            "//pkg/kubelet/lifecycle:go_default_library",
         ],
         "//conditions:default": [],
     }),
