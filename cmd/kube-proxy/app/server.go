@@ -55,6 +55,7 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/configz"
+	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -481,6 +482,7 @@ with the apiserver API to configure the proxy.`,
 			if err := opts.Complete(); err != nil {
 				klog.Fatalf("failed complete: %v", err)
 			}
+
 			if err := opts.Validate(); err != nil {
 				klog.Fatalf("failed validate: %v", err)
 			}
@@ -616,6 +618,7 @@ func serveMetrics(bindAddress, proxyMode string, enableProfiling bool, errCh cha
 
 	if enableProfiling {
 		routes.Profiling{}.Install(proxyMux)
+		routes.DebugFlags{}.Install(proxyMux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
 	}
 
 	configz.InstallHandler(proxyMux)
