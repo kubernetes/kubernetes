@@ -96,6 +96,7 @@ go_library(
         "//vendor/github.com/miekg/dns:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
     ],
