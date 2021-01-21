@@ -22,9 +22,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -92,6 +94,7 @@ func (hs *proxierHealthServer) QueuedUpdate() {
 func (hs *proxierHealthServer) Run() error {
 	serveMux := http.NewServeMux()
 	serveMux.Handle("/healthz", healthzHandler{hs: hs})
+	serveMux.Handle("/debug/flags/v", routes.StringFlagPutHandler(logs.GlogSetter))
 	server := hs.httpFactory.New(hs.addr, serveMux)
 
 	listener, err := hs.listener.Listen(hs.addr)
