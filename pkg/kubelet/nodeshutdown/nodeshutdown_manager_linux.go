@@ -31,14 +31,16 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 const (
-	nodeShutdownReason  = "Shutdown"
-	nodeShutdownMessage = "Node is shutting, evicting pods"
+	nodeShutdownReason          = "Shutdown"
+	nodeShutdownMessage         = "Node is shutting, evicting pods"
+	nodeShutdownNotAdmitMessage = "Node is in progress of shutting down, not admitting any new pods"
 )
 
 var systemDbus = func() (dbusInhibiter, error) {
@@ -63,8 +65,9 @@ type Manager struct {
 	shutdownGracePeriodRequested    time.Duration
 	shutdownGracePeriodCriticalPods time.Duration
 
-	getPods eviction.ActivePodsFunc
-	killPod eviction.KillPodFunc
+	getPods        eviction.ActivePodsFunc
+	killPod        eviction.KillPodFunc
+	syncNodeStatus func()
 
 	dbusCon     dbusInhibiter
 	inhibitLock systemd.InhibitLock
@@ -76,14 +79,30 @@ type Manager struct {
 }
 
 // NewManager returns a new node shutdown manager.
-func NewManager(getPodsFunc eviction.ActivePodsFunc, killPodFunc eviction.KillPodFunc, shutdownGracePeriodRequested, shutdownGracePeriodCriticalPods time.Duration) *Manager {
-	return &Manager{
+func NewManager(getPodsFunc eviction.ActivePodsFunc, killPodFunc eviction.KillPodFunc, syncNodeStatus func(), shutdownGracePeriodRequested, shutdownGracePeriodCriticalPods time.Duration) (*Manager, lifecycle.PodAdmitHandler) {
+	manager := &Manager{
 		getPods:                         getPodsFunc,
 		killPod:                         killPodFunc,
+		syncNodeStatus:                  syncNodeStatus,
 		shutdownGracePeriodRequested:    shutdownGracePeriodRequested,
 		shutdownGracePeriodCriticalPods: shutdownGracePeriodCriticalPods,
 		clock:                           clock.RealClock{},
 	}
+	return manager, manager
+}
+
+// Admit rejects all pods if node is shutting
+func (m *Manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	nodeShuttingDown := m.ShutdownStatus() != nil
+
+	if nodeShuttingDown {
+		return lifecycle.PodAdmitResult{
+			Admit:   false,
+			Reason:  nodeShutdownReason,
+			Message: nodeShutdownNotAdmitMessage,
+		}
+	}
+	return lifecycle.PodAdmitResult{Admit: true}
 }
 
 // Start starts the node shutdown manager and will start watching the node for shutdown events.
@@ -158,6 +177,9 @@ func (m *Manager) Start() error {
 				m.nodeShuttingDownMutex.Unlock()
 
 				if isShuttingDown {
+					// Update node status and ready condition
+					go m.syncNodeStatus()
+
 					m.processShutdownEvent()
 				} else {
 					m.aquireInhibitLock()
