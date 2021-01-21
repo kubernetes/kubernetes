@@ -85,6 +85,7 @@ func LoadPolicyFromBytes(policyDef []byte) (*auditinternal.Policy, error) {
 	if policyCnt == 0 {
 		return nil, fmt.Errorf("loaded illegal policy with 0 rules")
 	}
-	klog.V(4).Infof("Loaded %d audit policy rules", policyCnt)
+
+	klog.V(4).InfoS("Load audit policy rules success", "policyCnt", policyCnt)
 	return policy, nil
 }
