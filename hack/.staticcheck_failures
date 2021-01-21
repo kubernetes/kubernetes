@@ -30,4 +30,3 @@ vendor/k8s.io/client-go/discovery
 vendor/k8s.io/client-go/rest
 vendor/k8s.io/client-go/rest/watch
 vendor/k8s.io/client-go/transport
-vendor/k8s.io/cloud-provider/sample
