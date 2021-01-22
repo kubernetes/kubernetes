@@ -230,13 +230,13 @@ func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs[HttpdNew] = Config{dockerLibraryRegistry, "httpd", "2.4.39-alpine"}
 	configs[InvalidRegistryImage] = Config{invalidRegistry, "alpine", "3.1"}
 	configs[IpcUtils] = Config{e2eRegistry, "ipc-utils", "1.0"}
-	configs[JessieDnsutils] = Config{e2eRegistry, "jessie-dnsutils", "1.0"}
+	configs[JessieDnsutils] = Config{promoterE2eRegistry, "jessie-dnsutils", "1.4"}
 	configs[Kitten] = Config{promoterE2eRegistry, "kitten", "1.4"}
 	configs[Nautilus] = Config{promoterE2eRegistry, "nautilus", "1.4"}
 	configs[NFSProvisioner] = Config{sigStorageRegistry, "nfs-provisioner", "v2.2.2"}
 	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
 	configs[NginxNew] = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
-	configs[Nonewprivs] = Config{e2eRegistry, "nonewprivs", "1.0"}
+	configs[Nonewprivs] = Config{promoterE2eRegistry, "nonewprivs", "1.3"}
 	configs[NonRoot] = Config{e2eRegistry, "nonroot", "1.0"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
 	configs[Pause] = Config{gcRegistry, "pause", "3.2"}
