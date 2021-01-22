@@ -1321,6 +1321,46 @@ function Setup-ContainerRuntime {
   }
 }
 
+function Test-ContainersFeatureInstalled {
+  return (Get-WindowsFeature Containers).Installed
+}
+
+# After this function returns, the computer must be restarted to complete
+# the installation!
+function Install-ContainersFeature {
+  Log-Output "Installing Windows 'Containers' feature"
+  Install-WindowsFeature Containers
+}
+
+function Test-DockerIsInstalled {
+  return ((Get-Package `
+               -ProviderName DockerMsftProvider `
+               -ErrorAction SilentlyContinue |
+           Where-Object Name -eq 'docker') -ne $null)
+}
+
+function Test-DockerIsRunning {
+  return ((Get-Service docker).Status -eq 'Running')
+}
+
+# Installs Docker EE via the DockerMsftProvider. Ensure that the Windows
+# Containers feature is installed before calling this function; otherwise,
+# a restart may be needed after this function returns.
+function Install-Docker {
+  Log-Output 'Installing NuGet module'
+  Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+
+  Log-Output 'Installing DockerMsftProvider module'
+  Install-Module -Name DockerMsftProvider -Repository PSGallery -Force
+
+  Log-Output "Installing latest Docker EE version"
+  Install-Package `
+      -Name docker `
+      -ProviderName DockerMsftProvider `
+      -Force `
+      -Verbose
+}
+
 # Add a registry key for docker in EventLog so that log messages are mapped
 # correctly. This is a workaround since the key is missing in the base image.
 # https://github.com/MicrosoftDocs/Virtualization-Documentation/pull/503

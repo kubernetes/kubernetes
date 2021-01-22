@@ -117,6 +117,26 @@ try {
   FetchAndImport-ModuleFromMetadata 'k8s-node-setup-psm1' 'k8s-node-setup.psm1'
 
   Dump-DebugInfoToConsole
+
+  if (-not (Test-ContainersFeatureInstalled)) {
+    Install-ContainersFeature
+    Log-Output 'Restarting computer after enabling Windows Containers feature'
+    Restart-Computer -Force
+    # Restart-Computer does not stop the rest of the script from executing.
+    exit 0
+  }
+
+  if (-not (Test-DockerIsInstalled)) {
+    Install-Docker
+  }
+  # For some reason the docker service may not be started automatically on the
+  # first reboot, although it seems to work fine on subsequent reboots.
+  Restart-Service docker
+  Start-Sleep 5
+  if (-not (Test-DockerIsRunning)) {
+      throw "docker service failed to start or stay running"
+  }
+
   Set-PrerequisiteOptions
   $kube_env = Fetch-KubeEnv
 
