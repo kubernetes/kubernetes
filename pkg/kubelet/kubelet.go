@@ -1480,6 +1480,13 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		return nil
 	}
 
+	// If the pod is a static pod and its mirror pod is still gracefully terminating,
+	// we do not want to start the new static pod until the old static pod is gracefully terminated.
+	podFullName := kubecontainer.GetPodFullName(pod)
+	if kl.podKiller.IsMirrorPodPendingTerminationByPodName(podFullName) {
+		return fmt.Errorf("pod %q is pending termination", podFullName)
+	}
+
 	// Latency measurements for the main workflow are relative to the
 	// first time the pod was seen by the API server.
 	var firstSeenTime time.Time
@@ -1615,7 +1622,6 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 
 	// Create Mirror Pod for Static Pod if it doesn't already exist
 	if kubetypes.IsStaticPod(pod) {
-		podFullName := kubecontainer.GetPodFullName(pod)
 		deleted := false
 		if mirrorPod != nil {
 			if mirrorPod.DeletionTimestamp != nil || !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
@@ -1746,6 +1752,9 @@ func (kl *Kubelet) deletePod(pod *v1.Pod) error {
 	}
 	podPair := kubecontainer.PodPair{APIPod: pod, RunningPod: &runningPod}
 
+	if _, ok := kl.podManager.GetMirrorPodByPod(pod); ok {
+		kl.podKiller.MarkMirrorPodPendingTermination(pod)
+	}
 	kl.podKiller.KillPod(&podPair)
 
 	// We leave the volume/directory cleanup to the periodic cleanup routine.
@@ -2083,9 +2092,6 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 		if kubetypes.IsMirrorPod(pod) {
 			kl.handleMirrorPod(pod, start)
 			continue
-		}
-		if _, ok := kl.podManager.GetMirrorPodByPod(pod); ok {
-			kl.podKiller.MarkMirrorPodPendingTermination(pod)
 		}
 		// Deletion is allowed to fail because the periodic cleanup routine
 		// will trigger deletion again.
