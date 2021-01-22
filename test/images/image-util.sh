@@ -96,7 +96,7 @@ build() {
     os_archs=$(listOsArchs "$image")
   else
     # prepend linux/ to the QEMUARCHS items.
-    os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[*]}")
+    os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[@]}")
   fi
 
   kube::util::ensure-gnu-sed
@@ -126,17 +126,17 @@ build() {
     # image tag
     TAG=$(<VERSION)
 
+    # NOTE(claudiub): Some Windows images might require their own Dockerfile
+    # while simpler ones will not. If we're building for Windows, check if
+    # "Dockerfile_windows" exists or not.
+    dockerfile_name="Dockerfile"
+    if [[ "$os_name" = "windows" && -f "Dockerfile_windows" ]]; then
+      dockerfile_name="Dockerfile_windows"
+    fi
+
+    base_image=""
     if [[ -f BASEIMAGE ]]; then
-      BASEIMAGE=$(getBaseImage "${os_arch}" | ${SED} "s|REGISTRY|${REGISTRY}|g")
-
-      # NOTE(claudiub): Some Windows images might require their own Dockerfile
-      # while simpler ones will not. If we're building for Windows, check if
-      # "Dockerfile_windows" exists or not.
-      dockerfile_name="Dockerfile"
-      if [[ "$os_name" = "windows" && -f "Dockerfile_windows" ]]; then
-        dockerfile_name="Dockerfile_windows"
-      fi
-
+      base_image=$(getBaseImage "${os_arch}" | ${SED} "s|REGISTRY|${REGISTRY}|g")
       ${SED} -i "s|BASEARCH|${arch}|g" $dockerfile_name
     fi
 
@@ -161,7 +161,7 @@ build() {
     fi
 
     docker buildx build --no-cache --pull --output=type="${output_type}" --platform "${os_name}/${arch}" \
-        --build-arg BASEIMAGE="${BASEIMAGE}" --build-arg REGISTRY="${REGISTRY}" --build-arg OS_VERSION="${os_version}" \
+        --build-arg BASEIMAGE="${base_image}" --build-arg REGISTRY="${REGISTRY}" --build-arg OS_VERSION="${os_version}" \
         -t "${REGISTRY}/${image}:${TAG}-${suffix}" -f "${dockerfile_name}" .
 
     popd
@@ -187,7 +187,7 @@ push() {
     os_archs=$(listOsArchs "$image")
   else
     # prepend linux/ to the QEMUARCHS items.
-    os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[*]}")
+    os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[@]}")
   fi
 
   kube::util::ensure-gnu-sed
