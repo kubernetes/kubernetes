@@ -160,7 +160,7 @@ build() {
       fi
     fi
 
-    docker buildx build --no-cache --pull --output=type="${output_type}" --platform "${os_name}/${arch}" \
+    docker buildx build --progress=plain --no-cache --pull --output=type="${output_type}" --platform "${os_name}/${arch}" \
         --build-arg BASEIMAGE="${base_image}" --build-arg REGISTRY="${REGISTRY}" --build-arg OS_VERSION="${os_version}" \
         -t "${REGISTRY}/${image}:${TAG}-${suffix}" -f "${dockerfile_name}" .
 
