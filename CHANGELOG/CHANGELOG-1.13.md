@@ -491,7 +491,7 @@ filename | sha512 hash
 * Resolves spurious rollouts of workload controllers when upgrading the API server due to incorrect defaulting of an alpha procMount field in pods ([#78882](https://github.com/kubernetes/kubernetes/pull/78882), [@liggitt](https://github.com/liggitt))
 * Bump ip-masq-agent version to v2.3.0 to fix vulnerabilities ([#77833](https://github.com/kubernetes/kubernetes/pull/77833), [@anfernee](https://github.com/anfernee))
 * Bump addon-manager to v8.9.1 ([#77623](https://github.com/kubernetes/kubernetes/pull/77623), [@MrHohn](https://github.com/MrHohn))
-    * - Rebase image on debian-base:v1.0.0
+* Rebase image on debian-base:v1.0.0
 
 
 
@@ -726,7 +726,7 @@ filename | sha512 hash
     *   reflector_short_watches_total
     *   reflector_watch_duration_seconds
     *   reflector_watches_total
-    * While this is a backwards-incompatible change, it would have been impossible to setup reliable monitoring around these metrics since the labels were not stable. 
+    *   While this is a backwards-incompatible change, it would have been impossible to setup reliable monitoring around these metrics since the labels were not stable. 
 
 
 
@@ -1139,7 +1139,7 @@ For the 1.13 release, SIG API Machinery is happy to announce that the [dry-run f
 
 ### SIG Auth
 
-With this release we've made several important enhancements to core SIG Auth areas. In the authorization category, we've further reduced Kubelet privileges by [restricting node self-updates of labels to a whitelisted selection and by disallowing kubelets from deleting their Node API object](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#noderestriction). In authentication, we added alpha-level support for automounting improved service account tokens through projected volumes. We also enabled [audience validation in TokenReview](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.13/#tokenreview-v1-authentication-k8s-io) for the new tokens for improved scoping. Under audit logging, the new alpha-level "dynamic audit configuration" adds support for [dynamically registering webhooks to receive a stream of audit events](https://kubernetes.io/docs/tasks/debug-application-cluster/audit/#dynamic-backend). Finally, we've enhanced secrets protection by graduating [etcd encryption](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/) out of experimental.
+With this release we've made several important enhancements to core SIG Auth areas. In the authorization category, we've further reduced Kubelet privileges by [restricting node self-updates of labels to a whitelisted selection and by disallowing kubelets from deleting their Node API object](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#noderestriction). In authentication, we added alpha-level support for automounting improved service account tokens through projected volumes. We also enabled [audience validation in TokenReview](https://v1-16.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.13/#tokenreview-v1-authentication-k8s-io) for the new tokens for improved scoping. Under audit logging, the new alpha-level "dynamic audit configuration" adds support for [dynamically registering webhooks to receive a stream of audit events](https://kubernetes.io/docs/tasks/debug-application-cluster/audit/#dynamic-backend). Finally, we've enhanced secrets protection by graduating [etcd encryption](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/) out of experimental.
 
 ### SIG AWS
 
@@ -1153,7 +1153,7 @@ For detailed release notes on the three alpha features from SIG AWS, please refe
 
 - [aws-alb-ingress-controller v1.0.0](https://github.com/kubernetes-sigs/aws-alb-ingress-controller/releases/tag/v1.0.0)
 - [aws-ebs-csi-driver v0.1](https://github.com/kubernetes-sigs/aws-ebs-csi-driver/releases/tag/v0.1.0)
-- [cloudprovider-aws external v0.1.0](https://github.com/kubernetes/cloud-provider-aws/blob/master/changelogs/CHANGELOG-0.1.md)
+- [cloudprovider-aws external v0.1.0](https://github.com/kubernetes/cloud-provider-aws/blob/master/CHANGELOG.md)
 
 ### SIG Azure
 
@@ -1489,7 +1489,7 @@ SIG Windows focused on improving reliability for Windows and Kubernetes support
 
 ### SIG Windows
 
--	`kubelet --system-reserved` and `--kube-reserved` are supported now on Windows nodes ([#69960](https://github.com/kubernetes/kubernetes/pull/69960), [@feiskyer](https://github.com/feiskyer))
+- `kubelet --system-reserved` and `--kube-reserved` are supported now on Windows nodes ([#69960](https://github.com/kubernetes/kubernetes/pull/69960), [@feiskyer](https://github.com/feiskyer))
 - Windows runtime endpoints is now switched to `npipe:////./pipe/dockershim` from `tcp://localhost:3735`. ([#69516](https://github.com/kubernetes/kubernetes/pull/69516), [@feiskyer](https://github.com/feiskyer))
 - Fixed service issues with named targetPort for Windows ([#70076](https://github.com/kubernetes/kubernetes/pull/70076), [@feiskyer](https://github.com/feiskyer))
 - Handle Windows named pipes in host mounts. ([#69484](https://github.com/kubernetes/kubernetes/pull/69484), [@ddebroy](https://github.com/ddebroy))
@@ -2193,7 +2193,7 @@ filename | sha512 hash
 * Add fallbacks to ARM API when getting empty node IP from Azure IMDS ([#69077](https://github.com/kubernetes/kubernetes/pull/69077), [@feiskyer](https://github.com/feiskyer))
 * Deduplicate PATH items when reading plugins. ([#69089](https://github.com/kubernetes/kubernetes/pull/69089), [@soltysh](https://github.com/soltysh))
 * Adds permissions for startup of an on-cluster kube-controller-manager ([#69062](https://github.com/kubernetes/kubernetes/pull/69062), [@dghubble](https://github.com/dghubble))
-* Fixes issue [[#68899](https://github.com/kubernetes/kubernetes/pull/68899)](https://github.com/kubernetes/kubernetes/issues/68899) where pods might schedule on an unschedulable node. ([#68984](https://github.com/kubernetes/kubernetes/pull/68984), [@k82cn](https://github.com/k82cn))
+* Fixes issue [#68899](https://github.com/kubernetes/kubernetes/pull/68899) where pods might schedule on an unschedulable node. ([#68984](https://github.com/kubernetes/kubernetes/pull/68984), [@k82cn](https://github.com/k82cn))
 * Returns error if NodeGetInfo fails. ([#68979](https://github.com/kubernetes/kubernetes/pull/68979), [@xing-yang](https://github.com/xing-yang))
 * Pod disruption budgets shouldn't be checked for terminal pods while evicting ([#68892](https://github.com/kubernetes/kubernetes/pull/68892), [@ravisantoshgudimetla](https://github.com/ravisantoshgudimetla))
 * Fix scheduler crashes when Prioritize Map function returns error. ([#68563](https://github.com/kubernetes/kubernetes/pull/68563), [@DylanBLE](https://github.com/DylanBLE))
