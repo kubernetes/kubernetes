@@ -21,19 +21,27 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+# These are "internal" modules.  For various reasons, we want them to be
+# decoupled from their parent modules.
+MODULES=(
+    hack/tools
+)
+
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on
 
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
 if [[ "${GOPROXY:-}" == "off" ]]; then
-  kube::log::error "Cannot run hack/update-hack-tools.sh with \$GOPROXY=off"
+  kube::log::error "Cannot run hack/update-internal-modules.sh with \$GOPROXY=off"
   exit 1
 fi
 
 kube::golang::verify_go_version
 
-pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-  echo "=== tidying go.mod/go.sum in hack/tools"
-  go mod edit -fmt
-  go mod tidy
-popd >/dev/null
+for mod in "${MODULES[@]}"; do
+  pushd "${KUBE_ROOT}/${mod}" >/dev/null
+    echo "=== tidying go.mod/go.sum in ${mod}"
+    go mod edit -fmt
+    go mod tidy
+  popd >/dev/null
+done
