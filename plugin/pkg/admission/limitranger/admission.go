@@ -60,7 +60,7 @@ type LimitRanger struct {
 	actions LimitRangerActions
 	lister  corev1listers.LimitRangeLister
 
-	// liveLookups holds the last few live lookups we've done to help ammortize cost on repeated lookup failures.
+	// liveLookups holds the last few live lookups we've done to help amortize cost on repeated lookup failures.
 	// This let's us handle the case of latent caches, by looking up actual results for a namespace on cache miss/no results.
 	// We track the lookup result here so that for repeated requests, we don't look it up very often.
 	liveLookupCache *lru.Cache
@@ -239,6 +239,11 @@ func mergeContainerResources(container *api.Container, defaultRequirements *api.
 	for k, v := range defaultRequirements.Limits {
 		_, found := container.Resources.Limits[k]
 		if !found {
+			request, found := container.Resources.Requests[k]
+			if found && v.Cmp(request) < 0 {
+				// skip default limit setting if container's request is larger
+				continue
+			}
 			container.Resources.Limits[k] = v.DeepCopy()
 			setLimits = append(setLimits, string(k))
 		}
@@ -553,10 +558,7 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 					}
 				}
 			}
-		}
-
-		// enforce pod limits on init containers
-		if limitType == corev1.LimitTypePod {
+		} else if limitType == corev1.LimitTypePod { // enforce pod limits on init containers
 			containerRequests, containerLimits := []api.ResourceList{}, []api.ResourceList{}
 			for j := range pod.Spec.Containers {
 				container := &pod.Spec.Containers[j]

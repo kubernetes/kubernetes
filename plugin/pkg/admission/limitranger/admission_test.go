@@ -227,7 +227,9 @@ func TestMergePodResourceRequirements(t *testing.T) {
 			api.ResourceCPU:    defaultRequirements.Requests[api.ResourceCPU],
 			api.ResourceMemory: resource.MustParse("512Mi"),
 		},
-		Limits: defaultRequirements.Limits,
+		Limits: api.ResourceList{
+			api.ResourceCPU: defaultRequirements.Limits[api.ResourceCPU],
+		},
 	}
 	mergePodResourceRequirements(&pod, &defaultRequirements)
 	for i := range pod.Spec.Containers {
@@ -242,7 +244,7 @@ func TestMergePodResourceRequirements(t *testing.T) {
 			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
 		}
 	}
-	verifyAnnotation(t, &pod, "LimitRanger plugin set: cpu request for container foo-0; cpu, memory limit for container foo-0")
+	verifyAnnotation(t, &pod, "LimitRanger plugin set: cpu request for container foo-0; cpu limit for container foo-0")
 
 	// pod with all resources enumerated should not merge anything
 	input = getResourceRequirements(getComputeResourceList("100m", "512Mi"), getComputeResourceList("200m", "1G"))
