@@ -36,8 +36,4 @@ pushd "${KUBE_ROOT}/hack/tools" >/dev/null
   echo "=== tidying go.mod/go.sum in hack/tools"
   go mod edit -fmt
   go mod tidy
-  go mod vendor
-
-  LICENSE_ROOT="${PWD}" "${KUBE_ROOT}/hack/update-vendor-licenses.sh"
-  rm -rf vendor
 popd >/dev/null
