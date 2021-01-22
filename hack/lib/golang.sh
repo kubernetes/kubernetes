@@ -49,6 +49,7 @@ readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
   linux/s390x
   linux/ppc64le
   darwin/amd64
+  darwin/arm64
   windows/amd64
   windows/386
 )
@@ -62,6 +63,7 @@ readonly KUBE_SUPPORTED_TEST_PLATFORMS=(
   linux/s390x
   linux/ppc64le
   darwin/amd64
+  darwin/arm64
   windows/amd64
 )
 
@@ -206,25 +208,30 @@ kube::golang::setup_platforms() {
     readonly KUBE_CLIENT_PLATFORMS
 
   elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
-    KUBE_SERVER_PLATFORMS=(linux/amd64)
+    host_arch=$(kube::util::host_arch)
+    if [[ "${host_arch}" != "amd64" && "${host_arch}" != "arm64" ]]; then
+      # on any platform other than amd64 and arm64, we just default to amd64
+      host_arch="amd64"
+    fi
+    KUBE_SERVER_PLATFORMS=("linux/${host_arch}")
     readonly KUBE_SERVER_PLATFORMS
-    KUBE_NODE_PLATFORMS=(linux/amd64)
+    KUBE_NODE_PLATFORMS=("linux/${host_arch}")
     readonly KUBE_NODE_PLATFORMS
     if [[ "${KUBE_BUILDER_OS:-}" == "darwin"* ]]; then
       KUBE_TEST_PLATFORMS=(
-        darwin/amd64
-        linux/amd64
+        "darwin/${host_arch}"
+        "linux/${host_arch}"
       )
       readonly KUBE_TEST_PLATFORMS
       KUBE_CLIENT_PLATFORMS=(
-        darwin/amd64
-        linux/amd64
+        "darwin/${host_arch}"
+        "linux/${host_arch}"
       )
       readonly KUBE_CLIENT_PLATFORMS
     else
-      KUBE_TEST_PLATFORMS=(linux/amd64)
+      KUBE_TEST_PLATFORMS=("linux/${host_arch}")
       readonly KUBE_TEST_PLATFORMS
-      KUBE_CLIENT_PLATFORMS=(linux/amd64)
+      KUBE_CLIENT_PLATFORMS=("linux/${host_arch}")
       readonly KUBE_CLIENT_PLATFORMS
     fi
   else
