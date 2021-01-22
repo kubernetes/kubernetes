@@ -160,18 +160,7 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 		t.Errorf("failed to create legacy REST storage: %v", err)
 	}
 
-	// Any new stores with export logic will need to be added here:
-	exceptions := registrytest.StrategyExceptions{
-		// Only these stores should have an export strategy defined:
-		HasExportStrategy: []string{
-			"secrets",
-			"limitRanges",
-			"nodes",
-			"podTemplates",
-		},
-	}
-
-	strategyErrors := registrytest.ValidateStorageStrategies(apiGroupInfo.VersionedResourcesStorageMap["v1"], exceptions)
+	strategyErrors := registrytest.ValidateStorageStrategies(apiGroupInfo.VersionedResourcesStorageMap["v1"])
 	for _, err := range strategyErrors {
 		t.Error(err)
 	}
@@ -187,14 +176,8 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
 
-	exceptions := registrytest.StrategyExceptions{
-		HasExportStrategy: []string{
-			"certificatesigningrequests",
-		},
-	}
-
 	strategyErrors := registrytest.ValidateStorageStrategies(
-		apiGroupInfo.VersionedResourcesStorageMap[certificatesapiv1beta1.SchemeGroupVersion.Version], exceptions)
+		apiGroupInfo.VersionedResourcesStorageMap[certificatesapiv1beta1.SchemeGroupVersion.Version])
 	for _, err := range strategyErrors {
 		t.Error(err)
 	}

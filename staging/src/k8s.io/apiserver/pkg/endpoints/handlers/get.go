@@ -19,13 +19,14 @@ package handlers
 import (
 	"context"
 	"fmt"
-	metainternalversionvalidation "k8s.io/apimachinery/pkg/apis/meta/internalversion/validation"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	metainternalversionvalidation "k8s.io/apimachinery/pkg/apis/meta/internalversion/validation"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"k8s.io/klog/v2"
 
@@ -81,22 +82,22 @@ func getResourceHandler(scope *RequestScope, getter getterFunc) http.HandlerFunc
 }
 
 // GetResource returns a function that handles retrieving a single resource from a rest.Storage object.
-func GetResource(r rest.Getter, e rest.Exporter, scope *RequestScope) http.HandlerFunc {
+func GetResource(r rest.Getter, scope *RequestScope) http.HandlerFunc {
 	return getResourceHandler(scope,
 		func(ctx context.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
 			// check for export
 			options := metav1.GetOptions{}
 			if values := req.URL.Query(); len(values) > 0 {
-				exports := metav1.ExportOptions{}
-				if err := metainternalversionscheme.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &exports); err != nil {
-					err = errors.NewBadRequest(err.Error())
-					return nil, err
-				}
-				if exports.Export {
-					if e == nil {
-						return nil, errors.NewBadRequest(fmt.Sprintf("export of %q is not supported", scope.Resource.Resource))
+				if len(values["export"]) > 0 {
+					exportBool := true
+					exportStrings := values["export"]
+					err := runtime.Convert_Slice_string_To_bool(&exportStrings, &exportBool, nil)
+					if err != nil {
+						return nil, errors.NewBadRequest(fmt.Sprintf("the export parameter cannot be parsed: %v", err))
 					}
-					return e.Export(ctx, name, exports)
+					if exportBool {
+						return nil, errors.NewBadRequest("the export parameter, deprecated since v1.14, is no longer supported")
+					}
 				}
 				if err := metainternalversionscheme.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &options); err != nil {
 					err = errors.NewBadRequest(err.Error())

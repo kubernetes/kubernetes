@@ -118,21 +118,6 @@ func (csrStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (s csrStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) error {
-	csr, ok := obj.(*certificates.CertificateSigningRequest)
-	if !ok {
-		// unexpected programmer error
-		return fmt.Errorf("unexpected object: %v", obj)
-	}
-	s.PrepareForCreate(ctx, obj)
-	if exact {
-		return nil
-	}
-	// CSRs allow direct subresource edits, we clear them without exact so the CSR value can be reused.
-	csr.Status = certificates.CertificateSigningRequestStatus{}
-	return nil
-}
-
 // Storage strategy for the Status subresource
 type csrStatusStrategy struct {
 	csrStrategy

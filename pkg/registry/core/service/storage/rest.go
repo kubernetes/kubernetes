@@ -79,7 +79,6 @@ type ServiceStorage interface {
 	rest.CreaterUpdater
 	rest.GracefulDeleter
 	rest.Watcher
-	rest.Exporter
 	rest.StorageVersionProvider
 }
 
@@ -187,10 +186,6 @@ func (rs *REST) List(ctx context.Context, options *metainternalversion.ListOptio
 
 func (rs *REST) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return rs.services.Watch(ctx, options)
-}
-
-func (rs *REST) Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
-	return rs.services.Export(ctx, name, opts)
 }
 
 func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
