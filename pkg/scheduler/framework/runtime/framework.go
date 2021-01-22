@@ -212,8 +212,10 @@ func WithCaptureProfile(c CaptureProfile) Option {
 	}
 }
 
-var defaultFrameworkOptions = frameworkOptions{
-	metricsRecorder: newMetricsRecorder(1000, time.Second),
+func defaultFrameworkOptions() frameworkOptions {
+	return frameworkOptions{
+		metricsRecorder: newMetricsRecorder(1000, time.Second),
+	}
 }
 
 // TODO(#91029): move this to frameworkImpl runtime package.
@@ -234,7 +236,7 @@ var _ framework.Framework = &frameworkImpl{}
 
 // NewFramework initializes plugins given the configuration and the registry.
 func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig, opts ...Option) (framework.Framework, error) {
-	options := defaultFrameworkOptions
+	options := defaultFrameworkOptions()
 	for _, opt := range opts {
 		opt(&options)
 	}
