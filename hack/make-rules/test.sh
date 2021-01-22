@@ -55,6 +55,7 @@ kube::test::find_dirs() {
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed "s|^\./|${KUBE_GO_PACKAGE}/|" | LC_ALL=C sort -u
 
+    # ./staging path is symlinked to ./vendor so we augment the paths here, packages without tests will not be included in coverage
     find ./staging -name '*_test.go' -not -path '*/test/integration/*' -prune -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
   )
 }
@@ -279,9 +280,7 @@ runTests() {
   # ignore paths:
   # vendor/k8s.io/code-generator/cmd/generator: is fragile when run under coverage, so ignore it for now.
   #                            https://github.com/kubernetes/kubernetes/issues/24967
-  # vendor/k8s.io/client-go/1.4/rest: causes cover internal errors
-  #                            https://github.com/golang/go/issues/16540
-  cover_ignore_dirs="vendor/k8s.io/code-generator/cmd/generator|vendor/k8s.io/client-go/1.4/rest"
+  cover_ignore_dirs="vendor/k8s.io/code-generator/cmd/generator"
   for path in ${cover_ignore_dirs//|/ }; do
       echo -e "skipped\tk8s.io/kubernetes/${path}"
   done
