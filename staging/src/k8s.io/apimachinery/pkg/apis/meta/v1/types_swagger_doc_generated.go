@@ -123,16 +123,6 @@ func (DeleteOptions) SwaggerDoc() map[string]string {
 	return map_DeleteOptions
 }
 
-var map_ExportOptions = map[string]string{
-	"":       "ExportOptions is the query options to the standard REST get call. Deprecated. Planned for removal in 1.18.",
-	"export": "Should this value be exported.  Export strips fields that a user can not specify. Deprecated. Planned for removal in 1.18.",
-	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'. Deprecated. Planned for removal in 1.18.",
-}
-
-func (ExportOptions) SwaggerDoc() map[string]string {
-	return map_ExportOptions
-}
-
 var map_FieldsV1 = map[string]string{
 	"": "FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.\n\nEach key is either a '.' representing the field itself, and will always map to an empty set, or a string representing a sub-field or item. The string will follow one of these four formats: 'f:<name>', where <name> is the name of a field in a struct, or key in a map 'v:<value>', where <value> is the exact json formatted value of a list item 'i:<index>', where <index> is position of a item in a list 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values If a key maps to an empty Fields value, the field that key represents is part of the set.\n\nThe exact format is defined in sigs.k8s.io/structured-merge-diff",
 }
