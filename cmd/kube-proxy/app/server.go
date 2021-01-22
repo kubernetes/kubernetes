@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"reflect"
 	goruntime "runtime"
 	"strings"
 	"time"
@@ -216,7 +217,7 @@ func NewOptions() *Options {
 }
 
 // Complete completes all the required options.
-func (o *Options) Complete() error {
+func (o *Options) Complete(configDefault, configFromFlags *kubeproxyconfig.KubeProxyConfiguration) error {
 	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
 		klog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
 		o.config.HealthzBindAddress = addressFromDeprecatedFlags(o.config.HealthzBindAddress, o.healthzPort)
@@ -234,6 +235,9 @@ func (o *Options) Complete() error {
 		if err := o.initWatcher(); err != nil {
 			return err
 		}
+
+		// Restore options which set by flags
+		//o.restoreConfigFromFlags(configDefault, configFromFlags)
 	}
 
 	if err := o.processHostnameOverrideFlag(); err != nil {
@@ -241,6 +245,29 @@ func (o *Options) Complete() error {
 	}
 
 	return utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates)
+}
+
+// Restore options which set by flags
+func (o *Options) restoreConfigFromFlags(configDefault, configFromFlags *kubeproxyconfig.KubeProxyConfiguration) {
+	if configDefault == nil || configFromFlags == nil {
+		return
+	}
+
+	configType := reflect.TypeOf(o.config).Elem()
+	configValue := reflect.ValueOf(o.config).Elem()
+	configDefaultValue := reflect.ValueOf(configDefault).Elem()
+	configFromFlagsValue := reflect.ValueOf(configFromFlags).Elem()
+
+	for i := 0; i < configType.NumField(); i++ {
+		fName := configType.Field(i).Name
+		defaultValue := configDefaultValue.FieldByName(fName)
+		flagValue := configFromFlagsValue.FieldByName(fName)
+
+		// If an option is set by flag and is different from the default value
+		if !reflect.DeepEqual(defaultValue.Interface(), flagValue.Interface()) {
+			configValue.FieldByName(fName).Set(configFromFlagsValue.FieldByName(fName))
+		}
+	}
 }
 
 // Creates a new filesystem watcher and adds watches for the config file.
@@ -461,6 +488,7 @@ func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*ku
 // NewProxyCommand creates a *cobra.Command object with default parameters
 func NewProxyCommand() *cobra.Command {
 	opts := NewOptions()
+	var kubeProxyConfigDefault *kubeproxyconfig.KubeProxyConfiguration
 
 	cmd := &cobra.Command{
 		Use: "kube-proxy",
@@ -479,9 +507,11 @@ with the apiserver API to configure the proxy.`,
 				klog.Fatalf("failed OS init: %v", err)
 			}
 
-			if err := opts.Complete(); err != nil {
+			kubeProxyConfigFromFlags := opts.config.DeepCopy()
+			if err := opts.Complete(kubeProxyConfigDefault, kubeProxyConfigFromFlags); err != nil {
 				klog.Fatalf("failed complete: %v", err)
 			}
+
 			if err := opts.Validate(); err != nil {
 				klog.Fatalf("failed validate: %v", err)
 			}
@@ -502,6 +532,7 @@ with the apiserver API to configure the proxy.`,
 
 	var err error
 	opts.config, err = opts.ApplyDefaults(opts.config)
+	kubeProxyConfigDefault = opts.config.DeepCopy()
 	if err != nil {
 		klog.Fatalf("unable to create flag defaults: %v", err)
 	}
