@@ -298,7 +298,7 @@ const (
 	NodeBootstrapTokenAuthGroup = "system:bootstrappers:kubeadm:default-node-token"
 
 	// DefaultCIImageRepository points to image registry where CI uploads images from ci-cross build job
-	DefaultCIImageRepository = "gcr.io/kubernetes-ci-images"
+	DefaultCIImageRepository = "gcr.io/k8s-staging-ci-images"
 
 	// CoreDNSConfigMap specifies in what ConfigMap in the kube-system namespace the CoreDNS config should be stored
 	CoreDNSConfigMap = "coredns"
