@@ -226,7 +226,7 @@ func setScheduling(a admission.Attributes, pod *api.Pod, runtimeClass *nodev1.Ru
 		}
 	}
 
-	newTolerations := tolerations.MergeTolerations(pod.Spec.Tolerations, nodeScheduling.Tolerations)
+	newTolerations := tolerations.MergeTolerations(pod.Spec.Tolerations, nodeScheduling.Tolerations, false)
 
 	pod.Spec.NodeSelector = newNodeSelector
 	pod.Spec.Tolerations = newTolerations

@@ -272,6 +272,7 @@ func TestVerifyAgainstWhitelist(t *testing.T) {
 func TestMergeTolerations(t *testing.T) {
 	tests := []struct {
 		name     string
+		preserve bool
 		a, b     []string
 		expected []string
 	}{{
@@ -299,11 +300,18 @@ func TestMergeTolerations(t *testing.T) {
 		a:        []string{"all"},
 		b:        []string{"foo-bar-nosched", "foo-baz-nosched", "foo-noexec-10"},
 		expected: []string{"all"},
+	}, {
+		// This case ensures the original tolerations are not mutated
+		name:     "merge into all with preserve",
+		preserve: true,
+		a:        []string{"all", "foo-bar-nosched"},
+		b:        []string{"foo-baz-nosched", "foo-noexec-10"},
+		expected: []string{"all", "foo-bar-nosched"},
 	}}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := MergeTolerations(getTolerations(test.a), getTolerations(test.b))
+			actual := MergeTolerations(getTolerations(test.a), getTolerations(test.b), test.preserve)
 			require.Len(t, actual, len(test.expected))
 			for i, expect := range getTolerations(test.expected) {
 				assert.Equal(t, expect, actual[i], "expected[%d] = %s", i, test.expected[i])
@@ -396,7 +404,7 @@ func TestFuzzed(t *testing.T) {
 		for i := 0; i < iterations; i++ {
 			a := genTolerations()
 			b := genTolerations()
-			result := MergeTolerations(a, b)
+			result := MergeTolerations(a, b, false)
 			for _, tol := range append(a, b...) {
 				require.True(t, isContained(tol, result), debugMsg(a, b, result))
 			}

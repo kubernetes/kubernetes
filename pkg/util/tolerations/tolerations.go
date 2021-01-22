@@ -44,12 +44,19 @@ next:
 
 // MergeTolerations merges two sets of tolerations into one. If one toleration is a superset of
 // another, only the superset is kept.
-func MergeTolerations(first, second []api.Toleration) []api.Toleration {
+func MergeTolerations(first, second []api.Toleration, preserveFirst bool) []api.Toleration {
 	all := append(first, second...)
 	var merged []api.Toleration
 
+	var offset = 0
+	if preserveFirst {
+		for _, t := range first {
+			merged = append(merged, t)
+		}
+		offset = len(first)
+	}
 next:
-	for i, t := range all {
+	for i, t := range all[offset:] {
 		for _, t2 := range merged {
 			if isSuperset(t2, t) {
 				continue next // t is redundant; ignore it
