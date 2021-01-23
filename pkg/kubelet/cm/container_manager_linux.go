@@ -69,10 +69,10 @@ import (
 )
 
 const (
-	dockerProcessName     = "dockerd"
+	dockerProcessName = "dockerd"
+	// dockerd option --pidfile can specify path to use for daemon PID file, pid file path is default "/var/run/docker.pid"
 	dockerPidFile         = "/var/run/docker.pid"
-	containerdProcessName = "docker-containerd"
-	containerdPidFile     = "/run/docker/libcontainerd/docker-containerd.pid"
+	containerdProcessName = "containerd"
 	maxPidFileLength      = 1 << 10 // 1KB
 )
 
@@ -841,6 +841,8 @@ func EnsureDockerInContainer(dockerAPIVersion *utilversion.Version, oomScoreAdj 
 	type process struct{ name, file string }
 	dockerProcs := []process{{dockerProcessName, dockerPidFile}}
 	if dockerAPIVersion.AtLeast(containerdAPIVersion) {
+		// By default containerd is started separately, so there is no pid file.
+		containerdPidFile := ""
 		dockerProcs = append(dockerProcs, process{containerdProcessName, containerdPidFile})
 	}
 	var errs []error
