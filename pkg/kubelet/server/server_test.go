@@ -307,7 +307,7 @@ func newServerTestWithDebug(enableDebugging bool, streamingServer streaming.Serv
 	return newServerTestWithDebuggingHandlers(enableDebugging, enableDebugging, streamingServer)
 }
 
-func newServerTestWithDebuggingHandlers(enableDebugging, enableSystemLogHandler bool, streamingServer streaming.Server) *serverTestFramework {
+func newServerTestWithDebuggingHandlers(enableDebugging, enableLogAndProfilingHandler bool, streamingServer streaming.Server) *serverTestFramework {
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
 		hostnameFunc: func() string {
@@ -343,7 +343,9 @@ func newServerTestWithDebuggingHandlers(enableDebugging, enableSystemLogHandler 
 		true,
 		enableDebugging,
 		false,
-		enableSystemLogHandler)
+		enableLogAndProfilingHandler,
+		enableLogAndProfilingHandler,
+		enableLogAndProfilingHandler)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
@@ -1549,12 +1551,14 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 
 }
 
-func TestDisablingSystemLogHandler(t *testing.T) {
+func TestDisablingLogAndProfilingHandler(t *testing.T) {
 	fw := newServerTestWithDebuggingHandlers(true, false, nil)
 	defer fw.testHTTPServer.Close()
 
-	// verify logs endpoint is disabled
+	// verify debug endpoints are disabled
 	verifyEndpointResponse(t, fw, "/logs/kubelet.log", "logs endpoint is disabled.\n")
+	verifyEndpointResponse(t, fw, "/debug/pprof/profile?seconds=2", "profiling endpoint is disabled.\n")
+	verifyEndpointResponse(t, fw, "/debug/flags/v", "flags endpoint is disabled.\n")
 }
 
 func TestFailedParseParamsSummaryHandler(t *testing.T) {

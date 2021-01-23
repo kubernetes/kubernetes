@@ -854,6 +854,14 @@ type KubeletConfiguration struct {
 	// Default: nil
 	// +optional
 	ReservedMemory []MemoryReservation `json:"reservedMemory,omitempty"`
+	// enableProfilingHandler enables profiling via web interface host:port/debug/pprof/
+	// Default: true
+	// +optional
+	EnableProfilingHandler *bool `json:"enableProfilingHandler,omitempty"`
+	// enableDebugFlagsHandler enables flags endpoint via web interface host:port/debug/flags/v
+	// Default: true
+	// +optional
+	EnableDebugFlagsHandler *bool `json:"enableDebugFlagsHandler,omitempty"`
 }
 
 type KubeletAuthorizationMode string
