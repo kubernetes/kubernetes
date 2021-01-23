@@ -3395,17 +3395,15 @@ func TestSubresourceField(t *testing.T) {
 		AbsPath("/apis/apps/v1").
 		Namespace("default").
 		Resource("deployments").
-		SubResource("status").
+		SubResource("scale").
 		Name("deployment").
-		Body([]byte(`{"status":{"unavailableReplicas":32}}`)).
+		Body([]byte(`{"spec":{"replicas":32}}`)).
 		Param("fieldManager", "manager").
 		Do(context.TODO()).
 		Get()
 	if err != nil {
 		t.Fatalf("Failed to update status: %v", err)
 	}
-
-	// TODO (nodo): add test for "scale" once we start tracking managed fields (#82046)
 
 	deployment, err := client.AppsV1().Deployments("default").Get(context.TODO(), "deployment", metav1.GetOptions{})
 	if err != nil {
@@ -3414,15 +3412,312 @@ func TestSubresourceField(t *testing.T) {
 
 	managedFields := deployment.GetManagedFields()
 	if len(managedFields) != 2 {
-		t.Fatalf("Expected object to have 3 managed fields entries, got: %d", len(managedFields))
+		t.Fatalf("Expected object to have 2 managed fields entries, got: %d", len(managedFields))
 	}
 	if managedFields[0].Manager != "manager" || managedFields[0].Operation != "Apply" || managedFields[0].Subresource != "" {
 		t.Fatalf(`Unexpected entry, got: %v`, managedFields[0])
 	}
 	if managedFields[1].Manager != "manager" ||
 		managedFields[1].Operation != "Update" ||
-		managedFields[1].Subresource != "status" ||
-		string(managedFields[1].FieldsV1.Raw) != `{"f:status":{"f:unavailableReplicas":{}}}` {
+		managedFields[1].Subresource != "scale" ||
+		string(managedFields[1].FieldsV1.Raw) != `{"f:spec":{"f:replicas":{}}}` {
 		t.Fatalf(`Unexpected entry, got: %v`, managedFields[1])
+	}
+}
+
+func TestApplyOnScaleDeployment(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	validDeployment := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment"
+		},
+		"spec": {
+			"replicas": 1,
+			"selector": {
+				"matchLabels": {
+					 "app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	// Create deployment
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Param("fieldManager", "apply_test").
+		Body(validDeployment).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+	deployment, err := client.AppsV1().Deployments("default").Get(context.TODO(), "deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+	if *deployment.Spec.Replicas != 1 {
+		t.Fatalf("Expected replicas to be 1, but got: %d", *deployment.Spec.Replicas)
+	}
+
+	// Call scale subresource to update replicas
+	_, err = client.CoreV1().RESTClient().
+		Patch(types.MergePatchType).
+		AbsPath("/apis/apps/v1").
+		Name("deployment").
+		Resource("deployments").
+		SubResource("scale").
+		Namespace("default").
+		Param("fieldManager", "scale_test").
+		Body([]byte(`{"spec":{"replicas": 5}}`)).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Error updating scale subresource: %v ", err)
+	}
+
+	deployment, err = client.AppsV1().Deployments("default").Get(context.TODO(), "deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+
+	if *deployment.Spec.Replicas != 5 {
+		t.Fatalf("Expected replicas to be 5, but got: %d", *deployment.Spec.Replicas)
+	}
+
+	assertReplicasOwnership(t, (*deployment).GetManagedFields(), "scale_test")
+
+	// Re-apply the original object, it should fail with conflict because replicas have changed
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Param("fieldManager", "apply_test").
+		Body(validDeployment).
+		Do(context.TODO()).
+		Get()
+	if !apierrors.IsConflict(err) {
+		t.Fatalf("Expected conflict error but got: %v", err)
+	}
+
+	// Re-apply forcing the changes should succeed
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Param("fieldManager", "apply_test").
+		Param("force", "true").
+		Body(validDeployment).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Error updating deployment: %v ", err)
+	}
+
+	deployment, err = client.AppsV1().Deployments("default").Get(context.TODO(), "deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+
+	if *deployment.Spec.Replicas != 1 {
+		t.Fatalf("Expected replicas to be 1, but got: %d", *deployment.Spec.Replicas)
+	}
+
+	assertReplicasOwnership(t, (*deployment).GetManagedFields(), "apply_test")
+
+	// Run "Apply" with a scale object with a different number of replicas. It should generate a conflict.
+	_, err = client.CoreV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		SubResource("scale").
+		Name("deployment").
+		Param("fieldManager", "apply_scale").
+		Body([]byte(`{"kind":"Scale","apiVersion":"autoscaling/v1","metadata":{"name":"deployment","namespace":"default"},"spec":{"replicas":17}}`)).
+		Do(context.TODO()).
+		Get()
+	if !apierrors.IsConflict(err) {
+		t.Fatalf("Expected conflict error but got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "apply_test") {
+		t.Fatalf("Expected conflict with `apply_test` manager but got: %v", err)
+	}
+
+	// Same as before but force. Only the new manager should own .spec.replicas
+	_, err = client.CoreV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		SubResource("scale").
+		Name("deployment").
+		Param("fieldManager", "apply_scale").
+		Param("force", "true").
+		Body([]byte(`{"kind":"Scale","apiVersion":"autoscaling/v1","metadata":{"name":"deployment","namespace":"default"},"spec":{"replicas":17}}`)).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Error updating deployment: %v ", err)
+	}
+
+	deployment, err = client.AppsV1().Deployments("default").Get(context.TODO(), "deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+
+	if *deployment.Spec.Replicas != 17 {
+		t.Fatalf("Expected to replicas to be 17, but got: %d", *deployment.Spec.Replicas)
+	}
+
+	assertReplicasOwnership(t, (*deployment).GetManagedFields(), "apply_scale")
+
+	// Replace scale object
+	_, err = client.CoreV1().RESTClient().
+		Put().
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		SubResource("scale").
+		Name("deployment").
+		Param("fieldManager", "replace_test").
+		Body([]byte(`{"kind":"Scale","apiVersion":"autoscaling/v1","metadata":{"name":"deployment","namespace":"default"},"spec":{"replicas":7}}`)).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Error updating deployment: %v ", err)
+	}
+
+	deployment, err = client.AppsV1().Deployments("default").Get(context.TODO(), "deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+
+	if *deployment.Spec.Replicas != 7 {
+		t.Fatalf("Expected to replicas to be 7, but got: %d", *deployment.Spec.Replicas)
+	}
+
+	assertReplicasOwnership(t, (*deployment).GetManagedFields(), "replace_test")
+
+	// Apply the same number of replicas, both managers should own the field
+	_, err = client.CoreV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		SubResource("scale").
+		Name("deployment").
+		Param("fieldManager", "co_owning_test").
+		Param("force", "true").
+		Body([]byte(`{"kind":"Scale","apiVersion":"autoscaling/v1","metadata":{"name":"deployment","namespace":"default"},"spec":{"replicas":7}}`)).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Error updating deployment: %v ", err)
+	}
+
+	deployment, err = client.AppsV1().Deployments("default").Get(context.TODO(), "deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+
+	if *deployment.Spec.Replicas != 7 {
+		t.Fatalf("Expected to replicas to be 7, but got: %d", *deployment.Spec.Replicas)
+	}
+
+	assertReplicasOwnership(t, (*deployment).GetManagedFields(), "replace_test", "co_owning_test")
+
+	// Scaling again should make this manager the only owner of replicas
+	_, err = client.CoreV1().RESTClient().
+		Patch(types.MergePatchType).
+		AbsPath("/apis/apps/v1").
+		Name("deployment").
+		Resource("deployments").
+		SubResource("scale").
+		Namespace("default").
+		Param("fieldManager", "scale_test").
+		Body([]byte(`{"spec":{"replicas": 5}}`)).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Error updating scale subresource: %v ", err)
+	}
+
+	deployment, err = client.AppsV1().Deployments("default").Get(context.TODO(), "deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+
+	if *deployment.Spec.Replicas != 5 {
+		t.Fatalf("Expected replicas to be 5, but got: %d", *deployment.Spec.Replicas)
+	}
+
+	assertReplicasOwnership(t, (*deployment).GetManagedFields(), "scale_test")
+}
+
+func assertReplicasOwnership(t *testing.T, managedFields []metav1.ManagedFieldsEntry, fieldManagers ...string) {
+	t.Helper()
+
+	seen := make(map[string]bool)
+	for _, m := range fieldManagers {
+		seen[m] = false
+	}
+
+	for _, managedField := range managedFields {
+		var entryJSON map[string]interface{}
+		if err := json.Unmarshal(managedField.FieldsV1.Raw, &entryJSON); err != nil {
+			t.Fatalf("failed to read into json")
+		}
+
+		spec, ok := entryJSON["f:spec"].(map[string]interface{})
+		if !ok {
+			// continue with the next managedField, as we this field does not hold the spec entry
+			continue
+		}
+
+		if _, ok := spec["f:replicas"]; !ok {
+			// continue with the next managedField, as we this field does not hold the spec.replicas entry
+			continue
+		}
+
+		// check if the manager is one of the ones we expect
+		if _, ok := seen[managedField.Manager]; !ok {
+			t.Fatalf("Unexpected field manager, found %q, expected to be in: %v", managedField.Manager, seen)
+		}
+
+		seen[managedField.Manager] = true
+	}
+
+	var missingManagers []string
+	for manager, managerSeen := range seen {
+		if !managerSeen {
+			missingManagers = append(missingManagers, manager)
+		}
+	}
+	if len(missingManagers) > 0 {
+		t.Fatalf("replicas fields should be owned by %v", missingManagers)
 	}
 }

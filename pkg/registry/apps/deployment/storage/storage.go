@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -52,6 +53,11 @@ type DeploymentStorage struct {
 	Status     *StatusREST
 	Scale      *ScaleREST
 	Rollback   *RollbackREST
+}
+
+// maps a group version to the replicas path in a deployment object
+var replicasPathInDeployment = fieldmanager.ResourcePathMappings{
+	schema.GroupVersion{Group: "apps", Version: "v1"}.String(): fieldpath.MakePathOrDie("spec", "replicas"),
 }
 
 // NewStorage returns new instance of DeploymentStorage.
@@ -337,6 +343,7 @@ func scaleFromDeployment(deployment *apps.Deployment) (*autoscaling.Scale, error
 	if err != nil {
 		return nil, err
 	}
+
 	return &autoscaling.Scale{
 		// TODO: Create a variant of ObjectMeta type that only contains the fields below.
 		ObjectMeta: metav1.ObjectMeta{
@@ -376,11 +383,22 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		return nil, errors.NewNotFound(apps.Resource("deployments/scale"), i.name)
 	}
 
+	managedFieldsHandler := fieldmanager.NewScaleHandler(
+		deployment.ManagedFields,
+		schema.GroupVersion{Group: "apps", Version: "v1"},
+		replicasPathInDeployment,
+	)
+
 	// deployment -> old scale
 	oldScale, err := scaleFromDeployment(deployment)
 	if err != nil {
 		return nil, err
 	}
+	scaleManagedFields, err := managedFieldsHandler.ToSubresource()
+	if err != nil {
+		return nil, err
+	}
+	oldScale.ManagedFields = scaleManagedFields
 
 	// old scale -> new scale
 	newScaleObj, err := i.reqObjInfo.UpdatedObject(ctx, oldScale)
@@ -412,5 +430,12 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 	// move replicas/resourceVersion fields to object and return
 	deployment.Spec.Replicas = scale.Spec.Replicas
 	deployment.ResourceVersion = scale.ResourceVersion
+
+	updatedEntries, err := managedFieldsHandler.ToParent(scale.ManagedFields)
+	if err != nil {
+		return nil, err
+	}
+	deployment.ManagedFields = updatedEntries
+
 	return deployment, nil
 }
