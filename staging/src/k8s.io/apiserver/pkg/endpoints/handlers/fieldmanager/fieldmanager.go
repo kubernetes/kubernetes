@@ -68,6 +68,7 @@ type Manager interface {
 type FieldManager struct {
 	fieldManager                         Manager
 	ignoreManagedFieldsFromRequestObject bool
+	Kind                                 schema.GroupVersionKind
 }
 
 // NewFieldManager creates a new FieldManager that decodes, manages, then re-encodes managedFields
@@ -107,7 +108,9 @@ func newDefaultFieldManager(f Manager, typeConverter TypeConverter, objectConver
 	f = NewLastAppliedManager(f, typeConverter, objectConverter, kind.GroupVersion())
 	f = NewLastAppliedUpdater(f)
 
-	return NewFieldManager(f, ignoreManagedFieldsFromRequestObject)
+	fm := NewFieldManager(f, ignoreManagedFieldsFromRequestObject)
+	fm.Kind = kind
+	return fm
 }
 
 func decodeLiveManagedFields(liveObj runtime.Object) (Managed, error) {

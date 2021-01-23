@@ -38,6 +38,8 @@ import (
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v4/merge"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
@@ -77,9 +79,9 @@ type fakeObjectDefaulter struct{}
 func (d *fakeObjectDefaulter) Default(in runtime.Object) {}
 
 type TestFieldManager struct {
-	fieldManager *FieldManager
+	FieldManager *FieldManager
 	emptyObj     runtime.Object
-	liveObj      runtime.Object
+	LiveObj      runtime.Object
 }
 
 func NewDefaultTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
@@ -119,9 +121,9 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, ignoreManagedFieldsFromReq
 		f = chainFieldManager(f)
 	}
 	return TestFieldManager{
-		fieldManager: NewFieldManager(f, ignoreManagedFieldsFromRequestObject),
+		FieldManager: NewFieldManager(f, ignoreManagedFieldsFromRequestObject),
 		emptyObj:     live,
-		liveObj:      live.DeepCopyObject(),
+		LiveObj:      live.DeepCopyObject(),
 	}
 }
 
@@ -146,27 +148,27 @@ func NewFakeOpenAPIModels() proto.Models {
 }
 
 func (f *TestFieldManager) Reset() {
-	f.liveObj = f.emptyObj.DeepCopyObject()
+	f.LiveObj = f.emptyObj.DeepCopyObject()
 }
 
 func (f *TestFieldManager) Apply(obj runtime.Object, manager string, force bool) error {
-	out, err := f.fieldManager.Apply(f.liveObj, obj, manager, force)
+	out, err := f.FieldManager.Apply(f.LiveObj, obj, manager, force)
 	if err == nil {
-		f.liveObj = out
+		f.LiveObj = out
 	}
 	return err
 }
 
 func (f *TestFieldManager) Update(obj runtime.Object, manager string) error {
-	out, err := f.fieldManager.Update(f.liveObj, obj, manager)
+	out, err := f.FieldManager.Update(f.LiveObj, obj, manager)
 	if err == nil {
-		f.liveObj = out
+		f.LiveObj = out
 	}
 	return err
 }
 
 func (f *TestFieldManager) ManagedFields() []metav1.ManagedFieldsEntry {
-	accessor, err := meta.Accessor(f.liveObj)
+	accessor, err := meta.Accessor(f.LiveObj)
 	if err != nil {
 		panic(fmt.Errorf("couldn't get accessor: %v", err))
 	}
@@ -236,6 +238,83 @@ func TestUpdateApplyConflict(t *testing.T) {
 		t.Fatalf("Expecting to get conflicts but got %v", err)
 	}
 }
+
+// =====
+func TestScaleConflict(t *testing.T) {
+	f := NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("autoscaling/v1", "Scale"))
+
+	patch := []byte(`{"kind":"Scale","apiVersion":"autoscaling/v1","metadata":{"name":"deployment","namespace":"default"},"spec":{"replicas":1}}`)
+	newObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal(patch, &newObj.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+
+	if err := f.Update(newObj, "fieldmanager_test"); err != nil {
+		t.Fatalf("failed to apply object: %v", err)
+	}
+
+	fmt.Println(f.LiveObj)
+	fmt.Println(f.ManagedFields())
+
+	appliedObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	appliedBytes := []byte(`{"kind":"Scale","apiVersion":"autoscaling/v1","metadata":{"name":"deployment","namespace":"default"},"spec":{"replicas":17}}`)
+	if err := yaml.Unmarshal(appliedBytes, &appliedObj.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+
+	err := f.Apply(appliedObj, "fieldmanager_conflict", false)
+	fmt.Println(err)
+	if err == nil || !apierrors.IsConflict(err) {
+		t.Fatalf("Expecting to get conflicts but got %v", err)
+	}
+}
+
+func TestCrazy(t *testing.T) {
+	f := NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("autoscaling/v1", "Scale"))
+
+	scale := &autoscaling.Scale{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Scale",
+			APIVersion: "autoscaling/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "deployment",
+			Namespace: "default",
+			ManagedFields: []metav1.ManagedFieldsEntry{
+				{
+					Manager:    "first_manager",
+					Operation:  metav1.ManagedFieldsOperationApply,
+					APIVersion: "autoscaling/v1",
+					FieldsType: "FieldsV1",
+					FieldsV1: &metav1.FieldsV1{
+						[]byte(`{"f:metadata":{},"f:spec":{".":{},"f:replicas":{}}}`),
+					},
+				},
+			},
+		},
+		Spec: autoscaling.ScaleSpec{
+			Replicas: 1,
+		},
+	}
+	// {scale_test Update apps/v1 2021-01-17 17:31:29 +0100 CET FieldsV1 {"f:spec":{".":{},"f:replicas":{}}}}
+	// OBJ.MANAGED_FIELDS[0].FieldsV1.Raw:
+	// {"f:spec":{".":{},"f:replicas":{}}}
+
+	patchObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	bytes := []byte(`{"kind":"Scale","apiVersion":"autoscaling/v1","metadata":{"name":"deployment","namespace":"default"},"spec":{"replicas":17}}`)
+	if err := yaml.Unmarshal(bytes, &patchObj.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+
+	obj := runtime.Object(scale)
+	fmt.Printf("%#v\n", obj)
+	_, err := f.FieldManager.Apply(obj, patchObj, "scale_test", false)
+	if err == nil || !apierrors.IsConflict(err) {
+		t.Fatalf("Expecting to get conflicts but got %v", err)
+	}
+}
+
+// ==/==
 
 func TestApplyStripsFields(t *testing.T) {
 	f := NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
@@ -765,33 +844,33 @@ func TestNoOpChanges(t *testing.T) {
 	if err := f.Apply(obj, "fieldmanager_test_apply", false); err != nil {
 		t.Fatalf("failed to apply object: %v", err)
 	}
-	before := f.liveObj.DeepCopyObject()
+	before := f.LiveObj.DeepCopyObject()
 	// Wait to make sure the timestamp is different
 	time.Sleep(time.Second)
 	// Applying with a different fieldmanager will create an entry..
 	if err := f.Apply(obj, "fieldmanager_test_apply_other", false); err != nil {
 		t.Fatalf("failed to update object: %v", err)
 	}
-	if reflect.DeepEqual(before, f.liveObj) {
-		t.Fatalf("Applying no-op apply with new manager didn't change object: \n%v", f.liveObj)
+	if reflect.DeepEqual(before, f.LiveObj) {
+		t.Fatalf("Applying no-op apply with new manager didn't change object: \n%v", f.LiveObj)
 	}
-	before = f.liveObj.DeepCopyObject()
+	before = f.LiveObj.DeepCopyObject()
 	// Wait to make sure the timestamp is different
 	time.Sleep(time.Second)
 	if err := f.Update(obj, "fieldmanager_test_update"); err != nil {
 		t.Fatalf("failed to update object: %v", err)
 	}
-	if !reflect.DeepEqual(before, f.liveObj) {
-		t.Fatalf("No-op update has changed the object:\n%v\n---\n%v", before, f.liveObj)
+	if !reflect.DeepEqual(before, f.LiveObj) {
+		t.Fatalf("No-op update has changed the object:\n%v\n---\n%v", before, f.LiveObj)
 	}
-	before = f.liveObj.DeepCopyObject()
+	before = f.LiveObj.DeepCopyObject()
 	// Wait to make sure the timestamp is different
 	time.Sleep(time.Second)
 	if err := f.Apply(obj, "fieldmanager_test_apply", true); err != nil {
 		t.Fatalf("failed to re-apply object: %v", err)
 	}
-	if !reflect.DeepEqual(before, f.liveObj) {
-		t.Fatalf("No-op apply has changed the object:\n%v\n---\n%v", before, f.liveObj)
+	if !reflect.DeepEqual(before, f.LiveObj) {
+		t.Fatalf("No-op apply has changed the object:\n%v\n---\n%v", before, f.LiveObj)
 	}
 }
 
@@ -906,7 +985,7 @@ spec:
 		t.Errorf("failed to update object: %v", err)
 	}
 
-	lastApplied, err := getLastApplied(f.liveObj)
+	lastApplied, err := getLastApplied(f.LiveObj)
 	if err != nil {
 		t.Errorf("failed to get last applied: %v", err)
 	}
@@ -934,7 +1013,7 @@ spec:
 		t.Errorf("expected conflict when applying with invalid last-applied annotation, but got no error for object: \n%+v", appliedObj)
 	}
 
-	lastApplied, err = getLastApplied(f.liveObj)
+	lastApplied, err = getLastApplied(f.LiveObj)
 	if err != nil {
 		t.Errorf("failed to get last applied: %v", err)
 	}
@@ -947,7 +1026,7 @@ spec:
 		t.Errorf("failed to force server-side apply with: %v", err)
 	}
 
-	lastApplied, err = getLastApplied(f.liveObj)
+	lastApplied, err = getLastApplied(f.LiveObj)
 	if err != nil {
 		t.Errorf("failed to get last applied: %v", err)
 	}
@@ -993,7 +1072,7 @@ spec:
 	if err := f.Update(newObj, "kubectl-client-side-apply-test"); err != nil {
 		t.Errorf("failed to update object: %v", err)
 	}
-	lastApplied, err := getLastApplied(f.liveObj)
+	lastApplied, err := getLastApplied(f.LiveObj)
 	if err != nil {
 		t.Errorf("failed to get last applied: %v", err)
 	}
@@ -1032,7 +1111,7 @@ spec:
 		t.Errorf("error applying object: %v", err)
 	}
 
-	lastApplied, err = getLastApplied(f.liveObj)
+	lastApplied, err = getLastApplied(f.LiveObj)
 	if err != nil {
 		t.Errorf("failed to get last applied: %v", err)
 	}
@@ -1114,7 +1193,7 @@ spec:
 	if m := f.ManagedFields(); len(m) != 0 {
 		t.Errorf("expected to continue to not track managed fields, but got: %v", m)
 	}
-	lastApplied, err := getLastApplied(f.liveObj)
+	lastApplied, err := getLastApplied(f.LiveObj)
 	if err != nil {
 		t.Errorf("failed to get last applied: %v", err)
 	}
@@ -1171,7 +1250,7 @@ spec:
 	if m := f.ManagedFields(); len(m) == 0 {
 		t.Errorf("expected to track managed fields, but got: %v", m)
 	}
-	lastApplied, err = getLastApplied(f.liveObj)
+	lastApplied, err = getLastApplied(f.LiveObj)
 	if err != nil {
 		t.Errorf("failed to get last applied: %v", err)
 	}

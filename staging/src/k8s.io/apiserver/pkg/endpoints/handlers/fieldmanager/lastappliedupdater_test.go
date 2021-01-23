@@ -65,7 +65,7 @@ spec:
 		t.Errorf("error applying object: %v", err)
 	}
 
-	lastApplied, err := getLastApplied(f.liveObj)
+	lastApplied, err := getLastApplied(f.LiveObj)
 	if err != nil {
 		t.Errorf("failed to get last applied: %v", err)
 	}
@@ -78,7 +78,7 @@ spec:
 		t.Errorf("error applying object: %v", err)
 	}
 
-	lastApplied, err = getLastApplied(f.liveObj)
+	lastApplied, err = getLastApplied(f.LiveObj)
 	if err != nil {
 		t.Errorf("failed to get last applied: %v", err)
 	}

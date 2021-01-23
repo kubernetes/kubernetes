@@ -618,8 +618,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				a.group.Creater,
 				parentResourceGVK,
 				reqScope.HubGroupVersion,
-				true,
+				false,
 			)
+			fmt.Println("installed parent field manager")
+			fmt.Printf("%#v\n", reqScope.ParentFieldManager)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create parent field manager: %v", err)
 			}

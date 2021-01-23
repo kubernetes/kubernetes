@@ -60,6 +60,10 @@ const (
 // PatchResource returns a function that will handle a resource patch.
 func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interface, patchTypes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		fmt.Printf("=================== %q ===========================\n", req.URL.Path)
+		fmt.Printf("FM: %#v - kind: %#v\n", scope.FieldManager, scope.FieldManager.Kind)
+		fmt.Printf("PFM: %#v\n - kind %#v\n", scope.ParentFieldManager, scope.FieldManager.Kind)
+		defer fmt.Printf("^^^^^^^^^^^^^^^^^^^ %q ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n", req.URL.Path)
 		// For performance tracking purposes.
 		trace := utiltrace.New("Patch", traceFields(req)...)
 		defer trace.LogIfLong(500 * time.Millisecond)
@@ -425,6 +429,8 @@ type applyPatcher struct {
 }
 
 func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Object, error) {
+	fmt.Println("in applyPatchToCurrentObject...")
+	fmt.Printf("the patch is\n%s\n\n", string(p.patch))
 	force := false
 	if p.options.Force != nil {
 		force = *p.options.Force
@@ -438,15 +444,27 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
 	}
 
-	// exclude scale objects
-	scaleGVK := schema.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}
-	if p.kind == scaleGVK {
-		// TODO: return early if it is a scale object
-		// var scale autoscaling.Scale
-		// err := runtime.DefaultUnstructuredConverter.FromUnstructured(patchObj.UnstructuredContent(), &scale)
-		// return &scale, err
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		panic(err)
 	}
-	return p.fieldManager.Apply(obj, patchObj, p.options.FieldManager, force)
+
+	if len(accessor.GetManagedFields()) == 0 {
+		fmt.Printf("OBJ.MANAGED_FIELDS IS EMPTY\n")
+	} else {
+		fmt.Printf("OBJ.MANAGED_FIELDS HAS LEN: %d\n", len(accessor.GetManagedFields()))
+		fmt.Printf("OBJ.MANAGED_FIELDS[0]:\n%v\n", accessor.GetManagedFields()[0])
+		fmt.Printf("OBJ.MANAGED_FIELDS[0].FieldsV1.Raw:\n%s\n", string(accessor.GetManagedFields()[0].FieldsV1.Raw))
+	}
+	fmt.Printf("OBJ:%#v\n\n", obj)
+	fmt.Printf("PATCH_OBJ:%#v\n\n", patchObj)
+	fmt.Printf("MANAGER:%#v\n\n", p.options.FieldManager)
+	fmt.Printf("FORCE:%#v\n\n", force)
+
+	o, err := p.fieldManager.Apply(obj, patchObj, p.options.FieldManager, force)
+	fmt.Printf("RESULT: %v\n", err)
+	fmt.Printf("FIELD_MANAGER: %#v\n", p.fieldManager)
+	return o, err
 }
 
 func (p *applyPatcher) createNewObject() (runtime.Object, error) {
@@ -489,6 +507,7 @@ func strategicPatchObject(
 // and is given the currently persisted object as input.
 // TODO: rename this function because the name implies it is related to applyPatcher
 func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object) (objToUpdate runtime.Object, patchErr error) {
+	fmt.Println("about to apply patch...")
 	// Make sure we actually have a persisted currentObject
 	p.trace.Step("About to apply patch")
 	currentObjectHasUID, err := hasUID(currentObject)

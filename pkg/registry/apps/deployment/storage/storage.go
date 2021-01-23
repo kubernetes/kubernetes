@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -333,6 +334,10 @@ func scaleFromDeployment(deployment *apps.Deployment) (*autoscaling.Scale, error
 	}
 	return &autoscaling.Scale{
 		// TODO: Create a variant of ObjectMeta type that only contains the fields below.
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Scale",
+			APIVersion: "autoscaling/v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              deployment.Name,
 			Namespace:         deployment.Namespace,
@@ -378,7 +383,57 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		return nil, err
 	}
 
+	type ReplicasFieldset struct {
+		Replicas interface{} `json:"f:replicas"`
+	}
+
+	type SpecReplicasFieldset struct {
+		Spec ReplicasFieldset `json:"f:spec"`
+	}
+
+	updateFields := func(fields *metav1.FieldsV1) bool {
+		var entryJSON SpecReplicasFieldset
+		if err := json.Unmarshal(fields.Raw, &entryJSON); err != nil {
+			fmt.Println("ERROR WHEN UNMARSHALLING", err.Error())
+			return false
+		}
+		if entryJSON.Spec.Replicas != nil {
+			bytes, err := json.Marshal(entryJSON)
+			if err != nil {
+				return false
+			}
+			fields.Raw = bytes
+			return true
+		}
+		return false
+	}
+
+	var replicasManagedFields []metav1.ManagedFieldsEntry
+	for _, mfe := range deployment.ManagedFields {
+		if updateFields(mfe.FieldsV1) {
+			replicasManagedFields = append(replicasManagedFields, mfe)
+		}
+	}
+	oldScale.ManagedFields = replicasManagedFields
+
+	if len(oldScale.ManagedFields) > 0 {
+		fmt.Printf("- %s\n", string(oldScale.ManagedFields[0].FieldsV1.Raw))
+		oldScale.ManagedFields[0].APIVersion = "autoscaling/v1"
+		oldScale.ManagedFields[0].FieldsV1.Raw = []byte(`{"f:spec":{".":{},"f:replicas":{}}}`)
+	}
+
+	// fmt.Println("==============================================")
+	// fmt.Printf("DEPLOYMENT:\n%#v\n", deployment)
+	// fmt.Println("==============================================")
+	// fmt.Printf("MANAGED_FIELDS:\n%d\n%#v\n", len(replicasManagedFields), replicasManagedFields)
+	// fmt.Printf("MANAGED_FIELDS[0]:\n%s\n", string(replicasManagedFields[0].FieldsV1.Raw))
+	// fmt.Println("==============================================")
+	// fmt.Printf("OLD_SCALE:\n%#v\n", oldScale)
+	// fmt.Println("==============================================")
+
 	// old scale -> new scale
+	fmt.Println("About to update old scale to new scale:")
+	fmt.Printf("OLD_SCALE:\n%#v\n\n", oldScale)
 	newScaleObj, err := i.reqObjInfo.UpdatedObject(ctx, oldScale)
 	if err != nil {
 		return nil, err
@@ -390,6 +445,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 	if !ok {
 		return nil, errors.NewBadRequest(fmt.Sprintf("expected input object type to be Scale, but %T", newScaleObj))
 	}
+	fmt.Printf("NEW_SCALE:\n%#v\n\n", scale)
 
 	// validate
 	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
