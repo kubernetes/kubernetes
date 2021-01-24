@@ -253,7 +253,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.ExpectNoError(err)
 
 			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
-			ginkgo.By("Confirming that after a kubelet restart, fake-device assignement is kept")
+			ginkgo.By("Confirming that after a kubelet restart, fake-device assignment is kept")
 			devIDRestart1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			framework.ExpectEqual(devIDRestart1, devID1)
 
