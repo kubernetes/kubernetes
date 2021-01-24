@@ -70,11 +70,9 @@ var _ = SIGDescribe("LoadBalancers", func() {
 		serviceLBNames = []string{}
 	})
 
-	ginkgo.It("should be able to change the type and ports of a service [Slow]", func() {
+	ginkgo.It("should be able to change the type and ports of a TCP service [Slow]", func() {
 		// requires cloud load-balancer support
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
-
-		loadBalancerSupportsUDP := !framework.ProviderIs("aws")
 
 		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutDefault
 		if framework.ProviderIs("aws") {
@@ -89,41 +87,19 @@ var _ = SIGDescribe("LoadBalancers", func() {
 		ns1 := f.Namespace.Name // LB1 in ns1 on TCP
 		framework.Logf("namespace for TCP test: %s", ns1)
 
-		ginkgo.By("creating a second namespace")
-		namespacePtr, err := f.CreateNamespace("services", nil)
-		framework.ExpectNoError(err, "failed to create namespace")
-		ns2 := namespacePtr.Name // LB2 in ns2 on UDP
-		framework.Logf("namespace for UDP test: %s", ns2)
-
 		nodeIP, err := e2enode.PickIP(cs) // for later
 		framework.ExpectNoError(err)
-
-		// Test TCP and UDP Services.  Services with the same name in different
-		// namespaces should get different node ports and load balancers.
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns1)
 		tcpJig := e2eservice.NewTestJig(cs, ns1, serviceName)
 		tcpService, err := tcpJig.CreateTCPService(nil)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("creating a UDP service " + serviceName + " with type=ClusterIP in namespace " + ns2)
-		udpJig := e2eservice.NewTestJig(cs, ns2, serviceName)
-		udpService, err := udpJig.CreateUDPService(nil)
-		framework.ExpectNoError(err)
-
-		ginkgo.By("verifying that TCP and UDP use the same port")
-		if tcpService.Spec.Ports[0].Port != udpService.Spec.Ports[0].Port {
-			framework.Failf("expected to use the same port for TCP and UDP")
-		}
 		svcPort := int(tcpService.Spec.Ports[0].Port)
-		framework.Logf("service port (TCP and UDP): %d", svcPort)
+		framework.Logf("service port TCP: %d", svcPort)
 
 		ginkgo.By("creating a pod to be part of the TCP service " + serviceName)
 		_, err = tcpJig.Run(nil)
-		framework.ExpectNoError(err)
-
-		ginkgo.By("creating a pod to be part of the UDP service " + serviceName)
-		_, err = udpJig.Run(nil)
 		framework.ExpectNoError(err)
 
 		// Change the services to NodePort.
@@ -136,19 +112,8 @@ var _ = SIGDescribe("LoadBalancers", func() {
 		tcpNodePort := int(tcpService.Spec.Ports[0].NodePort)
 		framework.Logf("TCP node port: %d", tcpNodePort)
 
-		ginkgo.By("changing the UDP service to type=NodePort")
-		udpService, err = udpJig.UpdateService(func(s *v1.Service) {
-			s.Spec.Type = v1.ServiceTypeNodePort
-		})
-		framework.ExpectNoError(err)
-		udpNodePort := int(udpService.Spec.Ports[0].NodePort)
-		framework.Logf("UDP node port: %d", udpNodePort)
-
 		ginkgo.By("hitting the TCP service's NodePort")
 		e2eservice.TestReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
-
-		ginkgo.By("hitting the UDP service's NodePort")
-		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
 
 		// Change the services to LoadBalancer.
 
@@ -186,18 +151,7 @@ var _ = SIGDescribe("LoadBalancers", func() {
 		})
 		framework.ExpectNoError(err)
 
-		if loadBalancerSupportsUDP {
-			ginkgo.By("changing the UDP service to type=LoadBalancer")
-			udpService, err = udpJig.UpdateService(func(s *v1.Service) {
-				s.Spec.Type = v1.ServiceTypeLoadBalancer
-			})
-			framework.ExpectNoError(err)
-		}
 		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(tcpService))
-		if loadBalancerSupportsUDP {
-			serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(udpService))
-		}
-
 		ginkgo.By("waiting for the TCP service to have a load balancer")
 		// Wait for the load balancer to be created asynchronously
 		tcpService, err = tcpJig.WaitForLoadBalancer(loadBalancerCreateTimeout)
@@ -229,37 +183,11 @@ var _ = SIGDescribe("LoadBalancers", func() {
 			}
 		}
 
-		var udpIngressIP string
-		if loadBalancerSupportsUDP {
-			ginkgo.By("waiting for the UDP service to have a load balancer")
-			// 2nd one should be faster since they ran in parallel.
-			udpService, err = udpJig.WaitForLoadBalancer(loadBalancerCreateTimeout)
-			framework.ExpectNoError(err)
-			if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
-				framework.Failf("UDP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", udpNodePort, udpService.Spec.Ports[0].NodePort)
-			}
-			udpIngressIP = e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0])
-			framework.Logf("UDP load balancer: %s", udpIngressIP)
-
-			ginkgo.By("verifying that TCP and UDP use different load balancers")
-			if tcpIngressIP == udpIngressIP {
-				framework.Failf("Load balancers are not different: %s", e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
-			}
-		}
-
 		ginkgo.By("hitting the TCP service's NodePort")
 		e2eservice.TestReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
 
-		ginkgo.By("hitting the UDP service's NodePort")
-		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
-
 		ginkgo.By("hitting the TCP service's LoadBalancer")
 		e2eservice.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
-
-		if loadBalancerSupportsUDP {
-			ginkgo.By("hitting the UDP service's LoadBalancer")
-			testReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
-		}
 
 		// Change the services' node ports.
 
@@ -276,38 +204,14 @@ var _ = SIGDescribe("LoadBalancers", func() {
 		}
 		framework.Logf("TCP node port: %d", tcpNodePort)
 
-		ginkgo.By("changing the UDP service's NodePort")
-		udpService, err = udpJig.ChangeServiceNodePort(udpNodePort)
-		framework.ExpectNoError(err)
-		udpNodePortOld := udpNodePort
-		udpNodePort = int(udpService.Spec.Ports[0].NodePort)
-		if udpNodePort == udpNodePortOld {
-			framework.Failf("UDP Spec.Ports[0].NodePort (%d) did not change", udpNodePort)
-		}
-		if loadBalancerSupportsUDP && e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
-			framework.Failf("UDP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", udpIngressIP, e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]))
-		}
-		framework.Logf("UDP node port: %d", udpNodePort)
-
 		ginkgo.By("hitting the TCP service's new NodePort")
 		e2eservice.TestReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
-
-		ginkgo.By("hitting the UDP service's new NodePort")
-		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
 
 		ginkgo.By("checking the old TCP NodePort is closed")
 		testNotReachableHTTP(nodeIP, tcpNodePortOld, e2eservice.KubeProxyLagTimeout)
 
-		ginkgo.By("checking the old UDP NodePort is closed")
-		testNotReachableUDP(nodeIP, udpNodePortOld, e2eservice.KubeProxyLagTimeout)
-
 		ginkgo.By("hitting the TCP service's LoadBalancer")
 		e2eservice.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
-
-		if loadBalancerSupportsUDP {
-			ginkgo.By("hitting the UDP service's LoadBalancer")
-			testReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
-		}
 
 		// Change the services' main ports.
 
@@ -328,76 +232,33 @@ var _ = SIGDescribe("LoadBalancers", func() {
 			framework.Failf("TCP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", tcpIngressIP, e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
 		}
 
-		ginkgo.By("changing the UDP service's port")
-		udpService, err = udpJig.UpdateService(func(s *v1.Service) {
-			s.Spec.Ports[0].Port++
-		})
-		framework.ExpectNoError(err)
-		if int(udpService.Spec.Ports[0].Port) != svcPort {
-			framework.Failf("UDP Spec.Ports[0].Port (%d) did not change", udpService.Spec.Ports[0].Port)
-		}
-		if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
-			framework.Failf("UDP Spec.Ports[0].NodePort (%d) changed", udpService.Spec.Ports[0].NodePort)
-		}
-		if loadBalancerSupportsUDP && e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
-			framework.Failf("UDP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", udpIngressIP, e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]))
-		}
-
-		framework.Logf("service port (TCP and UDP): %d", svcPort)
+		framework.Logf("service port TCP: %d", svcPort)
 
 		ginkgo.By("hitting the TCP service's NodePort")
 		e2eservice.TestReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
 
-		ginkgo.By("hitting the UDP service's NodePort")
-		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
-
 		ginkgo.By("hitting the TCP service's LoadBalancer")
 		e2eservice.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 
-		if loadBalancerSupportsUDP {
-			ginkgo.By("hitting the UDP service's LoadBalancer")
-			testReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
-		}
-
 		ginkgo.By("Scaling the pods to 0")
 		err = tcpJig.Scale(0)
-		framework.ExpectNoError(err)
-		err = udpJig.Scale(0)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("looking for ICMP REJECT on the TCP service's NodePort")
 		testRejectedHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
 
-		ginkgo.By("looking for ICMP REJECT on the UDP service's NodePort")
-		testRejectedUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
-
 		ginkgo.By("looking for ICMP REJECT on the TCP service's LoadBalancer")
 		testRejectedHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 
-		if loadBalancerSupportsUDP {
-			ginkgo.By("looking for ICMP REJECT on the UDP service's LoadBalancer")
-			testRejectedUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
-		}
-
 		ginkgo.By("Scaling the pods to 1")
 		err = tcpJig.Scale(1)
-		framework.ExpectNoError(err)
-		err = udpJig.Scale(1)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the TCP service's NodePort")
 		e2eservice.TestReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
 
-		ginkgo.By("hitting the UDP service's NodePort")
-		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
-
 		ginkgo.By("hitting the TCP service's LoadBalancer")
 		e2eservice.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
-
-		if loadBalancerSupportsUDP {
-			ginkgo.By("hitting the UDP service's LoadBalancer")
-			testReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
-		}
 
 		// Change the services back to ClusterIP.
 
@@ -413,6 +274,194 @@ var _ = SIGDescribe("LoadBalancers", func() {
 		_, err = tcpJig.WaitForLoadBalancerDestroy(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 		framework.ExpectNoError(err)
 
+		ginkgo.By("checking the TCP NodePort is closed")
+		testNotReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
+
+		ginkgo.By("checking the TCP LoadBalancer is closed")
+		testNotReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
+	})
+
+	ginkgo.It("should be able to change the type and ports of a UDP service [Slow]", func() {
+		// requires cloud load-balancer support
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+
+		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutDefault
+		loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
+
+		// This test is more monolithic than we'd like because LB turnup can be
+		// very slow, so we lumped all the tests into one LB lifecycle.
+
+		serviceName := "mutability-test"
+		ns2 := f.Namespace.Name // LB1 in ns2 on TCP
+		framework.Logf("namespace for TCP test: %s", ns2)
+
+		nodeIP, err := e2enode.PickIP(cs) // for later
+		framework.ExpectNoError(err)
+
+		ginkgo.By("creating a UDP service " + serviceName + " with type=ClusterIP in namespace " + ns2)
+		udpJig := e2eservice.NewTestJig(cs, ns2, serviceName)
+		udpService, err := udpJig.CreateUDPService(nil)
+		framework.ExpectNoError(err)
+
+		svcPort := int(udpService.Spec.Ports[0].Port)
+		framework.Logf("service port UDP: %d", svcPort)
+
+		ginkgo.By("creating a pod to be part of the UDP service " + serviceName)
+		_, err = udpJig.Run(nil)
+		framework.ExpectNoError(err)
+
+		// Change the services to NodePort.
+
+		ginkgo.By("changing the UDP service to type=NodePort")
+		udpService, err = udpJig.UpdateService(func(s *v1.Service) {
+			s.Spec.Type = v1.ServiceTypeNodePort
+		})
+		framework.ExpectNoError(err)
+		udpNodePort := int(udpService.Spec.Ports[0].NodePort)
+		framework.Logf("UDP node port: %d", udpNodePort)
+
+		ginkgo.By("hitting the UDP service's NodePort")
+		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
+
+		// Change the services to LoadBalancer.
+
+		// Here we test that LoadBalancers can receive static IP addresses.  This isn't
+		// necessary, but is an additional feature this monolithic test checks.
+		requestedIP := ""
+		staticIPName := ""
+		ginkgo.By("creating a static load balancer IP")
+		staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", framework.RunID)
+		gceCloud, err := gce.GetGCECloud()
+		framework.ExpectNoError(err, "failed to get GCE cloud provider")
+
+		err = gceCloud.ReserveRegionAddress(&compute.Address{Name: staticIPName}, gceCloud.Region())
+		defer func() {
+			if staticIPName != "" {
+				// Release GCE static IP - this is not kube-managed and will not be automatically released.
+				if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
+					framework.Logf("failed to release static IP %s: %v", staticIPName, err)
+				}
+			}
+		}()
+		framework.ExpectNoError(err, "failed to create region address: %s", staticIPName)
+		reservedAddr, err := gceCloud.GetRegionAddress(staticIPName, gceCloud.Region())
+		framework.ExpectNoError(err, "failed to get region address: %s", staticIPName)
+
+		requestedIP = reservedAddr.Address
+		framework.Logf("Allocated static load balancer IP: %s", requestedIP)
+
+		ginkgo.By("changing the UDP service to type=LoadBalancer")
+		udpService, err = udpJig.UpdateService(func(s *v1.Service) {
+			s.Spec.Type = v1.ServiceTypeLoadBalancer
+		})
+		framework.ExpectNoError(err)
+
+		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(udpService))
+
+		// Do this as early as possible, which overrides the `defer` above.
+		// This is mostly out of fear of leaking the IP in a timeout case
+		// (as of this writing we're not 100% sure where the leaks are
+		// coming from, so this is first-aid rather than surgery).
+		ginkgo.By("demoting the static IP to ephemeral")
+		if staticIPName != "" {
+			gceCloud, err := gce.GetGCECloud()
+			framework.ExpectNoError(err, "failed to get GCE cloud provider")
+			// Deleting it after it is attached "demotes" it to an
+			// ephemeral IP, which can be auto-released.
+			if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
+				framework.Failf("failed to release static IP %s: %v", staticIPName, err)
+			}
+			staticIPName = ""
+		}
+
+		var udpIngressIP string
+		ginkgo.By("waiting for the UDP service to have a load balancer")
+		// 2nd one should be faster since they ran in parallel.
+		udpService, err = udpJig.WaitForLoadBalancer(loadBalancerCreateTimeout)
+		framework.ExpectNoError(err)
+		if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
+			framework.Failf("UDP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", udpNodePort, udpService.Spec.Ports[0].NodePort)
+		}
+		udpIngressIP = e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0])
+		framework.Logf("UDP load balancer: %s", udpIngressIP)
+
+		ginkgo.By("hitting the UDP service's NodePort")
+		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
+
+		ginkgo.By("hitting the UDP service's LoadBalancer")
+		testReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+
+		// Change the services' node ports.
+
+		ginkgo.By("changing the UDP service's NodePort")
+		udpService, err = udpJig.ChangeServiceNodePort(udpNodePort)
+		framework.ExpectNoError(err)
+		udpNodePortOld := udpNodePort
+		udpNodePort = int(udpService.Spec.Ports[0].NodePort)
+		if udpNodePort == udpNodePortOld {
+			framework.Failf("UDP Spec.Ports[0].NodePort (%d) did not change", udpNodePort)
+		}
+		if e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
+			framework.Failf("UDP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", udpIngressIP, e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]))
+		}
+		framework.Logf("UDP node port: %d", udpNodePort)
+
+		ginkgo.By("hitting the UDP service's new NodePort")
+		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
+
+		ginkgo.By("checking the old UDP NodePort is closed")
+		testNotReachableUDP(nodeIP, udpNodePortOld, e2eservice.KubeProxyLagTimeout)
+
+		ginkgo.By("hitting the UDP service's LoadBalancer")
+		testReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+
+		// Change the services' main ports.
+
+		ginkgo.By("changing the UDP service's port")
+		udpService, err = udpJig.UpdateService(func(s *v1.Service) {
+			s.Spec.Ports[0].Port++
+		})
+		framework.ExpectNoError(err)
+		if int(udpService.Spec.Ports[0].Port) != svcPort {
+			framework.Failf("UDP Spec.Ports[0].Port (%d) did not change", udpService.Spec.Ports[0].Port)
+		}
+		if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
+			framework.Failf("UDP Spec.Ports[0].NodePort (%d) changed", udpService.Spec.Ports[0].NodePort)
+		}
+		if e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
+			framework.Failf("UDP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", udpIngressIP, e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]))
+		}
+
+		framework.Logf("service port UDP: %d", svcPort)
+
+		ginkgo.By("hitting the UDP service's NodePort")
+		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
+
+		ginkgo.By("hitting the UDP service's LoadBalancer")
+		testReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
+
+		ginkgo.By("Scaling the pods to 0")
+		err = udpJig.Scale(0)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("looking for ICMP REJECT on the UDP service's NodePort")
+		testRejectedUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
+
+		ginkgo.By("looking for ICMP REJECT on the UDP service's LoadBalancer")
+		testRejectedUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
+
+		ginkgo.By("Scaling the pods to 1")
+		err = udpJig.Scale(1)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("hitting the UDP service's NodePort")
+		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
+
+		ginkgo.By("hitting the UDP service's LoadBalancer")
+		testReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
+
+		// Change the services back to ClusterIP.
+
 		ginkgo.By("changing UDP service back to type=ClusterIP")
 		udpReadback, err := udpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
@@ -421,25 +470,15 @@ var _ = SIGDescribe("LoadBalancers", func() {
 		if udpReadback.Spec.Ports[0].NodePort != 0 {
 			framework.Fail("UDP Spec.Ports[0].NodePort was not cleared")
 		}
-		if loadBalancerSupportsUDP {
-			// Wait for the load balancer to be destroyed asynchronously
-			_, err = udpJig.WaitForLoadBalancerDestroy(udpIngressIP, svcPort, loadBalancerCreateTimeout)
-			framework.ExpectNoError(err)
-		}
-
-		ginkgo.By("checking the TCP NodePort is closed")
-		testNotReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
+		// Wait for the load balancer to be destroyed asynchronously
+		_, err = udpJig.WaitForLoadBalancerDestroy(udpIngressIP, svcPort, loadBalancerCreateTimeout)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("checking the UDP NodePort is closed")
 		testNotReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
 
-		ginkgo.By("checking the TCP LoadBalancer is closed")
-		testNotReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
-
-		if loadBalancerSupportsUDP {
-			ginkgo.By("checking the UDP LoadBalancer is closed")
-			testNotReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
-		}
+		ginkgo.By("checking the UDP LoadBalancer is closed")
+		testNotReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
 	})
 
 	ginkgo.It("should only allow access from service loadbalancer source ranges [Slow]", func() {
