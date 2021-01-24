@@ -210,3 +210,17 @@ dependencies:
       match: k8s.gcr.io\/pause:\d+\.\d+
     - path: test/utils/image/manifest.go
       match: configs\[Pause\] = Config{gcRegistry, "pause", "\d+\.\d+"}
+
+  # metadata-concealment: bump this one first
+  - name: "metadata-concealment"
+    version: "1.6"
+    refPaths:
+    - path: test/images/metadata-concealment/VERSION
+      match: \d.\d
+
+  # then after merge and successful postsubmit image push / promotion, bump this
+  - name: "metadata-concealment: dependents"
+    version: "1.6"
+    refPaths:
+    - path: test/utils/image/manifest.go
+      match: configs\[CheckMetadataConcealment\] = Config{promoterE2eRegistry, "metadata-concealment", "\d+\.\d+"}
