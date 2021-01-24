@@ -596,9 +596,10 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	}
 
 	var (
-		configMaps = make(map[string]*v1.ConfigMap)
-		secrets    = make(map[string]*v1.Secret)
-		tmpEnv     = make(map[string]string)
+		configMaps  = make(map[string]*v1.ConfigMap)
+		secrets     = make(map[string]*v1.Secret)
+		tmpEnv      = make(map[string]string)
+		mappingFunc = expansion.MappingFuncFor(tmpEnv, serviceEnv)
 	)
 
 	// Env will override EnvFrom variables.
@@ -633,6 +634,9 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 				if errMsgs := utilvalidation.IsEnvVarName(k); len(errMsgs) != 0 {
 					invalidKeys = append(invalidKeys, k)
 					continue
+				}
+				if cm.Expand != nil && *cm.Expand {
+					v = expansion.Expand(v, mappingFunc)
 				}
 				tmpEnv[k] = v
 			}
@@ -687,9 +691,6 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	//     b.  If a source is defined for an environment variable, resolve the source
 	// 2.  Create the container's environment in the order variables are declared
 	// 3.  Add remaining service environment vars
-	var (
-		mappingFunc = expansion.MappingFuncFor(tmpEnv, serviceEnv)
-	)
 	for _, envVar := range container.Env {
 		runtimeVal := envVar.Value
 		if runtimeVal != "" {
@@ -738,6 +739,9 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 						continue
 					}
 					return result, fmt.Errorf("couldn't find key %v in ConfigMap %v/%v", key, pod.Namespace, name)
+				}
+				if cm.Expand != nil && *cm.Expand {
+					runtimeVal = expansion.Expand(runtimeVal, mappingFunc)
 				}
 			case envVar.ValueFrom.SecretKeyRef != nil:
 				s := envVar.ValueFrom.SecretKeyRef
