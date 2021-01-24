@@ -627,7 +627,9 @@ func runCPUManagerTests(f *framework.Framework) {
 		ginkgo.By("wait for the deleted pod to be cleaned up from the state file")
 		waitForStateFileCleanedUp()
 		ginkgo.By("the deleted pod has already been deleted from the state file")
+	})
 
+	ginkgo.AfterEach(func() {
 		setOldKubeletConfig(f, oldCfg)
 	})
 }
