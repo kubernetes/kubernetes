@@ -1,0 +1,31 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+filters:
+  ".*":
+    reviewers:
+    - deads2k
+    - sttts
+    - soltysh
+    - mfojtik
+    - marun
+    - tnozicka
+
+    # approvers are limited to the team that manages rebases and pays the price for carries that are introduced
+    approvers:
+    - deads2k
+    - sttts
+    - soltysh
+    - mfojtik
+    - marun
+    - tnozicka
+
+  "^\\.go.(mod|sum)$":
+    labels:
+    - "vendor-update"
+  "^vendor/.*":
+    labels:
+    - "vendor-update"
+  "^staging/.*":
+    labels:
+    - "vendor-update"
+component: kube-apiserver
