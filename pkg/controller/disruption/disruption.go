@@ -19,6 +19,7 @@ package disruption
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	apps "k8s.io/api/apps/v1beta1"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
 	appsv1informers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
@@ -71,6 +73,7 @@ type DisruptionController struct {
 	mapper     apimeta.RESTMapper
 
 	scaleNamespacer scaleclient.ScalesGetter
+	discoveryClient discovery.DiscoveryInterface
 
 	pdbLister       policylisters.PodDisruptionBudgetLister
 	pdbListerSynced cache.InformerSynced
@@ -121,6 +124,7 @@ func NewDisruptionController(
 	kubeClient clientset.Interface,
 	restMapper apimeta.RESTMapper,
 	scaleNamespacer scaleclient.ScalesGetter,
+	discoveryClient discovery.DiscoveryInterface,
 ) *DisruptionController {
 	dc := &DisruptionController{
 		kubeClient:   kubeClient,
@@ -164,6 +168,7 @@ func NewDisruptionController(
 
 	dc.mapper = restMapper
 	dc.scaleNamespacer = scaleNamespacer
+	dc.discoveryClient = discoveryClient
 
 	return dc
 }
@@ -294,6 +299,16 @@ func (dc *DisruptionController) getScaleController(controllerRef *metav1.OwnerRe
 	scale, err := dc.scaleNamespacer.Scales(namespace).Get(context.TODO(), gr, controllerRef.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
+			// The IsNotFound error can mean either that the resource does not exist,
+			// or it exist but doesn't implement the scale subresource. We check which
+			// situation we are facing so we can give an appropriate error message.
+			isScale, err := dc.implementsScale(gv, controllerRef.Kind)
+			if err != nil {
+				return nil, err
+			}
+			if !isScale {
+				return nil, fmt.Errorf("%s does not implement the scale subresource", gr.String())
+			}
 			return nil, nil
 		}
 		return nil, err
@@ -302,6 +317,22 @@ func (dc *DisruptionController) getScaleController(controllerRef *metav1.OwnerRe
 		return nil, nil
 	}
 	return &controllerAndScale{scale.UID, scale.Spec.Replicas}, nil
+}
+
+func (dc *DisruptionController) implementsScale(gv schema.GroupVersion, kind string) (bool, error) {
+	resourceList, err := dc.discoveryClient.ServerResourcesForGroupVersion(gv.String())
+	if err != nil {
+		return false, err
+	}
+	for _, resource := range resourceList.APIResources {
+		if resource.Kind != kind {
+			continue
+		}
+		if strings.HasSuffix(resource.Name, "/scale") {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, expectedGroups []string) (bool, error) {
