@@ -34,6 +34,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -42,7 +43,11 @@ func newStrategy(cidr string, hasSecondary bool) (testStrategy Strategy, testSta
 	if err != nil {
 		panic("invalid CIDR")
 	}
-	testStrategy, _ = StrategyForServiceCIDRs(*testCIDR, hasSecondary)
+	ipFamily := api.IPv4Protocol
+	if netutils.IsIPv6CIDR(testCIDR) {
+		ipFamily = api.IPv6Protocol
+	}
+	testStrategy, _ = StrategyForServiceCIDRs(ipFamily, hasSecondary)
 	testStatusStrategy = NewServiceStatusStrategy(testStrategy)
 	return
 }
