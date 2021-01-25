@@ -283,7 +283,9 @@ func runGuPodTest(f *framework.Framework) {
 		cpu1 = cpuList[1]
 	} else if isMultiNUMA() {
 		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-		cpu1 = cpuList[1]
+		if len(cpuList) > 1 {
+			cpu1 = cpuList[1]
+		}
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
 	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
@@ -313,6 +315,10 @@ func runNonGuPodTest(f *framework.Framework, cpuCap int64) {
 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	expAllowedCPUsListRegex = fmt.Sprintf("^0-%d\n$", cpuCap-1)
+	// on the single CPU node the only possible value is 0
+	if cpuCap == 1 {
+		expAllowedCPUsListRegex = "^0\n$"
+	}
 	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod.Spec.Containers[0].Name, pod.Name)
@@ -323,7 +329,6 @@ func runNonGuPodTest(f *framework.Framework, cpuCap int64) {
 }
 
 func runMultipleGuNonGuPods(f *framework.Framework, cpuCap int64, cpuAlloc int64) {
-
 	var cpuListString, expAllowedCPUsListRegex string
 	var cpuList []int
 	var cpu1 int
@@ -359,7 +364,9 @@ func runMultipleGuNonGuPods(f *framework.Framework, cpuCap int64, cpuAlloc int64
 		cpu1 = cpuList[1]
 	} else if isMultiNUMA() {
 		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-		cpu1 = cpuList[1]
+		if len(cpuList) > 1 {
+			cpu1 = cpuList[1]
+		}
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
 	err = f.PodClient().MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
@@ -403,12 +410,13 @@ func runMultipleCPUGuPod(f *framework.Framework) {
 	cpuListString = "1-2"
 	if isMultiNUMA() {
 		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-		if !isHTEnabled() {
-			cset = cpuset.MustParse(fmt.Sprintf("%d-%d", cpuList[1], cpuList[2]))
-		} else {
+		if len(cpuList) > 1 {
 			cset = cpuset.MustParse(getCPUSiblingList(int64(cpuList[1])))
+			if !isHTEnabled() && len(cpuList) > 2 {
+				cset = cpuset.MustParse(fmt.Sprintf("%d-%d", cpuList[1], cpuList[2]))
+			}
+			cpuListString = fmt.Sprintf("%s", cset)
 		}
-		cpuListString = fmt.Sprintf("%s", cset)
 	} else if isHTEnabled() {
 		cpuListString = "2-3"
 		cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
@@ -428,7 +436,6 @@ func runMultipleCPUGuPod(f *framework.Framework) {
 }
 
 func runMultipleCPUContainersGuPod(f *framework.Framework) {
-
 	var expAllowedCPUsListRegex string
 	var cpuList []int
 	var cpu1, cpu2 int
@@ -459,11 +466,15 @@ func runMultipleCPUContainersGuPod(f *framework.Framework) {
 		}
 		if isMultiNUMA() {
 			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-			cpu2 = cpuList[1]
+			if len(cpuList) > 1 {
+				cpu2 = cpuList[1]
+			}
 		}
 	} else if isMultiNUMA() {
 		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-		cpu1, cpu2 = cpuList[1], cpuList[2]
+		if len(cpuList) > 2 {
+			cpu1, cpu2 = cpuList[1], cpuList[2]
+		}
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d|%d\n$", cpu1, cpu2)
 	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
@@ -517,11 +528,15 @@ func runMultipleGuPods(f *framework.Framework) {
 		}
 		if isMultiNUMA() {
 			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-			cpu2 = cpuList[1]
+			if len(cpuList) > 1 {
+				cpu2 = cpuList[1]
+			}
 		}
 	} else if isMultiNUMA() {
 		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-		cpu1, cpu2 = cpuList[1], cpuList[2]
+		if len(cpuList) > 2 {
+			cpu1, cpu2 = cpuList[1], cpuList[2]
+		}
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
 	err = f.PodClient().MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
@@ -607,7 +622,9 @@ func runCPUManagerTests(f *framework.Framework) {
 			cpu1 = cpuList[1]
 		} else if isMultiNUMA() {
 			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-			cpu1 = cpuList[1]
+			if len(cpuList) > 1 {
+				cpu1 = cpuList[1]
+			}
 		}
 		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
 		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
