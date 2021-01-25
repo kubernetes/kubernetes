@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	apierrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -221,14 +222,28 @@ func (cfgCtl *configController) initializeConfigController(informerFactory kubei
 		}})
 }
 
+// used from the unit tests only.
+func (cfgCtl *configController) getPriorityLevelState(plName string) *priorityLevelState {
+	cfgCtl.lock.Lock()
+	defer cfgCtl.lock.Unlock()
+	return cfgCtl.priorityLevelStates[plName]
+}
+
 func (cfgCtl *configController) Run(stopCh <-chan struct{}) error {
+	defer utilruntime.HandleCrash()
+
+	// Let the config worker stop when we are done
 	defer cfgCtl.configQueue.ShutDown()
+
 	klog.Info("Starting API Priority and Fairness config controller")
 	if ok := cache.WaitForCacheSync(stopCh, cfgCtl.plInformerSynced, cfgCtl.fsInformerSynced); !ok {
 		return fmt.Errorf("Never achieved initial sync")
 	}
+
 	klog.Info("Running API Priority and Fairness config worker")
-	wait.Until(cfgCtl.runWorker, time.Second, stopCh)
+	go wait.Until(cfgCtl.runWorker, time.Second, stopCh)
+
+	<-stopCh
 	klog.Info("Shutting down API Priority and Fairness config worker")
 	return nil
 }
