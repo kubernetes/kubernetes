@@ -2173,7 +2173,7 @@ func TestEnsureBackendPoolDeletedFromVMSS(t *testing.T) {
 			backendPoolID:      testLBBackendpoolID0,
 			expectedPutVMSS:    true,
 			vmssClientErr:      &retry.Error{RawError: fmt.Errorf("error")},
-			expectedErr:        fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: error"),
+			expectedErr:        utilerrors.NewAggregate([]error{fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: error")}),
 		},
 	}
 
