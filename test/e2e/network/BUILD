@@ -25,6 +25,7 @@ go_library(
         "ingress_scale.go",
         "ingressclass.go",
         "kube_proxy.go",
+        "loadbalancer.go",
         "network_policy.go",
         "network_tiers.go",
         "networking.go",
