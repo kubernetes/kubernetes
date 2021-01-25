@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -83,26 +82,6 @@ func dropDisabledFields(secret *api.Secret, oldSecret *api.Secret) {
 
 func (strategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-func (s strategy) Export(ctx context.Context, obj runtime.Object, exact bool) error {
-	t, ok := obj.(*api.Secret)
-	if !ok {
-		// unexpected programmer error
-		return fmt.Errorf("unexpected object: %v", obj)
-	}
-	s.PrepareForCreate(ctx, obj)
-	if exact {
-		return nil
-	}
-	// secrets that are tied to the UID of a service account cannot be exported anyway
-	if t.Type == api.SecretTypeServiceAccountToken || len(t.Annotations[api.ServiceAccountUIDKey]) > 0 {
-		errs := []*field.Error{
-			field.Invalid(field.NewPath("type"), t, "can not export service account secrets"),
-		}
-		return errors.NewInvalid(api.Kind("Secret"), t.Name, errs)
-	}
-	return nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

@@ -52,7 +52,6 @@ func addToGroupVersion(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&ListOptions{},
 		&metav1.GetOptions{},
-		&metav1.ExportOptions{},
 		&metav1.DeleteOptions{},
 		&metav1.CreateOptions{},
 		&metav1.UpdateOptions{},

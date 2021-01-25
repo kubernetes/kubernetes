@@ -163,10 +163,6 @@ func (s *serviceStorage) ConvertToTable(ctx context.Context, object runtime.Obje
 	panic("not implemented")
 }
 
-func (s *serviceStorage) Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
-	panic("not implemented")
-}
-
 func (s *serviceStorage) StorageVersion() runtime.GroupVersioner {
 	panic("not implemented")
 }
