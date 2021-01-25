@@ -577,7 +577,7 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 
 	unified := libcontainercgroups.IsCgroup2UnifiedMode()
 	if unified {
-		libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()
+		libcontainerCgroupConfig.Path = m.Name(cgroupConfig.Name)
 	} else {
 		libcontainerCgroupConfig.Paths = m.buildCgroupPaths(cgroupConfig.Name)
 	}
