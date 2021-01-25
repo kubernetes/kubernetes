@@ -82,7 +82,6 @@ func (p *PrefixMatcher) Matches(path string) bool {
 	if p.paths.Has(pth) {
 		return true
 	}
-	b/test/integration/framework/master_utils.go
 	for _, prefix := range p.prefixes {
 		if strings.HasPrefix(pth, prefix) {
 			return true
