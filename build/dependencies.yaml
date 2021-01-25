@@ -99,7 +99,7 @@ dependencies:
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.15.5
+    version: 1.15.7
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: build/root/WORKSPACE
@@ -112,7 +112,7 @@ dependencies:
       match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.15.5-1
+    version: v1.15.7-2
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: test/images/sample-apiserver/Makefile
