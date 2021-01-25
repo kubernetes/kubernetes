@@ -124,6 +124,17 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/allocation/v1alpha1
+		gvr("allocation.k8s.io", "v1alpha1", "ipranges"): {
+			Stub:             `{"metadata": {"name": "range1"}, "spec": {"range": "192.168.0.0/16"}}`,
+			ExpectedEtcdPath: "/registry/allocation/" + namespace + "/range1",
+		},
+		gvr("allocation.k8s.io", "v1alpha1", "ipaddress"): {
+			Stub:             `{"metadata": {"name": "3232235777"}, "spec": {"address": "192.168.1.2"}}`,
+			ExpectedEtcdPath: "/registry/allocation/" + namespace + "/address1",
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/autoscaling/v1
 		gvr("autoscaling", "v1", "horizontalpodautoscalers"): {
 			Stub:             `{"metadata": {"name": "hpa2"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
