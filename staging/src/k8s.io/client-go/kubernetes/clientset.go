@@ -24,6 +24,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
+	allocationv1alpha1 "k8s.io/client-go/kubernetes/typed/allocation/v1alpha1"
 	internalv1alpha1 "k8s.io/client-go/kubernetes/typed/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	appsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
@@ -73,6 +74,7 @@ type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	AdmissionregistrationV1() admissionregistrationv1.AdmissionregistrationV1Interface
 	AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface
+	AllocationV1alpha1() allocationv1alpha1.AllocationV1alpha1Interface
 	InternalV1alpha1() internalv1alpha1.InternalV1alpha1Interface
 	AppsV1() appsv1.AppsV1Interface
 	AppsV1beta1() appsv1beta1.AppsV1beta1Interface
@@ -122,6 +124,7 @@ type Clientset struct {
 	*discovery.DiscoveryClient
 	admissionregistrationV1      *admissionregistrationv1.AdmissionregistrationV1Client
 	admissionregistrationV1beta1 *admissionregistrationv1beta1.AdmissionregistrationV1beta1Client
+	allocationV1alpha1           *allocationv1alpha1.AllocationV1alpha1Client
 	internalV1alpha1             *internalv1alpha1.InternalV1alpha1Client
 	appsV1                       *appsv1.AppsV1Client
 	appsV1beta1                  *appsv1beta1.AppsV1beta1Client
@@ -173,6 +176,11 @@ func (c *Clientset) AdmissionregistrationV1() admissionregistrationv1.Admissionr
 // AdmissionregistrationV1beta1 retrieves the AdmissionregistrationV1beta1Client
 func (c *Clientset) AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface {
 	return c.admissionregistrationV1beta1
+}
+
+// AllocationV1alpha1 retrieves the AllocationV1alpha1Client
+func (c *Clientset) AllocationV1alpha1() allocationv1alpha1.AllocationV1alpha1Interface {
+	return c.allocationV1alpha1
 }
 
 // InternalV1alpha1 retrieves the InternalV1alpha1Client
@@ -409,6 +417,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.allocationV1alpha1, err = allocationv1alpha1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.internalV1alpha1, err = internalv1alpha1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -587,6 +599,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.admissionregistrationV1 = admissionregistrationv1.NewForConfigOrDie(c)
 	cs.admissionregistrationV1beta1 = admissionregistrationv1beta1.NewForConfigOrDie(c)
+	cs.allocationV1alpha1 = allocationv1alpha1.NewForConfigOrDie(c)
 	cs.internalV1alpha1 = internalv1alpha1.NewForConfigOrDie(c)
 	cs.appsV1 = appsv1.NewForConfigOrDie(c)
 	cs.appsV1beta1 = appsv1beta1.NewForConfigOrDie(c)
@@ -638,6 +651,7 @@ func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.admissionregistrationV1 = admissionregistrationv1.New(c)
 	cs.admissionregistrationV1beta1 = admissionregistrationv1beta1.New(c)
+	cs.allocationV1alpha1 = allocationv1alpha1.New(c)
 	cs.internalV1alpha1 = internalv1alpha1.New(c)
 	cs.appsV1 = appsv1.New(c)
 	cs.appsV1beta1 = appsv1beta1.New(c)
