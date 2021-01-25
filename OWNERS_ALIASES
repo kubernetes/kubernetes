@@ -165,6 +165,12 @@ aliases:
     - xmudrii # Release Manager
   changelog-reviewers:
     - wilsonehusin # 1.21 Release Notes Lead
+    # TODO(wilsonehusin): uncomment once ashnehete is an org member
+    #                     https://github.com/kubernetes/kubernetes/pull/97700#issuecomment-766734702
+    #- ashnehete # 1.21 Release Notes shadow
+    - melodychn # 1.21 Release Notes shadow
+    - pmmalinov01 # 1.21 Release Notes shadow
+    - soniasingla # 1.21 Release Notes shadow
 
   sig-storage-approvers:
     - saad-ali
