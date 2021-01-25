@@ -18,6 +18,7 @@ package netpol
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -988,7 +989,80 @@ var _ = SIGDescribeCopy("Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive
 
 			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolSCTP, Reachability: reachability})
 		})
+
+		// This policy came up in https://github.com/kubernetes/kubernetes/issues/96341.   Its a good test case b/c it confirms that 0.0.0.0/0 works properly.
+		ginkgo.It("should support egress to the outside world while blocking internal pods [Feature:NetworkPolicy]", func() {
+			np := &networkingv1.NetworkPolicy{}
+
+			nsX, _, _, model, k8s := getK8SModel(f)
+			// grab a pods IP address so we can block everything in its subnet...
+			podList, err := f.ClientSet.CoreV1().Pods(nsX).List(context.TODO(), metav1.ListOptions{LabelSelector: "pod=a"})
+			framework.ExpectNoError(err, "Failing to find pod x/a")
+			podA := podList.Items[0]
+
+			// Exclude podServer's IP with an Except clause
+			hostMask := 24
+			allowAll := "0.0.0.0/0"
+			if utilnet.IsIPv6String(podA.Status.PodIP) {
+				hostMask = hostMask * 4
+				allowAll = "::/0"
+			}
+			podServerCIDR := fmt.Sprintf("%s/%d", podA.Status.PodIP, hostMask)
+
+			policy := fmt.Sprintf(`
+			{
+				"kind": "NetworkPolicy",
+				"apiVersion": "networking.k8s.io/v1",
+				"metadata": {
+				"name": "test-netpol"
+				},
+				"spec": {
+				"egress": [
+					{
+						"to": [
+							{
+								"podSelector": {}
+							},
+							{
+								"ipBlock": {
+									"cidr": "%v",
+									"except": [ "%v" ]
+								}
+							}
+						]
+					}
+				],
+				"ingress": [
+					{
+						"from": [
+							{
+								"ipBlock": { "cidr": "%v" }
+							}
+						]
+					}
+				],
+				"podSelector": {},
+				"policyTypes": ["Ingress", "Egress"]
+				}
+		 }
+		 `, allowAll, podServerCIDR, allowAll)
+
+			err = json.Unmarshal([]byte(policy), np)
+			framework.ExpectNoError(err, "unmarshal network policy")
+
+			CreatePolicy(k8s, np, nsX)
+
+			reachability := NewReachability(model.AllPods(), true)
+			reachability.ExpectAllEgress(NewPodString(nsX, "a"), false)
+			reachability.ExpectAllEgress(NewPodString(nsX, "b"), false)
+			reachability.ExpectAllEgress(NewPodString(nsX, "c"), false)
+			fmt.Println("sleeeeep")
+			time.Sleep(50 * time.Minute)
+			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+		})
+
 	})
+
 })
 
 // getNamespaces returns the canonical set of namespaces used by this test, taking a root ns as input.  This allows this test to run in parallel.
