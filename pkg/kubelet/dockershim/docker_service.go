@@ -271,7 +271,8 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 			cgroupDriver = dockerInfo.CgroupDriver
 		}
 		if len(kubeCgroupDriver) != 0 && kubeCgroupDriver != cgroupDriver {
-			return nil, fmt.Errorf("misconfiguration: kubelet cgroup driver: %q is different from docker cgroup driver: %q", kubeCgroupDriver, cgroupDriver)
+			// auto-detect and match the docker service cgroup driver in dockershim.
+			klog.Infof("The kubelet cgroup driver %q is different from the Docker cgroup driver %q. Will use the Docker cgroup driver", kubeCgroupDriver, cgroupDriver)
 		}
 		klog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 		ds.cgroupDriver = cgroupDriver
