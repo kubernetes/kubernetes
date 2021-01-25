@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	v1alpha1 "k8s.io/api/allocation/v1alpha1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -101,6 +102,12 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().V1beta1().MutatingWebhookConfigurations().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("validatingwebhookconfigurations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().V1beta1().ValidatingWebhookConfigurations().Informer()}, nil
+
+		// Group=allocation.k8s.io, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("ipaddresses"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Allocation().V1alpha1().IPAddresses().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("ipranges"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Allocation().V1alpha1().IPRanges().Informer()}, nil
 
 		// Group=apps, Version=v1
 	case appsv1.SchemeGroupVersion.WithResource("controllerrevisions"):
