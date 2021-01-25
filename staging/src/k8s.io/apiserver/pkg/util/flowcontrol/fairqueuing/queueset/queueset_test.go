@@ -18,6 +18,7 @@ package queueset
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync/atomic"
@@ -385,5 +386,66 @@ func TestContextCancel(t *testing.T) {
 	}
 	if !idle1 {
 		t.Error("Not idle at the end")
+	}
+}
+
+func TestTotalRequestsExecutingWithPanic(t *testing.T) {
+	metrics.Register()
+	metrics.Reset()
+	now := time.Now()
+	clk, counter := clock.NewFakeEventClock(now, 0, nil)
+	qsf := NewQueueSetFactory(clk, counter)
+	qCfg := fq.QueuingConfig{
+		Name:             "TestTotalRequestsExecutingWithPanic",
+		DesiredNumQueues: 0,
+		RequestWaitLimit: 15 * time.Second,
+	}
+	qsc, err := qsf.BeginConstruction(qCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+	counter.Add(1) // account for the goroutine running this test
+
+	queue, ok := qs.(*queueSet)
+	if !ok {
+		t.Fatalf("expected a QueueSet of type: %T but got: %T", &queueSet{}, qs)
+	}
+	if queue.totRequestsExecuting != 0 {
+		t.Fatalf("precondition: expected total requests currently executing of the QueueSet to be 0, but got: %d", queue.totRequestsExecuting)
+	}
+	if queue.dCfg.ConcurrencyLimit != 1 {
+		t.Fatalf("precondition: expected concurrency limit of the QueueSet to be 1, but got: %d", queue.dCfg.ConcurrencyLimit)
+	}
+
+	ctx := context.Background()
+	req, _ := qs.StartRequest(ctx, 1, "fs", "test", "one")
+	if req == nil {
+		t.Fatal("expected a Request object from StartRequest, but got nil")
+	}
+
+	panicErrExpected := errors.New("apiserver panic'd")
+	var panicErrGot interface{}
+	func() {
+		defer func() {
+			panicErrGot = recover()
+		}()
+
+		req.Finish(func() {
+			// verify that total requests executing goes up by 1 since the request is executing.
+			if queue.totRequestsExecuting != 1 {
+				t.Fatalf("expected total requests currently executing of the QueueSet to be 1, but got: %d", queue.totRequestsExecuting)
+			}
+
+			panic(panicErrExpected)
+		})
+	}()
+
+	// verify that the panic was from us (above)
+	if panicErrExpected != panicErrGot {
+		t.Errorf("expected panic error: %#v, but got: %#v", panicErrExpected, panicErrGot)
+	}
+	if queue.totRequestsExecuting != 0 {
+		t.Errorf("expected total requests currently executing of the QueueSet to be 0, but got: %d", queue.totRequestsExecuting)
 	}
 }
