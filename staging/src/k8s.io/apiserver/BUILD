@@ -34,6 +34,8 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizerfactory:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authorization/path:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/authorization/pathforuser:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/authorization/privilegedgroup:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authorization/union:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/endpoints:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/features:all-srcs",

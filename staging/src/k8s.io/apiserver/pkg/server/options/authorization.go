@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/apiserver/pkg/authorization/privilegedgroup"
@@ -63,6 +64,11 @@ type DelegatingAuthorizationOptions struct {
 	// AlwaysAllowGroups are groups which are allowed to take any actions.  In kube, this is system:masters.
 	AlwaysAllowGroups []string
 
+	// HardCodedAccess is a list of user/path tuples which are granted access.  A common usage is to allow access to
+	// /metrics if the expected scraper requested the endpoint.  The format is `user1,user2,user3=path1,path2,path3`.
+	// This precludes granting access to users/paths with commas or equals signs.
+	HardCodedAccess []string
+
 	// ClientTimeout specifies a time limit for requests made by SubjectAccessReviews client.
 	// The default value is set to 10 seconds.
 	ClientTimeout time.Duration
@@ -71,6 +77,11 @@ type DelegatingAuthorizationOptions struct {
 	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
 	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
 	WebhookRetryBackoff *wait.Backoff
+}
+
+type HardCodedAccess struct {
+	Users        []string
+	AllowedPaths []string
 }
 
 func NewDelegatingAuthorizationOptions() *DelegatingAuthorizationOptions {
@@ -95,6 +106,12 @@ func (s *DelegatingAuthorizationOptions) WithAlwaysAllowPaths(paths ...string) *
 	return s
 }
 
+// WithHardCodedAccess appends creates an entry that allows the users access to the paths without a delegated authorization check.
+func (s *DelegatingAuthorizationOptions) WithHardCodedAccess(userPathTuples ...string) *DelegatingAuthorizationOptions {
+	s.HardCodedAccess = append(s.HardCodedAccess, userPathTuples...)
+	return s
+}
+
 // WithClientTimeout sets the given timeout for SAR client used by this authorizer
 func (s *DelegatingAuthorizationOptions) WithClientTimeout(timeout time.Duration) {
 	s.ClientTimeout = timeout
@@ -113,6 +130,14 @@ func (s *DelegatingAuthorizationOptions) Validate() []error {
 	allErrors := []error{}
 	if s.WebhookRetryBackoff != nil && s.WebhookRetryBackoff.Steps <= 0 {
 		allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 1, but is: %d", s.WebhookRetryBackoff.Steps))
+	}
+
+	for i, userPathTuple := range s.HardCodedAccess {
+		tokens := strings.Split(userPathTuple, "=")
+		if len(tokens) != 2 {
+			allErrors = append(allErrors, fmt.Errorf("direct-access[%d] %q, must be in format user1,user2=path1,path2", i, userPathTuple))
+			continue
+		}
 	}
 
 	return allErrors
@@ -142,6 +167,10 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.AlwaysAllowPaths, "authorization-always-allow-paths", s.AlwaysAllowPaths,
 		"A list of HTTP paths to skip during authorization, i.e. these are authorized without "+
 			"contacting the 'core' kubernetes server.")
+
+	fs.StringArrayVar(&s.HardCodedAccess, "authorization-direct-access", s.HardCodedAccess,
+		"Grants access to enumerated paths by enumerated users without a delegated authorization check.  The format "+
+			"is user1,user2,user3=path1,path2.  For example, `system:serviceaccount:monitoring:scraper=/metrics`.")
 }
 
 func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.AuthorizationInfo) error {

@@ -96,7 +96,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/union:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authorization/authorizerfactory:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authorization/privilegedgroup:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/union:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/discovery:go_default_library",

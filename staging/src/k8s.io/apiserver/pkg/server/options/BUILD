@@ -55,6 +55,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizerfactory:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/path:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authorization/privilegedgroup:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/union:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
