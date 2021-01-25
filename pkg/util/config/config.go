@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
+// Merger is an interface for merging when a change from a source is received
 type Merger interface {
 	// Invoked when a change from a source is received.  May also function as an incremental
 	// merger if you wish to consume changes incrementally.  Must be reentrant when more than
@@ -32,6 +33,7 @@ type Merger interface {
 // MergeFunc implements the Merger interface
 type MergeFunc func(source string, update interface{}) error
 
+// Merge method is concrete realization of the Merger interface
 func (f MergeFunc) Merge(source string, update interface{}) error {
 	return f(source, update)
 }
@@ -94,10 +96,12 @@ type Accessor interface {
 // AccessorFunc implements the Accessor interface.
 type AccessorFunc func() interface{}
 
+// MergedState method is concrete realization of the Accessor interface
 func (f AccessorFunc) MergedState() interface{} {
 	return f()
 }
 
+// Listener is an interface for update when a change is made to an object
 type Listener interface {
 	// OnUpdate is invoked when a change is made to an object.
 	OnUpdate(instance interface{})
@@ -106,10 +110,12 @@ type Listener interface {
 // ListenerFunc receives a representation of the change or object.
 type ListenerFunc func(instance interface{})
 
+// OnUpdate method is concrete realization of the Listener interface
 func (f ListenerFunc) OnUpdate(instance interface{}) {
 	f(instance)
 }
 
+// Broadcaster is a class for handling listeners, contains Add listener or Nitify all listener in listeners
 type Broadcaster struct {
 	// Listeners for changes and their lock.
 	listenerLock sync.RWMutex
