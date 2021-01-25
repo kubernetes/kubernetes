@@ -27,9 +27,33 @@ import (
 // NewAuthorizer returns an authorizer which accepts a given set of paths.
 // Each path is either a fully matching path or it ends in * in case a prefix match is done. A leading / is optional.
 func NewAuthorizer(alwaysAllowPaths []string) (authorizer.Authorizer, error) {
+	matcher, err := NewPrefixMatcher(alwaysAllowPaths)
+	if err != nil {
+		return nil, err
+	}
+
+	return authorizer.AuthorizerFunc(func(a authorizer.Attributes) (authorizer.Decision, string, error) {
+		if a.IsResourceRequest() {
+			return authorizer.DecisionNoOpinion, "", nil
+		}
+
+		if matcher.Matches(a.GetPath()) {
+			return authorizer.DecisionAllow, "", nil
+		}
+
+		return authorizer.DecisionNoOpinion, "", nil
+	}), nil
+}
+
+type PrefixMatcher struct {
+	paths    sets.String
+	prefixes []string
+}
+
+func NewPrefixMatcher(inPaths []string) (*PrefixMatcher, error) {
 	var prefixes []string
 	paths := sets.NewString()
-	for _, p := range alwaysAllowPaths {
+	for _, p := range inPaths {
 		p = strings.TrimPrefix(p, "/")
 		if len(p) == 0 {
 			// matches "/"
@@ -45,23 +69,25 @@ func NewAuthorizer(alwaysAllowPaths []string) (authorizer.Authorizer, error) {
 			paths.Insert(p)
 		}
 	}
+	return &PrefixMatcher{
+		paths:    paths,
+		prefixes: prefixes,
+	}, nil
+}
 
-	return authorizer.AuthorizerFunc(func(a authorizer.Attributes) (authorizer.Decision, string, error) {
-		if a.IsResourceRequest() {
-			return authorizer.DecisionNoOpinion, "", nil
+// Matches checks each path and returns true on a match.  It is either a fully matching path or it ends in * in case a
+// prefix match is done. A leading / is optional.
+func (p *PrefixMatcher) Matches(path string) bool {
+	pth := strings.TrimPrefix(path, "/")
+	if p.paths.Has(pth) {
+		return true
+	}
+	b/test/integration/framework/master_utils.go
+	for _, prefix := range p.prefixes {
+		if strings.HasPrefix(pth, prefix) {
+			return true
 		}
+	}
 
-		pth := strings.TrimPrefix(a.GetPath(), "/")
-		if paths.Has(pth) {
-			return authorizer.DecisionAllow, "", nil
-		}
-
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(pth, prefix) {
-				return authorizer.DecisionAllow, "", nil
-			}
-		}
-
-		return authorizer.DecisionNoOpinion, "", nil
-	}), nil
+	return false
 }

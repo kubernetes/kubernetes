@@ -28,6 +28,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"k8s.io/apiserver/pkg/authorization/privilegedgroup"
+
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/go-openapi/spec"
 	"github.com/google/uuid"
@@ -47,7 +49,6 @@ import (
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/filterlatency"
@@ -850,6 +851,6 @@ func AuthorizeClientBearerToken(loopback *restclient.Config, authn *Authenticati
 	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens)
 	authn.Authenticator = authenticatorunion.New(tokenAuthenticator, authn.Authenticator)
 
-	tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+	tokenAuthorizer := privilegedgroup.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 	authz.Authorizer = authorizerunion.New(tokenAuthorizer, authz.Authorizer)
 }

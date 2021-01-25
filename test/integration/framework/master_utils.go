@@ -37,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/apiserver/pkg/authorization/privilegedgroup"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -180,7 +181,7 @@ func startMasterOrDie(masterConfig *controlplane.Config, incomingServer *httptes
 	}
 
 	if masterConfig.GenericConfig.Authorization.Authorizer != nil {
-		tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+		tokenAuthorizer := privilegedgroup.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		masterConfig.GenericConfig.Authorization.Authorizer = authorizerunion.New(tokenAuthorizer, masterConfig.GenericConfig.Authorization.Authorizer)
 	} else {
 		masterConfig.GenericConfig.Authorization.Authorizer = alwaysAllow{}

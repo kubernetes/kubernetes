@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apiserver/pkg/authorization/privilegedgroup"
+
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 
@@ -161,7 +163,7 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 	var authorizers []authorizer.Authorizer
 
 	if len(s.AlwaysAllowGroups) > 0 {
-		authorizers = append(authorizers, authorizerfactory.NewPrivilegedGroups(s.AlwaysAllowGroups...))
+		authorizers = append(authorizers, privilegedgroup.NewPrivilegedGroups(s.AlwaysAllowGroups...))
 	}
 
 	if len(s.AlwaysAllowPaths) > 0 {
