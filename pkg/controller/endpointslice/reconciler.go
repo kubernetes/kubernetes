@@ -120,6 +120,7 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	slicesToDelete := []*discovery.EndpointSlice{}
 
 	// Build data structures for existing state.
+	currentAnnotations := map[string]string{}
 	existingSlicesByPortMap := map[endpointutil.PortMapKey][]*discovery.EndpointSlice{}
 	numExistingEndpoints := 0
 	for _, existingSlice := range existingSlices {
@@ -127,6 +128,11 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 			epHash := endpointutil.NewPortMapKey(existingSlice.Ports)
 			existingSlicesByPortMap[epHash] = append(existingSlicesByPortMap[epHash], existingSlice)
 			numExistingEndpoints += len(existingSlice.Endpoints)
+			// Get current annotations, in case that there are multiple slices is
+			// the user responsability to keep them consistent.
+			if len(existingSlice.Annotations) > 0 {
+				currentAnnotations = existingSlice.Annotations
+			}
 		} else {
 			slicesToDelete = append(slicesToDelete, existingSlice)
 		}
@@ -214,6 +220,13 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 			Endpoints: 0,
 			Slices:    1,
 		})
+	}
+
+	// New slices must inherit current slices annotations.
+	// The TriggerTime annotation is overwritten later in r.finalize()
+	// so we can copy it directly.
+	for _, slice := range slicesToCreate {
+		slice.Annotations = currentAnnotations
 	}
 
 	metrics.EndpointsAddedPerSync.WithLabelValues().Observe(float64(totalAdded))

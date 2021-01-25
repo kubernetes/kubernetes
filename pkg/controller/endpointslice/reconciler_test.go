@@ -491,13 +491,14 @@ func TestReconcile1Pod(t *testing.T) {
 }
 
 // given an existing endpoint slice and no pods matching the service, the existing
-// slice should be updated to a placeholder (not deleted)
+// slice should be updated to a placeholder (not deleted) and keep the annotations
 func TestReconcile1EndpointSlice(t *testing.T) {
 	client := newClientset()
 	setupMetrics()
 	namespace := "test"
 	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 	endpointSlice1 := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
+	endpointSlice1.Annotations = map[string]string{"test": "bar"}
 
 	_, createErr := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), endpointSlice1, metav1.CreateOptions{})
 	assert.Nil(t, createErr, "Expected no error creating endpoint slice")
@@ -516,6 +517,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
 	assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
 	assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
+	assert.EqualValues(t, "bar", slices[0].Annotations["test"])
 	expectTrackedResourceVersion(t, r.endpointSliceTracker, &slices[0], "200")
 	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 1, numDeleted: 0})
 }
