@@ -32,6 +32,9 @@ endif
 # It's necessary to set this because some environments don't link sh -> bash.
 SHELL := /usr/bin/env bash
 
+# Define variables so `make --warn-undefined-variables` works.
+PRINT_HELP ?=
+
 # We don't need make's built-in rules.
 MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:
@@ -55,10 +58,6 @@ else
 $(error Both KUBE_GOFLAGS and GOFLAGS are set. Please use just GOFLAGS)
 endif
 endif
-
-# Extra options for the release or quick-release options:
-KUBE_RELEASE_RUN_TESTS := $(KUBE_RELEASE_RUN_TESTS)
-KUBE_FASTBUILD := $(KUBE_FASTBUILD)
 
 # This controls the verbosity of the build.  Higher numbers mean more output.
 KUBE_VERBOSE ?= 1
@@ -364,7 +363,7 @@ clean_generated:
 	@echo "$$CLEAN_GENERATED_HELP_INFO"
 else
 clean_generated:
-	find . -type f -name $(GENERATED_FILE_PREFIX)\* | grep -v "[.]/staging/.*" | xargs rm -f
+	find . -type f -name '$(GENERATED_FILE_PREFIX)*'  | xargs rm -f
 endif
 
 define VET_HELP_INFO
