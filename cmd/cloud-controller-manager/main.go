@@ -26,7 +26,6 @@ package main
 
 import (
 	"math/rand"
-	"net/http"
 	"os"
 	"time"
 
@@ -40,10 +39,7 @@ import (
 	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
-	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/klog/v2"
-	nodeipamcontrolleroptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 	// For existing cloud providers, the option to import legacy providers is still available.
 	// e.g. _"k8s.io/legacy-cloud-providers/<provider>"
 )
@@ -114,20 +110,4 @@ func cloudInitializer(config *cloudcontrollerconfig.CompletedConfig) cloudprovid
 	}
 
 	return cloud
-}
-
-func startNodeIpamControllerWrapper(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) app.InitFunc {
-	fs := pflag.NewFlagSet("fs", pflag.ContinueOnError)
-	var nodeIPAMControllerOptions nodeipamcontrolleroptions.NodeIPAMControllerOptions
-	nodeIPAMControllerOptions.AddFlags(fs)
-	errors := nodeIPAMControllerOptions.Validate()
-	if len(errors) > 0 {
-		klog.Fatal("NodeIPAM controller values are not properly.")
-	}
-	var nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration
-	nodeIPAMControllerOptions.ApplyTo(&nodeIPAMConfig)
-
-	return func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
-		return startNodeIpamController(completedConfig, nodeIPAMConfig, ctx, cloud)
-	}
 }

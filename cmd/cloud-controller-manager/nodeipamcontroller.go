@@ -22,16 +22,20 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/spf13/pflag"
+
 	"net"
 	"net/http"
 	"strings"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider/app"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
 	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
+	nodeipamcontrolleroptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	nodeipamcontroller "k8s.io/kubernetes/pkg/controller/nodeipam"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
@@ -44,6 +48,22 @@ const (
 	// defaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr
 	defaultNodeMaskCIDRIPv6 = 64
 )
+
+func startNodeIpamControllerWrapper(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) app.InitFunc {
+	fs := pflag.NewFlagSet("fs", pflag.ContinueOnError)
+	var nodeIPAMControllerOptions nodeipamcontrolleroptions.NodeIPAMControllerOptions
+	nodeIPAMControllerOptions.AddFlags(fs)
+	errors := nodeIPAMControllerOptions.Validate()
+	if len(errors) > 0 {
+		klog.Fatal("NodeIPAM controller values are not properly.")
+	}
+	var nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration
+	nodeIPAMControllerOptions.ApplyTo(&nodeIPAMConfig)
+
+	return func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
+		return startNodeIpamController(completedConfig, nodeIPAMConfig, ctx, cloud)
+	}
+}
 
 func startNodeIpamController(ccmConfig *cloudcontrollerconfig.CompletedConfig, nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration, ctx genericcontrollermanager.ControllerContext, cloud cloudprovider.Interface) (http.Handler, bool, error) {
 	var serviceCIDR *net.IPNet

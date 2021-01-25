@@ -4,9 +4,9 @@ This directory provides sample code about how all cloud providers should leverag
 
 ## Purpose
 
-Begin with 1.20, all cloud providers should not copy over or vender in `k8s.io/kubernetes/cmd/cloud-controller-manager`. Inside this directory, some sample code will be provided to demonstrate how cloud providers should leverage cloud-controller-manager. 
+Begin with 1.20, all cloud providers should not copy over or vendor in `k8s.io/kubernetes/cmd/cloud-controller-manager`. Inside this directory, some sample code will be provided to demonstrate how cloud providers should leverage cloud-controller-manager. 
 
-## Steps cloud providers shoud follow
+## Steps cloud providers should follow
 
 1. Have your external repo under k8s.io. e.g. `k8s.io/cloud-provider-<provider>`
 2. Create `main.go` file under your external repo CCM directory. Please refer to `basic_main.go` for a minimum working sample.
