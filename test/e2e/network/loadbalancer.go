@@ -422,7 +422,7 @@ var _ = SIGDescribe("LoadBalancers", func() {
 			s.Spec.Ports[0].Port++
 		})
 		framework.ExpectNoError(err)
-		if int(udpService.Spec.Ports[0].Port) != svcPort {
+		if int(udpService.Spec.Ports[0].Port) == svcPort {
 			framework.Failf("UDP Spec.Ports[0].Port (%d) did not change", udpService.Spec.Ports[0].Port)
 		}
 		if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
