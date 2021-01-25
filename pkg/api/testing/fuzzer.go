@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	admissionregistrationfuzzer "k8s.io/kubernetes/pkg/apis/admissionregistration/fuzzer"
+	allocationfuzzer "k8s.io/kubernetes/pkg/apis/allocation/fuzzer"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsfuzzer "k8s.io/kubernetes/pkg/apis/apps/fuzzer"
 	autoscalingfuzzer "k8s.io/kubernetes/pkg/apis/autoscaling/fuzzer"
@@ -107,4 +108,5 @@ var FuzzerFuncs = fuzzer.MergeFuzzerFuncs(
 	metafuzzer.Funcs,
 	schedulingfuzzer.Funcs,
 	discoveryfuzzer.Funcs,
+	allocationfuzzer.Funcs,
 )
