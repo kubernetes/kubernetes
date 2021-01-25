@@ -112,7 +112,7 @@ var (
 		certificate signing request (CSR) for a locally created key pair. By
 		default, kubeadm will set up the Kubernetes Control Plane to automatically
 		approve these signing requests. This token is passed in with the
-		--tls-bootstrap-token abcdef.1234567890abcdef flag.
+		--tls-bootstrap-token flag.
 
 		Often times the same token is used for both parts. In this case, the
 		--token flag can be used instead of specifying each token individually.
