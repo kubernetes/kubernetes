@@ -18,7 +18,6 @@ package service
 
 import (
 	"context"
-	"net"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,7 +30,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
-	netutil "k8s.io/utils/net"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -49,14 +47,7 @@ type svcStrategy struct {
 }
 
 // StrategyForServiceCIDRs returns the appropriate service strategy for the given configuration.
-func StrategyForServiceCIDRs(primaryCIDR net.IPNet, hasSecondary bool) (Strategy, api.IPFamily) {
-	// detect this cluster default Service IPFamily (ipfamily of --service-cluster-ip-range)
-	// we do it once here, to avoid having to do it over and over during ipfamily assignment
-	serviceIPFamily := api.IPv4Protocol
-	if netutil.IsIPv6CIDR(&primaryCIDR) {
-		serviceIPFamily = api.IPv6Protocol
-	}
-
+func StrategyForServiceCIDRs(serviceIPFamily api.IPFamily, hasSecondary bool) (Strategy, api.IPFamily) {
 	var strategy Strategy
 	switch {
 	case hasSecondary && serviceIPFamily == api.IPv4Protocol:
