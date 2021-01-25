@@ -755,6 +755,17 @@ const (
 	//
 	// Enables kubelet to detect CSI volume condition and send the event of the abnormal volume to the corresponding pod that is using it.
 	CSIVolumeHealth featuregate.Feature = "CSIVolumeHealth"
+	// owner: @aojea
+	// alpha: v1.21
+	//
+	// Enables the Services ClusterIPs allocation with API objects
+	ClusterIPAllocatorAPI featuregate.Feature = "ClusterIPAllocatorAPI"
+
+	// owner: @aojea
+	// alpha: v1.21
+	//
+	// Enables the Services NodePort allocation with API objects
+	NodePortAllocatorAPI featuregate.Feature = "NodePortAllocatorAPI"
 )
 
 func init() {
@@ -869,6 +880,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletPodResourcesGetAllocatable:              {Default: false, PreRelease: featuregate.Alpha},
 	NamespaceDefaultLabelName:                      {Default: true, PreRelease: featuregate.Beta}, // graduate to GA and lock to default in 1.22, remove in 1.24
 	CSIVolumeHealth:                                {Default: false, PreRelease: featuregate.Alpha},
+	ClusterIPAllocatorAPI:                          {Default: true, PreRelease: featuregate.Alpha},
+	NodePortAllocatorAPI:                           {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
