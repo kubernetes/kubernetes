@@ -363,7 +363,7 @@ clean_generated:
 	@echo "$$CLEAN_GENERATED_HELP_INFO"
 else
 clean_generated:
-	find . -type f -name $(GENERATED_FILE_PREFIX)\* | grep -v "[.]/staging/.*" | xargs rm -f
+	find . -type f -name '$(GENERATED_FILE_PREFIX)*'  | xargs rm -f
 endif
 
 define VET_HELP_INFO
