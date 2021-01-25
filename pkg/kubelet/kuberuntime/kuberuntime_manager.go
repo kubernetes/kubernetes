@@ -101,8 +101,9 @@ type kubeGenericRuntimeManager struct {
 	runtimeHelper kubecontainer.RuntimeHelper
 
 	// Health check results.
-	livenessManager proberesults.Manager
-	startupManager  proberesults.Manager
+	livenessManager  proberesults.Manager
+	readinessManager proberesults.Manager
+	startupManager   proberesults.Manager
 
 	// If true, enforce container cpu limits with CFS quota support
 	cpuCFSQuota bool
@@ -159,6 +160,7 @@ type LegacyLogProvider interface {
 func NewKubeGenericRuntimeManager(
 	recorder record.EventRecorder,
 	livenessManager proberesults.Manager,
+	readinessManager proberesults.Manager,
 	startupManager proberesults.Manager,
 	seccompProfileRoot string,
 	machineInfo *cadvisorapi.MachineInfo,
@@ -187,6 +189,7 @@ func NewKubeGenericRuntimeManager(
 		cpuCFSQuotaPeriod:   cpuCFSQuotaPeriod,
 		seccompProfileRoot:  seccompProfileRoot,
 		livenessManager:     livenessManager,
+		readinessManager:    readinessManager,
 		startupManager:      startupManager,
 		machineInfo:         machineInfo,
 		osInterface:         osInterface,
