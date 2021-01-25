@@ -319,6 +319,13 @@ func TestUpdatePodStatus(t *testing.T) {
 	}
 }
 
+func (m *manager) extractedReadinessHandling() {
+	update := <-m.readinessManager.Updates()
+	// This code corresponds to an extract from kubelet.syncLoopIteration()
+	ready := update.Result == results.Success
+	m.statusManager.SetContainerReadiness(update.PodUID, update.ContainerID, ready)
+}
+
 func TestUpdateReadiness(t *testing.T) {
 	testPod := getTestPod()
 	setTestProbe(testPod, readiness, v1.Probe{})
@@ -327,10 +334,10 @@ func TestUpdateReadiness(t *testing.T) {
 
 	// Start syncing readiness without leaking goroutine.
 	stopCh := make(chan struct{})
-	go wait.Until(m.updateReadiness, 0, stopCh)
+	go wait.Until(m.extractedReadinessHandling, 0, stopCh)
 	defer func() {
 		close(stopCh)
-		// Send an update to exit updateReadiness()
+		// Send an update to exit extractedReadinessHandling()
 		m.readinessManager.Set(kubecontainer.ContainerID{}, results.Success, &v1.Pod{})
 	}()
 

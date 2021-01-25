@@ -17,14 +17,13 @@ limitations under the License.
 package prober
 
 import (
-	"k8s.io/apimachinery/pkg/util/clock"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
@@ -71,9 +70,6 @@ type Manager interface {
 	// UpdatePodStatus modifies the given PodStatus with the appropriate Ready state for each
 	// container based on container running status, cached probe results and worker states.
 	UpdatePodStatus(types.UID, *v1.PodStatus)
-
-	// Start starts the Manager sync loops.
-	Start()
 }
 
 type manager struct {
@@ -104,12 +100,12 @@ type manager struct {
 func NewManager(
 	statusManager status.Manager,
 	livenessManager results.Manager,
+	readinessManager results.Manager,
 	startupManager results.Manager,
 	runner kubecontainer.CommandRunner,
 	recorder record.EventRecorder) Manager {
 
 	prober := newProber(runner, recorder)
-	readinessManager := results.NewManager()
 	return &manager{
 		statusManager:    statusManager,
 		prober:           prober,
@@ -119,12 +115,6 @@ func NewManager(
 		workers:          make(map[probeKey]*worker),
 		start:            clock.RealClock{}.Now(),
 	}
-}
-
-// Start syncing probe status. This should only be called once.
-func (m *manager) Start() {
-	// Start syncing readiness.
-	go wait.Forever(m.updateReadiness, 0)
 }
 
 // Key uniquely identifying container probes
@@ -263,6 +253,7 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 					select {
 					case w.manualTriggerCh <- struct{}{}:
 					default: // Non-blocking.
+						klog.Warningf("Failed to trigger a manual run of %s probe", w.probeType.String())
 					}
 				}
 			}
@@ -299,11 +290,4 @@ func (m *manager) workerCount() int {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 	return len(m.workers)
-}
-
-func (m *manager) updateReadiness() {
-	update := <-m.readinessManager.Updates()
-
-	ready := update.Result == results.Success
-	m.statusManager.SetContainerReadiness(update.PodUID, update.ContainerID, ready)
 }
