@@ -29,26 +29,31 @@ import (
 )
 
 const (
-	samplesHistName = "sawtestsamples"
-	ddtRange        = 3000
-	ddtOffset       = 500
-	numIterations   = 100
+	samplesHistName       = "sawtestsamples"
+	samplingPeriod        = time.Millisecond
+	ddtRangeCentiPeriods  = 300
+	ddtOffsetCentiPeriods = 50
+	numIterations         = 100
 )
 
-/* TestSampler does a rough behavioral test of SampleAndWatermarkHistograms.
-   The test creates one and exercises it, checking that the count in the
-   sampling histogram is correct at each step.  A fake clock is used, and
-   the exercise consists of changing that fake clock by an amount of time
-   chosen uniformly at random from a range that goes from a little negative
-   to somewhat more than two sampling periods.  The negative changes are
-   included because negative changes have been observed in real monotonic
-   clock readings.
+/* TestSampler does a rough behavioral test of the sampling in a
+   SampleAndWatermarkHistograms.  The test creates one and exercises
+   it, checking that the count in the sampling histogram is correct at
+   each step.  The sampling histogram is expected to get one
+   observation at the end of each sampling period.  A fake clock is
+   used, and the exercise consists of repeatedly changing that fake
+   clock by an amount of time chosen uniformly at random from a range
+   that goes from a little negative to somewhat more than two sampling
+   periods.  The negative changes are included because small negative
+   changes have been observed in real monotonic clock readings (see
+   issue #96459) and we want to test that they are properly tolerated.
+   The designed toleration is to pretend that the clock did not
+   change, until it resumes net forward progress.
 */
 func TestSampler(t *testing.T) {
 	t0 := time.Now()
 	clk := clock.NewFakePassiveClock(t0)
 	buckets := []float64{0, 1}
-	const samplingPeriod = time.Millisecond
 	gen := NewSampleAndWaterMarkHistogramsGenerator(clk, samplingPeriod,
 		&compbasemetrics.HistogramOpts{Name: samplesHistName, Buckets: buckets},
 		&compbasemetrics.HistogramOpts{Name: "marks", Buckets: buckets},
@@ -58,12 +63,18 @@ func TestSampler(t *testing.T) {
 	for _, reg := range regs {
 		legacyregistry.MustRegister(reg)
 	}
-	dt := 2 * samplingPeriod
+	// `dt` is the admitted cumulative difference in fake time
+	// since the start of the test.  "admitted" means this is
+	// never allowed to decrease, which matches the designed
+	// toleration for negative monotonic clock changes.
+	var dt time.Duration
+	// `t1` is the current fake time
 	t1 := t0.Add(dt)
-	klog.Infof("Expect about %v warnings about time going backwards; this is fake time deliberately misbehaving.", (numIterations*ddtOffset)/ddtRange)
+	klog.Infof("Expect about %v warnings about time going backwards; this is fake time deliberately misbehaving.", (numIterations*ddtOffsetCentiPeriods)/ddtRangeCentiPeriods)
 	t.Logf("t0=%s", t0)
 	for i := 0; i < numIterations; i++ {
-		ddt := time.Microsecond * time.Duration(rand.Intn(ddtRange)-ddtOffset)
+		// `ddt` is the next step to take in fake time
+		ddt := time.Duration(rand.Intn(ddtRangeCentiPeriods)-ddtOffsetCentiPeriods) * samplingPeriod / 100
 		t1 = t1.Add(ddt)
 		diff := t1.Sub(t0)
 		if diff > dt {
@@ -71,7 +82,7 @@ func TestSampler(t *testing.T) {
 		}
 		clk.SetTime(t1)
 		saw.Set(1)
-		expectedCount := int64(dt / time.Millisecond)
+		expectedCount := int64(dt / samplingPeriod)
 		actualCount, err := getHistogramCount(regs, samplesHistName)
 		if err != nil {
 			t.Fatalf("For t0=%s, t1=%s, failed to getHistogramCount: %#+v", t0, t1, err)
