@@ -21,6 +21,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -45,9 +46,8 @@ func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
 	return nil
 }
 
-func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
+func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
 	klog.Infof("[fake cpumanager] AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
-	return nil
 }
 
 func (m *fakeManager) RemoveContainer(containerID string) error {
@@ -69,9 +69,9 @@ func (m *fakeManager) State() state.Reader {
 	return m.state
 }
 
-func (m *fakeManager) GetCPUs(podUID, containerName string) []int64 {
+func (m *fakeManager) GetCPUs(podUID, containerName string) cpuset.CPUSet {
 	klog.Infof("[fake cpumanager] GetCPUs(podUID: %s, containerName: %s)", podUID, containerName)
-	return nil
+	return cpuset.CPUSet{}
 }
 
 // NewFakeManager creates empty/fake cpu manager

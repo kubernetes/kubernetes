@@ -15,6 +15,9 @@ go_library(
         "helpers_linux.go",
         "helpers_unsupported.go",
         "internal_container_lifecycle.go",
+        "internal_container_lifecycle_linux.go",
+        "internal_container_lifecycle_unsupported.go",
+        "internal_container_lifecycle_windows.go",
         "node_container_manager_linux.go",
         "pod_container_manager_linux.go",
         "pod_container_manager_stub.go",
@@ -42,6 +45,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
+        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//staging/src/k8s.io/kubelet/pkg/apis/podresources/v1:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ] + select({
