@@ -148,6 +148,8 @@ aliases:
     - puerco # Release Manager
     - saschagrunert # Release Manager / SIG Chair
     - xmudrii # Release Manager
+  changelog-approvers:
+  changelog-reviewers:
 
   sig-storage-approvers:
     - saad-ali
