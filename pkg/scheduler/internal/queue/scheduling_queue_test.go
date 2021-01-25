@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ktypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/component-base/metrics/testutil"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -1514,7 +1515,11 @@ func TestBackOffFlow(t *testing.T) {
 			UID:       "test-uid",
 		},
 	}
-	podID := nsNameForPod(pod)
+
+	podID := ktypes.NamespacedName{
+		Namespace: pod.Namespace,
+		Name:      pod.Name,
+	}
 	if err := q.Add(pod); err != nil {
 		t.Fatal(err)
 	}

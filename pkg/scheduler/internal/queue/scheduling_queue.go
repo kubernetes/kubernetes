@@ -250,30 +250,22 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 	defer p.lock.Unlock()
 	pInfo := p.newQueuedPodInfo(pod)
 	if err := p.activeQ.Add(pInfo); err != nil {
-		klog.Errorf("Error adding pod %v to the scheduling queue: %v", nsNameForPod(pod), err)
+		klog.ErrorS(err, "Error adding pod to the scheduling queue", "pod", klog.KObj(pod))
 		return err
 	}
 	if p.unschedulableQ.get(pod) != nil {
-		klog.Errorf("Error: pod %v is already in the unschedulable queue.", nsNameForPod(pod))
+		klog.ErrorS(nil, "Error: pod is already in the unschedulable queue", "pod", klog.KObj(pod))
 		p.unschedulableQ.delete(pod)
 	}
 	// Delete pod from backoffQ if it is backing off
 	if err := p.podBackoffQ.Delete(pInfo); err == nil {
-		klog.Errorf("Error: pod %v is already in the podBackoff queue.", nsNameForPod(pod))
+		klog.ErrorS(nil, "Error: pod is already in the podBackoff queue", "pod", klog.KObj(pod))
 	}
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", PodAdd).Inc()
 	p.PodNominator.AddNominatedPod(pod, "")
 	p.cond.Broadcast()
 
 	return nil
-}
-
-// nsNameForPod returns a namespacedname for a pod
-func nsNameForPod(pod *v1.Pod) ktypes.NamespacedName {
-	return ktypes.NamespacedName{
-		Namespace: pod.Namespace,
-		Name:      pod.Name,
-	}
 }
 
 // isPodBackingoff returns true if a pod is still waiting for its backoff timer.
@@ -299,14 +291,14 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 	defer p.lock.Unlock()
 	pod := pInfo.Pod
 	if p.unschedulableQ.get(pod) != nil {
-		return fmt.Errorf("pod: %v is already present in unschedulable queue", nsNameForPod(pod))
+		return fmt.Errorf("Pod %v is already present in unschedulable queue", klog.KObj(pod))
 	}
 
 	if _, exists, _ := p.activeQ.Get(pInfo); exists {
-		return fmt.Errorf("pod: %v is already present in the active queue", nsNameForPod(pod))
+		return fmt.Errorf("Pod %v is already present in the active queue", klog.KObj(pod))
 	}
 	if _, exists, _ := p.podBackoffQ.Get(pInfo); exists {
-		return fmt.Errorf("pod %v is already present in the backoff queue", nsNameForPod(pod))
+		return fmt.Errorf("Pod %v is already present in the backoff queue", klog.KObj(pod))
 	}
 
 	// Refresh the timestamp since the pod is re-added.
@@ -344,7 +336,7 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 		}
 		_, err := p.podBackoffQ.Pop()
 		if err != nil {
-			klog.Errorf("Unable to pop pod %v from backoff queue despite backoff completion.", nsNameForPod(pod))
+			klog.ErrorS(err, "Unable to pop pod from backoff queue despite backoff completion", "pod", klog.KObj(pod))
 			return
 		}
 		p.activeQ.Add(rawPodInfo)
@@ -514,14 +506,14 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 		pod := pInfo.Pod
 		if p.isPodBackingoff(pInfo) {
 			if err := p.podBackoffQ.Add(pInfo); err != nil {
-				klog.Errorf("Error adding pod %v to the backoff queue: %v", pod.Name, err)
+				klog.ErrorS(err, "Error adding pod to the backoff queue", "pod", klog.KObj(pod))
 			} else {
 				metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Inc()
 				p.unschedulableQ.delete(pod)
 			}
 		} else {
 			if err := p.activeQ.Add(pInfo); err != nil {
-				klog.Errorf("Error adding pod %v to the scheduling queue: %v", pod.Name, err)
+				klog.ErrorS(err, "Error adding pod to the scheduling queue", "pod", klog.KObj(pod))
 			} else {
 				metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Inc()
 				p.unschedulableQ.delete(pod)
@@ -544,7 +536,7 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod
 			namespaces := util.GetNamespacesFromPodAffinityTerm(up, &term)
 			selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 			if err != nil {
-				klog.Errorf("Error getting label selectors for pod: %v.", up.Name)
+				klog.ErrorS(err, "Error getting label selectors for pod", "pod", klog.KObj(up))
 			}
 			if util.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
 				podsToMove = append(podsToMove, pInfo)
@@ -748,7 +740,7 @@ func (npm *nominatedPodMap) add(p *v1.Pod, nodeName string) {
 	npm.nominatedPodToNode[p.UID] = nnn
 	for _, np := range npm.nominatedPods[nnn] {
 		if np.UID == p.UID {
-			klog.V(4).Infof("Pod %v/%v already exists in the nominated map!", p.Namespace, p.Name)
+			klog.V(4).InfoS("Pod already exists in the nominated map", "pod", klog.KObj(p))
 			return
 		}
 	}
@@ -810,10 +802,10 @@ func MakeNextPodFunc(queue SchedulingQueue) func() *framework.QueuedPodInfo {
 	return func() *framework.QueuedPodInfo {
 		podInfo, err := queue.Pop()
 		if err == nil {
-			klog.V(4).Infof("About to try and schedule pod %v/%v", podInfo.Pod.Namespace, podInfo.Pod.Name)
+			klog.V(4).InfoS("About to try and schedule pod", "pod", klog.KObj(podInfo.Pod))
 			return podInfo
 		}
-		klog.Errorf("Error while retrieving next pod from scheduling queue: %v", err)
+		klog.ErrorS(err, "Error while retrieving next pod from scheduling queue")
 		return nil
 	}
 }
