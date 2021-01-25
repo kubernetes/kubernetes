@@ -35,6 +35,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	allocationclient "k8s.io/client-go/kubernetes/typed/allocation/v1alpha1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	ipapiallocator "k8s.io/kubernetes/pkg/registry/allocation"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
 	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
 	endpointsstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
@@ -191,49 +193,70 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	if serviceClusterIPRange.IP == nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("service clusterIPRange is missing")
 	}
-
+	serviceIPFamily := api.IPv4Protocol
+	if utilsnet.IsIPv6(serviceClusterIPRange.IP) {
+		serviceIPFamily = api.IPv6Protocol
+	}
 	serviceStorageConfig, err := c.StorageFactory.NewConfig(api.Resource("services"))
 	if err != nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 
-	serviceClusterIPAllocator, err := ipallocator.NewAllocatorCIDRRange(&serviceClusterIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
-		mem := allocator.NewAllocationMap(max, rangeSpec)
-		// TODO etcdallocator package to return a storage interface via the storageFactory
-		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
-		if err != nil {
-			return nil, err
-		}
-		serviceClusterIPRegistry = etcd
-		return etcd, nil
-	})
-	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster IP allocator: %v", err)
-	}
-	restStorage.ServiceClusterIPAllocator = serviceClusterIPRegistry
-
-	// allocator for secondary service ip range
-	var secondaryServiceClusterIPAllocator ipallocator.Interface
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && c.SecondaryServiceIPRange.IP != nil {
-		var secondaryServiceClusterIPRegistry rangeallocation.RangeRegistry
-		secondaryServiceClusterIPAllocator, err = ipallocator.NewAllocatorCIDRRange(&c.SecondaryServiceIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
+	var serviceClusterIPAllocator, secondaryServiceClusterIPAllocator ipallocator.Interface
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ClusterIPAllocatorAPI) {
+		serviceClusterIPAllocator, err = ipallocator.NewAllocatorCIDRRange(&serviceClusterIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
 			mem := allocator.NewAllocationMap(max, rangeSpec)
 			// TODO etcdallocator package to return a storage interface via the storageFactory
-			etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
+			etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
 			if err != nil {
 				return nil, err
 			}
-			secondaryServiceClusterIPRegistry = etcd
+			serviceClusterIPRegistry = etcd
 			return etcd, nil
 		})
 		if err != nil {
-			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
+			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster IP allocator: %v", err)
 		}
-		restStorage.SecondaryServiceClusterIPAllocator = secondaryServiceClusterIPRegistry
+		restStorage.ServiceClusterIPAllocator = serviceClusterIPRegistry
+		// allocator for secondary service ip range
+		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && c.SecondaryServiceIPRange.IP != nil {
+			var secondaryServiceClusterIPRegistry rangeallocation.RangeRegistry
+			secondaryServiceClusterIPAllocator, err = ipallocator.NewAllocatorCIDRRange(&c.SecondaryServiceIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
+				mem := allocator.NewAllocationMap(max, rangeSpec)
+				// TODO etcdallocator package to return a storage interface via the storageFactory
+				etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
+				if err != nil {
+					return nil, err
+				}
+				secondaryServiceClusterIPRegistry = etcd
+				return etcd, nil
+			})
+			if err != nil {
+				return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
+			}
+			restStorage.SecondaryServiceClusterIPAllocator = secondaryServiceClusterIPRegistry
+		}
+	} else {
+		allocationClient, err := allocationclient.NewForConfig(c.LoopbackClientConfig)
+		if err != nil {
+			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		}
+		serviceClusterIPAllocator, err = ipapiallocator.NewAllocatorCIDRRange(&serviceClusterIPRange, allocationClient)
+		if err != nil {
+			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && c.SecondaryServiceIPRange.IP != nil {
+			secondaryServiceClusterIPAllocator, err = ipapiallocator.NewAllocatorCIDRRange(&c.SecondaryServiceIPRange, allocationClient)
+			if err != nil {
+				return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+			}
+		}
 	}
 
+	var serviceNodePortAllocator portallocator.Interface
 	var serviceNodePortRegistry rangeallocation.RangeRegistry
-	serviceNodePortAllocator, err := portallocator.NewPortAllocatorCustom(c.ServiceNodePortRange, func(max int, rangeSpec string) (allocator.Interface, error) {
+	// if !utilfeature.DefaultFeatureGate.Enabled(features.NodePortAllocatorAPI) {
+	serviceNodePortAllocator, err = portallocator.NewPortAllocatorCustom(c.ServiceNodePortRange, func(max int, rangeSpec string) (allocator.Interface, error) {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
 		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/servicenodeports", api.Resource("servicenodeportallocations"), serviceStorageConfig)
@@ -247,13 +270,16 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster port allocator: %v", err)
 	}
 	restStorage.ServiceNodePortAllocator = serviceNodePortRegistry
+	// } else {
+	// TODO implement nodeport allocator
+	//	}
 
 	controllerStorage, err := controllerstore.NewStorage(restOptionsGetter)
 	if err != nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 
-	serviceRESTStorage, serviceStatusStorage, err := servicestore.NewGenericREST(restOptionsGetter, serviceClusterIPRange, secondaryServiceClusterIPAllocator != nil)
+	serviceRESTStorage, serviceStatusStorage, err := servicestore.NewGenericREST(restOptionsGetter, serviceIPFamily, secondaryServiceClusterIPAllocator != nil)
 	if err != nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
@@ -262,6 +288,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		endpointsStorage,
 		podStorage.Pod,
 		serviceClusterIPAllocator,
+		serviceIPFamily,
 		secondaryServiceClusterIPAllocator,
 		serviceNodePortAllocator,
 		c.ProxyTransport)

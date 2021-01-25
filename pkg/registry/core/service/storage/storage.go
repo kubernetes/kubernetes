@@ -18,7 +18,6 @@ package storage
 
 import (
 	"context"
-	"net"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,8 +45,24 @@ type GenericREST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against services.
-func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet, hasSecondary bool) (*GenericREST, *StatusREST, error) {
-	strategy, _ := registry.StrategyForServiceCIDRs(serviceCIDR, hasSecondary)
+func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceIPFamily api.IPFamily, hasSecondary bool) (*GenericREST, *StatusREST, error) {
+	ipv4 := api.IPv4Protocol
+	ipv6 := api.IPv6Protocol
+	var primaryIPFamily *api.IPFamily = nil
+	var secondaryFamily *api.IPFamily = nil
+	if serviceIPFamily == api.IPv6Protocol {
+		primaryIPFamily = &ipv6
+		if hasSecondary {
+			secondaryFamily = &ipv4
+		}
+	} else {
+		primaryIPFamily = &ipv4
+		if hasSecondary {
+			secondaryFamily = &ipv6
+		}
+	}
+
+	strategy, _ := registry.StrategyForServiceCIDRs(serviceIPFamily, hasSecondary)
 
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Service{} },

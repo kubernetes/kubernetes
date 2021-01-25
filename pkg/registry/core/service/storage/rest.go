@@ -96,21 +96,15 @@ func NewREST(
 	endpoints EndpointsStorage,
 	pods rest.Getter,
 	serviceIPs ipallocator.Interface,
+	serviceIPFamily api.IPFamily,
 	secondaryServiceIPs ipallocator.Interface,
 	serviceNodePorts portallocator.Interface,
 	proxyTransport http.RoundTripper,
 ) (*REST, *registry.ProxyREST) {
-
-	strategy, _ := registry.StrategyForServiceCIDRs(serviceIPs.CIDR(), secondaryServiceIPs != nil)
+	// detect this cluster default Service IPFamily (ipfamily of --service-cluster-ip-range[0])
+	strategy, _ := registry.StrategyForServiceCIDRs(serviceIPFamily, secondaryServiceIPs != nil)
 
 	byIPFamily := make(map[api.IPFamily]ipallocator.Interface)
-
-	// detect this cluster default Service IPFamily (ipfamily of --service-cluster-ip-range[0])
-	serviceIPFamily := api.IPv4Protocol
-	cidr := serviceIPs.CIDR()
-	if netutil.IsIPv6CIDR(&cidr) {
-		serviceIPFamily = api.IPv6Protocol
-	}
 
 	// add primary family
 	byIPFamily[serviceIPFamily] = serviceIPs
