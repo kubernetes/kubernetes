@@ -47,7 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
@@ -551,7 +551,7 @@ func (plugin *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAll
 		return fmt.Errorf("failed to get existing persistent volumes")
 	}
 	for _, pv := range pvList.Items {
-		if v1helper.GetPersistentVolumeClass(&pv) != className {
+		if storagehelpers.GetPersistentVolumeClass(&pv) != className {
 			continue
 		}
 		pvName := pv.ObjectMeta.Name
@@ -732,7 +732,7 @@ func (p *glusterfsVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTop
 		return nil, fmt.Errorf("%s does not support block volume provisioning", p.plugin.GetPluginName())
 	}
 	klog.V(4).Infof("provision volume with options %v", p.options)
-	scName := v1helper.GetPersistentVolumeClaimClass(p.options.PVC)
+	scName := storagehelpers.GetPersistentVolumeClaimClass(p.options.PVC)
 	cfg, err := parseClassParameters(p.options.Parameters, p.plugin.host.GetKubeClient())
 	if err != nil {
 		return nil, err

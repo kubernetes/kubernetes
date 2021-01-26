@@ -21,7 +21,6 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//pkg/util/resizefs:go_default_library",
@@ -43,6 +42,7 @@ go_library(
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
+        "//staging/src/k8s.io/component-helpers/storage/volume:go_default_library",
         "//staging/src/k8s.io/mount-utils:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",

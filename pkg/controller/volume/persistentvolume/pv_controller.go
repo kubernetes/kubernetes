@@ -39,7 +39,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	volerr "k8s.io/cloud-provider/volume/errors"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
@@ -285,8 +285,8 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 		return fmt.Errorf("requested PV is too small")
 	}
 
-	requestedClass := v1helper.GetPersistentVolumeClaimClass(claim)
-	if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
+	requestedClass := storagehelpers.GetPersistentVolumeClaimClass(claim)
+	if storagehelpers.GetPersistentVolumeClass(volume) != requestedClass {
 		return fmt.Errorf("storageClassName does not match")
 	}
 
@@ -353,7 +353,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				if err = ctrl.emitEventForUnboundDelayBindingClaim(claim); err != nil {
 					return err
 				}
-			case v1helper.GetPersistentVolumeClaimClass(claim) != "":
+			case storagehelpers.GetPersistentVolumeClaimClass(claim) != "":
 				if err = ctrl.provisionClaim(claim); err != nil {
 					return err
 				}
@@ -1467,7 +1467,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	claim *v1.PersistentVolumeClaim,
 	plugin vol.ProvisionableVolumePlugin,
 	storageClass *storage.StorageClass) (string, error) {
-	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
+	claimClass := storagehelpers.GetPersistentVolumeClaimClass(claim)
 	klog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
 	// called from provisionClaim(), in this case, plugin MUST NOT be nil
@@ -1661,7 +1661,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 	claim *v1.PersistentVolumeClaim,
 	storageClass *storage.StorageClass) (string, error) {
-	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
+	claimClass := storagehelpers.GetPersistentVolumeClaimClass(claim)
 	klog.V(4).Infof("provisionClaimOperationExternal [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 	// Set provisionerName to external provisioner name by setClaimProvisioner
 	var err error
@@ -1759,7 +1759,7 @@ func (ctrl *PersistentVolumeController) newRecyclerEventRecorder(volume *v1.Pers
 func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *v1.PersistentVolumeClaim) (vol.ProvisionableVolumePlugin, *storage.StorageClass, error) {
 	// provisionClaim() which leads here is never called with claimClass=="", we
 	// can save some checks.
-	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
+	claimClass := storagehelpers.GetPersistentVolumeClaimClass(claim)
 	class, err := ctrl.classLister.Get(claimClass)
 	if err != nil {
 		return nil, nil, err
@@ -1827,7 +1827,7 @@ func (ctrl *PersistentVolumeController) getProvisionerNameFromVolume(volume *v1.
 	// the AnnDynamicallyProvisioned annotation value, use the storageClass's Provisioner
 	// field to avoid explosion of the metric in the cases like local storage provisioner
 	// tagging a volume with arbitrary provisioner names
-	storageClass := v1helper.GetPersistentVolumeClass(volume)
+	storageClass := storagehelpers.GetPersistentVolumeClass(volume)
 	class, err := ctrl.classLister.Get(storageClass)
 	if err != nil {
 		return "N/A"

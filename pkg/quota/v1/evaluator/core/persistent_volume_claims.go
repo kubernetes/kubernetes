@@ -28,9 +28,9 @@ import (
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	k8sfeatures "k8s.io/kubernetes/pkg/features"
 )
 
@@ -153,7 +153,7 @@ func (p *pvcEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 	// charge for claim
 	result[corev1.ResourcePersistentVolumeClaims] = *(resource.NewQuantity(1, resource.DecimalSI))
 	result[pvcObjectCountName] = *(resource.NewQuantity(1, resource.DecimalSI))
-	storageClassRef := helper.GetPersistentVolumeClaimClass(pvc)
+	storageClassRef := storagehelpers.GetPersistentVolumeClaimClass(pvc)
 	if len(storageClassRef) > 0 {
 		storageClassClaim := corev1.ResourceName(storageClassRef + storageClassSuffix + string(corev1.ResourcePersistentVolumeClaims))
 		result[storageClassClaim] = *(resource.NewQuantity(1, resource.DecimalSI))
