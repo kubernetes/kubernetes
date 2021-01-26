@@ -96,7 +96,7 @@ func (t *vSphereCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.Stor
 		case "iopslimit":
 			params[paramIopslimit] = v
 		default:
-			klog.V(2).Infof("StorageClass parameter [name:%q, value:%q] is not supported", k, v)
+			klog.V(2).InfoS("StorageClass parameter is not supported", "name", k, "value", v)
 		}
 	}
 
