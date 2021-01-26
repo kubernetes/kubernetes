@@ -120,7 +120,7 @@ dependencies:
 
   # Base images
   - name: "k8s.gcr.io/debian-base: dependents"
-    version: buster-v1.2.0
+    version: buster-v1.3.0
     refPaths:
     - path: build/workspace.bzl
       match: tag =
