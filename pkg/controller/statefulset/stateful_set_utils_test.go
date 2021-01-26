@@ -365,6 +365,17 @@ func TestGetPersistentVolumeClaims(t *testing.T) {
 	if !reflect.DeepEqual(claims, resultClaims) {
 		t.Fatalf("Unexpected pvc:\n %+v\n, desired pvc:\n %+v", claims, resultClaims)
 	}
+
+	// template annotations propagate to claims, deeply
+	statefulSet.Spec.Selector.MatchLabels = nil
+	statefulSet.Spec.VolumeClaimTemplates[0].ObjectMeta.Annotations = map[string]string{"foo": "bar"}
+	claims = getPersistentVolumeClaims(statefulSet, pod)
+	delete(statefulSet.Spec.VolumeClaimTemplates[0].ObjectMeta.Annotations, "foo")
+	pvc.SetAnnotations(map[string]string{"foo": "bar"})
+	resultClaims = map[string]v1.PersistentVolumeClaim{"datadir": pvc}
+	if !reflect.DeepEqual(claims, resultClaims) {
+		t.Fatalf("Unexpected pvc:\n %+v\n, desired pvc:\n %+v", claims, resultClaims)
+	}
 }
 
 func newPod() *v1.Pod {

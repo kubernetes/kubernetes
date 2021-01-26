@@ -141,6 +141,12 @@ func getPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) map[string]v1
 	claims := make(map[string]v1.PersistentVolumeClaim, len(templates))
 	for i := range templates {
 		claim := templates[i]
+		if templates[i].Annotations != nil {
+			claim.Annotations = map[string]string{}
+			for key, value := range templates[i].Annotations {
+				claim.Annotations[key] = value
+			}
+		}
 		claim.Name = getPersistentVolumeClaimName(set, &claim, ordinal)
 		claim.Namespace = set.Namespace
 		if claim.Labels != nil {
