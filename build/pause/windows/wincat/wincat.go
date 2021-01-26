@@ -43,16 +43,26 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to %s:%s because %s", host, port, err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.Printf("error while closing conn stream: %v", err)
+		}
+	}()
 
 	var wg sync.WaitGroup
 	wg.Add(2)
 
 	go func() {
 		defer func() {
-			os.Stdout.Close()
-			os.Stdin.Close()
-			conn.CloseRead()
+			if err := os.Stdout.Close(); err != nil {
+				log.Printf("error while closing stdout stream: %v", err)
+			}
+			if err := os.Stdin.Close(); err != nil {
+				log.Printf("error while closing stdin stream: %v", err)
+			}
+			if err := conn.CloseRead(); err != nil {
+				log.Printf("error while closing conn read stream: %v", err)
+			}
 			wg.Done()
 		}()
 
@@ -64,7 +74,9 @@ func main() {
 
 	go func() {
 		defer func() {
-			conn.CloseWrite()
+			if err := conn.CloseWrite(); err != nil {
+				log.Printf("error while closing conn write stream: %v", err)
+			}
 			wg.Done()
 		}()
 
@@ -73,6 +85,5 @@ func main() {
 			log.Printf("error while copying stream from stdin: %v", err)
 		}
 	}()
-
 	wg.Wait()
 }
