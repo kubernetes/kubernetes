@@ -160,17 +160,14 @@ func (saw *sampleAndWaterMarkHistograms) SetX1(x1 float64) {
 }
 
 func (saw *sampleAndWaterMarkHistograms) innerSet(updateXOrX1 func()) {
-	var when time.Time
-	var whenInt int64
-	var acc sampleAndWaterMarkAccumulator
-	var wellOrdered bool
-	func() {
+	when, whenInt, acc, wellOrdered := func() (time.Time, int64, sampleAndWaterMarkAccumulator, bool) {
 		saw.Lock()
 		defer saw.Unlock()
-		when = saw.clock.Now()
-		whenInt = saw.quantize(when)
-		acc = saw.sampleAndWaterMarkAccumulator
-		wellOrdered = !when.Before(acc.lastSet)
+		// Moved these variables here to tiptoe around https://github.com/golang/go/issues/43570 for #97685
+		when := saw.clock.Now()
+		whenInt := saw.quantize(when)
+		acc := saw.sampleAndWaterMarkAccumulator
+		wellOrdered := !when.Before(acc.lastSet)
 		updateXOrX1()
 		saw.relX = saw.x / saw.x1
 		if wellOrdered {
@@ -195,6 +192,7 @@ func (saw *sampleAndWaterMarkHistograms) innerSet(updateXOrX1 func()) {
 		} else if saw.relX > saw.hiRelX {
 			saw.hiRelX = saw.relX
 		}
+		return when, whenInt, acc, wellOrdered
 	}()
 	if !wellOrdered {
 		lastSetS := acc.lastSet.String()
