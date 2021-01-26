@@ -172,7 +172,7 @@ func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source stri
 	}
 
 	// Logging with sensitive mount options removed.
-	klog.V(4).Infof("Mounting cmd (%s) with arguments (%s)", mountCmd, mountArgsLogStr)
+	klog.V(4).InfoS("Mounting cmd with arguments executed", "mountCmd", mountCmd, "mountArgs", mountArgsLogStr)
 	command := exec.Command(mountCmd, mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -189,7 +189,7 @@ func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source stri
 // systemd-runs (needed by Mount()) works.
 func detectSystemd() bool {
 	if _, err := exec.LookPath("systemd-run"); err != nil {
-		klog.V(2).Infof("Detected OS without systemd")
+		klog.V(2).InfoS("Detected OS without systemd")
 		return false
 	}
 	// Try to run systemd-run --scope /bin/true, that should be enough
@@ -199,11 +199,11 @@ func detectSystemd() bool {
 	cmd := exec.Command("systemd-run", "--description=Kubernetes systemd probe", "--scope", "true")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		klog.V(2).Infof("Cannot run systemd-run, assuming non-systemd OS")
-		klog.V(4).Infof("systemd-run output: %s, failed with: %v", string(output), err)
+		klog.V(2).InfoS("Cannot run systemd-run, assuming non-systemd OS")
+		klog.ErrorS(err, "systemd-run failed", "output", string(output))
 		return false
 	}
-	klog.V(2).Infof("Detected OS with systemd")
+	klog.V(2).InfoS("Detected OS with systemd")
 	return true
 }
 
@@ -263,7 +263,7 @@ func AddSystemdScopeSensitive(systemdRunPath, mountName, command string, args []
 
 // Unmount unmounts the target.
 func (mounter *Mounter) Unmount(target string) error {
-	klog.V(4).Infof("Unmounting %s", target)
+	klog.V(4).InfoS("Unmounting target", "target", target)
 	command := exec.Command("umount", target)
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -278,7 +278,7 @@ func (mounter *Mounter) UnmountWithForce(target string, umountTimeout time.Durat
 	err := tryUnmount(target, umountTimeout)
 	if err != nil {
 		if err == context.DeadlineExceeded {
-			klog.V(2).Infof("Timed out waiting for unmount of %s, trying with -f", target)
+			klog.V(2).InfoS("Timed out waiting for unmount of target, trying with -f", "target", target)
 			err = forceUmount(target)
 		}
 		return err
@@ -337,7 +337,7 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 
 // checkAndRepairFileSystem checks and repairs filesystems using command fsck.
 func (mounter *SafeFormatAndMount) checkAndRepairFilesystem(source string) error {
-	klog.V(4).Infof("Checking for issues with fsck on disk: %s", source)
+	klog.V(4).InfoS("Checking for issues with fsck on disk", "source", source)
 	args := []string{"-a", source}
 	out, err := mounter.Exec.Command("fsck", args...).CombinedOutput()
 	if err != nil {
@@ -346,11 +346,11 @@ func (mounter *SafeFormatAndMount) checkAndRepairFilesystem(source string) error
 		case err == utilexec.ErrExecutableNotFound:
 			klog.Warningf("'fsck' not found on system; continuing mount without running 'fsck'.")
 		case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
-			klog.Infof("Device %s has errors which were corrected by fsck.", source)
+			klog.InfoS("Device has errors which were corrected by fsck.", "device", source)
 		case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
 			return NewMountError(HasFilesystemErrors, "'fsck' found errors on device %s but could not correct them: %s", source, string(out))
 		case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
-			klog.Infof("`fsck` error %s", string(out))
+			klog.InfoS("`fsck` error", "error", string(out))
 		}
 	}
 	return nil
@@ -405,7 +405,7 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 			}
 		}
 
-		klog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
+		klog.InfoS("Disk appears to be unformatted, attempting to format disk", "disk", source, "type", fstype, "args", args)
 		output, err := mounter.Exec.Command("mkfs."+fstype, args...).CombinedOutput()
 		if err != nil {
 			// Do not log sensitiveOptions only options
@@ -415,7 +415,7 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 			return NewMountError(FormatFailed, detailedErr)
 		}
 
-		klog.Infof("Disk successfully formatted (mkfs): %s - %s %s", fstype, source, target)
+		klog.InfoS("Disk successfully formatted", "fstype", fstype, "source", source, "target", target)
 	} else {
 		if fstype != existingFormat {
 			// Verify that the disk is formatted with filesystem type we are expecting
@@ -433,7 +433,7 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 	}
 
 	// Mount the disk
-	klog.V(4).Infof("Attempting to mount disk %s in %s format at %s", source, fstype, target)
+	klog.V(4).InfoS("Attempting to mount disk", "source", source, "fstype", fstype, "target", target)
 	if err := mounter.MountSensitive(source, target, fstype, options, sensitiveOptions); err != nil {
 		return NewMountError(mountErrorValue, err.Error())
 	}
@@ -444,10 +444,10 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 // GetDiskFormat uses 'blkid' to see if the given disk is unformatted
 func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	args := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
-	klog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
+	klog.V(4).InfoS("Attempting to determine if disk is formatted using blkid", "disk", disk, "args", args)
 	dataOut, err := mounter.Exec.Command("blkid", args...).CombinedOutput()
 	output := string(dataOut)
-	klog.V(4).Infof("Output: %q", output)
+	klog.V(4).InfoS("Output", output)
 
 	if err != nil {
 		if exit, ok := err.(utilexec.ExitError); ok {
@@ -485,7 +485,7 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	}
 
 	if len(pttype) > 0 {
-		klog.V(4).Infof("Disk %s detected partition table type: %s", disk, pttype)
+		klog.V(4).InfoS("Disk detected partition table type", "disk", disk, "pttype", pttype)
 		// Returns a special non-empty string as filesystem type, then kubelet
 		// will not format it.
 		return "unknown data, probably partitions", nil
@@ -594,7 +594,7 @@ func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
 
 // tryUnmount calls plain "umount" and waits for unmountTimeout for it to finish.
 func tryUnmount(path string, unmountTimeout time.Duration) error {
-	klog.V(4).Infof("Unmounting %s", path)
+	klog.V(4).InfoS("Unmounting target", "path", path)
 	ctx, cancel := context.WithTimeout(context.Background(), unmountTimeout)
 	defer cancel()
 
