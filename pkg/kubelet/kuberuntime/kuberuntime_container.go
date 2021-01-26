@@ -56,6 +56,8 @@ import (
 var (
 	// ErrCreateContainerConfig - failed to create container config
 	ErrCreateContainerConfig = errors.New("CreateContainerConfigError")
+	// ErrPreCreateHook - failed to execute PreCreateHook
+	ErrPreCreateHook = errors.New("PreCreateHookError")
 	// ErrCreateContainer - failed to create container
 	ErrCreateContainer = errors.New("CreateContainerError")
 	// ErrPreStartHook - failed to execute PreStartHook
@@ -165,6 +167,13 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		s, _ := grpcstatus.FromError(err)
 		m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", s.Message())
 		return s.Message(), ErrCreateContainerConfig
+	}
+
+	err = m.internalLifecycle.PreCreateContainer(pod, container, containerConfig)
+	if err != nil {
+		s, _ := grpcstatus.FromError(err)
+		m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Internal PreCreateContainer hook failed: %v", s.Message())
+		return s.Message(), ErrPreCreateHook
 	}
 
 	containerID, err := m.runtimeService.CreateContainer(podSandboxID, containerConfig, podSandboxConfig)

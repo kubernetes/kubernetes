@@ -167,7 +167,7 @@ var nonRoundTrippableTypes = sets.NewString(
 	"PatchOptions",
 )
 
-var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions", "GetOptions", "CreateOptions", "UpdateOptions", "PatchOptions"}
+var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "GetOptions", "CreateOptions", "UpdateOptions", "PatchOptions"}
 
 // TestCommonKindsRegistered verifies that all group/versions registered with
 // the legacyscheme package have the common kinds.

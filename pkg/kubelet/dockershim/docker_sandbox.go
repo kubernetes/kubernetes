@@ -662,7 +662,6 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 	securityOpts := ds.getSandBoxSecurityOpts(securityOptSeparator)
 	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
 
-	applyExperimentalCreateConfig(createConfig, c.Annotations)
 	return createConfig, nil
 }
 

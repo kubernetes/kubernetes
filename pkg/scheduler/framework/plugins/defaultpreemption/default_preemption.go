@@ -597,21 +597,21 @@ func selectVictimsOnNode(
 	nodeInfo *framework.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget,
 ) ([]*v1.Pod, int, *framework.Status) {
-	var potentialVictims []*v1.Pod
+	var potentialVictims []*framework.PodInfo
 	ph := fh.PreemptHandle()
-	removePod := func(rp *v1.Pod) error {
-		if err := nodeInfo.RemovePod(rp); err != nil {
+	removePod := func(rpi *framework.PodInfo) error {
+		if err := nodeInfo.RemovePod(rpi.Pod); err != nil {
 			return err
 		}
-		status := ph.RunPreFilterExtensionRemovePod(ctx, state, pod, rp, nodeInfo)
+		status := ph.RunPreFilterExtensionRemovePod(ctx, state, pod, rpi, nodeInfo)
 		if !status.IsSuccess() {
 			return status.AsError()
 		}
 		return nil
 	}
-	addPod := func(ap *v1.Pod) error {
-		nodeInfo.AddPod(ap)
-		status := ph.RunPreFilterExtensionAddPod(ctx, state, pod, ap, nodeInfo)
+	addPod := func(api *framework.PodInfo) error {
+		nodeInfo.AddPodInfo(api)
+		status := ph.RunPreFilterExtensionAddPod(ctx, state, pod, api, nodeInfo)
 		if !status.IsSuccess() {
 			return status.AsError()
 		}
@@ -620,10 +620,10 @@ func selectVictimsOnNode(
 	// As the first step, remove all the lower priority pods from the node and
 	// check if the given pod can be scheduled.
 	podPriority := corev1helpers.PodPriority(pod)
-	for _, p := range nodeInfo.Pods {
-		if corev1helpers.PodPriority(p.Pod) < podPriority {
-			potentialVictims = append(potentialVictims, p.Pod)
-			if err := removePod(p.Pod); err != nil {
+	for _, pi := range nodeInfo.Pods {
+		if corev1helpers.PodPriority(pi.Pod) < podPriority {
+			potentialVictims = append(potentialVictims, pi)
+			if err := removePod(pi); err != nil {
 				return nil, 0, framework.NewStatus(framework.Error, err.Error())
 			}
 		}
@@ -646,23 +646,24 @@ func selectVictimsOnNode(
 	}
 	var victims []*v1.Pod
 	numViolatingVictim := 0
-	sort.Slice(potentialVictims, func(i, j int) bool { return util.MoreImportantPod(potentialVictims[i], potentialVictims[j]) })
+	sort.Slice(potentialVictims, func(i, j int) bool { return util.MoreImportantPod(potentialVictims[i].Pod, potentialVictims[j].Pod) })
 	// Try to reprieve as many pods as possible. We first try to reprieve the PDB
 	// violating victims and then other non-violating ones. In both cases, we start
 	// from the highest priority victims.
 	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims, pdbs)
-	reprievePod := func(p *v1.Pod) (bool, error) {
-		if err := addPod(p); err != nil {
+	reprievePod := func(pi *framework.PodInfo) (bool, error) {
+		if err := addPod(pi); err != nil {
 			return false, err
 		}
 		status := fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
 		fits := status.IsSuccess()
 		if !fits {
-			if err := removePod(p); err != nil {
+			if err := removePod(pi); err != nil {
 				return false, err
 			}
-			victims = append(victims, p)
-			klog.V(5).Infof("Pod %v/%v is a potential preemption victim on node %v.", p.Namespace, p.Name, nodeInfo.Node().Name)
+			rpi := pi.Pod
+			victims = append(victims, rpi)
+			klog.V(5).Infof("Pod %v/%v is a potential preemption victim on node %v.", rpi.Namespace, rpi.Name, nodeInfo.Node().Name)
 		}
 		return fits, nil
 	}
@@ -743,14 +744,14 @@ func getLowerPriorityNominatedPods(pn framework.PodNominator, pod *v1.Pod, nodeN
 // preempted.
 // This function is stable and does not change the order of received pods. So, if it
 // receives a sorted list, grouping will preserve the order of the input list.
-func filterPodsWithPDBViolation(pods []*v1.Pod, pdbs []*policy.PodDisruptionBudget) (violatingPods, nonViolatingPods []*v1.Pod) {
+func filterPodsWithPDBViolation(podInfos []*framework.PodInfo, pdbs []*policy.PodDisruptionBudget) (violatingPodInfos, nonViolatingPodInfos []*framework.PodInfo) {
 	pdbsAllowed := make([]int32, len(pdbs))
 	for i, pdb := range pdbs {
 		pdbsAllowed[i] = pdb.Status.DisruptionsAllowed
 	}
 
-	for _, obj := range pods {
-		pod := obj
+	for _, podInfo := range podInfos {
+		pod := podInfo.Pod
 		pdbForPodIsViolated := false
 		// A pod with no labels will not match any PDB. So, no need to check.
 		if len(pod.Labels) != 0 {
@@ -782,12 +783,12 @@ func filterPodsWithPDBViolation(pods []*v1.Pod, pdbs []*policy.PodDisruptionBudg
 			}
 		}
 		if pdbForPodIsViolated {
-			violatingPods = append(violatingPods, pod)
+			violatingPodInfos = append(violatingPodInfos, podInfo)
 		} else {
-			nonViolatingPods = append(nonViolatingPods, pod)
+			nonViolatingPodInfos = append(nonViolatingPodInfos, podInfo)
 		}
 	}
-	return violatingPods, nonViolatingPods
+	return violatingPodInfos, nonViolatingPodInfos
 }
 
 func getPDBLister(informerFactory informers.SharedInformerFactory) policylisters.PodDisruptionBudgetLister {

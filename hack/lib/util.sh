@@ -729,6 +729,17 @@ function kube::util::ensure_dockerized {
   fi
 }
 
+# kube::util::ensure-bash-version
+# Check if we are using a supported bash version
+#
+function kube::util::ensure-bash-version {
+  # shellcheck disable=SC2004
+  if ((${BASH_VERSINFO[0]}<5)); then
+    echo "ERROR: This script requires a minimum bash version of 5.0"
+    exit 1
+  fi
+}
+
 # kube::util::ensure-gnu-sed
 # Determines which sed binary is gnu-sed on linux/darwin
 #

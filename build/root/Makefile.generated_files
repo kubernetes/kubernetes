@@ -32,6 +32,10 @@ endif
 # It's necessary to set this because some environments don't link sh -> bash.
 SHELL := /usr/bin/env bash
 
+# Define variables so `make --warn-undefined-variables` works.
+DBG_CODEGEN ?=
+UPDATE_API_KNOWN_VIOLATIONS ?=
+
 # This rule collects all the generated file sets into a single rule.  Other
 # rules should depend on this to ensure generated files are rebuilt.
 .PHONY: generated_files
@@ -95,6 +99,9 @@ endif
 ALL_GO_DIRS := $(shell                                                   \
     hack/make-rules/helpers/cache_go_dirs.sh $(META_DIR)/all_go_dirs.mk  \
 )
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** found $(shell echo $(ALL_GO_DIRS) | wc -w) *.go dirs)
+endif
 
 # Generate a list of all files that have a `+k8s:` comment-tag.  This will be
 # used to derive lists of files/dirs for generation tools.
@@ -105,7 +112,9 @@ ALL_K8S_TAG_FILES := $(shell                             \
     find $(ALL_GO_DIRS) -maxdepth 1 -type f -name \*.go  \
         | xargs grep --color=never -l '^// *+k8s:'       \
 )
-
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** found $(shell echo $(ALL_K8S_TAG_FILES) | wc -w) +k8s: tagged files)
+endif
 
 #
 # Code generation logic.
@@ -130,11 +139,14 @@ PRERELEASE_LIFECYCLE_GEN := $(BIN_DIR)/prerelease-lifecycle-gen
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all +k8s:prerelease-lifecycle-gen tags)
 endif
-PRERELEASE_LIFECYCLE_DIRS := $(shell                                             \
+PRERELEASE_LIFECYCLE_DIRS := $(shell                                                 \
     grep --color=never -l '+k8s:prerelease-lifecycle-gen=true' $(ALL_K8S_TAG_FILES)  \
-        | xargs -n1 dirname                                          \
-        | LC_ALL=C sort -u                                           \
+        | xargs -n1 dirname                                                          \
+        | LC_ALL=C sort -u                                                           \
 )
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** found $(shell echo $(PRERELEASE_LIFECYCLE_DIRS) | wc -w) +k8s:prerelease-lifecycle-gen tagged dirs)
+endif
 PRERELEASE_LIFECYCLE_FILES := $(addsuffix /$(PRERELEASE_LIFECYCLE_FILENAME), $(PRERELEASE_LIFECYCLE_DIRS))
 
 # Reset the list of packages that need generation.
@@ -147,16 +159,18 @@ $(shell rm -f $(META_DIR)/$(PRERELEASE_LIFECYCLE_GEN).todo)
 gen_prerelease_lifecycle: $(PRERELEASE_LIFECYCLE_GEN) $(META_DIR)/$(PRERELEASE_LIFECYCLE_GEN).todo
 	if [[ -s $(META_DIR)/$(PRERELEASE_LIFECYCLE_GEN).todo ]]; then                 \
 	    pkgs=$$(cat $(META_DIR)/$(PRERELEASE_LIFECYCLE_GEN).todo | paste -sd, -);  \
-	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                           \
+	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                                       \
 	        echo "DBG: running $(PRERELEASE_LIFECYCLE_GEN) for $$pkgs";            \
-	    fi;                                                            \
+	    fi;                                                                        \
+	    N=$$(cat $(META_DIR)/$(PRERELEASE_LIFECYCLE_GEN).todo | wc -l);            \
+	    echo "Generating prerelease lifecycle code for $$N targets";               \
 	    ./hack/run-in-gopath.sh $(PRERELEASE_LIFECYCLE_GEN)                        \
-	        --v $(KUBE_VERBOSE)                                        \
-	        --logtostderr                                              \
-	        -i "$$pkgs"                                                \
+	        --v $(KUBE_VERBOSE)                                                    \
+	        --logtostderr                                                          \
+	        -i "$$pkgs"                                                            \
 	        -O $(PRERELEASE_LIFECYCLE_BASENAME)                                    \
-	        "$$@";                                                     \
-	fi                                                                 \
+	        "$$@";                                                                 \
+	fi
 
 # For each dir in PRERELEASE_LIFECYCLE_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
@@ -165,10 +179,10 @@ gen_prerelease_lifecycle: $(PRERELEASE_LIFECYCLE_GEN) $(META_DIR)/$(PRERELEASE_L
 # has to be done in a distinct step because wildcards don't work in static
 # pattern rules.
 #
-# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $(PRERELEASE_LIFECYCLE_DIRS), $(eval                     \
-    $(dir)/$(PRERELEASE_LIFECYCLE_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
+$(foreach dir, $(PRERELEASE_LIFECYCLE_DIRS), $(eval                            \
+    $(dir)/$(PRERELEASE_LIFECYCLE_FILENAME): $(GODEPS_$(PRJ_SRC_PATH)/$(dir))  \
 ))
 
 # How to regenerate prerelease-lifecycle code.  This is a little slow to run,
@@ -191,7 +205,7 @@ $(PRERELEASE_LIFECYCLE_FILES): $(PRERELEASE_LIFECYCLE_GEN)
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
-$(PRERELEASE_LIFECYCLE_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/prerelease-lifecycle-gen)
+$(PRERELEASE_LIFECYCLE_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/prerelease-lifecycle-gen)
 	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/prerelease-lifecycle-gen
 	touch $@
 
@@ -223,6 +237,9 @@ DEEPCOPY_DIRS := $(shell                                             \
         | xargs -n1 dirname                                          \
         | LC_ALL=C sort -u                                           \
 )
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** found $(shell echo $(DEEPCOPY_DIRS) | wc -w) +k8s:deepcopy-gen tagged dirs)
+endif
 DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 
 # Reset the list of packages that need generation.
@@ -238,6 +255,8 @@ gen_deepcopy: $(DEEPCOPY_GEN) $(META_DIR)/$(DEEPCOPY_GEN).todo
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                           \
 	        echo "DBG: running $(DEEPCOPY_GEN) for $$pkgs";            \
 	    fi;                                                            \
+	    N=$$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | wc -l);            \
+	    echo "Generating deepcopy code for $$N targets";               \
 	    ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                        \
 	        --v $(KUBE_VERBOSE)                                        \
 	        --logtostderr                                              \
@@ -245,7 +264,7 @@ gen_deepcopy: $(DEEPCOPY_GEN) $(META_DIR)/$(DEEPCOPY_GEN).todo
 	        --bounding-dirs $(PRJ_SRC_PATH),"k8s.io/api"               \
 	        -O $(DEEPCOPY_BASENAME)                                    \
 	        "$$@";                                                     \
-	fi                                                                 \
+	fi
 
 # For each dir in DEEPCOPY_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
@@ -254,10 +273,10 @@ gen_deepcopy: $(DEEPCOPY_GEN) $(META_DIR)/$(DEEPCOPY_GEN).todo
 # has to be done in a distinct step because wildcards don't work in static
 # pattern rules.
 #
-# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $(DEEPCOPY_DIRS), $(eval                     \
-    $(dir)/$(DEEPCOPY_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
+$(foreach dir, $(DEEPCOPY_DIRS), $(eval                            \
+    $(dir)/$(DEEPCOPY_FILENAME): $(GODEPS_$(PRJ_SRC_PATH)/$(dir))  \
 ))
 
 # How to regenerate deep-copy code.  This is a little slow to run, so we batch
@@ -280,7 +299,7 @@ $(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
-$(DEEPCOPY_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/deepcopy-gen)
+$(DEEPCOPY_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/deepcopy-gen)
 	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/deepcopy-gen
 	touch $@
 
@@ -318,6 +337,9 @@ DEFAULTER_DIRS := $(shell                                            \
         | xargs -n1 dirname                                          \
         | LC_ALL=C sort -u                                           \
 )
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** found $(shell echo $(DEFAULTER_DIRS) | wc -w) +k8s:defaulter-gen tagged dirs)
+endif
 DEFAULTER_FILES := $(addsuffix /$(DEFAULTER_FILENAME), $(DEFAULTER_DIRS))
 DEFAULTER_EXTRA_PEER_PKGS := \
     $(addprefix $(PRJ_SRC_PATH)/, $(DEFAULTER_DIRS))
@@ -335,6 +357,8 @@ gen_defaulter: $(DEFAULTER_GEN) $(META_DIR)/$(DEFAULTER_GEN).todo
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                            \
 	        echo "DBG: running $(DEFAULTER_GEN) for $$pkgs";            \
 	    fi;                                                             \
+	    N=$$(cat $(META_DIR)/$(DEFAULTER_GEN).todo | wc -l);            \
+	    echo "Generating defaulter code for $$N targets";               \
 	    ./hack/run-in-gopath.sh $(DEFAULTER_GEN)                        \
 	        --v $(KUBE_VERBOSE)                                         \
 	        --logtostderr                                               \
@@ -349,10 +373,10 @@ gen_defaulter: $(DEFAULTER_GEN) $(META_DIR)/$(DEFAULTER_GEN).todo
 #
 # Note that this is a deps-only statement, not a full rule (see below for that).
 #
-# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $(DEFAULTER_DIRS), $(eval                     \
-    $(dir)/$(DEFAULTER_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
+$(foreach dir, $(DEFAULTER_DIRS), $(eval                            \
+    $(dir)/$(DEFAULTER_FILENAME): $(GODEPS_$(PRJ_SRC_PATH)/$(dir))  \
 ))
 
 # How to regenerate defaulter code.  This is a little slow to run, so we batch
@@ -375,7 +399,7 @@ $(DEFAULTER_FILES): $(DEFAULTER_GEN)
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
-$(DEFAULTER_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/defaulter-gen)
+$(DEFAULTER_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/defaulter-gen)
 	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/defaulter-gen
 	touch $@
 
@@ -422,6 +446,9 @@ CONVERSION_DIRS := $(shell                                              \
         | xargs -n1 dirname                                             \
         | LC_ALL=C sort -u                                              \
 )
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** found $(shell echo $(CONVERSION_DIRS) | wc -w) +k8s:conversion-gen tagged dirs)
+endif
 CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
 CONVERSION_EXTRA_PEER_PKGS := \
     k8s.io/kubernetes/pkg/apis/core \
@@ -442,6 +469,8 @@ gen_conversion: $(CONVERSION_GEN) $(META_DIR)/$(CONVERSION_GEN).todo
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                             \
 	        echo "DBG: running $(CONVERSION_GEN) for $$pkgs";            \
 	    fi;                                                              \
+	    N=$$(cat $(META_DIR)/$(CONVERSION_GEN).todo | wc -l);            \
+	    echo "Generating conversion code for $$N targets";               \
 	    ./hack/run-in-gopath.sh $(CONVERSION_GEN)                        \
 	        --extra-peer-dirs $$(echo $(CONVERSION_EXTRA_PEER_PKGS) | sed 's/ /,/g') \
 	        --extra-dirs $$(echo $(CONVERSION_EXTRA_PKGS) | sed 's/ /,/g') \
@@ -457,10 +486,10 @@ gen_conversion: $(CONVERSION_GEN) $(META_DIR)/$(CONVERSION_GEN).todo
 #
 # Note that this is a deps-only statement, not a full rule (see below for that).
 #
-# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $(CONVERSION_DIRS), $(eval                     \
-    $(dir)/$(CONVERSION_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
+$(foreach dir, $(CONVERSION_DIRS), $(eval                            \
+    $(dir)/$(CONVERSION_FILENAME): $(GODEPS_$(PRJ_SRC_PATH)/$(dir))  \
 ))
 
 # How to regenerate conversion code.  This is a little slow to run, so we batch
@@ -483,7 +512,7 @@ $(CONVERSION_FILES): $(CONVERSION_GEN)
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
-$(CONVERSION_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/conversion-gen)
+$(CONVERSION_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/conversion-gen)
 	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/conversion-gen
 	touch $@
 
@@ -522,7 +551,7 @@ SAMPLEAPISERVER_OPENAPI_TAG_FILES := $(filter $(APIMACHINERY_DEFAULT_TAG_FILES) 
 KUBE_OPENAPI_OUTPUT_PKG := pkg/generated/openapi
 AGGREGATOR_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/kube-aggregator/pkg/generated/openapi
 APIEXTENSIONS_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi
-CODEGEN_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/code-generator/_examples/apiserver/openapi
+CODEGEN_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/code-generator/examples/apiserver/openapi
 SAMPLEAPISERVER_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/sample-apiserver/pkg/generated/openapi
 
 OPENAPI_TARGETS := KUBE AGGREGATOR APIEXTENSIONS CODEGEN SAMPLEAPISERVER
@@ -537,6 +566,9 @@ $(prefix)_OPENAPI_DIRS := $(shell                                            \
         | xargs -n1 dirname                                                  \
         | LC_ALL=C sort -u                                                   \
 )
+ifeq ($(DBG_MAKEFILE),1)
+    $$(warning ***** found $(shell echo $($(prefix)_OPENAPI_TAG_FILES) | wc -w) +k8s:openapi-gen tagged dirs for $(prefix))
+endif
 endef
 $(foreach prefix, $(OPENAPI_TARGETS), $(eval $(OPENAPI_DIR_DEF)))
 
@@ -553,14 +585,11 @@ define OPENAPI_TARGETS_DEF
 # Note that this is a deps-only statement, not a full rule
 # (see below for that).
 #
-# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $($(prefix)_OPENAPI_DIRS), $(eval            \
-    $($(prefix)_OPENAPI_OUTFILE): $($(PRJ_SRC_PATH)/$(dir)) \
+$(foreach dir, $($(prefix)_OPENAPI_DIRS), $(eval                   \
+    $($(prefix)_OPENAPI_OUTFILE): $(GODEPS_$(PRJ_SRC_PATH)/$(dir)) \
 ))
-
-# Rebuild spec if the violation file changed.
-$($(prefix)_OPENAPI_OUTFILE): $($(prefix)_KNOWN_VIOLATION_FILENAME)
 
 # When UPDATE_API_KNOWN_VIOLATIONS is set to be true, let the generator to write
 # updated API violations to the known API violation exceptions list.
@@ -577,7 +606,8 @@ endif
 # The Make rule fails if generated API rule violation report differs from the
 # checked-in violation file, and prints error message to request developer to
 # fix either the API source code, or the known API rule violation file.
-$$($(prefix)_OPENAPI_OUTFILE): $(OPENAPI_GEN) $($(prefix)_KNOWN_VIOLATION_FILENAME:-)
+$$($(prefix)_OPENAPI_OUTFILE): $(OPENAPI_GEN) $($(prefix)_KNOWN_VIOLATION_FILENAME)
+	echo "Generating openapi code for $(prefix)";                                              \
 	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                                     \
 	    --v $(KUBE_VERBOSE)                                                                    \
 	    --logtostderr                                                                          \
@@ -606,7 +636,7 @@ gen_openapi: $(OPENAPI_GEN) $(KUBE_OPENAPI_OUTFILE) $(AGGREGATOR_OPENAPI_OUTFILE
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
-$(OPENAPI_GEN): $(k8s.io/kubernetes/vendor/k8s.io/kube-openapi/cmd/openapi-gen)
+$(OPENAPI_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/kube-openapi/cmd/openapi-gen)
 	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/kube-openapi/cmd/openapi-gen
 	touch $@
 
@@ -635,6 +665,6 @@ gen_bindata: $(BINDATA_GEN) FORCE
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
-$(BINDATA_GEN): $(k8s.io/kubernetes/vendor/github.com/go-bindata/go-bindata/go-bindata)
+$(BINDATA_GEN): $(GODEPS_k8s.io/kubernetes/vendor/github.com/go-bindata/go-bindata/go-bindata)
 	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/github.com/go-bindata/go-bindata/go-bindata
 	touch $@

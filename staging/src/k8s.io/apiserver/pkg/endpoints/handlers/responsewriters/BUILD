@@ -57,6 +57,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flushwriter:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/wsstream:go_default_library",
+        "//vendor/k8s.io/utils/trace:go_default_library",
     ],
 )
 

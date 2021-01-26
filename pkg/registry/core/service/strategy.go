@@ -18,7 +18,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"reflect"
 
@@ -37,7 +36,6 @@ import (
 
 type Strategy interface {
 	rest.RESTCreateUpdateStrategy
-	rest.RESTExportStrategy
 }
 
 // svcStrategy implements behavior for Services
@@ -137,30 +135,6 @@ func (strategy svcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime
 
 func (svcStrategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-func (svcStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) error {
-	t, ok := obj.(*api.Service)
-	if !ok {
-		// unexpected programmer error
-		return fmt.Errorf("unexpected object: %v", obj)
-	}
-	// TODO: service does not yet have a prepare create strategy (see above)
-	t.Status = api.ServiceStatus{}
-	if exact {
-		return nil
-	}
-	//set ClusterIPs as nil - if ClusterIPs[0] != None
-	if len(t.Spec.ClusterIPs) > 0 && t.Spec.ClusterIPs[0] != api.ClusterIPNone {
-		t.Spec.ClusterIP = ""
-		t.Spec.ClusterIPs = nil
-	}
-	if t.Spec.Type == api.ServiceTypeNodePort {
-		for i := range t.Spec.Ports {
-			t.Spec.Ports[i].NodePort = 0
-		}
-	}
-	return nil
 }
 
 // dropServiceDisabledFields drops fields that are not used if their associated feature gates

@@ -1077,8 +1077,8 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.filterRules.Reset()
 
 	// Write table headers.
-	writeLine(proxier.filterChains, "*filter")
-	writeLine(proxier.natChains, "*nat")
+	utilproxy.WriteLine(proxier.filterChains, "*filter")
+	utilproxy.WriteLine(proxier.natChains, "*nat")
 
 	proxier.createAndLinkKubeChain()
 
@@ -1696,7 +1696,7 @@ func (proxier *Proxier) writeIptablesRules() {
 				"-m", "set", "--match-set", proxier.ipsetList[set.name].Name,
 				set.matchType,
 			)
-			writeLine(proxier.natRules, append(args, "-j", set.to)...)
+			utilproxy.WriteLine(proxier.natRules, append(args, "-j", set.to)...)
 		}
 	}
 
@@ -1707,14 +1707,14 @@ func (proxier *Proxier) writeIptablesRules() {
 			"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name,
 		)
 		if proxier.masqueradeAll {
-			writeLine(proxier.natRules, append(args, "dst,dst", "-j", string(KubeMarkMasqChain))...)
+			utilproxy.WriteLine(proxier.natRules, append(args, "dst,dst", "-j", string(KubeMarkMasqChain))...)
 		} else if proxier.localDetector.IsImplemented() {
 			// This masquerades off-cluster traffic to a service VIP.  The idea
 			// is that you can establish a static route for your Service range,
 			// routing to any node, and that node will bridge into the Service
 			// for you.  Since that might bounce off-node, we masquerade here.
 			// If/when we support "Local" policy for VIPs, we should update this.
-			writeLine(proxier.natRules, proxier.localDetector.JumpIfNotLocal(append(args, "dst,dst"), string(KubeMarkMasqChain))...)
+			utilproxy.WriteLine(proxier.natRules, proxier.localDetector.JumpIfNotLocal(append(args, "dst,dst"), string(KubeMarkMasqChain))...)
 		} else {
 			// Masquerade all OUTPUT traffic coming from a service ip.
 			// The kube dummy interface has all service VIPs assigned which
@@ -1723,7 +1723,7 @@ func (proxier *Proxier) writeIptablesRules() {
 			// VIP:<service port>.
 			// Always masquerading OUTPUT (node-originating) traffic with a VIP
 			// source ip and service port destination fixes the outgoing connections.
-			writeLine(proxier.natRules, append(args, "src,dst", "-j", string(KubeMarkMasqChain))...)
+			utilproxy.WriteLine(proxier.natRules, append(args, "src,dst", "-j", string(KubeMarkMasqChain))...)
 		}
 	}
 
@@ -1736,11 +1736,11 @@ func (proxier *Proxier) writeIptablesRules() {
 		externalTrafficOnlyArgs := append(args,
 			"-m", "physdev", "!", "--physdev-is-in",
 			"-m", "addrtype", "!", "--src-type", "LOCAL")
-		writeLine(proxier.natRules, append(externalTrafficOnlyArgs, "-j", "ACCEPT")...)
+		utilproxy.WriteLine(proxier.natRules, append(externalTrafficOnlyArgs, "-j", "ACCEPT")...)
 		dstLocalOnlyArgs := append(args, "-m", "addrtype", "--dst-type", "LOCAL")
 		// Allow traffic bound for external IPs that happen to be recognized as local IPs to stay local.
 		// This covers cases like GCE load-balancers which get added to the local routing table.
-		writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", "ACCEPT")...)
+		utilproxy.WriteLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", "ACCEPT")...)
 	}
 
 	if !proxier.ipsetList[kubeExternalIPSet].isEmpty() {
@@ -1751,7 +1751,7 @@ func (proxier *Proxier) writeIptablesRules() {
 			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name,
 			"dst,dst",
 		)
-		writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+		utilproxy.WriteLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 		externalIPRules(args)
 	}
 
@@ -1770,16 +1770,16 @@ func (proxier *Proxier) writeIptablesRules() {
 		"-A", string(kubeServicesChain),
 		"-m", "addrtype", "--dst-type", "LOCAL",
 	)
-	writeLine(proxier.natRules, append(args, "-j", string(KubeNodePortChain))...)
+	utilproxy.WriteLine(proxier.natRules, append(args, "-j", string(KubeNodePortChain))...)
 
 	// mark drop for KUBE-LOAD-BALANCER
-	writeLine(proxier.natRules, []string{
+	utilproxy.WriteLine(proxier.natRules, []string{
 		"-A", string(KubeLoadBalancerChain),
 		"-j", string(KubeMarkMasqChain),
 	}...)
 
 	// mark drop for KUBE-FIRE-WALL
-	writeLine(proxier.natRules, []string{
+	utilproxy.WriteLine(proxier.natRules, []string{
 		"-A", string(KubeFireWallChain),
 		"-j", string(KubeMarkDropChain),
 	}...)
@@ -1792,7 +1792,7 @@ func (proxier *Proxier) writeIptablesRules() {
 	// If the masqueradeMark has been added then we want to forward that same
 	// traffic, this allows NodePort traffic to be forwarded even if the default
 	// FORWARD policy is not accept.
-	writeLine(proxier.filterRules,
+	utilproxy.WriteLine(proxier.filterRules,
 		"-A", string(KubeForwardChain),
 		"-m", "comment", "--comment", `"kubernetes forwarding rules"`,
 		"-m", "mark", "--mark", fmt.Sprintf("%s/%s", proxier.masqueradeMark, proxier.masqueradeMark),
@@ -1802,14 +1802,14 @@ func (proxier *Proxier) writeIptablesRules() {
 	// The following two rules ensure the traffic after the initial packet
 	// accepted by the "kubernetes forwarding rules" rule above will be
 	// accepted.
-	writeLine(proxier.filterRules,
+	utilproxy.WriteLine(proxier.filterRules,
 		"-A", string(KubeForwardChain),
 		"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod source rule"`,
 		"-m", "conntrack",
 		"--ctstate", "RELATED,ESTABLISHED",
 		"-j", "ACCEPT",
 	)
-	writeLine(proxier.filterRules,
+	utilproxy.WriteLine(proxier.filterRules,
 		"-A", string(KubeForwardChain),
 		"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod destination rule"`,
 		"-m", "conntrack",
@@ -1821,13 +1821,13 @@ func (proxier *Proxier) writeIptablesRules() {
 	// this so that it is easier to flush and change, for example if the mark
 	// value should ever change.
 	// NB: THIS MUST MATCH the corresponding code in the kubelet
-	writeLine(proxier.natRules, []string{
+	utilproxy.WriteLine(proxier.natRules, []string{
 		"-A", string(kubePostroutingChain),
 		"-m", "mark", "!", "--mark", fmt.Sprintf("%s/%s", proxier.masqueradeMark, proxier.masqueradeMark),
 		"-j", "RETURN",
 	}...)
 	// Clear the mark to avoid re-masquerading if the packet re-traverses the network stack.
-	writeLine(proxier.natRules, []string{
+	utilproxy.WriteLine(proxier.natRules, []string{
 		"-A", string(kubePostroutingChain),
 		// XOR proxier.masqueradeMark to unset it
 		"-j", "MARK", "--xor-mark", proxier.masqueradeMark,
@@ -1840,19 +1840,19 @@ func (proxier *Proxier) writeIptablesRules() {
 	if proxier.iptables.HasRandomFully() {
 		masqRule = append(masqRule, "--random-fully")
 	}
-	writeLine(proxier.natRules, masqRule...)
+	utilproxy.WriteLine(proxier.natRules, masqRule...)
 
 	// Install the kubernetes-specific masquerade mark rule. We use a whole chain for
 	// this so that it is easier to flush and change, for example if the mark
 	// value should ever change.
-	writeLine(proxier.natRules, []string{
+	utilproxy.WriteLine(proxier.natRules, []string{
 		"-A", string(KubeMarkMasqChain),
 		"-j", "MARK", "--or-mark", proxier.masqueradeMark,
 	}...)
 
 	// Write the end-of-table markers.
-	writeLine(proxier.filterRules, "COMMIT")
-	writeLine(proxier.natRules, "COMMIT")
+	utilproxy.WriteLine(proxier.filterRules, "COMMIT")
+	utilproxy.WriteLine(proxier.natRules, "COMMIT")
 }
 
 func (proxier *Proxier) acceptIPVSTraffic() {
@@ -1866,7 +1866,7 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 			default:
 				matchType = "dst,dst"
 			}
-			writeLine(proxier.natRules, []string{
+			utilproxy.WriteLine(proxier.natRules, []string{
 				"-A", string(kubeServicesChain),
 				"-m", "set", "--match-set", proxier.ipsetList[set].Name, matchType,
 				"-j", "ACCEPT",
@@ -1896,15 +1896,15 @@ func (proxier *Proxier) createAndLinkKubeChain() {
 		}
 		if ch.table == utiliptables.TableNAT {
 			if chain, ok := existingNATChains[ch.chain]; ok {
-				writeBytesLine(proxier.natChains, chain)
+				utilproxy.WriteBytesLine(proxier.natChains, chain)
 			} else {
-				writeLine(proxier.natChains, utiliptables.MakeChainLine(ch.chain))
+				utilproxy.WriteLine(proxier.natChains, utiliptables.MakeChainLine(ch.chain))
 			}
 		} else {
 			if chain, ok := existingFilterChains[ch.chain]; ok {
-				writeBytesLine(proxier.filterChains, chain)
+				utilproxy.WriteBytesLine(proxier.filterChains, chain)
 			} else {
-				writeLine(proxier.filterChains, utiliptables.MakeChainLine(ch.chain))
+				utilproxy.WriteLine(proxier.filterChains, utiliptables.MakeChainLine(ch.chain))
 			}
 		}
 	}
@@ -2171,24 +2171,6 @@ func (proxier *Proxier) getLegacyBindAddr(activeBindAddrs map[string]bool, curre
 		}
 	}
 	return legacyAddrs
-}
-
-// Join all words with spaces, terminate with newline and write to buff.
-func writeLine(buf *bytes.Buffer, words ...string) {
-	// We avoid strings.Join for performance reasons.
-	for i := range words {
-		buf.WriteString(words[i])
-		if i < len(words)-1 {
-			buf.WriteByte(' ')
-		} else {
-			buf.WriteByte('\n')
-		}
-	}
-}
-
-func writeBytesLine(buf *bytes.Buffer, bytes []byte) {
-	buf.Write(bytes)
-	buf.WriteByte('\n')
 }
 
 // listenPortOpener opens ports by calling bind() and listen().

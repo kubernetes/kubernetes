@@ -10,6 +10,7 @@ go_test(
     size = "large",
     srcs = [
         "apiserver_test.go",
+        "export_test.go",
         "main_test.go",
         "max_json_patch_operations_test.go",
         "max_request_body_bytes_test.go",

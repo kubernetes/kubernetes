@@ -21,7 +21,6 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/kubeapiserver:go_default_library",
-        "//pkg/util/slice:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

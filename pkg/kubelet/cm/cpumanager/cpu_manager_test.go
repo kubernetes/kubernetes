@@ -252,14 +252,6 @@ func TestCPUManagerAdd(t *testing.T) {
 			expAllocateErr:     fmt.Errorf("fake reg error"),
 			expAddContainerErr: nil,
 		},
-		{
-			description:        "cpu manager add - container update error",
-			updateErr:          fmt.Errorf("fake update error"),
-			policy:             testPolicy,
-			expCPUSet:          cpuset.NewCPUSet(1, 2, 3, 4),
-			expAllocateErr:     nil,
-			expAddContainerErr: fmt.Errorf("fake update error"),
-		},
 	}
 
 	for _, testCase := range testCases {
@@ -287,7 +279,8 @@ func TestCPUManagerAdd(t *testing.T) {
 				testCase.description, testCase.expAllocateErr, err)
 		}
 
-		err = mgr.AddContainer(pod, container, "fakeID")
+		mgr.AddContainer(pod, container, "fakeID")
+		_, _, err = mgr.containerMap.GetContainerRef("fakeID")
 		if !reflect.DeepEqual(err, testCase.expAddContainerErr) {
 			t.Errorf("CPU Manager AddContainer() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expAddContainerErr, err)
@@ -520,7 +513,9 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 				t.Errorf("StaticPolicy Allocate() error (%v). unexpected error for container id: %v: %v",
 					testCase.description, containerIDs[i], err)
 			}
-			err = mgr.AddContainer(testCase.pod, &containers[i], containerIDs[i])
+
+			mgr.AddContainer(testCase.pod, &containers[i], containerIDs[i])
+			_, _, err = mgr.containerMap.GetContainerRef(containerIDs[i])
 			if err != nil {
 				t.Errorf("StaticPolicy AddContainer() error (%v). unexpected error for container id: %v: %v",
 					testCase.description, containerIDs[i], err)
@@ -1018,14 +1013,6 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 			expAllocateErr:     nil,
 			expAddContainerErr: nil,
 		},
-		{
-			description:        "cpu manager add - container update error",
-			updateErr:          fmt.Errorf("fake update error"),
-			policy:             testPolicy,
-			expCPUSet:          cpuset.NewCPUSet(0, 1, 2, 3),
-			expAllocateErr:     nil,
-			expAddContainerErr: fmt.Errorf("fake update error"),
-		},
 	}
 
 	for _, testCase := range testCases {
@@ -1053,7 +1040,8 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 				testCase.description, testCase.expAllocateErr, err)
 		}
 
-		err = mgr.AddContainer(pod, container, "fakeID")
+		mgr.AddContainer(pod, container, "fakeID")
+		_, _, err = mgr.containerMap.GetContainerRef("fakeID")
 		if !reflect.DeepEqual(err, testCase.expAddContainerErr) {
 			t.Errorf("CPU Manager AddContainer() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expAddContainerErr, err)

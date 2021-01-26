@@ -273,13 +273,12 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	}
 
 	// validate image name
-	imageName := o.Image
-	if imageName == "" {
+	if o.Image == "" {
 		return fmt.Errorf("--image is required")
 	}
-	validImageRef := reference.ReferenceRegexp.MatchString(imageName)
-	if !validImageRef {
-		return fmt.Errorf("Invalid image name %q: %v", imageName, reference.ErrReferenceInvalidFormat)
+
+	if !reference.ReferenceRegexp.MatchString(o.Image) {
+		return fmt.Errorf("Invalid image name %q: %v", o.Image, reference.ErrReferenceInvalidFormat)
 	}
 
 	if o.TTY && !o.Interactive {

@@ -23,9 +23,10 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/generate"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/hash"
@@ -246,7 +247,7 @@ func handleFromEnvFileSource(secret *v1.Secret, envFileSource string) error {
 		return fmt.Errorf("env secret file cannot be a directory")
 	}
 
-	return addFromEnvFile(envFileSource, func(key, value string) error {
+	return cmdutil.AddFromEnvFile(envFileSource, func(key, value string) error {
 		return addKeyFromLiteralToSecret(secret, key, []byte(value))
 	})
 }
