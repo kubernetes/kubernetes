@@ -34,6 +34,7 @@ import (
 	openapicontroller "k8s.io/apiextensions-apiserver/pkg/controller/openapi"
 	"k8s.io/apiextensions-apiserver/pkg/controller/status"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition"
+	"k8s.io/apiextensions-apiserver/pkg/storageversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,11 +42,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	genericstorageversion "k8s.io/apiserver/pkg/storageversion"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/kubernetes"
 )
 
 var (
@@ -188,6 +193,15 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		delegate:  delegateHandler,
 	}
 	establishingController := establish.NewEstablishingController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
+	var sc genericstorageversion.Client
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
+		kubeclientset, err := kubernetes.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create clientset for storage versions: %v", err)
+		}
+		sc = kubeclientset.InternalV1alpha1().StorageVersions()
+	}
 	crdHandler, err := NewCustomResourceDefinitionHandler(
 		versionDiscoveryHandler,
 		groupDiscoveryHandler,
@@ -204,6 +218,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		time.Duration(c.GenericConfig.MinRequestTimeout)*time.Second,
 		apiGroupInfo.StaticOpenAPISpec,
 		c.GenericConfig.MaxRequestBodyBytes,
+		storageversion.NewManager(sc, c.GenericConfig.APIServerID),
 	)
 	if err != nil {
 		return nil, err

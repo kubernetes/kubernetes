@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
+	"k8s.io/apiextensions-apiserver/pkg/storageversion"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -87,6 +88,17 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
+)
+
+const (
+	// If the StorageVersionAPI feature gate is enabled, after a CRD storage
+	// (a.k.a. serving info) is created, the API server will block CR write
+	// requests that hit this storage until the corresponding storage
+	// version update gets processed/aborted by the storage version manager.
+	// The API server will unblock CR write requests if the storage version
+	// update takes longer than storageVersionUpdateTimeout after the
+	// storage is created.
+	storageVersionUpdateTimeout = 15 * time.Second
 )
 
 // crdHandler serves the `/apis` endpoint.
@@ -134,6 +146,13 @@ type crdHandler struct {
 	// The limit on the request size that would be accepted and decoded in a write request
 	// 0 means no limit.
 	maxRequestBodyBytes int64
+
+	// storageVersionManager manages CRD StorageVersion updates.
+	// NOTE: since we want StorageVersion updates happen in the same order
+	// as the CRD spec updates / underlying storage changes, one must hold
+	// customStorageLock when calling methods in storageVersionManager, to
+	// make sure the updates get queued up in the right order.
+	storageVersionManager storageversion.Manager
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -165,6 +184,33 @@ type crdInfo struct {
 	storageVersion string
 
 	waitGroup *utilwaitgroup.SafeWaitGroup
+
+	// storageVersionUpdate holds information about the storage version
+	// update issued when the crdInfo was created. The API server uses the
+	// information to decide whether a CR write request should be allowed,
+	// rejected, or blocked.
+	storageVersionUpdate *storageVersionUpdate
+}
+
+// storageVersionUpdate holds information about a storage version update,
+// indicating whether the update gets processed, aborted, or timed-out.
+type storageVersionUpdate struct {
+	// processedCh is closed by the storage version manager after the
+	// storage version update gets processed (either succeeded or failed).
+	// The API server will unblock and allow CR write requests if this
+	// channel is closed.
+	processedCh <-chan struct{}
+	// abortedCh is closed by the storage version manager if the storage
+	// version update gets aborted. The API server will unblock and reject
+	// CR write requests if this channel is closed.
+	abortedCh <-chan struct{}
+	// timeout is the time when the API server will unblock and allow CR
+	// write requests even if the storage version update hasn't been
+	// processed nor aborted.
+	timeout time.Time
+	// timeoutLogOnce allows the API server to log once when the timeout is
+	// hit.
+	timeoutLogOnce sync.Once
 }
 
 // crdStorageMap goes from customresourcedefinition to its storage
@@ -185,7 +231,8 @@ func NewCustomResourceDefinitionHandler(
 	requestTimeout time.Duration,
 	minRequestTimeout time.Duration,
 	staticOpenAPISpec *goopenapispec.Swagger,
-	maxRequestBodyBytes int64) (*crdHandler, error) {
+	maxRequestBodyBytes int64,
+	storageVersionManager storageversion.Manager) (*crdHandler, error) {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
@@ -202,6 +249,7 @@ func NewCustomResourceDefinitionHandler(
 		minRequestTimeout:       minRequestTimeout,
 		staticOpenAPISpec:       staticOpenAPISpec,
 		maxRequestBodyBytes:     maxRequestBodyBytes,
+		storageVersionManager:   storageVersionManager,
 	}
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    ret.createCustomResourceDefinition,
@@ -315,7 +363,31 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	terminating := apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating)
 
-	crdInfo, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	var crdInfo *crdInfo
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) &&
+		(requestInfo.Verb == "create" ||
+			requestInfo.Verb == "update" ||
+			requestInfo.Verb == "patch") {
+		var aborted bool
+		crdInfo, aborted, err = r.getOrCreateServingInfoForWrite(crd.UID, crd.Name)
+		// The server aborted storage version update due to the CRD being deleted.
+		// The CR request is forbidden.
+		if aborted {
+			err = apierrors.NewForbidden(schema.GroupResource{
+				Group:    requestInfo.APIGroup,
+				Resource: requestInfo.Resource,
+			}, requestInfo.Name, fmt.Errorf("storage version update aborted due to CRD deletion"))
+			utilruntime.HandleError(err)
+			responsewriters.ErrorNegotiated(
+				err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup,
+					Version: requestInfo.APIVersion}, w, req,
+			)
+			return
+		}
+	} else {
+		crdInfo, err = r.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	}
 	if apierrors.IsNotFound(err) {
 		r.delegate.ServeHTTP(w, req)
 		return
@@ -470,15 +542,25 @@ func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
 	// this could happen if the create event is merged from create-update events
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	oldInfo, found := storageMap[crd.UID]
-	if !found {
-		return
-	}
-	if apiequality.Semantic.DeepEqual(&crd.Spec, oldInfo.spec) && apiequality.Semantic.DeepEqual(&crd.Status.AcceptedNames, oldInfo.acceptedNames) {
+	// If an old storage with the same spec and accepted names exists, skip
+	// tearing down the storage; also skip updating storage version because
+	// the same update has been done when the old storage was created.
+	if found && apiequality.Semantic.DeepEqual(&crd.Spec, oldInfo.spec) &&
+		apiequality.Semantic.DeepEqual(&crd.Status.AcceptedNames, oldInfo.acceptedNames) {
 		klog.V(6).Infof("Ignoring customresourcedefinition %s create event because a storage with the same spec and accepted names exists",
 			crd.Name)
 		return
 	}
-	r.removeStorage_locked(crd.UID)
+	// Tear down the old storage
+	var tearDownFinishedCh <-chan struct{}
+	if found {
+		tearDownFinishedCh = r.removeStorage_locked(crd.UID)
+	}
+	// Update storage version with the latest info in the watch event
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		r.storageVersionManager.EnqueueStorageVersionUpdate(crd, tearDownFinishedCh, nil, nil)
+	}
 }
 
 // updateCustomResourceDefinition removes potentially stale storage so it gets re-created
@@ -504,26 +586,40 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 
 	if oldCRD.UID != newCRD.UID {
 		r.removeStorage_locked(oldCRD.UID)
+		if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+			utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+			r.storageVersionManager.TeardownFor(oldCRD.UID)
+		}
 	}
 
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	oldInfo, found := storageMap[newCRD.UID]
-	if !found {
-		return
-	}
-	if apiequality.Semantic.DeepEqual(&newCRD.Spec, oldInfo.spec) && apiequality.Semantic.DeepEqual(&newCRD.Status.AcceptedNames, oldInfo.acceptedNames) {
+	// If an old storage with the same spec and accepted names exists, skip
+	// tearing down the storage; also skip updating storage version because
+	// the same update has been done when the old storage was created.
+	if found && apiequality.Semantic.DeepEqual(&newCRD.Spec, oldInfo.spec) &&
+		apiequality.Semantic.DeepEqual(&newCRD.Status.AcceptedNames, oldInfo.acceptedNames) {
 		klog.V(6).Infof("Ignoring customresourcedefinition %s update because neither spec, nor accepted names changed", oldCRD.Name)
 		return
 	}
-
-	klog.V(4).Infof("Updating customresourcedefinition %s", newCRD.Name)
-	r.removeStorage_locked(newCRD.UID)
+	// Tear down the old storage
+	var tearDownFinishedCh <-chan struct{}
+	if found {
+		klog.V(4).Infof("Updating customresourcedefinition %s", newCRD.Name)
+		tearDownFinishedCh = r.removeStorage_locked(newCRD.UID)
+	}
+	// Update storage version with the latest info in the watch event
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		r.storageVersionManager.EnqueueStorageVersionUpdate(newCRD, tearDownFinishedCh, nil, nil)
+	}
 }
 
 // removeStorage_locked removes the cached storage with the given uid as key from the storage map. This function
 // updates r.customStorage with the cleaned-up storageMap and tears down the old storage.
 // NOTE: Caller MUST hold r.customStorageLock to write r.customStorage thread-safely.
-func (r *crdHandler) removeStorage_locked(uid types.UID) {
+func (r *crdHandler) removeStorage_locked(uid types.UID) <-chan struct{} {
+	tearDownFinishedCh := make(chan struct{})
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	if oldInfo, ok := storageMap[uid]; ok {
 		// Copy because we cannot write to storageMap without a race
@@ -535,8 +631,11 @@ func (r *crdHandler) removeStorage_locked(uid types.UID) {
 		r.customStorage.Store(storageMap2)
 
 		// Tear down the old storage
-		go r.tearDown(oldInfo)
+		go r.tearDown(oldInfo, tearDownFinishedCh)
+	} else {
+		close(tearDownFinishedCh)
 	}
+	return tearDownFinishedCh
 }
 
 // removeDeadStorage removes REST storage that isn't being used
@@ -563,13 +662,17 @@ func (r *crdHandler) removeDeadStorage() {
 	for uid, crdInfo := range storageMap {
 		if _, ok := storageMap2[uid]; !ok {
 			klog.V(4).Infof("Removing dead CRD storage for %s/%s", crdInfo.spec.Group, crdInfo.spec.Names.Kind)
-			go r.tearDown(crdInfo)
+			go r.tearDown(crdInfo, nil)
+			r.storageVersionManager.TeardownFor(uid)
 		}
 	}
 }
 
 // Wait up to a minute for requests to drain, then tear down storage
-func (r *crdHandler) tearDown(oldInfo *crdInfo) {
+func (r *crdHandler) tearDown(oldInfo *crdInfo, finishedCh chan<- struct{}) {
+	if finishedCh != nil {
+		defer close(finishedCh)
+	}
 	requestsDrained := make(chan struct{})
 	go func() {
 		defer close(requestsDrained)
@@ -599,6 +702,53 @@ func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions
 		return nil, err
 	}
 	return info.storages[info.storageVersion].CustomResource, nil
+}
+
+// getOrCreateServingInfoForWrite is getOrCreateServingInfoFor, but blocks CR
+// write requests until the storage version update is processed, aborted, or
+// timed-out.
+// If the storage version update is processed, unblock and allow the write request.
+// If the storage version update is aborted, unblock and reject the write request.
+// If the storage version update timed-out, unblock and allow the write request.
+//
+// If aborted is true, the returned error (403) should be surfaced to the client,
+// indicating that the server forbids the CR request due to the CRD deletion.
+// Otherwise, any non-nil error returned by getOrCreateServingInfoFor may be
+// wrapped by the server as an internal error (500) before surfacing to the client.
+func (r *crdHandler) getOrCreateServingInfoForWrite(uid types.UID, name string) (ret *crdInfo, aborted bool, err error) {
+	ret, err = r.getOrCreateServingInfoFor(uid, name)
+
+	// Surface non-nil error early.
+	if err != nil ||
+		// Return early if the StorageVersionAPI feature gate is disabled.
+		!utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) ||
+		ret.storageVersionUpdate == nil ||
+		ret.storageVersionUpdate.processedCh == nil {
+		return ret, false, err
+	}
+
+	// NOTE: currently the graceful CRD deletion waits 1s for in-flight requests
+	// to register themselves to the wait group. Ideally the storage version update should
+	// not cause the requests to miss the 1s window; otherwise the requests may
+	// fail ungracefully (e.g. it may happen if the CRD was deleted immediately after the
+	// first CR request establishes the underlying storage).
+	select {
+	case <-ret.storageVersionUpdate.processedCh:
+	case <-ret.storageVersionUpdate.abortedCh:
+		// Storage version update aborted. The caller knows which error
+		// to return to the client (403).
+		return nil, true, nil
+	// Unblock the requests if the storage version update takes a long time, otherwise
+	// CR requests may stack up and overwhelm the API server.
+	// TODO(roycaihw): benchmark the storage version update latency to adjust the timeout.
+	case <-time.After(ret.storageVersionUpdate.timeout.Sub(time.Now())):
+		ret.storageVersionUpdate.timeoutLogOnce.Do(func() {
+			klog.V(4).Infof("timeout waiting for CRD storage version update, group: %v, resource: %v; unblocking write requests",
+				ret.spec.Group, ret.spec.Names.Plural)
+		})
+	}
+	return ret, false, nil
 }
 
 // getOrCreateServingInfoFor gets the CRD serving info for the given CRD UID if the key exists in the storage map.
@@ -950,6 +1100,20 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	storageMap2[crd.UID] = ret
 	r.customStorage.Store(storageMap2)
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		return ret, nil
+	}
+
+	// spawn storage version update in background and use channels to make handlers wait
+	processedCh := make(chan struct{})
+	abortedCh := make(chan struct{})
+	r.storageVersionManager.EnqueueStorageVersionUpdate(crd, nil, processedCh, abortedCh)
+	ret.storageVersionUpdate = &storageVersionUpdate{
+		processedCh: processedCh,
+		abortedCh:   abortedCh,
+		timeout:     time.Now().Add(storageVersionUpdateTimeout),
+	}
 	return ret, nil
 }
 

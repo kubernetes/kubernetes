@@ -22,11 +22,14 @@ import (
 	"time"
 
 	"k8s.io/api/apiserverinternal/v1alpha1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 )
+
+type processStorageVersionFunc func(*v1alpha1.StorageVersion) error
 
 // Client has the methods required to update the storage version.
 type Client interface {
@@ -121,13 +124,23 @@ func setStatusCondition(conditions *[]v1alpha1.StorageVersionCondition, newCondi
 	existingCondition.ObservedGeneration = newCondition.ObservedGeneration
 }
 
-// updateStorageVersionFor updates the storage version object for the resource.
-func updateStorageVersionFor(c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string) error {
+// UpdateStorageVersionFor updates the storage version object for the resource.
+// postProcessFunc is invoked on the storage version object after the local
+// calulation is finished, and before the client sends the create/update request.
+// It allows the caller to customizes the storage version object, e.g. setting
+// an owner reference.
+func UpdateStorageVersionFor(ctx context.Context, c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string, postProcessFunc processStorageVersionFunc) error {
 	retries := 3
 	var retry int
 	var err error
 	for retry < retries {
-		err = singleUpdate(c, apiserverID, gr, encodingVersion, decodableVersions)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		err = singleUpdate(ctx, c, apiserverID, gr, encodingVersion, decodableVersions, postProcessFunc)
 		if err == nil {
 			return nil
 		}
@@ -144,10 +157,10 @@ func updateStorageVersionFor(c Client, apiserverID string, gr schema.GroupResour
 	return err
 }
 
-func singleUpdate(c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string) error {
+func singleUpdate(ctx context.Context, c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string, postProcessFunc processStorageVersionFunc) error {
 	shouldCreate := false
 	name := fmt.Sprintf("%s.%s", gr.Group, gr.Resource)
-	sv, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+	sv, err := c.Get(ctx, name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -156,18 +169,28 @@ func singleUpdate(c Client, apiserverID string, gr schema.GroupResource, encodin
 		sv = &v1alpha1.StorageVersion{}
 		sv.ObjectMeta.Name = name
 	}
+	svCopy := sv.DeepCopy()
 	updatedSV := localUpdateStorageVersion(sv, apiserverID, encodingVersion, decodableVersions)
+	if postProcessFunc != nil {
+		if err := postProcessFunc(updatedSV); err != nil {
+			return err
+		}
+	}
 	if shouldCreate {
-		createdSV, err := c.Create(context.TODO(), updatedSV, metav1.CreateOptions{})
+		createdSV, err := c.Create(ctx, updatedSV, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
 		// assign the calculated status to the object just created, then update status
 		createdSV.Status = updatedSV.Status
-		_, err = c.UpdateStatus(context.TODO(), createdSV, metav1.UpdateOptions{})
+		_, err = c.UpdateStatus(ctx, createdSV, metav1.UpdateOptions{})
 		return err
 	}
-	_, err = c.UpdateStatus(context.TODO(), updatedSV, metav1.UpdateOptions{})
+	if apiequality.Semantic.DeepEqual(svCopy, updatedSV) {
+		klog.V(6).Infof("Ignoring storageversion %s update because nothing changed", name)
+		return nil
+	}
+	_, err = c.UpdateStatus(ctx, updatedSV, metav1.UpdateOptions{})
 	return err
 }
 
