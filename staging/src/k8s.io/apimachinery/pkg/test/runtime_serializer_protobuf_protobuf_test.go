@@ -218,7 +218,7 @@ func TestProtobufDecode(t *testing.T) {
 		0x0a, 0x15,
 		0x0a, 0x0d, 0x6f, 0x74, 0x68, 0x65, 0x72, 0x2f, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, // apiversion
 		0x12, 0x04, 0x74, 0x65, 0x73, 0x74, // kind
-		0x12, 0x07, 0x6b, 0x38, 0x73, 0x00, 0x01, 0x02, 0x03, // data
+		0x12, 0x03, 0x01, 0x02, 0x03, // data
 		0x1a, 0x00, // content-type
 		0x22, 0x00, // content-encoding
 	}
@@ -238,7 +238,9 @@ func TestProtobufDecode(t *testing.T) {
 		},
 		{
 			obj: &runtime.Unknown{
-				Raw: []byte{},
+				// content type is set because wire data has the right prefix
+				ContentType: runtime.ContentTypeProtobuf,
+				Raw:         []byte{},
 			},
 			data: wire1,
 		},
@@ -248,9 +250,9 @@ func TestProtobufDecode(t *testing.T) {
 					APIVersion: "other/version",
 					Kind:       "test",
 				},
-				// content type is set because the prefix matches the content
+				// content type is set because wire data has the right prefix
 				ContentType: runtime.ContentTypeProtobuf,
-				Raw:         []byte{0x6b, 0x38, 0x73, 0x00, 0x01, 0x02, 0x03},
+				Raw:         []byte{0x01, 0x02, 0x03},
 			},
 			data: wire2,
 		},

@@ -120,9 +120,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 	if intoUnknown, ok := into.(*runtime.Unknown); ok && intoUnknown != nil {
 		*intoUnknown = unk
-		if ok, _, _ := s.RecognizesData(unk.Raw); ok {
-			intoUnknown.ContentType = runtime.ContentTypeProtobuf
-		}
+		intoUnknown.ContentType = runtime.ContentTypeProtobuf
 		return intoUnknown, &actual, nil
 	}
 
