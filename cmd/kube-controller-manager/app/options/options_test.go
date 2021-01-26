@@ -428,7 +428,8 @@ func TestAddFlags(t *testing.T) {
 			ClientTimeout:                10 * time.Second,
 			WebhookRetryBackoff:          apiserveroptions.DefaultAuthWebhookRetryBackoff(),
 			RemoteKubeConfigFileOptional: true,
-			AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or /healthz/*
+			AlwaysAllowPaths:             []string{"/healthz", "/readyz", "/livez"}, // note: this does not match /healthz/ or /healthz/*
+			AlwaysAllowGroups:            []string{"system:masters"},
 		},
 		Kubeconfig: "/kubeconfig",
 		Master:     "192.168.4.20",
