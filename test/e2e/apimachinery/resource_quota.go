@@ -1421,6 +1421,80 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 
 })
 
+var _ = SIGDescribe("ResourceQuota [Feature:CrossNamespacePodAffinity] [alpha]", func() {
+	f := framework.NewDefaultFramework("cross-namespace-pod-affinity")
+	ginkgo.It("should verify ResourceQuota with cross namespace pod affinity scope using scope-selectors.", func() {
+		ginkgo.By("Creating a ResourceQuota with cross namespace pod affinity scope")
+		quota, err := createResourceQuota(
+			f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeSelector("quota-cross-namespace-pod-affinity", v1.ResourceQuotaScopeCrossNamespacePodAffinity))
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring ResourceQuota status is calculated")
+		wantUsedResources := v1.ResourceList{v1.ResourcePods: resource.MustParse("0")}
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quota.Name, wantUsedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a pod that does not use cross namespace affinity")
+		pod := newTestPodWithAffinityForQuota(f, "no-cross-namespace-affinity", &v1.Affinity{
+			PodAntiAffinity: &v1.PodAntiAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
+					TopologyKey: "region",
+				}}}})
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a pod that uses namespaces field")
+		podWithNamespaces := newTestPodWithAffinityForQuota(f, "with-namespaces", &v1.Affinity{
+			PodAntiAffinity: &v1.PodAntiAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
+					TopologyKey: "region",
+					Namespaces:  []string{"ns1"},
+				}}}})
+		podWithNamespaces, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), podWithNamespaces, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota captures podWithNamespaces usage")
+		wantUsedResources[v1.ResourcePods] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quota.Name, wantUsedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a pod that uses namespaceSelector field")
+		podWithNamespaceSelector := newTestPodWithAffinityForQuota(f, "with-namespace-selector", &v1.Affinity{
+			PodAntiAffinity: &v1.PodAntiAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
+					TopologyKey: "region",
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "team",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"ads"},
+							},
+						},
+					}}}}})
+		podWithNamespaceSelector, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), podWithNamespaceSelector, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota captures podWithNamespaceSelector usage")
+		wantUsedResources[v1.ResourcePods] = resource.MustParse("2")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quota.Name, wantUsedResources)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Deleting the pods")
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
+		framework.ExpectNoError(err)
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podWithNamespaces.Name, *metav1.NewDeleteOptions(0))
+		framework.ExpectNoError(err)
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podWithNamespaceSelector.Name, *metav1.NewDeleteOptions(0))
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring resource quota status released the pod usage")
+		wantUsedResources[v1.ResourcePods] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quota.Name, wantUsedResources)
+		framework.ExpectNoError(err)
+	})
+})
+
 // newTestResourceQuotaWithScopeSelector returns a quota that enforces default constraints for testing with scopeSelectors
 func newTestResourceQuotaWithScopeSelector(name string, scope v1.ResourceQuotaScope) *v1.ResourceQuota {
 	hard := v1.ResourceList{}
@@ -1559,6 +1633,30 @@ func newTestPodForQuotaWithPriority(f *framework.Framework, name string, request
 				},
 			},
 			PriorityClassName: pclass,
+		},
+	}
+}
+
+// newTestPodForQuota returns a pod that has the specified requests and limits
+func newTestPodWithAffinityForQuota(f *framework.Framework, name string, affinity *v1.Affinity) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.PodSpec{
+			// prevent disruption to other test workloads in parallel test runs by ensuring the quota
+			// test pods don't get scheduled onto a node
+			NodeSelector: map[string]string{
+				"x-test.k8s.io/unsatisfiable": "not-schedulable",
+			},
+			Affinity: affinity,
+			Containers: []v1.Container{
+				{
+					Name:      "pause",
+					Image:     imageutils.GetPauseImageName(),
+					Resources: v1.ResourceRequirements{},
+				},
+			},
 		},
 	}
 }

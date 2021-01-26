@@ -676,6 +676,11 @@ const (
 	//
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
+	// owner: @ahg-g
+	// alpha: v1.21
+	//
+	// Allow specifying NamespaceSelector in PodAffinityTerm.
+	PodAffinityNamespaceSelector featuregate.Feature = "PodAffinityNamespaceSelector"
 )
 
 func init() {
@@ -778,6 +783,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PreferNominatedNode:                            {Default: false, PreRelease: featuregate.Alpha},
 	RunAsGroup:                                     {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	PodDeletionCost:                                {Default: false, PreRelease: featuregate.Alpha},
+	PodAffinityNamespaceSelector:                   {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
