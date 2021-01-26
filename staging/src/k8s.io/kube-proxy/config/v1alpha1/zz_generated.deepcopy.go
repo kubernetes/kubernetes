@@ -36,6 +36,11 @@ func (in *KubeProxyConfiguration) DeepCopyInto(out *KubeProxyConfiguration) {
 			(*out)[key] = val
 		}
 	}
+	if in.EnableProfiling != nil {
+		in, out := &in.EnableProfiling, &out.EnableProfiling
+		*out = new(bool)
+		**out = **in
+	}
 	out.ClientConnection = in.ClientConnection
 	in.IPTables.DeepCopyInto(&out.IPTables)
 	in.IPVS.DeepCopyInto(&out.IPVS)

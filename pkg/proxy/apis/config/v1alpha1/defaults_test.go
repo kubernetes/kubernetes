@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
+	"k8s.io/utils/pointer"
 )
 
 func TestDefaultsKubeProxyConfiguration(t *testing.T) {
@@ -67,6 +68,7 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 1 * time.Hour},
 				},
 				ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Minute},
+				EnableProfiling:  pointer.BoolPtr(true),
 			},
 		},
 		{
@@ -103,6 +105,7 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 1 * time.Hour},
 				},
 				ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Minute},
+				EnableProfiling:  pointer.BoolPtr(true),
 			},
 		},
 	}

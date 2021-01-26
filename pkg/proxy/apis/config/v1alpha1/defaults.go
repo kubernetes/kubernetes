@@ -125,6 +125,11 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	if obj.FeatureGates == nil {
 		obj.FeatureGates = make(map[string]bool)
 	}
+
+	// Enable profiling by default in the kube-proxy
+	if obj.EnableProfiling == nil {
+		obj.EnableProfiling = pointer.BoolPtr(true)
+	}
 }
 
 // getDefaultAddresses returns default address of healthz and metrics server
