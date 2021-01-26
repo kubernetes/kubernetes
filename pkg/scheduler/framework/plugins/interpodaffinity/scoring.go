@@ -137,7 +137,7 @@ func (pl *InterPodAffinity) PreScore(
 	}
 
 	if pl.sharedLister == nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("InterPodAffinity PreScore with empty shared lister found"))
+		return framework.NewStatus(framework.Error, "empty shared lister in InterPodAffinity PreScore")
 	}
 
 	affinity := pod.Spec.Affinity
@@ -151,19 +151,19 @@ func (pl *InterPodAffinity) PreScore(
 	if hasPreferredAffinityConstraints || hasPreferredAntiAffinityConstraints {
 		allNodes, err = pl.sharedLister.NodeInfos().List()
 		if err != nil {
-			framework.NewStatus(framework.Error, fmt.Sprintf("get all nodes from shared lister error, err: %v", err))
+			framework.AsStatus(fmt.Errorf("failed to get all nodes from shared lister: %w", err))
 		}
 	} else {
 		allNodes, err = pl.sharedLister.NodeInfos().HavePodsWithAffinityList()
 		if err != nil {
-			framework.NewStatus(framework.Error, fmt.Sprintf("get pods with affinity list error, err: %v", err))
+			framework.AsStatus(fmt.Errorf("failed to get pods with affinity list: %w", err))
 		}
 	}
 
 	podInfo := framework.NewPodInfo(pod)
 	if podInfo.ParseError != nil {
 		// Ideally we never reach here, because errors will be caught by PreFilter
-		return framework.NewStatus(framework.Error, fmt.Sprintf("parsing pod: %+v", podInfo.ParseError))
+		return framework.AsStatus(fmt.Errorf("failed to parse pod: %w", podInfo.ParseError))
 	}
 
 	state := &preScoreState{
@@ -223,14 +223,14 @@ func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) 
 // Note: the returned "score" is positive for pod-affinity, and negative for pod-antiaffinity.
 func (pl *InterPodAffinity) Score(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := pl.sharedLister.NodeInfos().Get(nodeName)
-	if err != nil || nodeInfo.Node() == nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v, node is nil: %v", nodeName, err, nodeInfo.Node() == nil))
+	if err != nil {
+		return 0, framework.AsStatus(fmt.Errorf("failed to get node %q from Snapshot: %w", nodeName, err))
 	}
 	node := nodeInfo.Node()
 
 	s, err := getPreScoreState(cycleState)
 	if err != nil {
-		return 0, framework.NewStatus(framework.Error, err.Error())
+		return 0, framework.AsStatus(err)
 	}
 	var score int64
 	for tpKey, tpValues := range s.topologyScore {
@@ -246,7 +246,7 @@ func (pl *InterPodAffinity) Score(ctx context.Context, cycleState *framework.Cyc
 func (pl *InterPodAffinity) NormalizeScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
 	s, err := getPreScoreState(cycleState)
 	if err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
+		return framework.AsStatus(err)
 	}
 	if len(s.topologyScore) == 0 {
 		return nil
