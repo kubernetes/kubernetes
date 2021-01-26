@@ -538,7 +538,7 @@ func (f *frameworkImpl) RunFilterPlugins(
 			if !pluginStatus.IsUnschedulable() {
 				// Filter plugins are not supposed to return any status other than
 				// Success or Unschedulable.
-				errStatus := framework.NewStatus(framework.Error, fmt.Sprintf("running %q filter plugin for pod %q: %v", pl.Name(), pod.Name, pluginStatus.Message()))
+				errStatus := framework.AsStatus(fmt.Errorf("running %q filter plugin: %w", pl.Name(), pluginStatus.AsError()))
 				return map[string]*framework.Status{pl.Name(): errStatus}
 			}
 			statuses[pl.Name()] = pluginStatus
@@ -577,7 +577,7 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framewo
 			return r, s
 		} else if !s.IsUnschedulable() {
 			// Any status other than Success or Unschedulable is Error.
-			return nil, framework.NewStatus(framework.Error, s.Message())
+			return nil, framework.AsStatus(s.AsError())
 		}
 		statuses[pl.Name()] = s
 	}
@@ -635,7 +635,7 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 			var err error
 			podsAdded, stateToUse, nodeInfoToUse, err = addNominatedPods(ctx, ph, pod, state, info)
 			if err != nil {
-				return framework.NewStatus(framework.Error, err.Error())
+				return framework.AsStatus(err)
 			}
 		} else if !podsAdded || !status.IsSuccess() {
 			break
