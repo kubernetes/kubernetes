@@ -59,7 +59,7 @@ const (
 	// using Headless Services
 	IsHeadlessService = "service.kubernetes.io/headless"
 
-	// labelNodeExcludeBalancers specifies that the node should not be considered as a target
+	// LabelNodeExcludeBalancers specifies that the node should not be considered as a target
 	// for external load-balancers which use nodes as a second hop (e.g. many cloud LBs which only
 	// understand nodes). For services that use externalTrafficPolicy=Local, this may mean that
 	// any backends on excluded nodes are not reachable by those external load-balancers.
