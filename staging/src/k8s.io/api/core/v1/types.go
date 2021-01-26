@@ -1976,6 +1976,9 @@ type ConfigMapKeySelector struct {
 	// Specify whether the ConfigMap or its key must be defined
 	// +optional
 	Optional *bool `json:"optional,omitempty" protobuf:"varint,3,opt,name=optional"`
+	// Expand variable references.
+	// +optional
+	Expand *bool `json:"expand,omitempty" protobuf:"varint,4,opt,name=expand"`
 }
 
 // SecretKeySelector selects a key of a Secret.
@@ -2013,6 +2016,9 @@ type ConfigMapEnvSource struct {
 	// Specify whether the ConfigMap must be defined
 	// +optional
 	Optional *bool `json:"optional,omitempty" protobuf:"varint,2,opt,name=optional"`
+	// Expand variable references.
+	// +optional
+	Expand *bool `json:"expand,omitempty" protobuf:"varint,3,opt,name=expand"`
 }
 
 // SecretEnvSource selects a Secret to populate the environment

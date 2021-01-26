@@ -264,6 +264,7 @@ func (ConfigMap) SwaggerDoc() map[string]string {
 var map_ConfigMapEnvSource = map[string]string{
 	"":         "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
 	"optional": "Specify whether the ConfigMap must be defined",
+	"expand":   "Expand variable references.",
 }
 
 func (ConfigMapEnvSource) SwaggerDoc() map[string]string {
@@ -274,6 +275,7 @@ var map_ConfigMapKeySelector = map[string]string{
 	"":         "Selects a key from a ConfigMap.",
 	"key":      "The key to select.",
 	"optional": "Specify whether the ConfigMap or its key must be defined",
+	"expand":   "Expand variable references.",
 }
 
 func (ConfigMapKeySelector) SwaggerDoc() map[string]string {

@@ -576,6 +576,11 @@ func (in *ConfigMapEnvSource) DeepCopyInto(out *ConfigMapEnvSource) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.Expand != nil {
+		in, out := &in.Expand, &out.Expand
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -595,6 +600,11 @@ func (in *ConfigMapKeySelector) DeepCopyInto(out *ConfigMapKeySelector) {
 	out.LocalObjectReference = in.LocalObjectReference
 	if in.Optional != nil {
 		in, out := &in.Optional, &out.Optional
+		*out = new(bool)
+		**out = **in
+	}
+	if in.Expand != nil {
+		in, out := &in.Expand, &out.Expand
 		*out = new(bool)
 		**out = **in
 	}
