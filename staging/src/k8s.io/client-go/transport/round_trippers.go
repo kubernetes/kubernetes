@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
-	"k8s.io/klog/v2"
 
+	"k8s.io/klog/v2"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 )
 

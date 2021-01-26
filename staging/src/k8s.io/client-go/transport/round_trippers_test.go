@@ -19,12 +19,13 @@ package transport
 import (
 	"bytes"
 	"fmt"
-	"k8s.io/klog/v2"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
 	"testing"
+
+	"k8s.io/klog/v2"
 )
 
 type testRoundTripper struct {
