@@ -441,18 +441,12 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		return nil, err
 	}
 
-	// shallow copy, do not modify the kubeconfig.Timeout.
-	config := *kubeconfig
-	config.Timeout = s.Generic.LeaderElection.RenewDeadline.Duration
-	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "leader-election"))
-
 	eventRecorder := createRecorder(client, KubeControllerManagerUserAgent)
 
 	c := &kubecontrollerconfig.Config{
-		Client:               client,
-		Kubeconfig:           kubeconfig,
-		EventRecorder:        eventRecorder,
-		LeaderElectionClient: leaderElectionClient,
+		Client:        client,
+		Kubeconfig:    kubeconfig,
+		EventRecorder: eventRecorder,
 	}
 	if err := s.ApplyTo(c); err != nil {
 		return nil, err
