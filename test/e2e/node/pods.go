@@ -282,6 +282,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 								events = append(events, event)
 								if event.Type == watch.Error {
 									framework.Logf("watch error seen for %s: %#v", pod.Name, event.Object)
+									break
 								}
 								if event.Type == watch.Deleted {
 									framework.Logf("watch delete seen for %s", pod.Name)
