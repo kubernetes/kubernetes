@@ -59,7 +59,7 @@ const (
 	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxContainerBackOff))
 	podRetryPeriod       = 1 * time.Second
 	podRetryTimeout      = 1 * time.Minute
-	podReadyTimeout      = 1 * time.Minute
+	podReadyTimeout      = 2 * time.Minute
 )
 
 // testHostIP tests that a pod gets a host IP
