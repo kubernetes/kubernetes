@@ -624,7 +624,7 @@ func selectVictimsOnNode(
 		if corev1helpers.PodPriority(pi.Pod) < podPriority {
 			potentialVictims = append(potentialVictims, pi)
 			if err := removePod(pi); err != nil {
-				return nil, 0, framework.NewStatus(framework.Error, err.Error())
+				return nil, 0, framework.AsStatus(err)
 			}
 		}
 	}
@@ -669,7 +669,7 @@ func selectVictimsOnNode(
 	}
 	for _, p := range violatingVictims {
 		if fits, err := reprievePod(p); err != nil {
-			return nil, 0, framework.NewStatus(framework.Error, err.Error())
+			return nil, 0, framework.AsStatus(err)
 		} else if !fits {
 			numViolatingVictim++
 		}
@@ -677,7 +677,7 @@ func selectVictimsOnNode(
 	// Now we try to reprieve non-violating victims.
 	for _, p := range nonViolatingVictims {
 		if _, err := reprievePod(p); err != nil {
-			return nil, 0, framework.NewStatus(framework.Error, err.Error())
+			return nil, 0, framework.AsStatus(err)
 		}
 	}
 	return victims, numViolatingVictim, framework.NewStatus(framework.Success)
