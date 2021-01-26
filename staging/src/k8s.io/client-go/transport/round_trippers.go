@@ -378,7 +378,7 @@ const (
 
 // NewDebuggingRoundTripper allows to display in the logs output debug information
 // on the API requests performed by the client.
-func NewDebuggingRoundTripper(rt http.RoundTripper, levels ...DebugLevel) *debuggingRoundTripper {
+func NewDebuggingRoundTripper(rt http.RoundTripper, levels ...DebugLevel) http.RoundTripper {
 	drt := &debuggingRoundTripper{
 		delegatedRoundTripper: rt,
 		levels:                make(map[DebugLevel]bool, len(levels)),

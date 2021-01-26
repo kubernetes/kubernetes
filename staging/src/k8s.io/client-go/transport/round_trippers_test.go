@@ -419,7 +419,7 @@ func TestHeaderEscapeRoundTrip(t *testing.T) {
 func TestDebuggingRoundTripper(t *testing.T) {
 	t.Parallel()
 
-	rawUrl := "https://127.0.0.1:12345/api/v1/pods?limit=500"
+	rawURL := "https://127.0.0.1:12345/api/v1/pods?limit=500"
 	req := &http.Request{
 		Method: http.MethodGet,
 		Header: map[string][]string{
@@ -440,7 +440,7 @@ func TestDebuggingRoundTripper(t *testing.T) {
 	}{
 		{
 			levels:              []DebugLevel{DebugJustURL},
-			expectedOutputLines: []string{fmt.Sprintf("%s %s", req.Method, rawUrl)},
+			expectedOutputLines: []string{fmt.Sprintf("%s %s", req.Method, rawURL)},
 		},
 		{
 			levels: []DebugLevel{DebugRequestHeaders},
@@ -471,7 +471,7 @@ func TestDebuggingRoundTripper(t *testing.T) {
 		},
 		{
 			levels:              []DebugLevel{DebugURLTiming},
-			expectedOutputLines: []string{fmt.Sprintf("%s %s %s", req.Method, rawUrl, res.Status)},
+			expectedOutputLines: []string{fmt.Sprintf("%s %s %s", req.Method, rawURL, res.Status)},
 		},
 		{
 			levels:              []DebugLevel{DebugResponseStatus},
@@ -489,12 +489,12 @@ func TestDebuggingRoundTripper(t *testing.T) {
 		klog.SetOutput(tmpWriteBuffer)
 		klog.LogToStderr(false)
 
-		// parse rawUrl
-		parsedUrl, err := url.Parse(rawUrl)
+		// parse rawURL
+		parsedURL, err := url.Parse(rawURL)
 		if err != nil {
-			t.Fatalf("url.Parse(%q) returned error: %v", rawUrl, err)
+			t.Fatalf("url.Parse(%q) returned error: %v", rawURL, err)
 		}
-		req.URL = parsedUrl
+		req.URL = parsedURL
 
 		// execute the round tripper
 		rt := &testRoundTripper{
