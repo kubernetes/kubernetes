@@ -352,7 +352,13 @@ func NewFilteredDialContext(wrapped DialContext, resolv Resolver, opts *Filtered
 		return wrapped
 	}
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
-		resp, err := resolv.LookupIPAddr(ctx, address)
+		// DialContext is given host:port. LookupIPAddress expects host.
+		addressToResolve, _, err := net.SplitHostPort(address)
+		if err != nil {
+			addressToResolve = address
+		}
+
+		resp, err := resolv.LookupIPAddr(ctx, addressToResolve)
 		if err != nil {
 			return nil, err
 		}
