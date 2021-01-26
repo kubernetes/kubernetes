@@ -27,18 +27,18 @@ spec:
           path: /var/lib/kubelet/device-plugins
       - name: plugins-registry-probe-mode
         hostPath:
-          path: /var/lib/kubelet/plugins_registry 
+          path: /var/lib/kubelet/plugins_registry
       - name: dev
         hostPath:
           path: /dev
       containers:
-      - image: gcr.io/kubernetes-e2e-test-images/sample-device-plugin:1.0 
+      - image: k8s.gcr.io/e2e-test-images/sample-device-plugin:1.3
         name: sample-device-plugin
         env:
         - name: PLUGIN_SOCK_DIR
           value: "/var/lib/kubelet/device-plugins"
         securityContext:
-           privileged: true
+          privileged: true
         volumeMounts:
         - name: device-plugin
           mountPath: /var/lib/kubelet/device-plugins

@@ -61,9 +61,9 @@ var NodePrePullImageList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Nonewprivs),
 	imageutils.GetPauseImageName(),
 	getGPUDevicePluginImage(),
-	"gcr.io/kubernetes-e2e-test-images/node-perf/npb-is:1.0",
-	"gcr.io/kubernetes-e2e-test-images/node-perf/npb-ep:1.0",
-	"gcr.io/kubernetes-e2e-test-images/node-perf/tf-wide-deep-amd64:1.0",
+	imageutils.GetE2EImage(imageutils.NodePerfNpbEp),
+	imageutils.GetE2EImage(imageutils.NodePerfNpbIs),
+	imageutils.GetE2EImage(imageutils.NodePerfTfWideDeep),
 )
 
 // updateImageAllowList updates the framework.ImagePrePullList with
