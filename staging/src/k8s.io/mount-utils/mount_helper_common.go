@@ -63,7 +63,7 @@ func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, exte
 	}
 
 	// Unmount the mount path
-	klog.V(4).Infof("%q is a mountpoint, unmounting", mountPath)
+	klog.V(4).InfoS("Unmounting mountpoint of mountpath", "mountpath", mountPath)
 	if err := mounter.UnmountWithForce(mountPath, umountTimeout); err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPoin
 	}
 
 	// Unmount the mount path
-	klog.V(4).Infof("%q is a mountpoint, unmounting", mountPath)
+	klog.V(4).InfoS("Unmounting mountpoint of mountpath", "mountpath", mountPath)
 	if err := mounter.Unmount(mountPath); err != nil {
 		return err
 	}
