@@ -6,6 +6,7 @@ go_test(
         "gc_test.go",
         "storage_version_filter_test.go",
         "storage_version_main_test.go",
+        "storage_version_test.go",
     ],
     tags = ["integration"],
     deps = [
