@@ -1501,7 +1501,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	// If the pod is a static pod and its mirror pod is still gracefully terminating,
 	// we do not want to start the new static pod until the old static pod is gracefully terminated.
 	podFullName := kubecontainer.GetPodFullName(pod)
-	if kl.podKiller.IsMirrorPodPendingTerminationByPodName(podFullName) {
+	if kl.podKiller.IsPodPendingTerminationByPodName(podFullName) {
 		return fmt.Errorf("pod %q is pending termination", podFullName)
 	}
 
@@ -1769,10 +1769,6 @@ func (kl *Kubelet) deletePod(pod *v1.Pod) error {
 		return fmt.Errorf("pod not found")
 	}
 	podPair := kubecontainer.PodPair{APIPod: pod, RunningPod: &runningPod}
-
-	if _, ok := kl.podManager.GetMirrorPodByPod(pod); ok {
-		kl.podKiller.MarkMirrorPodPendingTermination(pod)
-	}
 	kl.podKiller.KillPod(&podPair)
 
 	// We leave the volume/directory cleanup to the periodic cleanup routine.
