@@ -360,7 +360,7 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 // Returns an already created pod and container name for subsequent attach, if applicable.
 func (o *DebugOptions) visitNode(ctx context.Context, node *corev1.Node) (*corev1.Pod, string, error) {
 	pods := o.podClient.Pods(o.Namespace)
-	newPod, err := pods.Create(ctx, o.generateNodeDebugPod(node.Name), metav1.CreateOptions{})
+	newPod, err := pods.Create(ctx, o.generateNodeDebugPod(node), metav1.CreateOptions{})
 	if err != nil {
 		return nil, "", err
 	}
@@ -451,7 +451,7 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) *corev1.Ephemeral
 
 // generateNodeDebugPod generates a debugging pod that schedules on the specified node.
 // The generated pod will run in the host PID, Network & IPC namespaces, and it will have the node's filesystem mounted at /host.
-func (o *DebugOptions) generateNodeDebugPod(node string) *corev1.Pod {
+func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) *corev1.Pod {
 	cn := "debugger"
 	// Setting a user-specified container name doesn't make much difference when there's only one container,
 	// but the argument exists for pod debugging so it might be confusing if it didn't work here.
@@ -462,9 +462,9 @@ func (o *DebugOptions) generateNodeDebugPod(node string) *corev1.Pod {
 	// The name of the debugging pod is based on the target node, and it's not configurable to
 	// limit the number of command line flags. There may be a collision on the name, but this
 	// should be rare enough that it's not worth the API round trip to check.
-	pn := fmt.Sprintf("node-debugger-%s-%s", node, nameSuffixFunc(5))
+	pn := fmt.Sprintf("node-debugger-%s-%s", node.Name, nameSuffixFunc(5))
 	if !o.Quiet {
-		fmt.Fprintf(o.Out, "Creating debugging pod %s with container %s on node %s.\n", pn, cn, node)
+		fmt.Fprintf(o.Out, "Creating debugging pod %s with container %s on node %s.\n", pn, cn, node.Name)
 	}
 
 	p := &corev1.Pod{
@@ -492,7 +492,7 @@ func (o *DebugOptions) generateNodeDebugPod(node string) *corev1.Pod {
 			HostIPC:       true,
 			HostNetwork:   true,
 			HostPID:       true,
-			NodeName:      node,
+			NodeName:      node.Name,
 			RestartPolicy: corev1.RestartPolicyNever,
 			Volumes: []corev1.Volume{
 				{
@@ -500,6 +500,11 @@ func (o *DebugOptions) generateNodeDebugPod(node string) *corev1.Pod {
 					VolumeSource: corev1.VolumeSource{
 						HostPath: &corev1.HostPathVolumeSource{Path: "/"},
 					},
+				},
+			},
+			Tolerations: []corev1.Toleration{
+				{
+					Operator: corev1.TolerationOpExists,
 				},
 			},
 		},
