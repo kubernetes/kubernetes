@@ -127,7 +127,7 @@ func (f *FakeMounter) MountSensitive(source string, target string, fstype string
 		absTarget = target
 	}
 	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: absTarget, Type: fstype, Opts: append(opts, sensitiveOptions...)})
-	klog.V(5).Infof("Fake mounter: mounted %s to %s", source, absTarget)
+	klog.V(5).InfoS("Fake mounter: mounted device to target", "device", source, "target", absTarget)
 	f.log = append(f.log, FakeAction{Action: FakeActionMount, Target: absTarget, Source: source, FSType: fstype})
 	return nil
 }
@@ -156,7 +156,7 @@ func (f *FakeMounter) Unmount(target string) error {
 					return err
 				}
 			}
-			klog.V(5).Infof("Fake mounter: unmounted %s from %s", mp.Device, absTarget)
+			klog.V(5).InfoS("Fake mounter: unmounted device from target", "device", mp.Device, "target", absTarget)
 			// Don't copy it to newMountpoints
 			continue
 		}
@@ -200,11 +200,11 @@ func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 
 	for _, mp := range f.MountPoints {
 		if mp.Path == absFile {
-			klog.V(5).Infof("isLikelyNotMountPoint for %s: mounted %s, false", file, mp.Path)
+			klog.V(5).InfoS("Path to file is likely not a mountpoint", "file", file, "path", mp.Path)
 			return false, nil
 		}
 	}
-	klog.V(5).Infof("isLikelyNotMountPoint for %s: true", file)
+	klog.V(5).InfoS("Path to file is likely a mountpoint", "file", file)
 	return true, nil
 }
 
