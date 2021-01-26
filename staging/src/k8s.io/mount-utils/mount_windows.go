@@ -74,7 +74,7 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 	sanitizedOptionsForLogging := sanitizedOptionsForLogging(options, sensitiveOptions)
 
 	if source == "tmpfs" {
-		klog.V(3).Infof("mounting source (%q), target (%q), with options (%q)", source, target, sanitizedOptionsForLogging)
+		klog.V(3).InfoS("mounting source to target with options", "source", source, "target", target, "options", sanitizedOptionsForLogging)
 		return os.MkdirAll(target, 0755)
 	}
 
@@ -83,8 +83,7 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		return err
 	}
 
-	klog.V(4).Infof("mount options(%q) source:%q, target:%q, fstype:%q, begin to mount",
-		sanitizedOptionsForLogging, source, target, fstype)
+	klog.V(4).InfoS("begin to mount", "source", source, "target", target, "fstype", fstype, "options", sanitizedOptionsForLogging)
 	bindSource := source
 
 	if bind, _, _, _ := MakeBindOptsSensitive(options, sensitiveOptions); bind {
@@ -115,7 +114,7 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 				valid, err := isValidPath(source)
 				if !valid {
 					if err == nil || isAccessDeniedError(err) {
-						klog.V(2).Infof("SMB Mapping(%s) already exists while it's not valid, return error: %v, now begin to remove and remount", source, err)
+						klog.V(2).InfoS("SMB Mapping already exists while it's not valid, now begin to remove and remount", "SMBMapping", source, "error", err)
 						if output, err = removeSMBMapping(source); err != nil {
 							return fmt.Errorf("Remove-SmbGlobalMapping failed: %v, output: %q", err, output)
 						}
@@ -124,7 +123,7 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 						}
 					}
 				} else {
-					klog.V(2).Infof("SMB Mapping(%s) already exists and is still valid, skip error(%v)", source, err)
+					klog.V(2).InfoS("SMB Mapping already exists and is still valid, skip error", "SMBMapping", source, "error", err)
 				}
 			} else {
 				return fmt.Errorf("New-SmbGlobalMapping(%s) failed: %v, output: %q", source, err, output)
@@ -148,7 +147,7 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		klog.Errorf("mklink failed: %v, source(%q) target(%q) output: %q", err, mklinkSource, target, string(output))
 		return err
 	}
-	klog.V(2).Infof("mklink source(%q) on target(%q) successfully, output: %q", mklinkSource, target, string(output))
+	klog.V(2).InfoS("mklink source on target successfully", "mklink", mklinkSource, "target", target, "output", string(output))
 
 	return nil
 }
@@ -210,7 +209,7 @@ func removeSMBMapping(remotepath string) (string, error) {
 
 // Unmount unmounts the target.
 func (mounter *Mounter) Unmount(target string) error {
-	klog.V(4).Infof("azureMount: Unmount target (%q)", target)
+	klog.V(4).InfoS("azureMount: Unmount target", "target", target)
 	target = NormalizeWindowsPath(target)
 	if output, err := exec.Command("cmd", "/c", "rmdir", target).CombinedOutput(); err != nil {
 		klog.Errorf("rmdir failed: %v, output: %q", err, string(output))
@@ -254,7 +253,7 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 
 func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
 	// Try to mount the disk
-	klog.V(4).Infof("Attempting to formatAndMount disk: %s %s %s", fstype, source, target)
+	klog.V(4).InfoS("Attempting to formatAndMount disk", "fstype", fstype, "source", source, "target", target)
 
 	if err := ValidateDiskNumber(source); err != nil {
 		klog.Errorf("diskMount: formatAndMount failed, err: %v", err)
@@ -272,7 +271,7 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 	if output, err := mounter.Exec.Command("powershell", "/c", cmd).CombinedOutput(); err != nil {
 		return fmt.Errorf("diskMount: format disk failed, error: %v, output: %q", err, string(output))
 	}
-	klog.V(4).Infof("diskMount: Disk successfully formatted, disk: %q, fstype: %q", source, fstype)
+	klog.V(4).InfoS("diskMount: Disk successfully formatted", "disk", source, "fstype", fstype)
 
 	volumeIds, err := listVolumesOnDisk(source)
 	if err != nil {
@@ -285,7 +284,7 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 		klog.Errorf("mklink(%s, %s) failed: %v, output: %q", target, driverPath, err, string(output))
 		return err
 	}
-	klog.V(2).Infof("formatAndMount disk(%s) fstype(%s) on(%s) with output(%s) successfully", driverPath, fstype, target, string(output))
+	klog.V(2).InfoS("formatAndMount disk of fstype on target with output successfully", "driverPath", driverPath, "fstype", fstype, "target", target, "output", string(output))
 	return nil
 }
 
@@ -293,7 +292,7 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 func listVolumesOnDisk(diskID string) (volumeIDs []string, err error) {
 	cmd := fmt.Sprintf("(Get-Disk -DeviceId %s | Get-Partition | Get-Volume).UniqueId", diskID)
 	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-	klog.V(4).Infof("listVolumesOnDisk id from %s: %s", diskID, string(output))
+	klog.V(4).InfoS("listVolumesOnDisk id from disk", "disk", diskID, "output", string(output))
 	if err != nil {
 		return []string{}, fmt.Errorf("error list volumes on disk. cmd: %s, output: %s, error: %v", cmd, string(output), err)
 	}
