@@ -82,28 +82,28 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 			t.Fatalf("Error occurred while generating unmapVolumeFunc: %v", e)
 		}
 
-		metricFamilyName := "storage_operation_status_count"
+		metricFamilyName := "storage_operation_duration_seconds"
 		labelFilter := map[string]string{
 			"status":         "success",
 			"operation_name": "unmap_volume",
 			"volume_plugin":  expectedPluginName,
 		}
 		// compare the relative change of the metric because of the global state of the prometheus.DefaultGatherer.Gather()
-		storageOperationStatusCountMetricBefore := findMetricWithNameAndLabels(metricFamilyName, labelFilter)
+		storageOperationDurationMetricBefore := findMetricWithNameAndLabels(metricFamilyName, labelFilter)
 
 		var ee error
 		unmapVolumeFunc.CompleteFunc(&ee)
 
-		storageOperationStatusCountMetricAfter := findMetricWithNameAndLabels(metricFamilyName, labelFilter)
-		if storageOperationStatusCountMetricAfter == nil {
+		storageOperationDurationMetricAfter := findMetricWithNameAndLabels(metricFamilyName, labelFilter)
+		if storageOperationDurationMetricAfter == nil {
 			t.Fatalf("Couldn't find the metric with name(%s) and labels(%v)", metricFamilyName, labelFilter)
 		}
 
-		if storageOperationStatusCountMetricBefore == nil {
-			assert.Equal(t, float64(1), *storageOperationStatusCountMetricAfter.Counter.Value, tc.name)
+		if storageOperationDurationMetricBefore == nil {
+			assert.Equal(t, uint64(1), *storageOperationDurationMetricAfter.Histogram.SampleCount, tc.name)
 		} else {
-			metricValueDiff := *storageOperationStatusCountMetricAfter.Counter.Value - *storageOperationStatusCountMetricBefore.Counter.Value
-			assert.Equal(t, float64(1), metricValueDiff, tc.name)
+			metricValueDiff := *storageOperationDurationMetricAfter.Histogram.SampleCount - *storageOperationDurationMetricBefore.Histogram.SampleCount
+			assert.Equal(t, uint64(1), metricValueDiff, tc.name)
 		}
 	}
 }

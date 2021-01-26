@@ -50,15 +50,6 @@ var storageOperationMetric = metrics.NewHistogramVec(
 	[]string{"volume_plugin", "operation_name", "status"},
 )
 
-var storageOperationStatusMetric = metrics.NewCounterVec(
-	&metrics.CounterOpts{
-		Name:           "storage_operation_status_count",
-		Help:           "Storage operation return statuses count",
-		StabilityLevel: metrics.ALPHA,
-	},
-	[]string{"volume_plugin", "operation_name", "status"},
-)
-
 var storageOperationEndToEndLatencyMetric = metrics.NewHistogramVec(
 	&metrics.HistogramOpts{
 		Name:           "volume_operation_total_seconds",
@@ -77,7 +68,6 @@ func registerMetrics() {
 	// legacyregistry is the internal k8s wrapper around the prometheus
 	// global registry, used specifically for metric stability enforcement
 	legacyregistry.MustRegister(storageOperationMetric)
-	legacyregistry.MustRegister(storageOperationStatusMetric)
 	legacyregistry.MustRegister(storageOperationEndToEndLatencyMetric)
 }
 
@@ -94,7 +84,6 @@ func OperationCompleteHook(plugin, operationName string) func(*error) {
 			status = statusFailUnknown
 		}
 		storageOperationMetric.WithLabelValues(plugin, operationName, status).Observe(timeTaken)
-		storageOperationStatusMetric.WithLabelValues(plugin, operationName, status).Inc()
 	}
 	return opComplete
 }

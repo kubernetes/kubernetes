@@ -639,21 +639,12 @@ func getControllerStorageMetrics(ms e2emetrics.ControllerManagerMetrics, pluginN
 				if len(pluginName) > 0 && pluginName != metricPluginName {
 					continue
 				}
-				result.latencyMetrics[operation] = count
-			}
-		case "storage_operation_status_count":
-			for _, sample := range samples {
-				count := int64(sample.Value)
-				operation := string(sample.Metric["operation_name"])
 				status := string(sample.Metric["status"])
 				statusCounts := result.statusMetrics[operation]
-				metricPluginName := string(sample.Metric["volume_plugin"])
-				if len(pluginName) > 0 && pluginName != metricPluginName {
-					continue
-				}
 				switch status {
 				case "success":
 					statusCounts.successCount = count
+					result.latencyMetrics[operation] = count
 				case "fail-unknown":
 					statusCounts.failCount = count
 				default:
