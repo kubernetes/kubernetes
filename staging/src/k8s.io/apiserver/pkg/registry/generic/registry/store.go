@@ -593,7 +593,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 				return nil, nil, apierrors.NewInvalid(qualifiedKind, name, fieldErrList)
 			}
 			if newResourceVersion != existingResourceVersion {
-				return nil, nil, apierrors.NewConflict(qualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
+				return nil, nil, apierrors.NewConflict(qualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg+". expected: %d, actual: %d", newResourceVersion, existingResourceVersion))
 			}
 		}
 
