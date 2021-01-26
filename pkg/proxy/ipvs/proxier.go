@@ -1871,8 +1871,8 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 
 // createAndLinkKubeChain create all kube chains that ipvs proxier need and write basic link.
 func (proxier *Proxier) createAndLinkKubeChain() {
-	existingFilterChains := proxier.getExistingChains(proxier.filterChainsData, utiliptables.TableFilter)
-	existingNATChains := proxier.getExistingChains(proxier.iptablesData, utiliptables.TableNAT)
+	existingFilterChains := utiliptables.GetExistingChains(proxier.iptables, utiliptables.TableFilter, proxier.filterChainsData)
+	existingNATChains := utiliptables.GetExistingChains(proxier.iptables, utiliptables.TableNAT, proxier.iptablesData)
 
 	// ensure KUBE-MARK-DROP chain exist but do not change any rules
 	for _, ch := range iptablesEnsureChains {
@@ -1910,20 +1910,6 @@ func (proxier *Proxier) createAndLinkKubeChain() {
 		}
 	}
 
-}
-
-// getExistingChains get iptables-save output so we can check for existing chains and rules.
-// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
-// Result may SHARE memory with contents of buffer.
-func (proxier *Proxier) getExistingChains(buffer *bytes.Buffer, table utiliptables.Table) map[utiliptables.Chain][]byte {
-	buffer.Reset()
-	err := proxier.iptables.SaveInto(table, buffer)
-	if err != nil { // if we failed to get any rules
-		klog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
-	} else { // otherwise parse the output
-		return utiliptables.GetChainLines(table, buffer.Bytes())
-	}
-	return nil
 }
 
 // After a UDP or SCTP endpoint has been removed, we must flush any pending conntrack entries to it, or else we

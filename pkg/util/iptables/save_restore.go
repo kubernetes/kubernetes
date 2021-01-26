@@ -19,6 +19,7 @@ package iptables
 import (
 	"bytes"
 	"fmt"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -70,6 +71,28 @@ func GetChainLines(table Table, save []byte) map[Chain][]byte {
 		}
 	}
 	return chainsMap
+}
+
+// LoadIptablesSaveDataToBuffer load iptables-save output to buffer.
+// buffer can used exist, if no, will allocate  one
+func LoadIPtablesSaveDatasToBuffer(iptables Interface, table Table, buffer *bytes.Buffer) ([]byte, error) {
+	if buffer == nil {
+		buffer = bytes.NewBuffer(nil)
+	}
+	buffer.Reset()
+	err := iptables.SaveInto(table, buffer)
+	return buffer.Bytes(), err
+}
+
+// GetExistingChains get iptables-save output so we can check for existing chains and rules.
+// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
+// Result may SHARE memory with contents of buffer.
+func GetExistingChains(iptables Interface, table Table, buffer *bytes.Buffer) map[Chain][]byte {
+	saveDatas, err := LoadIPtablesSaveDatasToBuffer(iptables, table, buffer)
+	if err != nil {
+		klog.ErrorS(err, "Failed to execute iptables-save, syncing all rules", "table", table)
+	}
+	return GetChainLines(table, saveDatas)
 }
 
 func readLine(readIndex int, byteArray []byte) ([]byte, int) {

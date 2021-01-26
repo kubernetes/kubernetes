@@ -884,27 +884,6 @@ func (proxier *Proxier) syncProxyRules() {
 	// Below this point we will not return until we try to write the iptables rules.
 	//
 
-	// Get iptables-save output so we can check for existing chains and rules.
-	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
-	existingFilterChains := make(map[utiliptables.Chain][]byte)
-	proxier.existingFilterChainsData.Reset()
-	err := proxier.iptables.SaveInto(utiliptables.TableFilter, proxier.existingFilterChainsData)
-	if err != nil { // if we failed to get any rules
-		klog.ErrorS(err, "Failed to execute iptables-save, syncing all rules")
-	} else { // otherwise parse the output
-		existingFilterChains = utiliptables.GetChainLines(utiliptables.TableFilter, proxier.existingFilterChainsData.Bytes())
-	}
-
-	// IMPORTANT: existingNATChains may share memory with proxier.iptablesData.
-	existingNATChains := make(map[utiliptables.Chain][]byte)
-	proxier.iptablesData.Reset()
-	err = proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesData)
-	if err != nil { // if we failed to get any rules
-		klog.ErrorS(err, "Failed to execute iptables-save, syncing all rules")
-	} else { // otherwise parse the output
-		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, proxier.iptablesData.Bytes())
-	}
-
 	// Reset all buffers used later.
 	// This is to avoid memory reallocations and thus improve performance.
 	proxier.filterChains.Reset()
@@ -915,6 +894,10 @@ func (proxier *Proxier) syncProxyRules() {
 	// Write table headers.
 	utilproxy.WriteLine(proxier.filterChains, "*filter")
 	utilproxy.WriteLine(proxier.natChains, "*nat")
+
+	// get existing filter and nat chain
+	existingFilterChains := utiliptables.GetExistingChains(proxier.iptables, utiliptables.TableFilter, proxier.existingFilterChainsData)
+	existingNATChains := utiliptables.GetExistingChains(proxier.iptables, utiliptables.TableNAT, proxier.iptablesData)
 
 	// Make sure we keep stats for the top-level chains, if they existed
 	// (which most should have because we created them above).
