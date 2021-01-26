@@ -3556,7 +3556,9 @@ func ValidatePreferredSchedulingTerms(terms []core.PreferredSchedulingTerm, fldP
 func validatePodAffinityTerm(podAffinityTerm core.PodAffinityTerm, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, fldPath.Child("matchExpressions"))...)
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.LabelSelector, fldPath.Child("labelSelector"))...)
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(podAffinityTerm.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
+
 	for _, name := range podAffinityTerm.Namespaces {
 		for _, msg := range ValidateNamespaceName(name, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, msg))
@@ -5425,10 +5427,10 @@ func validateScopedResourceSelectorRequirement(resourceQuotaSpec *core.ResourceQ
 			}
 		}
 		switch req.ScopeName {
-		case core.ResourceQuotaScopeBestEffort, core.ResourceQuotaScopeNotBestEffort, core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating:
+		case core.ResourceQuotaScopeBestEffort, core.ResourceQuotaScopeNotBestEffort, core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeCrossNamespacePodAffinity:
 			if req.Operator != core.ScopeSelectorOpExists {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), req.Operator,
-					"must be 'Exist' only operator when scope is any of ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeBestEffort and ResourceQuotaScopeNotBestEffort"))
+					"must be 'Exist' when scope is any of ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeBestEffort, ResourceQuotaScopeNotBestEffort or ResourceQuotaScopeCrossNamespacePodAffinity"))
 			}
 		}
 

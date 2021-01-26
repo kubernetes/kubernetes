@@ -28,6 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// LabelSelectorEmpty returns true if the label selector is empty
+func LabelSelectorIsEmpty(ps *LabelSelector) bool {
+	return len(ps.MatchLabels)+len(ps.MatchExpressions) == 0
+}
+
 // LabelSelectorAsSelector converts the LabelSelector api type into a struct that implements
 // labels.Selector
 // Note: This function should be kept in sync with the selector methods in pkg/labels/selector.go
@@ -35,7 +40,7 @@ func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 	if ps == nil {
 		return labels.Nothing(), nil
 	}
-	if len(ps.MatchLabels)+len(ps.MatchExpressions) == 0 {
+	if LabelSelectorIsEmpty(ps) {
 		return labels.Everything(), nil
 	}
 	selector := labels.NewSelector()

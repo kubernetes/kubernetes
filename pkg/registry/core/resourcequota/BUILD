@@ -15,6 +15,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/core/resourcequota",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/api/resourcequota:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

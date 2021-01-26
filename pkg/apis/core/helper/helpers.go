@@ -104,6 +104,7 @@ var standardResourceQuotaScopes = sets.NewString(
 	string(core.ResourceQuotaScopeBestEffort),
 	string(core.ResourceQuotaScopeNotBestEffort),
 	string(core.ResourceQuotaScopePriorityClass),
+	string(core.ResourceQuotaScopeCrossNamespacePodAffinity),
 )
 
 // IsStandardResourceQuotaScope returns true if the scope is a standard value
@@ -127,7 +128,8 @@ var podComputeQuotaResources = sets.NewString(
 // IsResourceQuotaScopeValidForResource returns true if the resource applies to the specified scope
 func IsResourceQuotaScopeValidForResource(scope core.ResourceQuotaScope, resource string) bool {
 	switch scope {
-	case core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeNotBestEffort, core.ResourceQuotaScopePriorityClass:
+	case core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeNotBestEffort,
+		core.ResourceQuotaScopePriorityClass, core.ResourceQuotaScopeCrossNamespacePodAffinity:
 		return podObjectCountQuotaResources.Has(resource) || podComputeQuotaResources.Has(resource)
 	case core.ResourceQuotaScopeBestEffort:
 		return podObjectCountQuotaResources.Has(resource)

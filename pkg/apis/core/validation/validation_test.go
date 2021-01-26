@@ -7405,6 +7405,15 @@ func TestValidatePod(t *testing.T) {
 							},
 							TopologyKey: "zone",
 							Namespaces:  []string{"ns"},
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1", "value2"},
+									},
+								},
+							},
 						},
 					},
 					PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
@@ -8122,7 +8131,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"invalid labelSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, values should be empty if the operator is Exists": {
-			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.matchExpressions.matchExpressions[0].values",
+			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchExpressions[0].values",
 			spec: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "123",
@@ -8152,7 +8161,68 @@ func TestValidatePod(t *testing.T) {
 				}),
 			},
 		},
-		"invalid name space in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, name space shouldbe valid": {
+		"invalid namespaceSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity, In operator must include Values": {
+			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.namespaceSelector.matchExpressions[0].values",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: core.PodAffinityTerm{
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key2",
+												Operator: metav1.LabelSelectorOpIn,
+											},
+										},
+									},
+									Namespaces:  []string{"ns"},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid namespaceSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity, Exists operator can not have values": {
+			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.namespaceSelector.matchExpressions[0].values",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: core.PodAffinityTerm{
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key2",
+												Operator: metav1.LabelSelectorOpExists,
+												Values:   []string{"value1", "value2"},
+											},
+										},
+									},
+									Namespaces:  []string{"ns"},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid name space in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, namespace should be valid": {
 			expectedError: "spec.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.namespace",
 			spec: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -14079,6 +14149,14 @@ func TestValidateResourceQuota(t *testing.T) {
 		Scopes: []core.ResourceQuotaScope{core.ResourceQuotaScopeNotBestEffort},
 	}
 
+	crossNamespaceAffinitySpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			core.ResourceCPU:       resource.MustParse("100"),
+			core.ResourceLimitsCPU: resource.MustParse("200"),
+		},
+		Scopes: []core.ResourceQuotaScope{core.ResourceQuotaScopeCrossNamespacePodAffinity},
+	}
+
 	scopeSelectorSpec := core.ResourceQuotaSpec{
 		ScopeSelector: &core.ScopeSelector{
 			MatchExpressions: []core.ScopedResourceSelectorRequirement{
@@ -14140,6 +14218,18 @@ func TestValidateResourceQuota(t *testing.T) {
 		Scopes: []core.ResourceQuotaScope{core.ResourceQuotaScopeBestEffort, core.ResourceQuotaScopeNotBestEffort},
 	}
 
+	invalidCrossNamespaceAffinitySpec := core.ResourceQuotaSpec{
+		ScopeSelector: &core.ScopeSelector{
+			MatchExpressions: []core.ScopedResourceSelectorRequirement{
+				{
+					ScopeName: core.ResourceQuotaScopeCrossNamespacePodAffinity,
+					Operator:  core.ScopeSelectorOpIn,
+					Values:    []string{"cluster-services"},
+				},
+			},
+		},
+	}
+
 	invalidScopeNameSpec := core.ResourceQuotaSpec{
 		Hard: core.ResourceList{
 			core.ResourceCPU: resource.MustParse("100"),
@@ -14182,6 +14272,13 @@ func TestValidateResourceQuota(t *testing.T) {
 				Namespace: "foo",
 			},
 			Spec: bestEffortSpec,
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: crossNamespaceAffinitySpec,
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -14247,6 +14344,10 @@ func TestValidateResourceQuota(t *testing.T) {
 		"invalid-quota-scope-name": {
 			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidScopeNameSpec},
 			"unsupported scope",
+		},
+		"invalid-cross-namespace-affinity": {
+			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidCrossNamespaceAffinitySpec},
+			"must be 'Exist' when scope is any of ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeBestEffort, ResourceQuotaScopeNotBestEffort or ResourceQuotaScopeCrossNamespacePodAffinity",
 		},
 	}
 	for k, v := range errorCases {
