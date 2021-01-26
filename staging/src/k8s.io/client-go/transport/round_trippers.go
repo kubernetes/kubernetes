@@ -353,7 +353,7 @@ func (r *requestInfo) toCurl() string {
 // through it based on what is configured
 type debuggingRoundTripper struct {
 	delegatedRoundTripper http.RoundTripper
-	levels map[DebugLevel]bool
+	levels                map[DebugLevel]bool
 }
 
 // DebugLevel is used to enable debugging of certain
@@ -381,7 +381,7 @@ const (
 func NewDebuggingRoundTripper(rt http.RoundTripper, levels ...DebugLevel) *debuggingRoundTripper {
 	drt := &debuggingRoundTripper{
 		delegatedRoundTripper: rt,
-		levels: 			   make(map[DebugLevel]bool, len(levels)),
+		levels:                make(map[DebugLevel]bool, len(levels)),
 	}
 	for _, v := range levels {
 		drt.levels[v] = true
