@@ -421,15 +421,15 @@ func TestDebuggingRoundTripper(t *testing.T) {
 
 	rawUrl := "https://127.0.0.1:12345/api/v1/pods?limit=500"
 	req := &http.Request{
-		Method:           http.MethodGet,
+		Method: http.MethodGet,
 		Header: map[string][]string{
-			"Authorization": []string{"bearer secretauthtoken"},
+			"Authorization":  []string{"bearer secretauthtoken"},
 			"X-Test-Request": []string{"test"},
 		},
 	}
 	res := &http.Response{
-		Status:           "OK",
-		StatusCode:       http.StatusOK,
+		Status:     "OK",
+		StatusCode: http.StatusOK,
 		Header: map[string][]string{
 			"X-Test-Response": []string{"test"},
 		},
@@ -439,7 +439,7 @@ func TestDebuggingRoundTripper(t *testing.T) {
 		expectedOutputLines []string
 	}{
 		{
-			levels: []DebugLevel{DebugJustURL},
+			levels:              []DebugLevel{DebugJustURL},
 			expectedOutputLines: []string{fmt.Sprintf("%s %s", req.Method, rawUrl)},
 		},
 		{
@@ -470,15 +470,15 @@ func TestDebuggingRoundTripper(t *testing.T) {
 			}(),
 		},
 		{
-			levels: []DebugLevel{DebugURLTiming},
+			levels:              []DebugLevel{DebugURLTiming},
 			expectedOutputLines: []string{fmt.Sprintf("%s %s %s", req.Method, rawUrl, res.Status)},
 		},
 		{
-			levels: []DebugLevel{DebugResponseStatus},
+			levels:              []DebugLevel{DebugResponseStatus},
 			expectedOutputLines: []string{fmt.Sprintf("Response Status: %s", res.Status)},
 		},
 		{
-			levels: []DebugLevel{DebugCurlCommand},
+			levels:              []DebugLevel{DebugCurlCommand},
 			expectedOutputLines: []string{fmt.Sprintf("curl -k -v -X")},
 		},
 	}
