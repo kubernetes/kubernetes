@@ -117,10 +117,16 @@ separate GCP projects and:
 #### 2b. Create a Kubernetes end-to-end (E2E) test cluster
 
 If you have built your own release binaries following step 1, run the following
-command:
+command to bring up a cluster for running the K8s e2e tests. See the
+[windows-gce](https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/sig-windows/windows-gce.yaml)
+e2e test configuration for the latest environment variables.
 
 ```bash
-WINDOWS_NODE_OS_DISTRIBUTION=win2019 ./hack/e2e-internal/e2e-up.sh
+KUBE_GCE_ENABLE_IP_ALIASES=true KUBERNETES_NODE_PLATFORM=windows \
+  KUBELET_TEST_ARGS=--feature-gates=KubeletPodResources=false \
+  LOGGING_STACKDRIVER_RESOURCE_TYPES=new NUM_NODES=2 \
+  NUM_WINDOWS_NODES=3 WINDOWS_NODE_OS_DISTRIBUTION=win2019 \
+  ./hack/e2e-internal/e2e-up.sh
 ```
 
 If any e2e cluster exists already, this command will prompt you to tear down and
@@ -168,13 +174,31 @@ use the steps below to run K8s e2e tests. These steps are based on
     export ARTIFACTS=${WORKSPACE}/e2e-artifacts
 
     curl \
-      https://raw.githubusercontent.com/yujuhong/gce-k8s-windows-testing/master/run-e2e.sh \
+      https://raw.githubusercontent.com/kubernetes-sigs/windows-testing/master/gce/run-e2e.sh \
       -o ${WORKSPACE}/run-e2e.sh
     chmod u+x run-e2e.sh
+
+    # Fetch a prepull manifest for the k8s version you're using.
+    curl \
+      https://raw.githubusercontent.com/kubernetes-sigs/windows-testing/master/gce/prepull-1.21.yaml \
+      -o ${WORKSPACE}/prepull-head.yaml
     ```
 
-    NOTE: `run-e2e.sh` begins with a 5 minute sleep to wait for container images
-    to be pre-pulled. You'll probably want to edit the script and remove this.
+    The e2e test scripts make some annoying assumptions about the path to the
+    k8s repository. If your `~/go/src/k8s.io/kubernetes` directory is actually
+    a symlink to `~/go/src/github.com/<username>/kubernetes`, create this
+    additional symlink:
+
+    ```bash
+    cd ~/go/src/github.com; ln -s . github.com
+    ```
+
+    Without this additional symlink you may receive this error when invoking
+    the `run-e2e.sh` script:
+
+    ```bash
+    chdir ../../github.com/<username>/kubernetes/_output/bin: no such file or directory
+    ```
 
 *   The canonical arguments for running all Windows e2e tests against a cluster
     on GCE can be seen by searching for `--test-cmd-args` in the
@@ -184,9 +208,17 @@ use the steps below to run K8s e2e tests. These steps are based on
     adding quotes around them. For example:
 
     ```bash
-    ./run-e2e.sh --node-os-distro=windows \
+    ./run-e2e.sh --node-os-distro=windows --minStartupPods=8 \
       --ginkgo.focus="\[Conformance\]|\[NodeConformance\]|\[sig-windows\]" \
-      --ginkgo.skip="\[LinuxOnly\]|\[Serial\]|\[Feature:.+\]" --minStartupPods=8
+      --ginkgo.skip="\[LinuxOnly\]|\[Serial\]|\[Feature:.+\]" \
+      --ginkgo.parallel.total=8    # TODO: does this flag actually help?
+    ```
+
+    If you get auth errors, you may need to re-authenticate:
+
+    ```bash
+    gcloud auth application-default login
+    gcloud auth login
     ```
 
 *   Run a single test by setting the ginkgo focus to match your test name; for
