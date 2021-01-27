@@ -55,6 +55,7 @@ import (
 
 	// Do some initialization to decode the query parameters correctly.
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
@@ -304,10 +305,17 @@ func newServerTest() *serverTestFramework {
 }
 
 func newServerTestWithDebug(enableDebugging bool, streamingServer streaming.Server) *serverTestFramework {
-	return newServerTestWithDebuggingHandlers(enableDebugging, enableDebugging, streamingServer)
+	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
+		EnableDebuggingHandlers: enableDebugging,
+		EnableSystemLogHandler:  enableDebugging,
+		EnableProfilingHandler:  enableDebugging,
+		EnableDebugFlagsHandler: enableDebugging,
+	}
+	return newServerTestWithDebuggingHandlers(kubeCfg, streamingServer)
 }
 
-func newServerTestWithDebuggingHandlers(enableDebugging, enableLogAndProfilingHandler bool, streamingServer streaming.Server) *serverTestFramework {
+func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletConfiguration, streamingServer streaming.Server) *serverTestFramework {
+
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
 		hostnameFunc: func() string {
@@ -341,11 +349,7 @@ func newServerTestWithDebuggingHandlers(enableDebugging, enableLogAndProfilingHa
 		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute),
 		fw.fakeAuth,
 		true,
-		enableDebugging,
-		false,
-		enableLogAndProfilingHandler,
-		enableLogAndProfilingHandler,
-		enableLogAndProfilingHandler)
+		kubeCfg)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
@@ -1506,9 +1510,15 @@ func TestMetricMethodBuckets(t *testing.T) {
 }
 
 func TestDebuggingDisabledHandlers(t *testing.T) {
-	// for backward compatibility even if enablesystemLogHandler is set but not enableDebuggingHandler then /logs
-	//shouldn't be served.
-	fw := newServerTestWithDebuggingHandlers(false, true, nil)
+	// for backward compatibility even if enablesystemLogHandler or enableProfilingHandler is set but not
+	// enableDebuggingHandler then /logs, /pprof and /flags shouldn't be served.
+	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
+		EnableDebuggingHandlers: false,
+		EnableSystemLogHandler:  true,
+		EnableDebugFlagsHandler: true,
+		EnableProfilingHandler:  true,
+	}
+	fw := newServerTestWithDebuggingHandlers(kubeCfg, nil)
 	defer fw.testHTTPServer.Close()
 
 	paths := []string{
@@ -1548,11 +1558,13 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 	resp, err = http.Get(fw.testHTTPServer.URL + "/spec")
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
 }
 
 func TestDisablingLogAndProfilingHandler(t *testing.T) {
-	fw := newServerTestWithDebuggingHandlers(true, false, nil)
+	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
+		EnableDebuggingHandlers: true,
+	}
+	fw := newServerTestWithDebuggingHandlers(kubeCfg, nil)
 	defer fw.testHTTPServer.Close()
 
 	// verify debug endpoints are disabled

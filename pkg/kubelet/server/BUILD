@@ -19,6 +19,7 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1/validation:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/apis/podresources:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/cri/streaming:go_default_library",
@@ -74,6 +75,7 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/install:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/cri/streaming:go_default_library",

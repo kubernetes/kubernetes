@@ -66,6 +66,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
@@ -139,19 +140,15 @@ func (a *filteringContainer) RegisteredHandlePaths() []string {
 func ListenAndServeKubeletServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
-	address net.IP,
-	port uint,
+	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	tlsOptions *TLSOptions,
 	auth AuthInterface,
-	enableCAdvisorJSONEndpoints,
-	enableDebuggingHandlers,
-	enableContentionProfiling,
-	enableSystemLogHandler,
-	enableProfilingHandler,
-	enableDebugFlagsHandler bool) {
-	klog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers,
-		enableContentionProfiling, enableSystemLogHandler, enableProfilingHandler, enableDebugFlagsHandler)
+	enableCAdvisorJSONEndpoints bool) {
+
+	address := net.ParseIP(kubeCfg.Address)
+	port := uint(kubeCfg.Port)
+	klog.InfoS("Starting to listen", "address", address, "port", port)
+	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, kubeCfg)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -172,8 +169,8 @@ func ListenAndServeKubeletServer(
 
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, enableCAdvisorJSONEndpoints bool) {
-	klog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false, false, false)
+	klog.InfoS("Starting to listen read-only", "address", address, "port", port)
+	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, nil)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -225,12 +222,8 @@ func NewServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	auth AuthInterface,
-	enableCAdvisorJSONEndpoints,
-	enableDebuggingHandlers,
-	enableContentionProfiling,
-	enableSystemLogHandler,
-	enableProfilingHandler,
-	enableDebugFlagsHandler bool) Server {
+	enableCAdvisorJSONEndpoints bool,
+	kubeCfg *kubeletconfiginternal.KubeletConfiguration) Server {
 	server := Server{
 		host:                 host,
 		resourceAnalyzer:     resourceAnalyzer,
@@ -243,13 +236,13 @@ func NewServer(
 		server.InstallAuthFilter()
 	}
 	server.InstallDefaultHandlers(enableCAdvisorJSONEndpoints)
-	if enableDebuggingHandlers {
+	if kubeCfg != nil && kubeCfg.EnableDebuggingHandlers {
 		server.InstallDebuggingHandlers()
 		// To maintain backward compatibility serve logs and pprof only when enableDebuggingHandlers is also enabled
 		// see https://github.com/kubernetes/kubernetes/pull/87273
-		server.InstallSystemLogHandler(enableSystemLogHandler)
-		server.InstallProfilingHandler(enableProfilingHandler, enableContentionProfiling)
-		server.InstallDebugFlagsHandler(enableDebugFlagsHandler)
+		server.InstallSystemLogHandler(kubeCfg.EnableSystemLogHandler)
+		server.InstallProfilingHandler(kubeCfg.EnableProfilingHandler, kubeCfg.EnableContentionProfiling)
+		server.InstallDebugFlagsHandler(kubeCfg.EnableDebugFlagsHandler)
 	} else {
 		server.InstallDebuggingDisabledHandlers()
 	}
@@ -563,9 +556,9 @@ func (s *Server) InstallDebugFlagsHandler(enableDebugFlagsHandler bool) {
 }
 
 // InstallProfilingHandler registers the HTTP request patterns for /debug/pprof endpoint.
-func (s *Server) InstallProfilingHandler(enableSystemLogHandler bool, enableContentionProfiling bool) {
+func (s *Server) InstallProfilingHandler(enableProfilingLogHandler bool, enableContentionProfiling bool) {
 	s.addMetricsBucketMatcher("debug")
-	if !enableSystemLogHandler {
+	if !enableProfilingLogHandler {
 		s.restfulCont.Handle(pprofBasePath, getHandlerForDisabledEndpoint("profiling endpoint is disabled."))
 		return
 	}
