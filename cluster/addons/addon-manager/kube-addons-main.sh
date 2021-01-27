@@ -63,6 +63,8 @@ log INFO "== Entering periodical apply loop at $(date -Is) =="
 while true; do
   start_sec=$(date +"%s")
   if is_leader; then
+    # (b/174769918). Remove when Istio addon is fully deprecated.
+    istio_relabel_workaround
     ensure_addons
     reconcile_addons
   else

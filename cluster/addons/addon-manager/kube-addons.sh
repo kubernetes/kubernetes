@@ -285,3 +285,14 @@ function is_leader() {
   KUBE_CONTROLLER_MANAGER_LEADER="${KUBE_CONTROLLER_MANAGER_LEADER##${HOSTNAME}_*}"
   [[ "$KUBE_CONTROLLER_MANAGER_LEADER" == "" ]]
 }
+
+# Workaround for Istio addon label change from Reconcile to EnsureExists.
+# This prevents the resources being deleted and re-created, which would
+# cause downtime (b/174769918). Remove when Istio addon is fully deprecated.
+function istio_relabel_workaround() {
+  if [[ "${ENABLE_ISTIO:-}" == "true" ]]; then
+    kubectl label namespace --overwrite istio-system ${ADDON_MANAGER_LABEL}=EnsureExists
+    kubectl label deploy -n istio-system --overwrite istio-ingressgateway ${ADDON_MANAGER_LABEL}=EnsureExists
+    kubectl label service -n istio-system --overwrite istio-ingressgateway ${ADDON_MANAGER_LABEL}=EnsureExists
+  fi
+}
