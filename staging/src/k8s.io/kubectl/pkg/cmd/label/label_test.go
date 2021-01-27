@@ -53,7 +53,7 @@ func TestValidateLabels(t *testing.T) {
 				"a": "c",
 				"d": "b",
 			},
-			test:      "one shared",
+			test:      "first shared",
 			expectErr: true,
 		},
 		{
