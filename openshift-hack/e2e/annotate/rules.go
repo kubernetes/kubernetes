@@ -77,8 +77,8 @@ var (
 			"should reject a Pod requesting a RuntimeClass with conflicting node selector",
 			"should run a Pod requesting a RuntimeClass with scheduling",
 
-			// A fix is in progress: https://github.com/openshift/origin/pull/24709
-			`Multi-AZ Clusters should spread the pods of a replication controller across zones`,
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1896558
+			`Multi-AZ Clusters should spread the pods of a service across zones`,
 
 			// NFS umount is broken in kernels 5.7+
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1854379

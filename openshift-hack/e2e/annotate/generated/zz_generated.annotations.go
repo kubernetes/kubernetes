@@ -1359,9 +1359,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-scheduling] Multi-AZ Cluster Volumes [sig-storage] should schedule pods in the same zones as statically provisioned PVs": "should schedule pods in the same zones as statically provisioned PVs [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-scheduling] Multi-AZ Clusters should spread the pods of a replication controller across zones": "should spread the pods of a replication controller across zones [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-scheduling] Multi-AZ Clusters should spread the pods of a replication controller across zones": "should spread the pods of a replication controller across zones [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-scheduling] Multi-AZ Clusters should spread the pods of a service across zones": "should spread the pods of a service across zones [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-scheduling] Multi-AZ Clusters should spread the pods of a service across zones": "should spread the pods of a service across zones [Disabled:Broken] [Serial] [Suite:k8s]",
 
 	"[Top Level] [sig-scheduling] SchedulerPredicates [Serial] PodTopologySpread Filtering validates 4 pods with MaxSkew=1 are evenly distributed into 2 nodes": "validates 4 pods with MaxSkew=1 are evenly distributed into 2 nodes [Suite:openshift/conformance/serial] [Suite:k8s]",
 
