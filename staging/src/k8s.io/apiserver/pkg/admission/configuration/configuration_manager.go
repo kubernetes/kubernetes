@@ -32,10 +32,7 @@ const (
 	defaultBootstrapGraceperiod = 5 * time.Second
 )
 
-var (
-	ErrNotReady = fmt.Errorf("configuration is not ready")
-	ErrDisabled = fmt.Errorf("disabled")
-)
+var ErrNotReady = fmt.Errorf("configuration is not ready")
 
 type getFunc func() (runtime.Object, error)
 
