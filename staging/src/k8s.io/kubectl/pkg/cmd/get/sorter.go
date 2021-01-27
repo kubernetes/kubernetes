@@ -59,7 +59,7 @@ func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 		return s.Delegate.PrintObj(table, out)
 	}
 
-	if meta.IsListType(obj) {
+	if meta.IsListType(obj) && meta.LenList(obj) > 1 {
 		if err := s.sortObj(obj); err != nil {
 			return err
 		}
@@ -73,9 +73,6 @@ func (s *SortingPrinter) sortObj(obj runtime.Object) error {
 	objs, err := meta.ExtractList(obj)
 	if err != nil {
 		return err
-	}
-	if len(objs) == 0 {
-		return nil
 	}
 
 	sorter, err := SortObjects(s.Decoder, objs, s.SortField)
