@@ -19,6 +19,7 @@ package taint
 
 import (
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -65,7 +66,8 @@ func parseTaints(spec []string) ([]corev1.Taint, []corev1.Taint, error) {
 				uniqueTaints[newTaint.Effect] = sets.String{}
 			}
 			uniqueTaints[newTaint.Effect].Insert(newTaint.Key)
-
+			now := metav1.Now()
+			newTaint.TimeAdded = &now
 			taints = append(taints, newTaint)
 		}
 	}
