@@ -345,10 +345,7 @@ func TestDaemonSetUpdatesNoTemplateChanged(t *testing.T) {
 	ds.Spec.UpdateStrategy.Type = apps.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
 	ds.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
-	err = manager.dsStore.Update(ds)
-	if err != nil {
-		t.Fatal(err)
-	}
+	manager.dsStore.Update(ds)
 
 	// template is not changed no pod should be removed
 	clearExpectations(t, manager, ds, podControl)
@@ -385,7 +382,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 		enableSurge    bool
 		maxSurge       int
 		maxUnavailable int
-		numUnavailable int
+		emptyNodes     int
 		Err            error
 	}{
 		{
@@ -404,7 +401,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 			}(),
 			nodeToPods:     make(map[string][]*v1.Pod),
 			maxUnavailable: 0,
-			numUnavailable: 0,
+			emptyNodes:     0,
 		},
 		{
 			name: "Two nodes with ready pods",
@@ -432,7 +429,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				return mapping
 			}(),
 			maxUnavailable: 1,
-			numUnavailable: 0,
+			emptyNodes:     0,
 		},
 		{
 			name: "Two nodes, one node without pods",
@@ -457,7 +454,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				return mapping
 			}(),
 			maxUnavailable: 1,
-			numUnavailable: 1,
+			emptyNodes:     1,
 		},
 		{
 			name: "Two nodes, one node without pods, surge",
@@ -482,7 +479,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				return mapping
 			}(),
 			maxUnavailable: 1,
-			numUnavailable: 1,
+			emptyNodes:     1,
 		},
 		{
 			name: "Two nodes with pods, MaxUnavailable in percents",
@@ -510,7 +507,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				return mapping
 			}(),
 			maxUnavailable: 1,
-			numUnavailable: 0,
+			emptyNodes:     0,
 		},
 		{
 			name: "Two nodes with pods, MaxUnavailable in percents, surge",
@@ -540,7 +537,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 			enableSurge:    true,
 			maxSurge:       1,
 			maxUnavailable: 0,
-			numUnavailable: 0,
+			emptyNodes:     0,
 		},
 		{
 			name: "Two nodes with pods, MaxUnavailable is 100%, surge",
@@ -570,7 +567,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 			enableSurge:    true,
 			maxSurge:       2,
 			maxUnavailable: 0,
-			numUnavailable: 0,
+			emptyNodes:     0,
 		},
 		{
 			name: "Two nodes with pods, MaxUnavailable in percents, pod terminating",
@@ -579,7 +576,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				if err != nil {
 					t.Fatalf("error creating DaemonSets controller: %v", err)
 				}
-				addNodes(manager.nodeStore, 0, 2, nil)
+				addNodes(manager.nodeStore, 0, 3, nil)
 				return manager
 			}(),
 			ds: func() *apps.DaemonSet {
@@ -599,8 +596,8 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				mapping["node-1"] = []*v1.Pod{pod1}
 				return mapping
 			}(),
-			maxUnavailable: 1,
-			numUnavailable: 1,
+			maxUnavailable: 2,
+			emptyNodes:     1,
 		},
 	}
 
@@ -613,7 +610,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error listing nodes: %v", err)
 			}
-			maxSurge, maxUnavailable, numUnavailable, err := c.Manager.getUnavailableNumbers(c.ds, nodeList, c.nodeToPods)
+			maxSurge, maxUnavailable, err := c.Manager.updatedDesiredNodeCounts(c.ds, nodeList, c.nodeToPods)
 			if err != nil && c.Err != nil {
 				if c.Err != err {
 					t.Fatalf("Expected error: %v but got: %v", c.Err, err)
@@ -622,8 +619,17 @@ func TestGetUnavailableNumbers(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if maxSurge != c.maxSurge || maxUnavailable != c.maxUnavailable || numUnavailable != c.numUnavailable {
-				t.Fatalf("Wrong values. maxSurge: %d, expected %d, maxUnavailable: %d, expected: %d, numUnavailable: %d. expected: %d", maxSurge, c.maxSurge, maxUnavailable, c.maxUnavailable, numUnavailable, c.numUnavailable)
+			if maxSurge != c.maxSurge || maxUnavailable != c.maxUnavailable {
+				t.Errorf("Wrong values. maxSurge: %d, expected %d, maxUnavailable: %d, expected: %d", maxSurge, c.maxSurge, maxUnavailable, c.maxUnavailable)
+			}
+			var emptyNodes int
+			for _, pods := range c.nodeToPods {
+				if len(pods) == 0 {
+					emptyNodes++
+				}
+			}
+			if emptyNodes != c.emptyNodes {
+				t.Errorf("expected numEmpty to be %d, was %d", c.emptyNodes, emptyNodes)
 			}
 		})
 	}

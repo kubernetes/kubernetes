@@ -19,7 +19,6 @@ package util
 import (
 	"fmt"
 	"strconv"
-	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -27,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -170,20 +168,6 @@ func IsPodUpdated(pod *v1.Pod, hash string, dsTemplateGeneration *int64) bool {
 		pod.Labels[extensions.DaemonSetTemplateGenerationKey] == fmt.Sprint(dsTemplateGeneration)
 	hashMatches := len(hash) > 0 && pod.Labels[extensions.DefaultDaemonSetUniqueLabelKey] == hash
 	return hashMatches || templateMatches
-}
-
-// SplitByAvailablePods splits provided daemon set pods by availability.
-func SplitByAvailablePods(minReadySeconds int32, pods []*v1.Pod, now time.Time) ([]*v1.Pod, []*v1.Pod) {
-	availablePods := make([]*v1.Pod, 0, len(pods))
-	var unavailablePods []*v1.Pod
-	for _, pod := range pods {
-		if podutil.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: now}) {
-			availablePods = append(availablePods, pod)
-		} else {
-			unavailablePods = append(unavailablePods, pod)
-		}
-	}
-	return availablePods, unavailablePods
 }
 
 // ReplaceDaemonSetPodNodeNameNodeAffinity replaces the RequiredDuringSchedulingIgnoredDuringExecution
