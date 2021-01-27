@@ -432,6 +432,17 @@ func (g *gcePDCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *uns
 }
 
 func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+	cfg := &testsuites.PerTestConfig{
+		Driver:    g,
+		Prefix:    "gcepd",
+		Framework: f,
+	}
+
+	if framework.ProviderIs("gke") {
+		framework.Logf("The csi gce-pd driver is automatically installed in GKE. Skipping driver installation.")
+		return cfg, func() {}
+	}
+
 	ginkgo.By("deploying csi gce-pd driver")
 	cancelLogging := testsuites.StartPodLogs(f)
 	// It would be safer to rename the gcePD driver, but that
