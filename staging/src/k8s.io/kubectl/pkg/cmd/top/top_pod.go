@@ -179,7 +179,6 @@ func (o TopPodOptions) RunTopPod() error {
 		return err
 	}
 
-	// TODO: Refactor this once Heapster becomes the API server.
 	// First we check why no metrics have been received.
 	if len(metrics.Items) == 0 {
 		// If the API server query is successful but all the pods are newly created,
