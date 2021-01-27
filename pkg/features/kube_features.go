@@ -262,6 +262,16 @@ const (
 	// Enables generic ephemeral inline volume support for pods
 	GenericEphemeralVolume featuregate.Feature = "GenericEphemeralVolume"
 
+	// owner: @chendave
+	// alpha: v1.21
+	//
+	// PreferNominatedNode tells scheduler whether the nominated node will be checked first before looping
+	// all the rest of nodes in the cluster.
+	// Enabling this feature also implies the preemptor pod might not be dispatched to the best candidate in
+	// some corner case, e.g. another node releases enough resources after the nominated node has been set
+	// and hence is the best candidate instead.
+	PreferNominatedNode featuregate.Feature = "PreferNominatedNode"
+
 	// owner: @tallclair
 	// alpha: v1.12
 	// beta:  v1.14
@@ -771,6 +781,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	GracefulNodeShutdown:                           {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLBNodePortControl:                       {Default: false, PreRelease: featuregate.Alpha},
 	MixedProtocolLBService:                         {Default: false, PreRelease: featuregate.Alpha},
+	PreferNominatedNode:                            {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
