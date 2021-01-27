@@ -1551,6 +1551,14 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 				klog.Warning(detailedErr)
 				return volumetypes.NewOperationContext(nil, nil, migrated)
 			}
+			oldCapacity := pvc.Status.Capacity[v1.ResourceStorage]
+			err = util.AddAnnPreResizeCapacity(pv, oldCapacity, og.kubeClient)
+			if err != nil {
+				detailedErr := fmt.Errorf("error updating pv %s annotation (%s) with pre-resize capacity %s: %v", pv.ObjectMeta.Name, util.AnnPreResizeCapacity, oldCapacity.String(), err)
+				klog.Warning(detailedErr)
+				return volumetypes.NewOperationContext(nil, nil, migrated)
+			}
+
 		}
 		return volumetypes.NewOperationContext(nil, nil, migrated)
 	}
