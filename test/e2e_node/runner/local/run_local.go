@@ -66,6 +66,14 @@ func main() {
 		systemSpecFile := filepath.Join(rootDir, system.SystemSpecPath, *systemSpecName+".yaml")
 		args = append(args, fmt.Sprintf("--system-spec-name=%s --system-spec-file=%s --extra-envs=%s", *systemSpecName, systemSpecFile, *extraEnvs))
 	}
+	// prepare to start kubelet with swap off, avoid ginkgo node timeout
+	swapoff, err := exec.LookPath("swapoff")
+	if err != nil {
+		klog.Exitf("Test failed: %v", err)
+	}
+	if err := runCommand(swapoff, "-a"); err != nil {
+		klog.Exitf("Test failed: %v", err)
+	}
 	if err := runCommand(ginkgo, args...); err != nil {
 		klog.Exitf("Test failed: %v", err)
 	}
