@@ -74,29 +74,29 @@ def cri_tarballs():
 # Use skopeo to find these values: https://github.com/containers/skopeo
 #
 # Example
-# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-base:buster-v1.2.0
-# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-base:buster-v1.2.0
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-base:buster-v1.3.0
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-base:buster-v1.3.0
 _DEBIAN_BASE_DIGEST = {
-    "manifest": "sha256:ea668d3febd312e0edfbbdab6bd7d86448ddc8fddb484e20ec76b36a7aeac04c",
-    "amd64": "sha256:2f3e61995bcd4b3a1a0aef49e4a7a6817c978031734b09df2aaaa28181898b0e",
-    "arm": "sha256:d1073dcf8f1d55fbbd297e5b280375b6f276ea83a08a25fd59dc4f3ca43c6d50",
-    "arm64": "sha256:dadcff1ab81177de4914f6db0e7d78a52e525daf7a1efb246cb3545de5e818d1",
-    "ppc64le": "sha256:bfb24dc0d1e71e1deb0f04a078fadf2c94070266746b1b5acc4e739aa57d5601",
-    "s390x": "sha256:cfe6a3508b7ee198cb5a0b3a62e0981676b1dfa4b3049f36398d03e6bd35a801",
+    "manifest": "sha256:d66137c7c362d1026dca670d1ff4c25e5b0770e8ace87ac3d008d52e4b0db338",
+    "amd64": "sha256:a5ab028d9a730b78af9abb15b5db9b2e6f82448ab269d6f3a07d1834c571ccc6",
+    "arm": "sha256:94e611363760607366ca1fed9375105b6c5fc922ab1249869b708690ca13733c",
+    "arm64": "sha256:83512c52d44587271cd0f355c0a9a7e6c2412ddc66b8a8eb98f994277297a72f",
+    "ppc64le": "sha256:9c8284b2797b114ebe8f3f1b2b5817a9c7f07f3f82513c49a30e6191a1acc1fc",
+    "s390x": "sha256:d617637dd4df0bc1cfa524fae3b4892cfe57f7fec9402ad8dfa28e38e82ec688",
 }
 
 # Use skopeo to find these values: https://github.com/containers/skopeo
 #
 # Example
-# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-iptables:buster-v1.3.0
-# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-iptables:buster-v1.3.0
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-iptables:buster-v1.4.0
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-iptables:buster-v1.4.0
 _DEBIAN_IPTABLES_DIGEST = {
-    "manifest": "sha256:4c9410a4ee555dcb0e8b7bd6fc77c65ac400f7c5bd4555df8187630efaea6ea4",
-    "amd64": "sha256:e30919918299988b318f0208e7fd264dee21a6be9d74bbd9f7fc15e78eade9b4",
-    "arm": "sha256:bf59578f532bfd3378c4a713eeb14cf0dbed224d5ad03f549165f8d853997ca4",
-    "arm64": "sha256:3d7ede6013b0516f1ec3852590895d4a7b6ec8f5e15bebc1a55237bba4538da2",
-    "ppc64le": "sha256:ebd3bb280f8da8fc6a7158b7c2fc59b4552487bffd95d0b5ac1b190aff7b0fd9",
-    "s390x": "sha256:a73b94aace7a571f36149aa917d4c7ee13453ed24a31f26549dd13b386dae4c1",
+    "manifest": "sha256:87f97cf2b62eb107871ee810f204ccde41affb70b29883aa898e93df85dea0f0",
+    "amd64": "sha256:da837f39cf3af78adb796c0caa9733449ae99e51cf624590c328e4c9951ace7a",
+    "arm": "sha256:bb6677337a4dbc3e578a3e87642d99be740dea391dc5e8987f04211c5e23abcd",
+    "arm64": "sha256:6ad4717d69db2cc47bc2efc91cebb96ba736be1de49e62e0deffdbaf0fa2318c",
+    "ppc64le": "sha256:168ccfeb861239536826a26da24ab5f68bb5349d7439424b7008b01e8f6534fc",
+    "s390x": "sha256:5a88d4f4c29bac5b5c93195059b928f7346be11d0f0f7f6da0e14c0bfdbd1362",
 }
 
 # Use skopeo to find these values: https://github.com/containers/skopeo
@@ -137,7 +137,7 @@ def image_dependencies():
             registry = "k8s.gcr.io/build-image",
             repository = "debian-base",
             # Ensure the digests above are updated to match a new tag
-            tag = "buster-v1.2.0",  # ignored, but kept here for documentation
+            tag = "buster-v1.3.0",  # ignored, but kept here for documentation
         )
 
         container_pull(
@@ -147,7 +147,7 @@ def image_dependencies():
             registry = "k8s.gcr.io/build-image",
             repository = "debian-iptables",
             # Ensure the digests above are updated to match a new tag
-            tag = "buster-v1.3.0",  # ignored, but kept here for documentation
+            tag = "buster-v1.4.0",  # ignored, but kept here for documentation
         )
 
 def etcd_tarballs():
