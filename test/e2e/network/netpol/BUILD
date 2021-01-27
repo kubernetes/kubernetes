@@ -7,6 +7,7 @@ go_library(
     srcs = [
         "kubemanager.go",
         "model.go",
+        "network_legacy.go",
         "network_policy.go",
         "network_policy_api.go",
         "policies.go",
@@ -27,8 +28,10 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/skipper:go_default_library",
+        "//test/e2e/storage/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
