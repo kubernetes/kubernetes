@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2eingress "k8s.io/kubernetes/test/e2e/framework/ingress"
@@ -1053,9 +1054,16 @@ var _ = SIGDescribe("Ingress API", func() {
 		framework.ExpectEqual(patchedIngress.Annotations["patched"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
-		ingToUpdate := patchedIngress.DeepCopy()
-		ingToUpdate.Annotations["updated"] = "true"
-		updatedIngress, err := ingClient.Update(context.TODO(), ingToUpdate, metav1.UpdateOptions{})
+		var ingToUpdate, updatedIngress *networkingv1.Ingress
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			ingToUpdate, err = ingClient.Get(context.TODO(), createdIngress.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			ingToUpdate.Annotations["updated"] = "true"
+			updatedIngress, err = ingClient.Update(context.TODO(), ingToUpdate, metav1.UpdateOptions{})
+			return err
+		})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(updatedIngress.Annotations["updated"], "true", "updated object should have the applied annotation")
 
@@ -1094,11 +1102,18 @@ var _ = SIGDescribe("Ingress API", func() {
 		framework.ExpectEqual(patchedStatus.Annotations["patchedstatus"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating /status")
-		statusToUpdate := patchedStatus.DeepCopy()
-		statusToUpdate.Status.LoadBalancer = v1.LoadBalancerStatus{
-			Ingress: []v1.LoadBalancerIngress{{IP: "169.1.1.2"}},
-		}
-		updatedStatus, err := ingClient.UpdateStatus(context.TODO(), statusToUpdate, metav1.UpdateOptions{})
+		var statusToUpdate, updatedStatus *networkingv1.Ingress
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			statusToUpdate, err = ingClient.Get(context.TODO(), createdIngress.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			statusToUpdate.Status.LoadBalancer = v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{{IP: "169.1.1.2"}},
+			}
+			updatedStatus, err = ingClient.UpdateStatus(context.TODO(), statusToUpdate, metav1.UpdateOptions{})
+			return err
+		})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(updatedStatus.Status.LoadBalancer, statusToUpdate.Status.LoadBalancer, fmt.Sprintf("updated object expected to have updated loadbalancer status %#v, got %#v", statusToUpdate.Status.LoadBalancer, updatedStatus.Status.LoadBalancer))
 
