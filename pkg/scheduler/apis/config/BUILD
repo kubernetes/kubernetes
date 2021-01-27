@@ -37,6 +37,7 @@ filegroup(
         "//pkg/scheduler/apis/config/testing:all-srcs",
         "//pkg/scheduler/apis/config/v1:all-srcs",
         "//pkg/scheduler/apis/config/v1beta1:all-srcs",
+        "//pkg/scheduler/apis/config/v1beta2:all-srcs",
         "//pkg/scheduler/apis/config/validation:all-srcs",
     ],
     tags = ["automanaged"],

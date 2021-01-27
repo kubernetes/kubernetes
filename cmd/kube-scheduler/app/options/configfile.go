@@ -19,13 +19,13 @@ package options
 import (
 	"fmt"
 	"io/ioutil"
-	"k8s.io/klog/v2"
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
-	kubeschedulerconfigv1beta1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
+	kubeschedulerconfigv1beta2 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
 )
 
 func loadConfigFromFile(file string) (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
@@ -62,7 +62,7 @@ func LogOrWriteConfig(fileName string, cfg *kubeschedulerconfig.KubeSchedulerCon
 		return fmt.Errorf("unable to locate encoder -- %q is not a supported media type", mediaType)
 	}
 
-	encoder := kubeschedulerscheme.Codecs.EncoderForVersion(info.Serializer, kubeschedulerconfigv1beta1.SchemeGroupVersion)
+	encoder := kubeschedulerscheme.Codecs.EncoderForVersion(info.Serializer, kubeschedulerconfigv1beta2.SchemeGroupVersion)
 	if klog.V(2).Enabled() {
 		bytes, err := runtime.Encode(encoder, cfg)
 		if err != nil {
