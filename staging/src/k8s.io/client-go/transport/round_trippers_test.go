@@ -424,15 +424,15 @@ func TestDebuggingRoundTripper(t *testing.T) {
 	req := &http.Request{
 		Method: http.MethodGet,
 		Header: map[string][]string{
-			"Authorization":  []string{"bearer secretauthtoken"},
-			"X-Test-Request": []string{"test"},
+			"Authorization":  {"bearer secretauthtoken"},
+			"X-Test-Request": {"test"},
 		},
 	}
 	res := &http.Response{
 		Status:     "OK",
 		StatusCode: http.StatusOK,
 		Header: map[string][]string{
-			"X-Test-Response": []string{"test"},
+			"X-Test-Response": {"test"},
 		},
 	}
 	tcs := []struct {
