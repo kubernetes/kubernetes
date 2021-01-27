@@ -806,6 +806,7 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 	node *v1.Node,
 	nodeToDaemonPods map[string][]*v1.Pod,
 	ds *apps.DaemonSet,
+	hash string,
 ) (nodesNeedingDaemonPods, podsToDelete []string, err error) {
 
 	shouldRun, shouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(node, ds)
@@ -853,14 +854,60 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 				daemonPodsRunning = append(daemonPodsRunning, pod)
 			}
 		}
-		// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
-		// Sort the daemon pods by creation time, so the oldest is preserved.
-		if len(daemonPodsRunning) > 1 {
+
+		// When surge is not enabled, if there is more than 1 running pod on a node delete all but the oldest
+		if !util.AllowsSurge(ds) {
+			if len(daemonPodsRunning) <= 1 {
+				// There are no excess pods to be pruned, and no pods to create
+				break
+			}
+
 			sort.Sort(podByCreationTimestampAndPhase(daemonPodsRunning))
 			for i := 1; i < len(daemonPodsRunning); i++ {
 				podsToDelete = append(podsToDelete, daemonPodsRunning[i].Name)
 			}
+			break
 		}
+
+		if len(daemonPodsRunning) <= 1 {
+			// // There are no excess pods to be pruned
+			if len(daemonPodsRunning) == 0 && shouldRun {
+				// We are surging so we need to have at least one non-deleted pod on the node
+				nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
+			}
+			break
+		}
+
+		// When surge is enabled, we allow 2 pods if and only if the oldest pod matching the current hash state
+		// is not ready AND the oldest pod that doesn't match the current hash state is ready. All other pods are
+		// deleted. If neither pod is ready, only the one matching the current hash revision is kept.
+		var oldestNewPod, oldestOldPod *v1.Pod
+		sort.Sort(podByCreationTimestampAndPhase(daemonPodsRunning))
+		for _, pod := range daemonPodsRunning {
+			if pod.Labels[apps.ControllerRevisionHashLabelKey] == hash {
+				if oldestNewPod == nil {
+					oldestNewPod = pod
+					continue
+				}
+			} else {
+				if oldestOldPod == nil {
+					oldestOldPod = pod
+					continue
+				}
+			}
+			podsToDelete = append(podsToDelete, pod.Name)
+		}
+		if oldestNewPod != nil && oldestOldPod != nil {
+			switch {
+			case !podutil.IsPodReady(oldestOldPod):
+				klog.V(5).Infof("Pod %s/%s from daemonset %s is no longer ready and will be replaced with newer pod %s", oldestOldPod.Namespace, oldestOldPod.Name, ds.Name, oldestNewPod.Name)
+				podsToDelete = append(podsToDelete, oldestOldPod.Name)
+			case podutil.IsPodAvailable(oldestNewPod, ds.Spec.MinReadySeconds, metav1.Time{Time: dsc.failedPodsBackoff.Clock.Now()}):
+				klog.V(5).Infof("Pod %s/%s from daemonset %s is now ready and will replace older pod %s", oldestNewPod.Namespace, oldestNewPod.Name, ds.Name, oldestOldPod.Name)
+				podsToDelete = append(podsToDelete, oldestOldPod.Name)
+			}
+		}
+
 	case !shouldContinueRunning && exists:
 		// If daemon pod isn't supposed to run on node, but it is, delete all daemon pods on node.
 		for _, pod := range daemonPods {
@@ -890,9 +937,10 @@ func (dsc *DaemonSetsController) manage(ds *apps.DaemonSet, nodeList []*v1.Node,
 	var nodesNeedingDaemonPods, podsToDelete []string
 	for _, node := range nodeList {
 		nodesNeedingDaemonPodsOnNode, podsToDeleteOnNode, err := dsc.podsShouldBeOnNode(
-			node, nodeToDaemonPods, ds)
+			node, nodeToDaemonPods, ds, hash)
 
 		if err != nil {
+			klog.V(0).Infof("DEBUG: sync of node %s for ds %s failed: %v", node.Name, ds.Name, err)
 			continue
 		}
 
@@ -1074,6 +1122,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, nodeL
 	}
 
 	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable int
+	now := dsc.failedPodsBackoff.Clock.Now()
 	for _, node := range nodeList {
 		shouldRun, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
 		if err != nil {
@@ -1092,7 +1141,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, nodeL
 				pod := daemonPods[0]
 				if podutil.IsPodReady(pod) {
 					numberReady++
-					if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+					if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
 						numberAvailable++
 					}
 				}
@@ -1127,9 +1176,10 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, nodeL
 }
 
 func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
-	startTime := time.Now()
+	startTime := dsc.failedPodsBackoff.Clock.Now()
+
 	defer func() {
-		klog.V(4).Infof("Finished syncing daemon set %q (%v)", key, time.Since(startTime))
+		klog.V(4).Infof("Finished syncing daemon set %q (%v)", key, dsc.failedPodsBackoff.Clock.Now().Sub(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
