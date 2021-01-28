@@ -17,6 +17,7 @@ limitations under the License.
 package corev1
 
 import (
+	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -543,5 +544,101 @@ func TestMatchNodeSelectorTermsStateless(t *testing.T) {
 				t.Errorf("MatchNodeSelectorTerms() got = %v, want %v", tt.args.nodeSelector, tt.want)
 			}
 		})
+	}
+}
+
+func TestGetAvoidPodsFromNode(t *testing.T) {
+	controllerFlag := true
+	testCases := []struct {
+		node        *v1.Node
+		expectValue v1.AvoidPods
+		expectErr   bool
+	}{
+		{
+			node:        &v1.Node{},
+			expectValue: v1.AvoidPods{},
+			expectErr:   false,
+		},
+		{
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.PreferAvoidPodsAnnotationKey: `
+							{
+							    "preferAvoidPods": [
+							        {
+							            "podSignature": {
+							                "podController": {
+						                            "apiVersion": "v1",
+						                            "kind": "ReplicationController",
+						                            "name": "foo",
+						                            "uid": "abcdef123456",
+						                            "controller": true
+							                }
+							            },
+							            "reason": "some reason",
+							            "message": "some message"
+							        }
+							    ]
+							}`,
+					},
+				},
+			},
+			expectValue: v1.AvoidPods{
+				PreferAvoidPods: []v1.PreferAvoidPodsEntry{
+					{
+						PodSignature: v1.PodSignature{
+							PodController: &metav1.OwnerReference{
+								APIVersion: "v1",
+								Kind:       "ReplicationController",
+								Name:       "foo",
+								UID:        "abcdef123456",
+								Controller: &controllerFlag,
+							},
+						},
+						Reason:  "some reason",
+						Message: "some message",
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			node: &v1.Node{
+				// Missing end symbol of "podController" and "podSignature"
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.PreferAvoidPodsAnnotationKey: `
+							{
+							    "preferAvoidPods": [
+							        {
+							            "podSignature": {
+							                "podController": {
+							                    "kind": "ReplicationController",
+							                    "apiVersion": "v1"
+							            "reason": "some reason",
+							            "message": "some message"
+							        }
+							    ]
+							}`,
+					},
+				},
+			},
+			expectValue: v1.AvoidPods{},
+			expectErr:   true,
+		},
+	}
+
+	for i, tc := range testCases {
+		v, err := GetAvoidPodsFromNodeAnnotations(tc.node.Annotations)
+		if err == nil && tc.expectErr {
+			t.Errorf("[%v]expected error but got none.", i)
+		}
+		if err != nil && !tc.expectErr {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
+		if !reflect.DeepEqual(tc.expectValue, v) {
+			t.Errorf("[%v]expect value %v but got %v with %v", i, tc.expectValue, v, v.PreferAvoidPods[0].PodSignature.PodController.Controller)
+		}
 	}
 }
