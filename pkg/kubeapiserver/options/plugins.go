@@ -27,7 +27,6 @@ import (
 	certapproval "k8s.io/kubernetes/plugin/pkg/admission/certificates/approval"
 	certsigning "k8s.io/kubernetes/plugin/pkg/admission/certificates/signing"
 	certsubjectrestriction "k8s.io/kubernetes/plugin/pkg/admission/certificates/subjectrestriction"
-	"k8s.io/kubernetes/plugin/pkg/admission/defaultingressclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit"
@@ -38,6 +37,8 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/limitranger"
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
+	"k8s.io/kubernetes/plugin/pkg/admission/network/defaultingressclass"
+	"k8s.io/kubernetes/plugin/pkg/admission/network/denyserviceexternalips"
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/nodetaint"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
@@ -93,6 +94,7 @@ var AllOrderedPlugins = []string{
 	certsigning.PluginName,                  // CertificateSigning
 	certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 	defaultingressclass.PluginName,          // DefaultIngressClass
+	denyserviceexternalips.PluginName,       // DenyServiceExternalIPs
 
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
@@ -111,6 +113,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	antiaffinity.Register(plugins)
 	defaulttolerationseconds.Register(plugins)
 	defaultingressclass.Register(plugins)
+	denyserviceexternalips.Register(plugins)
 	deny.Register(plugins) // DEPRECATED as no real meaning
 	eventratelimit.Register(plugins)
 	exec.Register(plugins)
@@ -142,23 +145,23 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
 func DefaultOffAdmissionPlugins() sets.String {
 	defaultOnPlugins := sets.NewString(
-		lifecycle.PluginName,                    //NamespaceLifecycle
-		limitranger.PluginName,                  //LimitRanger
-		serviceaccount.PluginName,               //ServiceAccount
-		setdefault.PluginName,                   //DefaultStorageClass
-		resize.PluginName,                       //PersistentVolumeClaimResize
-		defaulttolerationseconds.PluginName,     //DefaultTolerationSeconds
-		mutatingwebhook.PluginName,              //MutatingAdmissionWebhook
-		validatingwebhook.PluginName,            //ValidatingAdmissionWebhook
-		resourcequota.PluginName,                //ResourceQuota
-		storageobjectinuseprotection.PluginName, //StorageObjectInUseProtection
-		podpriority.PluginName,                  //PodPriority
-		nodetaint.PluginName,                    //TaintNodesByCondition
-		runtimeclass.PluginName,                 //RuntimeClass
+		lifecycle.PluginName,                    // NamespaceLifecycle
+		limitranger.PluginName,                  // LimitRanger
+		serviceaccount.PluginName,               // ServiceAccount
+		setdefault.PluginName,                   // DefaultStorageClass
+		resize.PluginName,                       // PersistentVolumeClaimResize
+		defaulttolerationseconds.PluginName,     // DefaultTolerationSeconds
+		mutatingwebhook.PluginName,              // MutatingAdmissionWebhook
+		validatingwebhook.PluginName,            // ValidatingAdmissionWebhook
+		resourcequota.PluginName,                // ResourceQuota
+		storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
+		podpriority.PluginName,                  // PodPriority
+		nodetaint.PluginName,                    // TaintNodesByCondition
+		runtimeclass.PluginName,                 // RuntimeClass
 		certapproval.PluginName,                 // CertificateApproval
 		certsigning.PluginName,                  // CertificateSigning
 		certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
-		defaultingressclass.PluginName,          //DefaultIngressClass
+		defaultingressclass.PluginName,          // DefaultIngressClass
 	)
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)
