@@ -34,6 +34,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 )
 
@@ -115,7 +116,7 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, cpuManagerPolicy string) *ResourceConfig {
 	// sum requests and limits.
 	reqs, limits := resource.PodRequestsAndLimits(pod)
 
@@ -169,6 +170,11 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) 
 	// build the result
 	result := &ResourceConfig{}
 	if qosClass == v1.PodQOSGuaranteed {
+		// if the pods are in Guaranteed QoS class and cpu manager is enabled and cpu manager policy is static, we should
+		// disable the use of cfs quota at the pod level
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) && (cpuManagerPolicy == string(cpumanager.PolicyStatic)) {
+			cpuQuota = int64(-1)
+		}
 		result.CpuShares = &cpuShares
 		result.CpuQuota = &cpuQuota
 		result.CpuPeriod = &cpuPeriod

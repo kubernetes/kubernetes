@@ -19,6 +19,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"time"
 
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
@@ -27,6 +28,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -83,6 +85,11 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 			cpuPeriod = int64(m.cpuCFSQuotaPeriod.Duration / time.Microsecond)
 		}
 		cpuQuota := milliCPUToQuota(cpuLimit.MilliValue(), cpuPeriod)
+		// if the pods are in Guaranteed QoS class and cpu manager is enabled and cpu manager policy is static, we should
+		// disable the use of cfs quota at the container level
+		if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) && (m.cpuManagerPolicy == string(cpumanager.PolicyStatic)) {
+			cpuQuota = -1
+		}
 		lc.Resources.CpuQuota = cpuQuota
 		lc.Resources.CpuPeriod = cpuPeriod
 	}

@@ -104,6 +104,9 @@ type kubeGenericRuntimeManager struct {
 	livenessManager proberesults.Manager
 	startupManager  proberesults.Manager
 
+	// cpuManagerPolicy is the cpu manager policy name
+	cpuManagerPolicy string
+
 	// If true, enforce container cpu limits with CFS quota support
 	cpuCFSQuota bool
 
@@ -169,6 +172,7 @@ func NewKubeGenericRuntimeManager(
 	imagePullBurst int,
 	imageCredentialProviderConfigFile string,
 	imageCredentialProviderBinDir string,
+	cpuManagerPolicy string,
 	cpuCFSQuota bool,
 	cpuCFSQuotaPeriod metav1.Duration,
 	runtimeService internalapi.RuntimeService,
@@ -180,6 +184,7 @@ func NewKubeGenericRuntimeManager(
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
+		cpuManagerPolicy:    cpuManagerPolicy,
 		cpuCFSQuota:         cpuCFSQuota,
 		cpuCFSQuotaPeriod:   cpuCFSQuotaPeriod,
 		seccompProfileRoot:  seccompProfileRoot,
