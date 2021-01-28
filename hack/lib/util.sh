@@ -734,8 +734,8 @@ function kube::util::ensure_dockerized {
 #
 function kube::util::ensure-bash-version {
   # shellcheck disable=SC2004
-  if ((${BASH_VERSINFO[0]}<5)); then
-    echo "ERROR: This script requires a minimum bash version of 5.0"
+  if ((${BASH_VERSINFO[0]}<4)) || ( ((${BASH_VERSINFO[0]}==4)) && ((${BASH_VERSINFO[1]}<2)) ); then
+    echo "ERROR: This script requires a minimum bash version of 4.2, but got version of ${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"
     exit 1
   fi
 }
