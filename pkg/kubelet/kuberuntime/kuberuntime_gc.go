@@ -56,9 +56,8 @@ type containerGCInfo struct {
 	name string
 	// Creation time for the container.
 	createTime time.Time
-	// If true, the container is in unknown state. Garbage collector should try
-	// to stop containers before removal.
-	unknown bool
+	// State of the container
+	state runtimeapi.ContainerState
 }
 
 // sandboxGCInfo is the internal information kept for sandboxes being considered for GC.
@@ -129,7 +128,8 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 		sort.Sort(byCreated(containers))
 	}
 	for i := len(containers) - 1; i >= numToKeep; i-- {
-		if containers[i].unknown {
+		if containers[i].state == runtimeapi.ContainerState_CONTAINER_UNKNOWN ||
+			containers[i].state == runtimeapi.ContainerState_CONTAINER_RUNNING {
 			// Containers in known state could be running, we should try
 			// to stop it before removal.
 			id := kubecontainer.ContainerID{
@@ -181,51 +181,55 @@ func (cgc *containerGC) removeSandbox(sandboxID string) {
 	}
 }
 
-// evictableContainers gets all containers that are evictable. Evictable containers are: not running
-// and created more than MinAge ago.
-func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByEvictUnit, error) {
+// evictableContainers gets all containers that are evictable.  Evictable containers are as follow:
+// 1. not running and created more than MinAge ago.
+// 2. running containers in the same pod.
+func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByEvictUnit, containersByEvictUnit, error) {
 	containers, err := cgc.manager.getKubeletContainers(true)
 	if err != nil {
-		return containersByEvictUnit{}, err
+		return containersByEvictUnit{}, containersByEvictUnit{}, err
 	}
 
 	evictUnits := make(containersByEvictUnit)
+	evictRunningUnits := make(containersByEvictUnit)
 	newestGCTime := time.Now().Add(-minAge)
 	for _, container := range containers {
-		// Prune out running containers.
-		if container.State == runtimeapi.ContainerState_CONTAINER_RUNNING {
-			continue
-		}
-
 		createdAt := time.Unix(0, container.CreatedAt)
-		if newestGCTime.Before(createdAt) {
-			continue
-		}
 
 		labeledInfo := getContainerInfoFromLabels(container.Labels)
 		containerInfo := containerGCInfo{
 			id:         container.Id,
 			name:       container.Metadata.Name,
 			createTime: createdAt,
-			unknown:    container.State == runtimeapi.ContainerState_CONTAINER_UNKNOWN,
+			state:      container.State,
 		}
 		key := evictUnit{
 			uid:  labeledInfo.PodUID,
 			name: containerInfo.name,
 		}
-		evictUnits[key] = append(evictUnits[key], containerInfo)
+		if container.State == runtimeapi.ContainerState_CONTAINER_RUNNING {
+			evictRunningUnits[key] = append(evictRunningUnits[key], containerInfo)
+		} else {
+			if newestGCTime.Before(createdAt) {
+				continue
+			}
+			evictUnits[key] = append(evictUnits[key], containerInfo)
+		}
 	}
 
-	return evictUnits, nil
+	return evictUnits, evictRunningUnits, nil
 }
 
 // evict all containers that are evictable
 func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictTerminatedPods bool) error {
 	// Separate containers by evict units.
-	evictUnits, err := cgc.evictableContainers(gcPolicy.MinAge)
+	evictUnits, evictRunningUnits, err := cgc.evictableContainers(gcPolicy.MinAge)
 	if err != nil {
 		return err
 	}
+
+	// Remove duplicated containers in running state.
+	cgc.enforceMaxContainersPerEvictUnit(evictRunningUnits, 1)
 
 	// Remove deleted pod containers if all sources are ready.
 	if allSourcesReady {

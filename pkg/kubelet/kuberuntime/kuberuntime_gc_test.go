@@ -381,6 +381,17 @@ func TestContainerGC(t *testing.T) {
 			evictTerminatedPods: true,
 			allSourcesReady:     false,
 		},
+		{
+			description: "repeat running containers should be removed",
+			containers: []containerTemplate{
+				makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_RUNNING),
+				makeGCContainer(podStateProvider, "foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_RUNNING),
+				makeGCContainer(podStateProvider, "foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_RUNNING),
+			},
+			remain:              []int{2},
+			evictTerminatedPods: false,
+			allSourcesReady:     false,
+		},
 	} {
 		t.Logf("TestCase #%d: %+v", c, test)
 		fakeContainers := makeFakeContainers(t, m, test.containers)
