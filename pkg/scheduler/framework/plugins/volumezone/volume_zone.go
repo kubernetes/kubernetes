@@ -112,7 +112,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 		}
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
 		if err != nil {
-			return framework.NewStatus(framework.Error, err.Error())
+			return framework.AsStatus(err)
 		}
 
 		if pvc == nil {
@@ -144,7 +144,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 
 		pv, err := pl.pvLister.Get(pvName)
 		if err != nil {
-			return framework.NewStatus(framework.Error, err.Error())
+			return framework.AsStatus(err)
 		}
 
 		if pv == nil {

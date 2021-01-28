@@ -196,7 +196,7 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 	podVolumes, reasons, err := pl.Binder.FindPodVolumes(pod, state.boundClaims, state.claimsToBind, node)
 
 	if err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
+		return framework.AsStatus(err)
 	}
 
 	if len(reasons) > 0 {

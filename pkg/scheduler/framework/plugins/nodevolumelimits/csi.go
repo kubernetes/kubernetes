@@ -87,7 +87,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 
 	newVolumes := make(map[string]string)
 	if err := pl.filterAttachableVolumes(csiNode, pod.Spec.Volumes, pod.Namespace, newVolumes); err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
+		return framework.AsStatus(err)
 	}
 
 	// If the pod doesn't have any new CSI volumes, the predicate will always be true
@@ -104,7 +104,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 	attachedVolumes := make(map[string]string)
 	for _, existingPod := range nodeInfo.Pods {
 		if err := pl.filterAttachableVolumes(csiNode, existingPod.Pod.Spec.Volumes, existingPod.Pod.Namespace, attachedVolumes); err != nil {
-			return framework.NewStatus(framework.Error, err.Error())
+			return framework.AsStatus(err)
 		}
 	}
 

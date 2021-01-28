@@ -185,7 +185,7 @@ func (pl *falseMapPlugin) Name() string {
 }
 
 func (pl *falseMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) (int64, *framework.Status) {
-	return 0, framework.NewStatus(framework.Error, errPrioritize.Error())
+	return 0, framework.AsStatus(errPrioritize)
 }
 
 func (pl *falseMapPlugin) ScoreExtensions() framework.ScoreExtensions {
