@@ -228,9 +228,9 @@ github.com/clusterhq/flocker-go
 # github.com/codegangsta/negroni v1.0.0 => github.com/codegangsta/negroni v1.0.0
 ## explicit
 # github.com/codegangsta/negroni => github.com/codegangsta/negroni v1.0.0
-# github.com/container-storage-interface/spec v1.2.0 => github.com/container-storage-interface/spec v1.2.0
+# github.com/container-storage-interface/spec v1.3.0 => github.com/container-storage-interface/spec v1.3.0
 ## explicit
-# github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.2.0
+# github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.3.0
 github.com/container-storage-interface/spec/lib/go/csi
 # github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59 => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 # github.com/containerd/cgroups => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
