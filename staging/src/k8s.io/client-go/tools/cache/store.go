@@ -100,14 +100,14 @@ func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	if key, ok := obj.(ExplicitKey); ok {
 		return string(key), nil
 	}
-	meta, err := meta.Accessor(obj)
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return "", fmt.Errorf("object has no meta: %v", err)
 	}
-	if len(meta.GetNamespace()) > 0 {
-		return meta.GetNamespace() + "/" + meta.GetName(), nil
+	if len(accessor.GetNamespace()) > 0 {
+		return accessor.GetNamespace() + "/" + accessor.GetName(), nil
 	}
-	return meta.GetName(), nil
+	return accessor.GetName(), nil
 }
 
 // SplitMetaNamespaceKey returns the namespace and name that
