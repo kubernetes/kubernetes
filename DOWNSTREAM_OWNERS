@@ -2,6 +2,7 @@
 
 filters:
   ".*":
+    # Downstream reviewers, don't have to match those in OWNERS
     reviewers:
     - deads2k
     - sttts
@@ -10,7 +11,7 @@ filters:
     - marun
     - tnozicka
 
-    # approvers are limited to the team that manages rebases and pays the price for carries that are introduced
+    # Approvers are limited to the team that manages rebases and pays the price for carries that are introduced
     approvers:
     - deads2k
     - sttts
