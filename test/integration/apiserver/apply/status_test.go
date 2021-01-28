@@ -156,8 +156,17 @@ func TestApplyStatus(t *testing.T) {
 					namespace = ""
 				}
 				name := newObj.GetName()
+
+				// etcd test stub data doesn't contain apiVersion/kind (!), but apply requires it
+				newObj.SetGroupVersionKind(mapping.GroupVersionKind)
+				createData, err := json.Marshal(newObj.Object)
+				if err != nil {
+					t.Fatal(err)
+				}
+
 				rsc := dynamicClient.Resource(mapping.Resource).Namespace(namespace)
-				_, err := rsc.Create(context.TODO(), &newObj, metav1.CreateOptions{FieldManager: "create_test"})
+				// apply to create
+				_, err = rsc.Patch(context.TODO(), name, types.ApplyPatchType, []byte(createData), metav1.PatchOptions{FieldManager: "create_test"})
 				if err != nil {
 					t.Fatal(err)
 				}
