@@ -1983,7 +1983,6 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 		nodeUnschedulable                bool
 		ds                               *apps.DaemonSet
 		shouldRun, shouldContinueRunning bool
-		err                              error
 	}{
 		{
 			predicateName: "ShouldRunDaemonPod",
@@ -2262,16 +2261,13 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 				manager.podNodeIndex.Add(p)
 			}
 			c.ds.Spec.UpdateStrategy = *strategy
-			shouldRun, shouldContinueRunning, err := manager.nodeShouldRunDaemonPod(node, c.ds)
+			shouldRun, shouldContinueRunning := manager.nodeShouldRunDaemonPod(node, c.ds)
 
 			if shouldRun != c.shouldRun {
 				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldRun: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldRun, shouldRun)
 			}
 			if shouldContinueRunning != c.shouldContinueRunning {
 				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldContinueRunning: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldContinueRunning, shouldContinueRunning)
-			}
-			if err != c.err {
-				t.Errorf("[%v] strategy: %v, predicateName: %v expected err: %v, got: %v", i, c.predicateName, c.ds.Spec.UpdateStrategy.Type, c.err, err)
 			}
 		}
 	}

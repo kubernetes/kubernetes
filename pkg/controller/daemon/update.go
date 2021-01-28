@@ -521,10 +521,7 @@ func (dsc *DaemonSetsController) updatedDesiredNodeCounts(ds *apps.DaemonSet, no
 	var desiredNumberScheduled int
 	for i := range nodeList {
 		node := nodeList[i]
-		wantToRun, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
-		if err != nil {
-			return -1, -1, err
-		}
+		wantToRun, _ := dsc.nodeShouldRunDaemonPod(node, ds)
 		if !wantToRun {
 			continue
 		}
