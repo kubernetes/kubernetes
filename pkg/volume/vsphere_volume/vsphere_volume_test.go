@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,7 +43,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/vsphere-volume")
 	if err != nil {
@@ -92,7 +92,7 @@ func TestPlugin(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/vsphere-volume")
 	if err != nil {
@@ -214,7 +214,7 @@ func TestUnsupportedCloudProvider(t *testing.T) {
 
 		plugMgr := volume.VolumePluginMgr{}
 		plugMgr.InitPlugins(ProbeVolumePlugins(), nil, /* prober */
-			volumetest.NewFakeVolumeHostWithCloudProvider(t, tmpDir, nil, nil, tc.cloudProvider))
+			volumetest.NewFakeKubeletVolumeHostWithCloudProvider(t, tmpDir, nil, nil, tc.cloudProvider))
 
 		plug, err := plugMgr.FindAttachablePluginByName("kubernetes.io/vsphere-volume")
 		if err != nil {
@@ -234,5 +234,25 @@ func TestUnsupportedCloudProvider(t *testing.T) {
 		} else if tc.success && err != nil {
 			t.Errorf("expected no error when creating detacher, but got error: %v", err)
 		}
+	}
+}
+
+func TestUnsupportedVolumeHost(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("vsphereVolumeTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/vsphere-volume")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+
+	_, err = plug.ConstructVolumeSpec("", "")
+	if err == nil {
+		t.Errorf("Expected failure constructing volume spec with unsupported VolumeHost")
 	}
 }

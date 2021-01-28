@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +38,7 @@ import (
 func TestSetDefaultDaemonSetSpec(t *testing.T) {
 	defaultLabels := map[string]string{"foo": "bar"}
 	maxUnavailable := intstr.FromInt(1)
+	maxSurge := intstr.FromInt(0)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
@@ -80,6 +81,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1beta2.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1beta2.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
+							MaxSurge:       &maxSurge,
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
@@ -110,6 +112,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1beta2.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1beta2.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
+							MaxSurge:       &maxSurge,
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(1),
@@ -146,6 +149,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1beta2.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1beta2.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
+							MaxSurge:       &maxSurge,
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
@@ -435,7 +439,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 func TestDefaultDeploymentAvailability(t *testing.T) {
 	d := roundTrip(t, runtime.Object(&appsv1beta2.Deployment{})).(*appsv1beta2.Deployment)
 
-	maxUnavailable, err := intstr.GetValueFromIntOrPercent(d.Spec.Strategy.RollingUpdate.MaxUnavailable, int(*(d.Spec.Replicas)), false)
+	maxUnavailable, err := intstr.GetScaledValueFromIntOrPercent(d.Spec.Strategy.RollingUpdate.MaxUnavailable, int(*(d.Spec.Replicas)), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

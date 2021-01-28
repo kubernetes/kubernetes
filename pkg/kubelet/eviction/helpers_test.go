@@ -23,14 +23,14 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -91,8 +91,7 @@ func TestGetReclaimableThreshold(t *testing.T) {
 	}
 	for testName, testCase := range testCases {
 		sort.Sort(byEvictionPriority(testCase.thresholds))
-		_, resource, ok := getReclaimableThreshold(testCase.thresholds)
-		print(resource)
+		_, _, ok := getReclaimableThreshold(testCase.thresholds)
 		if !ok {
 			t.Errorf("Didn't find reclaimable threshold, test: %v", testName)
 		}

@@ -146,6 +146,7 @@ type userAgentRoundTripper struct {
 	rt    http.RoundTripper
 }
 
+// NewUserAgentRoundTripper will add User-Agent header to a request unless it has already been set.
 func NewUserAgentRoundTripper(agent string, rt http.RoundTripper) http.RoundTripper {
 	return &userAgentRoundTripper{agent, rt}
 }
@@ -167,7 +168,7 @@ func (rt *userAgentRoundTripper) WrappedRoundTripper() http.RoundTripper { retur
 
 type basicAuthRoundTripper struct {
 	username string
-	password string
+	password string `datapolicy:"password"`
 	rt       http.RoundTripper
 }
 
@@ -260,7 +261,7 @@ func NewBearerAuthRoundTripper(bearer string, rt http.RoundTripper) http.RoundTr
 	return &bearerAuthRoundTripper{bearer, nil, rt}
 }
 
-// NewBearerAuthRoundTripper adds the provided bearer token to a request
+// NewBearerAuthWithRefreshRoundTripper adds the provided bearer token to a request
 // unless the authorization header has already been set.
 // If tokenFile is non-empty, it is periodically read,
 // and the last successfully read content is used as the bearer token.
@@ -305,7 +306,7 @@ func (rt *bearerAuthRoundTripper) WrappedRoundTripper() http.RoundTripper { retu
 
 // requestInfo keeps track of information about a request/response combination
 type requestInfo struct {
-	RequestHeaders http.Header
+	RequestHeaders http.Header `datapolicy:"token"`
 	RequestVerb    string
 	RequestURL     string
 
@@ -340,6 +341,7 @@ func (r *requestInfo) toCurl() string {
 	headers := ""
 	for key, values := range r.RequestHeaders {
 		for _, value := range values {
+			value = maskValue(key, value)
 			headers += fmt.Sprintf(` -H %q`, fmt.Sprintf("%s: %s", key, value))
 		}
 	}
@@ -424,7 +426,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 
 	}
 	if rt.levels[debugRequestHeaders] {
-		klog.Infof("Request Headers:")
+		klog.Info("Request Headers:")
 		for key, values := range reqInfo.RequestHeaders {
 			for _, value := range values {
 				value = maskValue(key, value)
@@ -446,7 +448,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 		klog.Infof("Response Status: %s in %d milliseconds", reqInfo.ResponseStatus, reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
 	}
 	if rt.levels[debugResponseHeaders] {
-		klog.Infof("Response Headers:")
+		klog.Info("Response Headers:")
 		for key, values := range reqInfo.ResponseHeaders {
 			for _, value := range values {
 				klog.Infof("    %s: %s", key, value)

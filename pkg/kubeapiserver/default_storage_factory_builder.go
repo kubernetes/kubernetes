@@ -49,6 +49,15 @@ var SpecialDefaultResourcePrefixes = map[schema.GroupResource]string{
 	{Group: "policy", Resource: "podsecuritypolicies"}:     "podsecuritypolicy",
 }
 
+// DefaultWatchCacheSizes defines default resources for which watchcache
+// should be disabled.
+func DefaultWatchCacheSizes() map[schema.GroupResource]int {
+	return map[schema.GroupResource]int{
+		{Resource: "events"}:                         0,
+		{Group: "events.k8s.io", Resource: "events"}: 0,
+	}
+}
+
 // NewStorageFactoryConfig returns a new StorageFactoryConfig set up with necessary resource overrides.
 func NewStorageFactoryConfig() *StorageFactoryConfig {
 

@@ -23,6 +23,7 @@ import (
 	"syscall"
 
 	"os"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -39,19 +40,26 @@ const (
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
-func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) error {
+func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(*error)) error {
 	if fsGroup == nil {
 		return nil
 	}
 
 	fsGroupPolicyEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableFSGroupPolicy)
 
-	klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", mounter.GetPath())
+	timer := time.AfterFunc(30*time.Second, func() {
+		klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", mounter.GetPath())
+	})
+	defer timer.Stop()
 
 	// This code exists for legacy purposes, so as old behaviour is entirely preserved when feature gate is disabled
 	// TODO: remove this when ConfigurableFSGroupPolicy turns GA.
 	if !fsGroupPolicyEnabled {
-		return legacyOwnershipChange(mounter, fsGroup)
+		err := legacyOwnershipChange(mounter, fsGroup)
+		if completeFunc != nil {
+			completeFunc(&err)
+		}
+		return err
 	}
 
 	if skipPermissionChange(mounter, fsGroup, fsGroupChangePolicy) {
@@ -59,13 +67,16 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1
 		return nil
 	}
 
-	return walkDeep(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
+	err := walkDeep(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
 	})
-
+	if completeFunc != nil {
+		completeFunc(&err)
+	}
+	return err
 }
 
 func legacyOwnershipChange(mounter Mounter, fsGroup *int64) error {

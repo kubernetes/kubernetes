@@ -557,8 +557,6 @@ type dhGEXSHA struct {
 	hashFunc crypto.Hash
 }
 
-const numMRTests = 64
-
 const (
 	dhGroupExchangeMinimumBits   = 2048
 	dhGroupExchangePreferredBits = 2048
@@ -572,7 +570,7 @@ func (gex *dhGEXSHA) diffieHellman(theirPublic, myPrivate *big.Int) (*big.Int, e
 	return new(big.Int).Exp(theirPublic, myPrivate, gex.p), nil
 }
 
-func (gex *dhGEXSHA) Client(c packetConn, randSource io.Reader, magics *handshakeMagics) (*kexResult, error) {
+func (gex dhGEXSHA) Client(c packetConn, randSource io.Reader, magics *handshakeMagics) (*kexResult, error) {
 	// Send GexRequest
 	kexDHGexRequest := kexDHGexRequestMsg{
 		MinBits:      dhGroupExchangeMinimumBits,
@@ -602,15 +600,8 @@ func (gex *dhGEXSHA) Client(c packetConn, randSource io.Reader, magics *handshak
 	gex.p = kexDHGexGroup.P
 	gex.g = kexDHGexGroup.G
 
-	// Check if p is safe by verifing that p and (p-1)/2 are primes
-	one := big.NewInt(1)
-	var pHalf = &big.Int{}
-	pHalf.Rsh(gex.p, 1)
-	if !gex.p.ProbablyPrime(numMRTests) || !pHalf.ProbablyPrime(numMRTests) {
-		return nil, fmt.Errorf("ssh: server provided gex p is not safe")
-	}
-
 	// Check if g is safe by verifing that g > 1 and g < p - 1
+	one := big.NewInt(1)
 	var pMinusOne = &big.Int{}
 	pMinusOne.Sub(gex.p, one)
 	if gex.g.Cmp(one) != 1 && gex.g.Cmp(pMinusOne) != -1 {
@@ -618,6 +609,8 @@ func (gex *dhGEXSHA) Client(c packetConn, randSource io.Reader, magics *handshak
 	}
 
 	// Send GexInit
+	var pHalf = &big.Int{}
+	pHalf.Rsh(gex.p, 1)
 	x, err := rand.Int(randSource, pHalf)
 	if err != nil {
 		return nil, err
@@ -677,7 +670,7 @@ func (gex *dhGEXSHA) Client(c packetConn, randSource io.Reader, magics *handshak
 // Server half implementation of the Diffie Hellman Key Exchange with SHA1 and SHA256.
 //
 // This is a minimal implementation to satisfy the automated tests.
-func (gex *dhGEXSHA) Server(c packetConn, randSource io.Reader, magics *handshakeMagics, priv Signer) (result *kexResult, err error) {
+func (gex dhGEXSHA) Server(c packetConn, randSource io.Reader, magics *handshakeMagics, priv Signer) (result *kexResult, err error) {
 	// Receive GexRequest
 	packet, err := c.readPacket()
 	if err != nil {

@@ -17,11 +17,9 @@ reviewers:
 - ncdc
 - enj
 - hzxuzhonghu
-- CaoShuFeng
 - jennybuckley
 - apelisse
 - jpbetz
 labels:
 - sig/api-machinery
-- triage/needs-information
 - area/apiserver

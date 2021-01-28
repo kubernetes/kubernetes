@@ -28,7 +28,7 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 
-	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -37,14 +37,15 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 const (
 	sharedConcurrencyMetricsName      = "apiserver_flowcontrol_request_concurrency_limit"
 	dispatchedRequestCountMetricsName = "apiserver_flowcontrol_dispatched_requests_total"
-	labelPriorityLevel                = "priorityLevel"
+	rejectedRequestCountMetricsName   = "apiserver_flowcontrol_rejected_requests_total"
+	labelPriorityLevel                = "priority_level"
 	timeout                           = time.Second * 10
 )
 
@@ -52,7 +53,7 @@ func setup(t testing.TB) (*httptest.Server, *rest.Config, framework.CloseFunc) {
 	opts := framework.MasterConfigOptions{EtcdOptions: framework.DefaultEtcdOptions()}
 	opts.EtcdOptions.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
 	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&opts)
-	resourceConfig := master.DefaultAPIResourceConfigSource()
+	resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 	resourceConfig.EnableVersions(schema.GroupVersion{
 		Group:   "flowcontrol.apiserver.k8s.io",
 		Version: "v1alpha1",
@@ -122,13 +123,20 @@ func TestPriorityLevelIsolation(t *testing.T) {
 
 	time.Sleep(time.Second * 10) // running in background for a while
 
-	reqCounts, err := getRequestCountOfPriorityLevel(loopbackClient)
+	allDispatchedReqCounts, rejectedReqCounts, err := getRequestCountOfPriorityLevel(loopbackClient)
 	if err != nil {
 		t.Error(err)
 	}
 
-	noxu1RequestCount := reqCounts[priorityLevelNoxu1.Name]
-	noxu2RequestCount := reqCounts[priorityLevelNoxu2.Name]
+	noxu1RequestCount := allDispatchedReqCounts[priorityLevelNoxu1.Name]
+	noxu2RequestCount := allDispatchedReqCounts[priorityLevelNoxu2.Name]
+
+	if rejectedReqCounts[priorityLevelNoxu1.Name] > 0 {
+		t.Errorf(`%v requests from the "elephant" stream were rejected unexpectedly`, rejectedReqCounts[priorityLevelNoxu2.Name])
+	}
+	if rejectedReqCounts[priorityLevelNoxu2.Name] > 0 {
+		t.Errorf(`%v requests from the "mouse" stream were rejected unexpectedly`, rejectedReqCounts[priorityLevelNoxu2.Name])
+	}
 
 	// Theoretically, the actual expected value of request counts upon the two priority-level should be
 	// the equal. We're deliberately lax to make flakes super rare.
@@ -192,10 +200,10 @@ func getSharedConcurrencyOfPriorityLevel(c clientset.Interface) (map[string]int,
 	}
 }
 
-func getRequestCountOfPriorityLevel(c clientset.Interface) (map[string]int, error) {
+func getRequestCountOfPriorityLevel(c clientset.Interface) (map[string]int, map[string]int, error) {
 	resp, err := getMetrics(c)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	dec := expfmt.NewDecoder(strings.NewReader(string(resp)), expfmt.FmtText)
@@ -204,37 +212,40 @@ func getRequestCountOfPriorityLevel(c clientset.Interface) (map[string]int, erro
 		Opts: &expfmt.DecodeOptions{},
 	}
 
-	reqCounts := make(map[string]int)
+	allReqCounts := make(map[string]int)
+	rejectReqCounts := make(map[string]int)
 	for {
 		var v model.Vector
 		if err := decoder.Decode(&v); err != nil {
 			if err == io.EOF {
 				// Expected loop termination condition.
-				return reqCounts, nil
+				return allReqCounts, rejectReqCounts, nil
 			}
-			return nil, fmt.Errorf("failed decoding metrics: %v", err)
+			return nil, nil, fmt.Errorf("failed decoding metrics: %v", err)
 		}
 		for _, metric := range v {
 			switch name := string(metric.Metric[model.MetricNameLabel]); name {
 			case dispatchedRequestCountMetricsName:
-				reqCounts[string(metric.Metric[labelPriorityLevel])] = int(metric.Value)
+				allReqCounts[string(metric.Metric[labelPriorityLevel])] = int(metric.Value)
+			case rejectedRequestCountMetricsName:
+				rejectReqCounts[string(metric.Metric[labelPriorityLevel])] = int(metric.Value)
 			}
 		}
 	}
 }
 
-func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, username string, concurrencyShares, queuelength int) (*flowcontrolv1alpha1.PriorityLevelConfiguration, *flowcontrolv1alpha1.FlowSchema, error) {
-	pl, err := c.FlowcontrolV1alpha1().PriorityLevelConfigurations().Create(context.Background(), &flowcontrolv1alpha1.PriorityLevelConfiguration{
+func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, username string, concurrencyShares, queuelength int) (*flowcontrol.PriorityLevelConfiguration, *flowcontrol.FlowSchema, error) {
+	pl, err := c.FlowcontrolV1beta1().PriorityLevelConfigurations().Create(context.Background(), &flowcontrol.PriorityLevelConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: username,
 		},
-		Spec: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1alpha1.PriorityLevelEnablementLimited,
-			Limited: &flowcontrolv1alpha1.LimitedPriorityLevelConfiguration{
+		Spec: flowcontrol.PriorityLevelConfigurationSpec{
+			Type: flowcontrol.PriorityLevelEnablementLimited,
+			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 				AssuredConcurrencyShares: int32(concurrencyShares),
-				LimitResponse: flowcontrolv1alpha1.LimitResponse{
-					Type: flowcontrolv1alpha1.LimitResponseTypeQueue,
-					Queuing: &flowcontrolv1alpha1.QueuingConfiguration{
+				LimitResponse: flowcontrol.LimitResponse{
+					Type: flowcontrol.LimitResponseTypeQueue,
+					Queuing: &flowcontrol.QueuingConfiguration{
 						Queues:           100,
 						HandSize:         1,
 						QueueLengthLimit: int32(queuelength),
@@ -246,33 +257,33 @@ func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, usern
 	if err != nil {
 		return nil, nil, err
 	}
-	fs, err := c.FlowcontrolV1alpha1().FlowSchemas().Create(context.TODO(), &flowcontrolv1alpha1.FlowSchema{
+	fs, err := c.FlowcontrolV1beta1().FlowSchemas().Create(context.TODO(), &flowcontrol.FlowSchema{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: username,
 		},
-		Spec: flowcontrolv1alpha1.FlowSchemaSpec{
-			DistinguisherMethod: &flowcontrolv1alpha1.FlowDistinguisherMethod{
-				Type: flowcontrolv1alpha1.FlowDistinguisherMethodByUserType,
+		Spec: flowcontrol.FlowSchemaSpec{
+			DistinguisherMethod: &flowcontrol.FlowDistinguisherMethod{
+				Type: flowcontrol.FlowDistinguisherMethodByUserType,
 			},
 			MatchingPrecedence: 1000,
-			PriorityLevelConfiguration: flowcontrolv1alpha1.PriorityLevelConfigurationReference{
+			PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
 				Name: username,
 			},
-			Rules: []flowcontrolv1alpha1.PolicyRulesWithSubjects{
+			Rules: []flowcontrol.PolicyRulesWithSubjects{
 				{
-					ResourceRules: []flowcontrolv1alpha1.ResourcePolicyRule{
+					ResourceRules: []flowcontrol.ResourcePolicyRule{
 						{
-							Verbs:        []string{flowcontrolv1alpha1.VerbAll},
-							APIGroups:    []string{flowcontrolv1alpha1.APIGroupAll},
-							Resources:    []string{flowcontrolv1alpha1.ResourceAll},
-							Namespaces:   []string{flowcontrolv1alpha1.NamespaceEvery},
+							Verbs:        []string{flowcontrol.VerbAll},
+							APIGroups:    []string{flowcontrol.APIGroupAll},
+							Resources:    []string{flowcontrol.ResourceAll},
+							Namespaces:   []string{flowcontrol.NamespaceEvery},
 							ClusterScope: true,
 						},
 					},
-					Subjects: []flowcontrolv1alpha1.Subject{
+					Subjects: []flowcontrol.Subject{
 						{
-							Kind: flowcontrolv1alpha1.SubjectKindUser,
-							User: &flowcontrolv1alpha1.UserSubject{
+							Kind: flowcontrol.SubjectKindUser,
+							User: &flowcontrol.UserSubject{
 								Name: username,
 							},
 						},
@@ -286,13 +297,13 @@ func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, usern
 	}
 
 	return pl, fs, wait.Poll(time.Second, timeout, func() (bool, error) {
-		fs, err := c.FlowcontrolV1alpha1().FlowSchemas().Get(context.TODO(), username, metav1.GetOptions{})
+		fs, err := c.FlowcontrolV1beta1().FlowSchemas().Get(context.TODO(), username, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		for _, condition := range fs.Status.Conditions {
-			if condition.Type == flowcontrolv1alpha1.FlowSchemaConditionDangling {
-				if condition.Status == flowcontrolv1alpha1.ConditionFalse {
+			if condition.Type == flowcontrol.FlowSchemaConditionDangling {
+				if condition.Status == flowcontrol.ConditionFalse {
 					return true, nil
 				}
 			}

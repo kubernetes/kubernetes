@@ -1373,10 +1373,8 @@ func Test_getNodeConditionPredicate(t *testing.T) {
 	tests := []struct {
 		name string
 
-		enableExclusion bool
-		enableLegacy    bool
-		input           *v1.Node
-		want            bool
+		input *v1.Node
+		want  bool
 	}{
 		{want: false, input: &v1.Node{}},
 		{want: true, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}},
@@ -1384,21 +1382,11 @@ func Test_getNodeConditionPredicate(t *testing.T) {
 		{want: true, input: &v1.Node{Spec: v1.NodeSpec{Unschedulable: true}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}},
 
 		{want: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}}},
-		{want: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeRoleMaster: ""}}}},
-		{want: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeRoleExcludeBalancer: ""}}}},
-
-		{want: true, enableExclusion: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeRoleMaster: ""}}}},
-		{want: true, enableLegacy: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeRoleExcludeBalancer: ""}}}},
-
-		{want: false, enableLegacy: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeRoleMaster: ""}}}},
-		{want: false, enableExclusion: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeRoleExcludeBalancer: ""}}}},
+		{want: false, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeRoleExcludeBalancer: ""}}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &Controller{
-				legacyNodeRoleFeatureEnabled:       tt.enableLegacy,
-				serviceNodeExclusionFeatureEnabled: tt.enableExclusion,
-			}
+			c := &Controller{}
 
 			if result := c.getNodeConditionPredicate()(tt.input); result != tt.want {
 				t.Errorf("getNodeConditionPredicate() = %v, want %v", result, tt.want)

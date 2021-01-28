@@ -28,7 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -43,7 +43,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
 	if err != nil {
@@ -96,7 +96,7 @@ func (fake *fakePDManager) AttachDisk(b *cinderVolumeMounter, globalPDPath strin
 		}
 	}
 	if notmnt {
-		err = b.mounter.Mount(fakeDeviceName, globalPath, "", []string{"bind"})
+		err = b.mounter.MountSensitiveWithoutSystemd(fakeDeviceName, globalPath, "", []string{"bind"}, nil)
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func (fake *fakePDManager) DetachDisk(c *cinderVolumeUnmounter) error {
 
 func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)
-	labels[v1.LabelZoneFailureDomain] = "nova"
+	labels[v1.LabelFailureDomainBetaZone] = "nova"
 	return "test-volume-name", 1, labels, "", nil
 }
 
@@ -141,7 +141,7 @@ func TestPlugin(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
 	if err != nil {
@@ -241,7 +241,7 @@ func TestPlugin(t *testing.T) {
 
 	req := persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0]
 
-	if req.Key != v1.LabelZoneFailureDomain {
+	if req.Key != v1.LabelFailureDomainBetaZone {
 		t.Errorf("Provision() returned unexpected requirement key in NodeAffinity %v", req.Key)
 	}
 
@@ -280,7 +280,7 @@ func TestGetVolumeLimit(t *testing.T) {
 
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	volumeHost := volumetest.NewFakeVolumeHostWithCloudProvider(t, tmpDir, nil, nil, cloud)
+	volumeHost := volumetest.NewFakeKubeletVolumeHostWithCloudProvider(t, tmpDir, nil, nil, cloud)
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumeHost)
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
@@ -316,7 +316,7 @@ func getOpenstackConfig() openstack.Config {
 			AuthURL         string `gcfg:"auth-url"`
 			Username        string
 			UserID          string `gcfg:"user-id"`
-			Password        string
+			Password        string `datapolicy:"password"`
 			TenantID        string `gcfg:"tenant-id"`
 			TenantName      string `gcfg:"tenant-name"`
 			TrustID         string `gcfg:"trust-id"`
@@ -341,4 +341,24 @@ func getOpenstackConfig() openstack.Config {
 		},
 	}
 	return cfg
+}
+
+func TestUnsupportedVolumeHost(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("cinderTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+
+	_, err = plug.ConstructVolumeSpec("", "")
+	if err == nil {
+		t.Errorf("Expected failure constructing volume spec with unsupported VolumeHost")
+	}
 }

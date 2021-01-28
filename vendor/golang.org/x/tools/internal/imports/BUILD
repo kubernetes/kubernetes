@@ -14,11 +14,10 @@ go_library(
     importpath = "golang.org/x/tools/internal/imports",
     visibility = ["//vendor/golang.org/x/tools:__subpackages__"],
     deps = [
+        "//vendor/golang.org/x/mod/module:go_default_library",
         "//vendor/golang.org/x/tools/go/ast/astutil:go_default_library",
-        "//vendor/golang.org/x/tools/go/packages:go_default_library",
+        "//vendor/golang.org/x/tools/internal/gocommand:go_default_library",
         "//vendor/golang.org/x/tools/internal/gopathwalk:go_default_library",
-        "//vendor/golang.org/x/tools/internal/module:go_default_library",
-        "//vendor/golang.org/x/tools/internal/semver:go_default_library",
     ],
 )
 

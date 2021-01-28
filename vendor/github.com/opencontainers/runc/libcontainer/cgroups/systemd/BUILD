@@ -20,6 +20,9 @@ go_library(
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/github.com/sirupsen/logrus:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/github.com/cyphar/filepath-securejoin:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
@@ -36,7 +39,13 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [

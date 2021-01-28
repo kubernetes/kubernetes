@@ -51,6 +51,11 @@ func (in *Endpoint) DeepCopyInto(out *Endpoint) {
 			(*out)[key] = val
 		}
 	}
+	if in.NodeName != nil {
+		in, out := &in.NodeName, &out.NodeName
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
@@ -69,6 +74,16 @@ func (in *EndpointConditions) DeepCopyInto(out *EndpointConditions) {
 	*out = *in
 	if in.Ready != nil {
 		in, out := &in.Ready, &out.Ready
+		*out = new(bool)
+		**out = **in
+	}
+	if in.Serving != nil {
+		in, out := &in.Serving, &out.Serving
+		*out = new(bool)
+		**out = **in
+	}
+	if in.Terminating != nil {
+		in, out := &in.Terminating, &out.Terminating
 		*out = new(bool)
 		**out = **in
 	}

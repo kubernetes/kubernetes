@@ -886,7 +886,7 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 		t.Errorf("unexpected error: %v", err)
 	}
 	opts.Preconditions = metav1.NewPreconditionDeleteOptions("UID1111").Preconditions
-	obj, _, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, &opts)
+	_, _, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, &opts)
 	if err == nil || !errors.IsConflict(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -923,7 +923,7 @@ func (t *Tester) testDeleteWithResourceVersion(obj runtime.Object, createFn Crea
 		t.Errorf("unexpected error: %v", err)
 	}
 	opts.Preconditions = metav1.NewRVDeletionPrecondition("RV1111").Preconditions
-	obj, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, &opts)
+	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, &opts)
 	if err == nil || !errors.IsConflict(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1115,7 +1115,7 @@ func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, createFn Create
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if wasDeleted != true {
+	if !wasDeleted {
 		t.Errorf("unexpected, object %s should have been deleted immediately", objectMeta.GetName())
 	}
 	_, err = t.storage.(rest.Getter).Get(ctx, objectMeta.GetName(), &metav1.GetOptions{})

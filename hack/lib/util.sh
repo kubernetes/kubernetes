@@ -54,7 +54,7 @@ kube::util::wait_for_url() {
   local i
   for i in $(seq 1 "${times}"); do
     local out
-    if out=$(curl --max-time "${maxtime}" -gkfs "${url}" 2>/dev/null); then
+    if out=$(curl --max-time "${maxtime}" -gkfs "${@:6}" "${url}" 2>/dev/null); then
       kube::log::status "On try ${i}, ${prefix}: ${out}"
       return 0
     fi
@@ -62,6 +62,17 @@ kube::util::wait_for_url() {
   done
   kube::log::error "Timed out waiting for ${prefix} to answer at ${url}; tried ${times} waiting ${wait} between each"
   return 1
+}
+
+kube::util::wait_for_url_with_bearer_token() {
+  local url=$1
+  local token=$2
+  local prefix=${3:-}
+  local wait=${4:-1}
+  local times=${5:-30}
+  local maxtime=${6:-1}
+
+  kube::util::wait_for_url "${url}" "${prefix}" "${wait}" "${times}" "${maxtime}" -H "Authorization: Bearer ${token}"
 }
 
 # Example:  kube::util::wait_for_success 120 5 "kubectl get nodes|grep localhost"
@@ -200,22 +211,32 @@ kube::util::find-binary-for-platform() {
     "${KUBE_ROOT}/_output/local/bin/${platform}/${lookfor}"
     "${KUBE_ROOT}/platforms/${platform}/${lookfor}"
   )
-  # Also search for binary in bazel build tree.
-  # The bazel go rules place some binaries in subtrees like
-  # "bazel-bin/source/path/linux_amd64_pure_stripped/binaryname", so make sure
-  # the platform name is matched in the path.
-  while IFS=$'\n' read -r location; do
-    locations+=("$location");
-  done < <(find "${KUBE_ROOT}/bazel-bin/" -type f -executable \
-    \( -path "*/${platform/\//_}*/${lookfor}" -o -path "*/${lookfor}" \) 2>/dev/null || true)
-  # search for executables for non-GNU versions of find (eg. BSD)
-  while IFS=$'\n' read -r location; do
-    locations+=("$location");
-  done < <(find "${KUBE_ROOT}/bazel-bin/" -type f -perm -111 \
-    \( -path "*/${platform/\//_}*/${lookfor}" -o -path "*/${lookfor}" \) 2>/dev/null || true)
+  # if we're looking for the host platform, add local non-platform-qualified search paths
+  if [[ "${platform}" = "$(kube::util::host_platform)" ]]; then
+    locations+=(
+      "${KUBE_ROOT}/_output/local/go/bin/${lookfor}"
+      "${KUBE_ROOT}/_output/dockerized/go/bin/${lookfor}"
+    );
+  fi
+
+  # Also search for binary in bazel build tree if bazel-out/ exists.
+  if [[ -d "${KUBE_ROOT}/bazel-out" ]]; then
+    while IFS=$'\n' read -r bin_build_mode; do
+      if grep -q "${platform}" "${bin_build_mode}"; then
+        # drop the extension to get the real binary path.
+        locations+=("${bin_build_mode%.*}")
+      fi
+    done < <(find "${KUBE_ROOT}/bazel-out/" -name "${lookfor}.go_build_mode")
+  fi
 
   # List most recently-updated location.
   local -r bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+
+  if [[ -z "${bin}" ]]; then
+    kube::log::error "Failed to find binary ${lookfor} for platform ${platform}"
+    return 1
+  fi
+
   echo -n "${bin}"
 }
 
@@ -235,11 +256,6 @@ kube::util::gen-docs() {
   genkubedocs=$(kube::util::find-binary "genkubedocs")
   genman=$(kube::util::find-binary "genman")
   genyaml=$(kube::util::find-binary "genyaml")
-  genfeddocs=$(kube::util::find-binary "genfeddocs")
-
-  # TODO: If ${genfeddocs} is not used from anywhere (it isn't used at
-  # least from k/k tree), remove it completely.
-  kube::util::sourced_variable "${genfeddocs}"
 
   mkdir -p "${dest}/docs/user-guide/kubectl/"
   "${gendocs}" "${dest}/docs/user-guide/kubectl/"
@@ -321,6 +337,9 @@ kube::util::group-version-to-pkg-path() {
       ;;
     meta/v1beta1)
       echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1beta1"
+      ;;
+    internal.apiserver.k8s.io/v1alpha1)
+      echo "vendor/k8s.io/api/apiserverinternal/v1alpha1"
       ;;
     *.k8s.io)
       echo "pkg/apis/${group_version%.*k8s.io}"
@@ -598,11 +617,9 @@ Can't connect to 'docker' daemon.  please fix and retry.
 Possible causes:
   - Docker Daemon not started
     - Linux: confirm via your init system
-    - macOS w/ docker-machine: run `docker-machine ls` and `docker-machine start <name>`
     - macOS w/ Docker for Mac: Check the menu bar and start the Docker application
   - DOCKER_HOST hasn't been set or is set incorrectly
     - Linux: domain socket is used, DOCKER_* should be unset. In Bash run `unset ${!DOCKER_*}`
-    - macOS w/ docker-machine: run `eval "$(docker-machine env <name>)"`
     - macOS w/ Docker for Mac: domain socket is used, DOCKER_* should be unset. In Bash run `unset ${!DOCKER_*}`
   - Other things to check:
     - Linux: User isn't in 'docker' group.  Add and relogin.
@@ -674,12 +691,12 @@ function kube::util::ensure-cfssl {
     kernel=$(uname -s)
     case "${kernel}" in
       Linux)
-        curl --retry 10 -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
-        curl --retry 10 -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+        curl --retry 10 -L -o cfssl https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssl_1.5.0_linux_amd64
+        curl --retry 10 -L -o cfssljson https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssljson_1.5.0_linux_amd64
         ;;
       Darwin)
-        curl --retry 10 -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_darwin-amd64
-        curl --retry 10 -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_darwin-amd64
+        curl --retry 10 -L -o cfssl https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssl_1.5.0_darwin_amd64
+        curl --retry 10 -L -o cfssljson https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssljson_1.5.0_darwin_amd64
         ;;
       *)
         echo "Unknown, unsupported platform: ${kernel}." >&2
@@ -708,6 +725,17 @@ function kube::util::ensure_dockerized {
     return 0
   else
     echo "ERROR: This script is designed to be run inside a kube-build container"
+    exit 1
+  fi
+}
+
+# kube::util::ensure-bash-version
+# Check if we are using a supported bash version
+#
+function kube::util::ensure-bash-version {
+  # shellcheck disable=SC2004
+  if ((${BASH_VERSINFO[0]}<5)); then
+    echo "ERROR: This script requires a minimum bash version of 5.0"
     exit 1
   fi
 }
@@ -754,7 +782,7 @@ function kube::util::check-file-in-alphabetical-order {
 # Checks whether jq is installed.
 function kube::util::require-jq {
   if ! command -v jq &>/dev/null; then
-    echo "jq not found. Please install." 1>&2
+    kube::log::error  "jq not found. Please install."
     return 1
   fi
 }

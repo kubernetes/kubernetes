@@ -28,6 +28,7 @@ import (
 	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -51,7 +52,6 @@ type applyFlags struct {
 	etcdUpgrade        bool
 	renewCerts         bool
 	imagePullTimeout   time.Duration
-	kustomizeDir       string
 	patchesDir         string
 }
 
@@ -60,8 +60,8 @@ func (f *applyFlags) sessionIsInteractive() bool {
 	return !(f.nonInteractiveMode || f.dryRun || f.force)
 }
 
-// NewCmdApply returns the cobra command for `kubeadm upgrade apply`
-func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
+// newCmdApply returns the cobra command for `kubeadm upgrade apply`
+func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 	flags := &applyFlags{
 		applyPlanFlags:   apf,
 		imagePullTimeout: defaultImagePullTimeout,
@@ -89,7 +89,6 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	cmd.Flags().DurationVar(&flags.imagePullTimeout, "image-pull-timeout", flags.imagePullTimeout, "The maximum amount of time to wait for the control plane pods to be downloaded.")
 	// TODO: The flag was deprecated in 1.19; remove the flag following a GA deprecation policy of 12 months or 2 releases (whichever is longer)
 	cmd.Flags().MarkDeprecated("image-pull-timeout", "This flag is deprecated and will be removed in a future version.")
-	options.AddKustomizePodsFlag(cmd.Flags(), &flags.kustomizeDir)
 	options.AddPatchesFlag(cmd.Flags(), &flags.patchesDir)
 
 	return cmd
@@ -165,6 +164,13 @@ func runApply(flags *applyFlags, args []string) error {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
 
+	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
+	fmt.Printf("[upgrade/postupgrade] Applying label %s='' to Nodes with label %s='' (deprecated)\n",
+		kubeadmconstants.LabelNodeRoleControlPlane, kubeadmconstants.LabelNodeRoleOldControlPlane)
+	if err := upgrade.LabelOldControlPlaneNodes(client); err != nil {
+		return err
+	}
+
 	// Upgrade RBAC rules and addons.
 	klog.V(1).Infoln("[upgrade/postupgrade] upgrading RBAC rules and addons")
 	if err := upgrade.PerformPostUpgradeTasks(client, cfg, flags.dryRun); err != nil {
@@ -217,8 +223,8 @@ func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, w
 	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q...\n", internalcfg.KubernetesVersion)
 
 	if flags.dryRun {
-		return upgrade.DryRunStaticPodUpgrade(flags.kustomizeDir, flags.patchesDir, internalcfg)
+		return upgrade.DryRunStaticPodUpgrade(flags.patchesDir, internalcfg)
 	}
 
-	return upgrade.PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade, flags.renewCerts, flags.kustomizeDir, flags.patchesDir)
+	return upgrade.PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade, flags.renewCerts, flags.patchesDir)
 }

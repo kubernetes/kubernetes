@@ -14,9 +14,8 @@ import (
 )
 
 const (
-	Version      = 4  // protocol version
-	HeaderLen    = 20 // header length without extension headers
-	maxHeaderLen = 60 // sensible default, revisit if later RFCs define new usage of version and header length fields
+	Version   = 4  // protocol version
+	HeaderLen = 20 // header length without extension headers
 )
 
 type HeaderFlags int
@@ -68,7 +67,7 @@ func (h *Header) Marshal() ([]byte, error) {
 	b[1] = byte(h.TOS)
 	flagsAndFragOff := (h.FragOff & 0x1fff) | int(h.Flags<<13)
 	switch runtime.GOOS {
-	case "darwin", "dragonfly", "netbsd":
+	case "darwin", "ios", "dragonfly", "netbsd":
 		socket.NativeEndian.PutUint16(b[2:4], uint16(h.TotalLen))
 		socket.NativeEndian.PutUint16(b[6:8], uint16(flagsAndFragOff))
 	case "freebsd":
@@ -127,7 +126,7 @@ func (h *Header) Parse(b []byte) error {
 	h.Src = net.IPv4(b[12], b[13], b[14], b[15])
 	h.Dst = net.IPv4(b[16], b[17], b[18], b[19])
 	switch runtime.GOOS {
-	case "darwin", "dragonfly", "netbsd":
+	case "darwin", "ios", "dragonfly", "netbsd":
 		h.TotalLen = int(socket.NativeEndian.Uint16(b[2:4])) + hdrlen
 		h.FragOff = int(socket.NativeEndian.Uint16(b[6:8]))
 	case "freebsd":

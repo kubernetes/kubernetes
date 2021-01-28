@@ -18,6 +18,7 @@ package queueset
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -125,7 +126,8 @@ type uniformScenario struct {
 	clients                                  []uniformClient
 	concurrencyLimit                         int
 	evalDuration                             time.Duration
-	expectFair                               []bool
+	expectedFair                             []bool
+	expectedFairnessMargin                   []float64
 	expectAllRequests                        bool
 	evalInqueueMetrics, evalExecutingMetrics bool
 	rejectReason                             string
@@ -167,7 +169,7 @@ func (uss *uniformScenarioState) exercise() {
 	for i, uc := range uss.clients {
 		uss.integrators[i] = fq.NewIntegrator(uss.clk)
 		fsName := fmt.Sprintf("client%d", i)
-		uss.expectedInqueue = uss.expectedInqueue + fmt.Sprintf(`				apiserver_flowcontrol_current_inqueue_requests{flowSchema=%q,priorityLevel=%q} 0%s`, fsName, uss.name, "\n")
+		uss.expectedInqueue = uss.expectedInqueue + fmt.Sprintf(`				apiserver_flowcontrol_current_inqueue_requests{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
 		for j := 0; j < uc.nThreads; j++ {
 			ust := uniformScenarioThread{
 				uss:    uss,
@@ -182,9 +184,9 @@ func (uss *uniformScenarioState) exercise() {
 		}
 	}
 	if uss.doSplit {
-		uss.evalTo(uss.startTime.Add(uss.evalDuration/2), false, uss.expectFair[0])
+		uss.evalTo(uss.startTime.Add(uss.evalDuration/2), false, uss.expectedFair[0], uss.expectedFairnessMargin[0])
 	}
-	uss.evalTo(uss.startTime.Add(uss.evalDuration), true, uss.expectFair[len(uss.expectFair)-1])
+	uss.evalTo(uss.startTime.Add(uss.evalDuration), true, uss.expectedFair[len(uss.expectedFair)-1], uss.expectedFairnessMargin[len(uss.expectedFairnessMargin)-1])
 	uss.clk.Run(nil)
 	uss.finalReview()
 }
@@ -252,7 +254,7 @@ func (ust *uniformScenarioThread) callK(k int) {
 	}
 }
 
-func (uss *uniformScenarioState) evalTo(lim time.Time, last, expectFair bool) {
+func (uss *uniformScenarioState) evalTo(lim time.Time, last, expectFair bool, margin float64) {
 	uss.clk.Run(&lim)
 	uss.clk.SetTime(lim)
 	if uss.doSplit && !last {
@@ -275,10 +277,11 @@ func (uss *uniformScenarioState) evalTo(lim time.Time, last, expectFair bool) {
 		var gotFair bool
 		if fairAverages[i] > 0 {
 			relDiff := (averages[i] - fairAverages[i]) / fairAverages[i]
-			gotFair = math.Abs(relDiff) <= 0.1
+			gotFair = math.Abs(relDiff) <= margin
 		} else {
-			gotFair = math.Abs(averages[i]) <= 0.1
+			gotFair = math.Abs(averages[i]) <= margin
 		}
+
 		if gotFair != expectFair {
 			uss.t.Errorf("%s client %d last=%v got an Average of %v but the fair average was %v", uss.name, i, last, averages[i], fairAverages[i])
 		} else {
@@ -309,10 +312,10 @@ func (uss *uniformScenarioState) finalReview() {
 	for i := range uss.clients {
 		fsName := fmt.Sprintf("client%d", i)
 		if atomic.AddInt32(&uss.executions[i], 0) > 0 {
-			uss.expectedExecuting = uss.expectedExecuting + fmt.Sprintf(`				apiserver_flowcontrol_current_executing_requests{flowSchema=%q,priorityLevel=%q} 0%s`, fsName, uss.name, "\n")
+			uss.expectedExecuting = uss.expectedExecuting + fmt.Sprintf(`				apiserver_flowcontrol_current_executing_requests{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
 		}
 		if atomic.AddInt32(&uss.rejects[i], 0) > 0 {
-			expectedRejects = expectedRejects + fmt.Sprintf(`				apiserver_flowcontrol_rejected_requests_total{flowSchema=%q,priorityLevel=%q,reason=%q} %d%s`, fsName, uss.name, uss.rejectReason, uss.rejects[i], "\n")
+			expectedRejects = expectedRejects + fmt.Sprintf(`				apiserver_flowcontrol_rejected_requests_total{flow_schema=%q,priority_level=%q,reason=%q} %d%s`, fsName, uss.name, uss.rejectReason, uss.rejects[i], "\n")
 		}
 	}
 	if uss.evalExecutingMetrics && len(uss.expectedExecuting) > 0 {
@@ -348,9 +351,7 @@ func ClockWait(clk *testclock.FakeEventClock, counter counter.GoRoutineCounter, 
 		close(dunch)
 	}, duration)
 	counter.Add(-1)
-	select {
-	case <-dunch:
-	}
+	<-dunch
 }
 
 func init() {
@@ -373,12 +374,13 @@ func TestNoRestraint(t *testing.T) {
 			{1001001001, 5, 10, time.Second, time.Second, false},
 			{2002002002, 2, 10, time.Second, time.Second / 2, false},
 		},
-		concurrencyLimit:  10,
-		evalDuration:      time.Second * 15,
-		expectFair:        []bool{true},
-		expectAllRequests: true,
-		clk:               clk,
-		counter:           counter,
+		concurrencyLimit:       10,
+		evalDuration:           time.Second * 15,
+		expectedFair:           []bool{true},
+		expectedFairnessMargin: []float64{0.1},
+		expectAllRequests:      true,
+		clk:                    clk,
+		counter:                counter,
 	}.exercise(t)
 }
 
@@ -407,14 +409,15 @@ func TestUniformFlowsHandSize1(t *testing.T) {
 			{1001001001, 8, 20, time.Second, time.Second - 1, false},
 			{2002002002, 8, 20, time.Second, time.Second - 1, false},
 		},
-		concurrencyLimit:     4,
-		evalDuration:         time.Second * 50,
-		expectFair:           []bool{true},
-		expectAllRequests:    true,
-		evalInqueueMetrics:   true,
-		evalExecutingMetrics: true,
-		clk:                  clk,
-		counter:              counter,
+		concurrencyLimit:       4,
+		evalDuration:           time.Second * 50,
+		expectedFair:           []bool{true},
+		expectedFairnessMargin: []float64{0.1},
+		expectAllRequests:      true,
+		evalInqueueMetrics:     true,
+		evalExecutingMetrics:   true,
+		clk:                    clk,
+		counter:                counter,
 	}.exercise(t)
 }
 
@@ -442,14 +445,15 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 			{1001001001, 8, 30, time.Second, time.Second - 1, false},
 			{2002002002, 8, 30, time.Second, time.Second - 1, false},
 		},
-		concurrencyLimit:     4,
-		evalDuration:         time.Second * 60,
-		expectFair:           []bool{true},
-		expectAllRequests:    true,
-		evalInqueueMetrics:   true,
-		evalExecutingMetrics: true,
-		clk:                  clk,
-		counter:              counter,
+		concurrencyLimit:       4,
+		evalDuration:           time.Second * 60,
+		expectedFair:           []bool{true},
+		expectedFairnessMargin: []float64{0.1},
+		expectAllRequests:      true,
+		evalInqueueMetrics:     true,
+		evalExecutingMetrics:   true,
+		clk:                    clk,
+		counter:                counter,
 	}.exercise(t)
 }
 
@@ -478,14 +482,15 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 			{1001001001, 8, 20, time.Second, time.Second, false},
 			{2002002002, 7, 30, time.Second, time.Second / 2, false},
 		},
-		concurrencyLimit:     4,
-		evalDuration:         time.Second * 40,
-		expectFair:           []bool{true},
-		expectAllRequests:    true,
-		evalInqueueMetrics:   true,
-		evalExecutingMetrics: true,
-		clk:                  clk,
-		counter:              counter,
+		concurrencyLimit:       4,
+		evalDuration:           time.Second * 40,
+		expectedFair:           []bool{true},
+		expectedFairnessMargin: []float64{0.1},
+		expectAllRequests:      true,
+		evalInqueueMetrics:     true,
+		evalExecutingMetrics:   true,
+		clk:                    clk,
+		counter:                counter,
 	}.exercise(t)
 }
 
@@ -514,14 +519,15 @@ func TestDifferentFlowsExpectUnequal(t *testing.T) {
 			{1001001001, 4, 20, time.Second, time.Second - 1, false},
 			{2002002002, 2, 20, time.Second, time.Second - 1, false},
 		},
-		concurrencyLimit:     3,
-		evalDuration:         time.Second * 20,
-		expectFair:           []bool{true},
-		expectAllRequests:    true,
-		evalInqueueMetrics:   true,
-		evalExecutingMetrics: true,
-		clk:                  clk,
-		counter:              counter,
+		concurrencyLimit:       3,
+		evalDuration:           time.Second * 20,
+		expectedFair:           []bool{true},
+		expectedFairnessMargin: []float64{0.1},
+		expectAllRequests:      true,
+		evalInqueueMetrics:     true,
+		evalExecutingMetrics:   true,
+		clk:                    clk,
+		counter:                counter,
 	}.exercise(t)
 }
 
@@ -549,14 +555,15 @@ func TestWindup(t *testing.T) {
 			{1001001001, 2, 40, time.Second, -1, false},
 			{2002002002, 2, 40, time.Second, -1, true},
 		},
-		concurrencyLimit:     3,
-		evalDuration:         time.Second * 40,
-		expectFair:           []bool{true, false},
-		expectAllRequests:    true,
-		evalInqueueMetrics:   true,
-		evalExecutingMetrics: true,
-		clk:                  clk,
-		counter:              counter,
+		concurrencyLimit:       3,
+		evalDuration:           time.Second * 40,
+		expectedFair:           []bool{true, true},
+		expectedFairnessMargin: []float64{0.1, 0.26},
+		expectAllRequests:      true,
+		evalInqueueMetrics:     true,
+		evalExecutingMetrics:   true,
+		clk:                    clk,
+		counter:                counter,
 	}.exercise(t)
 }
 
@@ -582,13 +589,14 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 			{1001001001, 6, 10, time.Second, 57 * time.Millisecond, false},
 			{2002002002, 4, 15, time.Second, 750 * time.Millisecond, false},
 		},
-		concurrencyLimit:     4,
-		evalDuration:         time.Second * 13,
-		expectFair:           []bool{false},
-		evalExecutingMetrics: true,
-		rejectReason:         "concurrency-limit",
-		clk:                  clk,
-		counter:              counter,
+		concurrencyLimit:       4,
+		evalDuration:           time.Second * 13,
+		expectedFair:           []bool{false},
+		expectedFairnessMargin: []float64{0.1},
+		evalExecutingMetrics:   true,
+		rejectReason:           "concurrency-limit",
+		clk:                    clk,
+		counter:                counter,
 	}.exercise(t)
 }
 
@@ -616,14 +624,15 @@ func TestTimeout(t *testing.T) {
 		clients: []uniformClient{
 			{1001001001, 5, 100, time.Second, time.Second, false},
 		},
-		concurrencyLimit:     1,
-		evalDuration:         time.Second * 10,
-		expectFair:           []bool{true},
-		evalInqueueMetrics:   true,
-		evalExecutingMetrics: true,
-		rejectReason:         "time-out",
-		clk:                  clk,
-		counter:              counter,
+		concurrencyLimit:       1,
+		evalDuration:           time.Second * 10,
+		expectedFair:           []bool{true},
+		expectedFairnessMargin: []float64{0.1},
+		evalInqueueMetrics:     true,
+		evalExecutingMetrics:   true,
+		rejectReason:           "time-out",
+		clk:                    clk,
+		counter:                counter,
 	}.exercise(t)
 }
 
@@ -703,6 +712,67 @@ func TestContextCancel(t *testing.T) {
 	}
 	if !idle1 {
 		t.Error("Not idle at the end")
+	}
+}
+
+func TestTotalRequestsExecutingWithPanic(t *testing.T) {
+	metrics.Register()
+	metrics.Reset()
+	now := time.Now()
+	clk, counter := testclock.NewFakeEventClock(now, 0, nil)
+	qsf := NewQueueSetFactory(clk, counter)
+	qCfg := fq.QueuingConfig{
+		Name:             "TestTotalRequestsExecutingWithPanic",
+		DesiredNumQueues: 0,
+		RequestWaitLimit: 15 * time.Second,
+	}
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	if err != nil {
+		t.Fatal(err)
+	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+	counter.Add(1) // account for the goroutine running this test
+
+	queue, ok := qs.(*queueSet)
+	if !ok {
+		t.Fatalf("expected a QueueSet of type: %T but got: %T", &queueSet{}, qs)
+	}
+	if queue.totRequestsExecuting != 0 {
+		t.Fatalf("precondition: expected total requests currently executing of the QueueSet to be 0, but got: %d", queue.totRequestsExecuting)
+	}
+	if queue.dCfg.ConcurrencyLimit != 1 {
+		t.Fatalf("precondition: expected concurrency limit of the QueueSet to be 1, but got: %d", queue.dCfg.ConcurrencyLimit)
+	}
+
+	ctx := context.Background()
+	req, _ := qs.StartRequest(ctx, 1, "", "fs", "test", "one", func(inQueue bool) {})
+	if req == nil {
+		t.Fatal("expected a Request object from StartRequest, but got nil")
+	}
+
+	panicErrExpected := errors.New("apiserver panic'd")
+	var panicErrGot interface{}
+	func() {
+		defer func() {
+			panicErrGot = recover()
+		}()
+
+		req.Finish(func() {
+			// verify that total requests executing goes up by 1 since the request is executing.
+			if queue.totRequestsExecuting != 1 {
+				t.Fatalf("expected total requests currently executing of the QueueSet to be 1, but got: %d", queue.totRequestsExecuting)
+			}
+
+			panic(panicErrExpected)
+		})
+	}()
+
+	// verify that the panic was from us (above)
+	if panicErrExpected != panicErrGot {
+		t.Errorf("expected panic error: %#v, but got: %#v", panicErrExpected, panicErrGot)
+	}
+	if queue.totRequestsExecuting != 0 {
+		t.Errorf("expected total requests currently executing of the QueueSet to be 0, but got: %d", queue.totRequestsExecuting)
 	}
 }
 

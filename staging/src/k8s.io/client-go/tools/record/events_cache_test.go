@@ -18,6 +18,7 @@ package record
 
 import (
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -69,10 +70,10 @@ func makeUniqueEvents(num int) []v1.Event {
 	events := []v1.Event{}
 	kind := "Pod"
 	for i := 0; i < num; i++ {
-		reason := strings.Join([]string{"reason", string(i)}, "-")
-		message := strings.Join([]string{"message", string(i)}, "-")
-		name := strings.Join([]string{"pod", string(i)}, "-")
-		namespace := strings.Join([]string{"ns", string(i)}, "-")
+		reason := strings.Join([]string{"reason", strconv.Itoa(i)}, "-")
+		message := strings.Join([]string{"message", strconv.Itoa(i)}, "-")
+		name := strings.Join([]string{"pod", strconv.Itoa(i)}, "-")
+		namespace := strings.Join([]string{"ns", strconv.Itoa(i)}, "-")
 		involvedObject := makeObjectReference(kind, name, namespace)
 		events = append(events, makeEvent(reason, message, involvedObject))
 	}
@@ -82,7 +83,7 @@ func makeUniqueEvents(num int) []v1.Event {
 func makeSimilarEvents(num int, template v1.Event, messagePrefix string) []v1.Event {
 	events := makeEvents(num, template)
 	for i := range events {
-		events[i].Message = strings.Join([]string{messagePrefix, string(i), events[i].Message}, "-")
+		events[i].Message = strings.Join([]string{messagePrefix, strconv.Itoa(i), events[i].Message}, "-")
 	}
 	return events
 }

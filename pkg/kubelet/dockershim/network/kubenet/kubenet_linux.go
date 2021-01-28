@@ -41,10 +41,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
-	utilebtables "k8s.io/kubernetes/pkg/util/ebtables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
+	utilebtables "k8s.io/utils/net/ebtables"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -90,22 +90,17 @@ var requiredCNIPlugins = [...]string{"bridge", "host-local", "loopback"}
 type kubenetNetworkPlugin struct {
 	network.NoopNetworkPlugin
 
-	host            network.Host
-	netConfig       *libcni.NetworkConfig
-	loConfig        *libcni.NetworkConfig
-	cniConfig       libcni.CNI
-	bandwidthShaper bandwidth.Shaper
-	mu              sync.Mutex //Mutex for protecting podIPs map, netConfig, and shaper initialization
-	podIPs          map[kubecontainer.ContainerID]utilsets.String
-	mtu             int
-	execer          utilexec.Interface
-	nsenterPath     string
-	hairpinMode     kubeletconfig.HairpinMode
-	// kubenet can use either hostportSyncer and hostportManager to implement hostports
-	// Currently, if network host supports legacy features, hostportSyncer will be used,
-	// otherwise, hostportManager will be used.
-	hostportSyncer    hostport.HostportSyncer
-	hostportSyncerv6  hostport.HostportSyncer
+	host              network.Host
+	netConfig         *libcni.NetworkConfig
+	loConfig          *libcni.NetworkConfig
+	cniConfig         libcni.CNI
+	bandwidthShaper   bandwidth.Shaper
+	mu                sync.Mutex //Mutex for protecting podIPs map, netConfig, and shaper initialization
+	podIPs            map[kubecontainer.ContainerID]utilsets.String
+	mtu               int
+	execer            utilexec.Interface
+	nsenterPath       string
+	hairpinMode       kubeletconfig.HairpinMode
 	hostportManager   hostport.HostPortManager
 	hostportManagerv6 hostport.HostPortManager
 	iptables          utiliptables.Interface
@@ -131,8 +126,6 @@ func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugi
 		iptablesv6:        iptInterfacev6,
 		sysctl:            utilsysctl.New(),
 		binDirs:           append([]string{DefaultCNIDir}, networkPluginDirs...),
-		hostportSyncer:    hostport.NewHostportSyncer(iptInterface),
-		hostportSyncerv6:  hostport.NewHostportSyncer(iptInterfacev6),
 		hostportManager:   hostport.NewHostportManager(iptInterface),
 		hostportManagerv6: hostport.NewHostportManager(iptInterfacev6),
 		nonMasqueradeCIDR: "10.0.0.0/8",
@@ -635,19 +628,14 @@ func (plugin *kubenetNetworkPlugin) getNetworkStatus(id kubecontainer.ContainerI
 	if !ok {
 		return nil
 	}
-	// sort making v4 first
-	// TODO: (khenidak) IPv6 beta stage.
-	// This - forced sort - could be avoided by checking which cidr that an IP belongs
-	// to, then placing the IP according to cidr index. But before doing that. Check how IP is collected
-	// across all of kubelet code (against cni and cri).
-	ips := make([]net.IP, 0)
+
+	if len(iplist) == 0 {
+		return nil
+	}
+
+	ips := make([]net.IP, 0, len(iplist))
 	for _, ip := range iplist {
-		isV6 := netutils.IsIPv6String(ip)
-		if !isV6 {
-			ips = append([]net.IP{net.ParseIP(ip)}, ips...)
-		} else {
-			ips = append(ips, net.ParseIP(ip))
-		}
+		ips = append(ips, net.ParseIP(ip))
 	}
 
 	return &network.PodNetworkStatus{

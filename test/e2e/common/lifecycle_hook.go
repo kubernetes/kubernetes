@@ -21,10 +21,11 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -41,26 +42,13 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 	)
 	ginkgo.Context("when create a pod with lifecycle hook", func() {
 		var targetIP, targetURL string
-		podHandleHookRequest := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "pod-handle-http-request",
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name:  "pod-handle-http-request",
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
-						Args:  []string{"netexec"},
-						Ports: []v1.ContainerPort{
-							{
-								ContainerPort: 8080,
-								Protocol:      v1.ProtocolTCP,
-							},
-						},
-					},
-				},
+		ports := []v1.ContainerPort{
+			{
+				ContainerPort: 8080,
+				Protocol:      v1.ProtocolTCP,
 			},
 		}
+		podHandleHookRequest := e2epod.NewAgnhostPod("", "pod-handle-http-request", nil, nil, ports, "netexec")
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
 			ginkgo.By("create the container to handle the HTTPGet hook request.")
@@ -92,7 +80,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			}
 		}
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Pod Lifecycle, post start exec hook
 			Description: When a post start handler is specified in the container lifecycle using a 'Exec' action, then the handler MUST be invoked after the start of the container. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a post start that invokes the server pod using ExecAction to validate that the post start is executed.
 		*/
@@ -108,7 +96,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			testPodWithHook(podWithHook)
 		})
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Pod Lifecycle, prestop exec hook
 			Description: When a pre-stop handler is specified in the container lifecycle using a 'Exec' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a pre-stop that invokes the server pod using ExecAction to validate that the pre-stop is executed.
 		*/
@@ -124,7 +112,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			testPodWithHook(podWithHook)
 		})
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Pod Lifecycle, post start http hook
 			Description: When a post start handler is specified in the container lifecycle using a HttpGet action, then the handler MUST be invoked after the start of the container. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a post start that invokes the server pod to validate that the post start is executed.
 		*/
@@ -142,7 +130,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			testPodWithHook(podWithHook)
 		})
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Pod Lifecycle, prestop http hook
 			Description: When a pre-stop handler is specified in the container lifecycle using a 'HttpGet' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a pre-stop that invokes the server pod to validate that the pre-stop is executed.
 		*/

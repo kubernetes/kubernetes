@@ -34,6 +34,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/initializer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/metrics:go_default_library",
@@ -69,6 +70,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend/factory:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/audit/buffered:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/audit/log:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/audit/truncate:go_default_library",
@@ -88,6 +90,9 @@ go_library(
         "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
@@ -100,7 +105,13 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [

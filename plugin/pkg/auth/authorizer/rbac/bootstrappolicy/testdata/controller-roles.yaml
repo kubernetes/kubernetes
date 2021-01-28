@@ -545,6 +545,12 @@ items:
     verbs:
     - update
   - apiGroups:
+    - ""
+    resources:
+    - endpoints/finalizers
+    verbs:
+    - update
+  - apiGroups:
     - discovery.k8s.io
     resources:
     - endpointslices
@@ -1179,6 +1185,32 @@ items:
     resources:
     - resourcequotas/status
     verbs:
+    - update
+  - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:root-ca-cert-publisher
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    verbs:
+    - create
     - update
   - apiGroups:
     - ""

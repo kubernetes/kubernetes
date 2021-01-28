@@ -1,12 +1,12 @@
-# Kubernetes
+# Kubernetes (K8s)
 
-[![GoDoc Widget]][GoDoc] [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569)
+[![GoPkg Widget]][GoPkg] [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569)
 
 <img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100">
 
 ----
 
-Kubernetes is an open source system for managing [containerized applications]
+Kubernetes, also known as K8s, is an open source system for managing [containerized applications]
 across multiple hosts. It provides basic mechanisms for deployment, maintenance,
 and scaling of applications.
 
@@ -23,7 +23,7 @@ read the CNCF [announcement].
 
 ----
 
-## To start using Kubernetes
+## To start using K8s
 
 See our documentation on [kubernetes.io].
 
@@ -34,7 +34,7 @@ Take a free course on [Scalable Microservices with Kubernetes].
 To use Kubernetes code as a library in other applications, see the [list of published components](https://git.k8s.io/kubernetes/staging/README.md).
 Use of the `k8s.io/kubernetes` module or `k8s.io/kubernetes/...` packages as libraries is not supported.
 
-## To start developing Kubernetes
+## To start developing K8s
 
 The [community repository] hosts all information about
 building Kubernetes from source, how to contribute code
@@ -79,11 +79,9 @@ That said, if you have questions, reach out to us
 [developer's documentation]: https://git.k8s.io/community/contributors/devel#readme
 [Docker environment]: https://docs.docker.com/engine
 [Go environment]: https://golang.org/doc/install
-[GoDoc]: https://godoc.org/k8s.io/kubernetes
-[GoDoc Widget]: https://godoc.org/k8s.io/kubernetes?status.svg
+[GoPkg]: https://pkg.go.dev/k8s.io/kubernetes
+[GoPkg Widget]: https://pkg.go.dev/badge/k8s.io/kubernetes.svg
 [interactive tutorial]: https://kubernetes.io/docs/tutorials/kubernetes-basics
 [kubernetes.io]: https://kubernetes.io
 [Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
 [troubleshooting guide]: https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()

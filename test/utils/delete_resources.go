@@ -63,9 +63,6 @@ func DeleteResourceWithRetries(c clientset.Interface, kind schema.GroupKind, nam
 		if err == nil || apierrors.IsNotFound(err) {
 			return true, nil
 		}
-		if IsRetryableAPIError(err) {
-			return false, nil
-		}
 		return false, fmt.Errorf("Failed to delete object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(deleteFunc)

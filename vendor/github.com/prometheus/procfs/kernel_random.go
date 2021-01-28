@@ -25,7 +25,7 @@ import (
 type KernelRandom struct {
 	// EntropyAvaliable gives the available entropy, in bits.
 	EntropyAvaliable *uint64
-	// PoolSize gives the size of the entropy pool, in bytes.
+	// PoolSize gives the size of the entropy pool, in bits.
 	PoolSize *uint64
 	// URandomMinReseedSeconds is the number of seconds after which the DRNG will be reseeded.
 	URandomMinReseedSeconds *uint64

@@ -42,6 +42,23 @@ func newInt32(i int32) *int32 {
 }
 
 func TestJobStrategy(t *testing.T) {
+	cases := map[string]struct {
+		ttlEnabled bool
+	}{
+		"features disabled": {},
+		"ttl enabled": {
+			ttlEnabled: true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, tc.ttlEnabled)()
+			testJobStrategy(t)
+		})
+	}
+}
+
+func testJobStrategy(t *testing.T) {
 	ttlEnabled := utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished)
 	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
@@ -88,13 +105,8 @@ func TestJobStrategy(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
-	if ttlEnabled && job.Spec.TTLSecondsAfterFinished == nil {
-		// When the TTL feature is enabled, the TTL field can be set
+	if ttlEnabled != (job.Spec.TTLSecondsAfterFinished != nil) {
 		t.Errorf("Job should allow setting .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)
-	}
-	if !ttlEnabled && job.Spec.TTLSecondsAfterFinished != nil {
-		// When the TTL feature is disabled, the TTL field cannot be set
-		t.Errorf("Job should not allow setting .spec.ttlSecondsAfterFinished when %v feature is disabled", features.TTLAfterFinished)
 	}
 
 	parallelism := int32(10)
@@ -108,33 +120,24 @@ func TestJobStrategy(t *testing.T) {
 			Active: 11,
 		},
 	}
-	// ensure we do not change status
+	// Ensure we do not change status
 	job.Status.Active = 10
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
 	if updatedJob.Status.Active != 10 {
 		t.Errorf("PrepareForUpdate should have preserved prior version status")
 	}
+	if ttlEnabled != (updatedJob.Spec.TTLSecondsAfterFinished != nil) {
+		t.Errorf("Job should only allow updating .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)
+	}
+
 	errs = Strategy.ValidateUpdate(ctx, updatedJob, job)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
 	}
-	if ttlEnabled != (job.Spec.TTLSecondsAfterFinished != nil || updatedJob.Spec.TTLSecondsAfterFinished != nil) {
-		t.Errorf("Job should only allow updating .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)
-	}
 
-	// set TTLSecondsAfterFinished on both old and new jobs
+	// Existing TTLSecondsAfterFinished should be preserved
 	job.Spec.TTLSecondsAfterFinished = newInt32(1)
 	updatedJob.Spec.TTLSecondsAfterFinished = newInt32(2)
-
-	// Existing TTLSecondsAfterFinished should be preserved when feature is on
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, true)()
-	Strategy.PrepareForUpdate(ctx, updatedJob, job)
-	if job.Spec.TTLSecondsAfterFinished == nil || updatedJob.Spec.TTLSecondsAfterFinished == nil {
-		t.Errorf("existing TTLSecondsAfterFinished should be preserved")
-	}
-
-	// Existing TTLSecondsAfterFinished should be preserved when feature is off
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, false)()
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
 	if job.Spec.TTLSecondsAfterFinished == nil || updatedJob.Spec.TTLSecondsAfterFinished == nil {
 		t.Errorf("existing TTLSecondsAfterFinished should be preserved")

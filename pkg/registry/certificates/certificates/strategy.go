@@ -118,21 +118,6 @@ func (csrStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (s csrStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) error {
-	csr, ok := obj.(*certificates.CertificateSigningRequest)
-	if !ok {
-		// unexpected programmer error
-		return fmt.Errorf("unexpected object: %v", obj)
-	}
-	s.PrepareForCreate(ctx, obj)
-	if exact {
-		return nil
-	}
-	// CSRs allow direct subresource edits, we clear them without exact so the CSR value can be reused.
-	csr.Status = certificates.CertificateSigningRequestStatus{}
-	return nil
-}
-
 // Storage strategy for the Status subresource
 type csrStatusStrategy struct {
 	csrStrategy
@@ -165,7 +150,7 @@ func (csrStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	populateConditionTimestamps(newCSR, oldCSR)
 }
 
-// preserveConditionInstances copies instances of the the specified condition type from oldCSR to newCSR.
+// preserveConditionInstances copies instances of the specified condition type from oldCSR to newCSR.
 // or returns false if the newCSR added or removed instances
 func preserveConditionInstances(newCSR, oldCSR *certificates.CertificateSigningRequest, conditionType certificates.RequestConditionType) bool {
 	oldIndices := findConditionIndices(oldCSR, conditionType)

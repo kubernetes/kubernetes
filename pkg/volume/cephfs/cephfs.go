@@ -26,7 +26,7 @@ import (
 	"strings"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -73,7 +73,7 @@ func (plugin *cephfsPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.CephFS != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CephFS != nil)
 }
 
-func (plugin *cephfsPlugin) RequiresRemount() bool {
+func (plugin *cephfsPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -189,7 +189,7 @@ type cephfs struct {
 	mon        []string
 	path       string
 	id         string
-	secret     string
+	secret     string `datapolicy:"token"`
 	secretFile string
 	readonly   bool
 	mounter    mount.Interface

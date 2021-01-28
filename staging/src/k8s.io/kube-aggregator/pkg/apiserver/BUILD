@@ -68,6 +68,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/proxy:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/pkg/version:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",

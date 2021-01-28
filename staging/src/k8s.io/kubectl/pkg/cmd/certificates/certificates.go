@@ -41,12 +41,13 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
+// NewCmdCertificate returns `certificate` Cobra command
 func NewCmdCertificate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "certificate SUBCOMMAND",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Modify certificate resources."),
-		Long:                  "Modify certificate resources.",
+		Long:                  i18n.T("Modify certificate resources."),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
@@ -58,6 +59,7 @@ func NewCmdCertificate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 	return cmd
 }
 
+// CertificateOptions declares the arguments accepted by the certificate command
 type CertificateOptions struct {
 	resource.FilenameOptions
 
@@ -73,7 +75,7 @@ type CertificateOptions struct {
 	genericclioptions.IOStreams
 }
 
-// NewCertificateOptions creates the options for certificate
+// NewCertificateOptions creates CertificateOptions struct for `certificate` command
 func NewCertificateOptions(ioStreams genericclioptions.IOStreams, operation string) *CertificateOptions {
 	return &CertificateOptions{
 		PrintFlags: genericclioptions.NewPrintFlags(operation).WithTypeSetter(scheme.Scheme),
@@ -81,6 +83,7 @@ func NewCertificateOptions(ioStreams genericclioptions.IOStreams, operation stri
 	}
 }
 
+// Complete loads data from the command environment
 func (o *CertificateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.csrNames = args
 	o.outputStyle = cmdutil.GetFlagString(cmd, "output")
@@ -104,6 +107,7 @@ func (o *CertificateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	return nil
 }
 
+// Validate checks if the provided `certificate` arguments are valid
 func (o *CertificateOptions) Validate() error {
 	if len(o.csrNames) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 		return fmt.Errorf("one or more CSRs must be specified as <name> or -f <filename>")
@@ -111,6 +115,7 @@ func (o *CertificateOptions) Validate() error {
 	return nil
 }
 
+// NewCmdCertificateApprove returns the `certificate approve` Cobra command
 func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCertificateOptions(ioStreams, "approved")
 
@@ -118,7 +123,7 @@ func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOS
 		Use:                   "approve (-f FILENAME | NAME)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Approve a certificate signing request"),
-		Long: templates.LongDesc(`
+		Long: templates.LongDesc(i18n.T(`
 		Approve a certificate signing request.
 
 		kubectl certificate approve allows a cluster admin to approve a certificate
@@ -129,7 +134,7 @@ func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOS
 		can potentially grant a requester access to cluster resources or to authenticate
 		as a requested identity. Before approving a CSR, ensure you understand what the
 		signed certificate can do.
-		`),
+		`)),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -145,6 +150,7 @@ func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOS
 	return cmd
 }
 
+// RunCertificateApprove approves a certificate signing request
 func (o *CertificateOptions) RunCertificateApprove(force bool) error {
 	return o.modifyCertificateCondition(
 		o.builder,
@@ -154,6 +160,7 @@ func (o *CertificateOptions) RunCertificateApprove(force bool) error {
 	)
 }
 
+// NewCmdCertificateDeny returns the `certificate deny` Cobra command
 func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCertificateOptions(ioStreams, "denied")
 
@@ -161,13 +168,13 @@ func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 		Use:                   "deny (-f FILENAME | NAME)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Deny a certificate signing request"),
-		Long: templates.LongDesc(`
+		Long: templates.LongDesc(i18n.T(`
 		Deny a certificate signing request.
 
 		kubectl certificate deny allows a cluster admin to deny a certificate
 		signing request (CSR). This action tells a certificate signing controller to
 		not to issue a certificate to the requestor.
-		`),
+		`)),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -183,6 +190,7 @@ func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	return cmd
 }
 
+// RunCertificateDeny denies a certificate signing request
 func (o *CertificateOptions) RunCertificateDeny(force bool) error {
 	return o.modifyCertificateCondition(
 		o.builder,

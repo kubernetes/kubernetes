@@ -155,7 +155,7 @@ func parseCRILog(log []byte, msg *logMessage) error {
 	}
 	// Keep this forward compatible.
 	tags := bytes.Split(log[:idx], tagDelimiter)
-	partial := (runtimeapi.LogTag(tags[0]) == runtimeapi.LogTagPartial)
+	partial := runtimeapi.LogTag(tags[0]) == runtimeapi.LogTagPartial
 	// Trim the tailing new line if this is a partial line.
 	if partial && len(log) > 0 && log[len(log)-1] == '\n' {
 		log = log[:len(log)-1]
@@ -303,6 +303,8 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 		return fmt.Errorf("failed to seek %d in log file %q: %v", start, path, err)
 	}
 
+	limitedMode := (opts.tail >= 0) && (!opts.follow)
+	limitedNum := opts.tail
 	// Start parsing the logs.
 	r := bufio.NewReader(f)
 	// Do not create watcher here because it is not needed if `Follow` is false.
@@ -313,7 +315,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	writer := newLogWriter(stdout, stderr, opts)
 	msg := &logMessage{}
 	for {
-		if stop {
+		if stop || (limitedMode && limitedNum == 0) {
 			klog.V(2).Infof("Finish parsing log file %q", path)
 			return nil
 		}
@@ -401,6 +403,10 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 			klog.Errorf("Failed with err %v when writing log for log file %q: %+v", err, path, msg)
 			return err
 		}
+		if limitedMode {
+			limitedNum--
+		}
+
 	}
 }
 

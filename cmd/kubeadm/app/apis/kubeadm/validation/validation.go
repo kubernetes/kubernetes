@@ -403,6 +403,87 @@ func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool,
 	return allErrs
 }
 
+// ValidateServiceSubnetSize validates that the maximum subnet size is not exceeded
+// Should be a small cidr due to how it is stored in etcd.
+// bigger cidr (specially those offered by IPv6) will add no value
+// and significantly increase snapshotting time.
+// NOTE: This is identical to validation performed in the apiserver.
+func ValidateServiceSubnetSize(subnetStr string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// subnets were already validated
+	subnets, _ := utilnet.ParseCIDRs(strings.Split(subnetStr, ","))
+	for _, serviceSubnet := range subnets {
+		ones, bits := serviceSubnet.Mask.Size()
+		if bits-ones > constants.MaximumBitsForServiceSubnet {
+			errMsg := fmt.Sprintf("specified service subnet is too large; for %d-bit addresses, the mask must be >= %d", bits, bits-constants.MaximumBitsForServiceSubnet)
+			allErrs = append(allErrs, field.Invalid(fldPath, serviceSubnet.String(), errMsg))
+		}
+	}
+	return allErrs
+}
+
+// ValidatePodSubnetNodeMask validates that the relation between podSubnet and node-masks is correct
+func ValidatePodSubnetNodeMask(subnetStr string, c *kubeadm.ClusterConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// subnets were already validated
+	subnets, _ := utilnet.ParseCIDRs(strings.Split(subnetStr, ","))
+	for _, podSubnet := range subnets {
+		// obtain podSubnet mask
+		mask := podSubnet.Mask
+		maskSize, _ := mask.Size()
+		// obtain node-cidr-mask
+		nodeMask, err := getClusterNodeMask(c, utilnet.IsIPv6(podSubnet.IP))
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, podSubnet.String(), err.Error()))
+			continue
+		}
+		// the pod subnet mask needs to allow one or multiple node-masks
+		// i.e. if it has a /24 the node mask must be between 24 and 32 for ipv4
+		if maskSize > nodeMask {
+			allErrs = append(allErrs, field.Invalid(fldPath, podSubnet.String(), "pod subnet size is smaller than the node subnet size"))
+		} else if (nodeMask - maskSize) > constants.PodSubnetNodeMaskMaxDiff {
+			allErrs = append(allErrs, field.Invalid(fldPath, podSubnet.String(), fmt.Sprintf("pod subnet mask and node-mask difference can not be greater than %d", constants.PodSubnetNodeMaskMaxDiff)))
+		}
+	}
+	return allErrs
+}
+
+// getClusterNodeMask returns the corresponding node-cidr-mask
+// based on the Cluster configuration and the IP family
+// Default is 24 for IPv4 and 64 for IPv6
+func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, error) {
+	// defaultNodeMaskCIDRIPv4 is default mask size for IPv4 node cidr for use by the controller manager
+	const defaultNodeMaskCIDRIPv4 = 24
+	// DefaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr for use by the controller manager
+	const defaultNodeMaskCIDRIPv6 = 64
+	var maskSize int
+	var maskArg string
+	var err error
+	isDualStack := features.Enabled(c.FeatureGates, features.IPv6DualStack)
+
+	if isDualStack && isIPv6 {
+		maskArg = "node-cidr-mask-size-ipv6"
+	} else if isDualStack && !isIPv6 {
+		maskArg = "node-cidr-mask-size-ipv4"
+	} else {
+		maskArg = "node-cidr-mask-size"
+	}
+
+	if v, ok := c.ControllerManager.ExtraArgs[maskArg]; ok && v != "" {
+		// assume it is an integer, if not it will fail later
+		maskSize, err = strconv.Atoi(v)
+		if err != nil {
+			errors.Wrapf(err, "could not parse the value of the kube-controller-manager flag %s as an integer: %v", maskArg, err)
+			return 0, err
+		}
+	} else if isIPv6 {
+		maskSize = defaultNodeMaskCIDRIPv6
+	} else {
+		maskSize = defaultNodeMaskCIDRIPv4
+	}
+	return maskSize, nil
+}
+
 // ValidateNetworking validates networking configuration
 func ValidateNetworking(c *kubeadm.ClusterConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -415,9 +496,13 @@ func ValidateNetworking(c *kubeadm.ClusterConfiguration, fldPath *field.Path) fi
 
 	if len(c.Networking.ServiceSubnet) != 0 {
 		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, field.NewPath("serviceSubnet"))...)
+		// Service subnet was already validated, we need to validate now the subnet size
+		allErrs = append(allErrs, ValidateServiceSubnetSize(c.Networking.ServiceSubnet, field.NewPath("serviceSubnet"))...)
 	}
 	if len(c.Networking.PodSubnet) != 0 {
-		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, field.NewPath("podSubnet"))...)
+		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInPodSubnet, isDualStack, field.NewPath("podSubnet"))...)
+		// Pod subnet was already validated, we need to validate now against the node-mask
+		allErrs = append(allErrs, ValidatePodSubnetNodeMask(c.Networking.PodSubnet, c, field.NewPath("podSubnet"))...)
 	}
 	return allErrs
 }
@@ -462,7 +547,6 @@ func isAllowedFlag(flagName string) bool {
 		kubeadmcmdoptions.NodeCRISocket,
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
-		kubeadmcmdoptions.Kustomize,
 		kubeadmcmdoptions.Patches,
 		"print-join-command", "rootfs", "v")
 	if knownFlags.Has(flagName) {

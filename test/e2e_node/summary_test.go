@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -60,6 +60,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 			pods := getSummaryTestPods(f, numRestarts, pod0, pod1)
 			f.PodClient().CreateBatch(pods)
 
+			ginkgo.By("restarting the containers to ensure container metrics are still being gathered after a container is restarted")
 			gomega.Eventually(func() error {
 				for _, pod := range pods {
 					err := verifyPodRestartCount(f, pod.Name, len(pod.Spec.Containers), numRestarts)
@@ -70,7 +71,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				return nil
 			}, time.Minute, 5*time.Second).Should(gomega.BeNil())
 
-			// Wait for cAdvisor to collect 2 stats points
+			ginkgo.By("Waiting 15 seconds for cAdvisor to collect 2 stats points")
 			time.Sleep(15 * time.Second)
 
 			// Setup expectations.
@@ -78,7 +79,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				maxStartAge = time.Hour * 24 * 365 // 1 year
 				maxStatsAge = time.Minute
 			)
-			// fetch node so we can know proper node memory bounds for unconstrained cgroups
+			ginkgo.By("Fetching node so we can match against an appropriate memory limit")
 			node := getLocalNode(f)
 			memoryCapacity := node.Status.Capacity["memory"]
 			memoryLimit := memoryCapacity.Value()
@@ -89,8 +90,12 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"Name":      gstruct.Ignore(),
 					"StartTime": recent(maxStartAge),
 					"CPU": ptrMatchAllFields(gstruct.Fields{
-						"Time":                 recent(maxStatsAge),
-						"UsageNanoCores":       bounded(10000, 2e9),
+						"Time": recent(maxStatsAge),
+						// CRI stats provider tries to estimate the value of UsageNanoCores. This value can be
+						// either 0 or between 10000 and 2e9.
+						// Please refer, https://github.com/kubernetes/kubernetes/pull/95345#discussion_r501630942
+						// for more information.
+						"UsageNanoCores":       gomega.SatisfyAny(gomega.BeZero(), bounded(10000, 2e9)),
 						"UsageCoreNanoSeconds": bounded(10000000, 1e15),
 					}),
 					"Memory": ptrMatchAllFields(gstruct.Fields{
@@ -301,7 +306,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"Time":           recent(maxStatsAge),
 						"AvailableBytes": fsCapacityBounds,
 						"CapacityBytes":  fsCapacityBounds,
-						// we assume we are not running tests on machines < 10tb of disk
+						// we assume we are not running tests on machines more than 10tb of disk
 						"UsedBytes":  bounded(e2evolume.Kb, 10*e2evolume.Tb),
 						"InodesFree": bounded(1e4, 1e8),
 						"Inodes":     bounded(1e4, 1e8),
@@ -312,7 +317,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
-							// we assume we are not running tests on machines < 10tb of disk
+							// we assume we are not running tests on machines more than 10tb of disk
 							"UsedBytes":  bounded(e2evolume.Kb, 10*e2evolume.Tb),
 							"InodesFree": bounded(1e4, 1e8),
 							"Inodes":     bounded(1e4, 1e8),
@@ -334,7 +339,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 
 			ginkgo.By("Validating /stats/summary")
 			// Give pods a minute to actually start up.
-			gomega.Eventually(getNodeSummary, 1*time.Minute, 15*time.Second).Should(matchExpectations)
+			gomega.Eventually(getNodeSummary, 90*time.Second, 15*time.Second).Should(matchExpectations)
 			// Then the summary should match the expectations a few more times.
 			gomega.Consistently(getNodeSummary, 30*time.Second, 15*time.Second).Should(matchExpectations)
 		})
@@ -352,8 +357,13 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 				RestartPolicy: v1.RestartPolicyAlways,
 				Containers: []v1.Container{
 					{
-						Name:    "busybox-container",
-						Image:   busyboxImage,
+						Name:  "busybox-container",
+						Image: busyboxImage,
+						SecurityContext: &v1.SecurityContext{
+							Capabilities: &v1.Capabilities{
+								Add: []v1.Capability{"NET_RAW"},
+							},
+						},
 						Command: getRestartingContainerCommand("/test-empty-dir-mnt", 0, numRestarts, "echo 'some bytes' >/outside_the_volume.txt; ping -c 1 google.com; echo 'hello world' >> /test-empty-dir-mnt/file;"),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{

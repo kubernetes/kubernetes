@@ -23,6 +23,7 @@ go_library(
         "listen_go_not111.go",
         "msg.go",
         "msg_helpers.go",
+        "msg_truncate.go",
         "nsecx.go",
         "privaterr.go",
         "reverse.go",
@@ -34,6 +35,7 @@ go_library(
         "sig0.go",
         "singleinflight.go",
         "smimea.go",
+        "svcb.go",
         "tlsa.go",
         "tsig.go",
         "types.go",
@@ -52,6 +54,11 @@ go_library(
     deps = [
         "//vendor/golang.org/x/crypto/ed25519:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/golang.org/x/net/ipv4:go_default_library",
+            "//vendor/golang.org/x/net/ipv6:go_default_library",
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/golang.org/x/net/ipv4:go_default_library",
             "//vendor/golang.org/x/net/ipv6:go_default_library",
@@ -72,10 +79,18 @@ go_library(
             "//vendor/golang.org/x/net/ipv6:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/golang.org/x/net/ipv4:go_default_library",
+            "//vendor/golang.org/x/net/ipv6:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//vendor/golang.org/x/net/ipv4:go_default_library",
             "//vendor/golang.org/x/net/ipv6:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
+            "//vendor/golang.org/x/net/ipv4:go_default_library",
+            "//vendor/golang.org/x/net/ipv6:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/golang.org/x/net/ipv4:go_default_library",

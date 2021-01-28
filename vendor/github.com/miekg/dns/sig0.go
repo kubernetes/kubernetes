@@ -2,7 +2,6 @@ package dns
 
 import (
 	"crypto"
-	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"encoding/binary"
@@ -85,7 +84,7 @@ func (rr *SIG) Verify(k *KEY, buf []byte) error {
 
 	var hash crypto.Hash
 	switch rr.Algorithm {
-	case DSA, RSASHA1:
+	case RSASHA1:
 		hash = crypto.SHA1
 	case RSASHA256, ECDSAP256SHA256:
 		hash = crypto.SHA256
@@ -178,19 +177,6 @@ func (rr *SIG) Verify(k *KEY, buf []byte) error {
 	hashed := hasher.Sum(nil)
 	sig := buf[sigend:]
 	switch k.Algorithm {
-	case DSA:
-		pk := k.publicKeyDSA()
-		sig = sig[1:]
-		r := big.NewInt(0)
-		r.SetBytes(sig[:len(sig)/2])
-		s := big.NewInt(0)
-		s.SetBytes(sig[len(sig)/2:])
-		if pk != nil {
-			if dsa.Verify(pk, hashed, r, s) {
-				return nil
-			}
-			return ErrSig
-		}
 	case RSASHA1, RSASHA256, RSASHA512:
 		pk := k.publicKeyRSA()
 		if pk != nil {
@@ -198,10 +184,8 @@ func (rr *SIG) Verify(k *KEY, buf []byte) error {
 		}
 	case ECDSAP256SHA256, ECDSAP384SHA384:
 		pk := k.publicKeyECDSA()
-		r := big.NewInt(0)
-		r.SetBytes(sig[:len(sig)/2])
-		s := big.NewInt(0)
-		s.SetBytes(sig[len(sig)/2:])
+		r := new(big.Int).SetBytes(sig[:len(sig)/2])
+		s := new(big.Int).SetBytes(sig[len(sig)/2:])
 		if pk != nil {
 			if ecdsa.Verify(pk, hashed, r, s) {
 				return nil

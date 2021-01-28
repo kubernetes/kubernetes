@@ -1,4 +1,0 @@
-{
-  "kind": "ReplicationControllerDummy",
-  "apiVersion": "extensions/v1beta1"
-}

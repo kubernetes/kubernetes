@@ -19,6 +19,7 @@ limitations under the License.
 package gce
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -149,7 +150,7 @@ func TestComputeL4ILBMetrics(t *testing.T) {
 				l4ILBServiceMap: make(map[string]L4ILBServiceState),
 			}
 			for i, serviceState := range tc.serviceStates {
-				newMetrics.SetL4ILBService(string(i), serviceState)
+				newMetrics.SetL4ILBService(strconv.Itoa(i), serviceState)
 			}
 			got := newMetrics.computeL4ILBMetrics()
 			if diff := cmp.Diff(tc.expectL4ILBCount, got); diff != "" {

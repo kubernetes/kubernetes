@@ -37,7 +37,7 @@ import (
 // is invoked to serve the request.
 func WithAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler, apiAuds authenticator.Audiences) http.Handler {
 	if auth == nil {
-		klog.Warningf("Authentication is disabled")
+		klog.Warning("Authentication is disabled")
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -50,7 +50,7 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 		defer recordAuthMetrics(resp, ok, err, apiAuds, authenticationStart)
 		if err != nil || !ok {
 			if err != nil {
-				klog.Errorf("Unable to authenticate the request due to an error: %v", err)
+				klog.ErrorS(err, "Unable to authenticate the request")
 			}
 			failed.ServeHTTP(w, req)
 			return

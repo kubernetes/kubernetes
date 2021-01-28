@@ -59,6 +59,9 @@ func (noRestraint) StartRequest(ctx context.Context, hashValue uint64, flowDisti
 	return noRestraintRequest{}, false
 }
 
+func (noRestraint) UpdateObservations() {
+}
+
 func (noRestraint) Dump(bool) debug.QueueSetDump {
 	return debug.QueueSetDump{}
 }

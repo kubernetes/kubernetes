@@ -44,7 +44,7 @@ func (o *CombinedInsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.StringVar(&o.BindAddress, "address", o.BindAddress, "DEPRECATED: the IP address on which to listen for the --port port (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces). See --bind-address instead.")
+	fs.StringVar(&o.BindAddress, "address", o.BindAddress, "DEPRECATED: the IP address on which to listen for the --port port (set to 0.0.0.0 or :: for listening in all interfaces and IP families). See --bind-address instead.")
 	// MarkDeprecated hides the flag from the help. We don't want that:
 	// fs.MarkDeprecated("address", "see --bind-address instead.")
 	fs.IntVar(&o.BindPort, "port", o.BindPort, "DEPRECATED: the port on which to serve HTTP insecurely without authentication and authorization. If 0, don't serve plain HTTP at all. See --secure-port instead.")
@@ -92,7 +92,7 @@ func (o *CombinedInsecureServingOptions) ApplyTo(c *schedulerappconfig.Config, c
 	return o.applyTo(c, componentConfig)
 }
 
-// ApplyToFromLoadedConfig updates the insecure serving options from the component config and then appies it to the given scheduler app configuration.
+// ApplyToFromLoadedConfig updates the insecure serving options from the component config and then applies it to the given scheduler app configuration.
 func (o *CombinedInsecureServingOptions) ApplyToFromLoadedConfig(c *schedulerappconfig.Config, componentConfig *kubeschedulerconfig.KubeSchedulerConfiguration) error {
 	if o == nil {
 		return nil

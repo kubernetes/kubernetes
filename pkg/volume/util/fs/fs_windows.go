@@ -34,9 +34,9 @@ var (
 	procGetDiskFreeSpaceEx = modkernel32.NewProc("GetDiskFreeSpaceExW")
 )
 
-// FSInfo returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
+// Info returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
 // for the filesystem that path resides upon.
-func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+func Info(path string) (int64, int64, int64, int64, int64, int64, error) {
 	var freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes int64
 	var err error
 
@@ -77,7 +77,7 @@ func DiskUsage(path string) (*resource.Quantity, error) {
 	return &used, nil
 }
 
-// Always return zero since inodes is not supported on Windows.
+// Find will always return zero since inodes is not supported on Windows.
 func Find(path string) (int64, error) {
 	return 0, nil
 }

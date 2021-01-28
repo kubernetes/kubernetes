@@ -21,11 +21,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
+	utilexec "k8s.io/utils/exec"
 
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -60,12 +62,13 @@ func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.File
 
 // given a wwn and lun, find the device and associated devicemapper parent
 func findDisk(wwn, lun string, io ioHandler, deviceUtil volumeutil.DeviceUtil) (string, string) {
-	fcPath := "-fc-0x" + wwn + "-lun-" + lun
+	fcPathExp := "^(pci-.*-fc|fc)-0x" + wwn + "-lun-" + lun
+	r := regexp.MustCompile(fcPathExp)
 	devPath := byPath
 	if dirs, err := io.ReadDir(devPath); err == nil {
 		for _, f := range dirs {
 			name := f.Name()
-			if strings.Contains(name, fcPath) {
+			if r.MatchString(name) {
 				if disk, err1 := io.EvalSymlinks(devPath + name); err1 == nil {
 					dm := deviceUtil.FindMultipathDeviceForDevice(disk)
 					klog.Infof("fc: find disk: %v, dm: %v", disk, dm)
@@ -107,6 +110,16 @@ func findDiskWWIDs(wwid string, io ioHandler, deviceUtil volumeutil.DeviceUtil) 
 	}
 	klog.V(2).Infof("fc: failed to find a disk [%s]", devID+fcPath)
 	return "", ""
+}
+
+// Flushes any outstanding I/O to the device
+func flushDevice(deviceName string, exec utilexec.Interface) {
+	out, err := exec.Command("blockdev", "--flushbufs", deviceName).CombinedOutput()
+	if err != nil {
+		// Ignore the error and continue deleting the device. There is will be no retry on error.
+		klog.Warningf("Failed to flush device %s: %s\n%s", deviceName, err, string(out))
+	}
+	klog.V(4).Infof("Flushed device %s", deviceName)
 }
 
 // Removes a scsi device based upon /dev/sdX name
@@ -255,6 +268,9 @@ func (util *fcUtil) DetachDisk(c fcDiskUnmounter, devicePath string) error {
 	// Find slave
 	if strings.HasPrefix(dstPath, "/dev/dm-") {
 		devices = c.deviceUtil.FindSlaveDevicesOnMultipath(dstPath)
+		if err := util.deleteMultipathDevice(c.exec, dstPath); err != nil {
+			return err
+		}
 	} else {
 		// Add single devicepath to devices
 		devices = append(devices, dstPath)
@@ -262,7 +278,7 @@ func (util *fcUtil) DetachDisk(c fcDiskUnmounter, devicePath string) error {
 	klog.V(4).Infof("fc: DetachDisk devicePath: %v, dstPath: %v, devices: %v", devicePath, dstPath, devices)
 	var lastErr error
 	for _, device := range devices {
-		err := util.detachFCDisk(c.io, device)
+		err := util.detachFCDisk(c.io, c.exec, device)
 		if err != nil {
 			klog.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
 			lastErr = fmt.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
@@ -276,11 +292,12 @@ func (util *fcUtil) DetachDisk(c fcDiskUnmounter, devicePath string) error {
 }
 
 // detachFCDisk removes scsi device file such as /dev/sdX from the node.
-func (util *fcUtil) detachFCDisk(io ioHandler, devicePath string) error {
+func (util *fcUtil) detachFCDisk(io ioHandler, exec utilexec.Interface, devicePath string) error {
 	// Remove scsi device from the node.
 	if !strings.HasPrefix(devicePath, "/dev/") {
 		return fmt.Errorf("fc detach disk: invalid device name: %s", devicePath)
 	}
+	flushDevice(devicePath, exec)
 	arr := strings.Split(devicePath, "/")
 	dev := arr[len(arr)-1]
 	removeFromScsiSubsystem(dev, io)
@@ -352,13 +369,16 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	if len(dm) != 0 {
 		// Find all devices which are managed by multipath
 		devices = c.deviceUtil.FindSlaveDevicesOnMultipath(dm)
+		if err := util.deleteMultipathDevice(c.exec, dm); err != nil {
+			return err
+		}
 	} else {
 		// Add single device path to devices
 		devices = append(devices, dstPath)
 	}
 	var lastErr error
 	for _, device := range devices {
-		err = util.detachFCDisk(c.io, device)
+		err = util.detachFCDisk(c.io, c.exec, device)
 		if err != nil {
 			klog.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
 			lastErr = fmt.Errorf("fc: detachFCDisk failed. device: %v err: %v", device, err)
@@ -368,6 +388,15 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 		klog.Errorf("fc: last error occurred during detach disk:\n%v", lastErr)
 		return lastErr
 	}
+	return nil
+}
+
+func (util *fcUtil) deleteMultipathDevice(exec utilexec.Interface, dmDevice string) error {
+	out, err := exec.Command("multipath", "-f", dmDevice).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to flush multipath device %s: %s\n%s", dmDevice, err, string(out))
+	}
+	klog.V(4).Infof("Flushed multipath device: %s", dmDevice)
 	return nil
 }
 

@@ -10,6 +10,7 @@ go_library(
         "//vendor/google.golang.org/api/googleapi:go_default_library",
         "//vendor/google.golang.org/api/internal/gensupport:go_default_library",
         "//vendor/google.golang.org/api/option:go_default_library",
+        "//vendor/google.golang.org/api/option/internaloption:go_default_library",
         "//vendor/google.golang.org/api/transport/http:go_default_library",
     ],
 )

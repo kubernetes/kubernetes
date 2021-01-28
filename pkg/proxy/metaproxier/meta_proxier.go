@@ -20,18 +20,18 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/config"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 
 	utilnet "k8s.io/utils/net"
-
-	discovery "k8s.io/api/discovery/v1beta1"
 )
 
 type metaProxier struct {
+	// actual, wrapped
 	ipv4Proxier proxy.Provider
+	// actual, wrapped
 	ipv6Proxier proxy.Provider
 	// TODO(imroc): implement node handler for meta proxier.
 	config.NoopNodeHandler
@@ -63,41 +63,23 @@ func (proxier *metaProxier) SyncLoop() {
 
 // OnServiceAdd is called whenever creation of new service object is observed.
 func (proxier *metaProxier) OnServiceAdd(service *v1.Service) {
-	if utilproxy.ShouldSkipService(service) {
-		return
-	}
-	if utilnet.IsIPv6String(service.Spec.ClusterIP) {
-		proxier.ipv6Proxier.OnServiceAdd(service)
-	} else {
-		proxier.ipv4Proxier.OnServiceAdd(service)
-	}
+	proxier.ipv4Proxier.OnServiceAdd(service)
+	proxier.ipv6Proxier.OnServiceAdd(service)
 }
 
 // OnServiceUpdate is called whenever modification of an existing
 // service object is observed.
 func (proxier *metaProxier) OnServiceUpdate(oldService, service *v1.Service) {
-	if utilproxy.ShouldSkipService(service) {
-		return
-	}
-	// IPFamily is immutable, hence we only need to check on the new service
-	if utilnet.IsIPv6String(service.Spec.ClusterIP) {
-		proxier.ipv6Proxier.OnServiceUpdate(oldService, service)
-	} else {
-		proxier.ipv4Proxier.OnServiceUpdate(oldService, service)
-	}
+	proxier.ipv4Proxier.OnServiceUpdate(oldService, service)
+	proxier.ipv6Proxier.OnServiceUpdate(oldService, service)
 }
 
 // OnServiceDelete is called whenever deletion of an existing service
 // object is observed.
 func (proxier *metaProxier) OnServiceDelete(service *v1.Service) {
-	if utilproxy.ShouldSkipService(service) {
-		return
-	}
-	if utilnet.IsIPv6String(service.Spec.ClusterIP) {
-		proxier.ipv6Proxier.OnServiceDelete(service)
-	} else {
-		proxier.ipv4Proxier.OnServiceDelete(service)
-	}
+	proxier.ipv4Proxier.OnServiceDelete(service)
+	proxier.ipv6Proxier.OnServiceDelete(service)
+
 }
 
 // OnServiceSynced is called once all the initial event handlers were
@@ -160,8 +142,6 @@ func (proxier *metaProxier) OnEndpointsSynced() {
 	proxier.ipv4Proxier.OnEndpointsSynced()
 	proxier.ipv6Proxier.OnEndpointsSynced()
 }
-
-// TODO: (khenidak) implement EndpointSlice handling
 
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
 // is observed.

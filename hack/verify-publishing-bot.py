@@ -45,7 +45,7 @@ def get_gomod_dependencies(rootdir, components):
 def get_rules_dependencies(rules_file):
     import yaml
     with open(rules_file) as f:
-        data = yaml.load(f)
+        data = yaml.safe_load(f)
     return data
 
 
@@ -85,6 +85,11 @@ def main():
             raise Exception("cannot find master branch for destination %s" % rule["destination"])
         if branch["source"]["branch"] != "master":
             raise Exception("cannot find master source branch for destination %s" % rule["destination"])
+
+        # we specify the go version for all master branches through `default-go-version`
+        # so ensure we don't specify explicit go version for master branch in rules
+        if "go" in branch:
+            raise Exception("go version must not be specified for master branch for destination %s" % rule["destination"])
 
         print("processing : %s" % rule["destination"])
         if rule["destination"] not in gomod_dependencies:

@@ -263,6 +263,8 @@ func TestStructInput(t *testing.T) {
 		{"allarray", "{.Book[*].Author}", storeData, "Nigel Rees Evelyn Waugh Herman Melville", false},
 		{"allfields", `{range .Bicycle[*]}{ "{" }{ @.* }{ "} " }{end}`, storeData, "{red 19.95 true} {green 20.01 false} ", false},
 		{"recurfields", "{..Price}", storeData, "8.95 12.99 8.99 19.95 20.01", false},
+		{"recurdotfields", "{...Price}", storeData, "8.95 12.99 8.99 19.95 20.01", false},
+		{"superrecurfields", "{............................................................Price}", storeData, "", true},
 		{"allstructsSlice", "{.Bicycle}", storeData,
 			`[{"Color":"red","Price":19.95,"IsNew":true},{"Color":"green","Price":20.01,"IsNew":false}]`, false},
 		{"allstructs", `{range .Bicycle[*]}{ @ }{ " " }{end}`, storeData,
@@ -389,6 +391,21 @@ func TestKubernetes(t *testing.T) {
 		{"recursive name", "{..name}", nodesData, `127.0.0.1 127.0.0.2 myself e2e`, false},
 	}
 	testJSONPathSortOutput(randomPrintOrderTests, t)
+}
+
+func TestEmptyRange(t *testing.T) {
+	var input = []byte(`{"items":[]}`)
+	var emptyList interface{}
+	err := json.Unmarshal(input, &emptyList)
+	if err != nil {
+		t.Error(err)
+	}
+
+	tests := []jsonpathTest{
+		{"empty range", `{range .items[*]}{.metadata.name}{end}`, &emptyList, "", false},
+		{"empty nested range", `{range .items[*]}{.metadata.name}{":"}{range @.spec.containers[*]}{.name}{","}{end}{"+"}{end}`, &emptyList, "", false},
+	}
+	testJSONPath(tests, true, t)
 }
 
 func TestNestedRanges(t *testing.T) {

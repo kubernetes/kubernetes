@@ -26,12 +26,9 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-BUILD_TARGETS=(
-  vendor/k8s.io/code-generator/cmd/client-gen
-  vendor/k8s.io/code-generator/cmd/lister-gen
-  vendor/k8s.io/code-generator/cmd/informer-gen
-)
-make -C "${KUBE_ROOT}" WHAT="${BUILD_TARGETS[*]}"
+go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/client-gen
+go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/lister-gen
+go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/informer-gen
 
 clientgen=$(kube::util::find-binary "client-gen")
 listergen=$(kube::util::find-binary "lister-gen")
@@ -59,7 +56,7 @@ GV_DIRS_CSV=$(IFS=',';echo "${GV_DIRS[*]// /,}";IFS=$)
 
 # This can be called with one flag, --verify-only, so it works for both the
 # update- and verify- scripts.
-${clientgen} --output-base "${KUBE_ROOT}/vendor" --output-package="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt" "$@"
+${clientgen} --output-base "${KUBE_ROOT}/vendor" --output-package="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/api" --input="${GV_DIRS_CSV}" --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt" "$@"
 
 listergen_external_apis=()
 kube::util::read-array listergen_external_apis < <(

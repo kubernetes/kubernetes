@@ -119,7 +119,7 @@ var cipherModes = map[string]*cipherMode{
 	chacha20Poly1305ID: {64, 0, newChaCha20Cipher},
 
 	// CBC mode is insecure and so is not included in the default config.
-	// (See http://www.isg.rhul.ac.uk/~kp/SandPfinal.pdf). If absolutely
+	// (See https://www.ieee-security.org/TC/SP2013/papers/4977a526.pdf). If absolutely
 	// needed, it's possible to specify a custom Config to enable it.
 	// You should expect that an active attacker can recover plaintext if
 	// you do.

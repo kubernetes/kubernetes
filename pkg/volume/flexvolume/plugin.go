@@ -28,8 +28,8 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -148,7 +148,7 @@ func (plugin *flexVolumePlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 // RequiresRemount is part of the volume.VolumePlugin interface.
-func (plugin *flexVolumePlugin) RequiresRemount() bool {
+func (plugin *flexVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

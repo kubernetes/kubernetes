@@ -33,9 +33,6 @@ var (
 		string(discovery.AddressTypeIPv6),
 		string(discovery.AddressTypeFQDN),
 	)
-	deprecatedAddressTypes = sets.NewString(
-		string(discovery.AddressTypeIP),
-	)
 	supportedPortProtocols = sets.NewString(
 		string(api.ProtocolTCP),
 		string(api.ProtocolUDP),
@@ -53,9 +50,9 @@ var (
 var ValidateEndpointSliceName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateEndpointSlice validates an EndpointSlice.
-func ValidateEndpointSlice(endpointSlice *discovery.EndpointSlice, validAddressTypes sets.String) field.ErrorList {
+func ValidateEndpointSlice(endpointSlice *discovery.EndpointSlice) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&endpointSlice.ObjectMeta, true, ValidateEndpointSliceName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateAddressType(endpointSlice.AddressType, validAddressTypes)...)
+	allErrs = append(allErrs, validateAddressType(endpointSlice.AddressType)...)
 	allErrs = append(allErrs, validateEndpoints(endpointSlice.Endpoints, endpointSlice.AddressType, field.NewPath("endpoints"))...)
 	allErrs = append(allErrs, validatePorts(endpointSlice.Ports, field.NewPath("ports"))...)
 
@@ -64,12 +61,12 @@ func ValidateEndpointSlice(endpointSlice *discovery.EndpointSlice, validAddressT
 
 // ValidateEndpointSliceCreate validates an EndpointSlice when it is created.
 func ValidateEndpointSliceCreate(endpointSlice *discovery.EndpointSlice) field.ErrorList {
-	return ValidateEndpointSlice(endpointSlice, supportedAddressTypes)
+	return ValidateEndpointSlice(endpointSlice)
 }
 
 // ValidateEndpointSliceUpdate validates an EndpointSlice when it is updated.
 func ValidateEndpointSliceUpdate(newEndpointSlice, oldEndpointSlice *discovery.EndpointSlice) field.ErrorList {
-	allErrs := ValidateEndpointSlice(newEndpointSlice, supportedAddressTypes.Union(deprecatedAddressTypes))
+	allErrs := ValidateEndpointSlice(newEndpointSlice)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newEndpointSlice.AddressType, oldEndpointSlice.AddressType, field.NewPath("addressType"))...)
 
 	return allErrs
@@ -97,16 +94,19 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 			// This validates known address types, unknown types fall through
 			// and do not get validated.
 			switch addrType {
-			case discovery.AddressTypeIP:
-				for _, msg := range validation.IsValidIP(address) {
-					allErrs = append(allErrs, field.Invalid(addressPath.Index(i), address, msg))
-				}
 			case discovery.AddressTypeIPv4:
 				allErrs = append(allErrs, validation.IsValidIPv4Address(addressPath.Index(i), address)...)
 			case discovery.AddressTypeIPv6:
 				allErrs = append(allErrs, validation.IsValidIPv6Address(addressPath.Index(i), address)...)
 			case discovery.AddressTypeFQDN:
 				allErrs = append(allErrs, validation.IsFullyQualifiedDomainName(addressPath.Index(i), address)...)
+			}
+		}
+
+		if endpoint.NodeName != nil {
+			nnPath := idxPath.Child("nodeName")
+			for _, msg := range apivalidation.ValidateNodeName(*endpoint.NodeName, false) {
+				allErrs = append(allErrs, field.Invalid(nnPath, *endpoint.NodeName, msg))
 			}
 		}
 
@@ -162,13 +162,13 @@ func validatePorts(endpointPorts []discovery.EndpointPort, fldPath *field.Path) 
 	return allErrs
 }
 
-func validateAddressType(addressType discovery.AddressType, validAddressTypes sets.String) field.ErrorList {
+func validateAddressType(addressType discovery.AddressType) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if addressType == "" {
 		allErrs = append(allErrs, field.Required(field.NewPath("addressType"), ""))
-	} else if !validAddressTypes.Has(string(addressType)) {
-		allErrs = append(allErrs, field.NotSupported(field.NewPath("addressType"), addressType, validAddressTypes.List()))
+	} else if !supportedAddressTypes.Has(string(addressType)) {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("addressType"), addressType, supportedAddressTypes.List()))
 	}
 
 	return allErrs

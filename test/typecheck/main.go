@@ -38,7 +38,8 @@ var (
 	platforms  = flag.String("platform", "", "comma-separated list of platforms to typecheck")
 	timings    = flag.Bool("time", false, "output times taken for each phase")
 	defuses    = flag.Bool("defuse", false, "output defs/uses")
-	serial     = flag.Bool("serial", false, "don't type check platforms in parallel")
+	serial     = flag.Bool("serial", false, "don't type check platforms in parallel (equivalent to --parallel=1)")
+	parallel   = flag.Int("parallel", 3, "limits how many platforms can be checked in parallel. 0 means no limit.")
 	skipTest   = flag.Bool("skip-test", false, "don't type check test code")
 	tags       = flag.String("tags", "", "comma-separated list of build tags to apply in addition to go's defaults")
 	ignoreDirs = flag.String("ignore-dirs", "", "comma-separated list of directories to ignore in addition to the default hardcoded list including staging, vendor, and hidden dirs")
@@ -50,7 +51,7 @@ var (
 		"darwin/amd64", "linux/arm",
 		"linux/386", "windows/amd64",
 		"linux/arm64", "linux/ppc64le",
-		"linux/s390x", "darwin/386",
+		"linux/s390x",
 	}
 
 	// directories we always ignore
@@ -273,14 +274,30 @@ func main() {
 	var wg sync.WaitGroup
 	var failMu sync.Mutex
 	failed := false
+
+	if *serial {
+		*parallel = 1
+	} else if *parallel == 0 {
+		*parallel = len(plats)
+	}
+	throttle := make(chan int, *parallel)
+
 	for _, plat := range plats {
 		wg.Add(1)
-		fn := func(plat string) {
+		go func(plat string) {
+			// block until there's room for this task
+			throttle <- 1
+			defer func() {
+				// indicate this task is done
+				<-throttle
+			}()
+
 			f := false
 			serialFprintf(os.Stdout, "type-checking %s\n", plat)
 			errors, err := c.verify(plat)
 			if err != nil {
 				serialFprintf(os.Stderr, "ERROR(%s): failed to verify: %v\n", plat, err)
+				f = true
 			} else if len(errors) > 0 {
 				for _, e := range errors {
 					// Special case CGo errors which may depend on headers we
@@ -295,12 +312,7 @@ func main() {
 			failed = failed || f
 			failMu.Unlock()
 			wg.Done()
-		}
-		if *serial {
-			fn(plat)
-		} else {
-			go fn(plat)
-		}
+		}(plat)
 	}
 	wg.Wait()
 	if failed {

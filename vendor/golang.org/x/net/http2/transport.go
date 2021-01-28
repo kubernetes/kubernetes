@@ -108,6 +108,19 @@ type Transport struct {
 	// waiting for their turn.
 	StrictMaxConcurrentStreams bool
 
+	// ReadIdleTimeout is the timeout after which a health check using ping
+	// frame will be carried out if no frame is received on the connection.
+	// Note that a ping response will is considered a received frame, so if
+	// there is no other traffic on the connection, the health check will
+	// be performed every ReadIdleTimeout interval.
+	// If zero, no health check is performed.
+	ReadIdleTimeout time.Duration
+
+	// PingTimeout is the timeout after which the connection will be closed
+	// if a response to Ping is not received.
+	// Defaults to 15s.
+	PingTimeout time.Duration
+
 	// t1, if non-nil, is the standard library Transport using
 	// this transport. Its settings are used (but not its
 	// RoundTrip method, etc).
@@ -131,14 +144,31 @@ func (t *Transport) disableCompression() bool {
 	return t.DisableCompression || (t.t1 != nil && t.t1.DisableCompression)
 }
 
+func (t *Transport) pingTimeout() time.Duration {
+	if t.PingTimeout == 0 {
+		return 15 * time.Second
+	}
+	return t.PingTimeout
+
+}
+
 // ConfigureTransport configures a net/http HTTP/1 Transport to use HTTP/2.
 // It returns an error if t1 has already been HTTP/2-enabled.
+//
+// Use ConfigureTransports instead to configure the HTTP/2 Transport.
 func ConfigureTransport(t1 *http.Transport) error {
-	_, err := configureTransport(t1)
+	_, err := ConfigureTransports(t1)
 	return err
 }
 
-func configureTransport(t1 *http.Transport) (*Transport, error) {
+// ConfigureTransports configures a net/http HTTP/1 Transport to use HTTP/2.
+// It returns a new HTTP/2 Transport for further configuration.
+// It returns an error if t1 has already been HTTP/2-enabled.
+func ConfigureTransports(t1 *http.Transport) (*Transport, error) {
+	return configureTransports(t1)
+}
+
+func configureTransports(t1 *http.Transport) (*Transport, error) {
 	connPool := new(clientConnPool)
 	t2 := &Transport{
 		ConnPool: noDialClientConnPool{connPool},
@@ -668,11 +698,26 @@ func (t *Transport) newClientConn(c net.Conn, singleUse bool) (*ClientConn, erro
 	cc.inflow.add(transportDefaultConnFlow + initialWindowSize)
 	cc.bw.Flush()
 	if cc.werr != nil {
+		cc.Close()
 		return nil, cc.werr
 	}
 
 	go cc.readLoop()
 	return cc, nil
+}
+
+func (cc *ClientConn) healthCheck() {
+	pingTimeout := cc.t.pingTimeout()
+	// We don't need to periodically ping in the health check, because the readLoop of ClientConn will
+	// trigger the healthCheck again if there is no frame received.
+	ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
+	defer cancel()
+	err := cc.Ping(ctx)
+	if err != nil {
+		cc.closeForLostPing()
+		cc.t.connPool().MarkDead(cc)
+		return
+	}
 }
 
 func (cc *ClientConn) setGoAway(f *GoAwayFrame) {
@@ -846,14 +891,12 @@ func (cc *ClientConn) sendGoAway() error {
 	return nil
 }
 
-// Close closes the client connection immediately.
-//
-// In-flight requests are interrupted. For a graceful shutdown, use Shutdown instead.
-func (cc *ClientConn) Close() error {
+// closes the client connection immediately. In-flight requests are interrupted.
+// err is sent to streams.
+func (cc *ClientConn) closeForError(err error) error {
 	cc.mu.Lock()
 	defer cc.cond.Broadcast()
 	defer cc.mu.Unlock()
-	err := errors.New("http2: client connection force closed via ClientConn.Close")
 	for id, cs := range cc.streams {
 		select {
 		case cs.resc <- resAndError{err: err}:
@@ -864,6 +907,20 @@ func (cc *ClientConn) Close() error {
 	}
 	cc.closed = true
 	return cc.tconn.Close()
+}
+
+// Close closes the client connection immediately.
+//
+// In-flight requests are interrupted. For a graceful shutdown, use Shutdown instead.
+func (cc *ClientConn) Close() error {
+	err := errors.New("http2: client connection force closed via ClientConn.Close")
+	return cc.closeForError(err)
+}
+
+// closes the client connection immediately. In-flight requests are interrupted.
+func (cc *ClientConn) closeForLostPing() error {
+	err := errors.New("http2: client connection lost")
+	return cc.closeForError(err)
 }
 
 const maxAllocFrameSize = 512 << 10
@@ -916,7 +973,7 @@ func commaSeparatedTrailers(req *http.Request) (string, error) {
 		k = http.CanonicalHeaderKey(k)
 		switch k {
 		case "Transfer-Encoding", "Trailer", "Content-Length":
-			return "", &badStringError{"invalid Trailer key", k}
+			return "", fmt.Errorf("invalid Trailer key %q", k)
 		}
 		keys = append(keys, k)
 	}
@@ -1033,6 +1090,15 @@ func (cc *ClientConn) roundTrip(req *http.Request) (res *http.Response, gotErrAf
 	bodyWriter := cc.t.getBodyWriterState(cs, body)
 	cs.on100 = bodyWriter.on100
 
+	defer func() {
+		cc.wmu.Lock()
+		werr := cc.werr
+		cc.wmu.Unlock()
+		if werr != nil {
+			cc.Close()
+		}
+	}()
+
 	cc.wmu.Lock()
 	endStream := !hasBody && !hasTrailers
 	werr := cc.writeHeaders(cs.ID, endStream, int(cc.maxFrameSize), hdrs)
@@ -1082,6 +1148,9 @@ func (cc *ClientConn) roundTrip(req *http.Request) (res *http.Response, gotErrAf
 			// we can keep it.
 			bodyWriter.cancel()
 			cs.abortRequestBodyWrite(errStopReqBodyWrite)
+			if hasBody && !bodyWritten {
+				<-bodyWriter.resc
+			}
 		}
 		if re.err != nil {
 			cc.forgetStreamID(cs.ID)
@@ -1102,6 +1171,7 @@ func (cc *ClientConn) roundTrip(req *http.Request) (res *http.Response, gotErrAf
 			} else {
 				bodyWriter.cancel()
 				cs.abortRequestBodyWrite(errStopReqBodyWriteAndCancel)
+				<-bodyWriter.resc
 			}
 			cc.forgetStreamID(cs.ID)
 			return nil, cs.getStartedWrite(), errTimeout
@@ -1111,6 +1181,7 @@ func (cc *ClientConn) roundTrip(req *http.Request) (res *http.Response, gotErrAf
 			} else {
 				bodyWriter.cancel()
 				cs.abortRequestBodyWrite(errStopReqBodyWriteAndCancel)
+				<-bodyWriter.resc
 			}
 			cc.forgetStreamID(cs.ID)
 			return nil, cs.getStartedWrite(), ctx.Err()
@@ -1120,6 +1191,7 @@ func (cc *ClientConn) roundTrip(req *http.Request) (res *http.Response, gotErrAf
 			} else {
 				bodyWriter.cancel()
 				cs.abortRequestBodyWrite(errStopReqBodyWriteAndCancel)
+				<-bodyWriter.resc
 			}
 			cc.forgetStreamID(cs.ID)
 			return nil, cs.getStartedWrite(), errRequestCanceled
@@ -1129,6 +1201,7 @@ func (cc *ClientConn) roundTrip(req *http.Request) (res *http.Response, gotErrAf
 			// forgetStreamID.
 			return nil, cs.getStartedWrite(), cs.resetErr
 		case err := <-bodyWriter.resc:
+			bodyWritten = true
 			// Prefer the read loop's response, if available. Issue 16102.
 			select {
 			case re := <-readLoopResCh:
@@ -1139,7 +1212,6 @@ func (cc *ClientConn) roundTrip(req *http.Request) (res *http.Response, gotErrAf
 				cc.forgetStreamID(cs.ID)
 				return nil, cs.getStartedWrite(), err
 			}
-			bodyWritten = true
 			if d := cc.responseHeaderTimeout(); d != 0 {
 				timer := time.NewTimer(d)
 				defer timer.Stop()
@@ -1394,13 +1466,6 @@ func (cs *clientStream) awaitFlowControl(maxBytes int) (taken int32, err error) 
 	}
 }
 
-type badStringError struct {
-	what string
-	str  string
-}
-
-func (e *badStringError) Error() string { return fmt.Sprintf("%s %q", e.what, e.str) }
-
 // requires cc.mu be held.
 func (cc *ClientConn) encodeHeaders(req *http.Request, addGzipHeader bool, trailers string, contentLength int64) ([]byte, error) {
 	cc.hbuf.Reset()
@@ -1616,6 +1681,7 @@ func (cc *ClientConn) writeHeader(name, value string) {
 }
 
 type resAndError struct {
+	_   incomparable
 	res *http.Response
 	err error
 }
@@ -1663,6 +1729,7 @@ func (cc *ClientConn) streamByID(id uint32, andRemove bool) *clientStream {
 
 // clientConnReadLoop is the state owned by the clientConn's frame-reading readLoop.
 type clientConnReadLoop struct {
+	_             incomparable
 	cc            *ClientConn
 	closeWhenIdle bool
 }
@@ -1742,8 +1809,17 @@ func (rl *clientConnReadLoop) run() error {
 	rl.closeWhenIdle = cc.t.disableKeepAlives() || cc.singleUse
 	gotReply := false // ever saw a HEADERS reply
 	gotSettings := false
+	readIdleTimeout := cc.t.ReadIdleTimeout
+	var t *time.Timer
+	if readIdleTimeout != 0 {
+		t = time.AfterFunc(readIdleTimeout, cc.healthCheck)
+		defer t.Stop()
+	}
 	for {
 		f, err := cc.fr.ReadFrame()
+		if t != nil {
+			t.Reset(readIdleTimeout)
+		}
 		if err != nil {
 			cc.vlogf("http2: Transport readFrame error on conn %p: (%T) %v", cc, err, err)
 		}
@@ -1955,8 +2031,8 @@ func (rl *clientConnReadLoop) handleResponse(cs *clientStream, f *MetaHeadersFra
 	if !streamEnded || isHead {
 		res.ContentLength = -1
 		if clens := res.Header["Content-Length"]; len(clens) == 1 {
-			if clen64, err := strconv.ParseInt(clens[0], 10, 64); err == nil {
-				res.ContentLength = clen64
+			if cl, err := strconv.ParseUint(clens[0], 10, 63); err == nil {
+				res.ContentLength = int64(cl)
 			} else {
 				// TODO: care? unlike http/1, it won't mess up our framing, so it's
 				// more safe smuggling-wise to ignore.
@@ -2474,11 +2550,13 @@ func strSliceContains(ss []string, s string) bool {
 
 type erringRoundTripper struct{ err error }
 
+func (rt erringRoundTripper) RoundTripErr() error                             { return rt.err }
 func (rt erringRoundTripper) RoundTrip(*http.Request) (*http.Response, error) { return nil, rt.err }
 
 // gzipReader wraps a response body so it can lazily
 // call gzip.NewReader on the first call to Read
 type gzipReader struct {
+	_    incomparable
 	body io.ReadCloser // underlying Response.Body
 	zr   *gzip.Reader  // lazily-initialized gzip reader
 	zerr error         // sticky error

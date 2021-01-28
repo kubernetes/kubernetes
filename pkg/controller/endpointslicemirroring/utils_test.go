@@ -27,8 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestNewEndpointSlice(t *testing.T) {
@@ -39,7 +43,11 @@ func TestNewEndpointSlice(t *testing.T) {
 	addrType := discovery.AddressTypeIPv4
 
 	endpoints := v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "test",
+			Labels:    map[string]string{"foo": "bar"},
+		},
 		Subsets: []v1.EndpointSubset{{
 			Ports: []v1.EndpointPort{{Port: 80}},
 		}},
@@ -51,6 +59,7 @@ func TestNewEndpointSlice(t *testing.T) {
 	expectedSlice := discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
+				"foo":                      "bar",
 				discovery.LabelServiceName: endpoints.Name,
 				discovery.LabelManagedBy:   controllerName,
 			},
@@ -65,6 +74,90 @@ func TestNewEndpointSlice(t *testing.T) {
 	generatedSlice := newEndpointSlice(&endpoints, ports, addrType, "")
 
 	assert.EqualValues(t, expectedSlice, *generatedSlice)
+
+	if len(endpoints.Labels) > 1 {
+		t.Errorf("Expected Endpoints labels to not be modified, got %+v", endpoints.Labels)
+	}
+}
+
+func TestAddressToEndpoint(t *testing.T) {
+	testCases := []struct {
+		name                string
+		epAddress           v1.EndpointAddress
+		expectedEndpoint    discovery.Endpoint
+		ready               bool
+		nodeNameGateEnabled bool
+	}{{
+		name: "simple + gate enabled",
+		epAddress: v1.EndpointAddress{
+			IP:       "10.1.2.3",
+			Hostname: "foo",
+			NodeName: utilpointer.StringPtr("node-abc"),
+			TargetRef: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Namespace:  "default",
+				Name:       "foo",
+			},
+		},
+		ready:               true,
+		nodeNameGateEnabled: true,
+		expectedEndpoint: discovery.Endpoint{
+			Addresses: []string{"10.1.2.3"},
+			Hostname:  utilpointer.StringPtr("foo"),
+			Conditions: discovery.EndpointConditions{
+				Ready: utilpointer.BoolPtr(true),
+			},
+			Topology: map[string]string{
+				"kubernetes.io/hostname": "node-abc",
+			},
+			TargetRef: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Namespace:  "default",
+				Name:       "foo",
+			},
+			NodeName: utilpointer.StringPtr("node-abc"),
+		},
+	}, {
+		name: "simple + gate disabled",
+		epAddress: v1.EndpointAddress{
+			IP:       "10.1.2.3",
+			Hostname: "foo",
+			NodeName: utilpointer.StringPtr("node-abc"),
+			TargetRef: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Namespace:  "default",
+				Name:       "foo",
+			},
+		},
+		ready:               true,
+		nodeNameGateEnabled: false,
+		expectedEndpoint: discovery.Endpoint{
+			Addresses: []string{"10.1.2.3"},
+			Hostname:  utilpointer.StringPtr("foo"),
+			Conditions: discovery.EndpointConditions{
+				Ready: utilpointer.BoolPtr(true),
+			},
+			Topology: map[string]string{
+				"kubernetes.io/hostname": "node-abc",
+			},
+			TargetRef: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Namespace:  "default",
+				Name:       "foo",
+			},
+		},
+	}}
+
+	for _, tc := range testCases {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceNodeName, tc.nodeNameGateEnabled)()
+
+		ep := addressToEndpoint(tc.epAddress, tc.ready)
+		assert.EqualValues(t, tc.expectedEndpoint, *ep)
+	}
 }
 
 // Test helpers

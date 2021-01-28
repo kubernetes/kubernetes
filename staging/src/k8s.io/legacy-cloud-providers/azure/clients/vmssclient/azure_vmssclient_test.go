@@ -194,7 +194,7 @@ func TestList(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	vmssList := []compute.VirtualMachineScaleSet{getTestVMSS("vmss1"), getTestVMSS("vmss2"), getTestVMSS("vmss3")}
 	responseBody, err := json.Marshal(compute.VirtualMachineScaleSetListResult{Value: &vmssList})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusOK,
@@ -283,7 +283,7 @@ func TestListWithListResponderError(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	vmssList := []compute.VirtualMachineScaleSet{getTestVMSS("vmss1"), getTestVMSS("vmss2"), getTestVMSS("vmss3")}
 	responseBody, err := json.Marshal(compute.VirtualMachineScaleSetListResult{Value: &vmssList})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusNotFound,
@@ -294,6 +294,35 @@ func TestListWithListResponderError(t *testing.T) {
 	result, rerr := vmssClient.List(context.TODO(), "rg")
 	assert.NotNil(t, rerr)
 	assert.Equal(t, 0, len(result))
+}
+
+func TestListWithNextPage(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets"
+	armClient := mockarmclient.NewMockInterface(ctrl)
+	vmssList := []compute.VirtualMachineScaleSet{getTestVMSS("vmss1"), getTestVMSS("vmss2"), getTestVMSS("vmss3")}
+	partialResponse, err := json.Marshal(compute.VirtualMachineScaleSetListResult{Value: &vmssList, NextLink: to.StringPtr("nextLink")})
+	assert.NoError(t, err)
+	pagedResponse, err := json.Marshal(compute.VirtualMachineScaleSetListResult{Value: &vmssList})
+	assert.NoError(t, err)
+	armClient.EXPECT().PrepareGetRequest(gomock.Any(), gomock.Any()).Return(&http.Request{}, nil)
+	armClient.EXPECT().Send(gomock.Any(), gomock.Any()).Return(
+		&http.Response{
+			StatusCode: http.StatusOK,
+			Body:       ioutil.NopCloser(bytes.NewReader(pagedResponse)),
+		}, nil)
+	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
+		&http.Response{
+			StatusCode: http.StatusOK,
+			Body:       ioutil.NopCloser(bytes.NewReader(partialResponse)),
+		}, nil).Times(1)
+	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(2)
+	vmssClient := getTestVMSSClient(armClient)
+	result, rerr := vmssClient.List(context.TODO(), "rg")
+	assert.Nil(t, rerr)
+	assert.Equal(t, 6, len(result))
 }
 
 func TestListNeverRateLimiter(t *testing.T) {
@@ -381,7 +410,7 @@ func TestListNextResultsMultiPages(t *testing.T) {
 		if err != nil {
 			assert.Equal(t, err.(autorest.DetailedError).Message, test.expectedErrMsg)
 		} else {
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 		}
 
 		if test.prepareErr != nil {
@@ -438,7 +467,7 @@ func TestListNextResultsMultiPagesWithListResponderError(t *testing.T) {
 		expected.Response = autorest.Response{Response: response}
 		vmssClient := getTestVMSSClient(armClient)
 		result, err := vmssClient.listNextResults(context.TODO(), lastResult)
-		assert.NotNil(t, err)
+		assert.Error(t, err)
 		if test.sendErr != nil {
 			assert.NotEqual(t, expected, result)
 		} else {
@@ -632,7 +661,7 @@ func TestWaitForAsyncOperationResult(t *testing.T) {
 	armClient.EXPECT().WaitForAsyncOperationResult(gomock.Any(), &azure.Future{}, "VMSSWaitForAsyncOperationResult").Return(response, nil)
 	vmssClient := getTestVMSSClient(armClient)
 	_, err := vmssClient.WaitForAsyncOperationResult(context.TODO(), &azure.Future{})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestDeleteInstances(t *testing.T) {

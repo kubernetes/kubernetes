@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // Labels allows you to present labels independently from their storage.
@@ -79,7 +81,7 @@ func (ls Set) AsSelectorPreValidated() Selector {
 	return SelectorFromValidatedSet(ls)
 }
 
-// FormatLabels convert label map into plain string
+// FormatLabels converts label map into plain string
 func FormatLabels(labelMap map[string]string) string {
 	l := Set(labelMap).String()
 	if l == "" {
@@ -141,28 +143,9 @@ func Equals(labels1, labels2 Set) bool {
 	return true
 }
 
-// AreLabelsInWhiteList verifies if the provided label list
-// is in the provided whitelist and returns true, otherwise false.
-func AreLabelsInWhiteList(labels, whitelist Set) bool {
-	if len(whitelist) == 0 {
-		return true
-	}
-
-	for k, v := range labels {
-		value, ok := whitelist[k]
-		if !ok {
-			return false
-		}
-		if value != v {
-			return false
-		}
-	}
-	return true
-}
-
 // ConvertSelectorToLabelsMap converts selector string to labels map
 // and validates keys and values
-func ConvertSelectorToLabelsMap(selector string) (Set, error) {
+func ConvertSelectorToLabelsMap(selector string, opts ...field.PathOption) (Set, error) {
 	labelsMap := Set{}
 
 	if len(selector) == 0 {
@@ -176,11 +159,11 @@ func ConvertSelectorToLabelsMap(selector string) (Set, error) {
 			return labelsMap, fmt.Errorf("invalid selector: %s", l)
 		}
 		key := strings.TrimSpace(l[0])
-		if err := validateLabelKey(key); err != nil {
+		if err := validateLabelKey(key, field.ToPath(opts...)); err != nil {
 			return labelsMap, err
 		}
 		value := strings.TrimSpace(l[1])
-		if err := validateLabelValue(key, value); err != nil {
+		if err := validateLabelValue(key, value, field.ToPath(opts...)); err != nil {
 			return labelsMap, err
 		}
 		labelsMap[key] = value

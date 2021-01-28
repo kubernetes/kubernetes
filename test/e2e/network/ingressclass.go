@@ -43,7 +43,7 @@ var _ = SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		cs = f.ClientSet
 	})
 
-	ginkgo.It("should set default value on new IngressClass", func() {
+	ginkgo.It("should set default value on new IngressClass [Serial]", func() {
 		ingressClass1, err := createIngressClass(cs, "ingressclass1", true, f.UniqueName)
 		framework.ExpectNoError(err)
 		defer deleteIngressClass(cs, ingressClass1.Name)
@@ -58,7 +58,7 @@ var _ = SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		}
 	})
 
-	ginkgo.It("should not set default value if no default IngressClass", func() {
+	ginkgo.It("should not set default value if no default IngressClass [Serial]", func() {
 		ingressClass1, err := createIngressClass(cs, "ingressclass1", false, f.UniqueName)
 		framework.ExpectNoError(err)
 		defer deleteIngressClass(cs, ingressClass1.Name)
@@ -71,7 +71,7 @@ var _ = SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		}
 	})
 
-	ginkgo.It("should prevent Ingress creation if more than 1 IngressClass marked as default", func() {
+	ginkgo.It("should prevent Ingress creation if more than 1 IngressClass marked as default [Serial]", func() {
 		ingressClass1, err := createIngressClass(cs, "ingressclass1", true, f.UniqueName)
 		framework.ExpectNoError(err)
 		defer deleteIngressClass(cs, ingressClass1.Name)
@@ -212,11 +212,11 @@ var _ = SIGDescribe("IngressClass API", func() {
 
 		// IngressClass resource create/read/update/watch verbs
 		ginkgo.By("creating")
-		ingressClass1, err := createIngressClass(cs, "ingressclass1", true, f.UniqueName)
+		ingressClass1, err := createIngressClass(cs, "ingressclass1", false, f.UniqueName)
 		framework.ExpectNoError(err)
-		_, err = createIngressClass(cs, "ingressclass2", true, f.UniqueName)
+		_, err = createIngressClass(cs, "ingressclass2", false, f.UniqueName)
 		framework.ExpectNoError(err)
-		_, err = createIngressClass(cs, "ingressclass3", true, f.UniqueName)
+		_, err = createIngressClass(cs, "ingressclass3", false, f.UniqueName)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("getting")

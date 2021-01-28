@@ -211,8 +211,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 }
 
 func initCSIObjects(stopCh chan struct{}, informers clientgoinformers.SharedInformerFactory) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 		go informers.Storage().V1().CSINodes().Informer().Run(stopCh)
 	}
 	go informers.Storage().V1().CSIDrivers().Informer().Run(stopCh)
@@ -438,7 +437,9 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		nil, /* prober */
 		false,
 		5*time.Second,
-		timers)
+		timers,
+		nil, /* filteredDialOptions */
+	)
 
 	if err != nil {
 		t.Fatalf("Error creating AttachDetach : %v", err)

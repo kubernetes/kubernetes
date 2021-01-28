@@ -15,14 +15,16 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/config:go_default_library",
+        "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/volume:go_default_library",
-        "//test/e2e/storage/testpatterns:go_default_library",
+        "//test/e2e/storage/framework:go_default_library",
         "//test/e2e/storage/testsuites:go_default_library",
         "//test/e2e/storage/utils:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -34,7 +36,7 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//test/e2e/framework/volume:go_default_library",
-        "//test/e2e/storage/testsuites:go_default_library",
+        "//test/e2e/storage/framework:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

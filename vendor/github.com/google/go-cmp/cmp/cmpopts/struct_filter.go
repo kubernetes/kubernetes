@@ -42,7 +42,7 @@ func newStructFilter(typ interface{}, names ...string) structFilter {
 
 	t := reflect.TypeOf(typ)
 	if t == nil || t.Kind() != reflect.Struct {
-		panic(fmt.Sprintf("%T must be a struct", typ))
+		panic(fmt.Sprintf("%T must be a non-pointer struct", typ))
 	}
 	var ft fieldTree
 	for _, name := range names {
@@ -160,14 +160,19 @@ func canonicalName(t reflect.Type, sel string) ([]string, error) {
 
 	// Find the canonical name for this current field name.
 	// If the field exists in an embedded struct, then it will be expanded.
+	sf, _ := t.FieldByName(name)
 	if !isExported(name) {
-		// Disallow unexported fields:
-		//	* To discourage people from actually touching unexported fields
-		//	* FieldByName is buggy (https://golang.org/issue/4876)
-		return []string{name}, fmt.Errorf("name must be exported")
+		// Avoid using reflect.Type.FieldByName for unexported fields due to
+		// buggy behavior with regard to embeddeding and unexported fields.
+		// See https://golang.org/issue/4876 for details.
+		sf = reflect.StructField{}
+		for i := 0; i < t.NumField() && sf.Name == ""; i++ {
+			if t.Field(i).Name == name {
+				sf = t.Field(i)
+			}
+		}
 	}
-	sf, ok := t.FieldByName(name)
-	if !ok {
+	if sf.Name == "" {
 		return []string{name}, fmt.Errorf("does not exist")
 	}
 	var ss []string

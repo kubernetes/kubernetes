@@ -31,8 +31,8 @@ import (
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/cloud-provider"
+	cloudctrlmgrtesting "k8s.io/cloud-provider/app/testing"
 	"k8s.io/cloud-provider/fake"
-	cloudctrlmgrtesting "k8s.io/kubernetes/cmd/cloud-controller-manager/app/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubectrlmgrtesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
@@ -327,5 +327,7 @@ func intPtr(x int) *int {
 }
 
 func fakeCloudProviderFactory(io.Reader) (cloudprovider.Interface, error) {
-	return &fake.Cloud{}, nil
+	return &fake.Cloud{
+		DisableRoutes: true, // disable routes for server tests, otherwise --cluster-cidr is required
+	}, nil
 }

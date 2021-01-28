@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -163,12 +164,12 @@ profiles:
 		},
 		"FilterPlugin": {
 			{Name: "NodeUnschedulable"},
-			{Name: "NodeResourcesFit"},
 			{Name: "NodeName"},
-			{Name: "NodePorts"},
-			{Name: "NodeAffinity"},
-			{Name: "VolumeRestrictions"},
 			{Name: "TaintToleration"},
+			{Name: "NodeAffinity"},
+			{Name: "NodePorts"},
+			{Name: "NodeResourcesFit"},
+			{Name: "VolumeRestrictions"},
 			{Name: "EBSLimits"},
 			{Name: "GCEPDLimits"},
 			{Name: "NodeVolumeLimits"},
@@ -185,7 +186,7 @@ profiles:
 			{Name: "InterPodAffinity"},
 			{Name: "PodTopologySpread"},
 			{Name: "TaintToleration"},
-			{Name: "SelectorSpread"},
+			{Name: "NodeAffinity"},
 		},
 		"ScorePlugin": {
 			{Name: "NodeResourcesBalancedAllocation", Weight: 1},
@@ -196,7 +197,6 @@ profiles:
 			{Name: "NodePreferAvoidPods", Weight: 10000},
 			{Name: "PodTopologySpread", Weight: 2},
 			{Name: "TaintToleration", Weight: 1},
-			{Name: "SelectorSpread", Weight: 1},
 		},
 		"BindPlugin":    {{Name: "DefaultBinder"}},
 		"ReservePlugin": {{Name: "VolumeBinding"}},
@@ -293,12 +293,12 @@ profiles:
 					},
 					"FilterPlugin": {
 						{Name: "NodeUnschedulable"},
-						{Name: "NodeResourcesFit"},
 						{Name: "NodeName"},
-						{Name: "NodePorts"},
-						{Name: "NodeAffinity"},
-						{Name: "VolumeRestrictions"},
 						{Name: "TaintToleration"},
+						{Name: "NodeAffinity"},
+						{Name: "NodePorts"},
+						{Name: "NodeResourcesFit"},
+						{Name: "VolumeRestrictions"},
 						{Name: "EBSLimits"},
 						{Name: "GCEPDLimits"},
 						{Name: "NodeVolumeLimits"},
@@ -315,7 +315,7 @@ profiles:
 						{Name: "InterPodAffinity"},
 						{Name: "PodTopologySpread"},
 						{Name: "TaintToleration"},
-						{Name: "SelectorSpread"},
+						{Name: "NodeAffinity"},
 					},
 					"ScorePlugin": {
 						{Name: "NodeResourcesBalancedAllocation", Weight: 1},
@@ -326,7 +326,6 @@ profiles:
 						{Name: "NodePreferAvoidPods", Weight: 10000},
 						{Name: "PodTopologySpread", Weight: 2},
 						{Name: "TaintToleration", Weight: 1},
-						{Name: "SelectorSpread", Weight: 1},
 					},
 					"BindPlugin":    {{Name: "DefaultBinder"}},
 					"ReservePlugin": {{Name: "VolumeBinding"}},
@@ -351,6 +350,7 @@ profiles:
 						{Name: "TaintToleration"},
 						{Name: "InterPodAffinity"},
 					},
+					"PostFilterPlugin": {{Name: "DefaultPreemption"}},
 					"PreScorePlugin": {
 						{Name: "InterPodAffinity"},
 					},
@@ -363,6 +363,15 @@ profiles:
 		},
 	}
 
+	makeListener := func(t *testing.T) net.Listener {
+		t.Helper()
+		l, err := net.Listen("tcp", ":0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return l
+	}
+
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			fs := pflag.NewFlagSet("test", pflag.PanicOnError)
@@ -370,6 +379,15 @@ profiles:
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			// use listeners instead of static ports so parallel test runs don't conflict
+			opts.SecureServing.Listener = makeListener(t)
+			defer opts.SecureServing.Listener.Close()
+			opts.CombinedInsecureServing.Metrics.Listener = makeListener(t)
+			defer opts.CombinedInsecureServing.Metrics.Listener.Close()
+			opts.CombinedInsecureServing.Healthz.Listener = makeListener(t)
+			defer opts.CombinedInsecureServing.Healthz.Listener.Close()
+
 			for _, f := range opts.Flags().FlagSets {
 				fs.AddFlagSet(f)
 			}
@@ -379,12 +397,10 @@ profiles:
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			cc, sched, err := Setup(ctx, opts)
+			_, sched, err := Setup(ctx, opts)
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer cc.SecureServing.Listener.Close()
-			defer cc.InsecureServing.Listener.Close()
 
 			gotPlugins := make(map[string]map[string][]kubeschedulerconfig.Plugin)
 			for n, p := range sched.Profiles {

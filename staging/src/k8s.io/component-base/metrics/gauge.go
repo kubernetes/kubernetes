@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -71,6 +72,11 @@ func (g *Gauge) initializeMetric() {
 func (g *Gauge) initializeDeprecatedMetric() {
 	g.GaugeOpts.markDeprecated()
 	g.initializeMetric()
+}
+
+// WithContext allows the normal Gauge metric to pass in context. The context is no-op now.
+func (g *Gauge) WithContext(ctx context.Context) GaugeMetric {
+	return g.GaugeMetric
 }
 
 // GaugeVec is the internal representation of our wrapping struct around prometheus
@@ -190,4 +196,28 @@ func NewGaugeFunc(opts GaugeOpts, function func() float64) GaugeFunc {
 	v := parseVersion(version.Get())
 
 	return newGaugeFunc(opts, function, v)
+}
+
+// WithContext returns wrapped GaugeVec with context
+func (v *GaugeVec) WithContext(ctx context.Context) *GaugeVecWithContext {
+	return &GaugeVecWithContext{
+		ctx:      ctx,
+		GaugeVec: *v,
+	}
+}
+
+// GaugeVecWithContext is the wrapper of GaugeVec with context.
+type GaugeVecWithContext struct {
+	GaugeVec
+	ctx context.Context
+}
+
+// WithLabelValues is the wrapper of GaugeVec.WithLabelValues.
+func (vc *GaugeVecWithContext) WithLabelValues(lvs ...string) GaugeMetric {
+	return vc.GaugeVec.WithLabelValues(lvs...)
+}
+
+// With is the wrapper of GaugeVec.With.
+func (vc *GaugeVecWithContext) With(labels map[string]string) GaugeMetric {
+	return vc.GaugeVec.With(labels)
 }

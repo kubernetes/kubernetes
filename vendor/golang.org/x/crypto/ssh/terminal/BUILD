@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "terminal.go",
         "util.go",
+        "util_aix.go",
         "util_bsd.go",
         "util_linux.go",
         "util_plan9.go",
@@ -15,6 +16,9 @@ go_library(
     importpath = "golang.org/x/crypto/ssh/terminal",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],

@@ -29,6 +29,7 @@ import (
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
 	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
 var controlPlaneJoinExample = cmdutil.Examples(`
@@ -43,7 +44,7 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 		options.NodeName,
 	}
 	if name == "etcd" {
-		flags = append(flags, options.Kustomize, options.Patches)
+		flags = append(flags, options.Patches)
 	}
 	if name != "mark-control-plane" {
 		flags = append(flags, options.APIServerAdvertiseAddress)
@@ -131,6 +132,11 @@ func runEtcdPhase(c workflow.RunData) error {
 		return nil
 	}
 
+	// Create the etcd data directory
+	if err := etcdutil.CreateDataDirectory(cfg.Etcd.Local.DataDir); err != nil {
+		return err
+	}
+
 	// Adds a new etcd instance; in order to do this the new etcd instance should be "announced" to
 	// the existing etcd members before being created.
 	// This operation must be executed after kubelet is already started in order to minimize the time
@@ -141,7 +147,7 @@ func runEtcdPhase(c workflow.RunData) error {
 	// because it needs two members as majority to agree on the consensus. You will only see this behavior between the time
 	// etcdctl member add informs the cluster about the new member and the new member successfully establishing a connection to the
 	// existing one."
-	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), data.KustomizeDir(), data.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
+	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), data.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
 		return errors.Wrap(err, "error creating local etcd static pod manifest file")
 	}
 

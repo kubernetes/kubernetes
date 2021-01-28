@@ -35,8 +35,8 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var serverPrintVersion = utilversion.MustParseSemantic("v1.10.0")
@@ -55,7 +55,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		podName := "pod-1"
 		framework.Logf("Creating pod %s", podName)
 
-		_, err := c.CoreV1().Pods(ns).Create(context.TODO(), newTablePod(podName), metav1.CreateOptions{})
+		_, err := c.CoreV1().Pods(ns).Create(context.TODO(), newTablePod(ns, podName), metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", podName, ns)
 
 		table := &metav1beta1.Table{}
@@ -111,7 +111,6 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		framework.ExpectNoError(err, "failed to get pod templates in Table form in namespace: %s", ns)
 		framework.ExpectEqual(len(pagedTable.Rows), 2)
 		framework.ExpectNotEqual(pagedTable.ResourceVersion, "")
-		framework.ExpectNotEqual(pagedTable.SelfLink, "")
 		framework.ExpectNotEqual(pagedTable.Continue, "")
 		framework.ExpectEqual(pagedTable.Rows[0].Cells[0], "template-0000")
 		framework.ExpectEqual(pagedTable.Rows[1].Cells[0], "template-0001")
@@ -138,7 +137,6 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		framework.ExpectEqual(len(table.Rows[0].Cells), len(table.ColumnDefinitions))
 		framework.ExpectEqual(table.ColumnDefinitions[0].Name, "Name")
 		framework.ExpectNotEqual(table.ResourceVersion, "")
-		framework.ExpectNotEqual(table.SelfLink, "")
 
 		out := printTable(table)
 		gomega.Expect(out).To(gomega.MatchRegexp("^NAME\\s"))
@@ -146,7 +144,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	})
 
 	/*
-			    Release : v1.16
+			    Release: v1.16
 				Testname: API metadata HTTP return
 				Description: Issue a HTTP request to the API.
 		        HTTP request MUST return a HTTP status code of 406.
@@ -179,25 +177,10 @@ func printTable(table *metav1beta1.Table) string {
 	return buf.String()
 }
 
-func newTablePod(podName string) *v1.Pod {
-	containerName := fmt.Sprintf("%s-container", podName)
+func newTablePod(ns, podName string) *v1.Pod {
 	port := 8080
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  containerName,
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"porter"},
-					Env:   []v1.EnvVar{{Name: fmt.Sprintf("SERVE_PORT_%d", port), Value: "foo"}},
-					Ports: []v1.ContainerPort{{ContainerPort: int32(port)}},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
+	pod := e2epod.NewAgnhostPod(ns, podName, nil, nil, []v1.ContainerPort{{ContainerPort: int32(port)}}, "porter")
+	pod.Spec.Containers[0].Env = []v1.EnvVar{{Name: fmt.Sprintf("SERVE_PORT_%d", port), Value: "foo"}}
+	pod.Spec.RestartPolicy = v1.RestartPolicyNever
 	return pod
 }

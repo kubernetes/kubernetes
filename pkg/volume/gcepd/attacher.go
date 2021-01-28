@@ -30,8 +30,8 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -220,7 +220,7 @@ func getDiskID(pdName string, exec utilexec.Interface) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("Could not found disk number for disk %q", pdName)
+	return "", fmt.Errorf("could not found disk number for disk %q", pdName)
 }
 
 func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
@@ -269,6 +269,8 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 				// A device path has successfully been created for the PD
 				klog.Infof("Successfully found attached GCE PD %q.", pdName)
 				return path, nil
+			} else {
+				klog.V(4).Infof("could not verify GCE PD (%q) is attached, device path does not exist", pdName)
 			}
 		case <-timer.C:
 			return "", fmt.Errorf("could not find attached GCE PD %q. Timeout waiting for mount paths to be created", pdName)

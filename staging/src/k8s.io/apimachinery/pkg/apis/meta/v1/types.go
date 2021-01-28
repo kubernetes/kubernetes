@@ -433,21 +433,6 @@ const (
 // +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ExportOptions is the query options to the standard REST get call.
-// Deprecated. Planned for removal in 1.18.
-type ExportOptions struct {
-	TypeMeta `json:",inline"`
-	// Should this value be exported.  Export strips fields that a user can not specify.
-	// Deprecated. Planned for removal in 1.18.
-	Export bool `json:"export" protobuf:"varint,1,opt,name=export"`
-	// Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.
-	// Deprecated. Planned for removal in 1.18.
-	Exact bool `json:"exact" protobuf:"varint,2,opt,name=exact"`
-}
-
-// +k8s:conversion-gen:explicit-from=net/url.Values
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // GetOptions is the standard query options to the standard REST get call.
 type GetOptions struct {
 	TypeMeta `json:",inline"`
@@ -1092,6 +1077,7 @@ type Patch struct{}
 // A label selector is a label query over a set of resources. The result of matchLabels and
 // matchExpressions are ANDed. An empty label selector matches all objects. A null
 // label selector matches no objects.
+// +structType=atomic
 type LabelSelector struct {
 	// matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
 	// map is equivalent to an element of matchExpressions, whose key field is "key", the

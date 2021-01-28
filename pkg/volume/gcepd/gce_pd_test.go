@@ -26,7 +26,7 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,7 +45,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -69,7 +69,7 @@ func TestGetAccessModes(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -86,7 +86,7 @@ type fakePDManager struct {
 func (fake *fakePDManager) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)
 	labels["fakepdmanager"] = "yes"
-	labels[v1.LabelZoneFailureDomain] = "zone1__zone2"
+	labels[v1.LabelFailureDomainBetaZone] = "zone1__zone2"
 	return "test-gce-volume-name", 100, labels, "", nil
 }
 
@@ -113,7 +113,7 @@ func TestPlugin(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -200,8 +200,8 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Provision() returned unexpected value for fakepdmanager: %v", persistentSpec.Labels["fakepdmanager"])
 	}
 
-	if persistentSpec.Labels[v1.LabelZoneFailureDomain] != "zone1__zone2" {
-		t.Errorf("Provision() returned unexpected value for %s: %v", v1.LabelZoneFailureDomain, persistentSpec.Labels[v1.LabelZoneFailureDomain])
+	if persistentSpec.Labels[v1.LabelFailureDomainBetaZone] != "zone1__zone2" {
+		t.Errorf("Provision() returned unexpected value for %s: %v", v1.LabelFailureDomainBetaZone, persistentSpec.Labels[v1.LabelFailureDomainBetaZone])
 	}
 
 	if persistentSpec.Spec.NodeAffinity == nil {
@@ -219,13 +219,14 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("NodeSelectorRequirement fakepdmanager-in-yes not found in volume NodeAffinity")
 	}
 	zones, _ := volumehelpers.ZonesToSet("zone1,zone2")
-	r, _ = getNodeSelectorRequirementWithKey(v1.LabelZoneFailureDomain, term)
+	r, _ = getNodeSelectorRequirementWithKey(v1.LabelFailureDomainBetaZone, term)
 	if r == nil {
-		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelZoneFailureDomain, zones)
-	}
-	sort.Strings(r.Values)
-	if !reflect.DeepEqual(r.Values, zones.List()) {
-		t.Errorf("ZoneFailureDomain elements %v does not match zone labels %v", r.Values, zones)
+		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelFailureDomainBetaZone, zones)
+	} else {
+		sort.Strings(r.Values)
+		if !reflect.DeepEqual(r.Values, zones.List()) {
+			t.Errorf("ZoneFailureDomain elements %v does not match zone labels %v", r.Values, zones)
+		}
 	}
 
 	// Test Deleter
@@ -249,7 +250,7 @@ func TestMountOptions(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -328,7 +329,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(gcePersistentDiskPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
@@ -341,5 +342,25 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	if !mounter.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for mounter.IsReadOnly")
+	}
+}
+
+func TestUnsupportedVolumeHost(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+
+	_, err = plug.ConstructVolumeSpec("", "")
+	if err == nil {
+		t.Errorf("Expected failure constructing volume spec with unsupported VolumeHost")
 	}
 }

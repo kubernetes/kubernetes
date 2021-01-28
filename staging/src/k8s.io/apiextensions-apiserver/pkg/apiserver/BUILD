@@ -89,16 +89,20 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
-        "//vendor/github.com/go-openapi/strfmt:go_default_library",
-        "//vendor/github.com/go-openapi/validate:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/validation/spec:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/validation/strfmt:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/validation/validate:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["customresource_handler_test.go"],
+    data = [
+        "//api/openapi-spec",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1:go_default_library",
@@ -125,6 +129,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )

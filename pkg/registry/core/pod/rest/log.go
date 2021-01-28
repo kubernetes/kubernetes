@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -70,10 +72,16 @@ func (r *LogREST) ProducesObject(verb string) interface{} {
 
 // Get retrieves a runtime.Object that will stream the contents of the pod log
 func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (runtime.Object, error) {
+	// register the metrics if the context is used.  This assumes sync.Once is fast.  If it's not, it could be an init block.
+	registerMetrics()
+
 	logOpts, ok := opts.(*api.PodLogOptions)
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
+
+	// we must do this before forcing the insecure flag if the feature is disabled
+	countSkipTLSMetric(logOpts.InsecureSkipTLSVerifyBackend)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AllowInsecureBackendProxy) {
 		logOpts.InsecureSkipTLSVerifyBackend = false
 	}
@@ -86,13 +94,32 @@ func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (ru
 		return nil, err
 	}
 	return &genericrest.LocationStreamer{
-		Location:        location,
-		Transport:       transport,
-		ContentType:     "text/plain",
-		Flush:           logOpts.Follow,
-		ResponseChecker: genericrest.NewGenericHttpResponseChecker(api.Resource("pods/log"), name),
-		RedirectChecker: genericrest.PreventRedirects,
+		Location:                    location,
+		Transport:                   transport,
+		ContentType:                 "text/plain",
+		Flush:                       logOpts.Follow,
+		ResponseChecker:             genericrest.NewGenericHttpResponseChecker(api.Resource("pods/log"), name),
+		RedirectChecker:             genericrest.PreventRedirects,
+		TLSVerificationErrorCounter: podLogsTLSFailure,
 	}, nil
+}
+
+func countSkipTLSMetric(insecureSkipTLSVerifyBackend bool) {
+	usageType := usageEnforce
+	if insecureSkipTLSVerifyBackend {
+		if utilfeature.DefaultFeatureGate.Enabled(features.AllowInsecureBackendProxy) {
+			usageType = usageSkipAllowed
+		} else {
+			usageType = usageSkipDenied
+		}
+	}
+
+	counter, err := podLogsUsage.GetMetricWithLabelValues(usageType)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+	counter.Inc()
 }
 
 // NewGetOptions creates a new options object

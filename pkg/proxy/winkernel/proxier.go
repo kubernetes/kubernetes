@@ -24,6 +24,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -118,6 +119,7 @@ type serviceInfo struct {
 	remoteEndpoint         *endpointsInfo
 	hns                    HostNetworkService
 	preserveDIP            bool
+	localTrafficDSR        bool
 }
 
 type hnsNetworkInfo struct {
@@ -133,6 +135,8 @@ type remoteSubnetInfo struct {
 	providerAddress   string
 	drMacAddress      string
 }
+
+const NETWORK_TYPE_OVERLAY = "overlay"
 
 func Log(v interface{}, message string, level klog.Level) {
 	klog.V(level).Infof("%s, %s", message, spewSdump(v))
@@ -161,6 +165,11 @@ type endpointsInfo struct {
 	refCount        *uint16
 	providerAddress string
 	hns             HostNetworkService
+
+	// conditions
+	ready       bool
+	serving     bool
+	terminating bool
 }
 
 // String is part of proxy.Endpoint interface.
@@ -171,6 +180,21 @@ func (info *endpointsInfo) String() string {
 // GetIsLocal is part of proxy.Endpoint interface.
 func (info *endpointsInfo) GetIsLocal() bool {
 	return info.isLocal
+}
+
+// IsReady returns true if an endpoint is ready and not terminating.
+func (info *endpointsInfo) IsReady() bool {
+	return info.ready
+}
+
+// IsServing returns true if an endpoint is ready, regardless of it's terminating state.
+func (info *endpointsInfo) IsServing() bool {
+	return info.serving
+}
+
+// IsTerminating returns true if an endpoint is terminating.
+func (info *endpointsInfo) IsTerminating() bool {
+	return info.terminating
 }
 
 // GetTopology returns the topology information of the endpoint.
@@ -299,6 +323,10 @@ func (proxier *Proxier) newEndpointInfo(baseInfo *proxy.BaseEndpointInfo) proxy.
 		refCount:   new(uint16),
 		hnsID:      "",
 		hns:        proxier.hns,
+
+		ready:       baseInfo.Ready,
+		serving:     baseInfo.Serving,
+		terminating: baseInfo.Terminating,
 	}
 
 	return info
@@ -310,6 +338,10 @@ func newSourceVIP(hns HostNetworkService, network string, ip string, mac string,
 		isLocal:         true,
 		macAddress:      mac,
 		providerAddress: providerAddress,
+
+		ready:       true,
+		serving:     true,
+		terminating: false,
 	}
 	ep, err := hns.createEndpoint(hnsEndpoint, network)
 	return ep, err
@@ -319,19 +351,21 @@ func (ep *endpointsInfo) Cleanup() {
 	Log(ep, "Endpoint Cleanup", 3)
 	if ep.refCount != nil {
 		*ep.refCount--
-	}
 
-	// Remove the remote hns endpoint, if no service is referring it
-	// Never delete a Local Endpoint. Local Endpoints are already created by other entities.
-	// Remove only remote endpoints created by this service
-	if (ep.refCount == nil || *ep.refCount <= 0) && !ep.GetIsLocal() {
-		klog.V(4).Infof("Removing endpoints for %v, since no one is referencing it", ep)
-		err := ep.hns.deleteEndpoint(ep.hnsID)
-		if err == nil {
-			ep.hnsID = ""
-		} else {
-			klog.Errorf("Endpoint deletion failed for %v: %v", ep.IP(), err)
+		// Remove the remote hns endpoint, if no service is referring it
+		// Never delete a Local Endpoint. Local Endpoints are already created by other entities.
+		// Remove only remote endpoints created by this service
+		if *ep.refCount <= 0 && !ep.GetIsLocal() {
+			klog.V(4).Infof("Removing endpoints for %v, since no one is referencing it", ep)
+			err := ep.hns.deleteEndpoint(ep.hnsID)
+			if err == nil {
+				ep.hnsID = ""
+			} else {
+				klog.Errorf("Endpoint deletion failed for %v: %v", ep.IP(), err)
+			}
 		}
+
+		ep.refCount = nil
 	}
 }
 
@@ -348,9 +382,11 @@ func (refCountMap endPointsReferenceCountMap) getRefCount(hnsID string) *uint16 
 func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.BaseServiceInfo) proxy.ServicePort {
 	info := &serviceInfo{BaseServiceInfo: baseInfo}
 	preserveDIP := service.Annotations["preserve-destination"] == "true"
+	localTrafficDSR := service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
 	err := hcn.DSRSupported()
 	if err != nil {
 		preserveDIP = false
+		localTrafficDSR = false
 	}
 	// targetPort is zero if it is specified as a name in port.TargetPort.
 	// Its real value would be got later from endpoints.
@@ -362,6 +398,7 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	info.preserveDIP = preserveDIP
 	info.targetPort = targetPort
 	info.hns = proxier.hns
+	info.localTrafficDSR = localTrafficDSR
 
 	for _, eip := range service.Spec.ExternalIPs {
 		info.externalIPs = append(info.externalIPs, &externalIPInfo{ip: eip})
@@ -529,7 +566,7 @@ func NewProxier(
 
 	// Network could have been detected before Remote Subnet Routes are applied or ManagementIP is updated
 	// Sleep and update the network to include new information
-	if hnsNetworkInfo.networkType == "Overlay" {
+	if strings.EqualFold(hnsNetworkInfo.networkType, NETWORK_TYPE_OVERLAY) {
 		time.Sleep(10 * time.Second)
 		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
 		if err != nil {
@@ -549,7 +586,7 @@ func NewProxier(
 
 	var sourceVip string
 	var hostMac string
-	if hnsNetworkInfo.networkType == "Overlay" {
+	if strings.EqualFold(hnsNetworkInfo.networkType, NETWORK_TYPE_OVERLAY) {
 		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinOverlay) {
 			return nil, fmt.Errorf("WinOverlay feature gate not enabled")
 		}
@@ -602,8 +639,12 @@ func NewProxier(
 		isIPv6Mode:          isIPv6,
 	}
 
-	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, &isIPv6, recorder, proxier.serviceMapChange)
-	endPointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, &isIPv6, recorder, endpointSlicesEnabled, proxier.endpointsMapChange)
+	ipFamily := v1.IPv4Protocol
+	if isIPv6 {
+		ipFamily = v1.IPv6Protocol
+	}
+	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, ipFamily, recorder, proxier.serviceMapChange)
+	endPointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, ipFamily, recorder, endpointSlicesEnabled, proxier.endpointsMapChange)
 	proxier.endpointsChanges = endPointChangeTracker
 	proxier.serviceChanges = serviceChanges
 
@@ -931,7 +972,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
-	serviceUpdateResult := proxy.UpdateServiceMap(proxier.serviceMap, proxier.serviceChanges)
+	serviceUpdateResult := proxier.serviceMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
 	staleServices := serviceUpdateResult.UDPStaleClusterIP
@@ -943,7 +984,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	if proxier.network.networkType == "Overlay" {
+	if strings.EqualFold(proxier.network.networkType, NETWORK_TYPE_OVERLAY) {
 		existingSourceVip, err := hns.getEndpointByIpAddress(proxier.sourceVip, hnsNetworkName)
 		if existingSourceVip == nil {
 			_, err = newSourceVIP(hns, hnsNetworkName, proxier.sourceVip, proxier.hostMac, proxier.nodeIP.String())
@@ -969,7 +1010,7 @@ func (proxier *Proxier) syncProxyRules() {
 			continue
 		}
 
-		if proxier.network.networkType == "Overlay" {
+		if strings.EqualFold(proxier.network.networkType, NETWORK_TYPE_OVERLAY) {
 			serviceVipEndpoint, _ := hns.getEndpointByIpAddress(svcInfo.ClusterIP().String(), hnsNetworkName)
 			if serviceVipEndpoint == nil {
 				klog.V(4).Infof("No existing remote endpoint for service VIP %v", svcInfo.ClusterIP().String())
@@ -1000,10 +1041,13 @@ func (proxier *Proxier) syncProxyRules() {
 		containsNodeIP := false
 
 		for _, epInfo := range proxier.endpointsMap[svcName] {
-
 			ep, ok := epInfo.(*endpointsInfo)
 			if !ok {
 				klog.Errorf("Failed to cast endpointsInfo %q", svcName.String())
+				continue
+			}
+
+			if !ep.IsReady() {
 				continue
 			}
 
@@ -1034,7 +1078,7 @@ func (proxier *Proxier) syncProxyRules() {
 					continue
 				}
 
-				if proxier.network.networkType == "Overlay" {
+				if strings.EqualFold(proxier.network.networkType, NETWORK_TYPE_OVERLAY) {
 					klog.Infof("Updating network %v to check for new remote subnet policies", proxier.network.name)
 					networkName := proxier.network.name
 					updatedNetwork, err := hns.getNetworkByName(networkName)
@@ -1078,7 +1122,18 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 			}
 
-			if proxier.network.networkType == "Overlay" {
+			// For Overlay networks 'SourceVIP' on an Load balancer Policy can either be chosen as
+			// a) Source VIP configured on kube-proxy (or)
+			// b) Node IP of the current node
+			//
+			// For L2Bridge network the Source VIP is always the NodeIP of the current node and the same
+			// would be configured on kube-proxy as SourceVIP
+			//
+			// The logic for choosing the SourceVIP in Overlay networks is based on the backend endpoints:
+			// a) Endpoints are any IP's outside the cluster ==> Choose NodeIP as the SourceVIP
+			// b) Endpoints are IP addresses of a remote node => Choose NodeIP as the SourceVIP
+			// c) Everything else (Local POD's, Remote POD's, Node IP of current node) ==> Choose the configured SourceVIP
+			if strings.EqualFold(proxier.network.networkType, NETWORK_TYPE_OVERLAY) && !ep.GetIsLocal() {
 				providerAddress := proxier.network.findRemoteSubnetProviderAddress(ep.IP())
 
 				isNodeIP := (ep.IP() == providerAddress)
@@ -1151,12 +1206,12 @@ func (proxier *Proxier) syncProxyRules() {
 			// If the preserve-destination service annotation is present, we will disable routing mesh for NodePort.
 			// This means that health services can use Node Port without falsely getting results from a different node.
 			nodePortEndpoints := hnsEndpoints
-			if svcInfo.preserveDIP {
+			if svcInfo.preserveDIP || svcInfo.localTrafficDSR {
 				nodePortEndpoints = hnsLocalEndpoints
 			}
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				nodePortEndpoints,
-				loadBalancerFlags{localRoutedVIP: true, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+				loadBalancerFlags{isDSR: svcInfo.localTrafficDSR, localRoutedVIP: true, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 				sourceVip,
 				"",
 				Enum(svcInfo.Protocol()),
@@ -1174,10 +1229,15 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Create a Load Balancer Policy for each external IP
 		for _, externalIP := range svcInfo.externalIPs {
+			// Disable routing mesh if ExternalTrafficPolicy is set to local
+			externalIPEndpoints := hnsEndpoints
+			if svcInfo.localTrafficDSR {
+				externalIPEndpoints = hnsLocalEndpoints
+			}
 			// Try loading existing policies, if already available
 			hnsLoadBalancer, err = hns.getLoadBalancer(
-				hnsEndpoints,
-				loadBalancerFlags{sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+				externalIPEndpoints,
+				loadBalancerFlags{isDSR: svcInfo.localTrafficDSR, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 				sourceVip,
 				externalIP.ip,
 				Enum(svcInfo.Protocol()),
@@ -1195,12 +1255,12 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
 			// Try loading existing policies, if already available
 			lbIngressEndpoints := hnsEndpoints
-			if svcInfo.preserveDIP {
+			if svcInfo.preserveDIP || svcInfo.localTrafficDSR {
 				lbIngressEndpoints = hnsLocalEndpoints
 			}
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				lbIngressEndpoints,
-				loadBalancerFlags{isDSR: svcInfo.preserveDIP || proxier.isDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+				loadBalancerFlags{isDSR: svcInfo.preserveDIP || proxier.isDSR || svcInfo.localTrafficDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 				sourceVip,
 				lbIngressIP.ip,
 				Enum(svcInfo.Protocol()),

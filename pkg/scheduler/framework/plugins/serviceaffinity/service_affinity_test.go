@@ -18,6 +18,7 @@ package serviceaffinity
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -25,8 +26,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/fake"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -538,7 +539,8 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 
 			// Add test.addedPod to state1 and verify it is equal to allPodsState.
 			nodeInfo := mustGetNodeInfo(t, snapshot, test.addedPod.Spec.NodeName)
-			if err := ipa.AddPod(context.Background(), state, test.pendingPod, test.addedPod, nodeInfo); err != nil {
+			addedPodInfo := framework.NewPodInfo(test.addedPod)
+			if err := ipa.AddPod(context.Background(), state, test.pendingPod, addedPodInfo, nodeInfo); err != nil {
 				t.Errorf("error adding pod to preFilterState: %v", err)
 			}
 
@@ -546,8 +548,8 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				t.Errorf("State is not equal, got: %v, want: %v", plState, plStateAllPods)
 			}
 
-			// Remove the added pod pod and make sure it is equal to the original state.
-			if err := ipa.RemovePod(context.Background(), state, test.pendingPod, test.addedPod, nodeInfo); err != nil {
+			// Remove the added pod and make sure it is equal to the original state.
+			if err := ipa.RemovePod(context.Background(), state, test.pendingPod, addedPodInfo, nodeInfo); err != nil {
 				t.Errorf("error removing pod from preFilterState: %v", err)
 			}
 			if !reflect.DeepEqual(sortState(plStateOriginal), sortState(plState)) {
@@ -615,7 +617,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	}
 	cycleState := framework.NewCycleState()
 	gotStatus := p.Filter(context.Background(), cycleState, pod, nodeInfo)
-	wantStatus := framework.NewStatus(framework.Error, `error reading "PreFilterServiceAffinity" from cycleState: not found`)
+	wantStatus := framework.AsStatus(fmt.Errorf(`error reading "PreFilterServiceAffinity" from cycleState: not found`))
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
 	}

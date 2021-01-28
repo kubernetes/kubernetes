@@ -27,8 +27,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on
-# Explicitly clear GOFLAGS, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
-export GOFLAGS=
+# Explicitly set GOFLAGS to ignore vendor, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
+export GOFLAGS=-mod=mod
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
 if [[ "${GOPROXY:-}" == "off" ]]; then
   kube::log::error "Cannot run with \$GOPROXY=off"

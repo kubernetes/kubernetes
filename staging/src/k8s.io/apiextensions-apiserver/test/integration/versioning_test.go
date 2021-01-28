@@ -112,7 +112,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 			i++
 
 			_, err := noxuNamespacedResourceClientV1beta2.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{})
-			assert.NotNil(t, err)
+			assert.Error(t, err)
 
 			// work around "grpc: the client connection is closing" error
 			// TODO: fix the grpc error

@@ -141,22 +141,6 @@ func (nodeStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (ns nodeStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) error {
-	n, ok := obj.(*api.Node)
-	if !ok {
-		// unexpected programmer error
-		return fmt.Errorf("unexpected object: %v", obj)
-	}
-	ns.PrepareForCreate(ctx, obj)
-	if exact {
-		return nil
-	}
-	// Nodes are the only resources that allow direct status edits, therefore
-	// we clear that without exact so that the node value can be reused.
-	n.Status = api.NodeStatus{}
-	return nil
-}
-
 type nodeStatusStrategy struct {
 	nodeStrategy
 }

@@ -17,13 +17,19 @@ limitations under the License.
 package labels
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+)
+
+var (
+	ignoreDetail = cmpopts.IgnoreFields(field.Error{}, "Detail")
 )
 
 func TestSelectorParse(t *testing.T) {
@@ -141,6 +147,7 @@ func expectMatchDirect(t *testing.T, selector, ls Set) {
 	}
 }
 
+//lint:ignore U1000 currently commented out in TODO of TestSetMatches
 func expectNoMatchDirect(t *testing.T, selector, ls Set) {
 	if SelectorFromSet(selector).Matches(ls) {
 		t.Errorf("Wanted '%s' to not match '%s', but it did.", selector, ls)
@@ -241,16 +248,14 @@ func TestLexerSequence(t *testing.T) {
 		{"key<1", []Token{IdentifierToken, LessThanToken, IdentifierToken}},
 	}
 	for _, v := range testcases {
-		var literals []string
 		var tokens []Token
 		l := &Lexer{s: v.s, pos: 0}
 		for {
-			token, lit := l.Lex()
+			token, _ := l.Lex()
 			if token == EndOfStringToken {
 				break
 			}
 			tokens = append(tokens, token)
-			literals = append(literals, lit)
 		}
 		if len(tokens) != len(v.t) {
 			t.Errorf("Bad number of tokens for '%s %d, %d", v.s, len(tokens), len(v.t))
@@ -304,27 +309,179 @@ func TestRequirementConstructor(t *testing.T) {
 		Key     string
 		Op      selection.Operator
 		Vals    sets.String
-		Success bool
+		WantErr field.ErrorList
 	}{
-		{"x", selection.In, nil, false},
-		{"x", selection.NotIn, sets.NewString(), false},
-		{"x", selection.In, sets.NewString("foo"), true},
-		{"x", selection.NotIn, sets.NewString("foo"), true},
-		{"x", selection.Exists, nil, true},
-		{"x", selection.DoesNotExist, nil, true},
-		{"1foo", selection.In, sets.NewString("bar"), true},
-		{"1234", selection.In, sets.NewString("bar"), true},
-		{"y", selection.GreaterThan, sets.NewString("1"), true},
-		{"z", selection.LessThan, sets.NewString("6"), true},
-		{"foo", selection.GreaterThan, sets.NewString("bar"), false},
-		{"barz", selection.LessThan, sets.NewString("blah"), false},
-		{strings.Repeat("a", 254), selection.Exists, nil, false}, //breaks DNS rule that len(key) <= 253
+		{
+			Key: "x1",
+			Op:  selection.In,
+			WantErr: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "values",
+					BadValue: []string{},
+				},
+			},
+		},
+		{
+			Key:  "x2",
+			Op:   selection.NotIn,
+			Vals: sets.NewString(),
+			WantErr: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "values",
+					BadValue: []string{},
+				},
+			},
+		},
+		{
+			Key:  "x3",
+			Op:   selection.In,
+			Vals: sets.NewString("foo"),
+		},
+		{
+			Key:  "x4",
+			Op:   selection.NotIn,
+			Vals: sets.NewString("foo"),
+		},
+		{
+			Key:  "x5",
+			Op:   selection.Equals,
+			Vals: sets.NewString("foo", "bar"),
+			WantErr: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "values",
+					BadValue: []string{"bar", "foo"},
+				},
+			},
+		},
+		{
+			Key: "x6",
+			Op:  selection.Exists,
+		},
+		{
+			Key: "x7",
+			Op:  selection.DoesNotExist,
+		},
+		{
+			Key:  "x8",
+			Op:   selection.Exists,
+			Vals: sets.NewString("foo"),
+			WantErr: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "values",
+					BadValue: []string{"foo"},
+				},
+			},
+		},
+		{
+			Key:  "x9",
+			Op:   selection.In,
+			Vals: sets.NewString("bar"),
+		},
+		{
+			Key:  "x10",
+			Op:   selection.In,
+			Vals: sets.NewString("bar"),
+		},
+		{
+			Key:  "x11",
+			Op:   selection.GreaterThan,
+			Vals: sets.NewString("1"),
+		},
+		{
+			Key:  "x12",
+			Op:   selection.LessThan,
+			Vals: sets.NewString("6"),
+		},
+		{
+			Key: "x13",
+			Op:  selection.GreaterThan,
+			WantErr: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "values",
+					BadValue: []string{},
+				},
+			},
+		},
+		{
+			Key:  "x14",
+			Op:   selection.GreaterThan,
+			Vals: sets.NewString("bar"),
+			WantErr: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "values[0]",
+					BadValue: "bar",
+				},
+			},
+		},
+		{
+			Key:  "x15",
+			Op:   selection.LessThan,
+			Vals: sets.NewString("bar"),
+			WantErr: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "values[0]",
+					BadValue: "bar",
+				},
+			},
+		},
+		{
+			Key: strings.Repeat("a", 254), //breaks DNS rule that len(key) <= 253
+			Op:  selection.Exists,
+			WantErr: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "key",
+					BadValue: strings.Repeat("a", 254),
+				},
+			},
+		},
+		{
+			Key:  "x16",
+			Op:   selection.Equals,
+			Vals: sets.NewString(strings.Repeat("a", 254)),
+			WantErr: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "values[0][x16]",
+					BadValue: strings.Repeat("a", 254),
+				},
+			},
+		},
+		{
+			Key:  "x17",
+			Op:   selection.Equals,
+			Vals: sets.NewString("a b"),
+			WantErr: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "values[0][x17]",
+					BadValue: "a b",
+				},
+			},
+		},
+		{
+			Key: "x18",
+			Op:  "unsupportedOp",
+			WantErr: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeNotSupported,
+					Field:    "operator",
+					BadValue: selection.Operator("unsupportedOp"),
+				},
+			},
+		},
 	}
 	for _, rc := range requirementConstructorTests {
-		if _, err := NewRequirement(rc.Key, rc.Op, rc.Vals.List()); err == nil && !rc.Success {
-			t.Errorf("expected error with key:%#v op:%v vals:%v, got no error", rc.Key, rc.Op, rc.Vals)
-		} else if err != nil && rc.Success {
-			t.Errorf("expected no error with key:%#v op:%v vals:%v, got:%v", rc.Key, rc.Op, rc.Vals, err)
+		_, err := NewRequirement(rc.Key, rc.Op, rc.Vals.List())
+		if diff := cmp.Diff(rc.WantErr.ToAggregate(), err, ignoreDetail); diff != "" {
+			t.Errorf("NewRequirement test %v returned unexpected error (-want,+got):\n%s", rc.Key, diff)
 		}
 	}
 }
@@ -715,27 +872,59 @@ func TestValidatedSelectorFromSet(t *testing.T) {
 		name             string
 		input            Set
 		expectedSelector internalSelector
-		expectedError    error
+		expectedError    field.ErrorList
 	}{
 		{
-			name:             "Simple Set, no error",
-			input:            Set{"key": "val"},
-			expectedSelector: internalSelector([]Requirement{{key: "key", operator: selection.Equals, strValues: []string{"val"}}}),
+			name:  "Simple Set, no error",
+			input: Set{"key": "val"},
+			expectedSelector: internalSelector{
+				Requirement{
+					key:       "key",
+					operator:  selection.Equals,
+					strValues: []string{"val"},
+				},
+			},
 		},
 		{
-			name:          "Invalid Set, value too long",
-			input:         Set{"Key": "axahm2EJ8Phiephe2eixohbee9eGeiyees1thuozi1xoh0GiuH3diewi8iem7Nui"},
-			expectedError: fmt.Errorf(`invalid label value: "axahm2EJ8Phiephe2eixohbee9eGeiyees1thuozi1xoh0GiuH3diewi8iem7Nui": at key: "Key": must be no more than 63 characters`),
+			name:  "Invalid Set, value too long",
+			input: Set{"Key": "axahm2EJ8Phiephe2eixohbee9eGeiyees1thuozi1xoh0GiuH3diewi8iem7Nui"},
+			expectedError: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "values[0][Key]",
+					BadValue: "axahm2EJ8Phiephe2eixohbee9eGeiyees1thuozi1xoh0GiuH3diewi8iem7Nui",
+				},
+			},
 		},
 	}
 
 	for _, tc := range tests {
 		selector, err := ValidatedSelectorFromSet(tc.input)
-		if !reflect.DeepEqual(err, tc.expectedError) {
-			t.Fatalf("expected error %v, got error %v", tc.expectedError, err)
+		if diff := cmp.Diff(tc.expectedError.ToAggregate(), err, ignoreDetail); diff != "" {
+			t.Errorf("ValidatedSelectorFromSet %#v returned unexpected error (-want,+got):\n%s", tc.name, diff)
 		}
-		if err == nil && !reflect.DeepEqual(selector, tc.expectedSelector) {
-			t.Errorf("expected selector %v, got selector %v", tc.expectedSelector, selector)
+		if err == nil {
+			if diff := cmp.Diff(tc.expectedSelector, selector, cmp.AllowUnexported(Requirement{})); diff != "" {
+				t.Errorf("ValidatedSelectorFromSet %#v returned unexpected selector (-want,+got):\n%s", tc.name, diff)
+			}
+		}
+	}
+}
+
+func BenchmarkRequirementString(b *testing.B) {
+	r := Requirement{
+		key:      "environment",
+		operator: selection.NotIn,
+		strValues: []string{
+			"dev",
+		},
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if r.String() != "environment notin (dev)" {
+			b.Errorf("Unexpected Requirement string")
 		}
 	}
 }

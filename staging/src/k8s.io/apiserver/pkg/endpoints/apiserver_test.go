@@ -142,10 +142,10 @@ func init() {
 
 func addGrouplessTypes() {
 	scheme.AddKnownTypes(grouplessGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ListOptions{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ListOptions{},
 		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
 	scheme.AddKnownTypes(grouplessInternalGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
 
 	utilruntime.Must(genericapitesting.RegisterConversions(scheme))
@@ -153,20 +153,20 @@ func addGrouplessTypes() {
 
 func addTestTypes() {
 	scheme.AddKnownTypes(testGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{},
 		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&genericapitesting.SimpleXGSubresource{})
 	scheme.AddKnownTypes(testGroupVersion, &examplev1.Pod{})
 	scheme.AddKnownTypes(testInternalGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&genericapitesting.SimpleXGSubresource{})
 	scheme.AddKnownTypes(testInternalGroupVersion, &example.Pod{})
 	// Register SimpleXGSubresource in both testGroupVersion and testGroup2Version, and also their
 	// their corresponding internal versions, to verify that the desired group version object is
 	// served in the tests.
-	scheme.AddKnownTypes(testGroup2Version, &genericapitesting.SimpleXGSubresource{}, &metav1.ExportOptions{})
-	scheme.AddKnownTypes(testInternalGroup2Version, &genericapitesting.SimpleXGSubresource{}, &metav1.ExportOptions{})
+	scheme.AddKnownTypes(testGroup2Version, &genericapitesting.SimpleXGSubresource{})
+	scheme.AddKnownTypes(testInternalGroup2Version, &genericapitesting.SimpleXGSubresource{})
 	metav1.AddToGroupVersion(scheme, testGroupVersion)
 
 	utilruntime.Must(genericapitesting.RegisterConversions(scheme))
@@ -174,7 +174,7 @@ func addTestTypes() {
 
 func addNewTestTypes() {
 	scheme.AddKnownTypes(newGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{},
 		&metav1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&examplev1.Pod{},
 	)
@@ -254,7 +254,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = grouplessGroupVersion
 		group.OptionsExternalVersion = &grouplessGroupVersion
 		group.Serializer = codecs
-		if err := (&group).InstallREST(container); err != nil {
+		if _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
@@ -266,7 +266,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = testGroupVersion
 		group.OptionsExternalVersion = &testGroupVersion
 		group.Serializer = codecs
-		if err := (&group).InstallREST(container); err != nil {
+		if _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
@@ -278,7 +278,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = newGroupVersion
 		group.OptionsExternalVersion = &newGroupVersion
 		group.Serializer = codecs
-		if err := (&group).InstallREST(container); err != nil {
+		if _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
@@ -366,21 +366,6 @@ type SimpleRESTStorage struct {
 
 func (storage *SimpleRESTStorage) NamespaceScoped() bool {
 	return true
-}
-
-func (storage *SimpleRESTStorage) Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
-	obj, err := storage.Get(ctx, name, &metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	s, ok := obj.(*genericapitesting.Simple)
-	if !ok {
-		return nil, fmt.Errorf("unexpected object")
-	}
-
-	// Set a marker to verify the method was called
-	s.Other = "exported"
-	return obj, storage.errors["export"]
 }
 
 func (storage *SimpleRESTStorage) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
@@ -1144,9 +1129,8 @@ func TestList(t *testing.T) {
 			t.Logf("%d: body: %s", i, string(body))
 			continue
 		}
-		// TODO: future, restore get links
-		if !selfLinker.called {
-			t.Errorf("%d: never set self link", i)
+		if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
+			t.Errorf("%d: unexpected selfLinker.called: %v", i, selfLinker.called)
 		}
 		if !simpleStorage.namespacePresent {
 			t.Errorf("%d: namespace not set", i)
@@ -1279,9 +1263,8 @@ func TestListCompression(t *testing.T) {
 			t.Logf("%d: body: %s", i, string(body))
 			continue
 		}
-		// TODO: future, restore get links
-		if !selfLinker.called {
-			t.Errorf("%d: never set self link", i)
+		if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
+			t.Errorf("%d: unexpected selfLinker.called: %v", i, selfLinker.called)
 		}
 		if !simpleStorage.namespacePresent {
 			t.Errorf("%d: namespace not set", i)
@@ -1399,12 +1382,14 @@ func TestNonEmptyList(t *testing.T) {
 	if listOut.Items[0].Other != simpleStorage.list[0].Other {
 		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0], string(body))
 	}
-	if listOut.SelfLink != "/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/simple" {
-		t.Errorf("unexpected list self link: %#v", listOut)
-	}
-	expectedSelfLink := "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple/something"
-	if listOut.Items[0].ObjectMeta.SelfLink != expectedSelfLink {
-		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0].ObjectMeta.SelfLink, expectedSelfLink)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
+		if listOut.SelfLink != "/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/simple" {
+			t.Errorf("unexpected list self link: %#v", listOut)
+		}
+		expectedSelfLink := "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple/something"
+		if listOut.Items[0].ObjectMeta.SelfLink != expectedSelfLink {
+			t.Errorf("Unexpected data: %#v, %s", listOut.Items[0].ObjectMeta.SelfLink, expectedSelfLink)
+		}
 	}
 }
 
@@ -1449,16 +1434,20 @@ func TestSelfLinkSkipsEmptyName(t *testing.T) {
 	if listOut.Items[0].Other != simpleStorage.list[0].Other {
 		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0], string(body))
 	}
-	if listOut.SelfLink != "/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/simple" {
-		t.Errorf("unexpected list self link: %#v", listOut)
-	}
-	expectedSelfLink := ""
-	if listOut.Items[0].ObjectMeta.SelfLink != expectedSelfLink {
-		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0].ObjectMeta.SelfLink, expectedSelfLink)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
+		if listOut.SelfLink != "/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/simple" {
+			t.Errorf("unexpected list self link: %#v", listOut)
+		}
+		expectedSelfLink := ""
+		if listOut.Items[0].ObjectMeta.SelfLink != expectedSelfLink {
+			t.Errorf("Unexpected data: %#v, %s", listOut.Items[0].ObjectMeta.SelfLink, expectedSelfLink)
+		}
 	}
 }
 
 func TestRootSelfLink(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemoveSelfLink, false)()
+
 	storage := map[string]rest.Storage{}
 	simpleStorage := GetWithOptionsRootRESTStorage{
 		SimpleTypedStorage: &SimpleTypedStorage{
@@ -1552,55 +1541,6 @@ func TestMetadata(t *testing.T) {
 	}
 }
 
-func TestExport(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	simpleStorage := SimpleRESTStorage{
-		item: genericapitesting.Simple{
-			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion:   "1234",
-				CreationTimestamp: metav1.NewTime(time.Unix(10, 10)),
-			},
-			Other: "foo",
-		},
-	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
-		name:        "id",
-		namespace:   "default",
-	}
-	storage["simple"] = &simpleStorage
-	handler := handleLinker(storage, selfLinker)
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id?export=true")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		data, _ := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		t.Fatalf("unexpected response: %#v\n%s\n", resp, string(data))
-	}
-	var itemOut genericapitesting.Simple
-	body, err := extractBody(resp, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if itemOut.Name != simpleStorage.item.Name {
-		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
-	}
-	if itemOut.Other != "exported" {
-		t.Errorf("Expected: exported, saw: %s", itemOut.Other)
-	}
-
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
-	}
-}
-
 func TestGet(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
@@ -1635,8 +1575,8 @@ func TestGet(t *testing.T) {
 	if itemOut.Name != simpleStorage.item.Name {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
 	}
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
+	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
+		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
 	}
 }
 
@@ -1715,6 +1655,7 @@ func BenchmarkGetNoCompression(b *testing.B) {
 	}
 	b.StopTimer()
 }
+
 func TestGetCompression(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
@@ -1781,8 +1722,8 @@ func TestGetCompression(t *testing.T) {
 		if itemOut.Name != simpleStorage.item.Name {
 			t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
 		}
-		if !selfLinker.called {
-			t.Errorf("Never set self link")
+		if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
+			t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
 		}
 	}
 }
@@ -2762,8 +2703,8 @@ func TestGetAlternateSelfLink(t *testing.T) {
 	if itemOut.Name != simpleStorage.item.Name {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
 	}
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
+	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
+		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
 	}
 }
 
@@ -2800,8 +2741,8 @@ func TestGetNamespaceSelfLink(t *testing.T) {
 	if itemOut.Name != simpleStorage.item.Name {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
 	}
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
+	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
+		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
 	}
 }
 
@@ -3342,8 +3283,8 @@ func TestUpdate(t *testing.T) {
 	if simpleStorage.updated == nil || simpleStorage.updated.Name != item.Name {
 		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
 	}
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
+	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
+		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
 	}
 }
 
@@ -3673,7 +3614,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		ParameterCodec: parameterCodec,
 	}
 	container := restful.NewContainer()
-	if err := group.InstallREST(container); err == nil {
+	if _, err := group.InstallREST(container); err == nil {
 		t.Fatal("expected error")
 	}
 
@@ -3705,7 +3646,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		ParameterCodec: parameterCodec,
 	}
 	container = restful.NewContainer()
-	if err := group.InstallREST(container); err != nil {
+	if _, err := group.InstallREST(container); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4010,8 +3951,8 @@ func TestCreate(t *testing.T) {
 	if response.StatusCode != http.StatusCreated {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
 	}
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
+	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
+		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
 	}
 }
 
@@ -4080,8 +4021,8 @@ func TestCreateYAML(t *testing.T) {
 	if response.StatusCode != http.StatusCreated {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
 	}
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
+	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
+		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
 	}
 }
 
@@ -4140,8 +4081,8 @@ func TestCreateInNamespace(t *testing.T) {
 	if response.StatusCode != http.StatusCreated {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
 	}
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
+	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
+		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
 	}
 }
 
@@ -4178,14 +4119,8 @@ func TestCreateInvokeAdmissionControl(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 
-		wg := sync.WaitGroup{}
-		wg.Add(1)
 		var response *http.Response
-		go func() {
-			response, err = client.Do(request)
-			wg.Done()
-		}()
-		wg.Wait()
+		response, err = client.Do(request)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -4567,7 +4502,7 @@ func TestXGSubresource(t *testing.T) {
 		Serializer:             codecs,
 	}
 
-	if err := (&group).InstallREST(container); err != nil {
+	if _, err := (&group).InstallREST(container); err != nil {
 		panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 	}
 

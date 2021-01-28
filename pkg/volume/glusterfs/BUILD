@@ -17,6 +17,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume/glusterfs",
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
+        "//pkg/proxy/util:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -29,10 +30,10 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
+        "//staging/src/k8s.io/mount-utils:go_default_library",
         "//vendor/github.com/heketi/heketi/client/api/go-client:go_default_library",
         "//vendor/github.com/heketi/heketi/pkg/glusterfs/api:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
-        "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
@@ -54,8 +55,8 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
+        "//staging/src/k8s.io/mount-utils:go_default_library",
         "//vendor/github.com/heketi/heketi/pkg/glusterfs/api:go_default_library",
-        "//vendor/k8s.io/utils/mount:go_default_library",
     ],
 )
 

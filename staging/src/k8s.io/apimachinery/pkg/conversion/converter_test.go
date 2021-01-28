@@ -21,23 +21,13 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
-
-	flag "github.com/spf13/pflag"
 )
-
-var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")
-
-func testLogger(t *testing.T) DebugLogger {
-	// We don't set logger to eliminate rubbish logs in tests.
-	// If you want to switch it, simply switch it to: "return t"
-	return nil
-}
 
 func TestConverter_byteSlice(t *testing.T) {
 	c := NewConverter(DefaultNameFunc)
 	src := []byte{1, 2, 3}
 	dest := []byte{}
-	err := c.Convert(&src, &dest, 0, nil)
+	err := c.Convert(&src, &dest, nil)
 	if err != nil {
 		t.Fatalf("expected no error")
 	}
@@ -68,7 +58,7 @@ func TestConverter_MismatchedTypes(t *testing.T) {
 
 	src := []string{"5"}
 	var dest int
-	if err := c.Convert(&src, &dest, 0, nil); err != nil {
+	if err := c.Convert(&src, &dest, nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if e, a := 5, dest; e != a {
@@ -87,7 +77,6 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	}
 	type C struct{}
 	c := NewConverter(DefaultNameFunc)
-	c.Debug = testLogger(t)
 	convertFn1 := func(in *A, out *B, s Scope) error {
 		out.Bar = in.Foo
 		out.Baz = in.Baz
@@ -118,7 +107,7 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	x := A{"hello, intrepid test reader!", 3}
 	y := B{}
 
-	if err := c.Convert(&x, &y, 0, nil); err != nil {
+	if err := c.Convert(&x, &y, nil); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 	if e, a := x.Foo, y.Bar; e != a {
@@ -131,7 +120,7 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	z := B{"all your test are belong to us", 42}
 	w := A{}
 
-	if err := c.Convert(&z, &w, 0, nil); err != nil {
+	if err := c.Convert(&z, &w, nil); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 	if e, a := z.Bar, w.Foo; e != a {
@@ -152,7 +141,7 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
-	if err := c.Convert(&A{}, &C{}, 0, nil); err == nil {
+	if err := c.Convert(&A{}, &C{}, nil); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
@@ -180,7 +169,7 @@ func TestConverter_IgnoredConversion(t *testing.T) {
 	}
 	a := A{}
 	b := B{}
-	if err := c.Convert(&a, &b, 0, nil); err != nil {
+	if err := c.Convert(&a, &b, nil); err != nil {
 		t.Errorf("%v", err)
 	}
 	if count != 0 {
@@ -217,7 +206,7 @@ func TestConverter_GeneratedConversionOverridden(t *testing.T) {
 
 	a := A{}
 	b := B{}
-	if err := c.Convert(&a, &b, 0, nil); err != nil {
+	if err := c.Convert(&a, &b, nil); err != nil {
 		t.Errorf("%v", err)
 	}
 }
@@ -260,10 +249,10 @@ func TestConverter_WithConversionOverridden(t *testing.T) {
 
 	a := A{}
 	b := B{}
-	if err := c.Convert(&a, &b, 0, nil); err == nil || err.Error() != "conversion function should be overridden" {
+	if err := c.Convert(&a, &b, nil); err == nil || err.Error() != "conversion function should be overridden" {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := newc.Convert(&a, &b, 0, nil); err != nil {
+	if err := newc.Convert(&a, &b, nil); err != nil {
 		t.Errorf("%v", err)
 	}
 }
@@ -272,7 +261,6 @@ func TestConverter_meta(t *testing.T) {
 	type Foo struct{ A string }
 	type Bar struct{ A string }
 	c := NewConverter(DefaultNameFunc)
-	c.Debug = testLogger(t)
 	checks := 0
 	convertFn1 := func(in *Foo, out *Bar, s Scope) error {
 		if s.Meta() == nil {
@@ -290,7 +278,7 @@ func TestConverter_meta(t *testing.T) {
 	); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if err := c.Convert(&Foo{}, &Bar{}, 0, &Meta{}); err != nil {
+	if err := c.Convert(&Foo{}, &Bar{}, &Meta{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	if checks != 1 {

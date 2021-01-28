@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/httplog"
-	"k8s.io/client-go/informers"
 	"k8s.io/klog/v2"
 )
 
@@ -82,16 +82,20 @@ func (l *log) Check(_ *http.Request) error {
 	return fmt.Errorf("logging blocked")
 }
 
+type cacheSyncWaiter interface {
+	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
+}
+
 type informerSync struct {
-	sharedInformerFactory informers.SharedInformerFactory
+	cacheSyncWaiter cacheSyncWaiter
 }
 
 var _ HealthChecker = &informerSync{}
 
-// NewInformerSyncHealthz returns a new HealthChecker that will pass only if all informers in the given sharedInformerFactory sync.
-func NewInformerSyncHealthz(sharedInformerFactory informers.SharedInformerFactory) HealthChecker {
+// NewInformerSyncHealthz returns a new HealthChecker that will pass only if all informers in the given cacheSyncWaiter sync.
+func NewInformerSyncHealthz(cacheSyncWaiter cacheSyncWaiter) HealthChecker {
 	return &informerSync{
-		sharedInformerFactory: sharedInformerFactory,
+		cacheSyncWaiter: cacheSyncWaiter,
 	}
 }
 
@@ -104,8 +108,8 @@ func (i *informerSync) Check(_ *http.Request) error {
 	// Close stopCh to force checking if informers are synced now.
 	close(stopCh)
 
-	var informersByStarted map[bool][]string
-	for informerType, started := range i.sharedInformerFactory.WaitForCacheSync(stopCh) {
+	informersByStarted := make(map[bool][]string)
+	for informerType, started := range i.cacheSyncWaiter.WaitForCacheSync(stopCh) {
 		informersByStarted[started] = append(informersByStarted[started], informerType.String())
 	}
 
@@ -157,6 +161,7 @@ func InstallPathHandler(mux mux, path string, checks ...HealthChecker) {
 
 	klog.V(5).Infof("Installing health checkers for (%v): %v", path, formatQuoted(checkerNames(checks...)...))
 
+	name := strings.Split(strings.TrimPrefix(path, "/"), "/")[0]
 	mux.Handle(path,
 		metrics.InstrumentHandlerFunc("GET",
 			/* group = */ "",
@@ -167,7 +172,7 @@ func InstallPathHandler(mux mux, path string, checks ...HealthChecker) {
 			/* component = */ "",
 			/* deprecated */ false,
 			/* removedRelease */ "",
-			handleRootHealthz(checks...)))
+			handleRootHealth(name, checks...)))
 	for _, check := range checks {
 		mux.Handle(fmt.Sprintf("%s/%v", path, check.Name()), adaptCheckToHandler(check.Check))
 	}
@@ -203,8 +208,8 @@ func getExcludedChecks(r *http.Request) sets.String {
 	return sets.NewString()
 }
 
-// handleRootHealthz returns an http.HandlerFunc that serves the provided checks.
-func handleRootHealthz(checks ...HealthChecker) http.HandlerFunc {
+// handleRootHealth returns an http.HandlerFunc that serves the provided checks.
+func handleRootHealth(name string, checks ...HealthChecker) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		excluded := getExcludedChecks(r)
 		// failedVerboseLogOutput is for output to the log.  It indicates detailed failed output information for the log.
@@ -236,8 +241,8 @@ func handleRootHealthz(checks ...HealthChecker) http.HandlerFunc {
 		}
 		// always be verbose on failure
 		if len(failedChecks) > 0 {
-			klog.V(2).Infof("healthz check failed: %s\n%v", strings.Join(failedChecks, ","), failedVerboseLogOutput.String())
-			http.Error(httplog.Unlogged(r, w), fmt.Sprintf("%shealthz check failed", individualCheckOutput.String()), http.StatusInternalServerError)
+			klog.V(2).Infof("%s check failed: %s\n%v", strings.Join(failedChecks, ","), name, failedVerboseLogOutput.String())
+			http.Error(httplog.Unlogged(r, w), fmt.Sprintf("%s%s check failed", individualCheckOutput.String(), name), http.StatusInternalServerError)
 			return
 		}
 
@@ -249,7 +254,7 @@ func handleRootHealthz(checks ...HealthChecker) http.HandlerFunc {
 		}
 
 		individualCheckOutput.WriteTo(w)
-		fmt.Fprint(w, "healthz check passed\n")
+		fmt.Fprintf(w, "%s check passed\n", name)
 	})
 }
 

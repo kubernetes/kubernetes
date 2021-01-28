@@ -20,6 +20,10 @@ type containerLogManagerStub struct{}
 
 func (*containerLogManagerStub) Start() {}
 
+func (*containerLogManagerStub) Clean(containerID string) error {
+	return nil
+}
+
 // NewStubContainerLogManager returns an empty ContainerLogManager which does nothing.
 func NewStubContainerLogManager() ContainerLogManager {
 	return &containerLogManagerStub{}

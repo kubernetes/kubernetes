@@ -133,6 +133,15 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 		if o.VolumeLifecycleModes != nil {
 			object.Spec.VolumeLifecycleModes = *o.VolumeLifecycleModes
 		}
+		if o.TokenRequests != nil {
+			object.Spec.TokenRequests = o.TokenRequests
+		}
+		if o.RequiresRepublish != nil {
+			object.Spec.RequiresRepublish = o.RequiresRepublish
+		}
+		if o.FSGroupPolicy != nil {
+			object.Spec.FSGroupPolicy = o.FSGroupPolicy
+		}
 	}
 
 	return nil
@@ -180,4 +189,16 @@ type PatchCSIOptions struct {
 	// field *if* the driver deploys a CSIDriver object. Ignored
 	// otherwise.
 	VolumeLifecycleModes *[]storagev1.VolumeLifecycleMode
+	// If not nil, the value to use for the CSIDriver.Spec.TokenRequests
+	// field *if* the driver deploys a CSIDriver object. Ignored
+	// otherwise.
+	TokenRequests []storagev1.TokenRequest
+	// If not nil, the value to use for the CSIDriver.Spec.RequiresRepublish
+	// field *if* the driver deploys a CSIDriver object. Ignored
+	// otherwise.
+	RequiresRepublish *bool
+	// If not nil, the value to use for the CSIDriver.Spec.FSGroupPolicy
+	// field *if* the driver deploys a CSIDriver object. Ignored
+	// otherwise.
+	FSGroupPolicy *storagev1.FSGroupPolicy
 }

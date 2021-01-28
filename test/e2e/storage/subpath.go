@@ -51,7 +51,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		})
 
 		/*
-		  Release : v1.12
+		  Release: v1.12
 		  Testname: SubPath: Reading content from a secret volume.
 		  Description: Containers in a pod can read content from a secret mounted volume which was configured with a subpath.
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
@@ -63,7 +63,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		})
 
 		/*
-		  Release : v1.12
+		  Release: v1.12
 		  Testname: SubPath: Reading content from a configmap volume.
 		  Description: Containers in a pod can read content from a configmap mounted volume which was configured with a subpath.
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
@@ -75,7 +75,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		})
 
 		/*
-		  Release : v1.12
+		  Release: v1.12
 		  Testname: SubPath: Reading content from a configmap volume.
 		  Description: Containers in a pod can read content from a configmap mounted volume which was configured with a subpath and also using a mountpath that is a specific file.
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
@@ -89,7 +89,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		})
 
 		/*
-		  Release : v1.12
+		  Release: v1.12
 		  Testname: SubPath: Reading content from a downwardAPI volume.
 		  Description: Containers in a pod can read content from a downwardAPI mounted volume which was configured with a subpath.
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
@@ -105,7 +105,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		})
 
 		/*
-		  Release : v1.12
+		  Release: v1.12
 		  Testname: SubPath: Reading content from a projected volume.
 		  Description: Containers in a pod can read content from a projected mounted volume which was configured with a subpath.
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.

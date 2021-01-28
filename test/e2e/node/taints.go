@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -279,7 +279,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Taint, Pod Eviction on taint removal
 		Description: The Pod with toleration timeout scheduled on a tainted Node MUST not be
 		evicted if the taint is removed before toleration time ends.
@@ -409,7 +409,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Pod Eviction, Toleration limits
 		Description: In a multi-pods scenario with tolerationSeconds, the pods MUST be evicted as per
 		the toleration time limit.
@@ -453,7 +453,9 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 
 		// 3. Wait to see if both pods get evicted in between [5, 25] seconds
 		ginkgo.By("Waiting for Pod1 and Pod2 to be deleted")
-		timeoutChannel := time.NewTimer(time.Duration(kubeletPodDeletionDelaySeconds+3*additionalWaitPerDeleteSeconds) * time.Second).C
+		// On Windows hosts, we're noticing that the pods are taking more time to get deleted, so having larger timeout
+		// is good
+		timeoutChannel := time.NewTimer(time.Duration(kubeletPodDeletionDelaySeconds+10*additionalWaitPerDeleteSeconds) * time.Second).C
 		var evicted int
 		for evicted != 2 {
 			select {

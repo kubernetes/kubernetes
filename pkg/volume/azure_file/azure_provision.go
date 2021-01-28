@@ -79,7 +79,7 @@ func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureU
 		return nil, fmt.Errorf("invalid PV spec")
 	}
 
-	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, spec.PersistentVolume.Spec.ClaimRef.Namespace)
+	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, defaultSecretNamespace)
 	if err != nil {
 		return nil, err
 	}

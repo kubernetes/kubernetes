@@ -71,8 +71,6 @@ type Plugin struct {
 	podsGetter     corev1lister.PodLister
 	nodesGetter    corev1lister.NodeLister
 
-	tokenRequestEnabled            bool
-	csiNodeInfoEnabled             bool
 	expandPersistentVolumesEnabled bool
 }
 
@@ -84,8 +82,6 @@ var (
 
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	p.tokenRequestEnabled = featureGates.Enabled(features.TokenRequest)
-	p.csiNodeInfoEnabled = featureGates.Enabled(features.CSINodeInfo)
 	p.expandPersistentVolumesEnabled = featureGates.Enabled(features.ExpandPersistentVolumes)
 }
 
@@ -159,19 +155,13 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		}
 
 	case svcacctResource:
-		if p.tokenRequestEnabled {
-			return p.admitServiceAccount(nodeName, a)
-		}
-		return nil
+		return p.admitServiceAccount(nodeName, a)
 
 	case leaseResource:
 		return p.admitLease(nodeName, a)
 
 	case csiNodeResource:
-		if p.csiNodeInfoEnabled {
-			return p.admitCSINode(nodeName, a)
-		}
-		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gates %s", features.CSINodeInfo))
+		return p.admitCSINode(nodeName, a)
 
 	default:
 		return nil
@@ -223,6 +213,9 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 	}
 	if len(pod.OwnerReferences) > 1 {
 		return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with a single owner reference set to itself", nodeName))
+	}
+	if len(pod.OwnerReferences) == 0 {
+		return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with an owner reference set to itself", nodeName))
 	}
 	if len(pod.OwnerReferences) == 1 {
 		owner := pod.OwnerReferences[0]
@@ -390,6 +383,11 @@ func (p *Plugin) admitPVCStatus(nodeName string, a admission.Attributes) error {
 
 func (p *Plugin) admitNode(nodeName string, a admission.Attributes) error {
 	requestedName := a.GetName()
+
+	if requestedName != nodeName {
+		return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to modify node %q", nodeName, requestedName))
+	}
+
 	if a.GetOperation() == admission.Create {
 		node, ok := a.GetObject().(*api.Node)
 		if !ok {
@@ -408,9 +406,6 @@ func (p *Plugin) admitNode(nodeName string, a admission.Attributes) error {
 		if forbiddenLabels := p.getForbiddenLabels(modifiedLabels); len(forbiddenLabels) > 0 {
 			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to set the following labels: %s", nodeName, strings.Join(forbiddenLabels.List(), ", ")))
 		}
-	}
-	if requestedName != nodeName {
-		return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to modify node %q", nodeName, requestedName))
 	}
 
 	if a.GetOperation() == admission.Update {
@@ -535,7 +530,7 @@ func (p *Plugin) admitServiceAccount(nodeName string, a admission.Attributes) er
 		return admission.NewForbidden(a, err)
 	}
 	if ref.UID != pod.UID {
-		return admission.NewForbidden(a, fmt.Errorf("the UID in the bound object reference (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", ref.UID, pod.UID))
+		return admission.NewForbidden(a, fmt.Errorf("the UID in the bound object reference (%s) does not match the UID in record. The object might have been deleted and then recreated", ref.UID))
 	}
 	if pod.Spec.NodeName != nodeName {
 		return admission.NewForbidden(a, fmt.Errorf("node requested token bound to a pod scheduled on a different node"))

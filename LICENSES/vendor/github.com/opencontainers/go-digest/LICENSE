@@ -178,6 +178,7 @@
 
    END OF TERMS AND CONDITIONS
 
+   Copyright 2019, 2020 OCI Contributors
    Copyright 2016 Docker, Inc.
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -192,4 +193,4 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 
-= vendor/github.com/opencontainers/go-digest/LICENSE.code 9cd86830b557232ce55e2a6b47387471
+= vendor/github.com/opencontainers/go-digest/LICENSE 2d6fc0e85c3f118af64c85a78d56d3cf

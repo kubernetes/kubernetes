@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -267,8 +266,14 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 		return nil, err
 	}
 
+	// Prepare kube config.
+	kubeConfig, err := createKubeConfig(c.ComponentConfig.ClientConnection, o.Master)
+	if err != nil {
+		return nil, err
+	}
+
 	// Prepare kube clients.
-	client, leaderElectionClient, eventClient, err := createClients(c.ComponentConfig.ClientConnection, o.Master, c.ComponentConfig.LeaderElection.RenewDeadline.Duration)
+	client, eventClient, err := createClients(kubeConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -280,15 +285,14 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	if c.ComponentConfig.LeaderElection.LeaderElect {
 		// Use the scheduler name in the first profile to record leader election.
 		coreRecorder := c.EventBroadcaster.DeprecatedNewLegacyRecorder(c.ComponentConfig.Profiles[0].SchedulerName)
-		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, leaderElectionClient, coreRecorder)
+		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, kubeConfig, coreRecorder)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	c.Client = client
-	c.InformerFactory = informers.NewSharedInformerFactory(client, 0)
-	c.PodInformer = scheduler.NewPodInformer(client, 0)
+	c.InformerFactory = scheduler.NewInformerFactory(client, 0)
 	c.LeaderElection = leaderElectionConfig
 
 	return c, nil
@@ -296,7 +300,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 
 // makeLeaderElectionConfig builds a leader election configuration. It will
 // create a new resource lock associated with the configuration.
-func makeLeaderElectionConfig(config componentbaseconfig.LeaderElectionConfiguration, client clientset.Interface, recorder record.EventRecorder) (*leaderelection.LeaderElectionConfig, error) {
+func makeLeaderElectionConfig(config componentbaseconfig.LeaderElectionConfiguration, kubeConfig *restclient.Config, recorder record.EventRecorder) (*leaderelection.LeaderElectionConfig, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get hostname: %v", err)
@@ -304,15 +308,15 @@ func makeLeaderElectionConfig(config componentbaseconfig.LeaderElectionConfigura
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id := hostname + "_" + string(uuid.NewUUID())
 
-	rl, err := resourcelock.New(config.ResourceLock,
+	rl, err := resourcelock.NewFromKubeconfig(config.ResourceLock,
 		config.ResourceNamespace,
 		config.ResourceName,
-		client.CoreV1(),
-		client.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,
-		})
+		},
+		kubeConfig,
+		config.RenewDeadline.Duration)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create resource lock: %v", err)
 	}
@@ -327,11 +331,11 @@ func makeLeaderElectionConfig(config componentbaseconfig.LeaderElectionConfigura
 	}, nil
 }
 
-// createClients creates a kube client and an event client from the given config and masterOverride.
+// createKubeConfig creates a kubeConfig from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createClients(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string, timeout time.Duration) (clientset.Interface, clientset.Interface, clientset.Interface, error) {
+func createKubeConfig(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string) (*restclient.Config, error) {
 	if len(config.Kubeconfig) == 0 && len(masterOverride) == 0 {
-		klog.Warningf("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
+		klog.Warning("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
 	}
 
 	// This creates a client, first loading any specified kubeconfig
@@ -340,33 +344,29 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.Kubeconfig},
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterOverride}}).ClientConfig()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	kubeConfig.DisableCompression = true
 	kubeConfig.AcceptContentTypes = config.AcceptContentTypes
 	kubeConfig.ContentType = config.ContentType
 	kubeConfig.QPS = config.QPS
-	//TODO make config struct use int instead of int32?
 	kubeConfig.Burst = int(config.Burst)
 
+	return kubeConfig, nil
+}
+
+// createClients creates a kube client and an event client from the given kubeConfig
+func createClients(kubeConfig *restclient.Config) (clientset.Interface, clientset.Interface, error) {
 	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeConfig, "scheduler"))
 	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// shallow copy, do not modify the kubeConfig.Timeout.
-	restConfig := *kubeConfig
-	restConfig.Timeout = timeout
-	leaderElectionClient, err := clientset.NewForConfig(restclient.AddUserAgent(&restConfig, "leader-election"))
-	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	eventClient, err := clientset.NewForConfig(kubeConfig)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	return client, leaderElectionClient, eventClient, nil
+	return client, eventClient, nil
 }

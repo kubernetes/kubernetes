@@ -85,6 +85,7 @@ func makeTestVol(name string, driverName string) *api.Volume {
 }
 
 func getTestCSIDriver(name string, podInfoMount *bool, attachable *bool, volumeLifecycleModes []storagev1.VolumeLifecycleMode) *storagev1.CSIDriver {
+	defaultFSGroupPolicy := storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy
 	return &storagev1.CSIDriver{
 		ObjectMeta: meta.ObjectMeta{
 			Name: name,
@@ -93,6 +94,7 @@ func getTestCSIDriver(name string, podInfoMount *bool, attachable *bool, volumeL
 			PodInfoOnMount:       podInfoMount,
 			AttachRequired:       attachable,
 			VolumeLifecycleModes: volumeLifecycleModes,
+			FSGroupPolicy:        &defaultFSGroupPolicy,
 		},
 	}
 }

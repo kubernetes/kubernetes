@@ -1,109 +1,131 @@
-// +build darwin freebsd linux netbsd openbsd
+// +build !windows
 
 package godirwalk
 
 import (
 	"os"
-	"path/filepath"
 	"syscall"
 	"unsafe"
-
-	"github.com/pkg/errors"
 )
 
-func readdirents(osDirname string, scratchBuffer []byte) (Dirents, error) {
+// MinimumScratchBufferSize specifies the minimum size of the scratch buffer
+// that ReadDirents, ReadDirnames, Scanner, and Walk will use when reading file
+// entries from the operating system. During program startup it is initialized
+// to the result from calling `os.Getpagesize()` for non Windows environments,
+// and 0 for Windows.
+var MinimumScratchBufferSize = os.Getpagesize()
+
+func newScratchBuffer() []byte { return make([]byte, MinimumScratchBufferSize) }
+
+func readDirents(osDirname string, scratchBuffer []byte) ([]*Dirent, error) {
+	var entries []*Dirent
+	var workBuffer []byte
+
 	dh, err := os.Open(osDirname)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot Open")
+		return nil, err
 	}
-
-	var entries Dirents
-
 	fd := int(dh.Fd())
 
 	if len(scratchBuffer) < MinimumScratchBufferSize {
-		scratchBuffer = make([]byte, DefaultScratchBufferSize)
+		scratchBuffer = newScratchBuffer()
 	}
 
-	var de *syscall.Dirent
-
+	var sde syscall.Dirent
 	for {
-		n, err := syscall.ReadDirent(fd, scratchBuffer)
-		if err != nil {
-			_ = dh.Close() // ignore potential error returned by Close
-			return nil, errors.Wrap(err, "cannot ReadDirent")
-		}
-		if n <= 0 {
-			break // end of directory reached
-		}
-		// Loop over the bytes returned by reading the directory entries.
-		buf := scratchBuffer[:n]
-		for len(buf) > 0 {
-			de = (*syscall.Dirent)(unsafe.Pointer(&buf[0])) // point entry to first syscall.Dirent in buffer
-			buf = buf[de.Reclen:]                           // advance buffer
-
-			if inoFromDirent(de) == 0 {
-				continue // this item has been deleted, but not yet removed from directory
-			}
-
-			nameSlice := nameFromDirent(de)
-			namlen := len(nameSlice)
-			if (namlen == 0) || (namlen == 1 && nameSlice[0] == '.') || (namlen == 2 && nameSlice[0] == '.' && nameSlice[1] == '.') {
-				continue // skip unimportant entries
-			}
-			osChildname := string(nameSlice)
-
-			// Convert syscall constant, which is in purview of OS, to a
-			// constant defined by Go, assumed by this project to be stable.
-			var mode os.FileMode
-			switch de.Type {
-			case syscall.DT_REG:
-				// regular file
-			case syscall.DT_DIR:
-				mode = os.ModeDir
-			case syscall.DT_LNK:
-				mode = os.ModeSymlink
-			case syscall.DT_CHR:
-				mode = os.ModeDevice | os.ModeCharDevice
-			case syscall.DT_BLK:
-				mode = os.ModeDevice
-			case syscall.DT_FIFO:
-				mode = os.ModeNamedPipe
-			case syscall.DT_SOCK:
-				mode = os.ModeSocket
-			default:
-				// If syscall returned unknown type (e.g., DT_UNKNOWN, DT_WHT),
-				// then resolve actual mode by getting stat.
-				fi, err := os.Lstat(filepath.Join(osDirname, osChildname))
-				if err != nil {
-					_ = dh.Close() // ignore potential error returned by Close
-					return nil, errors.Wrap(err, "cannot Stat")
+		if len(workBuffer) == 0 {
+			n, err := syscall.ReadDirent(fd, scratchBuffer)
+			// n, err := unix.ReadDirent(fd, scratchBuffer)
+			if err != nil {
+				if err == syscall.EINTR /* || err == unix.EINTR */ {
+					continue
 				}
-				// We only care about the bits that identify the type of a file
-				// system node, and can ignore append, exclusive, temporary,
-				// setuid, setgid, permission bits, and sticky bits, which are
-				// coincident to the bits that declare type of the file system
-				// node.
-				mode = fi.Mode() & os.ModeType
+				_ = dh.Close()
+				return nil, err
 			}
-
-			entries = append(entries, &Dirent{name: osChildname, modeType: mode})
+			if n <= 0 { // end of directory: normal exit
+				if err = dh.Close(); err != nil {
+					return nil, err
+				}
+				return entries, nil
+			}
+			workBuffer = scratchBuffer[:n] // trim work buffer to number of bytes read
 		}
+
+		copy((*[unsafe.Sizeof(syscall.Dirent{})]byte)(unsafe.Pointer(&sde))[:], workBuffer)
+		workBuffer = workBuffer[reclen(&sde):] // advance buffer for next iteration through loop
+
+		if inoFromDirent(&sde) == 0 {
+			continue // inode set to 0 indicates an entry that was marked as deleted
+		}
+
+		nameSlice := nameFromDirent(&sde)
+		nameLength := len(nameSlice)
+
+		if nameLength == 0 || (nameSlice[0] == '.' && (nameLength == 1 || (nameLength == 2 && nameSlice[1] == '.'))) {
+			continue
+		}
+
+		childName := string(nameSlice)
+		mt, err := modeTypeFromDirent(&sde, osDirname, childName)
+		if err != nil {
+			_ = dh.Close()
+			return nil, err
+		}
+		entries = append(entries, &Dirent{name: childName, path: osDirname, modeType: mt})
 	}
-	if err = dh.Close(); err != nil {
-		return nil, err
-	}
-	return entries, nil
 }
 
-func readdirnames(osDirname string, scratchBuffer []byte) ([]string, error) {
-	des, err := readdirents(osDirname, scratchBuffer)
+func readDirnames(osDirname string, scratchBuffer []byte) ([]string, error) {
+	var entries []string
+	var workBuffer []byte
+	var sde *syscall.Dirent
+
+	dh, err := os.Open(osDirname)
 	if err != nil {
 		return nil, err
 	}
-	names := make([]string, len(des))
-	for i, v := range des {
-		names[i] = v.name
+	fd := int(dh.Fd())
+
+	if len(scratchBuffer) < MinimumScratchBufferSize {
+		scratchBuffer = newScratchBuffer()
 	}
-	return names, nil
+
+	for {
+		if len(workBuffer) == 0 {
+			n, err := syscall.ReadDirent(fd, scratchBuffer)
+			// n, err := unix.ReadDirent(fd, scratchBuffer)
+			if err != nil {
+				if err == syscall.EINTR /* || err == unix.EINTR */ {
+					continue
+				}
+				_ = dh.Close()
+				return nil, err
+			}
+			if n <= 0 { // end of directory: normal exit
+				if err = dh.Close(); err != nil {
+					return nil, err
+				}
+				return entries, nil
+			}
+			workBuffer = scratchBuffer[:n] // trim work buffer to number of bytes read
+		}
+
+		sde = (*syscall.Dirent)(unsafe.Pointer(&workBuffer[0])) // point entry to first syscall.Dirent in buffer
+		// Handle first entry in the work buffer.
+		workBuffer = workBuffer[reclen(sde):] // advance buffer for next iteration through loop
+
+		if inoFromDirent(sde) == 0 {
+			continue // inode set to 0 indicates an entry that was marked as deleted
+		}
+
+		nameSlice := nameFromDirent(sde)
+		nameLength := len(nameSlice)
+
+		if nameLength == 0 || (nameSlice[0] == '.' && (nameLength == 1 || (nameLength == 2 && nameSlice[1] == '.'))) {
+			continue
+		}
+
+		entries = append(entries, string(nameSlice))
+	}
 }

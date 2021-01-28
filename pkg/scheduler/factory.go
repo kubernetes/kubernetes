@@ -20,32 +20,30 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
-	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/core"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -66,15 +64,10 @@ type Configurator struct {
 
 	informerFactory informers.SharedInformerFactory
 
-	podInformer coreinformers.PodInformer
-
 	// Close this to stop all reflectors
 	StopEverything <-chan struct{}
 
 	schedulerCache internalcache.Cache
-
-	// Disable pod preemption or not.
-	disablePreemption bool
 
 	// Always check all predicates even if the middle of one predicate fails.
 	alwaysCheckAllPredicates bool
@@ -93,24 +86,6 @@ type Configurator struct {
 	frameworkCapturer FrameworkCapturer
 }
 
-func (c *Configurator) buildFramework(p schedulerapi.KubeSchedulerProfile, opts ...frameworkruntime.Option) (framework.Framework, error) {
-	if c.frameworkCapturer != nil {
-		c.frameworkCapturer(p)
-	}
-	opts = append([]frameworkruntime.Option{
-		frameworkruntime.WithClientSet(c.client),
-		frameworkruntime.WithInformerFactory(c.informerFactory),
-		frameworkruntime.WithSnapshotSharedLister(c.nodeInfoSnapshot),
-		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),
-	}, opts...)
-	return frameworkruntime.NewFramework(
-		c.registry,
-		p.Plugins,
-		p.PluginConfig,
-		opts...,
-	)
-}
-
 // create a scheduler from a set of registered plugins.
 func (c *Configurator) create() (*Scheduler, error) {
 	var extenders []framework.Extender
@@ -118,7 +93,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	if len(c.extenders) != 0 {
 		var ignorableExtenders []framework.Extender
 		for ii := range c.extenders {
-			klog.V(2).Infof("Creating extender with config %+v", c.extenders[ii])
+			klog.V(2).InfoS("Creating extender", "extender", c.extenders[ii])
 			extender, err := core.NewHTTPExtender(&c.extenders[ii])
 			if err != nil {
 				return nil, err
@@ -158,8 +133,14 @@ func (c *Configurator) create() (*Scheduler, error) {
 
 	// The nominator will be passed all the way to framework instantiation.
 	nominator := internalqueue.NewPodNominator()
-	profiles, err := profile.NewMap(c.profiles, c.buildFramework, c.recorderFactory,
-		frameworkruntime.WithPodNominator(nominator))
+	profiles, err := profile.NewMap(c.profiles, c.registry, c.recorderFactory,
+		frameworkruntime.WithClientSet(c.client),
+		frameworkruntime.WithInformerFactory(c.informerFactory),
+		frameworkruntime.WithSnapshotSharedLister(c.nodeInfoSnapshot),
+		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),
+		frameworkruntime.WithPodNominator(nominator),
+		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(c.frameworkCapturer)),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
 	}
@@ -167,7 +148,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		return nil, errors.New("at least one profile is required")
 	}
 	// Profiles are required to have equivalent queue sort plugins.
-	lessFn := profiles[c.profiles[0].SchedulerName].Framework.QueueSortFunc()
+	lessFn := profiles[c.profiles[0].SchedulerName].QueueSortFunc()
 	podQueue := internalqueue.NewSchedulingQueue(
 		lessFn,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
@@ -178,7 +159,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	// Setup cache debugger.
 	debugger := cachedebugger.New(
 		c.informerFactory.Core().V1().Nodes().Lister(),
-		c.podInformer.Lister(),
+		c.informerFactory.Core().V1().Pods().Lister(),
 		c.schedulerCache,
 		podQueue,
 	)
@@ -188,8 +169,6 @@ func (c *Configurator) create() (*Scheduler, error) {
 		c.schedulerCache,
 		c.nodeInfoSnapshot,
 		extenders,
-		c.informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
-		c.disablePreemption,
 		c.percentageOfNodesToScore,
 	)
 
@@ -206,7 +185,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 
 // createFromProvider creates a scheduler from the name of a registered algorithm provider.
 func (c *Configurator) createFromProvider(providerName string) (*Scheduler, error) {
-	klog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
+	klog.V(2).InfoS("Creating scheduler from algorithm provider", "algorithmProvider", providerName)
 	r := algorithmprovider.NewRegistry()
 	defaultPlugins, exist := r[providerName]
 	if !exist {
@@ -229,7 +208,7 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	lr := frameworkplugins.NewLegacyRegistry()
 	args := &frameworkplugins.ConfigProducerArgs{}
 
-	klog.V(2).Infof("Creating scheduler from configuration: %v", policy)
+	klog.V(2).InfoS("Creating scheduler from configuration", "policy", policy)
 
 	// validate the policy configuration
 	if err := validation.ValidatePolicy(policy); err != nil {
@@ -238,26 +217,26 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 
 	predicateKeys := sets.NewString()
 	if policy.Predicates == nil {
-		klog.V(2).Infof("Using predicates from algorithm provider '%v'", schedulerapi.SchedulerDefaultProviderName)
+		klog.V(2).InfoS("Using predicates from algorithm provider", "algorithmProvider", schedulerapi.SchedulerDefaultProviderName)
 		predicateKeys = lr.DefaultPredicates
 	} else {
 		for _, predicate := range policy.Predicates {
-			klog.V(2).Infof("Registering predicate: %s", predicate.Name)
+			klog.V(2).InfoS("Registering predicate", "predicate", predicate.Name)
 			predicateKeys.Insert(lr.ProcessPredicatePolicy(predicate, args))
 		}
 	}
 
 	priorityKeys := make(map[string]int64)
 	if policy.Priorities == nil {
-		klog.V(2).Infof("Using default priorities")
+		klog.V(2).InfoS("Using default priorities")
 		priorityKeys = lr.DefaultPriorities
 	} else {
 		for _, priority := range policy.Priorities {
 			if priority.Name == frameworkplugins.EqualPriority {
-				klog.V(2).Infof("Skip registering priority: %s", priority.Name)
+				klog.V(2).InfoS("Skip registering priority", "priority", priority.Name)
 				continue
 			}
-			klog.V(2).Infof("Registering priority: %s", priority.Name)
+			klog.V(2).InfoS("Registering priority", "priority", priority.Name)
 			priorityKeys[lr.ProcessPriorityPolicy(priority, args)] = priority.Weight
 		}
 	}
@@ -276,163 +255,61 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 		c.alwaysCheckAllPredicates = policy.AlwaysCheckAllPredicates
 	}
 
-	klog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v'", predicateKeys, priorityKeys)
+	klog.V(2).InfoS("Creating scheduler", "predicates", predicateKeys, "priorities", priorityKeys)
 
-	pluginsForPredicates, pluginConfigForPredicates, err := getPredicateConfigs(predicateKeys, lr, args)
-	if err != nil {
-		return nil, err
-	}
-
-	pluginsForPriorities, pluginConfigForPriorities, err := getPriorityConfigs(priorityKeys, lr, args)
-	if err != nil {
-		return nil, err
-	}
 	// Combine all framework configurations. If this results in any duplication, framework
 	// instantiation should fail.
-	var defPlugins schedulerapi.Plugins
-	// "PrioritySort" and "DefaultBinder" were neither predicates nor priorities
+
+	// "PrioritySort", "DefaultPreemption" and "DefaultBinder" were neither predicates nor priorities
 	// before. We add them by default.
-	defPlugins.Append(&schedulerapi.Plugins{
+	plugins := schedulerapi.Plugins{
 		QueueSort: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}},
+		},
+		PostFilter: &schedulerapi.PluginSet{
+			Enabled: []schedulerapi.Plugin{{Name: defaultpreemption.Name}},
 		},
 		Bind: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}},
 		},
-	})
-	defPlugins.Append(pluginsForPredicates)
-	defPlugins.Append(pluginsForPriorities)
-	defPluginConfig, err := mergePluginConfigsFromPolicy(pluginConfigForPredicates, pluginConfigForPriorities)
-	if err != nil {
+	}
+	var pluginConfig []schedulerapi.PluginConfig
+	var err error
+	if plugins, pluginConfig, err = lr.AppendPredicateConfigs(predicateKeys, args, plugins, pluginConfig); err != nil {
+		return nil, err
+	}
+	if plugins, pluginConfig, err = lr.AppendPriorityConfigs(priorityKeys, args, plugins, pluginConfig); err != nil {
+		return nil, err
+	}
+	if pluginConfig, err = dedupPluginConfigs(pluginConfig); err != nil {
 		return nil, err
 	}
 	for i := range c.profiles {
 		prof := &c.profiles[i]
-		// Plugins are empty when using Policy.
+		// Plugins and PluginConfig are empty when using Policy; overriding.
 		prof.Plugins = &schedulerapi.Plugins{}
-		prof.Plugins.Append(&defPlugins)
-
-		// PluginConfig is ignored when using Policy.
-		prof.PluginConfig = defPluginConfig
+		prof.Plugins.Append(&plugins)
+		prof.PluginConfig = pluginConfig
 	}
 
 	return c.create()
 }
 
-// mergePluginConfigsFromPolicy merges the giving plugin configs ensuring that,
+// dedupPluginConfigs removes duplicates from pluginConfig, ensuring that,
 // if a plugin name is repeated, the arguments are the same.
-func mergePluginConfigsFromPolicy(pc1, pc2 []schedulerapi.PluginConfig) ([]schedulerapi.PluginConfig, error) {
+func dedupPluginConfigs(pc []schedulerapi.PluginConfig) ([]schedulerapi.PluginConfig, error) {
 	args := make(map[string]runtime.Object)
-	for _, c := range pc1 {
-		args[c.Name] = c.Args
-	}
-	for _, c := range pc2 {
-		if v, ok := args[c.Name]; ok && !cmp.Equal(v, c.Args) {
+	result := make([]schedulerapi.PluginConfig, 0, len(pc))
+	for _, c := range pc {
+		if v, found := args[c.Name]; !found {
+			result = append(result, c)
+			args[c.Name] = c.Args
+		} else if !cmp.Equal(v, c.Args) {
 			// This should be unreachable.
 			return nil, fmt.Errorf("inconsistent configuration produced for plugin %s", c.Name)
 		}
-		args[c.Name] = c.Args
 	}
-	pc := make([]schedulerapi.PluginConfig, 0, len(args))
-	for k, v := range args {
-		pc = append(pc, schedulerapi.PluginConfig{
-			Name: k,
-			Args: v,
-		})
-	}
-	return pc, nil
-}
-
-// getPriorityConfigs returns priorities configuration: ones that will run as priorities and ones that will run
-// as framework plugins. Specifically, a priority will run as a framework plugin if a plugin config producer was
-// registered for that priority.
-func getPriorityConfigs(keys map[string]int64, lr *frameworkplugins.LegacyRegistry, args *frameworkplugins.ConfigProducerArgs) (*schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
-	var plugins schedulerapi.Plugins
-	var pluginConfig []schedulerapi.PluginConfig
-
-	// Sort the keys so that it is easier for unit tests to do compare.
-	var sortedKeys []string
-	for k := range keys {
-		sortedKeys = append(sortedKeys, k)
-	}
-	sort.Strings(sortedKeys)
-
-	for _, priority := range sortedKeys {
-		weight := keys[priority]
-		producer, exist := lr.PriorityToConfigProducer[priority]
-		if !exist {
-			return nil, nil, fmt.Errorf("no config producer registered for %q", priority)
-		}
-		a := *args
-		a.Weight = int32(weight)
-		pl, plc := producer(a)
-		plugins.Append(&pl)
-		pluginConfig = append(pluginConfig, plc...)
-	}
-	return &plugins, pluginConfig, nil
-}
-
-// getPredicateConfigs returns predicates configuration: ones that will run as fitPredicates and ones that will run
-// as framework plugins. Specifically, a predicate will run as a framework plugin if a plugin config producer was
-// registered for that predicate.
-// Note that the framework executes plugins according to their order in the Plugins list, and so predicates run as plugins
-// are added to the Plugins list according to the order specified in predicates.Ordering().
-func getPredicateConfigs(keys sets.String, lr *frameworkplugins.LegacyRegistry, args *frameworkplugins.ConfigProducerArgs) (*schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
-	allPredicates := keys.Union(lr.MandatoryPredicates)
-
-	// Create the framework plugin configurations, and place them in the order
-	// that the corresponding predicates were supposed to run.
-	var plugins schedulerapi.Plugins
-	var pluginConfig []schedulerapi.PluginConfig
-
-	for _, predicateKey := range frameworkplugins.PredicateOrdering() {
-		if allPredicates.Has(predicateKey) {
-			producer, exist := lr.PredicateToConfigProducer[predicateKey]
-			if !exist {
-				return nil, nil, fmt.Errorf("no framework config producer registered for %q", predicateKey)
-			}
-			pl, plc := producer(*args)
-			plugins.Append(&pl)
-			pluginConfig = append(pluginConfig, plc...)
-			allPredicates.Delete(predicateKey)
-		}
-	}
-
-	// Third, add the rest in no specific order.
-	for predicateKey := range allPredicates {
-		producer, exist := lr.PredicateToConfigProducer[predicateKey]
-		if !exist {
-			return nil, nil, fmt.Errorf("no framework config producer registered for %q", predicateKey)
-		}
-		pl, plc := producer(*args)
-		plugins.Append(&pl)
-		pluginConfig = append(pluginConfig, plc...)
-	}
-
-	return &plugins, pluginConfig, nil
-}
-
-type podInformer struct {
-	informer cache.SharedIndexInformer
-}
-
-func (i *podInformer) Informer() cache.SharedIndexInformer {
-	return i.informer
-}
-
-func (i *podInformer) Lister() corelisters.PodLister {
-	return corelisters.NewPodLister(i.informer.GetIndexer())
-}
-
-// NewPodInformer creates a shared index informer that returns only non-terminal pods.
-func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) coreinformers.PodInformer {
-	selector := fields.ParseSelectorOrDie(
-		"status.phase!=" + string(v1.PodSucceeded) +
-			",status.phase!=" + string(v1.PodFailed))
-	lw := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), string(v1.ResourcePods), metav1.NamespaceAll, selector)
-	return &podInformer{
-		informer: cache.NewSharedIndexInformer(lw, &v1.Pod{}, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}),
-	}
+	return result, nil
 }
 
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error
@@ -441,10 +318,10 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 		pod := podInfo.Pod
 		if err == core.ErrNoNodesAvailable {
 			klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
-		} else if _, ok := err.(*core.FitError); ok {
+		} else if _, ok := err.(*framework.FitError); ok {
 			klog.V(2).InfoS("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", err)
 		} else if apierrors.IsNotFound(err) {
-			klog.V(2).Infof("Unable to schedule %v/%v: possibly due to node not found: %v; waiting", pod.Namespace, pod.Name, err)
+			klog.V(2).InfoS("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", err)
 			if errStatus, ok := err.(apierrors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
 				nodeName := errStatus.Status().Details.Name
 				// when node is not found, We do not remove the node right away. Trying again to get
@@ -453,7 +330,7 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 				if err != nil && apierrors.IsNotFound(err) {
 					node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 					if err := schedulerCache.RemoveNode(&node); err != nil {
-						klog.V(4).Infof("Node %q is not found; failed to remove it from the cache.", node.Name)
+						klog.V(4).InfoS("Node is not found; failed to remove it from the cache", "node", node.Name)
 					}
 				}
 			}
@@ -464,13 +341,21 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 		// Check if the Pod exists in informer cache.
 		cachedPod, err := podLister.Pods(pod.Namespace).Get(pod.Name)
 		if err != nil {
-			klog.Warningf("Pod %v/%v doesn't exist in informer cache: %v", pod.Namespace, pod.Name, err)
+			klog.InfoS("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", err)
 			return
 		}
+
+		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
+		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
+		if len(cachedPod.Spec.NodeName) != 0 {
+			klog.InfoS("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
+			return
+		}
+
 		// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
 		podInfo.Pod = cachedPod.DeepCopy()
 		if err := podQueue.AddUnschedulableIfNotPresent(podInfo, podQueue.SchedulingCycle()); err != nil {
-			klog.Error(err)
+			klog.ErrorS(err, "Error occurred")
 		}
 	}
 }

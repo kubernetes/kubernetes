@@ -50,7 +50,7 @@ go_library(
         "//vendor/google.golang.org/protobuf/internal/fieldsort:go_default_library",
         "//vendor/google.golang.org/protobuf/internal/filedesc:go_default_library",
         "//vendor/google.golang.org/protobuf/internal/flags:go_default_library",
-        "//vendor/google.golang.org/protobuf/internal/genname:go_default_library",
+        "//vendor/google.golang.org/protobuf/internal/genid:go_default_library",
         "//vendor/google.golang.org/protobuf/internal/pragma:go_default_library",
         "//vendor/google.golang.org/protobuf/internal/strs:go_default_library",
         "//vendor/google.golang.org/protobuf/proto:go_default_library",

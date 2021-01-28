@@ -243,13 +243,13 @@ func getExpectReplicasFuncLinear(c clientset.Interface, params *DNSParamsLinear)
 			replicasFromNodes = math.Ceil(float64(len(nodes.Items)) / params.nodesPerReplica)
 		}
 		if params.coresPerReplica > 0 {
-			replicasFromCores = math.Ceil(float64(getScheduableCores(nodes.Items)) / params.coresPerReplica)
+			replicasFromCores = math.Ceil(float64(getSchedulableCores(nodes.Items)) / params.coresPerReplica)
 		}
 		return int(math.Max(1.0, math.Max(replicasFromNodes, replicasFromCores)))
 	}
 }
 
-func getScheduableCores(nodes []v1.Node) int64 {
+func getSchedulableCores(nodes []v1.Node) int64 {
 	var sc resource.Quantity
 	for _, node := range nodes {
 		if !node.Spec.Unschedulable {

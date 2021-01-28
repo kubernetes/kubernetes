@@ -79,7 +79,8 @@ type CreateDeploymentOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewCreateCreateDeploymentOptions(ioStreams genericclioptions.IOStreams) *CreateDeploymentOptions {
+// NewCreateDeploymentOptions returns an initialized CreateDeploymentOptions instance
+func NewCreateDeploymentOptions(ioStreams genericclioptions.IOStreams) *CreateDeploymentOptions {
 	return &CreateDeploymentOptions{
 		Port:       -1,
 		Replicas:   1,
@@ -91,7 +92,7 @@ func NewCreateCreateDeploymentOptions(ioStreams genericclioptions.IOStreams) *Cr
 // NewCmdCreateDeployment is a macro command to create a new deployment.
 // This command is better known to users as `kubectl create deployment`.
 func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewCreateCreateDeploymentOptions(ioStreams)
+	o := NewCreateDeploymentOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "deployment NAME --image=image -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: true,
@@ -173,6 +174,7 @@ func (o *CreateDeploymentOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 	return nil
 }
 
+// Validate makes sure there is no discrepency in provided option values
 func (o *CreateDeploymentOptions) Validate() error {
 	if len(o.Images) > 1 && len(o.Command) > 0 {
 		return fmt.Errorf("cannot specify multiple --image options and command")

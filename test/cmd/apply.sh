@@ -144,10 +144,22 @@ run_kubectl_apply_tests() {
 }
 __EOF__
 
+  # Ensure the API server has recognized and started serving the associated CR API
+  local tries=5
+  for i in $(seq 1 $tries); do
+      local output
+      output=$(kubectl "${kube_flags[@]:?}" api-resources --api-group mygroup.example.com -oname)
+      if kube::test::if_has_string "$output" resources.mygroup.example.com; then
+          break
+      fi
+      echo "${i}: Waiting for CR API to be available"
+      sleep "$i"
+  done
+
   # Dry-run create the CR
   kubectl "${kube_flags[@]:?}" apply --dry-run=server -f hack/testdata/CRD/resource.yaml "${kube_flags[@]:?}"
   # Make sure that the CR doesn't exist
-  ! kubectl "${kube_flags[@]:?}" get resource/myobj || exit 1
+  ! kubectl "${kube_flags[@]:?}" get resource/myobj 2>/dev/null || exit 1
 
   # clean-up
   kubectl "${kube_flags[@]:?}" delete customresourcedefinition resources.mygroup.example.com
@@ -161,11 +173,8 @@ __EOF__
   kube::test::get_object_assert 'pods a -n nsb' "{{${id_field:?}}}" 'a'
   # apply b with namespace
   kubectl apply --namespace nsb --prune -l prune-group=true -f hack/testdata/prune/b.yaml "${kube_flags[@]:?}"
-  # check right pod exists
-  kube::test::get_object_assert 'pods b -n nsb' "{{${id_field:?}}}" 'b'
-  # check wrong pod doesn't exist
-  output_message=$(! kubectl get pods a -n nsb 2>&1 "${kube_flags[@]:?}")
-  kube::test::if_has_string "${output_message}" 'pods "a" not found'
+  # check right pod exists and wrong pod doesn't exist
+  kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" 'b:'
 
   # cleanup
   kubectl delete pods b -n nsb
@@ -179,8 +188,7 @@ __EOF__
   # check right pod exists
   kube::test::get_object_assert 'pods a' "{{${id_field:?}}}" 'a'
   # check wrong pod doesn't exist
-  output_message=$(! kubectl get pods b -n nsb 2>&1 "${kube_flags[@]:?}")
-  kube::test::if_has_string "${output_message}" 'pods "b" not found'
+  kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" ''
 
   # apply b
   kubectl apply -l prune-group=true -f hack/testdata/prune/b.yaml "${kube_flags[@]:?}"
@@ -242,11 +250,8 @@ __EOF__
   kube::test::get_object_assert 'pods b -n nsb' "{{${id_field:?}}}" 'b'
   # apply --prune must prune a
   kubectl apply --prune --all -f hack/testdata/prune/b.yaml
-  # check wrong pod doesn't exist
-  output_message=$(! kubectl get pods a -n nsb 2>&1 "${kube_flags[@]:?}")
-  kube::test::if_has_string "${output_message}" 'pods "a" not found'
-  # check right pod exists
-  kube::test::get_object_assert 'pods b -n nsb' "{{${id_field:?}}}" 'b'
+  # check wrong pod doesn't exist and right pod exists
+  kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" 'b:'
 
   # cleanup
   kubectl delete ns nsb
@@ -264,7 +269,7 @@ __EOF__
   kube::test::get_object_assert 'services a' "{{${id_field:?}}}" 'a'
   # change immutable field and apply service a
   output_message=$(! kubectl apply -f hack/testdata/service-revision2.yaml 2>&1 "${kube_flags[@]:?}")
-  kube::test::if_has_string "${output_message}" 'field is immutable'
+  kube::test::if_has_string "${output_message}" 'may not change once set'
   # apply --force to recreate resources for immutable fields
   kubectl apply -f hack/testdata/service-revision2.yaml --force "${kube_flags[@]:?}"
   # check immutable field exists
@@ -305,8 +310,8 @@ __EOF__
   kubectl delete -f hack/testdata/multi-resource-1.yaml "${kube_flags[@]:?}"
 
   ## kubectl apply multiple resources with one failure during builder phase.
-  # Pre-Condition: No configmaps
-  kube::test::get_object_assert configmaps "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # Pre-Condition: No configmaps with name=foo
+  kube::test::get_object_assert 'configmaps --field-selector=metadata.name=foo' "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Apply a configmap and a bogus custom resource.
   output_message=$(! kubectl apply -f hack/testdata/multi-resource-2.yaml 2>&1 "${kube_flags[@]:?}")
   # Should be error message from bogus custom resource.
@@ -444,10 +449,22 @@ run_kubectl_server_side_apply_tests() {
 }
 __EOF__
 
+  # Ensure the API server has recognized and started serving the associated CR API
+  local tries=5
+  for i in $(seq 1 $tries); do
+      local output
+      output=$(kubectl "${kube_flags[@]:?}" api-resources --api-group mygroup.example.com -oname)
+      if kube::test::if_has_string "$output" resources.mygroup.example.com; then
+          break
+      fi
+      echo "${i}: Waiting for CR API to be available"
+      sleep "$i"
+  done
+
   # Dry-run create the CR
   kubectl "${kube_flags[@]:?}" apply --server-side --dry-run=server -f hack/testdata/CRD/resource.yaml "${kube_flags[@]:?}"
   # Make sure that the CR doesn't exist
-  ! kubectl "${kube_flags[@]:?}" get resource/myobj || exit 1
+  ! kubectl "${kube_flags[@]:?}" get resource/myobj 2>/dev/null || exit 1
 
   # clean-up
   kubectl "${kube_flags[@]:?}" delete customresourcedefinition resources.mygroup.example.com

@@ -11,7 +11,9 @@ approvers:
 reviewers:
 - andrewsykim
 - cheftako
+- cici37
 - deads2k
+- jpbetz
 - lavalamp
 - liggitt
 - luxas
@@ -19,5 +21,4 @@ reviewers:
 - sttts
 labels:
 - sig/api-machinery
-- triage/needs-information
 - sig/cloud-provider

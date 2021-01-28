@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"

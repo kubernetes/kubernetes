@@ -603,7 +603,7 @@ binary | sha256 hash
 * Update GlusterFS provisioning readme with endpoint/service details ([#31854](https://github.com/kubernetes/kubernetes/pull/31854), [@humblec](https://github.com/humblec))
 * Add logging for enabled/disabled API Groups ([#32198](https://github.com/kubernetes/kubernetes/pull/32198), [@deads2k](https://github.com/deads2k))
 * New federation deployment mechanism now allows non-GCP clusters. ([#34620](https://github.com/kubernetes/kubernetes/pull/34620), [@madhusudancs](https://github.com/madhusudancs))
-        * Writes the federation kubeconfig to the local kubeconfig file.
+     * Writes the federation kubeconfig to the local kubeconfig file.
 
 
 
@@ -628,7 +628,7 @@ binary | sha256 hash
 * Update GlusterFS provisioning readme with endpoint/service details ([#31854](https://github.com/kubernetes/kubernetes/pull/31854), [@humblec](https://github.com/humblec))
 * Add logging for enabled/disabled API Groups ([#32198](https://github.com/kubernetes/kubernetes/pull/32198), [@deads2k](https://github.com/deads2k))
 * New federation deployment mechanism now allows non-GCP clusters. ([#34620](https://github.com/kubernetes/kubernetes/pull/34620), [@madhusudancs](https://github.com/madhusudancs))
-        * Writes the federation kubeconfig to the local kubeconfig file.
+     * Writes the federation kubeconfig to the local kubeconfig file.
 
 
 
@@ -686,8 +686,8 @@ binary | sha256 hash
 ### Other notable changes
 
 * Update GCI base image: ([#34156](https://github.com/kubernetes/kubernetes/pull/34156), [@adityakali](https://github.com/adityakali))
-        * Enabled VXLAN and IP_SET config options in kernel to support some networking tools (ebtools)
-        * OpenSSL CVE fixes
+   * Enabled VXLAN and IP_SET config options in kernel to support some networking tools (ebtools)
+   * OpenSSL CVE fixes
 * ContainerVm/GCI image: try to use ifdown/ifup if available ([#33595](https://github.com/kubernetes/kubernetes/pull/33595), [@freehan](https://github.com/freehan))
 * Make the informer library available for the go client library. ([#32718](https://github.com/kubernetes/kubernetes/pull/32718), [@mikedanese](https://github.com/mikedanese))
 * Enforce Disk based pod eviction with GCI base image in Kubelet ([#33520](https://github.com/kubernetes/kubernetes/pull/33520), [@vishh](https://github.com/vishh))
@@ -920,9 +920,9 @@ binary | sha256 hash
 * Remove cpu limits for dns pod to avoid CPU starvation ([#33227](https://github.com/kubernetes/kubernetes/pull/33227), [@vishh](https://github.com/vishh))
 * Resolves x509 verification issue with masters dialing nodes when started with --kubelet-certificate-authority ([#33141](https://github.com/kubernetes/kubernetes/pull/33141), [@liggitt](https://github.com/liggitt))
 * Upgrading Container-VM base image for k8s on GCE. Brief changelog as follows: ([#32738](https://github.com/kubernetes/kubernetes/pull/32738), [@Amey-D](https://github.com/Amey-D))
-    *     - Fixed performance regression in veth device driver
-    *     - Docker and related binaries are statically linked
-    *     - Fixed the issue of systemd being oom-killable
+    * Fixed performance regression in veth device driver
+    * Docker and related binaries are statically linked
+    * Fixed the issue of systemd being oom-killable
 * Update cAdvisor to v0.24.0 - see the [cAdvisor changelog](https://github.com/google/cadvisor/blob/v0.24.0/CHANGELOG.md) for the full list of changes. ([#33052](https://github.com/kubernetes/kubernetes/pull/33052), [@timstclair](https://github.com/timstclair))
 
 
@@ -1110,11 +1110,11 @@ binary | sha256 hash
 * Handle overlapping deployments gracefully ([#30730](https://github.com/kubernetes/kubernetes/pull/30730), [@janetkuo](https://github.com/janetkuo))
 * Remove environment variables and internal Kubernetes Docker labels from cAdvisor Prometheus metric labels. ([#31064](https://github.com/kubernetes/kubernetes/pull/31064), [@grobie](https://github.com/grobie))
     * Old behavior:
-    * - environment variables explicitly whitelisted via --docker-env-metadata-whitelist were exported as `container_env_*=*`. Default is zero so by default non were exported
-    * - all docker labels were exported as `container_label_*=*`
+      * environment variables explicitly whitelisted via --docker-env-metadata-whitelist were exported as `container_env_*=*`. Default is zero so by default non were exported
+      * all docker labels were exported as `container_label_*=*`
     * New behavior:
-    * - Only `container_name`, `pod_name`, `namespace`, `id`, `image`, and `name` labels are exposed
-    * - no environment variables will be exposed ever via /metrics, even if whitelisted
+      * Only `container_name`, `pod_name`, `namespace`, `id`, `image`, and `name` labels are exposed
+      * no environment variables will be exposed ever via /metrics, even if whitelisted
 * Filter duplicate network packets in promiscuous bridge mode (with ebtables) ([#28717](https://github.com/kubernetes/kubernetes/pull/28717), [@freehan](https://github.com/freehan))
 * Refactor to simplify the hard-traveled path of the KubeletConfiguration object ([#29216](https://github.com/kubernetes/kubernetes/pull/29216), [@mtaufen](https://github.com/mtaufen))
 * Fix overflow issue in controller-manager rate limiter ([#31396](https://github.com/kubernetes/kubernetes/pull/31396), [@foxish](https://github.com/foxish))
@@ -1137,24 +1137,22 @@ binary | sha256 hash
 
 * Moved init-container feature from alpha to beta. ([#31026](https://github.com/kubernetes/kubernetes/pull/31026), [@erictune](https://github.com/erictune))
     * Security Action Required:
-    * This only applies to you if you use the PodSecurityPolicy feature.  You are using that feature if `kubectl get podsecuritypolicy` returns one or more objects.  If it returns an error, you are not using it.
-    * If there are any pods with the key `pods.beta.kubernetes.io/init-containers`, then that pod may not have been filtered by the PodSecurityPolicy.  You should find such pods and either delete them or audit them to ensure they do not use features that you intend to be blocked by PodSecurityPolicy.
-    * Explanation of Feature
-    * In 1.3, an init container is specified with this annotation key
-    * on the pod or pod template: `pods.alpha.kubernetes.io/init-containers`.
-    * In 1.4, either that key or this key: `pods.beta.kubernetes.io/init-containers`,
-    * can be used.
+      * This only applies to you if you use the PodSecurityPolicy feature.  You are using that feature if `kubectl get podsecuritypolicy` returns one or more objects.  If it returns an error, you are not using it.
+      * If there are any pods with the key `pods.beta.kubernetes.io/init-containers`, then that pod may not have been filtered by the PodSecurityPolicy.  You should find such pods and either delete them or audit them to ensure they do not use features that you intend to be blocked by PodSecurityPolicy.
+    * Explanation of Feature:
+      * In 1.3, an init container is specified with this annotation key on the pod or pod template: `pods.alpha.kubernetes.io/init-containers`.
+      * In 1.4, either that key or this key: `pods.beta.kubernetes.io/init-containers`,can be used.
     * When you GET an object, you will see both annotation keys with the same values.
-    * You can safely roll back from 1.4 to 1.3, and things with init-containers
-    * will still work (pods, deployments, etc).
+      You can safely roll back from 1.4 to 1.3, and things with init-containers
+      will still work (pods, deployments, etc).
     * If you are running 1.3, only use the alpha annotation, or it may be lost when
-    * rolling forward.
-    * The status has moved from annotation key
-    * `pods.beta.kubernetes.io/init-container-statuses` to
-    * `pods.beta.kubernetes.io/init-container-statuses`.
+      rolling forward.
+      The status has moved from annotation key
+      `pods.beta.kubernetes.io/init-container-statuses` to
+      `pods.beta.kubernetes.io/init-container-statuses`.
     * Any code that inspects this annotation should be changed to use the new key.
-    * State of Initialization will continue to be reported in both pods.alpha.kubernetes.io/initialized
-    * and in `podStatus.conditions.{status: "True", type: Initialized}`
+      State of Initialization will continue to be reported in both pods.alpha.kubernetes.io/initialized
+      and in `podStatus.conditions.{status: "True", type: Initialized}`
 * Action required: federation-only: Please update your cluster name to be a valid DNS label. ([#30956](https://github.com/kubernetes/kubernetes/pull/30956), [@nikhiljindal](https://github.com/nikhiljindal))
     * Updating federation.v1beta1.Cluster API to disallow subdomains as valid cluster names. Only DNS labels are allowed as valid cluster names now.
 * [Kubelet] Rename `--config` to `--pod-manifest-path`. `--config` is deprecated. ([#29999](https://github.com/kubernetes/kubernetes/pull/29999), [@mtaufen](https://github.com/mtaufen))
@@ -1195,8 +1193,8 @@ binary | sha256 hash
 * Return container command exit codes in kubectl run/exec ([#26541](https://github.com/kubernetes/kubernetes/pull/26541), [@sttts](https://github.com/sttts))
 * Fix kubectl describe to display a container's resource limit env vars as node allocatable when the limits are not set ([#29849](https://github.com/kubernetes/kubernetes/pull/29849), [@aveshagarwal](https://github.com/aveshagarwal))
 * The `valueFrom.fieldRef.name` field on environment variables in pods and objects with pod templates now allows two additional fields to be used: ([#27880](https://github.com/kubernetes/kubernetes/pull/27880), [@smarterclayton](https://github.com/smarterclayton))
-        * `spec.nodeName` will return the name of the node this pod is running on
-        * `spec.serviceAccountName` will return the name of the service account this pod is running under
+  * `spec.nodeName` will return the name of the node this pod is running on
+  * `spec.serviceAccountName` will return the name of the service account this pod is running under
 * Adding ImagePolicyWebhook admission controller. ([#30631](https://github.com/kubernetes/kubernetes/pull/30631), [@ecordell](https://github.com/ecordell))
 * Validate involvedObject.Namespace matches event.Namespace ([#30533](https://github.com/kubernetes/kubernetes/pull/30533), [@liggitt](https://github.com/liggitt))
 * allow group impersonation ([#30803](https://github.com/kubernetes/kubernetes/pull/30803), [@deads2k](https://github.com/deads2k))
@@ -1267,13 +1265,14 @@ binary | sha256 hash
 * azure: kube-up respects AZURE_RESOURCE_GROUP ([#28700](https://github.com/kubernetes/kubernetes/pull/28700), [@colemickens](https://github.com/colemickens))
 * Modified influxdb petset to provision persistent  volume. ([#28840](https://github.com/kubernetes/kubernetes/pull/28840), [@jszczepkowski](https://github.com/jszczepkowski))
 * Allow service names up to 63 characters (RFC 1035) ([#29523](https://github.com/kubernetes/kubernetes/pull/29523), [@fraenkel](https://github.com/fraenkel))
-* Change eviction policies in NodeController: ([#28897](https://github.com/kubernetes/kubernetes/pull/28897), [@gmarek](https://github.com/gmarek))
-    * - add a "partialDisruption" mode, when more than 33% of Nodes in the zone are not Ready
-    * - add "fullDisruption" mode, when all Nodes in the zone are not Ready
+* Change eviction logic in NodeController and make it Zone-aware ([#28897](https://github.com/kubernetes/kubernetes/pull/28897), [@gmarek](https://github.com/gmarek))
+    * Change eviction policies in NodeController:
+      *  add a "partialDisruption" mode, when more than 33% of Nodes in the zone are not Ready
+      *  add "fullDisruption" mode, when all Nodes in the zone are not Ready
     * Eviction behavior depends on the mode in which NodeController is operating:
-    * - if the new state is "partialDisruption" or "fullDisruption" we call a user defined function that returns a new QPS to use (default 1/10 of the default rate, and the default rate respectively),
-    * - if the new state is "normal" we resume normal operation (go back to default limiter settings),
-    * - if all zones in the cluster are in "fullDisruption" state we stop all evictions.
+      * if the new state is "partialDisruption" or "fullDisruption" we call a user defined function that returns a new QPS to use (default 1/10 of the default rate, and the default rate respectively),
+      * if the new state is "normal" we resume normal operation (go back to default limiter settings),
+      * if all zones in the cluster are in "fullDisruption" state we stop all evictions.
 * Add a flag for `kubectl expose`to set ClusterIP and allow headless services ([#28239](https://github.com/kubernetes/kubernetes/pull/28239), [@ApsOps](https://github.com/ApsOps))
 * Add support to quota pvc storage requests ([#28636](https://github.com/kubernetes/kubernetes/pull/28636), [@derekwaynecarr](https://github.com/derekwaynecarr))
 
@@ -1295,9 +1294,9 @@ binary | sha256 hash
 
 * Federation API server kubeconfig secret consumed by federation-controller-manager has a new name. ([#28938](https://github.com/kubernetes/kubernetes/pull/28938), [@madhusudancs](https://github.com/madhusudancs))
     * If you are upgrading your Cluster Federation components from v1.3.x, please run this command to migrate the federation-apiserver-secret to federation-apiserver-kubeconfig serect;
-    * $ kubectl --namespace=federation get secret federation-apiserver-secret -o json | sed 's/federation-apiserver-secret/federation-apiserver-kubeconfig/g' | kubectl create -f -
+    ```$ kubectl --namespace=federation get secret federation-apiserver-secret -o json | sed 's/federation-apiserver-secret/federation-apiserver-kubeconfig/g' | kubectl create -f -```
     * You might also want to delete the old secret using this command:
-    * $ kubectl delete secret --namespace=federation federation-apiserver-secret
+    ```$ kubectl delete secret --namespace=federation federation-apiserver-secret```
 * Stop eating panics ([#28800](https://github.com/kubernetes/kubernetes/pull/28800), [@lavalamp](https://github.com/lavalamp))
 
 ### Other notable changes
@@ -1351,9 +1350,7 @@ binary | sha256 hash
 * Fix watch cache filtering ([#28966](https://github.com/kubernetes/kubernetes/pull/28966), [@liggitt](https://github.com/liggitt))
 * Deprecate deleting-pods-burst ControllerManager flag ([#28882](https://github.com/kubernetes/kubernetes/pull/28882), [@gmarek](https://github.com/gmarek))
 * Add support for terminal resizing for exec, attach, and run. Note that for Docker, exec sessions ([#25273](https://github.com/kubernetes/kubernetes/pull/25273), [@ncdc](https://github.com/ncdc))
-    * inherit the environment from the primary process, so if the container was created with tty=false,
-    * that means the exec session's TERM variable will default to "dumb". Users can override this by
-    * setting TERM=xterm (or whatever is appropriate) to get the correct "smart" terminal behavior.
+    * inherit the environment from the primary process, so if the container was created with tty=false,that means the exec session's TERM variable will default to "dumb". Users can override this by setting TERM=xterm (or whatever is appropriate) to get the correct "smart" terminal behavior.
 * Implement alpha version of PreferAvoidPods ([#20699](https://github.com/kubernetes/kubernetes/pull/20699), [@jiangyaoguo](https://github.com/jiangyaoguo))
 * Retry when apiserver fails to listen on insecure port ([#28797](https://github.com/kubernetes/kubernetes/pull/28797), [@aaronlevy](https://github.com/aaronlevy))
 * Add SSH_OPTS to config ssh and scp port ([#28872](https://github.com/kubernetes/kubernetes/pull/28872), [@lojies](https://github.com/lojies))
@@ -1430,7 +1427,5 @@ binary | sha1 hash | md5 hash
 Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for older releases.
 
 Release notes of older releases can be found in:
-- [CHANGELOG-1.2.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.2.md)
-- [CHANGELOG-1.3.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.3.md)
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/CHANGELOG.md?pixel)]()
+- [CHANGELOG-1.2.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.2.md)
+- [CHANGELOG-1.3.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.3.md)

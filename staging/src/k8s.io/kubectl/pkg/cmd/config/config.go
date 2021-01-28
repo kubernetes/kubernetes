@@ -40,14 +40,14 @@ func NewCmdConfig(f cmdutil.Factory, pathOptions *clientcmd.PathOptions, streams
 		Use:                   "config SUBCOMMAND",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Modify kubeconfig files"),
-		Long: templates.LongDesc(`
+		Long: templates.LongDesc(i18n.T(`
 			Modify kubeconfig files using subcommands like "kubectl config set current-context my-context"
 
 			The loading order follows these rules:
 
-			1. If the --` + pathOptions.ExplicitFileFlag + ` flag is set, then only that file is loaded. The flag may only be set once and no merging takes place.
-			2. If $` + pathOptions.EnvVar + ` environment variable is set, then it is used as a list of paths (normal path delimiting rules for your system). These paths are merged. When a value is modified, it is modified in the file that defines the stanza. When a value is created, it is created in the first file that exists. If no files in the chain exist, then it creates the last file in the list.
-			3. Otherwise, ` + path.Join("${HOME}", pathOptions.GlobalFileSubpath) + ` is used and no merging takes place.`),
+			1. If the --`) + pathOptions.ExplicitFileFlag + i18n.T(` flag is set, then only that file is loaded. The flag may only be set once and no merging takes place.
+			2. If $`) + pathOptions.EnvVar + i18n.T(` environment variable is set, then it is used as a list of paths (normal path delimiting rules for your system). These paths are merged. When a value is modified, it is modified in the file that defines the stanza. When a value is created, it is created in the first file that exists. If no files in the chain exist, then it creates the last file in the list.
+			3. Otherwise, `) + path.Join("${HOME}", pathOptions.GlobalFileSubpath) + i18n.T(` is used and no merging takes place.`)),
 		Run: cmdutil.DefaultSubCommandRun(streams.ErrOut),
 	}
 
@@ -65,8 +65,10 @@ func NewCmdConfig(f cmdutil.Factory, pathOptions *clientcmd.PathOptions, streams
 	cmd.AddCommand(NewCmdConfigUseContext(streams.Out, pathOptions))
 	cmd.AddCommand(NewCmdConfigGetContexts(streams, pathOptions))
 	cmd.AddCommand(NewCmdConfigGetClusters(streams.Out, pathOptions))
+	cmd.AddCommand(NewCmdConfigGetUsers(streams, pathOptions))
 	cmd.AddCommand(NewCmdConfigDeleteCluster(streams.Out, pathOptions))
 	cmd.AddCommand(NewCmdConfigDeleteContext(streams.Out, streams.ErrOut, pathOptions))
+	cmd.AddCommand(NewCmdConfigDeleteUser(streams, pathOptions))
 	cmd.AddCommand(NewCmdConfigRenameContext(streams.Out, pathOptions))
 
 	return cmd

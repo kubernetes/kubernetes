@@ -26,7 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-base/metrics/testutil"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
 type mockSummaryProvider struct {
@@ -51,6 +51,8 @@ func TestCollectResourceMetrics(t *testing.T) {
 		"node_memory_working_set_bytes",
 		"container_cpu_usage_seconds_total",
 		"container_memory_working_set_bytes",
+		"pod_cpu_usage_seconds_total",
+		"pod_memory_working_set_bytes",
 	}
 
 	tests := []struct {
@@ -166,6 +168,39 @@ func TestCollectResourceMetrics(t *testing.T) {
 				container_memory_working_set_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 1000 2000
 				container_memory_working_set_bytes{container="container_a",namespace="namespace_b",pod="pod_b"} 1000 2000
 				container_memory_working_set_bytes{container="container_b",namespace="namespace_a",pod="pod_a"} 1000 2000
+			`,
+		},
+		{
+			name: "arbitrary pod metrics",
+			summary: &statsapi.Summary{
+				Pods: []statsapi.PodStats{
+					{
+						PodRef: statsapi.PodReference{
+							Name:      "pod_a",
+							Namespace: "namespace_a",
+						},
+						CPU: &statsapi.CPUStats{
+							Time:                 testTime,
+							UsageCoreNanoSeconds: uint64Ptr(10000000000),
+						},
+						Memory: &statsapi.MemoryStats{
+							Time:            testTime,
+							WorkingSetBytes: uint64Ptr(1000),
+						},
+					},
+				},
+			},
+			summaryErr: nil,
+			expectedMetrics: `
+				# HELP scrape_error [ALPHA] 1 if there was an error while getting container metrics, 0 otherwise
+				# TYPE scrape_error gauge
+				scrape_error 0
+				# HELP pod_cpu_usage_seconds_total [ALPHA] Cumulative cpu time consumed by the pod in core-seconds
+				# TYPE pod_cpu_usage_seconds_total counter
+				pod_cpu_usage_seconds_total{namespace="namespace_a",pod="pod_a"} 10 2000
+				# HELP pod_memory_working_set_bytes [ALPHA] Current working set of the pod in bytes
+				# TYPE pod_memory_working_set_bytes gauge
+				pod_memory_working_set_bytes{namespace="namespace_a",pod="pod_a"} 1000 2000
 			`,
 		},
 	}

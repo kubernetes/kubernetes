@@ -439,8 +439,8 @@ Kubectl flag `--container-port` flag is deprecated: it will be removed in the fu
   * ARP caching fix
   * Use /dev/xvdXX names
   * ELB:
-    * ELB proxy protocol support
-    * mixed plaintext/encrypted ports support in ELBs
+    * ELB proxy protocol support 
+	* mixed plaintext/encrypted ports support in ELBs
     * SSL support for ELB listeners
   * Allow VPC CIDR to be specified (experimental)
   * Fix problems with >2 security groups
@@ -667,9 +667,7 @@ binary | sha1 hash | md5 hash
 * Stabilize map order in kubectl describe ([#26046](https://github.com/kubernetes/kubernetes/pull/26046), [@timoreimann](https://github.com/timoreimann))
 * Google Cloud DNS dnsprovider - replacement for [#25389](https://github.com/kubernetes/kubernetes/pull/25389) ([#26020](https://github.com/kubernetes/kubernetes/pull/26020), [@quinton-hoole](https://github.com/quinton-hoole))
 * Fix system container detection in kubelet on systemd. ([#25982](https://github.com/kubernetes/kubernetes/pull/25982), [@derekwaynecarr](https://github.com/derekwaynecarr))
-    * This fixed environments where CPU and Memory Accounting were not enabled on the unit
-    * that launched the kubelet or docker from reporting the root cgroup when
-    * monitoring usage stats for those components.
+    * This fixed environments where CPU and Memory Accounting were not enabled on the unit that launched the kubelet or docker from reporting the root cgroup when monitoring usage stats for those components.
 * Added pods-per-core to kubelet. [#25762](https://github.com/kubernetes/kubernetes/pull/25762) ([#25813](https://github.com/kubernetes/kubernetes/pull/25813), [@rrati](https://github.com/rrati))
 * promote sourceRange into service spec ([#25826](https://github.com/kubernetes/kubernetes/pull/25826), [@freehan](https://github.com/freehan))
 * kube-controller-manager: Add configure-cloud-routes option ([#25614](https://github.com/kubernetes/kubernetes/pull/25614), [@justinsb](https://github.com/justinsb))
@@ -698,9 +696,7 @@ binary | sha1 hash | md5 hash
 * Fix hyperkube flag parsing ([#25512](https://github.com/kubernetes/kubernetes/pull/25512), [@colhom](https://github.com/colhom))
 * Add a kubectl create secret tls command ([#24719](https://github.com/kubernetes/kubernetes/pull/24719), [@bprashanth](https://github.com/bprashanth))
 * Introduce a new add-on pod NodeProblemDetector. ([#25986](https://github.com/kubernetes/kubernetes/pull/25986), [@Random-Liu](https://github.com/Random-Liu))
-    * NodeProblemDetector is a DaemonSet running on each node, monitoring node health and reporting
-    * node problems as NodeCondition and Event. Currently it already supports kernel log monitoring, and
-    * will support more problem detection in the future. It is enabled by default on gce now.
+    * NodeProblemDetector is a DaemonSet running on each node, monitoring node health and reporting node problems as NodeCondition and Event. Currently it already supports kernel log monitoring, and will support more problem detection in the future. It is enabled by default on gce now.
 * Handle cAdvisor partial failures ([#25933](https://github.com/kubernetes/kubernetes/pull/25933), [@timstclair](https://github.com/timstclair))
 * Use SkyDNS as a library for a more integrated kube DNS ([#23930](https://github.com/kubernetes/kubernetes/pull/23930), [@ArtfulCoder](https://github.com/ArtfulCoder))
 * Introduce node memory pressure condition to scheduler ([#25531](https://github.com/kubernetes/kubernetes/pull/25531), [@ingvagabund](https://github.com/ingvagabund))
@@ -717,8 +713,7 @@ binary | sha1 hash | md5 hash
 * Add "kubectl set image" for easier updating container images (for pods or resources with pod templates).  ([#25509](https://github.com/kubernetes/kubernetes/pull/25509), [@janetkuo](https://github.com/janetkuo))
 * NodeController doesn't evict Pods if no Nodes are Ready ([#25571](https://github.com/kubernetes/kubernetes/pull/25571), [@gmarek](https://github.com/gmarek))
 * Incompatible change of kube-up.sh:  ([#25734](https://github.com/kubernetes/kubernetes/pull/25734), [@jszczepkowski](https://github.com/jszczepkowski))
-    * when turning on cluster autoscaler by setting KUBE_ENABLE_NODE_AUTOSCALER=true,
-    * KUBE_AUTOSCALER_MIN_NODES and KUBE_AUTOSCALER_MAX_NODES need to be set.
+    * When turning on cluster autoscaler by setting KUBE_ENABLE_NODE_AUTOSCALER=true,KUBE_AUTOSCALER_MIN_NODES and KUBE_AUTOSCALER_MAX_NODES need to be set.
 * systemd node spec proposal ([#17688](https://github.com/kubernetes/kubernetes/pull/17688), [@derekwaynecarr](https://github.com/derekwaynecarr))
 * Bump GCE ContainerVM to container-v1-3-v20160517 (Docker 1.11.1) ([#25843](https://github.com/kubernetes/kubernetes/pull/25843), [@zmerlynn](https://github.com/zmerlynn))
 * AWS: Move enforcement of attached AWS device limit from kubelet to scheduler ([#23254](https://github.com/kubernetes/kubernetes/pull/23254), [@jsafrane](https://github.com/jsafrane))
@@ -803,8 +798,7 @@ binary | sha1 hash | md5 hash
 * GCE: Prefer preconfigured node tags for firewalls, if available ([#25148](https://github.com/kubernetes/kubernetes/pull/25148), [@a-robinson](https://github.com/a-robinson))
 * kubectl rolling-update support for same image ([#24645](https://github.com/kubernetes/kubernetes/pull/24645), [@jlowdermilk](https://github.com/jlowdermilk))
 * Add an entry to the salt config to allow Debian jessie on GCE. ([#25123](https://github.com/kubernetes/kubernetes/pull/25123), [@jlewi](https://github.com/jlewi))
-    * As with the existing Wheezy image on GCE, docker is expected
-    * to already be installed in the image.
+    * As with the existing Wheezy image on GCE, docker is expected to already be installed in the image.
 * Mark kube-push.sh as broken ([#25095](https://github.com/kubernetes/kubernetes/pull/25095), [@ihmccreery](https://github.com/ihmccreery))
 * AWS: Add support for ap-northeast-2 region (Seoul) ([#24457](https://github.com/kubernetes/kubernetes/pull/24457), [@leokhoa](https://github.com/leokhoa))
 * GCI: Update the command to get the image ([#24987](https://github.com/kubernetes/kubernetes/pull/24987), [@andyzheng0831](https://github.com/andyzheng0831))
@@ -967,6 +961,4 @@ binary | sha1 hash | md5 hash
 Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for older releases.
 
 Release notes of older releases can be found in:
-- [CHANGELOG-1.2.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.2.md)
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/CHANGELOG.md?pixel)]()
+- [CHANGELOG-1.2.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.2.md)

@@ -158,8 +158,8 @@ func AddResetFlags(flagSet *flag.FlagSet, resetOptions *resetOptions) {
 	cmdutil.AddCRISocketFlag(flagSet, &resetOptions.criSocketPath)
 }
 
-// NewCmdReset returns the "kubeadm reset" command
-func NewCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra.Command {
+// newCmdReset returns the "kubeadm reset" command
+func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra.Command {
 	if resetOptions == nil {
 		resetOptions = newResetOptions()
 	}

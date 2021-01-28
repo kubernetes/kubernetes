@@ -19,13 +19,14 @@ package interpodaffinity
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -252,12 +253,56 @@ func TestPreferredAffinity(t *testing.T) {
 		},
 	}
 
+	invalidAffinityLabels := &v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+				{
+					Weight: 8,
+					PodAffinityTerm: v1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "security",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"{{.bad-value.}}"},
+								},
+							},
+						},
+						TopologyKey: "region",
+					},
+				},
+			},
+		},
+	}
+	invalidAntiAffinityLabels := &v1.Affinity{
+		PodAntiAffinity: &v1.PodAntiAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+				{
+					Weight: 5,
+					PodAffinityTerm: v1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "security",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"{{.bad-value.}}"},
+								},
+							},
+						},
+						TopologyKey: "az",
+					},
+				},
+			},
+		},
+	}
+
 	tests := []struct {
 		pod          *v1.Pod
 		pods         []*v1.Pod
 		nodes        []*v1.Node
 		expectedList framework.NodeScoreList
 		name         string
+		wantStatus   *framework.Status
 	}{
 		{
 			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
@@ -326,8 +371,8 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine4", Labels: labelRgChina}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: labelRgIndia}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 50}, {Name: "machine3", Score: framework.MaxNodeScore}, {Name: "machine4", Score: framework.MaxNodeScore}, {Name: "machine5", Score: 50}},
-			name:         "Affinity: nodes in one region has more matching pods comparing to other reqion, so the region which has more macthes will get high score",
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: framework.MaxNodeScore}, {Name: "machine4", Score: framework.MaxNodeScore}, {Name: "machine5", Score: 0}},
+			name:         "Affinity: nodes in one region has more matching pods comparing to other region, so the region which has more matches will get high score",
 		},
 		// Test with the different operators and values for pod affinity scheduling preference, including some match failures.
 		{
@@ -393,7 +438,7 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
 			},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: framework.MaxNodeScore}},
-			name:         "Anti Affinity: pod that doesnot match existing pods in node will get high score ",
+			name:         "Anti Affinity: pod that does not match existing pods in node will get high score ",
 		},
 		{
 			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: awayFromS1InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
@@ -406,7 +451,7 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
 			},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: framework.MaxNodeScore}},
-			name:         "Anti Affinity: pod that does not matches topology key & matches the pods in nodes will get higher score comparing to others ",
+			name:         "Anti Affinity: pod that does not match topology key & match the pods in nodes will get higher score comparing to others ",
 		},
 		{
 			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: awayFromS1InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
@@ -420,7 +465,7 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 			},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: framework.MaxNodeScore}},
-			name:         "Anti Affinity: one node has more matching pods comparing to other node, so the node which has more unmacthes will get high score",
+			name:         "Anti Affinity: one node has more matching pods comparing to other node, so the node which has more unmatches will get high score",
 		},
 		// Test the symmetry cases for anti affinity
 		{
@@ -453,7 +498,7 @@ func TestPreferredAffinity(t *testing.T) {
 		// Combined cases considering both affinity and anti-affinity, the pod to schedule and existing pods have the same labels (they are in the same RC/service),
 		// the pod prefer to run together with its brother pods in the same region, but wants to stay away from them at node level,
 		// so that all the pods of a RC/service can stay in a same region but trying to separate with each other
-		// machine-1,machine-3,machine-4 are in ChinaRegion others machin-2,machine-5 are in IndiaRegion
+		// machine-1,machine-3,machine-4 are in ChinaRegion others machine-2,machine-5 are in IndiaRegion
 		{
 			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS1InRegionAwayFromS2InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			pods: []*v1.Pod{
@@ -472,7 +517,7 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine4", Labels: labelRgChina}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: labelRgIndia}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 40}, {Name: "machine3", Score: framework.MaxNodeScore}, {Name: "machine4", Score: framework.MaxNodeScore}, {Name: "machine5", Score: 40}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: framework.MaxNodeScore}, {Name: "machine4", Score: framework.MaxNodeScore}, {Name: "machine5", Score: 0}},
 			name:         "Affinity and Anti Affinity: considering both affinity and anti-affinity, the pod to schedule and existing pods have the same labels",
 		},
 		// Consider Affinity, Anti Affinity and symmetry together.
@@ -510,8 +555,26 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
 			name:         "Avoid panic when partial nodes in a topology don't have pods with affinity",
+		},
+		{
+			name:       "invalid Affinity fails PreScore",
+			pod:        &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: invalidAffinityLabels}},
+			wantStatus: framework.NewStatus(framework.Error, `Invalid value: "{{.bad-value.}}"`),
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
+			},
+		},
+		{
+			name:       "invalid AntiAffinity fails PreScore",
+			pod:        &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: invalidAntiAffinityLabels}},
+			wantStatus: framework.NewStatus(framework.Error, `Invalid value: "{{.bad-value.}}"`),
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
+			},
 		},
 	}
 	for _, test := range tests {
@@ -527,25 +590,28 @@ func TestPreferredAffinity(t *testing.T) {
 
 			status := p.PreScore(context.Background(), state, test.pod, test.nodes)
 			if !status.IsSuccess() {
-				t.Errorf("unexpected error: %v", status)
-			}
-			var gotList framework.NodeScoreList
-			for _, n := range test.nodes {
-				nodeName := n.ObjectMeta.Name
-				score, status := p.Score(context.Background(), state, test.pod, nodeName)
+				if !strings.Contains(status.Message(), test.wantStatus.Message()) {
+					t.Errorf("unexpected error: %v", status)
+				}
+			} else {
+				var gotList framework.NodeScoreList
+				for _, n := range test.nodes {
+					nodeName := n.ObjectMeta.Name
+					score, status := p.Score(context.Background(), state, test.pod, nodeName)
+					if !status.IsSuccess() {
+						t.Errorf("unexpected error: %v", status)
+					}
+					gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
+				}
+
+				status = p.ScoreExtensions().NormalizeScore(context.Background(), state, test.pod, gotList)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
-				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
-			}
 
-			status = p.ScoreExtensions().NormalizeScore(context.Background(), state, test.pod, gotList)
-			if !status.IsSuccess() {
-				t.Errorf("unexpected error: %v", status)
-			}
-
-			if !reflect.DeepEqual(test.expectedList, gotList) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+				if !reflect.DeepEqual(test.expectedList, gotList) {
+					t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+				}
 			}
 
 		})

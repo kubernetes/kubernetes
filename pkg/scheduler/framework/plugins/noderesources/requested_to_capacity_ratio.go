@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 const (
@@ -38,14 +38,14 @@ const (
 type functionShape []functionShapePoint
 
 type functionShapePoint struct {
-	// Utilization is function argument.
+	// utilization is function argument.
 	utilization int64
-	// Score is function value.
+	// score is function value.
 	score int64
 }
 
 // NewRequestedToCapacityRatio initializes a new plugin and returns it.
-func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
+func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	args, err := getRequestedToCapacityRatioArgs(plArgs)
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func getRequestedToCapacityRatioArgs(obj runtime.Object) (config.RequestedToCapa
 // RequestedToCapacityRatio is a score plugin that allow users to apply bin packing
 // on core resources like CPU, Memory as well as extended resources like accelerators.
 type RequestedToCapacityRatio struct {
-	handle framework.FrameworkHandle
+	handle framework.Handle
 	resourceAllocationScorer
 }
 

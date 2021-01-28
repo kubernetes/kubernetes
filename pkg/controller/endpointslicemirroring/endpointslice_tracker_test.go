@@ -19,8 +19,11 @@ package endpointslicemirroring
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestEndpointSliceTrackerUpdate(t *testing.T) {
@@ -43,47 +46,69 @@ func TestEndpointSliceTrackerUpdate(t *testing.T) {
 	epSlice1DifferentRV.ResourceVersion = "rv2"
 
 	testCases := map[string]struct {
-		updateParam *discovery.EndpointSlice
-		checksParam *discovery.EndpointSlice
-		expectHas   bool
-		expectStale bool
+		updateParam                     *discovery.EndpointSlice
+		checksParam                     *discovery.EndpointSlice
+		expectHas                       bool
+		expectStale                     bool
+		expectResourceVersionsByService map[types.NamespacedName]endpointSliceResourceVersions
 	}{
 		"same slice": {
 			updateParam: epSlice1,
 			checksParam: epSlice1,
 			expectHas:   true,
 			expectStale: false,
+			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
+				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
+					epSlice1.Name: epSlice1.ResourceVersion,
+				},
+			},
 		},
 		"different namespace": {
 			updateParam: epSlice1,
 			checksParam: epSlice1DifferentNS,
 			expectHas:   false,
 			expectStale: true,
+			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
+				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
+					epSlice1.Name: epSlice1.ResourceVersion,
+				},
+			},
 		},
 		"different service": {
 			updateParam: epSlice1,
 			checksParam: epSlice1DifferentService,
 			expectHas:   false,
 			expectStale: true,
+			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
+				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
+					epSlice1.Name: epSlice1.ResourceVersion,
+				},
+			},
 		},
 		"different resource version": {
 			updateParam: epSlice1,
 			checksParam: epSlice1DifferentRV,
 			expectHas:   true,
 			expectStale: true,
+			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
+				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
+					epSlice1.Name: epSlice1.ResourceVersion,
+				},
+			},
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			esTracker := newEndpointSliceTracker()
-			esTracker.update(tc.updateParam)
-			if esTracker.has(tc.checksParam) != tc.expectHas {
-				t.Errorf("tc.tracker.has(%+v) == %t, expected %t", tc.checksParam, esTracker.has(tc.checksParam), tc.expectHas)
+			esTracker.Update(tc.updateParam)
+			if esTracker.Has(tc.checksParam) != tc.expectHas {
+				t.Errorf("tc.tracker.Has(%+v) == %t, expected %t", tc.checksParam, esTracker.Has(tc.checksParam), tc.expectHas)
 			}
-			if esTracker.stale(tc.checksParam) != tc.expectStale {
-				t.Errorf("tc.tracker.stale(%+v) == %t, expected %t", tc.checksParam, esTracker.stale(tc.checksParam), tc.expectStale)
+			if esTracker.Stale(tc.checksParam) != tc.expectStale {
+				t.Errorf("tc.tracker.Stale(%+v) == %t, expected %t", tc.checksParam, esTracker.Stale(tc.checksParam), tc.expectStale)
 			}
+			assert.Equal(t, tc.expectResourceVersionsByService, esTracker.resourceVersionsByService)
 		})
 	}
 }
@@ -160,15 +185,81 @@ func TestEndpointSliceTrackerDelete(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			esTracker := newEndpointSliceTracker()
-			esTracker.update(epSlice1)
+			esTracker.Update(epSlice1)
 
-			esTracker.delete(tc.deleteParam)
-			if esTracker.has(tc.checksParam) != tc.expectHas {
-				t.Errorf("esTracker.has(%+v) == %t, expected %t", tc.checksParam, esTracker.has(tc.checksParam), tc.expectHas)
+			esTracker.Delete(tc.deleteParam)
+			if esTracker.Has(tc.checksParam) != tc.expectHas {
+				t.Errorf("esTracker.Has(%+v) == %t, expected %t", tc.checksParam, esTracker.Has(tc.checksParam), tc.expectHas)
 			}
-			if esTracker.stale(tc.checksParam) != tc.expectStale {
-				t.Errorf("esTracker.stale(%+v) == %t, expected %t", tc.checksParam, esTracker.stale(tc.checksParam), tc.expectStale)
+			if esTracker.Stale(tc.checksParam) != tc.expectStale {
+				t.Errorf("esTracker.Stale(%+v) == %t, expected %t", tc.checksParam, esTracker.Stale(tc.checksParam), tc.expectStale)
 			}
+		})
+	}
+}
+
+func TestEndpointSliceTrackerDeleteService(t *testing.T) {
+	svcName1, svcNS1 := "svc1", "ns1"
+	svcName2, svcNS2 := "svc2", "ns2"
+	epSlice1 := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "example-1",
+			Namespace:       svcNS1,
+			ResourceVersion: "rv1",
+			Labels:          map[string]string{discovery.LabelServiceName: svcName1},
+		},
+	}
+
+	testCases := map[string]struct {
+		updateParam                     *discovery.EndpointSlice
+		deleteServiceParam              *types.NamespacedName
+		expectHas                       bool
+		expectStale                     bool
+		expectResourceVersionsByService map[types.NamespacedName]endpointSliceResourceVersions
+	}{
+		"same service": {
+			updateParam:                     epSlice1,
+			deleteServiceParam:              &types.NamespacedName{Namespace: svcNS1, Name: svcName1},
+			expectHas:                       false,
+			expectStale:                     true,
+			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{},
+		},
+		"different namespace": {
+			updateParam:        epSlice1,
+			deleteServiceParam: &types.NamespacedName{Namespace: svcNS2, Name: svcName1},
+			expectHas:          true,
+			expectStale:        false,
+			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
+				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
+					epSlice1.Name: epSlice1.ResourceVersion,
+				},
+			},
+		},
+		"different service": {
+			updateParam:        epSlice1,
+			deleteServiceParam: &types.NamespacedName{Namespace: svcNS1, Name: svcName2},
+			expectHas:          true,
+			expectStale:        false,
+			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
+				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
+					epSlice1.Name: epSlice1.ResourceVersion,
+				},
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			esTracker := newEndpointSliceTracker()
+			esTracker.Update(tc.updateParam)
+			esTracker.DeleteService(tc.deleteServiceParam.Namespace, tc.deleteServiceParam.Name)
+			if esTracker.Has(tc.updateParam) != tc.expectHas {
+				t.Errorf("tc.tracker.Has(%+v) == %t, expected %t", tc.updateParam, esTracker.Has(tc.updateParam), tc.expectHas)
+			}
+			if esTracker.Stale(tc.updateParam) != tc.expectStale {
+				t.Errorf("tc.tracker.Stale(%+v) == %t, expected %t", tc.updateParam, esTracker.Stale(tc.updateParam), tc.expectStale)
+			}
+			assert.Equal(t, tc.expectResourceVersionsByService, esTracker.resourceVersionsByService)
 		})
 	}
 }

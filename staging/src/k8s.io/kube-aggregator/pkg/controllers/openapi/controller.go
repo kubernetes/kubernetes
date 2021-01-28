@@ -80,8 +80,8 @@ func (c *AggregationController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting OpenAPI AggregationController")
-	defer klog.Infof("Shutting down OpenAPI AggregationController")
+	klog.Info("Starting OpenAPI AggregationController")
+	defer klog.Info("Shutting down OpenAPI AggregationController")
 
 	go wait.Until(c.runWorker, time.Second, stopCh)
 

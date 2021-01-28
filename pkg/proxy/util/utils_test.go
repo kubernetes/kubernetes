@@ -17,10 +17,12 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
 	"reflect"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -163,6 +165,39 @@ func TestIsProxyableHostname(t *testing.T) {
 	}
 }
 
+func TestIsAllowedHost(t *testing.T) {
+	testCases := []struct {
+		ip     string
+		denied []string
+		want   error
+	}{
+		{"8.8.8.8", []string{}, nil},
+		{"169.254.169.254", []string{"169.0.0.0/8"}, ErrAddressNotAllowed},
+		{"169.254.169.254", []string{"fce8::/15", "169.254.169.0/24"}, ErrAddressNotAllowed},
+		{"fce9:beef::", []string{"fce8::/15", "169.254.169.0/24"}, ErrAddressNotAllowed},
+		{"127.0.0.1", []string{"127.0.0.1/32"}, ErrAddressNotAllowed},
+		{"34.107.204.206", []string{"fce8::/15"}, nil},
+		{"fce9:beef::", []string{"127.0.0.1/32"}, nil},
+		{"34.107.204.206", []string{"127.0.0.1/32"}, nil},
+		{"127.0.0.1", []string{}, nil},
+	}
+
+	for i := range testCases {
+		var denyList []*net.IPNet
+		for _, cidrStr := range testCases[i].denied {
+			_, ipNet, err := net.ParseCIDR(cidrStr)
+			if err != nil {
+				t.Fatalf("bad IP for test case: %v: %v", cidrStr, err)
+			}
+			denyList = append(denyList, ipNet)
+		}
+		got := IsAllowedHost(net.ParseIP(testCases[i].ip), denyList)
+		if testCases[i].want != got {
+			t.Errorf("case %d: expected %v, got %v", i, testCases[i].want, got)
+		}
+	}
+}
+
 func TestShouldSkipService(t *testing.T) {
 	testCases := []struct {
 		service    *v1.Service
@@ -240,6 +275,125 @@ func TestShouldSkipService(t *testing.T) {
 			t.Errorf("case %d: expect %v, got %v", i, testCases[i].shouldSkip, skip)
 		}
 	}
+}
+
+func TestNewFilteredDialContext(t *testing.T) {
+
+	_, cidr, _ := net.ParseCIDR("1.1.1.1/28")
+
+	testCases := []struct {
+		name string
+
+		// opts passed to NewFilteredDialContext
+		opts *FilteredDialOptions
+
+		// value passed to dial
+		dial string
+
+		// value expected to be passed to resolve
+		expectResolve string
+		// result from resolver
+		resolveTo  []net.IPAddr
+		resolveErr error
+
+		// expect the wrapped dialer to be called
+		expectWrappedDial bool
+		// expect an error result
+		expectErr string
+	}{
+		{
+			name:              "allow with nil opts",
+			opts:              nil,
+			dial:              "127.0.0.1:8080",
+			expectResolve:     "", // resolver not called, no-op opts
+			expectWrappedDial: true,
+			expectErr:         "",
+		},
+		{
+			name:              "allow localhost",
+			opts:              &FilteredDialOptions{AllowLocalLoopback: true},
+			dial:              "127.0.0.1:8080",
+			expectResolve:     "", // resolver not called, no-op opts
+			expectWrappedDial: true,
+			expectErr:         "",
+		},
+		{
+			name:              "disallow localhost",
+			opts:              &FilteredDialOptions{AllowLocalLoopback: false},
+			dial:              "127.0.0.1:8080",
+			expectResolve:     "127.0.0.1",
+			resolveTo:         []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}},
+			expectWrappedDial: false,
+			expectErr:         "address not allowed",
+		},
+		{
+			name:              "disallow IP",
+			opts:              &FilteredDialOptions{AllowLocalLoopback: false, DialHostCIDRDenylist: []*net.IPNet{cidr}},
+			dial:              "foo.com:8080",
+			expectResolve:     "foo.com",
+			resolveTo:         []net.IPAddr{{IP: net.ParseIP("1.1.1.1")}},
+			expectWrappedDial: false,
+			expectErr:         "address not allowed",
+		},
+		{
+			name:              "allow IP",
+			opts:              &FilteredDialOptions{AllowLocalLoopback: false, DialHostCIDRDenylist: []*net.IPNet{cidr}},
+			dial:              "foo.com:8080",
+			expectResolve:     "foo.com",
+			resolveTo:         []net.IPAddr{{IP: net.ParseIP("2.2.2.2")}},
+			expectWrappedDial: true,
+			expectErr:         "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			wrappedDialer := &testDialer{}
+			testResolver := &testResolver{addrs: tc.resolveTo, err: tc.resolveErr}
+			dialer := NewFilteredDialContext(wrappedDialer.DialContext, testResolver, tc.opts)
+			_, err := dialer(context.TODO(), "tcp", tc.dial)
+
+			if tc.expectResolve != testResolver.resolveAddress {
+				t.Fatalf("expected to resolve %s, got %s", tc.expectResolve, testResolver.resolveAddress)
+			}
+			if tc.expectWrappedDial != wrappedDialer.called {
+				t.Fatalf("expected wrapped dialer called %v, got %v", tc.expectWrappedDial, wrappedDialer.called)
+			}
+
+			if err != nil {
+				if len(tc.expectErr) == 0 {
+					t.Fatalf("unexpected error: %v", err)
+				} else if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected error containing %q, got %v", tc.expectErr, err)
+				}
+			} else {
+				if len(tc.expectErr) > 0 {
+					t.Fatalf("expected error, got none")
+				}
+			}
+		})
+	}
+}
+
+type testDialer struct {
+	called bool
+}
+
+func (t *testDialer) DialContext(_ context.Context, network, address string) (net.Conn, error) {
+	t.called = true
+	return nil, nil
+}
+
+type testResolver struct {
+	addrs []net.IPAddr
+	err   error
+
+	resolveAddress string
+}
+
+func (t *testResolver) LookupIPAddr(_ context.Context, address string) ([]net.IPAddr, error) {
+	t.resolveAddress = address
+	return t.addrs, t.err
 }
 
 type InterfaceAddrsPair struct {
@@ -534,7 +688,7 @@ func TestShuffleStrings(t *testing.T) {
 	}
 }
 
-func TestFilterIncorrectIPVersion(t *testing.T) {
+func TestMapIPsByIPFamily(t *testing.T) {
 	testCases := []struct {
 		desc            string
 		ipString        []string
@@ -616,12 +770,346 @@ func TestFilterIncorrectIPVersion(t *testing.T) {
 
 	for _, testcase := range testCases {
 		t.Run(testcase.desc, func(t *testing.T) {
-			correct, incorrect := FilterIncorrectIPVersion(testcase.ipString, testcase.wantIPv6)
-			if !reflect.DeepEqual(testcase.expectCorrect, correct) {
-				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, correct)
+			ipFamily := v1.IPv4Protocol
+			otherIPFamily := v1.IPv6Protocol
+
+			if testcase.wantIPv6 {
+				ipFamily = v1.IPv6Protocol
+				otherIPFamily = v1.IPv4Protocol
 			}
-			if !reflect.DeepEqual(testcase.expectIncorrect, incorrect) {
-				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, incorrect)
+
+			ipMap := MapIPsByIPFamily(testcase.ipString)
+
+			if !reflect.DeepEqual(testcase.expectCorrect, ipMap[ipFamily]) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, ipMap[ipFamily])
+			}
+			if !reflect.DeepEqual(testcase.expectIncorrect, ipMap[otherIPFamily]) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, ipMap[otherIPFamily])
+			}
+		})
+	}
+}
+
+func TestMapCIDRsByIPFamily(t *testing.T) {
+	testCases := []struct {
+		desc            string
+		ipString        []string
+		wantIPv6        bool
+		expectCorrect   []string
+		expectIncorrect []string
+	}{
+		{
+			desc:            "empty input IPv4",
+			ipString:        []string{},
+			wantIPv6:        false,
+			expectCorrect:   nil,
+			expectIncorrect: nil,
+		},
+		{
+			desc:            "empty input IPv6",
+			ipString:        []string{},
+			wantIPv6:        true,
+			expectCorrect:   nil,
+			expectIncorrect: nil,
+		},
+		{
+			desc:            "want IPv4 and receive IPv6",
+			ipString:        []string{"fd00:20::1/64"},
+			wantIPv6:        false,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"fd00:20::1/64"},
+		},
+		{
+			desc:            "want IPv6 and receive IPv4",
+			ipString:        []string{"192.168.200.2/24"},
+			wantIPv6:        true,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"192.168.200.2/24"},
+		},
+		{
+			desc:            "want IPv6 and receive IPv4 and IPv6",
+			ipString:        []string{"192.168.200.2/24", "192.1.34.23/24", "fd00:20::1/64", "2001:db9::3/64"},
+			wantIPv6:        true,
+			expectCorrect:   []string{"fd00:20::1/64", "2001:db9::3/64"},
+			expectIncorrect: []string{"192.168.200.2/24", "192.1.34.23/24"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv4 and IPv6",
+			ipString:        []string{"192.168.200.2/24", "192.1.34.23/24", "fd00:20::1/64", "2001:db9::3/64"},
+			wantIPv6:        false,
+			expectCorrect:   []string{"192.168.200.2/24", "192.1.34.23/24"},
+			expectIncorrect: []string{"fd00:20::1/64", "2001:db9::3/64"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv4 only",
+			ipString:        []string{"192.168.200.2/24", "192.1.34.23/24"},
+			wantIPv6:        false,
+			expectCorrect:   []string{"192.168.200.2/24", "192.1.34.23/24"},
+			expectIncorrect: nil,
+		},
+		{
+			desc:            "want IPv6 and receive IPv4 only",
+			ipString:        []string{"192.168.200.2/24", "192.1.34.23/24"},
+			wantIPv6:        true,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"192.168.200.2/24", "192.1.34.23/24"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv6 only",
+			ipString:        []string{"fd00:20::1/64", "2001:db9::3/64"},
+			wantIPv6:        false,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"fd00:20::1/64", "2001:db9::3/64"},
+		},
+		{
+			desc:            "want IPv6 and receive IPv6 only",
+			ipString:        []string{"fd00:20::1/64", "2001:db9::3/64"},
+			wantIPv6:        true,
+			expectCorrect:   []string{"fd00:20::1/64", "2001:db9::3/64"},
+			expectIncorrect: nil,
+		},
+	}
+
+	for _, testcase := range testCases {
+		t.Run(testcase.desc, func(t *testing.T) {
+			ipFamily := v1.IPv4Protocol
+			otherIPFamily := v1.IPv6Protocol
+
+			if testcase.wantIPv6 {
+				ipFamily = v1.IPv6Protocol
+				otherIPFamily = v1.IPv4Protocol
+			}
+
+			cidrMap := MapCIDRsByIPFamily(testcase.ipString)
+
+			if !reflect.DeepEqual(testcase.expectCorrect, cidrMap[ipFamily]) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, cidrMap[ipFamily])
+			}
+			if !reflect.DeepEqual(testcase.expectIncorrect, cidrMap[otherIPFamily]) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, cidrMap[otherIPFamily])
+			}
+		})
+	}
+}
+
+func TestGetClusterIPByFamily(t *testing.T) {
+	testCases := []struct {
+		name           string
+		service        v1.Service
+		requestFamily  v1.IPFamily
+		expectedResult string
+	}{
+		{
+			name:           "old style service ipv4. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "10.0.0.10",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "10.0.0.10",
+				},
+			},
+		},
+
+		{
+			name:           "old style service ipv4. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "10.0.0.10",
+				},
+			},
+		},
+
+		{
+			name:           "old style service ipv6. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "2000::1",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "2000::1",
+				},
+			},
+		},
+
+		{
+			name:           "old style service ipv6. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "2000::1",
+				},
+			},
+		},
+
+		{
+			name:           "service single stack ipv4. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "10.0.0.10",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"10.0.0.10"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service single stack ipv4. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"10.0.0.10"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service single stack ipv6. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "2000::1",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"2000::1"},
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service single stack ipv6. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"2000::1"},
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+				},
+			},
+		},
+		// dual stack
+		{
+			name:           "service dual stack ipv4,6. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "10.0.0.10",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"10.0.0.10", "2000::1"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service dual stack ipv4,6. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "2000::1",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"10.0.0.10", "2000::1"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service dual stack ipv6,4. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "2000::1",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"2000::1", "10.0.0.10"},
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service dual stack ipv6,4. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "10.0.0.10",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"2000::1", "10.0.0.10"},
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ip := GetClusterIPByFamily(testCase.requestFamily, &testCase.service)
+			if ip != testCase.expectedResult {
+				t.Fatalf("expected ip:%v got %v", testCase.expectedResult, ip)
+			}
+		})
+	}
+
+}
+
+func TestWriteLine(t *testing.T) {
+	testCases := []struct {
+		name     string
+		words    []string
+		expected string
+	}{
+		{
+			name:     "write no word",
+			words:    []string{},
+			expected: "",
+		},
+		{
+			name:     "write one word",
+			words:    []string{"test1"},
+			expected: "test1\n",
+		},
+		{
+			name:     "write multi word",
+			words:    []string{"test1", "test2", "test3"},
+			expected: "test1 test2 test3\n",
+		},
+	}
+	testBuffer := bytes.NewBuffer(nil)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testBuffer.Reset()
+			WriteLine(testBuffer, testCase.words...)
+			if !strings.EqualFold(testBuffer.String(), testCase.expected) {
+				t.Fatalf("write word is %v\n expected: %s, got: %s", testCase.words, testCase.expected, testBuffer.String())
+			}
+		})
+	}
+}
+
+func TestWriteBytesLine(t *testing.T) {
+	testCases := []struct {
+		name     string
+		bytes    []byte
+		expected string
+	}{
+		{
+			name:     "empty bytes",
+			bytes:    []byte{},
+			expected: "\n",
+		},
+		{
+			name:     "test bytes",
+			bytes:    []byte("test write bytes line"),
+			expected: "test write bytes line\n",
+		},
+	}
+
+	testBuffer := bytes.NewBuffer(nil)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testBuffer.Reset()
+			WriteBytesLine(testBuffer, testCase.bytes)
+			if !strings.EqualFold(testBuffer.String(), testCase.expected) {
+				t.Fatalf("write word is %v\n expected: %s, got: %s", testCase.bytes, testCase.expected, testBuffer.String())
 			}
 		})
 	}

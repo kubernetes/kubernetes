@@ -24,6 +24,7 @@ import (
 	capi "k8s.io/api/certificates/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -74,7 +75,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		}
 
 		role.Rules = append(role.Rules, rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie())
-		if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 			role.Rules = append(role.Rules, rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie())
 		}
 
@@ -168,6 +169,10 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				// The controller needs to be able to set a service's finalizers to be able to create an EndpointSlice
 				// resource that is owned by the service and sets blockOwnerDeletion=true in its ownerRef.
 				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("services/finalizers").RuleOrDie(),
+				// The controller needs to be able to set a service's finalizers to be able to create an EndpointSlice
+				// resource that is owned by the endpoint and sets blockOwnerDeletion=true in its ownerRef.
+				// see https://github.com/openshift/kubernetes/blob/8691466059314c3f7d6dcffcbb76d14596ca716c/pkg/controller/endpointslicemirroring/utils.go#L87-L88
+				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("endpoints/finalizers").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "list", "create", "update", "delete").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
 				eventsRule(),
 			},
@@ -398,12 +403,25 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		})
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.RootCAConfigMap) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "root-ca-cert-publisher"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("create", "update").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
 				eventsRule(),
+			},
+		})
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "storage-version-garbage-collector"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(coordinationGroup).Resources("leases").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch", "patch", "update", "delete").Groups(internalAPIServerGroup).
+					Resources("storageversions").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "patch", "update").Groups(internalAPIServerGroup).
+					Resources("storageversions/status").RuleOrDie(),
 			},
 		})
 	}

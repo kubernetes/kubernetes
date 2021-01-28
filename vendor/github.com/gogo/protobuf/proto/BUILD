@@ -18,6 +18,8 @@ go_library(
         "lib.go",
         "lib_gogo.go",
         "message_set.go",
+        "pointer_reflect.go",
+        "pointer_reflect_gogo.go",
         "pointer_unsafe.go",
         "pointer_unsafe_gogo.go",
         "properties.go",

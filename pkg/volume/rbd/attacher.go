@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -226,7 +226,7 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 		if err = detacher.mounter.Unmount(deviceMountPath); err != nil {
 			return err
 		}
-		klog.V(3).Infof("rbd: successfully umount device mountpath %s", deviceMountPath)
+		klog.V(3).Infof("rbd: successfully unmount device mountpath %s", deviceMountPath)
 	}
 
 	// Get devicePath from deviceMountPath if devicePath is empty

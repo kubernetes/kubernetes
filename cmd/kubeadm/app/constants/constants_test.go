@@ -110,41 +110,6 @@ func TestGetStaticPodFilepath(t *testing.T) {
 	}
 }
 
-func TestAddSelfHostedPrefix(t *testing.T) {
-	var tests = []struct {
-		componentName, expected string
-	}{
-		{
-			componentName: "kube-apiserver",
-			expected:      "self-hosted-kube-apiserver",
-		},
-		{
-			componentName: "kube-controller-manager",
-			expected:      "self-hosted-kube-controller-manager",
-		},
-		{
-			componentName: "kube-scheduler",
-			expected:      "self-hosted-kube-scheduler",
-		},
-		{
-			componentName: "foo",
-			expected:      "self-hosted-foo",
-		},
-	}
-	for _, rt := range tests {
-		t.Run(rt.componentName, func(t *testing.T) {
-			actual := AddSelfHostedPrefix(rt.componentName)
-			if actual != rt.expected {
-				t.Errorf(
-					"failed AddSelfHostedPrefix:\n\texpected: %s\n\t  actual: %s",
-					rt.expected,
-					actual,
-				)
-			}
-		})
-	}
-}
-
 func TestEtcdSupportedVersion(t *testing.T) {
 	var supportedEtcdVersion = map[uint8]string{
 		13: "3.2.24",

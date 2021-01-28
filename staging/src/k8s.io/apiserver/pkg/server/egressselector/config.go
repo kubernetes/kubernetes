@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/apis/apiserver/install"
@@ -31,6 +32,10 @@ import (
 )
 
 var cfgScheme = runtime.NewScheme()
+
+// validEgressSelectorNames contains the set of valid egress selctor names.
+// 'master' is deprecated in favor of 'controlplane' and will be removed in v1.22.
+var validEgressSelectorNames = sets.NewString("master", "controlplane", "cluster", "etcd")
 
 func init() {
 	install.Install(cfgScheme)
@@ -97,6 +102,30 @@ func ValidateEgressSelectorConfiguration(config *apiserver.EgressSelectorConfigu
 				}))
 		}
 	}
+
+	var foundControlPlane, foundMaster bool
+	for _, service := range config.EgressSelections {
+		canonicalName := strings.ToLower(service.Name)
+
+		if !validEgressSelectorNames.Has(canonicalName) {
+			allErrs = append(allErrs, field.NotSupported(field.NewPath("egressSelection", "name"), canonicalName, validEgressSelectorNames.List()))
+			continue
+		}
+
+		if canonicalName == "master" {
+			foundMaster = true
+		}
+
+		if canonicalName == "controlplane" {
+			foundControlPlane = true
+		}
+	}
+
+	// error if both master and controlplane egress selectors are set
+	if foundMaster && foundControlPlane {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("egressSelection", "name"), "both egressSelection names 'master' and 'controlplane' are specified, only one is allowed"))
+	}
+
 	return allErrs
 }
 
@@ -199,7 +228,7 @@ func validateTLSConfig(tlsConfig *apiserver.TLSConfig, fldPath *field.Path) fiel
 		return allErrs
 	}
 	if tlsConfig.CABundle != "" {
-		if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.CABundle); exists == false || err != nil {
+		if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.CABundle); !exists || err != nil {
 			allErrs = append(allErrs, field.Invalid(
 				fldPath.Child("tlsConfig", "caBundle"),
 				tlsConfig.CABundle,
@@ -211,7 +240,7 @@ func validateTLSConfig(tlsConfig *apiserver.TLSConfig, fldPath *field.Path) fiel
 			fldPath.Child("tlsConfig", "clientCert"),
 			"nil",
 			"Using TLS requires clientCert"))
-	} else if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.ClientCert); exists == false || err != nil {
+	} else if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.ClientCert); !exists || err != nil {
 		allErrs = append(allErrs, field.Invalid(
 			fldPath.Child("tlsConfig", "clientCert"),
 			tlsConfig.ClientCert,
@@ -222,7 +251,7 @@ func validateTLSConfig(tlsConfig *apiserver.TLSConfig, fldPath *field.Path) fiel
 			fldPath.Child("tlsConfig", "clientKey"),
 			"nil",
 			"Using TLS requires requires clientKey"))
-	} else if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.ClientKey); exists == false || err != nil {
+	} else if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.ClientKey); !exists || err != nil {
 		allErrs = append(allErrs, field.Invalid(
 			fldPath.Child("tlsConfig", "clientKey"),
 			tlsConfig.ClientKey,

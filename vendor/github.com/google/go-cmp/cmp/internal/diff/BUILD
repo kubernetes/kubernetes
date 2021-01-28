@@ -9,6 +9,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/google/go-cmp/cmp/internal/diff",
     importpath = "github.com/google/go-cmp/cmp/internal/diff",
     visibility = ["//vendor/github.com/google/go-cmp/cmp:__subpackages__"],
+    deps = ["//vendor/github.com/google/go-cmp/cmp/internal/flags:go_default_library"],
 )
 
 filegroup(

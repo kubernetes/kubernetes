@@ -187,7 +187,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 func TestDefaultDeploymentAvailability(t *testing.T) {
 	d := roundTrip(t, runtime.Object(&appsv1beta1.Deployment{})).(*appsv1beta1.Deployment)
 
-	maxUnavailable, err := intstr.GetValueFromIntOrPercent(d.Spec.Strategy.RollingUpdate.MaxUnavailable, int(*(d.Spec.Replicas)), false)
+	maxUnavailable, err := intstr.GetScaledValueFromIntOrPercent(d.Spec.Strategy.RollingUpdate.MaxUnavailable, int(*(d.Spec.Replicas)), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

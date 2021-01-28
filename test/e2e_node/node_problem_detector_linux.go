@@ -25,6 +25,8 @@ import (
 	"path"
 	"time"
 
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -33,16 +35,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
+
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
-
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector]", func() {
+var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector] [Serial]", func() {
 	const (
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second
@@ -76,9 +76,10 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			condition = v1.NodeConditionType("TestCondition")
 
 			// File paths used in the test.
-			logFile      = "/log/test.log"
-			configFile   = "/config/testconfig.json"
-			etcLocaltime = "/etc/localtime"
+			logFile        = "/log/test.log"
+			configFile     = "/config/testconfig.json"
+			kubeConfigFile = "/config/kubeconfig"
+			etcLocaltime   = "/etc/localtime"
 
 			// Volumes used in the test.
 			configVolume    = "config"
@@ -152,6 +153,29 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				}
 				]
 			}`
+
+			// This token is known to apiserver and its group is `system:masters`.
+			// See also the function `generateTokenFile` in `test/e2e_node/services/apiserver.go`.
+			kubeConfig := fmt.Sprintf(`
+apiVersion: v1
+kind: Config
+users:
+- name: node-problem-detector
+  user:
+    token: %s
+clusters:
+- cluster:
+    server: %s
+    insecure-skip-tls-verify: true
+  name: local
+contexts:
+- context:
+    cluster: local
+    user: node-problem-detector
+  name: local-context
+current-context: local-context
+`, framework.TestContext.BearerToken, framework.TestContext.Host)
+
 			ginkgo.By("Generate event list options")
 			selector := fields.Set{
 				"involvedObject.kind":      "Node",
@@ -160,24 +184,28 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				"source":                   source,
 			}.AsSelector().String()
 			eventListOptions = metav1.ListOptions{FieldSelector: selector}
-			ginkgo.By("Create the test log file")
-			framework.ExpectNoError(err)
+
 			ginkgo.By("Create config map for the node problem detector")
 			_, err = c.CoreV1().ConfigMaps(ns).Create(context.TODO(), &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: configName},
-				Data:       map[string]string{path.Base(configFile): config},
+				Data: map[string]string{
+					path.Base(configFile):     config,
+					path.Base(kubeConfigFile): kubeConfig,
+				},
 			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
+
 			ginkgo.By("Create the node problem detector")
 			hostPathType := new(v1.HostPathType)
-			*hostPathType = v1.HostPathType(string(v1.HostPathFileOrCreate))
-			f.PodClient().CreateSync(&v1.Pod{
+			*hostPathType = v1.HostPathFileOrCreate
+			pod := f.PodClient().CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 				},
 				Spec: v1.PodSpec{
-					HostNetwork:     true,
-					SecurityContext: &v1.PodSecurityContext{},
+					HostNetwork:        true,
+					SecurityContext:    &v1.PodSecurityContext{},
+					ServiceAccountName: name,
 					Volumes: []v1.Volume{
 						{
 							Name: configVolume,
@@ -203,11 +231,39 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 							},
 						},
 					},
+					InitContainers: []v1.Container{
+						{
+							Name:    "init-log-file",
+							Image:   "debian",
+							Command: []string{"/bin/sh"},
+							Args: []string{
+								"-c",
+								fmt.Sprintf("touch %s", logFile),
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      logVolume,
+									MountPath: path.Dir(logFile),
+								},
+								{
+									Name:      localtimeVolume,
+									MountPath: etcLocaltime,
+								},
+							},
+						},
+					},
 					Containers: []v1.Container{
 						{
 							Name:    name,
 							Image:   image,
-							Command: []string{"sh", "-c", "touch " + logFile + " && /node-problem-detector --logtostderr --system-log-monitors=" + configFile + fmt.Sprintf(" --apiserver-override=%s?inClusterConfig=false", framework.TestContext.Host)},
+							Command: []string{"/node-problem-detector"},
+							Args: []string{
+								"--logtostderr",
+								fmt.Sprintf("--system-log-monitors=%s", configFile),
+								// `ServiceAccount` admission controller is disabled in node e2e tests, so we could not use
+								// inClusterConfig here.
+								fmt.Sprintf("--apiserver-override=%s?inClusterConfig=false&auth=%s", framework.TestContext.Host, kubeConfigFile),
+							},
 							Env: []v1.EnvVar{
 								{
 									Name: "NODE_NAME",
@@ -237,8 +293,6 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 					},
 				},
 			})
-			pod, err := f.PodClient().Get(context.TODO(), name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
 			// TODO: remove hardcoded kubelet volume directory path
 			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
 			hostLogFile = "/var/lib/kubelet/pods/" + string(pod.UID) + "/volumes/kubernetes.io~empty-dir" + logFile

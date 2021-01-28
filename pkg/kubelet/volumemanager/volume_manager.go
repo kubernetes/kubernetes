@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
@@ -193,7 +193,8 @@ func NewVolumeManager(
 		kubeContainerRuntime,
 		keepTerminatedPodVolumes,
 		csiMigratedPluginManager,
-		intreeToCSITranslator)
+		intreeToCSITranslator,
+		volumePluginMgr)
 	vm.reconciler = reconciler.NewReconciler(
 		kubeClient,
 		controllerAttachDetachEnabled,
@@ -259,6 +260,11 @@ type volumeManager struct {
 func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
+	if vm.kubeClient != nil {
+		// start informer for CSIDriver
+		go vm.volumePluginMgr.Run(stopCh)
+	}
+
 	go vm.desiredStateOfWorldPopulator.Run(sourcesReady, stopCh)
 	klog.V(2).Infof("The desired_state_of_world populator starts")
 
@@ -266,11 +272,6 @@ func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 	go vm.reconciler.Run(stopCh)
 
 	metrics.Register(vm.actualStateOfWorld, vm.desiredStateOfWorld, vm.volumePluginMgr)
-
-	if vm.kubeClient != nil {
-		// start informer for CSIDriver
-		vm.volumePluginMgr.Run(stopCh)
-	}
 
 	<-stopCh
 	klog.Infof("Shutting down Kubelet Volume Manager")

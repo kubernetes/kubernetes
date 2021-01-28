@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Mirror Pod, update
 			Description: Updating a static Pod MUST recreate an updated mirror Pod. Create a static pod, verify that a mirror pod is created. Update the static pod by changing the container image, the mirror pod MUST be re-created and updated with the new image.
 		*/
@@ -89,7 +89,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			framework.ExpectEqual(pod.Spec.Containers[0].Image, image)
 		})
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Mirror Pod, delete
 			Description:  When a mirror-Pod is deleted then the mirror pod MUST be re-created. Create a static pod, verify that a mirror pod is created. Delete the mirror pod, the mirror pod MUST be re-created and running.
 		*/
@@ -109,7 +109,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Mirror Pod, force delete
 			Description: When a mirror-Pod is deleted, forcibly, then the mirror pod MUST be re-created. Create a static pod, verify that a mirror pod is created. Delete the mirror pod with delete wait time set to zero forcing immediate deletion, the mirror pod MUST be re-created and running.
 		*/
@@ -191,6 +191,11 @@ func checkMirrorPodRunning(cl clientset.Interface, name, namespace string) error
 	}
 	if pod.Status.Phase != v1.PodRunning {
 		return fmt.Errorf("expected the mirror pod %q to be running, got %q", name, pod.Status.Phase)
+	}
+	for i := range pod.Status.ContainerStatuses {
+		if pod.Status.ContainerStatuses[i].State.Running == nil {
+			return fmt.Errorf("expected the mirror pod %q with container %q to be running", name, pod.Status.ContainerStatuses[i].Name)
+		}
 	}
 	return validateMirrorPod(cl, pod)
 }

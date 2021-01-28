@@ -1287,8 +1287,8 @@ Anyway, the cluster should get back to the proper size after 10 min.
 * Default ClusterRole and ClusterRoleBinding objects are automatically updated at server start to add missing permissions and subjects (extra permissions and subjects are left in place). To prevent autoupdating a particular role or rolebinding, annotate it with `rbac.authorization.kubernetes.io/autoupdate=false`. ([#41155](https://github.com/kubernetes/kubernetes/pull/41155), [@liggitt](https://github.com/liggitt))
 * `v1beta1` RoleBinding/ClusterRoleBinding subjects changed `apiVersion` to `apiGroup` to fully-qualify a subject. ServiceAccount subjects default to an apiGroup of `""`, User and Group subjects default to an apiGroup of `"rbac.authorization.k8s.io"`. ([#41184](https://github.com/kubernetes/kubernetes/pull/41184), [@liggitt](https://github.com/liggitt))
 * To create or update an RBAC RoleBinding or ClusterRoleBinding object, a user must: ([#39383](https://github.com/kubernetes/kubernetes/pull/39383), [@liggitt](https://github.com/liggitt))
-    * 1. Be authorized to make the create or update API request
-    * 2. Be allowed to bind the referenced role, either by already having all of the permissions contained in the referenced role, or by having the "bind" permission on the referenced role.
+     1. Be authorized to make the create or update API request
+     2. Be allowed to bind the referenced role, either by already having all of the permissions contained in the referenced role, or by having the "bind" permission on the referenced role.
 * The `--authorization-rbac-super-user` flag (alpha in 1.5) is deprecated; the `system:masters` group has privileged access ([#38121](https://github.com/kubernetes/kubernetes/pull/38121), [@deads2k](https://github.com/deads2k))
 * special handling of the user `*` in RoleBinding and ClusterRoleBinding objects is removed in v1beta1. To match all users, explicitly bind to the group `system:authenticated` and/or `system:unauthenticated`. Existing v1alpha1 bindings to the user `*` are automatically converted to the group `system:authenticated`. ([#38981](https://github.com/kubernetes/kubernetes/pull/38981), [@liggitt](https://github.com/liggitt))
 
@@ -2253,18 +2253,19 @@ filename | sha256 hash
 * kubelet created cgroups follow lowercase naming conventions ([#42497](https://github.com/kubernetes/kubernetes/pull/42497), [@derekwaynecarr](https://github.com/derekwaynecarr))
 * Support whitespace in command path for gcp auth plugin ([#41653](https://github.com/kubernetes/kubernetes/pull/41653), [@jlowdermilk](https://github.com/jlowdermilk))
 * Updates the dnsmasq cache/mux layer to be managed by dnsmasq-nanny. ([#41826](https://github.com/kubernetes/kubernetes/pull/41826), [@bowei](https://github.com/bowei))
-    * dnsmasq-nanny manages dnsmasq based on values from the
-    * kube-system:kube-dns configmap:
-    * "stubDomains": {
-    * 	"acme.local": ["1.2.3.4"]
-    * },
-    * is a map of domain to list of nameservers for the domain. This is used
-    * to inject private DNS domains into the kube-dns namespace. In the above
-    * example, any DNS requests for *.acme.local will be served by the
-    * nameserver 1.2.3.4.
-    * "upstreamNameservers": ["8.8.8.8", "8.8.4.4"]
-    * is a list of upstreamNameservers to use, overriding the configuration
-    * specified in /etc/resolv.conf.
+    * dnsmasq-nanny manages dnsmasq based on values from the kube-system:kube-dns configmap:
+         ```
+          "stubDomains": {
+              "acme.local": ["1.2.3.4"]
+           },
+         ```
+      is a map of domain to list of nameservers for the domain. This is used
+      to inject private DNS domains into the kube-dns namespace. In the above
+      example, any DNS requests for *.acme.local will be served by the
+      nameserver 1.2.3.4.
+      ```"upstreamNameservers": ["8.8.8.8", "8.8.4.4"]```
+      is a list of upstreamNameservers to use, overriding the configuration
+      specified in /etc/resolv.conf.
 * kubelet exports metrics for cgroup management ([#41988](https://github.com/kubernetes/kubernetes/pull/41988), [@sjenning](https://github.com/sjenning))
 * kubectl: respect deployment strategy parameters for rollout status ([#41809](https://github.com/kubernetes/kubernetes/pull/41809), [@kargakis](https://github.com/kargakis))
 * Remove cmd/kube-discovery from the tree since it's not necessary anymore ([#42070](https://github.com/kubernetes/kubernetes/pull/42070), [@luxas](https://github.com/luxas))
@@ -2423,9 +2424,8 @@ filename | sha256 hash
 * Report node not ready on failed PLEG health check ([#41569](https://github.com/kubernetes/kubernetes/pull/41569), [@yujuhong](https://github.com/yujuhong))
 * Delay Deletion of a Pod until volumes are cleaned up ([#41456](https://github.com/kubernetes/kubernetes/pull/41456), [@dashpole](https://github.com/dashpole))
 * Alpha version of dynamic volume provisioning is removed in this release. Annotation ([#40000](https://github.com/kubernetes/kubernetes/pull/40000), [@jsafrane](https://github.com/jsafrane))
-    * "volume.alpha.kubernetes.io/storage-class" does not have any special meaning. A default storage class
-    * and  DefaultStorageClass admission plugin can be used to preserve similar behavior of Kubernetes cluster,
-    * see https://kubernetes.io/docs/user-guide/persistent-volumes/#class-1 for details.
+    * "volume.alpha.kubernetes.io/storage-class" does not have any special meaning. A default storage class and  DefaultStorageClass admission plugin can be used to preserve similar behavior of Kubernetes cluster,
+      see https://kubernetes.io/docs/user-guide/persistent-volumes/#class-1 for details.
 * An `automountServiceAccountToken *bool` field was added to ServiceAccount and PodSpec objects. If set to `false` on a pod spec, no service account token is automounted in the pod. If set to `false` on a service account, no service account token is automounted for that service account unless explicitly overridden in the pod spec. ([#37953](https://github.com/kubernetes/kubernetes/pull/37953), [@liggitt](https://github.com/liggitt))
 * Bump addon-manager version to v6.4-alpha.1 in kubemark ([#41506](https://github.com/kubernetes/kubernetes/pull/41506), [@shyamjvs](https://github.com/shyamjvs))
 * Do not daemonize `salt-minion` for the openstack-heat provider. ([#40722](https://github.com/kubernetes/kubernetes/pull/40722), [@micmro](https://github.com/micmro))
@@ -2652,11 +2652,11 @@ filename | sha256 hash
 * Added support for creating HA clusters for centos using kube-up.sh. ([#39462](https://github.com/kubernetes/kubernetes/pull/39462), [@Shawyeok](https://github.com/Shawyeok))
 * azure: fix Azure Container Registry integration ([#40142](https://github.com/kubernetes/kubernetes/pull/40142), [@colemickens](https://github.com/colemickens))
 * - Splits Juju Charm layers into master/worker roles ([#40324](https://github.com/kubernetes/kubernetes/pull/40324), [@chuckbutler](https://github.com/chuckbutler))
-    * - Adds support for 1.5.x series of Kubernetes
-    * - Introduces a tactic for keeping templates in sync with upstream eliminating template drift
-    * - Adds CNI support to the Juju Charms
-    * - Adds durable storage support to the Juju Charms
-    * - Introduces an e2e Charm layer for repeatable testing efforts and validation of clusters
+    * Adds support for 1.5.x series of Kubernetes
+    * Introduces a tactic for keeping templates in sync with upstream eliminating template drift
+    * Adds CNI support to the Juju Charms
+    * Adds durable storage support to the Juju Charms
+    * Introduces an e2e Charm layer for repeatable testing efforts and validation of clusters
 * genericapiserver: more dependency cutoffs ([#40216](https://github.com/kubernetes/kubernetes/pull/40216), [@sttts](https://github.com/sttts))
 * AWS: trust region if found from AWS metadata ([#38880](https://github.com/kubernetes/kubernetes/pull/38880), [@justinsb](https://github.com/justinsb))
 * Volumes and environment variables populated from ConfigMap and Secret objects can now tolerate the named source object or specific keys being missing, by adding `optional: true` to the volume or environment variable source specifications. ([#39981](https://github.com/kubernetes/kubernetes/pull/39981), [@fraenkel](https://github.com/fraenkel))
@@ -2877,9 +2877,7 @@ filename | sha256 hash
 Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for older releases.
 
 Release notes of older releases can be found in:
-- [CHANGELOG-1.2.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.2.md)
-- [CHANGELOG-1.3.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.3.md)
-- [CHANGELOG-1.4.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.4.md)
-- [CHANGELOG-1.5.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.5.md)
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/CHANGELOG.md?pixel)]()
+- [CHANGELOG-1.2.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.2.md)
+- [CHANGELOG-1.3.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.3.md)
+- [CHANGELOG-1.4.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.4.md)
+- [CHANGELOG-1.5.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.5.md)

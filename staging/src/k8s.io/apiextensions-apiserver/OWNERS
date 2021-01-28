@@ -15,4 +15,3 @@ reviewers:
 - roycaihw
 labels:
 - sig/api-machinery
-- triage/needs-information

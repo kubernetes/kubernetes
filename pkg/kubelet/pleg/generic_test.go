@@ -650,9 +650,7 @@ func TestRelistIPChange(t *testing.T) {
 }
 
 func TestRunningPodAndContainerCount(t *testing.T) {
-	fakeRuntime := &containertest.FakeRuntime{}
-	runtimeCache, _ := kubecontainer.NewRuntimeCache(fakeRuntime)
-	metrics.Register(runtimeCache)
+	metrics.Register()
 	testPleg := newTestGenericPLEG()
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 
@@ -664,11 +662,20 @@ func TestRunningPodAndContainerCount(t *testing.T) {
 				createTestContainer("c2", kubecontainer.ContainerStateUnknown),
 				createTestContainer("c3", kubecontainer.ContainerStateUnknown),
 			},
+			Sandboxes: []*kubecontainer.Container{
+				createTestContainer("s1", kubecontainer.ContainerStateRunning),
+				createTestContainer("s2", kubecontainer.ContainerStateRunning),
+				createTestContainer("s3", kubecontainer.ContainerStateUnknown),
+			},
 		}},
 		{Pod: &kubecontainer.Pod{
 			ID: "4567",
 			Containers: []*kubecontainer.Container{
 				createTestContainer("c1", kubecontainer.ContainerStateExited),
+			},
+			Sandboxes: []*kubecontainer.Container{
+				createTestContainer("s1", kubecontainer.ContainerStateRunning),
+				createTestContainer("s2", kubecontainer.ContainerStateExited),
 			},
 		}},
 	}

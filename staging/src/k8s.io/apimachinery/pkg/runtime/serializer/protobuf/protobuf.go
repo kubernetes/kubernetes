@@ -61,6 +61,7 @@ func (e errNotMarshalable) Status() metav1.Status {
 	}
 }
 
+// IsNotMarshalable checks the type of error, returns a boolean true if error is not nil and not marshalable false otherwise
 func IsNotMarshalable(err error) bool {
 	_, ok := err.(errNotMarshalable)
 	return err != nil && ok
@@ -77,6 +78,7 @@ func NewSerializer(creater runtime.ObjectCreater, typer runtime.ObjectTyper) *Se
 	}
 }
 
+// Serializer handles encoding versioned objects into the proper wire form
 type Serializer struct {
 	prefix  []byte
 	creater runtime.ObjectCreater
@@ -457,8 +459,10 @@ func (s *RawSerializer) Identifier() runtime.Identifier {
 	return rawSerializerIdentifier
 }
 
+// LengthDelimitedFramer is exported variable of type lengthDelimitedFramer
 var LengthDelimitedFramer = lengthDelimitedFramer{}
 
+// Provides length delimited frame reader and writer methods
 type lengthDelimitedFramer struct{}
 
 // NewFrameWriter implements stream framing for this serializer

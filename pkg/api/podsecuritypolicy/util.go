@@ -23,7 +23,7 @@ import (
 )
 
 // DropDisabledFields removes disabled fields from the pod security policy spec.
-// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a od security policy spec.
+// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pod security policy spec.
 func DropDisabledFields(pspSpec, oldPSPSpec *policy.PodSecurityPolicySpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) && !allowedProcMountTypesInUse(oldPSPSpec) {
 		pspSpec.AllowedProcMountTypes = nil
@@ -37,10 +37,6 @@ func DropDisabledFields(pspSpec, oldPSPSpec *policy.PodSecurityPolicySpec) {
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 		pspSpec.AllowedCSIDrivers = nil
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) &&
-		(oldPSPSpec == nil || oldPSPSpec.RuntimeClass == nil) {
-		pspSpec.RuntimeClass = nil
 	}
 }
 

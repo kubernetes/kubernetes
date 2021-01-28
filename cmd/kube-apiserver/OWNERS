@@ -23,10 +23,8 @@ reviewers:
 - ncdc
 - sttts
 - hzxuzhonghu
-- CaoShuFeng
 - logicalhan
 - yue9944882
 labels:
 - sig/api-machinery
-- triage/needs-information
 - area/apiserver

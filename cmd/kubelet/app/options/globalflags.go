@@ -84,9 +84,7 @@ func addCredentialProviderFlags(fs *pflag.FlagSet) {
 	global := pflag.CommandLine
 	local := pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
 
-	// TODO(#58034): This is not a static file, so it's not quite as straightforward as --google-json-key.
-	// We need to figure out how ACR users can dynamically provide pull credentials before we can deprecate this.
-	pflagRegister(global, local, "azure-container-registry-config")
+	addLegacyCloudProviderCredentialProviderFlags(global, local)
 
 	fs.AddFlagSet(local)
 }

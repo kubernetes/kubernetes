@@ -21,10 +21,11 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -99,6 +100,29 @@ func OnPatchFactory(testCache map[string]*v1.Event, patchEvent chan<- *v1.Event)
 		patchEvent <- patchedObj
 		return patchedObj, nil
 	}
+}
+
+func TestNonRacyShutdown(t *testing.T) {
+	// Attempt to simulate previously racy conditions, and ensure that no race
+	// occurs: Nominally, calling "Eventf" *followed by* shutdown from the same
+	// thread should be a safe operation, but it's not if we launch recorder.Action
+	// in a goroutine.
+
+	caster := NewBroadcasterForTests(0)
+	clock := clock.NewFakeClock(time.Now())
+	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, caster, clock)
+
+	var wg sync.WaitGroup
+	wg.Add(100)
+	for i := 0; i < 100; i++ {
+		go func() {
+			defer wg.Done()
+			recorder.Eventf(&v1.ObjectReference{}, v1.EventTypeNormal, "Started", "blah")
+		}()
+	}
+
+	wg.Wait()
+	caster.Shutdown()
 }
 
 func TestEventf(t *testing.T) {
@@ -509,7 +533,7 @@ func TestLotsOfEvents(t *testing.T) {
 			APIVersion: "version",
 		}
 		// we need to vary the reason to prevent aggregation
-		go recorder.Eventf(ref, v1.EventTypeNormal, "Reason-"+string(i), strconv.Itoa(i))
+		go recorder.Eventf(ref, v1.EventTypeNormal, "Reason-"+strconv.Itoa(i), strconv.Itoa(i))
 	}
 	// Make sure no events were dropped by either of the listeners.
 	for i := 0; i < maxQueuedEvents; i++ {

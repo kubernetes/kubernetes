@@ -19,11 +19,12 @@ package interpodaffinity
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -772,6 +773,80 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			),
 			name: "PodAntiAffinity symmetry check b2: incoming pod and existing pod partially match each other on AffinityTerms",
 		},
+		{
+			name: "PodAffinity fails PreFilter with an invalid affinity label syntax",
+			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel,
+				[]v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "service",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"{{.bad-value.}}"},
+								},
+							},
+						},
+						TopologyKey: "region",
+					},
+				},
+				[]v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "service",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"antivirusscan", "value2"},
+								},
+							},
+						},
+						TopologyKey: "node",
+					},
+				}),
+			node: &node1,
+			wantStatus: framework.NewStatus(
+				framework.UnschedulableAndUnresolvable,
+				`Invalid value: "{{.bad-value.}}"`,
+			),
+		},
+		{
+			name: "PodAntiAffinity fails PreFilter with an invalid antiaffinity label syntax",
+			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel,
+				[]v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "service",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"foo"},
+								},
+							},
+						},
+						TopologyKey: "region",
+					},
+				},
+				[]v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "service",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"{{.bad-value.}}"},
+								},
+							},
+						},
+						TopologyKey: "node",
+					},
+				}),
+			node: &node1,
+			wantStatus: framework.NewStatus(
+				framework.UnschedulableAndUnresolvable,
+				`Invalid value: "{{.bad-value.}}"`,
+			),
+		},
 	}
 
 	for _, test := range tests {
@@ -783,12 +858,15 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			state := framework.NewCycleState()
 			preFilterStatus := p.PreFilter(context.Background(), state, test.pod)
 			if !preFilterStatus.IsSuccess() {
-				t.Errorf("prefilter failed with status: %v", preFilterStatus)
-			}
-			nodeInfo := mustGetNodeInfo(t, snapshot, test.node.Name)
-			gotStatus := p.Filter(context.Background(), state, test.pod, nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+				if !strings.Contains(preFilterStatus.Message(), test.wantStatus.Message()) {
+					t.Errorf("prefilter failed with status: %v", preFilterStatus)
+				}
+			} else {
+				nodeInfo := mustGetNodeInfo(t, snapshot, test.node.Name)
+				gotStatus := p.Filter(context.Background(), state, test.pod, nodeInfo)
+				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
+					t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+				}
 			}
 		})
 	}
@@ -1983,7 +2061,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 
 			// Add test.addedPod to state1 and verify it is equal to allPodsState.
 			nodeInfo := mustGetNodeInfo(t, snapshot, test.addedPod.Spec.NodeName)
-			if err := ipa.AddPod(context.Background(), cycleState, test.pendingPod, test.addedPod, nodeInfo); err != nil {
+			if err := ipa.AddPod(context.Background(), cycleState, test.pendingPod, framework.NewPodInfo(test.addedPod), nodeInfo); err != nil {
 				t.Errorf("error adding pod to meta: %v", err)
 			}
 
@@ -2005,7 +2083,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 			}
 
 			// Remove the added pod pod and make sure it is equal to the original state.
-			if err := ipa.RemovePod(context.Background(), cycleState, test.pendingPod, test.addedPod, nodeInfo); err != nil {
+			if err := ipa.RemovePod(context.Background(), cycleState, test.pendingPod, framework.NewPodInfo(test.addedPod), nodeInfo); err != nil {
 				t.Errorf("error removing pod from meta: %v", err)
 			}
 			if !reflect.DeepEqual(originalState, state) {

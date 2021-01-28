@@ -19,8 +19,6 @@ package customresource
 import (
 	"context"
 
-	"github.com/go-openapi/validate"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"

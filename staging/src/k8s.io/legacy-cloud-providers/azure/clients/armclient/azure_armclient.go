@@ -64,10 +64,11 @@ func New(authorizer autorest.Authorizer, baseURI, userAgent, apiVersion, clientR
 
 	backoff := clientBackoff
 	if backoff == nil {
+		backoff = &retry.Backoff{}
+	}
+	if backoff.Steps == 0 {
 		// 1 steps means no retry.
-		backoff = &retry.Backoff{
-			Steps: 1,
-		}
+		backoff.Steps = 1
 	}
 
 	return &Client{
@@ -109,6 +110,11 @@ func (c *Client) sendRequest(ctx context.Context, request *http.Request) (*http.
 		request,
 		retry.DoExponentialBackoffRetry(&sendBackoff),
 	)
+
+	if response == nil && err == nil {
+		return response, retry.NewError(false, fmt.Errorf("Empty response and no HTTP code"))
+	}
+
 	return response, retry.GetError(response, err)
 }
 
@@ -161,7 +167,7 @@ func (c *Client) Send(ctx context.Context, request *http.Request) (*http.Respons
 
 	// only use the result if the regional request actually goes through and returns 2xx status code, for two reasons:
 	// 1. the retry on regional ARM host approach is a hack.
-	// 2. the concatted regional uri could be wrong as the rule is not officially declared by ARM.
+	// 2. the concatenated regional uri could be wrong as the rule is not officially declared by ARM.
 	if regionalResponse == nil || regionalResponse.StatusCode > 299 {
 		regionalErrStr := ""
 		if regionalError != nil {

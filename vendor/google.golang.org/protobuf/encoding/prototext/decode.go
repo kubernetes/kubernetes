@@ -12,8 +12,8 @@ import (
 	"google.golang.org/protobuf/internal/encoding/messageset"
 	"google.golang.org/protobuf/internal/encoding/text"
 	"google.golang.org/protobuf/internal/errors"
-	"google.golang.org/protobuf/internal/fieldnum"
 	"google.golang.org/protobuf/internal/flags"
+	"google.golang.org/protobuf/internal/genid"
 	"google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/internal/set"
 	"google.golang.org/protobuf/internal/strs"
@@ -108,7 +108,7 @@ func (d decoder) unmarshalMessage(m pref.Message, checkDelims bool) error {
 		return errors.New("no support for proto1 MessageSets")
 	}
 
-	if messageDesc.FullName() == "google.protobuf.Any" {
+	if messageDesc.FullName() == genid.Any_message_fullname {
 		return d.unmarshalAny(m, checkDelims)
 	}
 
@@ -538,14 +538,13 @@ Loop:
 			return d.unexpectedTokenError(tok)
 		}
 
-		name := tok.IdentName()
-		switch name {
-		case "key":
+		switch name := pref.Name(tok.IdentName()); name {
+		case genid.MapEntry_Key_field_name:
 			if !tok.HasSeparator() {
 				return d.syntaxError(tok.Pos(), "missing field separator :")
 			}
 			if key.IsValid() {
-				return d.newError(tok.Pos(), `map entry "key" cannot be repeated`)
+				return d.newError(tok.Pos(), "map entry %q cannot be repeated", name)
 			}
 			val, err := d.unmarshalScalar(fd.MapKey())
 			if err != nil {
@@ -553,14 +552,14 @@ Loop:
 			}
 			key = val.MapKey()
 
-		case "value":
+		case genid.MapEntry_Value_field_name:
 			if kind := fd.MapValue().Kind(); (kind != pref.MessageKind) && (kind != pref.GroupKind) {
 				if !tok.HasSeparator() {
 					return d.syntaxError(tok.Pos(), "missing field separator :")
 				}
 			}
 			if pval.IsValid() {
-				return d.newError(tok.Pos(), `map entry "value" cannot be repeated`)
+				return d.newError(tok.Pos(), "map entry %q cannot be repeated", name)
 			}
 			pval, err = unmarshalMapValue()
 			if err != nil {
@@ -597,13 +596,9 @@ Loop:
 func (d decoder) unmarshalAny(m pref.Message, checkDelims bool) error {
 	var typeURL string
 	var bValue []byte
-
-	// hasFields tracks which valid fields have been seen in the loop below in
-	// order to flag an error if there are duplicates or conflicts. It may
-	// contain the strings "type_url", "value" and "expanded".  The literal
-	// "expanded" is used to indicate that the expanded form has been
-	// encountered already.
-	hasFields := map[string]bool{}
+	var seenTypeUrl bool
+	var seenValue bool
+	var isExpanded bool
 
 	if checkDelims {
 		tok, err := d.Read()
@@ -642,12 +637,12 @@ Loop:
 				return d.syntaxError(tok.Pos(), "missing field separator :")
 			}
 
-			switch tok.IdentName() {
-			case "type_url":
-				if hasFields["type_url"] {
-					return d.newError(tok.Pos(), "duplicate Any type_url field")
+			switch name := pref.Name(tok.IdentName()); name {
+			case genid.Any_TypeUrl_field_name:
+				if seenTypeUrl {
+					return d.newError(tok.Pos(), "duplicate %v field", genid.Any_TypeUrl_field_fullname)
 				}
-				if hasFields["expanded"] {
+				if isExpanded {
 					return d.newError(tok.Pos(), "conflict with [%s] field", typeURL)
 				}
 				tok, err := d.Read()
@@ -657,15 +652,15 @@ Loop:
 				var ok bool
 				typeURL, ok = tok.String()
 				if !ok {
-					return d.newError(tok.Pos(), "invalid Any type_url: %v", tok.RawString())
+					return d.newError(tok.Pos(), "invalid %v field value: %v", genid.Any_TypeUrl_field_fullname, tok.RawString())
 				}
-				hasFields["type_url"] = true
+				seenTypeUrl = true
 
-			case "value":
-				if hasFields["value"] {
-					return d.newError(tok.Pos(), "duplicate Any value field")
+			case genid.Any_Value_field_name:
+				if seenValue {
+					return d.newError(tok.Pos(), "duplicate %v field", genid.Any_Value_field_fullname)
 				}
-				if hasFields["expanded"] {
+				if isExpanded {
 					return d.newError(tok.Pos(), "conflict with [%s] field", typeURL)
 				}
 				tok, err := d.Read()
@@ -674,22 +669,22 @@ Loop:
 				}
 				s, ok := tok.String()
 				if !ok {
-					return d.newError(tok.Pos(), "invalid Any value: %v", tok.RawString())
+					return d.newError(tok.Pos(), "invalid %v field value: %v", genid.Any_Value_field_fullname, tok.RawString())
 				}
 				bValue = []byte(s)
-				hasFields["value"] = true
+				seenValue = true
 
 			default:
 				if !d.opts.DiscardUnknown {
-					return d.newError(tok.Pos(), "invalid field name %q in google.protobuf.Any message", tok.RawString())
+					return d.newError(tok.Pos(), "invalid field name %q in %v message", tok.RawString(), genid.Any_message_fullname)
 				}
 			}
 
 		case text.TypeName:
-			if hasFields["expanded"] {
+			if isExpanded {
 				return d.newError(tok.Pos(), "cannot have more than one type")
 			}
-			if hasFields["type_url"] {
+			if seenTypeUrl {
 				return d.newError(tok.Pos(), "conflict with type_url field")
 			}
 			typeURL = tok.TypeName()
@@ -698,21 +693,21 @@ Loop:
 			if err != nil {
 				return err
 			}
-			hasFields["expanded"] = true
+			isExpanded = true
 
 		default:
 			if !d.opts.DiscardUnknown {
-				return d.newError(tok.Pos(), "invalid field name %q in google.protobuf.Any message", tok.RawString())
+				return d.newError(tok.Pos(), "invalid field name %q in %v message", tok.RawString(), genid.Any_message_fullname)
 			}
 		}
 	}
 
 	fds := m.Descriptor().Fields()
 	if len(typeURL) > 0 {
-		m.Set(fds.ByNumber(fieldnum.Any_TypeUrl), pref.ValueOfString(typeURL))
+		m.Set(fds.ByNumber(genid.Any_TypeUrl_field_number), pref.ValueOfString(typeURL))
 	}
 	if len(bValue) > 0 {
-		m.Set(fds.ByNumber(fieldnum.Any_Value), pref.ValueOfBytes(bValue))
+		m.Set(fds.ByNumber(genid.Any_Value_field_number), pref.ValueOfBytes(bValue))
 	}
 	return nil
 }

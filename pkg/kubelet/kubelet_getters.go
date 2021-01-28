@@ -22,16 +22,18 @@ import (
 	"io/ioutil"
 	"net"
 	"path/filepath"
+	"time"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -235,6 +237,15 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 	if kl.kubeClient == nil {
 		return kl.initialNode(context.TODO())
 	}
+	// if we have a valid kube client, we wait for initial lister to sync
+	if !kl.nodeHasSynced() {
+		err := wait.PollImmediate(time.Second, maxWaitForAPIServerSync, func() (bool, error) {
+			return kl.nodeHasSynced(), nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("nodes have not yet been read at least once, cannot construct node object")
+		}
+	}
 	return kl.nodeLister.Get(string(kl.nodeName))
 }
 
@@ -245,7 +256,7 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 // zero capacity, and the default labels.
 func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 	if kl.kubeClient != nil {
-		if n, err := kl.nodeLister.Get(string(kl.nodeName)); err == nil {
+		if n, err := kl.GetNode(); err == nil {
 			return n, nil
 		}
 	}
@@ -262,23 +273,23 @@ func (kl *Kubelet) GetPodCgroupRoot() string {
 	return kl.containerManager.GetPodCgroupRoot()
 }
 
-// GetHostIP returns host IP or nil in case of error.
-func (kl *Kubelet) GetHostIP() (net.IP, error) {
+// GetHostIPs returns host IPs or nil in case of error.
+func (kl *Kubelet) GetHostIPs() ([]net.IP, error) {
 	node, err := kl.GetNode()
 	if err != nil {
 		return nil, fmt.Errorf("cannot get node: %v", err)
 	}
-	return utilnode.GetNodeHostIP(node)
+	return utilnode.GetNodeHostIPs(node)
 }
 
-// getHostIPAnyway attempts to return the host IP from kubelet's nodeInfo, or
+// getHostIPsAnyWay attempts to return the host IPs from kubelet's nodeInfo, or
 // the initialNode.
-func (kl *Kubelet) getHostIPAnyWay() (net.IP, error) {
+func (kl *Kubelet) getHostIPsAnyWay() ([]net.IP, error) {
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
 		return nil, err
 	}
-	return utilnode.GetNodeHostIP(node)
+	return utilnode.GetNodeHostIPs(node)
 }
 
 // GetExtraSupplementalGroupsForPod returns a list of the extra
@@ -382,5 +393,13 @@ func (kl *Kubelet) GetVersionInfo() (*cadvisorapiv1.VersionInfo, error) {
 
 // GetCachedMachineInfo assumes that the machine info can't change without a reboot
 func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapiv1.MachineInfo, error) {
+	kl.machineInfoLock.RLock()
+	defer kl.machineInfoLock.RUnlock()
 	return kl.machineInfo, nil
+}
+
+func (kl *Kubelet) setCachedMachineInfo(info *cadvisorapiv1.MachineInfo) {
+	kl.machineInfoLock.Lock()
+	defer kl.machineInfoLock.Unlock()
+	kl.machineInfo = info
 }

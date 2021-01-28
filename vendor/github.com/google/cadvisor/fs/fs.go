@@ -527,6 +527,26 @@ func (i *RealFsInfo) GetDeviceInfoByFsUUID(uuid string) (*DeviceInfo, error) {
 	return &DeviceInfo{deviceName, p.major, p.minor}, nil
 }
 
+func (i *RealFsInfo) mountInfoFromDir(dir string) (*mount.MountInfo, bool) {
+	mount, found := i.mounts[dir]
+	// try the parent dir if not found until we reach the root dir
+	// this is an issue on btrfs systems where the directory is not
+	// the subvolume
+	for !found {
+		pathdir, _ := filepath.Split(dir)
+		// break when we reach root
+		if pathdir == "/" {
+			mount, found = i.mounts["/"]
+			break
+		}
+		// trim "/" from the new parent path otherwise the next possible
+		// filepath.Split in the loop will not split the string any further
+		dir = strings.TrimSuffix(pathdir, "/")
+		mount, found = i.mounts[dir]
+	}
+	return &mount, found
+}
+
 func (i *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
 	buf := new(syscall.Stat_t)
 	err := syscall.Stat(dir, buf)
@@ -543,24 +563,9 @@ func (i *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
 		}
 	}
 
-	mount, found := i.mounts[dir]
-	// try the parent dir if not found until we reach the root dir
-	// this is an issue on btrfs systems where the directory is not
-	// the subvolume
-	for !found {
-		pathdir, _ := filepath.Split(dir)
-		// break when we reach root
-		if pathdir == "/" {
-			break
-		}
-		// trim "/" from the new parent path otherwise the next possible
-		// filepath.Split in the loop will not split the string any further
-		dir = strings.TrimSuffix(pathdir, "/")
-		mount, found = i.mounts[dir]
-	}
-
+	mount, found := i.mountInfoFromDir(dir)
 	if found && mount.FsType == "btrfs" && mount.Major == 0 && strings.HasPrefix(mount.Source, "/dev/") {
-		major, minor, err := getBtrfsMajorMinorIds(&mount)
+		major, minor, err := getBtrfsMajorMinorIds(mount)
 		if err != nil {
 			klog.Warningf("%s", err)
 		} else {

@@ -92,7 +92,7 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Jobs, completion after task failure
 		Description: Explicitly cause the tasks to fail once initially. After restarting, the Job MUST
 		execute to completion.
@@ -148,7 +148,7 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	/*
-		Release : v1.15
+		Release: v1.15
 		Testname: Jobs, active pods, graceful termination
 		Description: Create a job. Ensure the active pods reflect paralellism in the namespace and delete the job. Job MUST be deleted successfully.
 	*/
@@ -172,7 +172,7 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Jobs, orphan pods, re-adoption
 		Description: Create a parallel job. The number of Pods MUST equal the level of parallelism.
 		Orphan a Pod by modifying its owner reference. The Job MUST re-adopt the orphan pod.
@@ -246,13 +246,7 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By(fmt.Sprintf("Checking that %d pod created and status is failed", backoff+1))
 		pods, err := e2ejob.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectNoError(err, "failed to get PodList for job %s in namespace: %s", job.Name, f.Namespace.Name)
-		// gomega.Expect(pods.Items).To(gomega.HaveLen(backoff + 1))
-		// due to NumRequeus not being stable enough, especially with failed status
-		// updates we need to allow more than backoff+1
-		// TODO revert this back to above when https://github.com/kubernetes/kubernetes/issues/64787 gets fixed
-		if len(pods.Items) < backoff+1 {
-			framework.Failf("Not enough pod created expected at least %d, got %#v", backoff+1, pods.Items)
-		}
+		gomega.Expect(pods.Items).To(gomega.HaveLen(backoff + 1))
 		for _, pod := range pods.Items {
 			framework.ExpectEqual(pod.Status.Phase, v1.PodFailed)
 		}
