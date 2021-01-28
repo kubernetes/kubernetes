@@ -209,10 +209,10 @@ var _ = SIGDescribe("KubeProxy", func() {
 		// Obtain the corresponding conntrack entry on the host checking
 		// the nf_conntrack file from the pod e2e-net-exec.
 		// It retries in a loop if the entry is not found.
-		cmd := fmt.Sprintf("conntrack -L -f %s -d %v"+
+		cmd := fmt.Sprintf("conntrack -L -f %s -d %v "+
 			"| grep -m 1 'CLOSE_WAIT.*dport=%v' ",
 			ipFamily, ip, testDaemonTCPPort)
-		if err := wait.PollImmediate(1*time.Second, postFinTimeoutSeconds, func() (bool, error) {
+		if err := wait.PollImmediate(2*time.Second, epsilonSeconds, func() (bool, error) {
 			result, err := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
 			// retry if we can't obtain the conntrack entry
 			if err != nil {
@@ -234,6 +234,12 @@ var _ = SIGDescribe("KubeProxy", func() {
 			}
 			return false, fmt.Errorf("wrong TCP CLOSE_WAIT timeout: %v expected: %v", timeoutSeconds, expectedTimeoutSeconds)
 		}); err != nil {
+			// Dump all conntrack entries for debugging
+			result, err := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "conntrack -L")
+			if err != nil {
+				framework.Logf("failed to obtain conntrack entry: %v %v", result, err)
+			}
+			framework.Logf("conntrack entries for node %v:  %v", serverNodeInfo.nodeIP, result)
 			framework.Failf("no valid conntrack entry for port %d on node %s: %v", testDaemonTCPPort, serverNodeInfo.nodeIP, err)
 		}
 	})
