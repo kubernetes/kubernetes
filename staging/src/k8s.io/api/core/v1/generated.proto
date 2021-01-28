@@ -4753,6 +4753,7 @@ message ServicePort {
 
   // The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
   // Default is TCP.
+  // +default="TCP"
   // +optional
   optional string protocol = 2;
 
