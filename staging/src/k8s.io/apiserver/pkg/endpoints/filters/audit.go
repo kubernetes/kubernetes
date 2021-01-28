@@ -50,7 +50,7 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy policy.Checker, lon
 			return
 		}
 		ctx := req.Context()
-		if ev == nil || ctx == nil {
+		if ctx == nil {
 			handler.ServeHTTP(w, req)
 			return
 		}
@@ -111,9 +111,24 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy policy.Checker, lon
 	})
 }
 
+func WithAuthenticationAuditInfo(handler http.Handler, policy policy.Checker) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+
+		attribs, err := GetAuthorizerAttributes(ctx)
+		if err != nil {
+			responsewriters.InternalError(w, req, fmt.Errorf("failed to GetAuthorizerAttributes: %v", err))
+		}
+
+		level, omitStages := policy.LevelAndStages(attribs)
+
+		EnrichWithAuthorizationAttributes
+	})
+}
+
 // createAuditEventAndAttachToContext is responsible for creating the audit event
 // and attaching it to the appropriate request context. It returns:
-// - context with audit event attached to it
+// - context with audit event attached to it, event is never nil
 // - created audit event
 // - error if anything bad happened
 func createAuditEventAndAttachToContext(req *http.Request, policy policy.Checker) (*http.Request, *auditinternal.Event, []auditinternal.Stage, error) {
@@ -125,17 +140,12 @@ func createAuditEventAndAttachToContext(req *http.Request, policy policy.Checker
 	}
 
 	level, omitStages := policy.LevelAndStages(attribs)
-	audit.ObservePolicyLevel(level)
-	if level == auditinternal.LevelNone {
-		// Don't audit.
-		return req, nil, nil, nil
-	}
 
 	requestReceivedTimestamp, ok := request.ReceivedTimestampFrom(ctx)
 	if !ok {
 		requestReceivedTimestamp = time.Now()
 	}
-	ev, err := audit.NewEventFromRequest(req, requestReceivedTimestamp, level, attribs)
+	ev, err := audit.NewEventFromRequest(req, requestReceivedTimestamp, level)
 	if err != nil {
 		return req, nil, nil, fmt.Errorf("failed to complete audit event from request: %v", err)
 	}
@@ -146,6 +156,11 @@ func createAuditEventAndAttachToContext(req *http.Request, policy policy.Checker
 }
 
 func processAuditEvent(sink audit.Sink, ev *auditinternal.Event, omitStages []auditinternal.Stage) bool {
+	audit.ObservePolicyLevel(ev.Level)
+	if ev.Level == auditinternal.LevelNone {
+		return true
+	}
+
 	for _, stage := range omitStages {
 		if ev.Stage == stage {
 			return true
