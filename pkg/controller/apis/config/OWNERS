@@ -1,0 +1,16 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- api-approvers
+- deads2k
+- luxas
+- mtaufen
+- sttts
+- stewart-yu
+reviewers:
+- api-reviewers
+- deads2k
+- luxas
+- mtaufen
+- sttts
+- stewart-yu

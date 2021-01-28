@@ -3,29 +3,33 @@
 filters:
   ".*":
     reviewers:
-    - deads2k
-    - sttts
-    - soltysh
-    - mfojtik
-    - marun
-    - tnozicka
-
-    # approvers are limited to the team that manages rebases and pays the price for carries that are introduced
+      - brendandburns
+      - dchen1107
+      - lavalamp
+      - smarterclayton
+      - thockin
+      - liggitt
     approvers:
-    - deads2k
-    - sttts
-    - soltysh
-    - mfojtik
-    - marun
-    - tnozicka
+      - dchen1107
+      - lavalamp
+      - smarterclayton
+      - thockin
+      - wojtek-t
+      - liggitt
+    emeritus_approvers:
+      - brendandburns
+      - bgrant0607
+      - jbeda
 
-  "^\\.go.(mod|sum)$":
+  # go.{mod,sum} files relate to go dependencies, and should be reviewed by the
+  # dep-approvers
+  "go\\.(mod|sum)$":
+    required_reviewers:
+      - kubernetes/dep-approvers
     labels:
-    - "vendor-update"
-  "^vendor/.*":
+      - area/dependency
+  # metrics.go files are sig-instrumentation related, and should be tagged
+  # and reviewed by sig-instrumentation
+  "metrics\\.go$":
     labels:
-    - "vendor-update"
-  "^staging/.*":
-    labels:
-    - "vendor-update"
-component: kube-apiserver
+      - sig/instrumentation

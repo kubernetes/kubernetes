@@ -1,0 +1,12 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- rootfs
+- saad-ali
+reviewers:
+- simonswine
+- saad-ali
+- jsafrane
+- rootfs
+- jingxu97
+- msau42
