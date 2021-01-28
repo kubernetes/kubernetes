@@ -82,7 +82,7 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) erro
 
 // NormalizeKubernetesVersion resolves version labels, sets alternative
 // image registry if requested for CI builds, and validates minimal
-// version that kubeadm SetInitDynamicDefaultssupports.
+// version that kubeadm SetInitDynamicDefaults supports.
 func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 	// Requested version is automatic CI build, thus use KubernetesCI Image Repository for core images
 	if kubeadmutil.KubernetesIsCIVersion(cfg.KubernetesVersion) {

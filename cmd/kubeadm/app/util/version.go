@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -42,6 +43,8 @@ var (
 	kubeReleaseRegex      = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?$`)
 	kubeReleaseLabelRegex = regexp.MustCompile(`^((latest|stable)+(-[1-9](\.[1-9]([0-9])?)?)?)\z`)
 	kubeBucketPrefixes    = regexp.MustCompile(`^((release|ci|ci-cross)/)?([-\w_\.+]+)$`)
+	versionLock           = &sync.RWMutex{}
+	versionCache          = map[string]string{}
 )
 
 // KubernetesReleaseVersion is helper function that can fetch
@@ -62,7 +65,13 @@ var (
 //  latest-1    (latest release in 1.x, including alpha/beta)
 //  latest-1.0  (and similarly 1.1, 1.2, 1.3, ...)
 func KubernetesReleaseVersion(version string) (string, error) {
-	return kubernetesReleaseVersion(version, fetchFromURL)
+	var err error
+	versionLock.Lock()
+	defer versionLock.Unlock()
+	if versionCache[version] == "" {
+		versionCache[version], err = kubernetesReleaseVersion(version, fetchFromURL)
+	}
+	return versionCache[version], err
 }
 
 // kubernetesReleaseVersion is a helper function to fetch
