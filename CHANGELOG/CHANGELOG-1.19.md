@@ -3417,13 +3417,8 @@ filename | sha512 hash
     - name: shared-disk
   - provisioner: kubernetes.io/azure-disk
   - parameters:
-<<<<<<< HEAD
     - skuname: Premium_LRS  # Currently only available with premium SSDs.
     - cachingMode: None  # ReadOnly host caching is not available for premium SSDs with maxShares>1
-=======
-    - skuname: Premium_LRS  #Currently only available with premium SSDs.
-    - cachingMode: None  #ReadOnly host caching is not available for premium SSDs with maxShares>1
->>>>>>> 74bb122e0a2... Change log:Fix  hyperlink of description [kube-controller-manager-kube-scheduler-and-cloud-controller-manager]
     maxShares: 2 ([#89328](https://github.com/kubernetes/kubernetes/pull/89328), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider and Storage]
 - Kube-apiserver, kube-scheduler and kube-controller manager now use SO_REUSEPORT socket option when listening on address defined by --bind-address and --secure-port flags, when running on Unix systems (Windows is NOT supported). This allows to run multiple instances of those processes on a single host with the same configuration, which allows to update/restart them in a graceful way, without causing downtime. ([#88893](https://github.com/kubernetes/kubernetes/pull/88893), [@invidian](https://github.com/invidian)) [SIG API Machinery, Scheduling and Testing]
 - Kubeadm: The ClusterStatus struct present in the kubeadm-config ConfigMap is deprecated and will be removed on a future version. It is going to be maintained by kubeadm until it gets removed. The same information can be found on `etcd` and `kube-apiserver` pod annotations, `kubeadm.kubernetes.io/etcd.advertise-client-urls` and `kubeadm.kubernetes.io/kube-apiserver.advertise-address.endpoint` respectively. ([#87656](https://github.com/kubernetes/kubernetes/pull/87656), [@ereslibre](https://github.com/ereslibre)) [SIG Cluster Lifecycle]
