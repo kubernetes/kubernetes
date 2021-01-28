@@ -28,7 +28,7 @@ func TestGetServiceIPAndRanges(t *testing.T) {
 		secondaryServiceIPRange string
 		expectedError           bool
 	}{
-		{"", "10.0.0.1", "10.0.0.0/24", "<nil>", false},
+		{"", "<nil>", "<nil>", "<nil>", true},
 		{"192.0.2.1/24", "192.0.2.1", "192.0.2.0/24", "<nil>", false},
 		{"192.0.2.1/24,192.168.128.0/17", "192.0.2.1", "192.0.2.0/24", "192.168.128.0/17", false},
 		// Dual stack IPv4/IPv6

@@ -731,24 +731,15 @@ func buildServiceResolver(enabledAggregatorRouting bool, hostname string, inform
 }
 
 func getServiceIPAndRanges(serviceClusterIPRanges string) (net.IP, net.IPNet, net.IPNet, error) {
-	serviceClusterIPRangeList := []string{}
-	if serviceClusterIPRanges != "" {
-		serviceClusterIPRangeList = strings.Split(serviceClusterIPRanges, ",")
+	if serviceClusterIPRanges == "" {
+		return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("Specify service cluster IP range(s)")
 	}
+
+	serviceClusterIPRangeList := strings.Split(serviceClusterIPRanges, ",")
 
 	var apiServerServiceIP net.IP
 	var primaryServiceIPRange net.IPNet
 	var secondaryServiceIPRange net.IPNet
-	var err error
-	// nothing provided by user, use default range (only applies to the Primary)
-	if len(serviceClusterIPRangeList) == 0 {
-		var primaryServiceClusterCIDR net.IPNet
-		primaryServiceIPRange, apiServerServiceIP, err = controlplane.ServiceIPRange(primaryServiceClusterCIDR)
-		if err != nil {
-			return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("error determining service IP ranges: %v", err)
-		}
-		return apiServerServiceIP, primaryServiceIPRange, net.IPNet{}, nil
-	}
 
 	if len(serviceClusterIPRangeList) > 0 {
 		_, primaryServiceClusterCIDR, err := net.ParseCIDR(serviceClusterIPRangeList[0])
