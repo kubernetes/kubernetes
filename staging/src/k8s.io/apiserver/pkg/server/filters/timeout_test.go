@@ -18,6 +18,7 @@ package filters
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -92,18 +93,27 @@ func TestTimeout(t *testing.T) {
 	timeoutErr := apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
 	record := &recorder{}
 
+	var ctx context.Context
+	withDeadline := func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			req = req.WithContext(ctx)
+			handler.ServeHTTP(w, req)
+		})
+	}
+
 	handler := newHandler(sendResponse, doPanic, writeErrors)
-	ts := httptest.NewServer(withPanicRecovery(
-		WithTimeout(handler, func(req *http.Request) (*http.Request, <-chan time.Time, func(), *apierrors.StatusError) {
-			return req, timeout, record.Record, timeoutErr
+	ts := httptest.NewServer(withDeadline(withPanicRecovery(
+		WithTimeout(handler, func(req *http.Request) (*http.Request, bool, func(), *apierrors.StatusError) {
+			return req, false, record.Record, timeoutErr
 		}), func(w http.ResponseWriter, req *http.Request, err interface{}) {
 			gotPanic <- err
 			http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
 		}),
-	)
+	))
 	defer ts.Close()
 
 	// No timeouts
+	ctx = context.Background()
 	sendResponse <- resp
 	res, err := http.Get(ts.URL)
 	if err != nil {
@@ -124,6 +134,8 @@ func TestTimeout(t *testing.T) {
 	}
 
 	// Times out
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
 	timeout <- time.Time{}
 	res, err = http.Get(ts.URL)
 	if err != nil {
@@ -145,6 +157,7 @@ func TestTimeout(t *testing.T) {
 	}
 
 	// Now try to send a response
+	ctx = context.Background()
 	sendResponse <- resp
 	if err := <-writeErrors; err != http.ErrHandlerTimeout {
 		t.Errorf("got Write error of %v; expected %v", err, http.ErrHandlerTimeout)
@@ -170,6 +183,7 @@ func TestTimeout(t *testing.T) {
 	}
 
 	// Panics with http.ErrAbortHandler
+	ctx = context.Background()
 	doPanic <- http.ErrAbortHandler
 	res, err = http.Get(ts.URL)
 	if err != nil {

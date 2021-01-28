@@ -282,10 +282,13 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
-	handler := genericapifilters.WithAudit(mux, auditSink, auditpolicy.FakeChecker(auditinternal.LevelRequestResponse, nil), func(r *http.Request, requestInfo *request.RequestInfo) bool {
+	longRunningCheck := func(r *http.Request, requestInfo *request.RequestInfo) bool {
 		// simplified long-running check
 		return requestInfo.Verb == "watch" || requestInfo.Verb == "proxy"
-	})
+	}
+	fakeChecker := auditpolicy.FakeChecker(auditinternal.LevelRequestResponse, nil)
+	handler := genericapifilters.WithAudit(mux, auditSink, fakeChecker, longRunningCheck)
+	handler = genericapifilters.WithRequestDeadline(handler, auditSink, fakeChecker, longRunningCheck, codecs, 60*time.Second)
 	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver())
 
 	return &defaultAPIServer{handler, container}

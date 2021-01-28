@@ -134,7 +134,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 				{path: "/mutating/1/5s", timeoutSeconds: 3}, // from request
 			},
 			expectError:   true,
-			errorContains: "request did not complete within requested timeout",
+			errorContains: "the server was unable to return a response in the time allotted",
 		},
 	}
 
