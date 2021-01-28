@@ -4446,7 +4446,7 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 				resource.BinarySI),
 		},
 	}
-	if errs := ValidateResourceRequirements(&containerLimitCase, field.NewPath("resources")); len(errs) != 0 {
+	if errs := ValidateResourceRequirements(&containerLimitCase, field.NewPath("resources"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 }
@@ -16410,7 +16410,7 @@ func TestValidateOverhead(t *testing.T) {
 		},
 	}
 	for _, tc := range successCase {
-		if errs := validateOverhead(tc.overhead, field.NewPath("overheads")); len(errs) != 0 {
+		if errs := validateOverhead(tc.overhead, field.NewPath("overheads"), PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("%q unexpected error: %v", tc.Name, errs)
 		}
 	}
@@ -16427,7 +16427,7 @@ func TestValidateOverhead(t *testing.T) {
 		},
 	}
 	for _, tc := range errorCase {
-		if errs := validateOverhead(tc.overhead, field.NewPath("resources")); len(errs) == 0 {
+		if errs := validateOverhead(tc.overhead, field.NewPath("resources"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("%q expected error", tc.Name)
 		}
 	}
@@ -17085,5 +17085,88 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 	for i, test := range tests {
 		err := ValidatePodTemplateSpec(test.spec, rootFld, PodValidationOptions{})
 		asserttestify.Equal(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.description)
+	}
+}
+
+func TestValidateResourceRequirements(t *testing.T) {
+	path := field.NewPath("resources")
+	tests := []struct {
+		name         string
+		requirements core.ResourceRequirements
+		opts         PodValidationOptions
+	}{
+		{
+			name: "limits and requests of hugepage resource are equal",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceCPU: resource.MustParse("10"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceCPU: resource.MustParse("10"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
+			},
+			opts: PodValidationOptions{},
+		},
+		{
+			name: "limits and requests of memory resource are equal",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("2Mi"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("2Mi"),
+				},
+			},
+			opts: PodValidationOptions{},
+		},
+		{
+			name: "limits and requests of cpu resource are equal",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceCPU: resource.MustParse("10"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceCPU: resource.MustParse("10"),
+				},
+			},
+			opts: PodValidationOptions{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := ValidateResourceRequirements(&tc.requirements, path, tc.opts); len(errs) != 0 {
+				t.Errorf("unexpected errors: %v", errs)
+			}
+		})
+	}
+
+	errTests := []struct {
+		name         string
+		requirements core.ResourceRequirements
+		opts         PodValidationOptions
+	}{
+		{
+			name: "hugepage resource without cpu or memory",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
+			},
+			opts: PodValidationOptions{},
+		},
+	}
+
+	for _, tc := range errTests {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := ValidateResourceRequirements(&tc.requirements, path, tc.opts); len(errs) == 0 {
+				t.Error("expected errors")
+			}
+		})
 	}
 }
