@@ -204,7 +204,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 
 	newVolumes := make(map[string]bool)
 	if err := pl.filterVolumes(pod.Spec.Volumes, pod.Namespace, newVolumes); err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
+		return framework.AsStatus(err)
 	}
 
 	// quick return
@@ -237,7 +237,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 	existingVolumes := make(map[string]bool)
 	for _, existingPod := range nodeInfo.Pods {
 		if err := pl.filterVolumes(existingPod.Pod.Spec.Volumes, existingPod.Pod.Namespace, existingVolumes); err != nil {
-			return framework.NewStatus(framework.Error, err.Error())
+			return framework.AsStatus(err)
 		}
 	}
 	numExistingVolumes := len(existingVolumes)

@@ -123,7 +123,7 @@ func (pl *SelectorSpread) NormalizeScore(ctx context.Context, state *framework.C
 		}
 		nodeInfo, err := pl.sharedLister.NodeInfos().Get(scores[i].Name)
 		if err != nil {
-			return framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", scores[i].Name, err))
+			return framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", scores[i].Name, err))
 		}
 		zoneID := utilnode.GetZoneKey(nodeInfo.Node())
 		if zoneID == "" {
@@ -154,7 +154,7 @@ func (pl *SelectorSpread) NormalizeScore(ctx context.Context, state *framework.C
 		if haveZones {
 			nodeInfo, err := pl.sharedLister.NodeInfos().Get(scores[i].Name)
 			if err != nil {
-				return framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", scores[i].Name, err))
+				return framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", scores[i].Name, err))
 			}
 
 			zoneID := utilnode.GetZoneKey(nodeInfo.Node())
