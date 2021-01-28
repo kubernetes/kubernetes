@@ -211,6 +211,60 @@ func TestIsHugePageResourceName(t *testing.T) {
 	}
 }
 
+func TestIsHugePageResourceValueDivisible(t *testing.T) {
+	testCases := []struct {
+		name     core.ResourceName
+		quantity resource.Quantity
+		result   bool
+	}{
+		{
+			name:     core.ResourceName("hugepages-2Mi"),
+			quantity: resource.MustParse("4Mi"),
+			result:   true,
+		},
+		{
+			name:     core.ResourceName("hugepages-2Mi"),
+			quantity: resource.MustParse("5Mi"),
+			result:   false,
+		},
+		{
+			name:     core.ResourceName("hugepages-1Gi"),
+			quantity: resource.MustParse("2Gi"),
+			result:   true,
+		},
+		{
+			name:     core.ResourceName("hugepages-1Gi"),
+			quantity: resource.MustParse("2.1Gi"),
+			result:   false,
+		},
+		{
+			name:     core.ResourceName("hugepages-1Mi"),
+			quantity: resource.MustParse("2.1Mi"),
+			result:   false,
+		},
+		{
+			name:     core.ResourceName("hugepages-64Ki"),
+			quantity: resource.MustParse("128Ki"),
+			result:   true,
+		},
+		{
+			name:     core.ResourceName("hugepages-"),
+			quantity: resource.MustParse("128Ki"),
+			result:   false,
+		},
+		{
+			name:     core.ResourceName("hugepages"),
+			quantity: resource.MustParse("128Ki"),
+			result:   false,
+		},
+	}
+	for _, testCase := range testCases {
+		if testCase.result != IsHugePageResourceValueDivisible(testCase.name, testCase.quantity) {
+			t.Errorf("resource: %v storage:%v expected result: %v", testCase.name, testCase.quantity, testCase.result)
+		}
+	}
+}
+
 func TestHugePageResourceName(t *testing.T) {
 	testCases := []struct {
 		pageSize resource.Quantity
