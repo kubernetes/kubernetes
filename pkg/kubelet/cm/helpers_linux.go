@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -115,7 +116,7 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, cpuMangerPolicy string) *ResourceConfig {
 	// sum requests and limits.
 	reqs, limits := resource.PodRequestsAndLimits(pod)
 
@@ -169,6 +170,11 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) 
 	// build the result
 	result := &ResourceConfig{}
 	if qosClass == v1.PodQOSGuaranteed {
+		// if the pods are in Guaranteed QoS class and cpu manager is enabled and cpu manager policy is static, we should
+		// disable the use of cfs quota at the pod level
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) && (cpuMangerPolicy == string(cpumanager.PolicyStatic)) {
+			cpuQuota = int64(-1)
+		}
 		result.CpuShares = &cpuShares
 		result.CpuQuota = &cpuQuota
 		result.CpuPeriod = &cpuPeriod
