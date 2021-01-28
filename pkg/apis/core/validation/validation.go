@@ -4664,11 +4664,10 @@ func ValidateNodeSpecificAnnotations(annotations map[string]string, fldPath *fie
 
 // ValidateNode tests if required fields in the node are set.
 func ValidateNode(node *core.Node) field.ErrorList {
-	fldPath := field.NewPath("metadata")
-	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, fldPath)
-	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
+	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, field.NewPath("metadata").Child("annotations"))...)
 	if len(node.Spec.Taints) > 0 {
-		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
+		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, field.NewPath("spec", "taints"))...)
 	}
 
 	// Only validate spec.
@@ -4733,9 +4732,8 @@ func ValidateNodeResources(node *core.Node) field.ErrorList {
 
 // ValidateNodeUpdate tests to make sure a node update can be applied.  Modifies oldNode.
 func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
-	fldPath := field.NewPath("metadata")
-	allErrs := ValidateObjectMetaUpdate(&node.ObjectMeta, &oldNode.ObjectMeta, fldPath)
-	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
+	allErrs := ValidateObjectMetaUpdate(&node.ObjectMeta, &oldNode.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, field.NewPath("metadata").Child("annotations"))...)
 
 	// TODO: Enable the code once we have better core object.status update model. Currently,
 	// anyone can update node status.
@@ -4801,7 +4799,7 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 
 	// update taints
 	if len(node.Spec.Taints) > 0 {
-		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
+		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, field.NewPath("spec", "taints"))...)
 	}
 	oldNode.Spec.Taints = node.Spec.Taints
 
