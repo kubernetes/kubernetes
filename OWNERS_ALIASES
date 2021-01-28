@@ -176,6 +176,7 @@ aliases:
     - jsafrane
     - gnufied
     - msau42
+    - xing-yang
   # emeritus:
   # - rootfs
   sig-storage-reviewers:
@@ -187,6 +188,7 @@ aliases:
     - gnufied
     - verult
     - humblec
+    - xing-yang
   # emeritus:
   # - davidz627
 
@@ -529,6 +531,7 @@ aliases:
     - saad-ali
     - msau42
     - jsafrane
+    - xing-yang
 
   sig-security-approvers:
     - IanColdwater
