@@ -18,6 +18,7 @@ package defaultpreemption
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -125,15 +126,16 @@ func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.Cycle
 	// It's safe to directly fetch pod here. Because the informer cache has already been
 	// initialized when creating the Scheduler obj, i.e., factory.go#MakeDefaultErrorFunc().
 	// However, tests may need to manually initialize the shared pod informer.
+	podNamespace, podName := pod.Namespace, pod.Name
 	pod, err := pl.podLister.Pods(pod.Namespace).Get(pod.Name)
 	if err != nil {
-		klog.Errorf("Error getting the updated preemptor pod object: %v", err)
+		klog.ErrorS(err, "getting the updated preemptor pod object", "pod", klog.KRef(podNamespace, podName))
 		return "", err
 	}
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
 	if !PodEligibleToPreemptOthers(pod, nodeLister, m[pod.Status.NominatedNodeName]) {
-		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
+		klog.V(5).InfoS("Pod is not eligible for more preemption", "pod", klog.KObj(pod))
 		return "", nil
 	}
 
@@ -197,10 +199,10 @@ func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framewor
 
 	potentialNodes := nodesWherePreemptionMightHelp(allNodes, m)
 	if len(potentialNodes) == 0 {
-		klog.V(3).Infof("Preemption will not help schedule pod %v/%v on any node.", pod.Namespace, pod.Name)
+		klog.V(3).InfoS("Preemption will not help schedule pod on any node", "pod", klog.KObj(pod))
 		// In this case, we should clean-up any existing nominated node name of the pod.
 		if err := util.ClearNominatedNodeName(pl.fh.ClientSet(), pod); err != nil {
-			klog.Errorf("Cannot clear 'NominatedNodeName' field of pod %v/%v: %v", pod.Namespace, pod.Name, err)
+			klog.ErrorS(err, "cannot clear 'NominatedNodeName' field of pod", "pod", klog.KObj(pod))
 			// We do not return as this error is not critical.
 		}
 		return nil, nil
@@ -239,7 +241,7 @@ func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framewor
 // terminating pods on the node, we don't consider this for preempting more pods.
 func PodEligibleToPreemptOthers(pod *v1.Pod, nodeInfos framework.NodeInfoLister, nominatedNodeStatus *framework.Status) bool {
 	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
-		klog.V(5).Infof("Pod %v/%v is not eligible for preemption because it has a preemptionPolicy of %v", pod.Namespace, pod.Name, v1.PreemptNever)
+		klog.V(5).InfoS("Pod is not eligible for preemption because it has a preemptionPolicy of Never", "pod", klog.KObj(pod))
 		return false
 	}
 	nomNodeName := pod.Status.NominatedNodeName
@@ -380,8 +382,8 @@ func CallExtenders(extenders []framework.Extender, pod *v1.Pod, nodeLister frame
 		nodeNameToVictims, err := extender.ProcessPreemption(pod, victimsMap, nodeLister)
 		if err != nil {
 			if extender.IsIgnorable() {
-				klog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
-					extender, err)
+				klog.InfoS("Skipping extender as it returned error and has ignorable flag set",
+					"extender", extender, "err", err)
 				continue
 			}
 			return nil, err
@@ -438,7 +440,7 @@ func SelectCandidate(candidates []Candidate) Candidate {
 	}
 
 	// We shouldn't reach here.
-	klog.Errorf("should not reach here, no candidate selected from %v.", candidates)
+	klog.ErrorS(errors.New("no candidate selected"), "should not reach here", "candidates", candidates)
 	// To not break the whole flow, return the first candidate.
 	return candidates[0]
 }
@@ -553,7 +555,7 @@ func pickOneNodeForPreemption(nodesToVictims map[string]*extenderv1.Victims) str
 	if latestStartTime == nil {
 		// If the earliest start time of all pods on the 1st node is nil, just return it,
 		// which is not expected to happen.
-		klog.Errorf("earliestStartTime is nil for node %s. Should not reach here.", minNodes2[0])
+		klog.ErrorS(errors.New("earliestStartTime is nil for node"), "should not reach here", "node", minNodes2[0])
 		return minNodes2[0]
 	}
 	nodeToReturn := minNodes2[0]
@@ -562,7 +564,7 @@ func pickOneNodeForPreemption(nodesToVictims map[string]*extenderv1.Victims) str
 		// Get earliest start time of all pods on the current node.
 		earliestStartTimeOnNode := util.GetEarliestPodStartTime(nodesToVictims[node])
 		if earliestStartTimeOnNode == nil {
-			klog.Errorf("earliestStartTime is nil for node %s. Should not reach here.", node)
+			klog.ErrorS(errors.New("earliestStartTime is nil for node"), "should not reach here", "node", node)
 			continue
 		}
 		if earliestStartTimeOnNode.After(latestStartTime.Time) {
@@ -663,7 +665,7 @@ func selectVictimsOnNode(
 			}
 			rpi := pi.Pod
 			victims = append(victims, rpi)
-			klog.V(5).Infof("Pod %v/%v is a potential preemption victim on node %v.", rpi.Namespace, rpi.Name, nodeInfo.Node().Name)
+			klog.V(5).InfoS("Pod is a potential preemption victim on node", "pod", klog.KObj(rpi), "node", nodeInfo.Node().Name)
 		}
 		return fits, nil
 	}
@@ -690,7 +692,7 @@ func selectVictimsOnNode(
 func PrepareCandidate(c Candidate, fh framework.Handle, cs kubernetes.Interface, pod *v1.Pod) error {
 	for _, victim := range c.Victims().Pods {
 		if err := util.DeletePod(cs, victim); err != nil {
-			klog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
+			klog.ErrorS(err, "preempting pod", "pod", klog.KObj(victim))
 			return err
 		}
 		// If the victim is a WaitingPod, send a reject message to the PermitPlugin
@@ -708,7 +710,7 @@ func PrepareCandidate(c Candidate, fh framework.Handle, cs kubernetes.Interface,
 	// lets scheduler find another place for them.
 	nominatedPods := getLowerPriorityNominatedPods(fh.PreemptHandle(), pod, c.Name())
 	if err := util.ClearNominatedNodeName(cs, nominatedPods...); err != nil {
-		klog.Errorf("Cannot clear 'NominatedNodeName' field: %v", err)
+		klog.ErrorS(err, "cannot clear 'NominatedNodeName' field")
 		// We do not return as this error is not critical.
 	}
 
