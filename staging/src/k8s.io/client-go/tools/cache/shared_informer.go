@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -150,6 +151,14 @@ type SharedInformer interface {
 	// because the implementation takes time to do work and there may
 	// be competing load and scheduling noise.
 	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration)
+	// RemoveEventHandler removes an event handler from the shared informer.
+	// It returns true if the removal is successful.
+	// The handler must be comparable to be removed otherwise it will return an error.
+	// If an identical handler is added more than once, it must be removed more than once.
+	RemoveEventHandler(handler ResourceEventHandler) (error, bool)
+	// EventHandlerCount returns the number of event handlers
+	// currently registered with the shared informer.
+	EventHandlerCount() int
 	// GetStore returns the informer's local cache as a Store.
 	GetStore() Store
 	// GetController is deprecated, it does nothing useful
@@ -524,6 +533,14 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 	}
 }
 
+func (s *sharedIndexInformer) RemoveEventHandler(handler ResourceEventHandler) (error, bool) {
+	return s.processor.removeEventHandler(handler)
+}
+
+func (s *sharedIndexInformer) EventHandlerCount() int {
+	return s.processor.eventHandlerCount()
+}
+
 func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
@@ -598,6 +615,53 @@ func (p *sharedProcessor) addListener(listener *processorListener) {
 func (p *sharedProcessor) addListenerLocked(listener *processorListener) {
 	p.listeners = append(p.listeners, listener)
 	p.syncingListeners = append(p.syncingListeners, listener)
+}
+
+func (p *sharedProcessor) removeListener(index int) {
+	handler := p.listeners[index].handler
+	p.listeners = append(p.listeners[:index], p.listeners[index+1:]...)
+	// we don't know where in syncingListeners the handler is,
+	// so we must remove it separately (if it exists in syncingListeners).
+	target := -1
+	for i, listener := range p.syncingListeners {
+		if listener.handler == handler {
+			target = i
+			break
+		}
+	}
+	if target != -1 {
+		p.syncingListeners = append(p.syncingListeners[:target], p.syncingListeners[target+1:]...)
+	}
+}
+
+func (p *sharedProcessor) removeEventHandler(handler ResourceEventHandler) (error, bool) {
+	p.listenersLock.Lock()
+	defer p.listenersLock.Unlock()
+
+	if !reflect.TypeOf(handler).Comparable() {
+		return fmt.Errorf("type of handler to be removed: %v is uncomparable", reflect.TypeOf(handler)), false
+	}
+
+	for i, listener := range p.listeners {
+		// This will panic if the handler is not comparable
+		// i.e. it's assumed you have a direct handle to the handler
+		// that was passed in initially when it was added.
+		if !reflect.TypeOf(listener.handler).Comparable() {
+			return fmt.Errorf("at least one of the existing handlers on the informer is uncomparable (type:%v) no handlers can be removed", reflect.TypeOf(listener.handler)), false
+		}
+		if listener.handler == handler {
+			p.removeListener(i)
+			return nil, true
+		}
+	}
+	return nil, false
+}
+
+func (p *sharedProcessor) eventHandlerCount() int {
+	p.listenersLock.Lock()
+	defer p.listenersLock.Unlock()
+
+	return len(p.listeners)
 }
 
 func (p *sharedProcessor) distribute(obj interface{}, sync bool) {
