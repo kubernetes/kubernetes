@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -148,56 +148,87 @@ func TestCheckMigrationFeatureFlags(t *testing.T) {
 		csiMigrationEnabled          bool
 		pluginFeatureComplete        featuregate.Feature
 		pluginFeatureCompleteEnabled bool
-		result                       bool
+		pluginUnregsiterFeature      featuregate.Feature
+		pluginUnregsiterEnabled      bool
+		expectMigrationComplete      bool
+		expectErr                    bool
 	}{
 		{
 			name:                         "plugin specific feature flag enabled with migration flag disabled",
-			pluginFeature:                features.CSIMigrationGCE,
+			pluginFeature:                features.CSIMigrationvSphere,
 			pluginFeatureEnabled:         true,
 			csiMigrationEnabled:          false,
-			pluginFeatureComplete:        features.CSIMigrationGCEComplete,
+			pluginFeatureComplete:        features.CSIMigrationvSphereComplete,
 			pluginFeatureCompleteEnabled: false,
-			result:                       false,
+			pluginUnregsiterFeature:      features.InTreePluginvSphereUnregister,
+			pluginUnregsiterEnabled:      false,
+			expectMigrationComplete:      false,
+			expectErr:                    false,
 		},
 		{
 			name:                         "plugin specific complete flag enabled but plugin specific feature flag disabled",
-			pluginFeature:                features.CSIMigrationAWS,
+			pluginFeature:                features.CSIMigrationvSphere,
 			pluginFeatureEnabled:         false,
 			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationAWSComplete,
+			pluginFeatureComplete:        features.CSIMigrationvSphereComplete,
 			pluginFeatureCompleteEnabled: true,
-			result:                       false,
+			pluginUnregsiterFeature:      features.InTreePluginvSphereUnregister,
+			pluginUnregsiterEnabled:      false,
+			expectMigrationComplete:      false,
+			expectErr:                    false,
 		},
 		{
 			name:                         "plugin specific complete feature disabled but plugin specific migration feature and CSI migration flag enabled",
-			pluginFeature:                features.CSIMigrationGCE,
+			pluginFeature:                features.CSIMigrationvSphere,
 			pluginFeatureEnabled:         true,
 			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationGCEComplete,
+			pluginFeatureComplete:        features.CSIMigrationvSphereComplete,
 			pluginFeatureCompleteEnabled: false,
-			result:                       true,
+			pluginUnregsiterFeature:      features.InTreePluginvSphereUnregister,
+			pluginUnregsiterEnabled:      false,
+			expectMigrationComplete:      false,
+			expectErr:                    true,
 		},
 		{
 			name:                         "all features enabled",
-			pluginFeature:                features.CSIMigrationAWS,
+			pluginFeature:                features.CSIMigrationvSphere,
 			pluginFeatureEnabled:         true,
 			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationAWSComplete,
+			pluginFeatureComplete:        features.CSIMigrationvSphereComplete,
 			pluginFeatureCompleteEnabled: true,
-			result:                       true,
+			pluginUnregsiterFeature:      features.InTreePluginvSphereUnregister,
+			pluginUnregsiterEnabled:      true,
+			expectMigrationComplete:      true,
+			expectErr:                    true,
+		},
+		{
+			name:                    "no plugin feature complete set",
+			pluginFeature:           features.CSIMigrationGCE,
+			pluginFeatureEnabled:    true,
+			csiMigrationEnabled:     true,
+			pluginUnregsiterFeature: features.InTreePluginGCEUnregister,
+			pluginUnregsiterEnabled: true,
+			expectMigrationComplete: true,
+			expectErr:               true,
 		},
 	}
 	for _, test := range testCases {
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, test.csiMigrationEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeatureComplete, test.pluginFeatureCompleteEnabled)()
-			err := CheckMigrationFeatureFlags(utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureComplete)
-			if err != nil && test.result == true {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginUnregsiterFeature, test.pluginUnregsiterEnabled)()
+			if test.pluginFeatureComplete != "" {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeatureComplete, test.pluginFeatureCompleteEnabled)()
+			}
+			migrationComplete, err := CheckMigrationFeatureFlags(utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureComplete, test.pluginUnregsiterFeature)
+			if err != nil && test.expectErr == true {
 				t.Errorf("Unexpected error: %v", err)
 			}
-			if err == nil && test.result == false {
+			if err == nil && test.expectErr == false {
 				t.Errorf("Unexpected validation pass")
+			}
+			if migrationComplete != test.expectMigrationComplete {
+				t.Errorf("Unexpected migrationComplete result. Exp: %v, got %v", test.expectMigrationComplete, migrationComplete)
 			}
 		})
 	}
@@ -205,103 +236,103 @@ func TestCheckMigrationFeatureFlags(t *testing.T) {
 
 func TestMigrationFeatureFlagStatus(t *testing.T) {
 	testCases := []struct {
-		name                         string
-		pluginName                   string
-		csiMigrationEnabled          bool
-		pluginFeature                featuregate.Feature
-		pluginFeatureEnabled         bool
-		pluginFeatureComplete        featuregate.Feature
-		pluginFeatureCompleteEnabled bool
-		csiMigrationResult           bool
-		csiMigrationCompleteResult   bool
+		name                          string
+		pluginName                    string
+		csiMigrationEnabled           bool
+		pluginFeature                 featuregate.Feature
+		pluginFeatureEnabled          bool
+		inTreePluginUnregister        featuregate.Feature
+		inTreePluginUnregisterEnabled bool
+		csiMigrationResult            bool
+		csiMigrationCompleteResult    bool
 	}{
 		{
-			name:                         "gce-pd migration flag disabled and migration-complete flag disabled with CSI migration flag disabled",
-			pluginName:                   "kubernetes.io/gce-pd",
-			pluginFeature:                features.CSIMigrationGCE,
-			pluginFeatureEnabled:         false,
-			csiMigrationEnabled:          false,
-			pluginFeatureComplete:        features.CSIMigrationGCEComplete,
-			pluginFeatureCompleteEnabled: false,
-			csiMigrationResult:           false,
-			csiMigrationCompleteResult:   false,
+			name:                          "gce-pd migration flag disabled and migration-complete flag disabled with CSI migration flag disabled",
+			pluginName:                    "kubernetes.io/gce-pd",
+			pluginFeature:                 features.CSIMigrationGCE,
+			pluginFeatureEnabled:          false,
+			csiMigrationEnabled:           false,
+			inTreePluginUnregister:        features.InTreePluginGCEUnregister,
+			inTreePluginUnregisterEnabled: false,
+			csiMigrationResult:            false,
+			csiMigrationCompleteResult:    false,
 		},
 		{
-			name:                         "gce-pd migration flag disabled and migration-complete flag disabled with CSI migration flag enabled",
-			pluginName:                   "kubernetes.io/gce-pd",
-			pluginFeature:                features.CSIMigrationGCE,
-			pluginFeatureEnabled:         false,
-			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationGCEComplete,
-			pluginFeatureCompleteEnabled: false,
-			csiMigrationResult:           false,
-			csiMigrationCompleteResult:   false,
+			name:                          "gce-pd migration flag disabled and migration-complete flag disabled with CSI migration flag enabled",
+			pluginName:                    "kubernetes.io/gce-pd",
+			pluginFeature:                 features.CSIMigrationGCE,
+			pluginFeatureEnabled:          false,
+			csiMigrationEnabled:           true,
+			inTreePluginUnregister:        features.InTreePluginGCEUnregister,
+			inTreePluginUnregisterEnabled: false,
+			csiMigrationResult:            false,
+			csiMigrationCompleteResult:    false,
 		},
 		{
-			name:                         "gce-pd migration flag enabled and migration-complete flag disabled with CSI migration flag enabled",
-			pluginName:                   "kubernetes.io/gce-pd",
-			pluginFeature:                features.CSIMigrationGCE,
-			pluginFeatureEnabled:         true,
-			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationGCEComplete,
-			pluginFeatureCompleteEnabled: false,
-			csiMigrationResult:           true,
-			csiMigrationCompleteResult:   false,
+			name:                          "gce-pd migration flag enabled and migration-complete flag disabled with CSI migration flag enabled",
+			pluginName:                    "kubernetes.io/gce-pd",
+			pluginFeature:                 features.CSIMigrationGCE,
+			pluginFeatureEnabled:          true,
+			csiMigrationEnabled:           true,
+			inTreePluginUnregister:        features.InTreePluginGCEUnregister,
+			inTreePluginUnregisterEnabled: false,
+			csiMigrationResult:            true,
+			csiMigrationCompleteResult:    false,
 		},
 		{
-			name:                         "gce-pd migration flag enabled and migration-complete flag enabled with CSI migration flag enabled",
-			pluginName:                   "kubernetes.io/gce-pd",
-			pluginFeature:                features.CSIMigrationGCE,
-			pluginFeatureEnabled:         true,
-			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationGCEComplete,
-			pluginFeatureCompleteEnabled: true,
-			csiMigrationResult:           true,
-			csiMigrationCompleteResult:   true,
+			name:                          "gce-pd migration flag enabled and migration-complete flag enabled with CSI migration flag enabled",
+			pluginName:                    "kubernetes.io/gce-pd",
+			pluginFeature:                 features.CSIMigrationGCE,
+			pluginFeatureEnabled:          true,
+			csiMigrationEnabled:           true,
+			inTreePluginUnregister:        features.InTreePluginGCEUnregister,
+			inTreePluginUnregisterEnabled: true,
+			csiMigrationResult:            true,
+			csiMigrationCompleteResult:    true,
 		},
 		{
-			name:                         "aws-ebs migration flag disabled and migration-complete flag disabled with CSI migration flag disabled",
-			pluginName:                   "kubernetes.io/aws-ebs",
-			pluginFeature:                features.CSIMigrationAWS,
-			pluginFeatureEnabled:         false,
-			csiMigrationEnabled:          false,
-			pluginFeatureComplete:        features.CSIMigrationAWSComplete,
-			pluginFeatureCompleteEnabled: false,
-			csiMigrationResult:           false,
-			csiMigrationCompleteResult:   false,
+			name:                          "aws-ebs migration flag disabled and migration-complete flag disabled with CSI migration flag disabled",
+			pluginName:                    "kubernetes.io/aws-ebs",
+			pluginFeature:                 features.CSIMigrationAWS,
+			pluginFeatureEnabled:          false,
+			csiMigrationEnabled:           false,
+			inTreePluginUnregister:        features.InTreePluginAWSUnregister,
+			inTreePluginUnregisterEnabled: false,
+			csiMigrationResult:            false,
+			csiMigrationCompleteResult:    false,
 		},
 		{
-			name:                         "aws-ebs migration flag disabled and migration-complete flag disabled with CSI migration flag enabled",
-			pluginName:                   "kubernetes.io/aws-ebs",
-			pluginFeature:                features.CSIMigrationAWS,
-			pluginFeatureEnabled:         false,
-			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationAWSComplete,
-			pluginFeatureCompleteEnabled: false,
-			csiMigrationResult:           false,
-			csiMigrationCompleteResult:   false,
+			name:                          "aws-ebs migration flag disabled and migration-complete flag disabled with CSI migration flag enabled",
+			pluginName:                    "kubernetes.io/aws-ebs",
+			pluginFeature:                 features.CSIMigrationAWS,
+			pluginFeatureEnabled:          false,
+			csiMigrationEnabled:           true,
+			inTreePluginUnregister:        features.InTreePluginAWSUnregister,
+			inTreePluginUnregisterEnabled: false,
+			csiMigrationResult:            false,
+			csiMigrationCompleteResult:    false,
 		},
 		{
-			name:                         "aws-ebs migration flag enabled and migration-complete flag disabled with CSI migration flag enabled",
-			pluginName:                   "kubernetes.io/aws-ebs",
-			pluginFeature:                features.CSIMigrationAWS,
-			pluginFeatureEnabled:         true,
-			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationAWSComplete,
-			pluginFeatureCompleteEnabled: false,
-			csiMigrationResult:           true,
-			csiMigrationCompleteResult:   false,
+			name:                          "aws-ebs migration flag enabled and migration-complete flag disabled with CSI migration flag enabled",
+			pluginName:                    "kubernetes.io/aws-ebs",
+			pluginFeature:                 features.CSIMigrationAWS,
+			pluginFeatureEnabled:          true,
+			csiMigrationEnabled:           true,
+			inTreePluginUnregister:        features.InTreePluginAWSUnregister,
+			inTreePluginUnregisterEnabled: false,
+			csiMigrationResult:            true,
+			csiMigrationCompleteResult:    false,
 		},
 		{
-			name:                         "aws-ebs migration flag enabled and migration-complete flag enabled with CSI migration flag enabled",
-			pluginName:                   "kubernetes.io/aws-ebs",
-			pluginFeature:                features.CSIMigrationAWS,
-			pluginFeatureEnabled:         true,
-			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationAWSComplete,
-			pluginFeatureCompleteEnabled: true,
-			csiMigrationResult:           true,
-			csiMigrationCompleteResult:   true,
+			name:                          "aws-ebs migration flag enabled and migration-complete flag enabled with CSI migration flag enabled",
+			pluginName:                    "kubernetes.io/aws-ebs",
+			pluginFeature:                 features.CSIMigrationAWS,
+			pluginFeatureEnabled:          true,
+			csiMigrationEnabled:           true,
+			inTreePluginUnregister:        features.InTreePluginAWSUnregister,
+			inTreePluginUnregisterEnabled: true,
+			csiMigrationResult:            true,
+			csiMigrationCompleteResult:    true,
 		},
 	}
 	csiTranslator := csitrans.New()
@@ -310,7 +341,7 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, test.csiMigrationEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeatureComplete, test.pluginFeatureCompleteEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.inTreePluginUnregister, test.inTreePluginUnregisterEnabled)()
 
 			csiMigrationResult := pm.IsMigrationEnabledForPlugin(test.pluginName)
 			if csiMigrationResult != test.csiMigrationResult {
