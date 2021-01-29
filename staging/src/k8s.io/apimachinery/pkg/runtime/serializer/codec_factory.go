@@ -87,6 +87,12 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 			Serializer:         yamlSerializer,
 		},
 		{
+			AcceptContentTypes: []string{runtime.ContentTypeText},
+			ContentType:        runtime.ContentTypeText,
+			EncodesAsText:      true,
+			Serializer:         jsonSerializer,
+		},
+		{
 			AcceptContentTypes: []string{runtime.ContentTypeProtobuf},
 			ContentType:        runtime.ContentTypeProtobuf,
 			FileExtensions:     []string{"pb"},
