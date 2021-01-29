@@ -509,7 +509,7 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 
 	// pod stats api summarizes ephemeral storage usage (container, emptyDir, host[etc-hosts, logs])
 	podEphemeralStorageTotalUsage := &resource.Quantity{}
-	if podStats.EphemeralStorage != nil {
+	if podStats.EphemeralStorage != nil && podStats.EphemeralStorage.UsedBytes != nil {
 		podEphemeralStorageTotalUsage = resource.NewQuantity(int64(*podStats.EphemeralStorage.UsedBytes), resource.BinarySI)
 	}
 	podEphemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
