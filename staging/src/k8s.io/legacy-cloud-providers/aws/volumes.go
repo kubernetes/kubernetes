@@ -87,7 +87,7 @@ func (c *Cloud) checkIfAttachedToNode(diskName KubernetesVolumeID, nodeName type
 	info, err := disk.describeVolume()
 
 	if err != nil {
-		klog.Warningf("Error describing volume %s with %v", diskName, err)
+		klog.InfoS("Error describing volume error", "volume", diskName, "erro", err)
 		awsDiskInfo.volumeState = "unknown"
 		return awsDiskInfo, false, err
 	}
@@ -104,7 +104,7 @@ func (c *Cloud) checkIfAttachedToNode(diskName KubernetesVolumeID, nodeName type
 		// has been deleted
 		if err != nil {
 			fetchErr := fmt.Errorf("error fetching instance %s for volume %s", instanceID, diskName)
-			klog.Warning(fetchErr)
+			klog.Warning("fetching instance for volume error", "instanceID",instanceID, "volume", diskName)
 			return awsDiskInfo, false, fetchErr
 		}
 
