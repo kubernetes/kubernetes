@@ -60,6 +60,16 @@ const (
 	permit                      = "Permit"
 )
 
+var allClusterEvents = []framework.ClusterEvent{
+	{Resource: framework.Pod, ActionType: framework.All},
+	{Resource: framework.Node, ActionType: framework.All},
+	{Resource: framework.CSINode, ActionType: framework.All},
+	{Resource: framework.PersistentVolume, ActionType: framework.All},
+	{Resource: framework.PersistentVolumeClaim, ActionType: framework.All},
+	{Resource: framework.Service, ActionType: framework.All},
+	{Resource: framework.StorageClass, ActionType: framework.All},
+}
+
 var configDecoder = scheme.Codecs.UniversalDecoder()
 
 // frameworkImpl is the component responsible for initializing and running scheduler
@@ -139,6 +149,7 @@ type frameworkOptions struct {
 	extenders            []framework.Extender
 	runAllFilters        bool
 	captureProfile       CaptureProfile
+	clusterEventMap      map[framework.ClusterEvent]sets.String
 }
 
 // Option for the frameworkImpl.
@@ -221,6 +232,14 @@ func WithCaptureProfile(c CaptureProfile) Option {
 func defaultFrameworkOptions() frameworkOptions {
 	return frameworkOptions{
 		metricsRecorder: newMetricsRecorder(1000, time.Second),
+		clusterEventMap: make(map[framework.ClusterEvent]sets.String),
+	}
+}
+
+// WithClusterEventMap sets clusterEventMap for the scheduling frameworkImpl.
+func WithClusterEventMap(m map[framework.ClusterEvent]sets.String) Option {
+	return func(o *frameworkOptions) {
+		o.clusterEventMap = m
 	}
 }
 
@@ -292,6 +311,9 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		}
 		pluginsMap[name] = p
 
+		// Update ClusterEventMap in place.
+		fillEventToPluginMap(p, options.clusterEventMap)
+
 		// a weight of zero is not permitted, plugins can be disabled explicitly
 		// when configured.
 		f.pluginNameToWeightMap[name] = int(pg[name].Weight)
@@ -341,6 +363,37 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	}
 
 	return f, nil
+}
+
+func fillEventToPluginMap(p framework.Plugin, eventToPlugins map[framework.ClusterEvent]sets.String) {
+	ext, ok := p.(framework.EnqueueExtensions)
+	if !ok {
+		// If interface EnqueueExtensions is not implemented, register the default events
+		// to the plugin. This is to ensure backward compatibility.
+		registerClusterEvents(p.Name(), eventToPlugins, allClusterEvents)
+		return
+	}
+
+	events := ext.EventsToRegister()
+	// It's rare that a plugin implements EnqueueExtensions but returns nil.
+	// We treat it as: the plugin is not interested in any event, and hence pod failed by that plugin
+	// cannot be moved by any regular cluster event.
+	if len(events) == 0 {
+		klog.InfoS("Plugin's EventsToRegister() returned nil", "plugin", p.Name())
+		return
+	}
+	// The most common case: a plugin implements EnqueueExtensions and returns non-nil result.
+	registerClusterEvents(p.Name(), eventToPlugins, events)
+}
+
+func registerClusterEvents(name string, eventToPlugins map[framework.ClusterEvent]sets.String, evts []framework.ClusterEvent) {
+	for _, evt := range evts {
+		if eventToPlugins[evt] == nil {
+			eventToPlugins[evt] = sets.NewString(name)
+		} else {
+			eventToPlugins[evt].Insert(name)
+		}
+	}
 }
 
 // getPluginArgsOrDefault returns a configuration provided by the user or builds

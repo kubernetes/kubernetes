@@ -279,6 +279,16 @@ type QueueSortPlugin interface {
 	Less(*QueuedPodInfo, *QueuedPodInfo) bool
 }
 
+// EnqueueExtensions is an optional interface that plugins can implement to efficiently
+// move unschedulable Pods in internal scheduling queues.
+type EnqueueExtensions interface {
+	// EventsToRegister returns a series of interested events that
+	// will be registered when instantiating the internal scheduling queue.
+	// Note: the returned list needs to be static (not depend on configuration parameters);
+	// otherwise it would lead to undefined behavior.
+	EventsToRegister() []ClusterEvent
+}
+
 // PreFilterExtensions is an interface that is included in plugins that allow specifying
 // callbacks to make incremental updates to its supposedly pre-calculated
 // state.
