@@ -201,14 +201,16 @@ var _ DeviceMountableVolumePlugin = &FakeVolumePlugin{}
 var _ NodeExpandableVolumePlugin = &FakeVolumePlugin{}
 
 func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
-	volumeList := *list
-	if list != nil && len(volumeList) > 0 {
-		volume := volumeList[0]
-		volume.Lock()
-		defer volume.Unlock()
-		volume.WaitForAttachHook = plugin.WaitForAttachHook
-		volume.UnmountDeviceHook = plugin.UnmountDeviceHook
-		return volume
+	if list != nil {
+		volumeList := *list
+		if len(volumeList) > 0 {
+			volume := volumeList[0]
+			volume.Lock()
+			defer volume.Unlock()
+			volume.WaitForAttachHook = plugin.WaitForAttachHook
+			volume.UnmountDeviceHook = plugin.UnmountDeviceHook
+			return volume
+		}
 	}
 	volume := &FakeVolume{
 		WaitForAttachHook: plugin.WaitForAttachHook,
@@ -217,7 +219,9 @@ func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 	volume.VolumesAttached = make(map[string]sets.String)
 	volume.DeviceMountState = make(map[string]string)
 	volume.VolumeMountState = make(map[string]string)
-	*list = append(*list, volume)
+	if list != nil {
+		*list = append(*list, volume)
+	}
 	return volume
 }
 
