@@ -119,7 +119,7 @@ func (c *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpro
 				route.TargetNode = mapInstanceToNodeName(instance)
 				routes = append(routes, route)
 			} else {
-				klog.Warningf("unable to find instance ID %s in the list of instances being routed to", instanceID)
+				klog.InfoS("unable to find instance in the list of instances being routed to","routetable", r)
 			}
 		}
 	}
@@ -174,7 +174,7 @@ func (c *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint st
 	}
 
 	if deleteRoute != nil {
-		klog.Infof("deleting blackholed route: %s", aws.StringValue(deleteRoute.DestinationCidrBlock))
+		klog.InfoS("deleting blackholed route", "deleteRoute", deleteRoute)
 
 		request := &ec2.DeleteRouteInput{}
 		request.DestinationCidrBlock = deleteRoute.DestinationCidrBlock
