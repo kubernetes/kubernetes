@@ -355,10 +355,6 @@ github.com/docker/go-connections/tlsconfig
 ## explicit
 github.com/docker/go-units
 # github.com/docker/go-units => github.com/docker/go-units v0.4.0
-# github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96 => github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
-github.com/docker/spdystream
-# github.com/docker/spdystream => github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
-github.com/docker/spdystream/spdy
 # github.com/docopt/docopt-go => github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
 # github.com/dustin/go-humanize v1.0.0 => github.com/dustin/go-humanize v1.0.0
 github.com/dustin/go-humanize
@@ -808,6 +804,10 @@ github.com/mitchellh/mapstructure
 ## explicit
 github.com/moby/ipvs
 # github.com/moby/ipvs => github.com/moby/ipvs v1.0.1
+# github.com/moby/spdystream v0.2.0 => github.com/moby/spdystream v0.2.0
+github.com/moby/spdystream
+# github.com/moby/spdystream => github.com/moby/spdystream v0.2.0
+github.com/moby/spdystream/spdy
 # github.com/moby/sys/mountinfo v0.1.3 => github.com/moby/sys/mountinfo v0.1.3
 github.com/moby/sys/mountinfo
 # github.com/moby/sys/mountinfo => github.com/moby/sys/mountinfo v0.1.3

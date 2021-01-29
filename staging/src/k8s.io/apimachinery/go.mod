@@ -6,7 +6,6 @@ go 1.15
 
 require (
 	github.com/davecgh/go-spew v1.1.1
-	github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
@@ -19,6 +18,7 @@ require (
 	github.com/googleapis/gnostic v0.4.1
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/json-iterator/go v1.1.10
+	github.com/moby/spdystream v0.2.0
 	github.com/modern-go/reflect2 v1.0.1
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/onsi/ginkgo v1.11.0 // indirect
