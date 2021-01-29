@@ -423,6 +423,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	var serviceLister corelisters.ServiceLister
 	var serviceHasSynced cache.InformerSynced
+	// If kubeClient == nil, we are running in standalone mode (i.e. no API servers)
+	// If not nil, we are running as part of a cluster and should sync w/API
 	if kubeDeps.KubeClient != nil {
 		kubeInformers := informers.NewSharedInformerFactory(kubeDeps.KubeClient, 0)
 		serviceLister = kubeInformers.Core().V1().Services().Lister()
