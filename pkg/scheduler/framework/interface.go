@@ -102,13 +102,16 @@ const (
 )
 
 // Status indicates the result of running a plugin. It consists of a code, a
-// message and (optionally) an error. When the status code is not `Success`,
-// the reasons should explain why.
+// message, (optionally) an error and an plugin name it fails by. When the status
+// code is not `Success`, the reasons should explain why.
 // NOTE: A nil Status is also considered as Success.
 type Status struct {
 	code    Code
 	reasons []string
 	err     error
+	// failedPlugin is an optional field that records the plugin name a Pod failed by.
+	// It's set by the framework when code is Error, Unschedulable or UnschedulableAndUnresolvable.
+	failedPlugin string
 }
 
 // Code returns code of the Status.
@@ -125,6 +128,23 @@ func (s *Status) Message() string {
 		return ""
 	}
 	return strings.Join(s.reasons, ", ")
+}
+
+// SetFailedPlugin sets the given plugin name to s.failedPlugin.
+func (s *Status) SetFailedPlugin(plugin string) {
+	s.failedPlugin = plugin
+}
+
+// WithFailedPlugin sets the given plugin name to s.failedPlugin,
+// and returns the given status object.
+func (s *Status) WithFailedPlugin(plugin string) *Status {
+	s.SetFailedPlugin(plugin)
+	return s
+}
+
+// FailedPlugin returns the failed plugin name.
+func (s *Status) FailedPlugin() string {
+	return s.failedPlugin
 }
 
 // Reasons returns reasons of the Status.
@@ -199,6 +219,8 @@ func (p PluginToStatus) Merge() *Status {
 		}
 		if statusPrecedence[s.Code()] > statusPrecedence[finalStatus.code] {
 			finalStatus.code = s.Code()
+			// Same as code, we keep the most relevant failedPlugin in the returned Status.
+			finalStatus.failedPlugin = s.FailedPlugin()
 		}
 
 		for _, r := range s.reasons {
@@ -220,7 +242,7 @@ type WaitingPod interface {
 	// to unblock the pod.
 	Allow(pluginName string)
 	// Reject declares the waiting pod unschedulable.
-	Reject(msg string)
+	Reject(pluginName, msg string)
 }
 
 // Plugin is the parent type for all the scheduling framework plugins.

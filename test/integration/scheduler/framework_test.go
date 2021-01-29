@@ -459,7 +459,7 @@ func (pp *PermitPlugin) Permit(ctx context.Context, state *framework.CycleState,
 		if pp.waitAndRejectPermit {
 			pp.rejectingPod = pod.Name
 			pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) {
-				wp.Reject(fmt.Sprintf("reject pod %v", wp.GetPod().Name))
+				wp.Reject(pp.name, fmt.Sprintf("reject pod %v", wp.GetPod().Name))
 			})
 			return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name)), 0
 		}
@@ -479,7 +479,7 @@ func (pp *PermitPlugin) allowAllPods() {
 
 // rejectAllPods rejects all waiting pods.
 func (pp *PermitPlugin) rejectAllPods() {
-	pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Reject("rejectAllPods") })
+	pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Reject(pp.name, "rejectAllPods") })
 }
 
 // reset used to reset permit plugin.
