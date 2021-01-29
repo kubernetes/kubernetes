@@ -60,6 +60,16 @@ const (
 	permit                      = "Permit"
 )
 
+var allClusterEvents = []framework.ClusterEvent{
+	{Resource: framework.Pod, ActionType: framework.All},
+	{Resource: framework.Node, ActionType: framework.All},
+	{Resource: framework.CSINode, ActionType: framework.All},
+	{Resource: framework.PersistentVolume, ActionType: framework.All},
+	{Resource: framework.PersistentVolumeClaim, ActionType: framework.All},
+	{Resource: framework.Service, ActionType: framework.All},
+	{Resource: framework.StorageClass, ActionType: framework.All},
+}
+
 var configDecoder = scheme.Codecs.UniversalDecoder()
 
 // frameworkImpl is the component responsible for initializing and running scheduler
@@ -133,6 +143,7 @@ type frameworkOptions struct {
 	extenders            []framework.Extender
 	runAllFilters        bool
 	captureProfile       CaptureProfile
+	clusterEventMap      map[string]map[framework.ClusterEvent]sets.String
 }
 
 // Option for the frameworkImpl.
@@ -215,6 +226,14 @@ func WithCaptureProfile(c CaptureProfile) Option {
 func defaultFrameworkOptions() frameworkOptions {
 	return frameworkOptions{
 		metricsRecorder: newMetricsRecorder(1000, time.Second),
+		clusterEventMap: make(map[string]map[framework.ClusterEvent]sets.String),
+	}
+}
+
+// WithClusterEventMap sets clusterEventMap for the scheduling frameworkImpl.
+func WithClusterEventMap(m map[string]map[framework.ClusterEvent]sets.String) Option {
+	return func(o *frameworkOptions) {
+		o.clusterEventMap = m
 	}
 }
 
@@ -279,6 +298,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		PluginConfig:  make([]config.PluginConfig, 0, len(pg)),
 	}
 
+	eventToPlugins := make(map[framework.ClusterEvent]sets.String)
 	pluginsMap := make(map[string]framework.Plugin)
 	var totalPriority int64
 	for name, factory := range r {
@@ -303,6 +323,9 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		}
 		pluginsMap[name] = p
 
+		// Update ClusterEventMap in place.
+		fillEventToPluginMap(p, eventToPlugins)
+
 		// a weight of zero is not permitted, plugins can be disabled explicitly
 		// when configured.
 		f.pluginNameToWeightMap[name] = int(pg[name].Weight)
@@ -321,6 +344,8 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			return nil, err
 		}
 	}
+
+	options.clusterEventMap[f.profileName] = eventToPlugins
 
 	// Verifying the score weights again since Plugin.Name() could return a different
 	// value from the one used in the configuration.
@@ -352,6 +377,63 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	}
 
 	return f, nil
+}
+
+func fillEventToPluginMap(p framework.Plugin, eventToPlugins map[framework.ClusterEvent]sets.String) {
+	ext, ok := p.(framework.EnqueueExtensions)
+	if !ok {
+		// If interface EnqueueExtensions is not implemented, register the default events
+		// to the plugin. This is to ensure backward compatibility.
+		registerClusterEvents(p.Name(), eventToPlugins, allClusterEvents)
+		return
+	}
+
+	eventSet := ext.EventsToRegister()
+	// It's rare that a plugin implements EnqueueExtensions but returns nil.
+	// We treat it as: the plugin is not interested in any event, and hence pod failed by that plugin
+	// cannot be moved by any regular cluster event.
+	if eventSet == nil {
+		return
+	}
+
+	// The most common case: a plugin implements EnqueueExtensions and returns non-nil result.
+	var events []framework.ClusterEvent
+	events = append(events, allClusterEvents...)
+	for _, nonEvt := range eventSet.NonInterested {
+		if nonEvt == framework.WildCardEvent {
+			events = nil
+			break
+		}
+		// Exclude the non-interested event entry.
+		for i, evt := range events {
+			if evt.Resource != nonEvt.Resource {
+				continue
+			}
+			// Use XOR to exclude non-interested bits.
+			actionType := evt.ActionType ^ nonEvt.ActionType
+			if actionType == 0 {
+				// Case 1: delete events[i]
+				events[i] = events[len(events)-1]
+				events = events[:len(events)-1]
+			} else {
+				// Case 2: update actionType
+				events[i].ActionType = actionType
+			}
+			break
+		}
+	}
+
+	registerClusterEvents(p.Name(), eventToPlugins, append(events, eventSet.Interested...))
+}
+
+func registerClusterEvents(name string, eventToPlugins map[framework.ClusterEvent]sets.String, evts []framework.ClusterEvent) {
+	for _, evt := range evts {
+		if eventToPlugins[evt] == nil {
+			eventToPlugins[evt] = sets.NewString(name)
+		} else {
+			eventToPlugins[evt].Insert(name)
+		}
+	}
 }
 
 // getPluginArgsOrDefault returns a configuration provided by the user or builds

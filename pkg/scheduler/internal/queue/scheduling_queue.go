@@ -34,6 +34,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ktypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -142,6 +143,8 @@ type PriorityQueue struct {
 	// when we received move request.
 	moveRequestCycle int64
 
+	clusterEventMap map[string]map[framework.ClusterEvent]sets.String
+
 	// closed indicates that the queue is closed.
 	// It is mainly used to let Pop() exit its control loop while waiting for an item.
 	closed bool
@@ -152,6 +155,7 @@ type priorityQueueOptions struct {
 	podInitialBackoffDuration time.Duration
 	podMaxBackoffDuration     time.Duration
 	podNominator              framework.PodNominator
+	clusterEventMap           map[string]map[framework.ClusterEvent]sets.String
 }
 
 // Option configures a PriorityQueue
@@ -185,6 +189,13 @@ func WithPodNominator(pn framework.PodNominator) Option {
 	}
 }
 
+// WithClusterEventMap sets clusterEventMap for PriorityQueue.
+func WithClusterEventMap(m map[string]map[framework.ClusterEvent]sets.String) Option {
+	return func(o *priorityQueueOptions) {
+		o.clusterEventMap = m
+	}
+}
+
 var defaultPriorityQueueOptions = priorityQueueOptions{
 	clock:                     util.RealClock{},
 	podInitialBackoffDuration: DefaultPodInitialBackoffDuration,
@@ -195,9 +206,10 @@ var defaultPriorityQueueOptions = priorityQueueOptions{
 var _ SchedulingQueue = &PriorityQueue{}
 
 // newQueuedPodInfoNoTimestamp builds a QueuedPodInfo object without timestamp.
-func newQueuedPodInfoNoTimestamp(pod *v1.Pod) *framework.QueuedPodInfo {
+func newQueuedPodInfoNoTimestamp(pod *v1.Pod, plugins ...string) *framework.QueuedPodInfo {
 	return &framework.QueuedPodInfo{
-		Pod: pod,
+		Pod:                  pod,
+		UnschedulablePlugins: sets.NewString(plugins...),
 	}
 }
 
@@ -230,6 +242,7 @@ func NewPriorityQueue(
 		activeQ:                   heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
 		unschedulableQ:            newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
 		moveRequestCycle:          -1,
+		clusterEventMap:           options.clusterEventMap,
 	}
 	pq.cond.L = &pq.lock
 	pq.podBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
@@ -510,7 +523,16 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event string) {
 
 // NOTE: this function assumes lock has been acquired in caller
 func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.QueuedPodInfo, event string) {
+	moved := false
 	for _, pInfo := range podInfoList {
+		// If the event doesn't help on making the Pod schedulable, continue.
+		// Note: we don't run the check if pInfo.UnschedulablePlugins is nil, which denotes
+		// either there is some abnormal error, or the pod gets failed by plugins other than PreFilter, Filter and Permit.
+		// In that case, it's desired to move them anyways.
+		if len(pInfo.UnschedulablePlugins) != 0 && !p.podMatchesEvent(pInfo, event) {
+			continue
+		}
+		moved = true
 		pod := pInfo.Pod
 		if p.isPodBackingoff(pInfo) {
 			if err := p.podBackoffQ.Add(pInfo); err != nil {
@@ -529,7 +551,9 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 		}
 	}
 	p.moveRequestCycle = p.schedulingCycle
-	p.cond.Broadcast()
+	if moved {
+		p.cond.Broadcast()
+	}
 }
 
 // getUnschedulablePodsWithMatchingAffinityTerm returns unschedulable pods which have
@@ -626,12 +650,13 @@ func (p *PriorityQueue) NumUnschedulablePods() int {
 }
 
 // newQueuedPodInfo builds a QueuedPodInfo object.
-func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod) *framework.QueuedPodInfo {
+func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod, plugins ...string) *framework.QueuedPodInfo {
 	now := p.clock.Now()
 	return &framework.QueuedPodInfo{
 		Pod:                     pod,
 		Timestamp:               now,
 		InitialAttemptTimestamp: now,
+		UnschedulablePlugins:    sets.NewString(plugins...),
 	}
 }
 
@@ -820,4 +845,41 @@ func MakeNextPodFunc(queue SchedulingQueue) func() *framework.QueuedPodInfo {
 
 func podInfoKeyFunc(obj interface{}) (string, error) {
 	return cache.MetaNamespaceKeyFunc(obj.(*framework.QueuedPodInfo).Pod)
+}
+
+// Checks if the Pod may become schedulable upon the event.
+// This is achieved by looking up the global clusterEventMap registry.
+func (p *PriorityQueue) podMatchesEvent(podInfo *framework.QueuedPodInfo, event string) bool {
+	clusterEvent, ok := clusterEventReg[event]
+	if !ok {
+		return false
+	}
+	if clusterEvent == framework.WildCardEvent {
+		return true
+	}
+
+	evtToPlugins := p.clusterEventMap[podInfo.Pod.Spec.SchedulerName]
+	if evtToPlugins == nil {
+		return false
+	}
+
+	// Don't directly use evtToPlugins[clusterEvent].Intersection(podInfo.UnschedulablePlugins) as
+	// upon the same resource type, we need to check if the ActionType is *compatible* instead
+	// of *identical*.
+	for evt, nameSet := range evtToPlugins {
+		if evt.Resource != clusterEvent.Resource {
+			continue
+		}
+
+		// Update AND sub-type of Update gets a non-zero number, so does
+		// any type (rather than Unknown) AND All. That implies it's a match.
+		if evt.ActionType&clusterEvent.ActionType != 0 {
+			// Do NOT return directly.
+			if len(nameSet.Intersection(podInfo.UnschedulablePlugins)) != 0 {
+				return true
+			}
+		}
+	}
+
+	return false
 }

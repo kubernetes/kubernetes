@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -636,6 +637,122 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.wantCfg, result); diff != "" {
 				t.Errorf("unexpected plugin args (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// fakeNoopPlugin doesn't implement interface framework.EnqueueExtensions.
+type fakeNoopPlugin struct{}
+
+func (pl *fakeNoopPlugin) Name() string { return "fakeNoop" }
+
+type fakeNodePlugin struct{}
+
+func (pl *fakeNodePlugin) Name() string { return "fakeNode" }
+
+func (pl *fakeNodePlugin) EventsToRegister() *framework.ClusterEventSet {
+	return &framework.ClusterEventSet{
+		NonInterested: []framework.ClusterEvent{
+			{Resource: framework.Node, ActionType: framework.Delete},
+			{Resource: framework.CSINode, ActionType: framework.Update | framework.Delete},
+		},
+	}
+}
+
+type fakePodPlugin struct{}
+
+func (pl *fakePodPlugin) Name() string { return "fakePod" }
+
+func (pl *fakePodPlugin) EventsToRegister() *framework.ClusterEventSet {
+	return &framework.ClusterEventSet{
+		Interested: []framework.ClusterEvent{
+			{Resource: framework.Pod, ActionType: framework.All},
+			{Resource: framework.Node, ActionType: framework.Add | framework.Update},
+			{Resource: framework.Service, ActionType: framework.Delete},
+		},
+		NonInterested: []framework.ClusterEvent{framework.WildCardEvent},
+	}
+}
+
+// fakeNoopRuntimePlugin implement interface framework.EnqueueExtensions, but returns nil
+// at runtime. This can simulate a plugin registered at scheduler setup, but does nothing
+// due to some disabled feature gate.
+type fakeNoopRuntimePlugin struct{}
+
+func (pl *fakeNoopRuntimePlugin) Name() string { return "fakeNoopRuntime" }
+
+func (pl *fakeNoopRuntimePlugin) EventsToRegister() *framework.ClusterEventSet { return nil }
+
+func TestFillEventToPluginMap(t *testing.T) {
+	tests := []struct {
+		name    string
+		plugins []framework.Plugin
+		want    map[framework.ClusterEvent]sets.String
+	}{
+		{
+			name:    "no-op plugin",
+			plugins: []framework.Plugin{&fakeNoopPlugin{}},
+			want: map[framework.ClusterEvent]sets.String{
+				{Resource: framework.Pod, ActionType: framework.All}:                   sets.NewString("fakeNoop"),
+				{Resource: framework.Node, ActionType: framework.All}:                  sets.NewString("fakeNoop"),
+				{Resource: framework.CSINode, ActionType: framework.All}:               sets.NewString("fakeNoop"),
+				{Resource: framework.PersistentVolume, ActionType: framework.All}:      sets.NewString("fakeNoop"),
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}: sets.NewString("fakeNoop"),
+				{Resource: framework.Service, ActionType: framework.All}:               sets.NewString("fakeNoop"),
+				{Resource: framework.StorageClass, ActionType: framework.All}:          sets.NewString("fakeNoop"),
+			},
+		},
+		{
+			name:    "node plugin",
+			plugins: []framework.Plugin{&fakeNodePlugin{}},
+			want: map[framework.ClusterEvent]sets.String{
+				{Resource: framework.Pod, ActionType: framework.All}:                     sets.NewString("fakeNode"),
+				{Resource: framework.Node, ActionType: framework.Add | framework.Update}: sets.NewString("fakeNode"),
+				{Resource: framework.CSINode, ActionType: framework.Add}:                 sets.NewString("fakeNode"),
+				{Resource: framework.PersistentVolume, ActionType: framework.All}:        sets.NewString("fakeNode"),
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}:   sets.NewString("fakeNode"),
+				{Resource: framework.Service, ActionType: framework.All}:                 sets.NewString("fakeNode"),
+				{Resource: framework.StorageClass, ActionType: framework.All}:            sets.NewString("fakeNode"),
+			},
+		},
+		{
+			name:    "pod plugin",
+			plugins: []framework.Plugin{&fakePodPlugin{}},
+			want: map[framework.ClusterEvent]sets.String{
+				{Resource: framework.Pod, ActionType: framework.All}:                     sets.NewString("fakePod"),
+				{Resource: framework.Node, ActionType: framework.Add | framework.Update}: sets.NewString("fakePod"),
+				{Resource: framework.Service, ActionType: framework.Delete}:              sets.NewString("fakePod"),
+			},
+		},
+		{
+			name:    "node and pod plugin",
+			plugins: []framework.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}},
+			want: map[framework.ClusterEvent]sets.String{
+				{Resource: framework.Pod, ActionType: framework.All}:                     sets.NewString("fakeNode", "fakePod"),
+				{Resource: framework.Node, ActionType: framework.Add | framework.Update}: sets.NewString("fakeNode", "fakePod"),
+				{Resource: framework.CSINode, ActionType: framework.Add}:                 sets.NewString("fakeNode"),
+				{Resource: framework.PersistentVolume, ActionType: framework.All}:        sets.NewString("fakeNode"),
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}:   sets.NewString("fakeNode"),
+				{Resource: framework.Service, ActionType: framework.All}:                 sets.NewString("fakeNode"),
+				{Resource: framework.Service, ActionType: framework.Delete}:              sets.NewString("fakePod"),
+				{Resource: framework.StorageClass, ActionType: framework.All}:            sets.NewString("fakeNode"),
+			},
+		},
+		{
+			name:    "no-op runtime plugin",
+			plugins: []framework.Plugin{&fakeNoopRuntimePlugin{}},
+			want:    map[framework.ClusterEvent]sets.String{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := make(map[framework.ClusterEvent]sets.String)
+			for _, p := range tt.plugins {
+				fillEventToPluginMap(p, got)
+			}
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("Unexpected eventToPlugin map (-want,+got):%s", diff)
 			}
 		})
 	}
