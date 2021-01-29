@@ -213,18 +213,14 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 			allErrors = append(allErrors, errors.New("service-account-key-file is a required flag"))
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
-			// Validate the JWKS URI when it is explicitly set.
-			// When unset, it is later derived from ExternalHost.
-			if o.ServiceAccounts.JWKSURI != "" {
-				if u, err := url.Parse(o.ServiceAccounts.JWKSURI); err != nil {
-					allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri must be a valid URL: %v", err))
-				} else if u.Scheme != "https" {
-					allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri requires https scheme, parsed as: %v", u.String()))
-				}
+		// Validate the JWKS URI when it is explicitly set.
+		// When unset, it is later derived from ExternalHost.
+		if o.ServiceAccounts.JWKSURI != "" {
+			if u, err := url.Parse(o.ServiceAccounts.JWKSURI); err != nil {
+				allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri must be a valid URL: %v", err))
+			} else if u.Scheme != "https" {
+				allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri requires https scheme, parsed as: %v", u.String()))
 			}
-		} else if len(o.ServiceAccounts.JWKSURI) > 0 {
-			allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri may only be set when the ServiceAccountIssuerDiscovery feature gate is enabled"))
 		}
 	}
 
