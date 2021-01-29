@@ -395,16 +395,7 @@ func (proxier *Proxier) syncProxyRules() {
 		proxier.unmergeService(change.previous, existingPorts)
 	}
 
-	localAddrs, err := utilproxy.GetLocalAddrs()
-	if err != nil {
-		klog.Errorf("Failed to get local addresses during proxy sync: %s, assuming IPs are not local", err)
-	} else if len(localAddrs) == 0 {
-		klog.Warning("No local addresses were found, assuming all external IPs are not local")
-	}
-
-	localAddrSet := netutils.IPSet{}
-	localAddrSet.Insert(localAddrs...)
-	proxier.localAddrs = localAddrSet
+	proxier.localAddrs = utilproxy.GetLocalAddrSet()
 
 	proxier.ensurePortals()
 	proxier.cleanupStaleStickySessions()
@@ -769,7 +760,7 @@ func (proxier *Proxier) openPortal(service proxy.ServicePortName, info *ServiceI
 }
 
 func (proxier *Proxier) openOnePortal(portal portal, protocol v1.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
-	if proxier.localAddrs.Len() > 0 && proxier.localAddrs.Has(portal.ip) {
+	if proxier.localAddrs.Has(portal.ip) {
 		err := proxier.claimNodePort(portal.ip, portal.port, protocol, name)
 		if err != nil {
 			return err
@@ -945,7 +936,7 @@ func (proxier *Proxier) closePortal(service proxy.ServicePortName, info *Service
 
 func (proxier *Proxier) closeOnePortal(portal portal, protocol v1.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
 	el := []error{}
-	if proxier.localAddrs.Len() > 0 && proxier.localAddrs.Has(portal.ip) {
+	if proxier.localAddrs.Has(portal.ip) {
 		if err := proxier.releaseNodePort(portal.ip, portal.port, protocol, name); err != nil {
 			el = append(el, err)
 		}

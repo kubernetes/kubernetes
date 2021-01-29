@@ -1039,16 +1039,6 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.V(4).Infof("syncProxyRules took %v", time.Since(start))
 	}()
 
-	localAddrs, err := utilproxy.GetLocalAddrs()
-	if err != nil {
-		klog.Errorf("Failed to get local addresses during proxy sync: %v, assuming external IPs are not local", err)
-	} else if len(localAddrs) == 0 {
-		klog.Warning("No local addresses found, assuming all external IPs are not local")
-	}
-
-	localAddrSet := utilnet.IPSet{}
-	localAddrSet.Insert(localAddrs...)
-
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
@@ -1085,7 +1075,7 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.createAndLinkKubeChain()
 
 	// make sure dummy interface exists in the system where ipvs Proxier will bind service address on it
-	_, err = proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	_, err := proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
 	if err != nil {
 		klog.Errorf("Failed to create dummy interface: %s, error: %v", DefaultDummyDevice, err)
 		return
@@ -1160,6 +1150,8 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	// reset slice to filtered entries
 	nodeIPs = nodeIPs[:idx]
+
+	localAddrSet := utilproxy.GetLocalAddrSet()
 
 	// Build IPVS rules for each service.
 	for svcName, svc := range proxier.serviceMap {
