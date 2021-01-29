@@ -84,6 +84,10 @@ type NodeResourcesFitArgs struct {
 	// with "example.com", such as "example.com/aaa" and "example.com/bbb".
 	// A resource group name can't contain '/'.
 	IgnoredResourceGroups []string
+
+	// EnablePodOverhead is set during conversion to the internal arg type, based on whether the
+	// PodOverhead feature gate is enabled
+	EnablePodOverhead bool
 }
 
 // PodTopologySpreadConstraintsDefaulting defines how to set default constraints
@@ -136,6 +140,10 @@ type RequestedToCapacityRatioArgs struct {
 	// The default resource set includes "cpu" and "memory" with an equal weight.
 	// Allowed weights go from 1 to 100.
 	Resources []ResourceSpec
+
+	// EnablePodOverhead is set during conversion to the internal arg type, based on whether the
+	// PodOverhead feature gate is enabled
+	EnablePodOverhead bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -148,6 +156,10 @@ type NodeResourcesLeastAllocatedArgs struct {
 	// The default resource set includes "cpu" and "memory" with an equal weight.
 	// Allowed weights go from 1 to 100.
 	Resources []ResourceSpec
+
+	// EnablePodOverhead is set during conversion to the internal arg type, based on whether the
+	// PodOverhead feature gate is enabled
+	EnablePodOverhead bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -160,6 +172,10 @@ type NodeResourcesMostAllocatedArgs struct {
 	// The default resource set includes "cpu" and "memory" with an equal weight.
 	// Allowed weights go from 1 to 100.
 	Resources []ResourceSpec
+
+	// EnablePodOverhead is set during conversion to the internal arg type, based on whether the
+	// PodOverhead feature gate is enabled
+	EnablePodOverhead bool
 }
 
 // UtilizationShapePoint represents a single point of a priority function shape.
@@ -217,4 +233,18 @@ type NodeAffinityArgs struct {
 	// When AddedAffinity is used, some Pods with affinity requirements that match
 	// a specific Node (such as Daemonset Pods) might remain unschedulable.
 	AddedAffinity *v1.NodeAffinity
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeResourcesBalancedAllocationArgs holds arguments to configure the BalancedAllocation plugin
+type NodeResourcesBalancedAllocationArgs struct {
+	metav1.TypeMeta
+
+	// EnableBalanceAttachedNodeVolumes is set during conversion to the internal arg type, based on whether the
+	// BalanceAttachedNodeVolumes feature gate is enabled
+	EnableBalanceAttachedNodeVolumes bool
+	// EnablePodOverhead is set during conversion to the internal arg type, based on whether the
+	// PodOverhead feature gate is enabled
+	EnablePodOverhead bool
 }

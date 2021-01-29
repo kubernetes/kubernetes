@@ -100,36 +100,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.NodeResourcesFitArgs)(nil), (*config.NodeResourcesFitArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(a.(*v1beta1.NodeResourcesFitArgs), b.(*config.NodeResourcesFitArgs), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.NodeResourcesFitArgs)(nil), (*v1beta1.NodeResourcesFitArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NodeResourcesFitArgs_To_v1beta1_NodeResourcesFitArgs(a.(*config.NodeResourcesFitArgs), b.(*v1beta1.NodeResourcesFitArgs), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.NodeResourcesLeastAllocatedArgs)(nil), (*config.NodeResourcesLeastAllocatedArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NodeResourcesLeastAllocatedArgs_To_config_NodeResourcesLeastAllocatedArgs(a.(*v1beta1.NodeResourcesLeastAllocatedArgs), b.(*config.NodeResourcesLeastAllocatedArgs), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.NodeResourcesLeastAllocatedArgs)(nil), (*v1beta1.NodeResourcesLeastAllocatedArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NodeResourcesLeastAllocatedArgs_To_v1beta1_NodeResourcesLeastAllocatedArgs(a.(*config.NodeResourcesLeastAllocatedArgs), b.(*v1beta1.NodeResourcesLeastAllocatedArgs), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.NodeResourcesMostAllocatedArgs)(nil), (*config.NodeResourcesMostAllocatedArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NodeResourcesMostAllocatedArgs_To_config_NodeResourcesMostAllocatedArgs(a.(*v1beta1.NodeResourcesMostAllocatedArgs), b.(*config.NodeResourcesMostAllocatedArgs), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.NodeResourcesMostAllocatedArgs)(nil), (*v1beta1.NodeResourcesMostAllocatedArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NodeResourcesMostAllocatedArgs_To_v1beta1_NodeResourcesMostAllocatedArgs(a.(*config.NodeResourcesMostAllocatedArgs), b.(*v1beta1.NodeResourcesMostAllocatedArgs), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1beta1.Plugin)(nil), (*config.Plugin)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_Plugin_To_config_Plugin(a.(*v1beta1.Plugin), b.(*config.Plugin), scope)
 	}); err != nil {
@@ -180,16 +150,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.RequestedToCapacityRatioArgs)(nil), (*config.RequestedToCapacityRatioArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_RequestedToCapacityRatioArgs_To_config_RequestedToCapacityRatioArgs(a.(*v1beta1.RequestedToCapacityRatioArgs), b.(*config.RequestedToCapacityRatioArgs), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.RequestedToCapacityRatioArgs)(nil), (*v1beta1.RequestedToCapacityRatioArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_RequestedToCapacityRatioArgs_To_v1beta1_RequestedToCapacityRatioArgs(a.(*config.RequestedToCapacityRatioArgs), b.(*v1beta1.RequestedToCapacityRatioArgs), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1beta1.ResourceSpec)(nil), (*config.ResourceSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_ResourceSpec_To_config_ResourceSpec(a.(*v1beta1.ResourceSpec), b.(*config.ResourceSpec), scope)
 	}); err != nil {
@@ -235,8 +195,58 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*config.NodeResourcesBalancedAllocationArgs)(nil), (*v1beta1.NodeResourcesBalancedAllocationArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_NodeResourcesBalancedAllocationArgs_To_v1beta1_NodeResourcesBalancedAllocationArgs(a.(*config.NodeResourcesBalancedAllocationArgs), b.(*v1beta1.NodeResourcesBalancedAllocationArgs), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*config.NodeResourcesFitArgs)(nil), (*v1beta1.NodeResourcesFitArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_NodeResourcesFitArgs_To_v1beta1_NodeResourcesFitArgs(a.(*config.NodeResourcesFitArgs), b.(*v1beta1.NodeResourcesFitArgs), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*config.NodeResourcesLeastAllocatedArgs)(nil), (*v1beta1.NodeResourcesLeastAllocatedArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_NodeResourcesLeastAllocatedArgs_To_v1beta1_NodeResourcesLeastAllocatedArgs(a.(*config.NodeResourcesLeastAllocatedArgs), b.(*v1beta1.NodeResourcesLeastAllocatedArgs), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*config.NodeResourcesMostAllocatedArgs)(nil), (*v1beta1.NodeResourcesMostAllocatedArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_NodeResourcesMostAllocatedArgs_To_v1beta1_NodeResourcesMostAllocatedArgs(a.(*config.NodeResourcesMostAllocatedArgs), b.(*v1beta1.NodeResourcesMostAllocatedArgs), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*config.RequestedToCapacityRatioArgs)(nil), (*v1beta1.RequestedToCapacityRatioArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_RequestedToCapacityRatioArgs_To_v1beta1_RequestedToCapacityRatioArgs(a.(*config.RequestedToCapacityRatioArgs), b.(*v1beta1.RequestedToCapacityRatioArgs), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*v1beta1.KubeSchedulerConfiguration)(nil), (*config.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(a.(*v1beta1.KubeSchedulerConfiguration), b.(*config.KubeSchedulerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.NodeResourcesBalancedAllocationArgs)(nil), (*config.NodeResourcesBalancedAllocationArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(a.(*v1beta1.NodeResourcesBalancedAllocationArgs), b.(*config.NodeResourcesBalancedAllocationArgs), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.NodeResourcesFitArgs)(nil), (*config.NodeResourcesFitArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(a.(*v1beta1.NodeResourcesFitArgs), b.(*config.NodeResourcesFitArgs), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.NodeResourcesLeastAllocatedArgs)(nil), (*config.NodeResourcesLeastAllocatedArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodeResourcesLeastAllocatedArgs_To_config_NodeResourcesLeastAllocatedArgs(a.(*v1beta1.NodeResourcesLeastAllocatedArgs), b.(*config.NodeResourcesLeastAllocatedArgs), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.NodeResourcesMostAllocatedArgs)(nil), (*config.NodeResourcesMostAllocatedArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodeResourcesMostAllocatedArgs_To_config_NodeResourcesMostAllocatedArgs(a.(*v1beta1.NodeResourcesMostAllocatedArgs), b.(*config.NodeResourcesMostAllocatedArgs), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.RequestedToCapacityRatioArgs)(nil), (*config.RequestedToCapacityRatioArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RequestedToCapacityRatioArgs_To_config_RequestedToCapacityRatioArgs(a.(*v1beta1.RequestedToCapacityRatioArgs), b.(*config.RequestedToCapacityRatioArgs), scope)
 	}); err != nil {
 		return err
 	}
@@ -536,26 +546,27 @@ func Convert_config_NodeLabelArgs_To_v1beta1_NodeLabelArgs(in *config.NodeLabelA
 	return autoConvert_config_NodeLabelArgs_To_v1beta1_NodeLabelArgs(in, out, s)
 }
 
+func autoConvert_v1beta1_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(in *v1beta1.NodeResourcesBalancedAllocationArgs, out *config.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
+	return nil
+}
+
+func autoConvert_config_NodeResourcesBalancedAllocationArgs_To_v1beta1_NodeResourcesBalancedAllocationArgs(in *config.NodeResourcesBalancedAllocationArgs, out *v1beta1.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
+	// WARNING: in.EnableBalanceAttachedNodeVolumes requires manual conversion: does not exist in peer-type
+	// WARNING: in.EnablePodOverhead requires manual conversion: does not exist in peer-type
+	return nil
+}
+
 func autoConvert_v1beta1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *v1beta1.NodeResourcesFitArgs, out *config.NodeResourcesFitArgs, s conversion.Scope) error {
 	out.IgnoredResources = *(*[]string)(unsafe.Pointer(&in.IgnoredResources))
 	out.IgnoredResourceGroups = *(*[]string)(unsafe.Pointer(&in.IgnoredResourceGroups))
 	return nil
 }
 
-// Convert_v1beta1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs is an autogenerated conversion function.
-func Convert_v1beta1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *v1beta1.NodeResourcesFitArgs, out *config.NodeResourcesFitArgs, s conversion.Scope) error {
-	return autoConvert_v1beta1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in, out, s)
-}
-
 func autoConvert_config_NodeResourcesFitArgs_To_v1beta1_NodeResourcesFitArgs(in *config.NodeResourcesFitArgs, out *v1beta1.NodeResourcesFitArgs, s conversion.Scope) error {
 	out.IgnoredResources = *(*[]string)(unsafe.Pointer(&in.IgnoredResources))
 	out.IgnoredResourceGroups = *(*[]string)(unsafe.Pointer(&in.IgnoredResourceGroups))
+	// WARNING: in.EnablePodOverhead requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-// Convert_config_NodeResourcesFitArgs_To_v1beta1_NodeResourcesFitArgs is an autogenerated conversion function.
-func Convert_config_NodeResourcesFitArgs_To_v1beta1_NodeResourcesFitArgs(in *config.NodeResourcesFitArgs, out *v1beta1.NodeResourcesFitArgs, s conversion.Scope) error {
-	return autoConvert_config_NodeResourcesFitArgs_To_v1beta1_NodeResourcesFitArgs(in, out, s)
 }
 
 func autoConvert_v1beta1_NodeResourcesLeastAllocatedArgs_To_config_NodeResourcesLeastAllocatedArgs(in *v1beta1.NodeResourcesLeastAllocatedArgs, out *config.NodeResourcesLeastAllocatedArgs, s conversion.Scope) error {
@@ -563,19 +574,10 @@ func autoConvert_v1beta1_NodeResourcesLeastAllocatedArgs_To_config_NodeResources
 	return nil
 }
 
-// Convert_v1beta1_NodeResourcesLeastAllocatedArgs_To_config_NodeResourcesLeastAllocatedArgs is an autogenerated conversion function.
-func Convert_v1beta1_NodeResourcesLeastAllocatedArgs_To_config_NodeResourcesLeastAllocatedArgs(in *v1beta1.NodeResourcesLeastAllocatedArgs, out *config.NodeResourcesLeastAllocatedArgs, s conversion.Scope) error {
-	return autoConvert_v1beta1_NodeResourcesLeastAllocatedArgs_To_config_NodeResourcesLeastAllocatedArgs(in, out, s)
-}
-
 func autoConvert_config_NodeResourcesLeastAllocatedArgs_To_v1beta1_NodeResourcesLeastAllocatedArgs(in *config.NodeResourcesLeastAllocatedArgs, out *v1beta1.NodeResourcesLeastAllocatedArgs, s conversion.Scope) error {
 	out.Resources = *(*[]v1beta1.ResourceSpec)(unsafe.Pointer(&in.Resources))
+	// WARNING: in.EnablePodOverhead requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-// Convert_config_NodeResourcesLeastAllocatedArgs_To_v1beta1_NodeResourcesLeastAllocatedArgs is an autogenerated conversion function.
-func Convert_config_NodeResourcesLeastAllocatedArgs_To_v1beta1_NodeResourcesLeastAllocatedArgs(in *config.NodeResourcesLeastAllocatedArgs, out *v1beta1.NodeResourcesLeastAllocatedArgs, s conversion.Scope) error {
-	return autoConvert_config_NodeResourcesLeastAllocatedArgs_To_v1beta1_NodeResourcesLeastAllocatedArgs(in, out, s)
 }
 
 func autoConvert_v1beta1_NodeResourcesMostAllocatedArgs_To_config_NodeResourcesMostAllocatedArgs(in *v1beta1.NodeResourcesMostAllocatedArgs, out *config.NodeResourcesMostAllocatedArgs, s conversion.Scope) error {
@@ -583,19 +585,10 @@ func autoConvert_v1beta1_NodeResourcesMostAllocatedArgs_To_config_NodeResourcesM
 	return nil
 }
 
-// Convert_v1beta1_NodeResourcesMostAllocatedArgs_To_config_NodeResourcesMostAllocatedArgs is an autogenerated conversion function.
-func Convert_v1beta1_NodeResourcesMostAllocatedArgs_To_config_NodeResourcesMostAllocatedArgs(in *v1beta1.NodeResourcesMostAllocatedArgs, out *config.NodeResourcesMostAllocatedArgs, s conversion.Scope) error {
-	return autoConvert_v1beta1_NodeResourcesMostAllocatedArgs_To_config_NodeResourcesMostAllocatedArgs(in, out, s)
-}
-
 func autoConvert_config_NodeResourcesMostAllocatedArgs_To_v1beta1_NodeResourcesMostAllocatedArgs(in *config.NodeResourcesMostAllocatedArgs, out *v1beta1.NodeResourcesMostAllocatedArgs, s conversion.Scope) error {
 	out.Resources = *(*[]v1beta1.ResourceSpec)(unsafe.Pointer(&in.Resources))
+	// WARNING: in.EnablePodOverhead requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-// Convert_config_NodeResourcesMostAllocatedArgs_To_v1beta1_NodeResourcesMostAllocatedArgs is an autogenerated conversion function.
-func Convert_config_NodeResourcesMostAllocatedArgs_To_v1beta1_NodeResourcesMostAllocatedArgs(in *config.NodeResourcesMostAllocatedArgs, out *v1beta1.NodeResourcesMostAllocatedArgs, s conversion.Scope) error {
-	return autoConvert_config_NodeResourcesMostAllocatedArgs_To_v1beta1_NodeResourcesMostAllocatedArgs(in, out, s)
 }
 
 func autoConvert_v1beta1_Plugin_To_config_Plugin(in *v1beta1.Plugin, out *config.Plugin, s conversion.Scope) error {
@@ -956,20 +949,11 @@ func autoConvert_v1beta1_RequestedToCapacityRatioArgs_To_config_RequestedToCapac
 	return nil
 }
 
-// Convert_v1beta1_RequestedToCapacityRatioArgs_To_config_RequestedToCapacityRatioArgs is an autogenerated conversion function.
-func Convert_v1beta1_RequestedToCapacityRatioArgs_To_config_RequestedToCapacityRatioArgs(in *v1beta1.RequestedToCapacityRatioArgs, out *config.RequestedToCapacityRatioArgs, s conversion.Scope) error {
-	return autoConvert_v1beta1_RequestedToCapacityRatioArgs_To_config_RequestedToCapacityRatioArgs(in, out, s)
-}
-
 func autoConvert_config_RequestedToCapacityRatioArgs_To_v1beta1_RequestedToCapacityRatioArgs(in *config.RequestedToCapacityRatioArgs, out *v1beta1.RequestedToCapacityRatioArgs, s conversion.Scope) error {
 	out.Shape = *(*[]v1beta1.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
 	out.Resources = *(*[]v1beta1.ResourceSpec)(unsafe.Pointer(&in.Resources))
+	// WARNING: in.EnablePodOverhead requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-// Convert_config_RequestedToCapacityRatioArgs_To_v1beta1_RequestedToCapacityRatioArgs is an autogenerated conversion function.
-func Convert_config_RequestedToCapacityRatioArgs_To_v1beta1_RequestedToCapacityRatioArgs(in *config.RequestedToCapacityRatioArgs, out *v1beta1.RequestedToCapacityRatioArgs, s conversion.Scope) error {
-	return autoConvert_config_RequestedToCapacityRatioArgs_To_v1beta1_RequestedToCapacityRatioArgs(in, out, s)
 }
 
 func autoConvert_v1beta1_ResourceSpec_To_config_ResourceSpec(in *v1beta1.ResourceSpec, out *config.ResourceSpec, s conversion.Scope) error {

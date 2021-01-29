@@ -24,11 +24,15 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kube-scheduler/config/v1beta1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 )
+
+var enablePodOverhead = utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead)
 
 // TestCodecsDecodePluginConfig tests that embedded plugin args get decoded
 // into their appropriate internal types and defaults are applied.
@@ -115,13 +119,14 @@ profiles:
 						},
 						{
 							Name: "NodeResourcesFit",
-							Args: &config.NodeResourcesFitArgs{IgnoredResources: []string{"foo"}},
+							Args: &config.NodeResourcesFitArgs{IgnoredResources: []string{"foo"}, EnablePodOverhead: enablePodOverhead},
 						},
 						{
 							Name: "RequestedToCapacityRatio",
 							Args: &config.RequestedToCapacityRatioArgs{
-								Shape:     []config.UtilizationShapePoint{{Utilization: 1}},
-								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								Shape:             []config.UtilizationShapePoint{{Utilization: 1}},
+								Resources:         []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								EnablePodOverhead: enablePodOverhead,
 							},
 						},
 						{
@@ -142,13 +147,15 @@ profiles:
 						{
 							Name: "NodeResourcesLeastAllocated",
 							Args: &config.NodeResourcesLeastAllocatedArgs{
-								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 2}, {Name: "unknown", Weight: 1}},
+								Resources:         []config.ResourceSpec{{Name: "cpu", Weight: 2}, {Name: "unknown", Weight: 1}},
+								EnablePodOverhead: enablePodOverhead,
 							},
 						},
 						{
 							Name: "NodeResourcesMostAllocated",
 							Args: &config.NodeResourcesMostAllocatedArgs{
-								Resources: []config.ResourceSpec{{Name: "memory", Weight: 1}},
+								Resources:         []config.ResourceSpec{{Name: "memory", Weight: 1}},
+								EnablePodOverhead: enablePodOverhead,
 							},
 						},
 						{
@@ -318,19 +325,21 @@ profiles:
 						},
 						{
 							Name: "NodeResourcesFit",
-							Args: &config.NodeResourcesFitArgs{},
+							Args: &config.NodeResourcesFitArgs{EnablePodOverhead: enablePodOverhead},
 						},
 						{Name: "OutOfTreePlugin"},
 						{
 							Name: "NodeResourcesLeastAllocated",
 							Args: &config.NodeResourcesLeastAllocatedArgs{
-								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								Resources:         []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								EnablePodOverhead: enablePodOverhead,
 							},
 						},
 						{
 							Name: "NodeResourcesMostAllocated",
 							Args: &config.NodeResourcesMostAllocatedArgs{
-								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								Resources:         []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								EnablePodOverhead: enablePodOverhead,
 							},
 						},
 						{

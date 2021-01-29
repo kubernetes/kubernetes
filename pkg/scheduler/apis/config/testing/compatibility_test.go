@@ -31,11 +31,15 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 )
+
+var enablePodOverhead = utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead)
+var enableBalanceAttachedNodeVolumes = utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes)
 
 type testCase struct {
 	name          string
@@ -1628,8 +1632,15 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 			Args: &config.NodeAffinityArgs{},
 		},
 		{
+			Name: "NodeResourcesBalancedAllocation",
+			Args: &config.NodeResourcesBalancedAllocationArgs{
+				EnableBalanceAttachedNodeVolumes: enableBalanceAttachedNodeVolumes,
+				EnablePodOverhead:                enablePodOverhead,
+			},
+		},
+		{
 			Name: "NodeResourcesFit",
-			Args: &config.NodeResourcesFitArgs{},
+			Args: &config.NodeResourcesFitArgs{EnablePodOverhead: enablePodOverhead},
 		},
 		{
 			Name: "NodeResourcesLeastAllocated",
@@ -1638,6 +1649,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 					{Name: "cpu", Weight: 1},
 					{Name: "memory", Weight: 1},
 				},
+				EnablePodOverhead: enablePodOverhead,
 			},
 		},
 		{
@@ -1826,6 +1838,13 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 					},
 				},
 				{
+					Name: "NodeResourcesBalancedAllocation",
+					Args: &config.NodeResourcesBalancedAllocationArgs{
+						EnableBalanceAttachedNodeVolumes: enableBalanceAttachedNodeVolumes,
+						EnablePodOverhead:                enablePodOverhead,
+					},
+				},
+				{
 					Name: "NodeResourcesFit",
 					Args: &config.NodeResourcesFitArgs{
 						IgnoredResources: []string{"foo", "bar"},
@@ -1838,6 +1857,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 							{Name: "cpu", Weight: 1},
 							{Name: "memory", Weight: 1},
 						},
+						EnablePodOverhead: enablePodOverhead,
 					},
 				},
 				{

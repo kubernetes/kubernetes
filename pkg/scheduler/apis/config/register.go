@@ -50,6 +50,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&NodeResourcesLeastAllocatedArgs{},
 		&NodeResourcesMostAllocatedArgs{},
 		&NodeAffinityArgs{},
+		&NodeResourcesBalancedAllocationArgs{},
 	)
 	scheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}, &Policy{})
 	return nil

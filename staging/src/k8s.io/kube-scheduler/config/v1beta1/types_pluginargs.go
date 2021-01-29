@@ -231,3 +231,12 @@ type NodeAffinityArgs struct {
 	// +optional
 	AddedAffinity *corev1.NodeAffinity `json:"addedAffinity,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeResourcesBalancedAllocationArgs holds arguments to configure the BalancedAllocation plugin
+// It has no user-facing config options, but is hacked during internal type conversion to
+// hold feature gate information for the plugin.
+type NodeResourcesBalancedAllocationArgs struct {
+	metav1.TypeMeta `json:",inline"`
+}
