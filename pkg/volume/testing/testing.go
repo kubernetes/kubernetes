@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
 	testingexec "k8s.io/utils/exec/testing"
 	"k8s.io/utils/mount"

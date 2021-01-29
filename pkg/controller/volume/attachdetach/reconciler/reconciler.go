@@ -171,7 +171,7 @@ func (rc *reconciler) reconcile() {
 			// See https://github.com/kubernetes/kubernetes/issues/93902
 			attachState := rc.actualStateOfWorld.GetAttachState(attachedVolume.VolumeName, attachedVolume.NodeName)
 			if attachState == cache.AttachStateDetached {
-				if klog.V(5).Enabled() {
+				if klog.V(5) {
 					klog.Infof(attachedVolume.GenerateMsgDetailed("Volume detached--skipping", ""))
 				}
 				continue
@@ -268,7 +268,7 @@ func (rc *reconciler) attachDesiredVolumes() {
 		attachState := rc.actualStateOfWorld.GetAttachState(volumeToAttach.VolumeName, volumeToAttach.NodeName)
 		if attachState == cache.AttachStateAttached {
 			// Volume/Node exists, touch it to reset detachRequestedTime
-			if klog.V(5).Enabled() {
+			if klog.V(5) {
 				klog.Infof(volumeToAttach.GenerateMsgDetailed("Volume attached--touching", ""))
 			}
 			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.NodeName)

@@ -415,7 +415,6 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		false,
 		1*time.Second,
 		DefaultTimerConfig,
-		nil, /* filteredDialOptions */
 	)
 	if err != nil {
 		t.Fatalf("NewAttachDetachController failed with error. Expected: <no error> Actual: <%v>", err)
