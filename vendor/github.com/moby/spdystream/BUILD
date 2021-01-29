@@ -9,10 +9,10 @@ go_library(
         "stream.go",
         "utils.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/docker/spdystream",
-    importpath = "github.com/docker/spdystream",
+    importmap = "k8s.io/kubernetes/vendor/github.com/moby/spdystream",
+    importpath = "github.com/moby/spdystream",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/docker/spdystream/spdy:go_default_library"],
+    deps = ["//vendor/github.com/moby/spdystream/spdy:go_default_library"],
 )
 
 filegroup(
@@ -26,7 +26,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//vendor/github.com/docker/spdystream/spdy:all-srcs",
+        "//vendor/github.com/moby/spdystream/spdy:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

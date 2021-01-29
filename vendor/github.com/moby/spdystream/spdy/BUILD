@@ -8,8 +8,8 @@ go_library(
         "types.go",
         "write.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/docker/spdystream/spdy",
-    importpath = "github.com/docker/spdystream/spdy",
+    importmap = "k8s.io/kubernetes/vendor/github.com/moby/spdystream/spdy",
+    importpath = "github.com/moby/spdystream/spdy",
     visibility = ["//visibility:public"],
 )
 
