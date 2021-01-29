@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
 
@@ -36,7 +37,7 @@ const (
 )
 
 // NewRequestedToCapacityRatio initializes a new plugin and returns it.
-func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	args, err := getRequestedToCapacityRatioArgs(plArgs)
 	if err != nil {
 		return nil, err
@@ -68,9 +69,10 @@ func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.Handle)
 	return &RequestedToCapacityRatio{
 		handle: handle,
 		resourceAllocationScorer: resourceAllocationScorer{
-			RequestedToCapacityRatioName,
-			buildRequestedToCapacityRatioScorerFunction(shape, resourceToWeightMap),
-			resourceToWeightMap,
+			Name:                RequestedToCapacityRatioName,
+			scorer:              buildRequestedToCapacityRatioScorerFunction(shape, resourceToWeightMap),
+			resourceToWeightMap: resourceToWeightMap,
+			enablePodOverhead:   fts.EnablePodOverhead,
 		},
 	}, nil
 }

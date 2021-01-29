@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -43,6 +44,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
@@ -1310,8 +1312,14 @@ func TestZeroRequest(t *testing.T) {
 
 			pluginRegistrations := []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterScorePlugin(noderesources.LeastAllocatedName, noderesources.NewLeastAllocated, 1),
-				st.RegisterScorePlugin(noderesources.BalancedAllocationName, noderesources.NewBalancedAllocation, 1),
+				st.RegisterScorePlugin(noderesources.LeastAllocatedName,
+					func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+						return noderesources.NewLeastAllocated(plArgs, fh, feature.Features{})
+					},
+					1),
+				st.RegisterScorePlugin(noderesources.BalancedAllocationName, func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return noderesources.NewBalancedAllocation(plArgs, fh, feature.Features{})
+				}, 1),
 				st.RegisterScorePlugin(selectorspread.Name, selectorspread.New, 1),
 				st.RegisterPreScorePlugin(selectorspread.Name, selectorspread.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
