@@ -163,6 +163,14 @@ aliases:
     - saschagrunert # Release Manager / SIG Chair
     - xmudrii # Release Manager
   changelog-reviewers:
+    - cpanato # Release Manager
+    - feiskyer # Release Manager
+    - hasheddan # Release Manager / SIG Technical Lead
+    - idealhack # Release Manager
+    - justaugustus # Release Manager / SIG Chair
+    - puerco # Release Manager
+    - saschagrunert # Release Manager / SIG Chair
+    - xmudrii # Release Manager
 
   sig-storage-approvers:
     - saad-ali
