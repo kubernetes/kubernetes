@@ -29,8 +29,6 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -4782,11 +4780,8 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 		addresses[address] = true
 	}
 
-	if len(oldNode.Spec.PodCIDRs) == 0 {
-		// Allow the controller manager to assign a CIDR to a node if it doesn't have one.
-		//this is a no op for a string slice.
-		oldNode.Spec.PodCIDRs = node.Spec.PodCIDRs
-	} else {
+	// Allow the controller manager to assign a CIDR to a node if it doesn't have one.
+	if len(oldNode.Spec.PodCIDRs) > 0 {
 		// compare the entire slice
 		if len(oldNode.Spec.PodCIDRs) != len(node.Spec.PodCIDRs) {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "podCIDRs"), "node updates may not change podCIDR except from \"\" to valid"))
@@ -4800,45 +4795,34 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	}
 
 	// Allow controller manager updating provider ID when not set
-	if len(oldNode.Spec.ProviderID) == 0 {
-		oldNode.Spec.ProviderID = node.Spec.ProviderID
-	} else {
-		if oldNode.Spec.ProviderID != node.Spec.ProviderID {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "providerID"), "node updates may not change providerID except from \"\" to valid"))
-		}
+	if len(oldNode.Spec.ProviderID) > 0 && oldNode.Spec.ProviderID != node.Spec.ProviderID {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "providerID"), "node updates may not change providerID except from \"\" to valid"))
 	}
 
 	if node.Spec.ConfigSource != nil {
 		allErrs = append(allErrs, validateNodeConfigSourceSpec(node.Spec.ConfigSource, field.NewPath("spec", "configSource"))...)
 	}
-	oldNode.Spec.ConfigSource = node.Spec.ConfigSource
 	if node.Status.Config != nil {
 		allErrs = append(allErrs, validateNodeConfigStatus(node.Status.Config, field.NewPath("status", "config"))...)
 	}
-	oldNode.Status.Config = node.Status.Config
-
-	// TODO: move reset function to its own location
-	// Ignore metadata changes now that they have been tested
-	oldNode.ObjectMeta = node.ObjectMeta
-	// Allow users to update capacity
-	oldNode.Status.Capacity = node.Status.Capacity
-	// Allow users to unschedule node
-	oldNode.Spec.Unschedulable = node.Spec.Unschedulable
-	// Clear status
-	oldNode.Status = node.Status
 
 	// update taints
 	if len(node.Spec.Taints) > 0 {
 		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
 	}
-	oldNode.Spec.Taints = node.Spec.Taints
 
-	// We made allowed changes to oldNode, and now we compare oldNode to node. Any remaining differences indicate changes to protected fields.
-	// TODO: Add a 'real' error type for this error and provide print actual diffs.
-	if !apiequality.Semantic.DeepEqual(oldNode, node) {
-		klog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
-		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels, taints, or capacity (or configSource, if the DynamicKubeletConfig feature gate is enabled)"))
+	if node.Spec.DoNotUseExternalID != oldNode.Spec.DoNotUseExternalID {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "externalID"), "may not be updated"))
 	}
+
+	// status and metadata are allowed change (barring restrictions above), so separately test spec field.
+	// spec only has a few fields, so check the ones we don't allow changing
+	//  1. PodCIDRs - immutable after first set - checked above
+	//  2. ProviderID - immutable after first set - checked above
+	//  3. Unschedulable - allowed to change
+	//  4. Taints - allowed to change
+	//  5. ConfigSource - allowed to change (and checked above)
+	//  6. DoNotUseExternalID - immutable - checked above
 
 	return allErrs
 }
