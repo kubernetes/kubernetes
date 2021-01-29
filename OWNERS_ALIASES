@@ -527,9 +527,10 @@ aliases:
     - tabbysable
 
   sig-windows-api-reviewers:
-    - patricklang
     - ddebroy
-    - benmoss
+    - jayunit100
+    - jsturtevant
+    - marosset
 
   dep-approvers:
     - BenTheElder
@@ -552,14 +553,16 @@ aliases:
     - dims            # Architecture
     - ehashman        # Instrumentation
     - janetkuo        # Apps
+    - jayunit100      # Windows
     - jdumars         # Architecture, Release
     - jsafrane        # Storage
+    - jsturtevant     # Windows
     - kow3ns          # Apps
     - lavalamp        # API Machinery
     - liggitt         # Auth
     - luxas           # Cluster Lifecycle
+    - marosset        # Windows
     - mattfarina      # Apps
-    - michmike        # Windows
     - msau42          # Storage
     - mwielgus        # Autoscaling
     - prydonius       # Apps
