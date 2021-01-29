@@ -673,7 +673,15 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 	})
 
-	ginkgo.It("ServiceAccountIssuerDiscovery should support OIDC discovery of service account issuer", func() {
+	/*
+	   Release: v1.21
+	   Testname: OIDC Discovery (ServiceAccountIssuerDiscovery)
+	   Description: Ensure kube-apiserver serves correct OIDC discovery
+	   endpoints by deploying a Pod that verifies its own
+	   token against these endpoints.
+	*/
+	framework.ConformanceIt("ServiceAccountIssuerDiscovery should support OIDC discovery of service account issuer", func() {
+
 		// Allow the test pod access to the OIDC discovery non-resource URLs.
 		// The role should have already been automatically created as part of the
 		// RBAC bootstrap policy, but not the role binding. If RBAC is disabled,
