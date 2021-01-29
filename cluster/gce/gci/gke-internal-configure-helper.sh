@@ -485,6 +485,24 @@ function gke-configure-npd-custom-plugins {
 function gke-setup-gcfs {
   # Write the systemd service file for GCFS FUSE client.
   local -r gcfsd_mnt_dir="/run/gcfsd/mnt"
+  local -r layer_cache_dir="/var/lib/containerd/io.containerd.snapshotter.v1.gcfs/snapshotter/layers"
+
+  local each_cache_size
+  local gcfs_cache_size_flag
+  if [[ -z "${GCFSD_CACHE_SIZE_MIB}" ]]; then
+    gcfs_cache_size_flag=""
+  else
+    # GCFSD maintains two caches, each being allocated half of GCFSD_CACHE_SIZE_MIB
+    each_cache_size=$((${GCFSD_CACHE_SIZE_MIB} / 2))
+    gcfs_cache_size_flag="--max_content_cache_size_mb=${each_cache_size} --max_large_files_cache_size_mb=${each_cache_size}"
+  fi
+
+  local gcfs_layer_caching_flag=""
+  if [[ "${ENABLE_GCFS_LAYER_CACHING:-false}" == "true" ]]; then
+    gcfs_layer_caching_flag="--layer_cache_dir=${layer_cache_dir}"
+  fi
+
+
   cat <<EOF >/etc/systemd/system/gcfsd.service
 # Systemd configuration for Google Container File System service
 [Unit]
@@ -494,7 +512,8 @@ After=network.target
 Type=simple
 ExecStartPre=-/bin/umount ${gcfsd_mnt_dir}
 ExecStartPre=/bin/mkdir -p ${gcfsd_mnt_dir}
-ExecStart=${KUBE_HOME}/bin/gcfsd --mount_point=${gcfsd_mnt_dir}
+ExecStartPre=/bin/mkdir -p ${layer_cache_dir}
+ExecStart=${KUBE_HOME}/bin/gcfsd --mount_point=${gcfsd_mnt_dir} ${gcfs_cache_size_flag} ${gcfs_layer_caching_flag}
 ExecStop=/bin/umount ${gcfsd_mnt_dir}
 RuntimeDirectory=gcfsd
 Restart=always
