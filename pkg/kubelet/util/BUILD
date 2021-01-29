@@ -9,7 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
-        "bootime_util_linux_test.go",
+        "boottime_util_freebsd_test.go",
+        "boottime_util_linux_test.go",
         "util_test.go",
         "util_unix_test.go",
         "util_windows_test.go",
@@ -45,6 +46,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "boottime_util_darwin.go",
+        "boottime_util_freebsd.go",
         "boottime_util_linux.go",
         "doc.go",
         "nodelease.go",
