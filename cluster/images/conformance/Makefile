@@ -54,9 +54,14 @@ endif
 	chmod a+rx ${TEMP_DIR}/e2e.test
 	chmod a+rx ${TEMP_DIR}/gorunner
 
-	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g; s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
+	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
 
-	docker build --pull -t ${REGISTRY}/conformance-${ARCH}:${VERSION} ${TEMP_DIR}
+	docker buildx build \
+		--platform linux/${ARCH} \
+		--load \
+		--pull \
+		-t ${REGISTRY}/conformance-${ARCH}:${VERSION} \
+		${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
 
 push: build
