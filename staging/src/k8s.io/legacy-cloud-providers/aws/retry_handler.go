@@ -54,8 +54,8 @@ func (c *CrossRequestRetryDelay) BeforeSign(r *request.Request) {
 	now := time.Now()
 	delay := c.backoff.ComputeDelayForRequest(now)
 	if delay > 0 {
-		klog.Warningf("Inserting delay before AWS request (%s) to avoid RequestLimitExceeded: %s",
-			describeRequest(r), delay.String())
+		klog.InfoS("Inserting delay before AWS request to avoid RequestLimitExceeded",
+			"request",describeRequest(r), "delay", delay.String())
 
 		if sleepFn := r.Config.SleepDelay; sleepFn != nil {
 			// Support SleepDelay for backwards compatibility
@@ -98,8 +98,8 @@ func (c *CrossRequestRetryDelay) AfterRetry(r *request.Request) {
 	if awsError.Code() == "RequestLimitExceeded" {
 		c.backoff.ReportError()
 		recordAWSThrottlesMetric(operationName(r))
-		klog.Warningf("Got RequestLimitExceeded error on AWS request (%s)",
-			describeRequest(r))
+		klog.InfoS("Got RequestLimitExceeded error on AWS request",
+			"request", describeRequest(r))
 	}
 }
 
