@@ -17,7 +17,6 @@ limitations under the License.
 package helper
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -387,19 +386,6 @@ func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (boo
 		}
 	}
 	return true, result
-}
-
-// GetAvoidPodsFromNodeAnnotations scans the list of annotations and
-// returns the pods that needs to be avoided for this node from scheduling
-func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (v1.AvoidPods, error) {
-	var avoidPods v1.AvoidPods
-	if len(annotations) > 0 && annotations[v1.PreferAvoidPodsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[v1.PreferAvoidPodsAnnotationKey]), &avoidPods)
-		if err != nil {
-			return avoidPods, err
-		}
-	}
-	return avoidPods, nil
 }
 
 // GetPersistentVolumeClass returns StorageClassName.

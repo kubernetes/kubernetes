@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -3501,7 +3502,7 @@ func ValidateTopologySelectorTerm(term core.TopologySelectorTerm, fldPath *field
 func ValidateAvoidPodsInNodeAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	v1Avoids, err := v1helper.GetAvoidPodsFromNodeAnnotations(annotations)
+	v1Avoids, err := schedulinghelper.GetAvoidPodsFromNodeAnnotations(annotations)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("AvoidPods"), core.PreferAvoidPodsAnnotationKey, err.Error()))
 		return allErrs

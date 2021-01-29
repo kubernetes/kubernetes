@@ -6,11 +6,11 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodepreferavoidpods",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/scheduler/framework:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
     ],
 )
 
