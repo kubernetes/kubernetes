@@ -53,16 +53,6 @@ import (
 	utilsexec "k8s.io/utils/exec"
 )
 
-var (
-	// placeholderToken is only set statically to make kubeadm not randomize the token on every run
-	placeholderToken = kubeadmapiv1beta2.BootstrapToken{
-		Token: &kubeadmapiv1beta2.BootstrapTokenString{
-			ID:     "abcdef",
-			Secret: "0123456789abcdef",
-		},
-	}
-)
-
 // newCmdConfig returns cobra.Command for "kubeadm config" command
 func newCmdConfig(out io.Writer) *cobra.Command {
 	var kubeConfigFile string
@@ -129,7 +119,7 @@ func newCmdConfigPrintActionDefaults(out io.Writer, action string, configBytesPr
 
 			Note that sensitive values like the Bootstrap Token fields are replaced with placeholder values like %q in order to pass validation but
 			not perform the real computation for creating a token.
-		`), action, action, placeholderToken),
+		`), action, action, configutil.PlaceholderToken),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			groups, err := mapLegacyKindsToGroups(kinds)
 			if err != nil {
@@ -164,7 +154,7 @@ func runConfigPrintActionDefaults(out io.Writer, componentConfigs []string, conf
 }
 
 func getDefaultComponentConfigBytes(group string) ([]byte, error) {
-	defaultedInitConfig, err := getDefaultedInitConfig()
+	defaultedInitConfig, err := configutil.DefaultedStaticInitConfiguration()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -206,22 +196,8 @@ func mapLegacyKindsToGroups(kinds []string) ([]string, error) {
 	return groups, nil
 }
 
-func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
-	initCfg := &kubeadmapiv1beta2.InitConfiguration{
-		LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
-		BootstrapTokens:  []kubeadmapiv1beta2.BootstrapToken{placeholderToken},
-		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
-			CRISocket: constants.DefaultDockerCRISocket, // avoid CRI detection
-		},
-	}
-	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{
-		KubernetesVersion: constants.CurrentKubernetesVersion.String(), // avoid going to the Internet for the current Kubernetes version
-	}
-	return configutil.DefaultedInitConfiguration(initCfg, clusterCfg)
-}
-
 func getDefaultInitConfigBytes() ([]byte, error) {
-	internalcfg, err := getDefaultedInitConfig()
+	internalcfg, err := configutil.DefaultedStaticInitConfiguration()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -233,7 +209,7 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1beta2.JoinConfiguration{
 		Discovery: kubeadmapiv1beta2.Discovery{
 			BootstrapToken: &kubeadmapiv1beta2.BootstrapTokenDiscovery{
-				Token:                    placeholderToken.Token.String(),
+				Token:                    configutil.PlaceholderToken.Token.String(),
 				APIServerEndpoint:        "kube-apiserver:6443",
 				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
 			},
