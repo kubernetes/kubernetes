@@ -21,6 +21,7 @@ go_library(
         "firewall.go",
         "fixture.go",
         "framework.go",
+        "hostport.go",
         "ingress.go",
         "ingress_scale.go",
         "ingressclass.go",
