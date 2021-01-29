@@ -30,62 +30,6 @@ type ComponentStatusApplyConfiguration struct {
 	Conditions                    *ComponentConditionList          `json:"conditions,omitempty"`
 }
 
-// ComponentStatusApplyConfiguration constructs an declarative configuration of the ComponentStatus type for use with
-// apply.
-func ComponentStatus() *ComponentStatusApplyConfiguration {
-	return &ComponentStatusApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *ComponentStatusApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *ComponentStatusApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *ComponentStatusApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *ComponentStatusApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *ComponentStatusApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *ComponentStatusApplyConfiguration) RemoveObjectMeta() *ComponentStatusApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *ComponentStatusApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetConditions sets the Conditions field in the declarative configuration to the given value.
-func (b *ComponentStatusApplyConfiguration) SetConditions(value ComponentConditionList) *ComponentStatusApplyConfiguration {
-	b.Conditions = &value
-	return b
-}
-
-// RemoveConditions removes the Conditions field from the declarative configuration.
-func (b *ComponentStatusApplyConfiguration) RemoveConditions() *ComponentStatusApplyConfiguration {
-	b.Conditions = nil
-	return b
-}
-
-// GetConditions gets the Conditions field from the declarative configuration.
-func (b *ComponentStatusApplyConfiguration) GetConditions() (value ComponentConditionList, ok bool) {
-	if v := b.Conditions; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ComponentStatusList represents a listAlias of ComponentStatusApplyConfiguration.
 type ComponentStatusList []*ComponentStatusApplyConfiguration
 

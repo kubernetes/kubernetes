@@ -178,18 +178,18 @@ func (c *podSecurityPolicies) Apply(ctx context.Context, podSecurityPolicy *poli
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := podSecurityPolicy.GetObjectMeta()
-	if !ok {
+	meta := podSecurityPolicy.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("podSecurityPolicy.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("podSecurityPolicy.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1beta1.PodSecurityPolicy{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("podsecuritypolicies").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

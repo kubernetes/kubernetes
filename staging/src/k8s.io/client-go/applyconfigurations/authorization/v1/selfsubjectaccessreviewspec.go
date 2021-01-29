@@ -25,46 +25,6 @@ type SelfSubjectAccessReviewSpecApplyConfiguration struct {
 	NonResourceAttributes *NonResourceAttributesApplyConfiguration `json:"nonResourceAttributes,omitempty"`
 }
 
-// SelfSubjectAccessReviewSpecApplyConfiguration constructs an declarative configuration of the SelfSubjectAccessReviewSpec type for use with
-// apply.
-func SelfSubjectAccessReviewSpec() *SelfSubjectAccessReviewSpecApplyConfiguration {
-	return &SelfSubjectAccessReviewSpecApplyConfiguration{}
-}
-
-// SetResourceAttributes sets the ResourceAttributes field in the declarative configuration to the given value.
-func (b *SelfSubjectAccessReviewSpecApplyConfiguration) SetResourceAttributes(value *ResourceAttributesApplyConfiguration) *SelfSubjectAccessReviewSpecApplyConfiguration {
-	b.ResourceAttributes = value
-	return b
-}
-
-// RemoveResourceAttributes removes the ResourceAttributes field from the declarative configuration.
-func (b *SelfSubjectAccessReviewSpecApplyConfiguration) RemoveResourceAttributes() *SelfSubjectAccessReviewSpecApplyConfiguration {
-	b.ResourceAttributes = nil
-	return b
-}
-
-// GetResourceAttributes gets the ResourceAttributes field from the declarative configuration.
-func (b *SelfSubjectAccessReviewSpecApplyConfiguration) GetResourceAttributes() (value *ResourceAttributesApplyConfiguration, ok bool) {
-	return b.ResourceAttributes, b.ResourceAttributes != nil
-}
-
-// SetNonResourceAttributes sets the NonResourceAttributes field in the declarative configuration to the given value.
-func (b *SelfSubjectAccessReviewSpecApplyConfiguration) SetNonResourceAttributes(value *NonResourceAttributesApplyConfiguration) *SelfSubjectAccessReviewSpecApplyConfiguration {
-	b.NonResourceAttributes = value
-	return b
-}
-
-// RemoveNonResourceAttributes removes the NonResourceAttributes field from the declarative configuration.
-func (b *SelfSubjectAccessReviewSpecApplyConfiguration) RemoveNonResourceAttributes() *SelfSubjectAccessReviewSpecApplyConfiguration {
-	b.NonResourceAttributes = nil
-	return b
-}
-
-// GetNonResourceAttributes gets the NonResourceAttributes field from the declarative configuration.
-func (b *SelfSubjectAccessReviewSpecApplyConfiguration) GetNonResourceAttributes() (value *NonResourceAttributesApplyConfiguration, ok bool) {
-	return b.NonResourceAttributes, b.NonResourceAttributes != nil
-}
-
 // SelfSubjectAccessReviewSpecList represents a listAlias of SelfSubjectAccessReviewSpecApplyConfiguration.
 type SelfSubjectAccessReviewSpecList []*SelfSubjectAccessReviewSpecApplyConfiguration
 

@@ -30,69 +30,6 @@ type ContainerResourceMetricStatusApplyConfiguration struct {
 	Container *string                              `json:"container,omitempty"`
 }
 
-// ContainerResourceMetricStatusApplyConfiguration constructs an declarative configuration of the ContainerResourceMetricStatus type for use with
-// apply.
-func ContainerResourceMetricStatus() *ContainerResourceMetricStatusApplyConfiguration {
-	return &ContainerResourceMetricStatusApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *ContainerResourceMetricStatusApplyConfiguration) SetName(value v1.ResourceName) *ContainerResourceMetricStatusApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *ContainerResourceMetricStatusApplyConfiguration) RemoveName() *ContainerResourceMetricStatusApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *ContainerResourceMetricStatusApplyConfiguration) GetName() (value v1.ResourceName, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetCurrent sets the Current field in the declarative configuration to the given value.
-func (b *ContainerResourceMetricStatusApplyConfiguration) SetCurrent(value *MetricValueStatusApplyConfiguration) *ContainerResourceMetricStatusApplyConfiguration {
-	b.Current = value
-	return b
-}
-
-// RemoveCurrent removes the Current field from the declarative configuration.
-func (b *ContainerResourceMetricStatusApplyConfiguration) RemoveCurrent() *ContainerResourceMetricStatusApplyConfiguration {
-	b.Current = nil
-	return b
-}
-
-// GetCurrent gets the Current field from the declarative configuration.
-func (b *ContainerResourceMetricStatusApplyConfiguration) GetCurrent() (value *MetricValueStatusApplyConfiguration, ok bool) {
-	return b.Current, b.Current != nil
-}
-
-// SetContainer sets the Container field in the declarative configuration to the given value.
-func (b *ContainerResourceMetricStatusApplyConfiguration) SetContainer(value string) *ContainerResourceMetricStatusApplyConfiguration {
-	b.Container = &value
-	return b
-}
-
-// RemoveContainer removes the Container field from the declarative configuration.
-func (b *ContainerResourceMetricStatusApplyConfiguration) RemoveContainer() *ContainerResourceMetricStatusApplyConfiguration {
-	b.Container = nil
-	return b
-}
-
-// GetContainer gets the Container field from the declarative configuration.
-func (b *ContainerResourceMetricStatusApplyConfiguration) GetContainer() (value string, ok bool) {
-	if v := b.Container; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ContainerResourceMetricStatusList represents a listAlias of ContainerResourceMetricStatusApplyConfiguration.
 type ContainerResourceMetricStatusList []*ContainerResourceMetricStatusApplyConfiguration
 

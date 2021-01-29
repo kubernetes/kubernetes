@@ -194,18 +194,18 @@ func (c *priorityLevelConfigurations) Apply(ctx context.Context, priorityLevelCo
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := priorityLevelConfiguration.GetObjectMeta()
-	if !ok {
+	meta := priorityLevelConfiguration.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("priorityLevelConfiguration.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("priorityLevelConfiguration.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("prioritylevelconfigurations").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

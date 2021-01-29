@@ -24,32 +24,6 @@ type ScopeSelectorApplyConfiguration struct {
 	MatchExpressions *ScopedResourceSelectorRequirementList `json:"matchExpressions,omitempty"`
 }
 
-// ScopeSelectorApplyConfiguration constructs an declarative configuration of the ScopeSelector type for use with
-// apply.
-func ScopeSelector() *ScopeSelectorApplyConfiguration {
-	return &ScopeSelectorApplyConfiguration{}
-}
-
-// SetMatchExpressions sets the MatchExpressions field in the declarative configuration to the given value.
-func (b *ScopeSelectorApplyConfiguration) SetMatchExpressions(value ScopedResourceSelectorRequirementList) *ScopeSelectorApplyConfiguration {
-	b.MatchExpressions = &value
-	return b
-}
-
-// RemoveMatchExpressions removes the MatchExpressions field from the declarative configuration.
-func (b *ScopeSelectorApplyConfiguration) RemoveMatchExpressions() *ScopeSelectorApplyConfiguration {
-	b.MatchExpressions = nil
-	return b
-}
-
-// GetMatchExpressions gets the MatchExpressions field from the declarative configuration.
-func (b *ScopeSelectorApplyConfiguration) GetMatchExpressions() (value ScopedResourceSelectorRequirementList, ok bool) {
-	if v := b.MatchExpressions; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ScopeSelectorList represents a listAlias of ScopeSelectorApplyConfiguration.
 type ScopeSelectorList []*ScopeSelectorApplyConfiguration
 

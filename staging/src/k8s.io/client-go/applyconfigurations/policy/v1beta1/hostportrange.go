@@ -25,52 +25,6 @@ type HostPortRangeApplyConfiguration struct {
 	Max *int32 `json:"max,omitempty"`
 }
 
-// HostPortRangeApplyConfiguration constructs an declarative configuration of the HostPortRange type for use with
-// apply.
-func HostPortRange() *HostPortRangeApplyConfiguration {
-	return &HostPortRangeApplyConfiguration{}
-}
-
-// SetMin sets the Min field in the declarative configuration to the given value.
-func (b *HostPortRangeApplyConfiguration) SetMin(value int32) *HostPortRangeApplyConfiguration {
-	b.Min = &value
-	return b
-}
-
-// RemoveMin removes the Min field from the declarative configuration.
-func (b *HostPortRangeApplyConfiguration) RemoveMin() *HostPortRangeApplyConfiguration {
-	b.Min = nil
-	return b
-}
-
-// GetMin gets the Min field from the declarative configuration.
-func (b *HostPortRangeApplyConfiguration) GetMin() (value int32, ok bool) {
-	if v := b.Min; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetMax sets the Max field in the declarative configuration to the given value.
-func (b *HostPortRangeApplyConfiguration) SetMax(value int32) *HostPortRangeApplyConfiguration {
-	b.Max = &value
-	return b
-}
-
-// RemoveMax removes the Max field from the declarative configuration.
-func (b *HostPortRangeApplyConfiguration) RemoveMax() *HostPortRangeApplyConfiguration {
-	b.Max = nil
-	return b
-}
-
-// GetMax gets the Max field from the declarative configuration.
-func (b *HostPortRangeApplyConfiguration) GetMax() (value int32, ok bool) {
-	if v := b.Max; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // HostPortRangeList represents a listAlias of HostPortRangeApplyConfiguration.
 type HostPortRangeList []*HostPortRangeApplyConfiguration
 

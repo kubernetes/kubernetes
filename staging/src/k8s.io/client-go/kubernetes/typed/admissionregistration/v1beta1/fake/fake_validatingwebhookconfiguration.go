@@ -130,16 +130,16 @@ func (c *FakeValidatingWebhookConfigurations) Apply(ctx context.Context, validat
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := validatingWebhookConfiguration.GetObjectMeta()
-	if !ok {
+	meta := validatingWebhookConfiguration.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("validatingWebhookConfiguration.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("validatingWebhookConfiguration.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(validatingwebhookconfigurationsResource, name, types.ApplyPatchType, data, subresources...), &v1beta1.ValidatingWebhookConfiguration{})
+		Invokes(testing.NewRootPatchSubresourceAction(validatingwebhookconfigurationsResource, *name, types.ApplyPatchType, data, subresources...), &v1beta1.ValidatingWebhookConfiguration{})
 	if obj == nil {
 		return nil, err
 	}

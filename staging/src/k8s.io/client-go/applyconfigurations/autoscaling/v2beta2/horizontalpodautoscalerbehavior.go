@@ -25,46 +25,6 @@ type HorizontalPodAutoscalerBehaviorApplyConfiguration struct {
 	ScaleDown *HPAScalingRulesApplyConfiguration `json:"scaleDown,omitempty"`
 }
 
-// HorizontalPodAutoscalerBehaviorApplyConfiguration constructs an declarative configuration of the HorizontalPodAutoscalerBehavior type for use with
-// apply.
-func HorizontalPodAutoscalerBehavior() *HorizontalPodAutoscalerBehaviorApplyConfiguration {
-	return &HorizontalPodAutoscalerBehaviorApplyConfiguration{}
-}
-
-// SetScaleUp sets the ScaleUp field in the declarative configuration to the given value.
-func (b *HorizontalPodAutoscalerBehaviorApplyConfiguration) SetScaleUp(value *HPAScalingRulesApplyConfiguration) *HorizontalPodAutoscalerBehaviorApplyConfiguration {
-	b.ScaleUp = value
-	return b
-}
-
-// RemoveScaleUp removes the ScaleUp field from the declarative configuration.
-func (b *HorizontalPodAutoscalerBehaviorApplyConfiguration) RemoveScaleUp() *HorizontalPodAutoscalerBehaviorApplyConfiguration {
-	b.ScaleUp = nil
-	return b
-}
-
-// GetScaleUp gets the ScaleUp field from the declarative configuration.
-func (b *HorizontalPodAutoscalerBehaviorApplyConfiguration) GetScaleUp() (value *HPAScalingRulesApplyConfiguration, ok bool) {
-	return b.ScaleUp, b.ScaleUp != nil
-}
-
-// SetScaleDown sets the ScaleDown field in the declarative configuration to the given value.
-func (b *HorizontalPodAutoscalerBehaviorApplyConfiguration) SetScaleDown(value *HPAScalingRulesApplyConfiguration) *HorizontalPodAutoscalerBehaviorApplyConfiguration {
-	b.ScaleDown = value
-	return b
-}
-
-// RemoveScaleDown removes the ScaleDown field from the declarative configuration.
-func (b *HorizontalPodAutoscalerBehaviorApplyConfiguration) RemoveScaleDown() *HorizontalPodAutoscalerBehaviorApplyConfiguration {
-	b.ScaleDown = nil
-	return b
-}
-
-// GetScaleDown gets the ScaleDown field from the declarative configuration.
-func (b *HorizontalPodAutoscalerBehaviorApplyConfiguration) GetScaleDown() (value *HPAScalingRulesApplyConfiguration, ok bool) {
-	return b.ScaleDown, b.ScaleDown != nil
-}
-
 // HorizontalPodAutoscalerBehaviorList represents a listAlias of HorizontalPodAutoscalerBehaviorApplyConfiguration.
 type HorizontalPodAutoscalerBehaviorList []*HorizontalPodAutoscalerBehaviorApplyConfiguration
 

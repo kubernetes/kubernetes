@@ -29,52 +29,6 @@ type RollingUpdateDeploymentApplyConfiguration struct {
 	MaxSurge       *intstr.IntOrString `json:"maxSurge,omitempty"`
 }
 
-// RollingUpdateDeploymentApplyConfiguration constructs an declarative configuration of the RollingUpdateDeployment type for use with
-// apply.
-func RollingUpdateDeployment() *RollingUpdateDeploymentApplyConfiguration {
-	return &RollingUpdateDeploymentApplyConfiguration{}
-}
-
-// SetMaxUnavailable sets the MaxUnavailable field in the declarative configuration to the given value.
-func (b *RollingUpdateDeploymentApplyConfiguration) SetMaxUnavailable(value intstr.IntOrString) *RollingUpdateDeploymentApplyConfiguration {
-	b.MaxUnavailable = &value
-	return b
-}
-
-// RemoveMaxUnavailable removes the MaxUnavailable field from the declarative configuration.
-func (b *RollingUpdateDeploymentApplyConfiguration) RemoveMaxUnavailable() *RollingUpdateDeploymentApplyConfiguration {
-	b.MaxUnavailable = nil
-	return b
-}
-
-// GetMaxUnavailable gets the MaxUnavailable field from the declarative configuration.
-func (b *RollingUpdateDeploymentApplyConfiguration) GetMaxUnavailable() (value intstr.IntOrString, ok bool) {
-	if v := b.MaxUnavailable; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetMaxSurge sets the MaxSurge field in the declarative configuration to the given value.
-func (b *RollingUpdateDeploymentApplyConfiguration) SetMaxSurge(value intstr.IntOrString) *RollingUpdateDeploymentApplyConfiguration {
-	b.MaxSurge = &value
-	return b
-}
-
-// RemoveMaxSurge removes the MaxSurge field from the declarative configuration.
-func (b *RollingUpdateDeploymentApplyConfiguration) RemoveMaxSurge() *RollingUpdateDeploymentApplyConfiguration {
-	b.MaxSurge = nil
-	return b
-}
-
-// GetMaxSurge gets the MaxSurge field from the declarative configuration.
-func (b *RollingUpdateDeploymentApplyConfiguration) GetMaxSurge() (value intstr.IntOrString, ok bool) {
-	if v := b.MaxSurge; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // RollingUpdateDeploymentList represents a listAlias of RollingUpdateDeploymentApplyConfiguration.
 type RollingUpdateDeploymentList []*RollingUpdateDeploymentApplyConfiguration
 

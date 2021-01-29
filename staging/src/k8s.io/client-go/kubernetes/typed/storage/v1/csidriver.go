@@ -178,18 +178,18 @@ func (c *cSIDrivers) Apply(ctx context.Context, cSIDriver *storagev1.CSIDriverAp
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := cSIDriver.GetObjectMeta()
-	if !ok {
+	meta := cSIDriver.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("cSIDriver.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("cSIDriver.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.CSIDriver{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("csidrivers").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

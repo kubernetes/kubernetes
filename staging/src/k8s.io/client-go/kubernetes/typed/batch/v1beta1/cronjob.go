@@ -205,19 +205,19 @@ func (c *cronJobs) Apply(ctx context.Context, cronJob *batchv1beta1.CronJobApply
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := cronJob.GetObjectMeta()
-	if !ok {
+	meta := cronJob.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("cronJob.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("cronJob.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1beta1.CronJob{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("cronjobs").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

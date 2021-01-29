@@ -188,19 +188,19 @@ func (c *roles) Apply(ctx context.Context, role *rbacv1beta1.RoleApplyConfigurat
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := role.GetObjectMeta()
-	if !ok {
+	meta := role.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("role.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("role.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1beta1.Role{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("roles").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

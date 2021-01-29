@@ -25,52 +25,6 @@ type ContainerStateWaitingApplyConfiguration struct {
 	Message *string `json:"message,omitempty"`
 }
 
-// ContainerStateWaitingApplyConfiguration constructs an declarative configuration of the ContainerStateWaiting type for use with
-// apply.
-func ContainerStateWaiting() *ContainerStateWaitingApplyConfiguration {
-	return &ContainerStateWaitingApplyConfiguration{}
-}
-
-// SetReason sets the Reason field in the declarative configuration to the given value.
-func (b *ContainerStateWaitingApplyConfiguration) SetReason(value string) *ContainerStateWaitingApplyConfiguration {
-	b.Reason = &value
-	return b
-}
-
-// RemoveReason removes the Reason field from the declarative configuration.
-func (b *ContainerStateWaitingApplyConfiguration) RemoveReason() *ContainerStateWaitingApplyConfiguration {
-	b.Reason = nil
-	return b
-}
-
-// GetReason gets the Reason field from the declarative configuration.
-func (b *ContainerStateWaitingApplyConfiguration) GetReason() (value string, ok bool) {
-	if v := b.Reason; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetMessage sets the Message field in the declarative configuration to the given value.
-func (b *ContainerStateWaitingApplyConfiguration) SetMessage(value string) *ContainerStateWaitingApplyConfiguration {
-	b.Message = &value
-	return b
-}
-
-// RemoveMessage removes the Message field from the declarative configuration.
-func (b *ContainerStateWaitingApplyConfiguration) RemoveMessage() *ContainerStateWaitingApplyConfiguration {
-	b.Message = nil
-	return b
-}
-
-// GetMessage gets the Message field from the declarative configuration.
-func (b *ContainerStateWaitingApplyConfiguration) GetMessage() (value string, ok bool) {
-	if v := b.Message; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ContainerStateWaitingList represents a listAlias of ContainerStateWaitingApplyConfiguration.
 type ContainerStateWaitingList []*ContainerStateWaitingApplyConfiguration
 

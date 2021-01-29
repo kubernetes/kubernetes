@@ -133,16 +133,16 @@ func (c *FakeNamespaces) Apply(ctx context.Context, namespace *applyconfiguratio
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := namespace.GetObjectMeta()
-	if !ok {
+	meta := namespace.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("namespace.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("namespace.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(namespacesResource, name, types.ApplyPatchType, data, subresources...), &corev1.Namespace{})
+		Invokes(testing.NewRootPatchSubresourceAction(namespacesResource, *name, types.ApplyPatchType, data, subresources...), &corev1.Namespace{})
 	if obj == nil {
 		return nil, err
 	}

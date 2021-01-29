@@ -188,19 +188,19 @@ func (c *endpoints) Apply(ctx context.Context, endpoints *corev1.EndpointsApplyC
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := endpoints.GetObjectMeta()
-	if !ok {
+	meta := endpoints.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("endpoints.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("endpoints.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.Endpoints{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("endpoints").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

@@ -25,46 +25,6 @@ type ExternalMetricSourceApplyConfiguration struct {
 	Target *MetricTargetApplyConfiguration     `json:"target,omitempty"`
 }
 
-// ExternalMetricSourceApplyConfiguration constructs an declarative configuration of the ExternalMetricSource type for use with
-// apply.
-func ExternalMetricSource() *ExternalMetricSourceApplyConfiguration {
-	return &ExternalMetricSourceApplyConfiguration{}
-}
-
-// SetMetric sets the Metric field in the declarative configuration to the given value.
-func (b *ExternalMetricSourceApplyConfiguration) SetMetric(value *MetricIdentifierApplyConfiguration) *ExternalMetricSourceApplyConfiguration {
-	b.Metric = value
-	return b
-}
-
-// RemoveMetric removes the Metric field from the declarative configuration.
-func (b *ExternalMetricSourceApplyConfiguration) RemoveMetric() *ExternalMetricSourceApplyConfiguration {
-	b.Metric = nil
-	return b
-}
-
-// GetMetric gets the Metric field from the declarative configuration.
-func (b *ExternalMetricSourceApplyConfiguration) GetMetric() (value *MetricIdentifierApplyConfiguration, ok bool) {
-	return b.Metric, b.Metric != nil
-}
-
-// SetTarget sets the Target field in the declarative configuration to the given value.
-func (b *ExternalMetricSourceApplyConfiguration) SetTarget(value *MetricTargetApplyConfiguration) *ExternalMetricSourceApplyConfiguration {
-	b.Target = value
-	return b
-}
-
-// RemoveTarget removes the Target field from the declarative configuration.
-func (b *ExternalMetricSourceApplyConfiguration) RemoveTarget() *ExternalMetricSourceApplyConfiguration {
-	b.Target = nil
-	return b
-}
-
-// GetTarget gets the Target field from the declarative configuration.
-func (b *ExternalMetricSourceApplyConfiguration) GetTarget() (value *MetricTargetApplyConfiguration, ok bool) {
-	return b.Target, b.Target != nil
-}
-
 // ExternalMetricSourceList represents a listAlias of ExternalMetricSourceApplyConfiguration.
 type ExternalMetricSourceList []*ExternalMetricSourceApplyConfiguration
 

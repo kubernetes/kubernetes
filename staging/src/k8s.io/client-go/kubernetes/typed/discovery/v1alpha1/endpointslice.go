@@ -188,19 +188,19 @@ func (c *endpointSlices) Apply(ctx context.Context, endpointSlice *discoveryv1al
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := endpointSlice.GetObjectMeta()
-	if !ok {
+	meta := endpointSlice.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("endpointSlice.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("endpointSlice.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1alpha1.EndpointSlice{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("endpointslices").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

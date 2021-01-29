@@ -25,46 +25,6 @@ type ExternalMetricStatusApplyConfiguration struct {
 	Current *MetricValueStatusApplyConfiguration `json:"current,omitempty"`
 }
 
-// ExternalMetricStatusApplyConfiguration constructs an declarative configuration of the ExternalMetricStatus type for use with
-// apply.
-func ExternalMetricStatus() *ExternalMetricStatusApplyConfiguration {
-	return &ExternalMetricStatusApplyConfiguration{}
-}
-
-// SetMetric sets the Metric field in the declarative configuration to the given value.
-func (b *ExternalMetricStatusApplyConfiguration) SetMetric(value *MetricIdentifierApplyConfiguration) *ExternalMetricStatusApplyConfiguration {
-	b.Metric = value
-	return b
-}
-
-// RemoveMetric removes the Metric field from the declarative configuration.
-func (b *ExternalMetricStatusApplyConfiguration) RemoveMetric() *ExternalMetricStatusApplyConfiguration {
-	b.Metric = nil
-	return b
-}
-
-// GetMetric gets the Metric field from the declarative configuration.
-func (b *ExternalMetricStatusApplyConfiguration) GetMetric() (value *MetricIdentifierApplyConfiguration, ok bool) {
-	return b.Metric, b.Metric != nil
-}
-
-// SetCurrent sets the Current field in the declarative configuration to the given value.
-func (b *ExternalMetricStatusApplyConfiguration) SetCurrent(value *MetricValueStatusApplyConfiguration) *ExternalMetricStatusApplyConfiguration {
-	b.Current = value
-	return b
-}
-
-// RemoveCurrent removes the Current field from the declarative configuration.
-func (b *ExternalMetricStatusApplyConfiguration) RemoveCurrent() *ExternalMetricStatusApplyConfiguration {
-	b.Current = nil
-	return b
-}
-
-// GetCurrent gets the Current field from the declarative configuration.
-func (b *ExternalMetricStatusApplyConfiguration) GetCurrent() (value *MetricValueStatusApplyConfiguration, ok bool) {
-	return b.Current, b.Current != nil
-}
-
 // ExternalMetricStatusList represents a listAlias of ExternalMetricStatusApplyConfiguration.
 type ExternalMetricStatusList []*ExternalMetricStatusApplyConfiguration
 

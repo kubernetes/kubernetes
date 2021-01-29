@@ -86,23 +86,13 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 	}
 
 	g.generateStruct(t, sw, typeParams)
-	sw.Do(constructor, typeParams)
 
 	for _, member := range t.Members {
 		memberType := g.refGraph.applyConfigForType(member.Type)
-		if jsonTags, ok := lookupJSONTags(member); ok {
+		if _, ok := lookupJSONTags(member); ok {
 			if g.refGraph.isApplyConfig(member.Type) {
 				memberType = &types.Type{Kind: types.Pointer, Elem: memberType}
 			}
-			memberParams := memberParams{
-				TypeParams: typeParams,
-				Member:     member,
-				MemberType: memberType,
-				JSONTags:   jsonTags,
-			}
-			g.generateMemberSet(sw, memberParams)
-			g.generateMemberRemove(sw, memberParams)
-			g.generateMemberGet(sw, memberParams)
 		}
 	}
 
@@ -141,58 +131,6 @@ func (g *applyConfigurationGenerator) generateStruct(t *types.Type, sw *generato
 	}
 	sw.Do("}\n", typeParams)
 }
-
-func (g *applyConfigurationGenerator) generateMemberSet(sw *generator.SnippetWriter, memberParams memberParams) {
-	sw.Do("// Set$.Member.Name$ sets the $.Member.Name$ field in the declarative configuration to the given value.\n", memberParams)
-	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) Set$.Member.Name$(value $.MemberType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
-	if memberParams.JSONTags.inline {
-		sw.Do("if value != nil {\n", memberParams)
-		sw.Do("  b.$.Member.Name$ApplyConfiguration = *value\n", memberParams)
-		sw.Do("}\n", memberParams)
-	} else if g.refGraph.isApplyConfig(memberParams.Member.Type) {
-		sw.Do("b.$.Member.Name$ = value\n", memberParams)
-	} else {
-		sw.Do("b.$.Member.Name$ = &value\n", memberParams)
-	}
-	sw.Do("  return b\n", memberParams)
-	sw.Do("}\n", memberParams)
-}
-
-func (g *applyConfigurationGenerator) generateMemberRemove(sw *generator.SnippetWriter, memberParams memberParams) {
-	if memberParams.JSONTags.inline {
-		// Inline types cannot be removed
-		return
-	}
-	sw.Do("// Remove$.Member.Name$ removes the $.Member.Name$ field from the declarative configuration.\n", memberParams)
-	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) Remove$.Member.Name$() *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
-	sw.Do("b.$.Member.Name$ = nil\n", memberParams)
-	sw.Do("  return b\n", memberParams)
-	sw.Do("}\n", memberParams)
-}
-
-func (g *applyConfigurationGenerator) generateMemberGet(sw *generator.SnippetWriter, memberParams memberParams) {
-	sw.Do("// Get$.Member.Name$ gets the $.Member.Name$ field from the declarative configuration.\n", memberParams)
-	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) Get$.Member.Name$() (value $.MemberType|raw$, ok bool) {\n", memberParams)
-	if memberParams.JSONTags.inline {
-		sw.Do("return &b.$.Member.Name$ApplyConfiguration, true\n", memberParams)
-	} else if g.refGraph.isApplyConfig(memberParams.Member.Type) {
-		sw.Do("return b.$.Member.Name$, b.$.Member.Name$ != nil\n", memberParams)
-	} else {
-		sw.Do("if v := b.$.Member.Name$; v != nil {\n", memberParams)
-		sw.Do("  return *v, true\n", memberParams)
-		sw.Do("}\n", memberParams)
-		sw.Do("return value, false\n", memberParams)
-	}
-	sw.Do("}\n", memberParams)
-}
-
-var constructor = `
-// $.ApplyConfig.ApplyConfiguration|public$ constructs an declarative configuration of the $.ApplyConfig.Type|public$ type for use with
-// apply.
-func $.ApplyConfig.Type|public$() *$.ApplyConfig.ApplyConfiguration|public$ {
-  return &$.ApplyConfig.ApplyConfiguration|public${}
-}
-`
 
 var listAlias = `
 // $.ApplyConfig.Type|public$List represents a listAlias of $.ApplyConfig.ApplyConfiguration|public$.

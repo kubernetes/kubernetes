@@ -24,32 +24,6 @@ type LocalObjectReferenceApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// LocalObjectReferenceApplyConfiguration constructs an declarative configuration of the LocalObjectReference type for use with
-// apply.
-func LocalObjectReference() *LocalObjectReferenceApplyConfiguration {
-	return &LocalObjectReferenceApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *LocalObjectReferenceApplyConfiguration) SetName(value string) *LocalObjectReferenceApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *LocalObjectReferenceApplyConfiguration) RemoveName() *LocalObjectReferenceApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *LocalObjectReferenceApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // LocalObjectReferenceList represents a listAlias of LocalObjectReferenceApplyConfiguration.
 type LocalObjectReferenceList []*LocalObjectReferenceApplyConfiguration
 

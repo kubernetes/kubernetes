@@ -19,9 +19,11 @@ package generators
 import "k8s.io/gengo/types"
 
 var (
-	applyConfiguration    = types.Ref("k8s.io/apimachinery/pkg/runtime", "ApplyConfiguration")
-	groupVersionKind      = types.Ref("k8s.io/apimachinery/pkg/runtime/schema", "GroupVersionKind")
-	rawExtension          = types.Ref("k8s.io/apimachinery/pkg/runtime", "RawExtension")
+	applyConfiguration = types.Ref("k8s.io/apimachinery/pkg/runtime", "ApplyConfiguration")
+	groupVersionKind   = types.Ref("k8s.io/apimachinery/pkg/runtime/schema", "GroupVersionKind")
+	// objectMeta            = types.Ref("k8s.io/apimachinery/pkg/apis/meta/v1", "ObjectMeta")
+	rawExtension = types.Ref("k8s.io/apimachinery/pkg/runtime", "RawExtension")
+	// typeMeta              = types.Ref("k8s.io/apimachinery/pkg/apis/meta/v1", "TypeMeta")
 	unknown               = types.Ref("k8s.io/apimachinery/pkg/runtime", "Unknown")
 	unstructured          = types.Ref("k8s.io/apimachinery/pkg/apis/meta/v1/unstructured", "Unstructured")
 	unstructuredConverter = types.Ref("k8s.io/apimachinery/pkg/runtime", "DefaultUnstructuredConverter")

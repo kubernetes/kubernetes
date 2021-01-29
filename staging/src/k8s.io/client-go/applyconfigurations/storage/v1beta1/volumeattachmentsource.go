@@ -29,49 +29,6 @@ type VolumeAttachmentSourceApplyConfiguration struct {
 	InlineVolumeSpec     *v1.PersistentVolumeSpecApplyConfiguration `json:"inlineVolumeSpec,omitempty"`
 }
 
-// VolumeAttachmentSourceApplyConfiguration constructs an declarative configuration of the VolumeAttachmentSource type for use with
-// apply.
-func VolumeAttachmentSource() *VolumeAttachmentSourceApplyConfiguration {
-	return &VolumeAttachmentSourceApplyConfiguration{}
-}
-
-// SetPersistentVolumeName sets the PersistentVolumeName field in the declarative configuration to the given value.
-func (b *VolumeAttachmentSourceApplyConfiguration) SetPersistentVolumeName(value string) *VolumeAttachmentSourceApplyConfiguration {
-	b.PersistentVolumeName = &value
-	return b
-}
-
-// RemovePersistentVolumeName removes the PersistentVolumeName field from the declarative configuration.
-func (b *VolumeAttachmentSourceApplyConfiguration) RemovePersistentVolumeName() *VolumeAttachmentSourceApplyConfiguration {
-	b.PersistentVolumeName = nil
-	return b
-}
-
-// GetPersistentVolumeName gets the PersistentVolumeName field from the declarative configuration.
-func (b *VolumeAttachmentSourceApplyConfiguration) GetPersistentVolumeName() (value string, ok bool) {
-	if v := b.PersistentVolumeName; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetInlineVolumeSpec sets the InlineVolumeSpec field in the declarative configuration to the given value.
-func (b *VolumeAttachmentSourceApplyConfiguration) SetInlineVolumeSpec(value *v1.PersistentVolumeSpecApplyConfiguration) *VolumeAttachmentSourceApplyConfiguration {
-	b.InlineVolumeSpec = value
-	return b
-}
-
-// RemoveInlineVolumeSpec removes the InlineVolumeSpec field from the declarative configuration.
-func (b *VolumeAttachmentSourceApplyConfiguration) RemoveInlineVolumeSpec() *VolumeAttachmentSourceApplyConfiguration {
-	b.InlineVolumeSpec = nil
-	return b
-}
-
-// GetInlineVolumeSpec gets the InlineVolumeSpec field from the declarative configuration.
-func (b *VolumeAttachmentSourceApplyConfiguration) GetInlineVolumeSpec() (value *v1.PersistentVolumeSpecApplyConfiguration, ok bool) {
-	return b.InlineVolumeSpec, b.InlineVolumeSpec != nil
-}
-
 // VolumeAttachmentSourceList represents a listAlias of VolumeAttachmentSourceApplyConfiguration.
 type VolumeAttachmentSourceList []*VolumeAttachmentSourceApplyConfiguration
 

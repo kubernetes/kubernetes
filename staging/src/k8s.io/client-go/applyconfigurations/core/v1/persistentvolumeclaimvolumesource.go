@@ -25,52 +25,6 @@ type PersistentVolumeClaimVolumeSourceApplyConfiguration struct {
 	ReadOnly  *bool   `json:"readOnly,omitempty"`
 }
 
-// PersistentVolumeClaimVolumeSourceApplyConfiguration constructs an declarative configuration of the PersistentVolumeClaimVolumeSource type for use with
-// apply.
-func PersistentVolumeClaimVolumeSource() *PersistentVolumeClaimVolumeSourceApplyConfiguration {
-	return &PersistentVolumeClaimVolumeSourceApplyConfiguration{}
-}
-
-// SetClaimName sets the ClaimName field in the declarative configuration to the given value.
-func (b *PersistentVolumeClaimVolumeSourceApplyConfiguration) SetClaimName(value string) *PersistentVolumeClaimVolumeSourceApplyConfiguration {
-	b.ClaimName = &value
-	return b
-}
-
-// RemoveClaimName removes the ClaimName field from the declarative configuration.
-func (b *PersistentVolumeClaimVolumeSourceApplyConfiguration) RemoveClaimName() *PersistentVolumeClaimVolumeSourceApplyConfiguration {
-	b.ClaimName = nil
-	return b
-}
-
-// GetClaimName gets the ClaimName field from the declarative configuration.
-func (b *PersistentVolumeClaimVolumeSourceApplyConfiguration) GetClaimName() (value string, ok bool) {
-	if v := b.ClaimName; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetReadOnly sets the ReadOnly field in the declarative configuration to the given value.
-func (b *PersistentVolumeClaimVolumeSourceApplyConfiguration) SetReadOnly(value bool) *PersistentVolumeClaimVolumeSourceApplyConfiguration {
-	b.ReadOnly = &value
-	return b
-}
-
-// RemoveReadOnly removes the ReadOnly field from the declarative configuration.
-func (b *PersistentVolumeClaimVolumeSourceApplyConfiguration) RemoveReadOnly() *PersistentVolumeClaimVolumeSourceApplyConfiguration {
-	b.ReadOnly = nil
-	return b
-}
-
-// GetReadOnly gets the ReadOnly field from the declarative configuration.
-func (b *PersistentVolumeClaimVolumeSourceApplyConfiguration) GetReadOnly() (value bool, ok bool) {
-	if v := b.ReadOnly; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // PersistentVolumeClaimVolumeSourceList represents a listAlias of PersistentVolumeClaimVolumeSourceApplyConfiguration.
 type PersistentVolumeClaimVolumeSourceList []*PersistentVolumeClaimVolumeSourceApplyConfiguration
 

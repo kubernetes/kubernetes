@@ -150,16 +150,16 @@ func (c *FakeReplicaSets) Apply(ctx context.Context, replicaSet *appsv1beta2.Rep
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := replicaSet.GetObjectMeta()
-	if !ok {
+	meta := replicaSet.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("replicaSet.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("replicaSet.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicasetsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &v1beta2.ReplicaSet{})
+		Invokes(testing.NewPatchSubresourceAction(replicasetsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &v1beta2.ReplicaSet{})
 
 	if obj == nil {
 		return nil, err

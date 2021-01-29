@@ -205,19 +205,19 @@ func (c *horizontalPodAutoscalers) Apply(ctx context.Context, horizontalPodAutos
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := horizontalPodAutoscaler.GetObjectMeta()
-	if !ok {
+	meta := horizontalPodAutoscaler.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("horizontalPodAutoscaler.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("horizontalPodAutoscaler.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.HorizontalPodAutoscaler{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

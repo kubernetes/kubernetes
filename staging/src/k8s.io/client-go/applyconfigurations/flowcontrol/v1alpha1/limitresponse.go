@@ -29,49 +29,6 @@ type LimitResponseApplyConfiguration struct {
 	Queuing *QueuingConfigurationApplyConfiguration `json:"queuing,omitempty"`
 }
 
-// LimitResponseApplyConfiguration constructs an declarative configuration of the LimitResponse type for use with
-// apply.
-func LimitResponse() *LimitResponseApplyConfiguration {
-	return &LimitResponseApplyConfiguration{}
-}
-
-// SetType sets the Type field in the declarative configuration to the given value.
-func (b *LimitResponseApplyConfiguration) SetType(value v1alpha1.LimitResponseType) *LimitResponseApplyConfiguration {
-	b.Type = &value
-	return b
-}
-
-// RemoveType removes the Type field from the declarative configuration.
-func (b *LimitResponseApplyConfiguration) RemoveType() *LimitResponseApplyConfiguration {
-	b.Type = nil
-	return b
-}
-
-// GetType gets the Type field from the declarative configuration.
-func (b *LimitResponseApplyConfiguration) GetType() (value v1alpha1.LimitResponseType, ok bool) {
-	if v := b.Type; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetQueuing sets the Queuing field in the declarative configuration to the given value.
-func (b *LimitResponseApplyConfiguration) SetQueuing(value *QueuingConfigurationApplyConfiguration) *LimitResponseApplyConfiguration {
-	b.Queuing = value
-	return b
-}
-
-// RemoveQueuing removes the Queuing field from the declarative configuration.
-func (b *LimitResponseApplyConfiguration) RemoveQueuing() *LimitResponseApplyConfiguration {
-	b.Queuing = nil
-	return b
-}
-
-// GetQueuing gets the Queuing field from the declarative configuration.
-func (b *LimitResponseApplyConfiguration) GetQueuing() (value *QueuingConfigurationApplyConfiguration, ok bool) {
-	return b.Queuing, b.Queuing != nil
-}
-
 // LimitResponseList represents a listAlias of LimitResponseApplyConfiguration.
 type LimitResponseList []*LimitResponseApplyConfiguration
 

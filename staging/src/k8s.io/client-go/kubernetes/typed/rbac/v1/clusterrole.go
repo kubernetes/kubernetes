@@ -178,18 +178,18 @@ func (c *clusterRoles) Apply(ctx context.Context, clusterRole *rbacv1.ClusterRol
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := clusterRole.GetObjectMeta()
-	if !ok {
+	meta := clusterRole.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("clusterRole.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("clusterRole.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.ClusterRole{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("clusterroles").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

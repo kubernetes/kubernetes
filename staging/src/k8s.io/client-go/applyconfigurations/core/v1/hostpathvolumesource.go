@@ -29,52 +29,6 @@ type HostPathVolumeSourceApplyConfiguration struct {
 	Type *v1.HostPathType `json:"type,omitempty"`
 }
 
-// HostPathVolumeSourceApplyConfiguration constructs an declarative configuration of the HostPathVolumeSource type for use with
-// apply.
-func HostPathVolumeSource() *HostPathVolumeSourceApplyConfiguration {
-	return &HostPathVolumeSourceApplyConfiguration{}
-}
-
-// SetPath sets the Path field in the declarative configuration to the given value.
-func (b *HostPathVolumeSourceApplyConfiguration) SetPath(value string) *HostPathVolumeSourceApplyConfiguration {
-	b.Path = &value
-	return b
-}
-
-// RemovePath removes the Path field from the declarative configuration.
-func (b *HostPathVolumeSourceApplyConfiguration) RemovePath() *HostPathVolumeSourceApplyConfiguration {
-	b.Path = nil
-	return b
-}
-
-// GetPath gets the Path field from the declarative configuration.
-func (b *HostPathVolumeSourceApplyConfiguration) GetPath() (value string, ok bool) {
-	if v := b.Path; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetType sets the Type field in the declarative configuration to the given value.
-func (b *HostPathVolumeSourceApplyConfiguration) SetType(value v1.HostPathType) *HostPathVolumeSourceApplyConfiguration {
-	b.Type = &value
-	return b
-}
-
-// RemoveType removes the Type field from the declarative configuration.
-func (b *HostPathVolumeSourceApplyConfiguration) RemoveType() *HostPathVolumeSourceApplyConfiguration {
-	b.Type = nil
-	return b
-}
-
-// GetType gets the Type field from the declarative configuration.
-func (b *HostPathVolumeSourceApplyConfiguration) GetType() (value v1.HostPathType, ok bool) {
-	if v := b.Type; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // HostPathVolumeSourceList represents a listAlias of HostPathVolumeSourceApplyConfiguration.
 type HostPathVolumeSourceList []*HostPathVolumeSourceApplyConfiguration
 

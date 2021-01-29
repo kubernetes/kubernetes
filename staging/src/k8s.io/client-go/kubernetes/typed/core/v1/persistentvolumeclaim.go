@@ -205,19 +205,19 @@ func (c *persistentVolumeClaims) Apply(ctx context.Context, persistentVolumeClai
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := persistentVolumeClaim.GetObjectMeta()
-	if !ok {
+	meta := persistentVolumeClaim.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("persistentVolumeClaim.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("persistentVolumeClaim.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.PersistentVolumeClaim{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

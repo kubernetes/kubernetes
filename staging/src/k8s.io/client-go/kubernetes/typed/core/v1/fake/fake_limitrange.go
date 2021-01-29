@@ -138,16 +138,16 @@ func (c *FakeLimitRanges) Apply(ctx context.Context, limitRange *applyconfigurat
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := limitRange.GetObjectMeta()
-	if !ok {
+	meta := limitRange.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("limitRange.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("limitRange.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(limitrangesResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.LimitRange{})
+		Invokes(testing.NewPatchSubresourceAction(limitrangesResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &corev1.LimitRange{})
 
 	if obj == nil {
 		return nil, err

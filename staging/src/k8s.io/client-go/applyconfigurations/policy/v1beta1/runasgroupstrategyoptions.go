@@ -29,52 +29,6 @@ type RunAsGroupStrategyOptionsApplyConfiguration struct {
 	Ranges *IDRangeList                `json:"ranges,omitempty"`
 }
 
-// RunAsGroupStrategyOptionsApplyConfiguration constructs an declarative configuration of the RunAsGroupStrategyOptions type for use with
-// apply.
-func RunAsGroupStrategyOptions() *RunAsGroupStrategyOptionsApplyConfiguration {
-	return &RunAsGroupStrategyOptionsApplyConfiguration{}
-}
-
-// SetRule sets the Rule field in the declarative configuration to the given value.
-func (b *RunAsGroupStrategyOptionsApplyConfiguration) SetRule(value v1beta1.RunAsGroupStrategy) *RunAsGroupStrategyOptionsApplyConfiguration {
-	b.Rule = &value
-	return b
-}
-
-// RemoveRule removes the Rule field from the declarative configuration.
-func (b *RunAsGroupStrategyOptionsApplyConfiguration) RemoveRule() *RunAsGroupStrategyOptionsApplyConfiguration {
-	b.Rule = nil
-	return b
-}
-
-// GetRule gets the Rule field from the declarative configuration.
-func (b *RunAsGroupStrategyOptionsApplyConfiguration) GetRule() (value v1beta1.RunAsGroupStrategy, ok bool) {
-	if v := b.Rule; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetRanges sets the Ranges field in the declarative configuration to the given value.
-func (b *RunAsGroupStrategyOptionsApplyConfiguration) SetRanges(value IDRangeList) *RunAsGroupStrategyOptionsApplyConfiguration {
-	b.Ranges = &value
-	return b
-}
-
-// RemoveRanges removes the Ranges field from the declarative configuration.
-func (b *RunAsGroupStrategyOptionsApplyConfiguration) RemoveRanges() *RunAsGroupStrategyOptionsApplyConfiguration {
-	b.Ranges = nil
-	return b
-}
-
-// GetRanges gets the Ranges field from the declarative configuration.
-func (b *RunAsGroupStrategyOptionsApplyConfiguration) GetRanges() (value IDRangeList, ok bool) {
-	if v := b.Ranges; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // RunAsGroupStrategyOptionsList represents a listAlias of RunAsGroupStrategyOptionsApplyConfiguration.
 type RunAsGroupStrategyOptionsList []*RunAsGroupStrategyOptionsApplyConfiguration
 

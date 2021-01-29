@@ -25,46 +25,6 @@ type LifecycleApplyConfiguration struct {
 	PreStop   *HandlerApplyConfiguration `json:"preStop,omitempty"`
 }
 
-// LifecycleApplyConfiguration constructs an declarative configuration of the Lifecycle type for use with
-// apply.
-func Lifecycle() *LifecycleApplyConfiguration {
-	return &LifecycleApplyConfiguration{}
-}
-
-// SetPostStart sets the PostStart field in the declarative configuration to the given value.
-func (b *LifecycleApplyConfiguration) SetPostStart(value *HandlerApplyConfiguration) *LifecycleApplyConfiguration {
-	b.PostStart = value
-	return b
-}
-
-// RemovePostStart removes the PostStart field from the declarative configuration.
-func (b *LifecycleApplyConfiguration) RemovePostStart() *LifecycleApplyConfiguration {
-	b.PostStart = nil
-	return b
-}
-
-// GetPostStart gets the PostStart field from the declarative configuration.
-func (b *LifecycleApplyConfiguration) GetPostStart() (value *HandlerApplyConfiguration, ok bool) {
-	return b.PostStart, b.PostStart != nil
-}
-
-// SetPreStop sets the PreStop field in the declarative configuration to the given value.
-func (b *LifecycleApplyConfiguration) SetPreStop(value *HandlerApplyConfiguration) *LifecycleApplyConfiguration {
-	b.PreStop = value
-	return b
-}
-
-// RemovePreStop removes the PreStop field from the declarative configuration.
-func (b *LifecycleApplyConfiguration) RemovePreStop() *LifecycleApplyConfiguration {
-	b.PreStop = nil
-	return b
-}
-
-// GetPreStop gets the PreStop field from the declarative configuration.
-func (b *LifecycleApplyConfiguration) GetPreStop() (value *HandlerApplyConfiguration, ok bool) {
-	return b.PreStop, b.PreStop != nil
-}
-
 // LifecycleList represents a listAlias of LifecycleApplyConfiguration.
 type LifecycleList []*LifecycleApplyConfiguration
 

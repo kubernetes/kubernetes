@@ -29,52 +29,6 @@ type ResourceRequirementsApplyConfiguration struct {
 	Requests *v1.ResourceList `json:"requests,omitempty"`
 }
 
-// ResourceRequirementsApplyConfiguration constructs an declarative configuration of the ResourceRequirements type for use with
-// apply.
-func ResourceRequirements() *ResourceRequirementsApplyConfiguration {
-	return &ResourceRequirementsApplyConfiguration{}
-}
-
-// SetLimits sets the Limits field in the declarative configuration to the given value.
-func (b *ResourceRequirementsApplyConfiguration) SetLimits(value v1.ResourceList) *ResourceRequirementsApplyConfiguration {
-	b.Limits = &value
-	return b
-}
-
-// RemoveLimits removes the Limits field from the declarative configuration.
-func (b *ResourceRequirementsApplyConfiguration) RemoveLimits() *ResourceRequirementsApplyConfiguration {
-	b.Limits = nil
-	return b
-}
-
-// GetLimits gets the Limits field from the declarative configuration.
-func (b *ResourceRequirementsApplyConfiguration) GetLimits() (value v1.ResourceList, ok bool) {
-	if v := b.Limits; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetRequests sets the Requests field in the declarative configuration to the given value.
-func (b *ResourceRequirementsApplyConfiguration) SetRequests(value v1.ResourceList) *ResourceRequirementsApplyConfiguration {
-	b.Requests = &value
-	return b
-}
-
-// RemoveRequests removes the Requests field from the declarative configuration.
-func (b *ResourceRequirementsApplyConfiguration) RemoveRequests() *ResourceRequirementsApplyConfiguration {
-	b.Requests = nil
-	return b
-}
-
-// GetRequests gets the Requests field from the declarative configuration.
-func (b *ResourceRequirementsApplyConfiguration) GetRequests() (value v1.ResourceList, ok bool) {
-	if v := b.Requests; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ResourceRequirementsList represents a listAlias of ResourceRequirementsApplyConfiguration.
 type ResourceRequirementsList []*ResourceRequirementsApplyConfiguration
 

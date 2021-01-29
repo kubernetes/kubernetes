@@ -178,18 +178,18 @@ func (c *cSINodes) Apply(ctx context.Context, cSINode *storagev1.CSINodeApplyCon
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := cSINode.GetObjectMeta()
-	if !ok {
+	meta := cSINode.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("cSINode.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("cSINode.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.CSINode{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("csinodes").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

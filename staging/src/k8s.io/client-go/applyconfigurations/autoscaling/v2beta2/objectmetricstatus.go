@@ -26,63 +26,6 @@ type ObjectMetricStatusApplyConfiguration struct {
 	DescribedObject *CrossVersionObjectReferenceApplyConfiguration `json:"describedObject,omitempty"`
 }
 
-// ObjectMetricStatusApplyConfiguration constructs an declarative configuration of the ObjectMetricStatus type for use with
-// apply.
-func ObjectMetricStatus() *ObjectMetricStatusApplyConfiguration {
-	return &ObjectMetricStatusApplyConfiguration{}
-}
-
-// SetMetric sets the Metric field in the declarative configuration to the given value.
-func (b *ObjectMetricStatusApplyConfiguration) SetMetric(value *MetricIdentifierApplyConfiguration) *ObjectMetricStatusApplyConfiguration {
-	b.Metric = value
-	return b
-}
-
-// RemoveMetric removes the Metric field from the declarative configuration.
-func (b *ObjectMetricStatusApplyConfiguration) RemoveMetric() *ObjectMetricStatusApplyConfiguration {
-	b.Metric = nil
-	return b
-}
-
-// GetMetric gets the Metric field from the declarative configuration.
-func (b *ObjectMetricStatusApplyConfiguration) GetMetric() (value *MetricIdentifierApplyConfiguration, ok bool) {
-	return b.Metric, b.Metric != nil
-}
-
-// SetCurrent sets the Current field in the declarative configuration to the given value.
-func (b *ObjectMetricStatusApplyConfiguration) SetCurrent(value *MetricValueStatusApplyConfiguration) *ObjectMetricStatusApplyConfiguration {
-	b.Current = value
-	return b
-}
-
-// RemoveCurrent removes the Current field from the declarative configuration.
-func (b *ObjectMetricStatusApplyConfiguration) RemoveCurrent() *ObjectMetricStatusApplyConfiguration {
-	b.Current = nil
-	return b
-}
-
-// GetCurrent gets the Current field from the declarative configuration.
-func (b *ObjectMetricStatusApplyConfiguration) GetCurrent() (value *MetricValueStatusApplyConfiguration, ok bool) {
-	return b.Current, b.Current != nil
-}
-
-// SetDescribedObject sets the DescribedObject field in the declarative configuration to the given value.
-func (b *ObjectMetricStatusApplyConfiguration) SetDescribedObject(value *CrossVersionObjectReferenceApplyConfiguration) *ObjectMetricStatusApplyConfiguration {
-	b.DescribedObject = value
-	return b
-}
-
-// RemoveDescribedObject removes the DescribedObject field from the declarative configuration.
-func (b *ObjectMetricStatusApplyConfiguration) RemoveDescribedObject() *ObjectMetricStatusApplyConfiguration {
-	b.DescribedObject = nil
-	return b
-}
-
-// GetDescribedObject gets the DescribedObject field from the declarative configuration.
-func (b *ObjectMetricStatusApplyConfiguration) GetDescribedObject() (value *CrossVersionObjectReferenceApplyConfiguration, ok bool) {
-	return b.DescribedObject, b.DescribedObject != nil
-}
-
 // ObjectMetricStatusList represents a listAlias of ObjectMetricStatusApplyConfiguration.
 type ObjectMetricStatusList []*ObjectMetricStatusApplyConfiguration
 

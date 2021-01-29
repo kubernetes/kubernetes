@@ -30,69 +30,6 @@ type HTTPIngressPathApplyConfiguration struct {
 	Backend  *IngressBackendApplyConfiguration `json:"backend,omitempty"`
 }
 
-// HTTPIngressPathApplyConfiguration constructs an declarative configuration of the HTTPIngressPath type for use with
-// apply.
-func HTTPIngressPath() *HTTPIngressPathApplyConfiguration {
-	return &HTTPIngressPathApplyConfiguration{}
-}
-
-// SetPath sets the Path field in the declarative configuration to the given value.
-func (b *HTTPIngressPathApplyConfiguration) SetPath(value string) *HTTPIngressPathApplyConfiguration {
-	b.Path = &value
-	return b
-}
-
-// RemovePath removes the Path field from the declarative configuration.
-func (b *HTTPIngressPathApplyConfiguration) RemovePath() *HTTPIngressPathApplyConfiguration {
-	b.Path = nil
-	return b
-}
-
-// GetPath gets the Path field from the declarative configuration.
-func (b *HTTPIngressPathApplyConfiguration) GetPath() (value string, ok bool) {
-	if v := b.Path; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetPathType sets the PathType field in the declarative configuration to the given value.
-func (b *HTTPIngressPathApplyConfiguration) SetPathType(value v1.PathType) *HTTPIngressPathApplyConfiguration {
-	b.PathType = &value
-	return b
-}
-
-// RemovePathType removes the PathType field from the declarative configuration.
-func (b *HTTPIngressPathApplyConfiguration) RemovePathType() *HTTPIngressPathApplyConfiguration {
-	b.PathType = nil
-	return b
-}
-
-// GetPathType gets the PathType field from the declarative configuration.
-func (b *HTTPIngressPathApplyConfiguration) GetPathType() (value v1.PathType, ok bool) {
-	if v := b.PathType; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetBackend sets the Backend field in the declarative configuration to the given value.
-func (b *HTTPIngressPathApplyConfiguration) SetBackend(value *IngressBackendApplyConfiguration) *HTTPIngressPathApplyConfiguration {
-	b.Backend = value
-	return b
-}
-
-// RemoveBackend removes the Backend field from the declarative configuration.
-func (b *HTTPIngressPathApplyConfiguration) RemoveBackend() *HTTPIngressPathApplyConfiguration {
-	b.Backend = nil
-	return b
-}
-
-// GetBackend gets the Backend field from the declarative configuration.
-func (b *HTTPIngressPathApplyConfiguration) GetBackend() (value *IngressBackendApplyConfiguration, ok bool) {
-	return b.Backend, b.Backend != nil
-}
-
 // HTTPIngressPathList represents a listAlias of HTTPIngressPathApplyConfiguration.
 type HTTPIngressPathList []*HTTPIngressPathApplyConfiguration
 

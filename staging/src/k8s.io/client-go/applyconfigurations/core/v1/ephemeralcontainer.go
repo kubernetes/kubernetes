@@ -25,45 +25,6 @@ type EphemeralContainerApplyConfiguration struct {
 	TargetContainerName                        *string `json:"targetContainerName,omitempty"`
 }
 
-// EphemeralContainerApplyConfiguration constructs an declarative configuration of the EphemeralContainer type for use with
-// apply.
-func EphemeralContainer() *EphemeralContainerApplyConfiguration {
-	return &EphemeralContainerApplyConfiguration{}
-}
-
-// SetEphemeralContainerCommon sets the EphemeralContainerCommon field in the declarative configuration to the given value.
-func (b *EphemeralContainerApplyConfiguration) SetEphemeralContainerCommon(value *EphemeralContainerCommonApplyConfiguration) *EphemeralContainerApplyConfiguration {
-	if value != nil {
-		b.EphemeralContainerCommonApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetEphemeralContainerCommon gets the EphemeralContainerCommon field from the declarative configuration.
-func (b *EphemeralContainerApplyConfiguration) GetEphemeralContainerCommon() (value *EphemeralContainerCommonApplyConfiguration, ok bool) {
-	return &b.EphemeralContainerCommonApplyConfiguration, true
-}
-
-// SetTargetContainerName sets the TargetContainerName field in the declarative configuration to the given value.
-func (b *EphemeralContainerApplyConfiguration) SetTargetContainerName(value string) *EphemeralContainerApplyConfiguration {
-	b.TargetContainerName = &value
-	return b
-}
-
-// RemoveTargetContainerName removes the TargetContainerName field from the declarative configuration.
-func (b *EphemeralContainerApplyConfiguration) RemoveTargetContainerName() *EphemeralContainerApplyConfiguration {
-	b.TargetContainerName = nil
-	return b
-}
-
-// GetTargetContainerName gets the TargetContainerName field from the declarative configuration.
-func (b *EphemeralContainerApplyConfiguration) GetTargetContainerName() (value string, ok bool) {
-	if v := b.TargetContainerName; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // EphemeralContainerList represents a listAlias of EphemeralContainerApplyConfiguration.
 type EphemeralContainerList []*EphemeralContainerApplyConfiguration
 

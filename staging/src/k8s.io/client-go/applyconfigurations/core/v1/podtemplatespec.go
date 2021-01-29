@@ -29,46 +29,6 @@ type PodTemplateSpecApplyConfiguration struct {
 	Spec       *PodSpecApplyConfiguration       `json:"spec,omitempty"`
 }
 
-// PodTemplateSpecApplyConfiguration constructs an declarative configuration of the PodTemplateSpec type for use with
-// apply.
-func PodTemplateSpec() *PodTemplateSpecApplyConfiguration {
-	return &PodTemplateSpecApplyConfiguration{}
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *PodTemplateSpecApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *PodTemplateSpecApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *PodTemplateSpecApplyConfiguration) RemoveObjectMeta() *PodTemplateSpecApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *PodTemplateSpecApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetSpec sets the Spec field in the declarative configuration to the given value.
-func (b *PodTemplateSpecApplyConfiguration) SetSpec(value *PodSpecApplyConfiguration) *PodTemplateSpecApplyConfiguration {
-	b.Spec = value
-	return b
-}
-
-// RemoveSpec removes the Spec field from the declarative configuration.
-func (b *PodTemplateSpecApplyConfiguration) RemoveSpec() *PodTemplateSpecApplyConfiguration {
-	b.Spec = nil
-	return b
-}
-
-// GetSpec gets the Spec field from the declarative configuration.
-func (b *PodTemplateSpecApplyConfiguration) GetSpec() (value *PodSpecApplyConfiguration, ok bool) {
-	return b.Spec, b.Spec != nil
-}
-
 // PodTemplateSpecList represents a listAlias of PodTemplateSpecApplyConfiguration.
 type PodTemplateSpecList []*PodTemplateSpecApplyConfiguration
 

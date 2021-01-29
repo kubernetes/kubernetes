@@ -29,52 +29,6 @@ type ResourceQuotaStatusApplyConfiguration struct {
 	Used *v1.ResourceList `json:"used,omitempty"`
 }
 
-// ResourceQuotaStatusApplyConfiguration constructs an declarative configuration of the ResourceQuotaStatus type for use with
-// apply.
-func ResourceQuotaStatus() *ResourceQuotaStatusApplyConfiguration {
-	return &ResourceQuotaStatusApplyConfiguration{}
-}
-
-// SetHard sets the Hard field in the declarative configuration to the given value.
-func (b *ResourceQuotaStatusApplyConfiguration) SetHard(value v1.ResourceList) *ResourceQuotaStatusApplyConfiguration {
-	b.Hard = &value
-	return b
-}
-
-// RemoveHard removes the Hard field from the declarative configuration.
-func (b *ResourceQuotaStatusApplyConfiguration) RemoveHard() *ResourceQuotaStatusApplyConfiguration {
-	b.Hard = nil
-	return b
-}
-
-// GetHard gets the Hard field from the declarative configuration.
-func (b *ResourceQuotaStatusApplyConfiguration) GetHard() (value v1.ResourceList, ok bool) {
-	if v := b.Hard; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetUsed sets the Used field in the declarative configuration to the given value.
-func (b *ResourceQuotaStatusApplyConfiguration) SetUsed(value v1.ResourceList) *ResourceQuotaStatusApplyConfiguration {
-	b.Used = &value
-	return b
-}
-
-// RemoveUsed removes the Used field from the declarative configuration.
-func (b *ResourceQuotaStatusApplyConfiguration) RemoveUsed() *ResourceQuotaStatusApplyConfiguration {
-	b.Used = nil
-	return b
-}
-
-// GetUsed gets the Used field from the declarative configuration.
-func (b *ResourceQuotaStatusApplyConfiguration) GetUsed() (value v1.ResourceList, ok bool) {
-	if v := b.Used; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ResourceQuotaStatusList represents a listAlias of ResourceQuotaStatusApplyConfiguration.
 type ResourceQuotaStatusList []*ResourceQuotaStatusApplyConfiguration
 

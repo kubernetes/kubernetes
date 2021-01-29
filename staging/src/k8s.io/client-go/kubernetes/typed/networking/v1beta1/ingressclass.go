@@ -178,18 +178,18 @@ func (c *ingressClasses) Apply(ctx context.Context, ingressClass *networkingv1be
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := ingressClass.GetObjectMeta()
-	if !ok {
+	meta := ingressClass.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("ingressClass.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("ingressClass.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1beta1.IngressClass{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("ingressclasses").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

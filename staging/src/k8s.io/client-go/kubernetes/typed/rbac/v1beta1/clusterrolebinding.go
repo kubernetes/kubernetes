@@ -178,18 +178,18 @@ func (c *clusterRoleBindings) Apply(ctx context.Context, clusterRoleBinding *rba
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := clusterRoleBinding.GetObjectMeta()
-	if !ok {
+	meta := clusterRoleBinding.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("clusterRoleBinding.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("clusterRoleBinding.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1beta1.ClusterRoleBinding{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("clusterrolebindings").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

@@ -25,52 +25,6 @@ type NonResourceAttributesApplyConfiguration struct {
 	Verb *string `json:"verb,omitempty"`
 }
 
-// NonResourceAttributesApplyConfiguration constructs an declarative configuration of the NonResourceAttributes type for use with
-// apply.
-func NonResourceAttributes() *NonResourceAttributesApplyConfiguration {
-	return &NonResourceAttributesApplyConfiguration{}
-}
-
-// SetPath sets the Path field in the declarative configuration to the given value.
-func (b *NonResourceAttributesApplyConfiguration) SetPath(value string) *NonResourceAttributesApplyConfiguration {
-	b.Path = &value
-	return b
-}
-
-// RemovePath removes the Path field from the declarative configuration.
-func (b *NonResourceAttributesApplyConfiguration) RemovePath() *NonResourceAttributesApplyConfiguration {
-	b.Path = nil
-	return b
-}
-
-// GetPath gets the Path field from the declarative configuration.
-func (b *NonResourceAttributesApplyConfiguration) GetPath() (value string, ok bool) {
-	if v := b.Path; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetVerb sets the Verb field in the declarative configuration to the given value.
-func (b *NonResourceAttributesApplyConfiguration) SetVerb(value string) *NonResourceAttributesApplyConfiguration {
-	b.Verb = &value
-	return b
-}
-
-// RemoveVerb removes the Verb field from the declarative configuration.
-func (b *NonResourceAttributesApplyConfiguration) RemoveVerb() *NonResourceAttributesApplyConfiguration {
-	b.Verb = nil
-	return b
-}
-
-// GetVerb gets the Verb field from the declarative configuration.
-func (b *NonResourceAttributesApplyConfiguration) GetVerb() (value string, ok bool) {
-	if v := b.Verb; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // NonResourceAttributesList represents a listAlias of NonResourceAttributesApplyConfiguration.
 type NonResourceAttributesList []*NonResourceAttributesApplyConfiguration
 

@@ -25,52 +25,6 @@ type SecretReferenceApplyConfiguration struct {
 	Namespace *string `json:"namespace,omitempty"`
 }
 
-// SecretReferenceApplyConfiguration constructs an declarative configuration of the SecretReference type for use with
-// apply.
-func SecretReference() *SecretReferenceApplyConfiguration {
-	return &SecretReferenceApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *SecretReferenceApplyConfiguration) SetName(value string) *SecretReferenceApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *SecretReferenceApplyConfiguration) RemoveName() *SecretReferenceApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *SecretReferenceApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetNamespace sets the Namespace field in the declarative configuration to the given value.
-func (b *SecretReferenceApplyConfiguration) SetNamespace(value string) *SecretReferenceApplyConfiguration {
-	b.Namespace = &value
-	return b
-}
-
-// RemoveNamespace removes the Namespace field from the declarative configuration.
-func (b *SecretReferenceApplyConfiguration) RemoveNamespace() *SecretReferenceApplyConfiguration {
-	b.Namespace = nil
-	return b
-}
-
-// GetNamespace gets the Namespace field from the declarative configuration.
-func (b *SecretReferenceApplyConfiguration) GetNamespace() (value string, ok bool) {
-	if v := b.Namespace; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // SecretReferenceList represents a listAlias of SecretReferenceApplyConfiguration.
 type SecretReferenceList []*SecretReferenceApplyConfiguration
 

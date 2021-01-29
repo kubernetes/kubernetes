@@ -178,18 +178,18 @@ func (c *namespaces) Apply(ctx context.Context, namespace *corev1.NamespaceApply
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := namespace.GetObjectMeta()
-	if !ok {
+	meta := namespace.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("namespace.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("namespace.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.Namespace{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("namespaces").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

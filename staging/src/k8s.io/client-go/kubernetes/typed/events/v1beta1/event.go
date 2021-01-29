@@ -188,19 +188,19 @@ func (c *events) Apply(ctx context.Context, event *eventsv1beta1.EventApplyConfi
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := event.GetObjectMeta()
-	if !ok {
+	meta := event.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("event.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("event.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1beta1.Event{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("events").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

@@ -26,66 +26,6 @@ type EnvFromSourceApplyConfiguration struct {
 	SecretRef    *SecretEnvSourceApplyConfiguration    `json:"secretRef,omitempty"`
 }
 
-// EnvFromSourceApplyConfiguration constructs an declarative configuration of the EnvFromSource type for use with
-// apply.
-func EnvFromSource() *EnvFromSourceApplyConfiguration {
-	return &EnvFromSourceApplyConfiguration{}
-}
-
-// SetPrefix sets the Prefix field in the declarative configuration to the given value.
-func (b *EnvFromSourceApplyConfiguration) SetPrefix(value string) *EnvFromSourceApplyConfiguration {
-	b.Prefix = &value
-	return b
-}
-
-// RemovePrefix removes the Prefix field from the declarative configuration.
-func (b *EnvFromSourceApplyConfiguration) RemovePrefix() *EnvFromSourceApplyConfiguration {
-	b.Prefix = nil
-	return b
-}
-
-// GetPrefix gets the Prefix field from the declarative configuration.
-func (b *EnvFromSourceApplyConfiguration) GetPrefix() (value string, ok bool) {
-	if v := b.Prefix; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetConfigMapRef sets the ConfigMapRef field in the declarative configuration to the given value.
-func (b *EnvFromSourceApplyConfiguration) SetConfigMapRef(value *ConfigMapEnvSourceApplyConfiguration) *EnvFromSourceApplyConfiguration {
-	b.ConfigMapRef = value
-	return b
-}
-
-// RemoveConfigMapRef removes the ConfigMapRef field from the declarative configuration.
-func (b *EnvFromSourceApplyConfiguration) RemoveConfigMapRef() *EnvFromSourceApplyConfiguration {
-	b.ConfigMapRef = nil
-	return b
-}
-
-// GetConfigMapRef gets the ConfigMapRef field from the declarative configuration.
-func (b *EnvFromSourceApplyConfiguration) GetConfigMapRef() (value *ConfigMapEnvSourceApplyConfiguration, ok bool) {
-	return b.ConfigMapRef, b.ConfigMapRef != nil
-}
-
-// SetSecretRef sets the SecretRef field in the declarative configuration to the given value.
-func (b *EnvFromSourceApplyConfiguration) SetSecretRef(value *SecretEnvSourceApplyConfiguration) *EnvFromSourceApplyConfiguration {
-	b.SecretRef = value
-	return b
-}
-
-// RemoveSecretRef removes the SecretRef field from the declarative configuration.
-func (b *EnvFromSourceApplyConfiguration) RemoveSecretRef() *EnvFromSourceApplyConfiguration {
-	b.SecretRef = nil
-	return b
-}
-
-// GetSecretRef gets the SecretRef field from the declarative configuration.
-func (b *EnvFromSourceApplyConfiguration) GetSecretRef() (value *SecretEnvSourceApplyConfiguration, ok bool) {
-	return b.SecretRef, b.SecretRef != nil
-}
-
 // EnvFromSourceList represents a listAlias of EnvFromSourceApplyConfiguration.
 type EnvFromSourceList []*EnvFromSourceApplyConfiguration
 

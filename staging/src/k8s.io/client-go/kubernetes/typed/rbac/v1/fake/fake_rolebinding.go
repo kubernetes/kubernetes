@@ -138,16 +138,16 @@ func (c *FakeRoleBindings) Apply(ctx context.Context, roleBinding *applyconfigur
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := roleBinding.GetObjectMeta()
-	if !ok {
+	meta := roleBinding.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("roleBinding.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("roleBinding.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rolebindingsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &rbacv1.RoleBinding{})
+		Invokes(testing.NewPatchSubresourceAction(rolebindingsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &rbacv1.RoleBinding{})
 
 	if obj == nil {
 		return nil, err

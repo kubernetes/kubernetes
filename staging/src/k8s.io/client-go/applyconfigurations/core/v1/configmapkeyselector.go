@@ -26,65 +26,6 @@ type ConfigMapKeySelectorApplyConfiguration struct {
 	Optional                               *bool   `json:"optional,omitempty"`
 }
 
-// ConfigMapKeySelectorApplyConfiguration constructs an declarative configuration of the ConfigMapKeySelector type for use with
-// apply.
-func ConfigMapKeySelector() *ConfigMapKeySelectorApplyConfiguration {
-	return &ConfigMapKeySelectorApplyConfiguration{}
-}
-
-// SetLocalObjectReference sets the LocalObjectReference field in the declarative configuration to the given value.
-func (b *ConfigMapKeySelectorApplyConfiguration) SetLocalObjectReference(value *LocalObjectReferenceApplyConfiguration) *ConfigMapKeySelectorApplyConfiguration {
-	if value != nil {
-		b.LocalObjectReferenceApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetLocalObjectReference gets the LocalObjectReference field from the declarative configuration.
-func (b *ConfigMapKeySelectorApplyConfiguration) GetLocalObjectReference() (value *LocalObjectReferenceApplyConfiguration, ok bool) {
-	return &b.LocalObjectReferenceApplyConfiguration, true
-}
-
-// SetKey sets the Key field in the declarative configuration to the given value.
-func (b *ConfigMapKeySelectorApplyConfiguration) SetKey(value string) *ConfigMapKeySelectorApplyConfiguration {
-	b.Key = &value
-	return b
-}
-
-// RemoveKey removes the Key field from the declarative configuration.
-func (b *ConfigMapKeySelectorApplyConfiguration) RemoveKey() *ConfigMapKeySelectorApplyConfiguration {
-	b.Key = nil
-	return b
-}
-
-// GetKey gets the Key field from the declarative configuration.
-func (b *ConfigMapKeySelectorApplyConfiguration) GetKey() (value string, ok bool) {
-	if v := b.Key; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetOptional sets the Optional field in the declarative configuration to the given value.
-func (b *ConfigMapKeySelectorApplyConfiguration) SetOptional(value bool) *ConfigMapKeySelectorApplyConfiguration {
-	b.Optional = &value
-	return b
-}
-
-// RemoveOptional removes the Optional field from the declarative configuration.
-func (b *ConfigMapKeySelectorApplyConfiguration) RemoveOptional() *ConfigMapKeySelectorApplyConfiguration {
-	b.Optional = nil
-	return b
-}
-
-// GetOptional gets the Optional field from the declarative configuration.
-func (b *ConfigMapKeySelectorApplyConfiguration) GetOptional() (value bool, ok bool) {
-	if v := b.Optional; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ConfigMapKeySelectorList represents a listAlias of ConfigMapKeySelectorApplyConfiguration.
 type ConfigMapKeySelectorList []*ConfigMapKeySelectorApplyConfiguration
 

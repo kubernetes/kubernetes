@@ -25,52 +25,6 @@ type IngressTLSApplyConfiguration struct {
 	SecretName *string   `json:"secretName,omitempty"`
 }
 
-// IngressTLSApplyConfiguration constructs an declarative configuration of the IngressTLS type for use with
-// apply.
-func IngressTLS() *IngressTLSApplyConfiguration {
-	return &IngressTLSApplyConfiguration{}
-}
-
-// SetHosts sets the Hosts field in the declarative configuration to the given value.
-func (b *IngressTLSApplyConfiguration) SetHosts(value []string) *IngressTLSApplyConfiguration {
-	b.Hosts = &value
-	return b
-}
-
-// RemoveHosts removes the Hosts field from the declarative configuration.
-func (b *IngressTLSApplyConfiguration) RemoveHosts() *IngressTLSApplyConfiguration {
-	b.Hosts = nil
-	return b
-}
-
-// GetHosts gets the Hosts field from the declarative configuration.
-func (b *IngressTLSApplyConfiguration) GetHosts() (value []string, ok bool) {
-	if v := b.Hosts; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetSecretName sets the SecretName field in the declarative configuration to the given value.
-func (b *IngressTLSApplyConfiguration) SetSecretName(value string) *IngressTLSApplyConfiguration {
-	b.SecretName = &value
-	return b
-}
-
-// RemoveSecretName removes the SecretName field from the declarative configuration.
-func (b *IngressTLSApplyConfiguration) RemoveSecretName() *IngressTLSApplyConfiguration {
-	b.SecretName = nil
-	return b
-}
-
-// GetSecretName gets the SecretName field from the declarative configuration.
-func (b *IngressTLSApplyConfiguration) GetSecretName() (value string, ok bool) {
-	if v := b.SecretName; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // IngressTLSList represents a listAlias of IngressTLSApplyConfiguration.
 type IngressTLSList []*IngressTLSApplyConfiguration
 

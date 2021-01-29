@@ -24,32 +24,6 @@ type PriorityLevelConfigurationReferenceApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// PriorityLevelConfigurationReferenceApplyConfiguration constructs an declarative configuration of the PriorityLevelConfigurationReference type for use with
-// apply.
-func PriorityLevelConfigurationReference() *PriorityLevelConfigurationReferenceApplyConfiguration {
-	return &PriorityLevelConfigurationReferenceApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *PriorityLevelConfigurationReferenceApplyConfiguration) SetName(value string) *PriorityLevelConfigurationReferenceApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *PriorityLevelConfigurationReferenceApplyConfiguration) RemoveName() *PriorityLevelConfigurationReferenceApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *PriorityLevelConfigurationReferenceApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // PriorityLevelConfigurationReferenceList represents a listAlias of PriorityLevelConfigurationReferenceApplyConfiguration.
 type PriorityLevelConfigurationReferenceList []*PriorityLevelConfigurationReferenceApplyConfiguration
 

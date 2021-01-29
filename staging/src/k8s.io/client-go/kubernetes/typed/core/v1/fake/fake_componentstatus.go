@@ -130,16 +130,16 @@ func (c *FakeComponentStatuses) Apply(ctx context.Context, componentStatus *appl
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := componentStatus.GetObjectMeta()
-	if !ok {
+	meta := componentStatus.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("componentStatus.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("componentStatus.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(componentstatusesResource, name, types.ApplyPatchType, data, subresources...), &corev1.ComponentStatus{})
+		Invokes(testing.NewRootPatchSubresourceAction(componentstatusesResource, *name, types.ApplyPatchType, data, subresources...), &corev1.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}

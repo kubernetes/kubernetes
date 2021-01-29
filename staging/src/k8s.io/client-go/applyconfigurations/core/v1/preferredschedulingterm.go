@@ -25,49 +25,6 @@ type PreferredSchedulingTermApplyConfiguration struct {
 	Preference *NodeSelectorTermApplyConfiguration `json:"preference,omitempty"`
 }
 
-// PreferredSchedulingTermApplyConfiguration constructs an declarative configuration of the PreferredSchedulingTerm type for use with
-// apply.
-func PreferredSchedulingTerm() *PreferredSchedulingTermApplyConfiguration {
-	return &PreferredSchedulingTermApplyConfiguration{}
-}
-
-// SetWeight sets the Weight field in the declarative configuration to the given value.
-func (b *PreferredSchedulingTermApplyConfiguration) SetWeight(value int32) *PreferredSchedulingTermApplyConfiguration {
-	b.Weight = &value
-	return b
-}
-
-// RemoveWeight removes the Weight field from the declarative configuration.
-func (b *PreferredSchedulingTermApplyConfiguration) RemoveWeight() *PreferredSchedulingTermApplyConfiguration {
-	b.Weight = nil
-	return b
-}
-
-// GetWeight gets the Weight field from the declarative configuration.
-func (b *PreferredSchedulingTermApplyConfiguration) GetWeight() (value int32, ok bool) {
-	if v := b.Weight; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetPreference sets the Preference field in the declarative configuration to the given value.
-func (b *PreferredSchedulingTermApplyConfiguration) SetPreference(value *NodeSelectorTermApplyConfiguration) *PreferredSchedulingTermApplyConfiguration {
-	b.Preference = value
-	return b
-}
-
-// RemovePreference removes the Preference field from the declarative configuration.
-func (b *PreferredSchedulingTermApplyConfiguration) RemovePreference() *PreferredSchedulingTermApplyConfiguration {
-	b.Preference = nil
-	return b
-}
-
-// GetPreference gets the Preference field from the declarative configuration.
-func (b *PreferredSchedulingTermApplyConfiguration) GetPreference() (value *NodeSelectorTermApplyConfiguration, ok bool) {
-	return b.Preference, b.Preference != nil
-}
-
 // PreferredSchedulingTermList represents a listAlias of PreferredSchedulingTermApplyConfiguration.
 type PreferredSchedulingTermList []*PreferredSchedulingTermApplyConfiguration
 

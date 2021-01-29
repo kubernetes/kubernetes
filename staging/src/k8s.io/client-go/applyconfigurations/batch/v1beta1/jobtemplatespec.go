@@ -30,46 +30,6 @@ type JobTemplateSpecApplyConfiguration struct {
 	Spec       *batchv1.JobSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// JobTemplateSpecApplyConfiguration constructs an declarative configuration of the JobTemplateSpec type for use with
-// apply.
-func JobTemplateSpec() *JobTemplateSpecApplyConfiguration {
-	return &JobTemplateSpecApplyConfiguration{}
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *JobTemplateSpecApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *JobTemplateSpecApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *JobTemplateSpecApplyConfiguration) RemoveObjectMeta() *JobTemplateSpecApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *JobTemplateSpecApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetSpec sets the Spec field in the declarative configuration to the given value.
-func (b *JobTemplateSpecApplyConfiguration) SetSpec(value *batchv1.JobSpecApplyConfiguration) *JobTemplateSpecApplyConfiguration {
-	b.Spec = value
-	return b
-}
-
-// RemoveSpec removes the Spec field from the declarative configuration.
-func (b *JobTemplateSpecApplyConfiguration) RemoveSpec() *JobTemplateSpecApplyConfiguration {
-	b.Spec = nil
-	return b
-}
-
-// GetSpec gets the Spec field from the declarative configuration.
-func (b *JobTemplateSpecApplyConfiguration) GetSpec() (value *batchv1.JobSpecApplyConfiguration, ok bool) {
-	return b.Spec, b.Spec != nil
-}
-
 // JobTemplateSpecList represents a listAlias of JobTemplateSpecApplyConfiguration.
 type JobTemplateSpecList []*JobTemplateSpecApplyConfiguration
 

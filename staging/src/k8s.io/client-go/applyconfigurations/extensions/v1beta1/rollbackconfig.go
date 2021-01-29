@@ -24,32 +24,6 @@ type RollbackConfigApplyConfiguration struct {
 	Revision *int64 `json:"revision,omitempty"`
 }
 
-// RollbackConfigApplyConfiguration constructs an declarative configuration of the RollbackConfig type for use with
-// apply.
-func RollbackConfig() *RollbackConfigApplyConfiguration {
-	return &RollbackConfigApplyConfiguration{}
-}
-
-// SetRevision sets the Revision field in the declarative configuration to the given value.
-func (b *RollbackConfigApplyConfiguration) SetRevision(value int64) *RollbackConfigApplyConfiguration {
-	b.Revision = &value
-	return b
-}
-
-// RemoveRevision removes the Revision field from the declarative configuration.
-func (b *RollbackConfigApplyConfiguration) RemoveRevision() *RollbackConfigApplyConfiguration {
-	b.Revision = nil
-	return b
-}
-
-// GetRevision gets the Revision field from the declarative configuration.
-func (b *RollbackConfigApplyConfiguration) GetRevision() (value int64, ok bool) {
-	if v := b.Revision; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // RollbackConfigList represents a listAlias of RollbackConfigApplyConfiguration.
 type RollbackConfigList []*RollbackConfigApplyConfiguration
 

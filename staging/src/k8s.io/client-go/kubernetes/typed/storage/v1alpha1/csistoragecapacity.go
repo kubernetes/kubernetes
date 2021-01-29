@@ -188,19 +188,19 @@ func (c *cSIStorageCapacities) Apply(ctx context.Context, cSIStorageCapacity *st
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := cSIStorageCapacity.GetObjectMeta()
-	if !ok {
+	meta := cSIStorageCapacity.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("cSIStorageCapacity.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("cSIStorageCapacity.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1alpha1.CSIStorageCapacity{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

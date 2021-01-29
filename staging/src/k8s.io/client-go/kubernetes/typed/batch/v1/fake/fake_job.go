@@ -150,16 +150,16 @@ func (c *FakeJobs) Apply(ctx context.Context, job *applyconfigurationsbatchv1.Jo
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := job.GetObjectMeta()
-	if !ok {
+	meta := job.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("job.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("job.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(jobsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &batchv1.Job{})
+		Invokes(testing.NewPatchSubresourceAction(jobsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &batchv1.Job{})
 
 	if obj == nil {
 		return nil, err

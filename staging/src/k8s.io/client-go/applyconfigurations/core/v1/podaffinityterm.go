@@ -30,69 +30,6 @@ type PodAffinityTermApplyConfiguration struct {
 	TopologyKey   *string                             `json:"topologyKey,omitempty"`
 }
 
-// PodAffinityTermApplyConfiguration constructs an declarative configuration of the PodAffinityTerm type for use with
-// apply.
-func PodAffinityTerm() *PodAffinityTermApplyConfiguration {
-	return &PodAffinityTermApplyConfiguration{}
-}
-
-// SetLabelSelector sets the LabelSelector field in the declarative configuration to the given value.
-func (b *PodAffinityTermApplyConfiguration) SetLabelSelector(value *v1.LabelSelectorApplyConfiguration) *PodAffinityTermApplyConfiguration {
-	b.LabelSelector = value
-	return b
-}
-
-// RemoveLabelSelector removes the LabelSelector field from the declarative configuration.
-func (b *PodAffinityTermApplyConfiguration) RemoveLabelSelector() *PodAffinityTermApplyConfiguration {
-	b.LabelSelector = nil
-	return b
-}
-
-// GetLabelSelector gets the LabelSelector field from the declarative configuration.
-func (b *PodAffinityTermApplyConfiguration) GetLabelSelector() (value *v1.LabelSelectorApplyConfiguration, ok bool) {
-	return b.LabelSelector, b.LabelSelector != nil
-}
-
-// SetNamespaces sets the Namespaces field in the declarative configuration to the given value.
-func (b *PodAffinityTermApplyConfiguration) SetNamespaces(value []string) *PodAffinityTermApplyConfiguration {
-	b.Namespaces = &value
-	return b
-}
-
-// RemoveNamespaces removes the Namespaces field from the declarative configuration.
-func (b *PodAffinityTermApplyConfiguration) RemoveNamespaces() *PodAffinityTermApplyConfiguration {
-	b.Namespaces = nil
-	return b
-}
-
-// GetNamespaces gets the Namespaces field from the declarative configuration.
-func (b *PodAffinityTermApplyConfiguration) GetNamespaces() (value []string, ok bool) {
-	if v := b.Namespaces; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetTopologyKey sets the TopologyKey field in the declarative configuration to the given value.
-func (b *PodAffinityTermApplyConfiguration) SetTopologyKey(value string) *PodAffinityTermApplyConfiguration {
-	b.TopologyKey = &value
-	return b
-}
-
-// RemoveTopologyKey removes the TopologyKey field from the declarative configuration.
-func (b *PodAffinityTermApplyConfiguration) RemoveTopologyKey() *PodAffinityTermApplyConfiguration {
-	b.TopologyKey = nil
-	return b
-}
-
-// GetTopologyKey gets the TopologyKey field from the declarative configuration.
-func (b *PodAffinityTermApplyConfiguration) GetTopologyKey() (value string, ok bool) {
-	if v := b.TopologyKey; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // PodAffinityTermList represents a listAlias of PodAffinityTermApplyConfiguration.
 type PodAffinityTermList []*PodAffinityTermApplyConfiguration
 

@@ -29,49 +29,6 @@ type ServiceStatusApplyConfiguration struct {
 	Conditions   *metav1.ConditionList                 `json:"conditions,omitempty"`
 }
 
-// ServiceStatusApplyConfiguration constructs an declarative configuration of the ServiceStatus type for use with
-// apply.
-func ServiceStatus() *ServiceStatusApplyConfiguration {
-	return &ServiceStatusApplyConfiguration{}
-}
-
-// SetLoadBalancer sets the LoadBalancer field in the declarative configuration to the given value.
-func (b *ServiceStatusApplyConfiguration) SetLoadBalancer(value *LoadBalancerStatusApplyConfiguration) *ServiceStatusApplyConfiguration {
-	b.LoadBalancer = value
-	return b
-}
-
-// RemoveLoadBalancer removes the LoadBalancer field from the declarative configuration.
-func (b *ServiceStatusApplyConfiguration) RemoveLoadBalancer() *ServiceStatusApplyConfiguration {
-	b.LoadBalancer = nil
-	return b
-}
-
-// GetLoadBalancer gets the LoadBalancer field from the declarative configuration.
-func (b *ServiceStatusApplyConfiguration) GetLoadBalancer() (value *LoadBalancerStatusApplyConfiguration, ok bool) {
-	return b.LoadBalancer, b.LoadBalancer != nil
-}
-
-// SetConditions sets the Conditions field in the declarative configuration to the given value.
-func (b *ServiceStatusApplyConfiguration) SetConditions(value metav1.ConditionList) *ServiceStatusApplyConfiguration {
-	b.Conditions = &value
-	return b
-}
-
-// RemoveConditions removes the Conditions field from the declarative configuration.
-func (b *ServiceStatusApplyConfiguration) RemoveConditions() *ServiceStatusApplyConfiguration {
-	b.Conditions = nil
-	return b
-}
-
-// GetConditions gets the Conditions field from the declarative configuration.
-func (b *ServiceStatusApplyConfiguration) GetConditions() (value metav1.ConditionList, ok bool) {
-	if v := b.Conditions; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ServiceStatusList represents a listAlias of ServiceStatusApplyConfiguration.
 type ServiceStatusList []*ServiceStatusApplyConfiguration
 

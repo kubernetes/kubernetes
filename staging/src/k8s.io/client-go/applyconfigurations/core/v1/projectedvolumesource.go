@@ -25,52 +25,6 @@ type ProjectedVolumeSourceApplyConfiguration struct {
 	DefaultMode *int32                `json:"defaultMode,omitempty"`
 }
 
-// ProjectedVolumeSourceApplyConfiguration constructs an declarative configuration of the ProjectedVolumeSource type for use with
-// apply.
-func ProjectedVolumeSource() *ProjectedVolumeSourceApplyConfiguration {
-	return &ProjectedVolumeSourceApplyConfiguration{}
-}
-
-// SetSources sets the Sources field in the declarative configuration to the given value.
-func (b *ProjectedVolumeSourceApplyConfiguration) SetSources(value VolumeProjectionList) *ProjectedVolumeSourceApplyConfiguration {
-	b.Sources = &value
-	return b
-}
-
-// RemoveSources removes the Sources field from the declarative configuration.
-func (b *ProjectedVolumeSourceApplyConfiguration) RemoveSources() *ProjectedVolumeSourceApplyConfiguration {
-	b.Sources = nil
-	return b
-}
-
-// GetSources gets the Sources field from the declarative configuration.
-func (b *ProjectedVolumeSourceApplyConfiguration) GetSources() (value VolumeProjectionList, ok bool) {
-	if v := b.Sources; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetDefaultMode sets the DefaultMode field in the declarative configuration to the given value.
-func (b *ProjectedVolumeSourceApplyConfiguration) SetDefaultMode(value int32) *ProjectedVolumeSourceApplyConfiguration {
-	b.DefaultMode = &value
-	return b
-}
-
-// RemoveDefaultMode removes the DefaultMode field from the declarative configuration.
-func (b *ProjectedVolumeSourceApplyConfiguration) RemoveDefaultMode() *ProjectedVolumeSourceApplyConfiguration {
-	b.DefaultMode = nil
-	return b
-}
-
-// GetDefaultMode gets the DefaultMode field from the declarative configuration.
-func (b *ProjectedVolumeSourceApplyConfiguration) GetDefaultMode() (value int32, ok bool) {
-	if v := b.DefaultMode; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ProjectedVolumeSourceList represents a listAlias of ProjectedVolumeSourceApplyConfiguration.
 type ProjectedVolumeSourceList []*ProjectedVolumeSourceApplyConfiguration
 

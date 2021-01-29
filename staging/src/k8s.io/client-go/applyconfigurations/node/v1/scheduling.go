@@ -29,52 +29,6 @@ type SchedulingApplyConfiguration struct {
 	Tolerations  *v1.TolerationList `json:"tolerations,omitempty"`
 }
 
-// SchedulingApplyConfiguration constructs an declarative configuration of the Scheduling type for use with
-// apply.
-func Scheduling() *SchedulingApplyConfiguration {
-	return &SchedulingApplyConfiguration{}
-}
-
-// SetNodeSelector sets the NodeSelector field in the declarative configuration to the given value.
-func (b *SchedulingApplyConfiguration) SetNodeSelector(value map[string]string) *SchedulingApplyConfiguration {
-	b.NodeSelector = &value
-	return b
-}
-
-// RemoveNodeSelector removes the NodeSelector field from the declarative configuration.
-func (b *SchedulingApplyConfiguration) RemoveNodeSelector() *SchedulingApplyConfiguration {
-	b.NodeSelector = nil
-	return b
-}
-
-// GetNodeSelector gets the NodeSelector field from the declarative configuration.
-func (b *SchedulingApplyConfiguration) GetNodeSelector() (value map[string]string, ok bool) {
-	if v := b.NodeSelector; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetTolerations sets the Tolerations field in the declarative configuration to the given value.
-func (b *SchedulingApplyConfiguration) SetTolerations(value v1.TolerationList) *SchedulingApplyConfiguration {
-	b.Tolerations = &value
-	return b
-}
-
-// RemoveTolerations removes the Tolerations field from the declarative configuration.
-func (b *SchedulingApplyConfiguration) RemoveTolerations() *SchedulingApplyConfiguration {
-	b.Tolerations = nil
-	return b
-}
-
-// GetTolerations gets the Tolerations field from the declarative configuration.
-func (b *SchedulingApplyConfiguration) GetTolerations() (value v1.TolerationList, ok bool) {
-	if v := b.Tolerations; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // SchedulingList represents a listAlias of SchedulingApplyConfiguration.
 type SchedulingList []*SchedulingApplyConfiguration
 

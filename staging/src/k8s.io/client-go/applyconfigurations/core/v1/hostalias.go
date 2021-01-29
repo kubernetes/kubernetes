@@ -25,52 +25,6 @@ type HostAliasApplyConfiguration struct {
 	Hostnames *[]string `json:"hostnames,omitempty"`
 }
 
-// HostAliasApplyConfiguration constructs an declarative configuration of the HostAlias type for use with
-// apply.
-func HostAlias() *HostAliasApplyConfiguration {
-	return &HostAliasApplyConfiguration{}
-}
-
-// SetIP sets the IP field in the declarative configuration to the given value.
-func (b *HostAliasApplyConfiguration) SetIP(value string) *HostAliasApplyConfiguration {
-	b.IP = &value
-	return b
-}
-
-// RemoveIP removes the IP field from the declarative configuration.
-func (b *HostAliasApplyConfiguration) RemoveIP() *HostAliasApplyConfiguration {
-	b.IP = nil
-	return b
-}
-
-// GetIP gets the IP field from the declarative configuration.
-func (b *HostAliasApplyConfiguration) GetIP() (value string, ok bool) {
-	if v := b.IP; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetHostnames sets the Hostnames field in the declarative configuration to the given value.
-func (b *HostAliasApplyConfiguration) SetHostnames(value []string) *HostAliasApplyConfiguration {
-	b.Hostnames = &value
-	return b
-}
-
-// RemoveHostnames removes the Hostnames field from the declarative configuration.
-func (b *HostAliasApplyConfiguration) RemoveHostnames() *HostAliasApplyConfiguration {
-	b.Hostnames = nil
-	return b
-}
-
-// GetHostnames gets the Hostnames field from the declarative configuration.
-func (b *HostAliasApplyConfiguration) GetHostnames() (value []string, ok bool) {
-	if v := b.Hostnames; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // HostAliasList represents a listAlias of HostAliasApplyConfiguration.
 type HostAliasList []*HostAliasApplyConfiguration
 

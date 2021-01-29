@@ -194,18 +194,18 @@ func (c *storageVersions) Apply(ctx context.Context, storageVersion *apiserverin
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := storageVersion.GetObjectMeta()
-	if !ok {
+	meta := storageVersion.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("storageVersion.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("storageVersion.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1alpha1.StorageVersion{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("storageversions").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

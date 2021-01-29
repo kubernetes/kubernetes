@@ -138,16 +138,16 @@ func (c *FakeEvents) Apply(ctx context.Context, event *eventsv1beta1.EventApplyC
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := event.GetObjectMeta()
-	if !ok {
+	meta := event.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("event.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("event.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(eventsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &v1beta1.Event{})
+		Invokes(testing.NewPatchSubresourceAction(eventsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &v1beta1.Event{})
 
 	if obj == nil {
 		return nil, err

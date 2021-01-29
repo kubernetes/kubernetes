@@ -138,16 +138,16 @@ func (c *FakeSecrets) Apply(ctx context.Context, secret *applyconfigurationscore
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := secret.GetObjectMeta()
-	if !ok {
+	meta := secret.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("secret.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("secret.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(secretsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.Secret{})
+		Invokes(testing.NewPatchSubresourceAction(secretsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &corev1.Secret{})
 
 	if obj == nil {
 		return nil, err

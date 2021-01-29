@@ -24,32 +24,6 @@ type AllowedCSIDriverApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// AllowedCSIDriverApplyConfiguration constructs an declarative configuration of the AllowedCSIDriver type for use with
-// apply.
-func AllowedCSIDriver() *AllowedCSIDriverApplyConfiguration {
-	return &AllowedCSIDriverApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *AllowedCSIDriverApplyConfiguration) SetName(value string) *AllowedCSIDriverApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *AllowedCSIDriverApplyConfiguration) RemoveName() *AllowedCSIDriverApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *AllowedCSIDriverApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // AllowedCSIDriverList represents a listAlias of AllowedCSIDriverApplyConfiguration.
 type AllowedCSIDriverList []*AllowedCSIDriverApplyConfiguration
 

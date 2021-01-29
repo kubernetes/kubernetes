@@ -188,19 +188,19 @@ func (c *services) Apply(ctx context.Context, service *corev1.ServiceApplyConfig
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := service.GetObjectMeta()
-	if !ok {
+	meta := service.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("service.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("service.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.Service{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("services").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

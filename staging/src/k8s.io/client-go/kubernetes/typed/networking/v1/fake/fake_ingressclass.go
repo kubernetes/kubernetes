@@ -130,16 +130,16 @@ func (c *FakeIngressClasses) Apply(ctx context.Context, ingressClass *applyconfi
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := ingressClass.GetObjectMeta()
-	if !ok {
+	meta := ingressClass.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("ingressClass.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("ingressClass.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(ingressclassesResource, name, types.ApplyPatchType, data, subresources...), &networkingv1.IngressClass{})
+		Invokes(testing.NewRootPatchSubresourceAction(ingressclassesResource, *name, types.ApplyPatchType, data, subresources...), &networkingv1.IngressClass{})
 	if obj == nil {
 		return nil, err
 	}

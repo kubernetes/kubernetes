@@ -26,69 +26,6 @@ type VolumeAttachmentSpecApplyConfiguration struct {
 	NodeName *string                                   `json:"nodeName,omitempty"`
 }
 
-// VolumeAttachmentSpecApplyConfiguration constructs an declarative configuration of the VolumeAttachmentSpec type for use with
-// apply.
-func VolumeAttachmentSpec() *VolumeAttachmentSpecApplyConfiguration {
-	return &VolumeAttachmentSpecApplyConfiguration{}
-}
-
-// SetAttacher sets the Attacher field in the declarative configuration to the given value.
-func (b *VolumeAttachmentSpecApplyConfiguration) SetAttacher(value string) *VolumeAttachmentSpecApplyConfiguration {
-	b.Attacher = &value
-	return b
-}
-
-// RemoveAttacher removes the Attacher field from the declarative configuration.
-func (b *VolumeAttachmentSpecApplyConfiguration) RemoveAttacher() *VolumeAttachmentSpecApplyConfiguration {
-	b.Attacher = nil
-	return b
-}
-
-// GetAttacher gets the Attacher field from the declarative configuration.
-func (b *VolumeAttachmentSpecApplyConfiguration) GetAttacher() (value string, ok bool) {
-	if v := b.Attacher; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetSource sets the Source field in the declarative configuration to the given value.
-func (b *VolumeAttachmentSpecApplyConfiguration) SetSource(value *VolumeAttachmentSourceApplyConfiguration) *VolumeAttachmentSpecApplyConfiguration {
-	b.Source = value
-	return b
-}
-
-// RemoveSource removes the Source field from the declarative configuration.
-func (b *VolumeAttachmentSpecApplyConfiguration) RemoveSource() *VolumeAttachmentSpecApplyConfiguration {
-	b.Source = nil
-	return b
-}
-
-// GetSource gets the Source field from the declarative configuration.
-func (b *VolumeAttachmentSpecApplyConfiguration) GetSource() (value *VolumeAttachmentSourceApplyConfiguration, ok bool) {
-	return b.Source, b.Source != nil
-}
-
-// SetNodeName sets the NodeName field in the declarative configuration to the given value.
-func (b *VolumeAttachmentSpecApplyConfiguration) SetNodeName(value string) *VolumeAttachmentSpecApplyConfiguration {
-	b.NodeName = &value
-	return b
-}
-
-// RemoveNodeName removes the NodeName field from the declarative configuration.
-func (b *VolumeAttachmentSpecApplyConfiguration) RemoveNodeName() *VolumeAttachmentSpecApplyConfiguration {
-	b.NodeName = nil
-	return b
-}
-
-// GetNodeName gets the NodeName field from the declarative configuration.
-func (b *VolumeAttachmentSpecApplyConfiguration) GetNodeName() (value string, ok bool) {
-	if v := b.NodeName; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // VolumeAttachmentSpecList represents a listAlias of VolumeAttachmentSpecApplyConfiguration.
 type VolumeAttachmentSpecList []*VolumeAttachmentSpecApplyConfiguration
 

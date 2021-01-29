@@ -29,49 +29,6 @@ type ResourceMetricSourceApplyConfiguration struct {
 	Target *MetricTargetApplyConfiguration `json:"target,omitempty"`
 }
 
-// ResourceMetricSourceApplyConfiguration constructs an declarative configuration of the ResourceMetricSource type for use with
-// apply.
-func ResourceMetricSource() *ResourceMetricSourceApplyConfiguration {
-	return &ResourceMetricSourceApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *ResourceMetricSourceApplyConfiguration) SetName(value v1.ResourceName) *ResourceMetricSourceApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *ResourceMetricSourceApplyConfiguration) RemoveName() *ResourceMetricSourceApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *ResourceMetricSourceApplyConfiguration) GetName() (value v1.ResourceName, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetTarget sets the Target field in the declarative configuration to the given value.
-func (b *ResourceMetricSourceApplyConfiguration) SetTarget(value *MetricTargetApplyConfiguration) *ResourceMetricSourceApplyConfiguration {
-	b.Target = value
-	return b
-}
-
-// RemoveTarget removes the Target field from the declarative configuration.
-func (b *ResourceMetricSourceApplyConfiguration) RemoveTarget() *ResourceMetricSourceApplyConfiguration {
-	b.Target = nil
-	return b
-}
-
-// GetTarget gets the Target field from the declarative configuration.
-func (b *ResourceMetricSourceApplyConfiguration) GetTarget() (value *MetricTargetApplyConfiguration, ok bool) {
-	return b.Target, b.Target != nil
-}
-
 // ResourceMetricSourceList represents a listAlias of ResourceMetricSourceApplyConfiguration.
 type ResourceMetricSourceList []*ResourceMetricSourceApplyConfiguration
 

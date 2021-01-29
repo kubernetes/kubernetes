@@ -29,45 +29,6 @@ type RuleWithOperationsApplyConfiguration struct {
 	RuleApplyConfiguration `json:",inline"`
 }
 
-// RuleWithOperationsApplyConfiguration constructs an declarative configuration of the RuleWithOperations type for use with
-// apply.
-func RuleWithOperations() *RuleWithOperationsApplyConfiguration {
-	return &RuleWithOperationsApplyConfiguration{}
-}
-
-// SetOperations sets the Operations field in the declarative configuration to the given value.
-func (b *RuleWithOperationsApplyConfiguration) SetOperations(value []v1beta1.OperationType) *RuleWithOperationsApplyConfiguration {
-	b.Operations = &value
-	return b
-}
-
-// RemoveOperations removes the Operations field from the declarative configuration.
-func (b *RuleWithOperationsApplyConfiguration) RemoveOperations() *RuleWithOperationsApplyConfiguration {
-	b.Operations = nil
-	return b
-}
-
-// GetOperations gets the Operations field from the declarative configuration.
-func (b *RuleWithOperationsApplyConfiguration) GetOperations() (value []v1beta1.OperationType, ok bool) {
-	if v := b.Operations; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetRule sets the Rule field in the declarative configuration to the given value.
-func (b *RuleWithOperationsApplyConfiguration) SetRule(value *RuleApplyConfiguration) *RuleWithOperationsApplyConfiguration {
-	if value != nil {
-		b.RuleApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetRule gets the Rule field from the declarative configuration.
-func (b *RuleWithOperationsApplyConfiguration) GetRule() (value *RuleApplyConfiguration, ok bool) {
-	return &b.RuleApplyConfiguration, true
-}
-
 // RuleWithOperationsList represents a listAlias of RuleWithOperationsApplyConfiguration.
 type RuleWithOperationsList []*RuleWithOperationsApplyConfiguration
 

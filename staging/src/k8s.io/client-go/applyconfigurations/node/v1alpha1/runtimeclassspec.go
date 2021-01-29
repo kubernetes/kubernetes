@@ -26,66 +26,6 @@ type RuntimeClassSpecApplyConfiguration struct {
 	Scheduling     *SchedulingApplyConfiguration `json:"scheduling,omitempty"`
 }
 
-// RuntimeClassSpecApplyConfiguration constructs an declarative configuration of the RuntimeClassSpec type for use with
-// apply.
-func RuntimeClassSpec() *RuntimeClassSpecApplyConfiguration {
-	return &RuntimeClassSpecApplyConfiguration{}
-}
-
-// SetRuntimeHandler sets the RuntimeHandler field in the declarative configuration to the given value.
-func (b *RuntimeClassSpecApplyConfiguration) SetRuntimeHandler(value string) *RuntimeClassSpecApplyConfiguration {
-	b.RuntimeHandler = &value
-	return b
-}
-
-// RemoveRuntimeHandler removes the RuntimeHandler field from the declarative configuration.
-func (b *RuntimeClassSpecApplyConfiguration) RemoveRuntimeHandler() *RuntimeClassSpecApplyConfiguration {
-	b.RuntimeHandler = nil
-	return b
-}
-
-// GetRuntimeHandler gets the RuntimeHandler field from the declarative configuration.
-func (b *RuntimeClassSpecApplyConfiguration) GetRuntimeHandler() (value string, ok bool) {
-	if v := b.RuntimeHandler; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetOverhead sets the Overhead field in the declarative configuration to the given value.
-func (b *RuntimeClassSpecApplyConfiguration) SetOverhead(value *OverheadApplyConfiguration) *RuntimeClassSpecApplyConfiguration {
-	b.Overhead = value
-	return b
-}
-
-// RemoveOverhead removes the Overhead field from the declarative configuration.
-func (b *RuntimeClassSpecApplyConfiguration) RemoveOverhead() *RuntimeClassSpecApplyConfiguration {
-	b.Overhead = nil
-	return b
-}
-
-// GetOverhead gets the Overhead field from the declarative configuration.
-func (b *RuntimeClassSpecApplyConfiguration) GetOverhead() (value *OverheadApplyConfiguration, ok bool) {
-	return b.Overhead, b.Overhead != nil
-}
-
-// SetScheduling sets the Scheduling field in the declarative configuration to the given value.
-func (b *RuntimeClassSpecApplyConfiguration) SetScheduling(value *SchedulingApplyConfiguration) *RuntimeClassSpecApplyConfiguration {
-	b.Scheduling = value
-	return b
-}
-
-// RemoveScheduling removes the Scheduling field from the declarative configuration.
-func (b *RuntimeClassSpecApplyConfiguration) RemoveScheduling() *RuntimeClassSpecApplyConfiguration {
-	b.Scheduling = nil
-	return b
-}
-
-// GetScheduling gets the Scheduling field from the declarative configuration.
-func (b *RuntimeClassSpecApplyConfiguration) GetScheduling() (value *SchedulingApplyConfiguration, ok bool) {
-	return b.Scheduling, b.Scheduling != nil
-}
-
 // RuntimeClassSpecList represents a listAlias of RuntimeClassSpecApplyConfiguration.
 type RuntimeClassSpecList []*RuntimeClassSpecApplyConfiguration
 

@@ -29,49 +29,6 @@ type MetricIdentifierApplyConfiguration struct {
 	Selector *v1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
 }
 
-// MetricIdentifierApplyConfiguration constructs an declarative configuration of the MetricIdentifier type for use with
-// apply.
-func MetricIdentifier() *MetricIdentifierApplyConfiguration {
-	return &MetricIdentifierApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *MetricIdentifierApplyConfiguration) SetName(value string) *MetricIdentifierApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *MetricIdentifierApplyConfiguration) RemoveName() *MetricIdentifierApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *MetricIdentifierApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetSelector sets the Selector field in the declarative configuration to the given value.
-func (b *MetricIdentifierApplyConfiguration) SetSelector(value *v1.LabelSelectorApplyConfiguration) *MetricIdentifierApplyConfiguration {
-	b.Selector = value
-	return b
-}
-
-// RemoveSelector removes the Selector field from the declarative configuration.
-func (b *MetricIdentifierApplyConfiguration) RemoveSelector() *MetricIdentifierApplyConfiguration {
-	b.Selector = nil
-	return b
-}
-
-// GetSelector gets the Selector field from the declarative configuration.
-func (b *MetricIdentifierApplyConfiguration) GetSelector() (value *v1.LabelSelectorApplyConfiguration, ok bool) {
-	return b.Selector, b.Selector != nil
-}
-
 // MetricIdentifierList represents a listAlias of MetricIdentifierApplyConfiguration.
 type MetricIdentifierList []*MetricIdentifierApplyConfiguration
 

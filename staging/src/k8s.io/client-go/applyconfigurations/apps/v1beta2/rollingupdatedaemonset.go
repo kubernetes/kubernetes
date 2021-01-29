@@ -29,52 +29,6 @@ type RollingUpdateDaemonSetApplyConfiguration struct {
 	MaxSurge       *intstr.IntOrString `json:"maxSurge,omitempty"`
 }
 
-// RollingUpdateDaemonSetApplyConfiguration constructs an declarative configuration of the RollingUpdateDaemonSet type for use with
-// apply.
-func RollingUpdateDaemonSet() *RollingUpdateDaemonSetApplyConfiguration {
-	return &RollingUpdateDaemonSetApplyConfiguration{}
-}
-
-// SetMaxUnavailable sets the MaxUnavailable field in the declarative configuration to the given value.
-func (b *RollingUpdateDaemonSetApplyConfiguration) SetMaxUnavailable(value intstr.IntOrString) *RollingUpdateDaemonSetApplyConfiguration {
-	b.MaxUnavailable = &value
-	return b
-}
-
-// RemoveMaxUnavailable removes the MaxUnavailable field from the declarative configuration.
-func (b *RollingUpdateDaemonSetApplyConfiguration) RemoveMaxUnavailable() *RollingUpdateDaemonSetApplyConfiguration {
-	b.MaxUnavailable = nil
-	return b
-}
-
-// GetMaxUnavailable gets the MaxUnavailable field from the declarative configuration.
-func (b *RollingUpdateDaemonSetApplyConfiguration) GetMaxUnavailable() (value intstr.IntOrString, ok bool) {
-	if v := b.MaxUnavailable; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetMaxSurge sets the MaxSurge field in the declarative configuration to the given value.
-func (b *RollingUpdateDaemonSetApplyConfiguration) SetMaxSurge(value intstr.IntOrString) *RollingUpdateDaemonSetApplyConfiguration {
-	b.MaxSurge = &value
-	return b
-}
-
-// RemoveMaxSurge removes the MaxSurge field from the declarative configuration.
-func (b *RollingUpdateDaemonSetApplyConfiguration) RemoveMaxSurge() *RollingUpdateDaemonSetApplyConfiguration {
-	b.MaxSurge = nil
-	return b
-}
-
-// GetMaxSurge gets the MaxSurge field from the declarative configuration.
-func (b *RollingUpdateDaemonSetApplyConfiguration) GetMaxSurge() (value intstr.IntOrString, ok bool) {
-	if v := b.MaxSurge; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // RollingUpdateDaemonSetList represents a listAlias of RollingUpdateDaemonSetApplyConfiguration.
 type RollingUpdateDaemonSetList []*RollingUpdateDaemonSetApplyConfiguration
 

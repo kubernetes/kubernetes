@@ -141,16 +141,16 @@ func (c *FakeFlowSchemas) Apply(ctx context.Context, flowSchema *flowcontrolv1be
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := flowSchema.GetObjectMeta()
-	if !ok {
+	meta := flowSchema.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("flowSchema.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("flowSchema.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(flowschemasResource, name, types.ApplyPatchType, data, subresources...), &v1beta1.FlowSchema{})
+		Invokes(testing.NewRootPatchSubresourceAction(flowschemasResource, *name, types.ApplyPatchType, data, subresources...), &v1beta1.FlowSchema{})
 	if obj == nil {
 		return nil, err
 	}

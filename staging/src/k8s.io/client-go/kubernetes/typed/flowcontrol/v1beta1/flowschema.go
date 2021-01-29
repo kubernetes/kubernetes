@@ -194,18 +194,18 @@ func (c *flowSchemas) Apply(ctx context.Context, flowSchema *flowcontrolv1beta1.
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := flowSchema.GetObjectMeta()
-	if !ok {
+	meta := flowSchema.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("flowSchema.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("flowSchema.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1beta1.FlowSchema{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("flowschemas").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

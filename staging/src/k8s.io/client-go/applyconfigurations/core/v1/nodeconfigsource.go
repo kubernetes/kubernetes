@@ -24,29 +24,6 @@ type NodeConfigSourceApplyConfiguration struct {
 	ConfigMap *ConfigMapNodeConfigSourceApplyConfiguration `json:"configMap,omitempty"`
 }
 
-// NodeConfigSourceApplyConfiguration constructs an declarative configuration of the NodeConfigSource type for use with
-// apply.
-func NodeConfigSource() *NodeConfigSourceApplyConfiguration {
-	return &NodeConfigSourceApplyConfiguration{}
-}
-
-// SetConfigMap sets the ConfigMap field in the declarative configuration to the given value.
-func (b *NodeConfigSourceApplyConfiguration) SetConfigMap(value *ConfigMapNodeConfigSourceApplyConfiguration) *NodeConfigSourceApplyConfiguration {
-	b.ConfigMap = value
-	return b
-}
-
-// RemoveConfigMap removes the ConfigMap field from the declarative configuration.
-func (b *NodeConfigSourceApplyConfiguration) RemoveConfigMap() *NodeConfigSourceApplyConfiguration {
-	b.ConfigMap = nil
-	return b
-}
-
-// GetConfigMap gets the ConfigMap field from the declarative configuration.
-func (b *NodeConfigSourceApplyConfiguration) GetConfigMap() (value *ConfigMapNodeConfigSourceApplyConfiguration, ok bool) {
-	return b.ConfigMap, b.ConfigMap != nil
-}
-
 // NodeConfigSourceList represents a listAlias of NodeConfigSourceApplyConfiguration.
 type NodeConfigSourceList []*NodeConfigSourceApplyConfiguration
 

@@ -25,52 +25,6 @@ type SysctlApplyConfiguration struct {
 	Value *string `json:"value,omitempty"`
 }
 
-// SysctlApplyConfiguration constructs an declarative configuration of the Sysctl type for use with
-// apply.
-func Sysctl() *SysctlApplyConfiguration {
-	return &SysctlApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *SysctlApplyConfiguration) SetName(value string) *SysctlApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *SysctlApplyConfiguration) RemoveName() *SysctlApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *SysctlApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetValue sets the Value field in the declarative configuration to the given value.
-func (b *SysctlApplyConfiguration) SetValue(value string) *SysctlApplyConfiguration {
-	b.Value = &value
-	return b
-}
-
-// RemoveValue removes the Value field from the declarative configuration.
-func (b *SysctlApplyConfiguration) RemoveValue() *SysctlApplyConfiguration {
-	b.Value = nil
-	return b
-}
-
-// GetValue gets the Value field from the declarative configuration.
-func (b *SysctlApplyConfiguration) GetValue() (value string, ok bool) {
-	if v := b.Value; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // SysctlList represents a listAlias of SysctlApplyConfiguration.
 type SysctlList []*SysctlApplyConfiguration
 

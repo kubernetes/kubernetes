@@ -178,18 +178,18 @@ func (c *runtimeClasses) Apply(ctx context.Context, runtimeClass *nodev1alpha1.R
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := runtimeClass.GetObjectMeta()
-	if !ok {
+	meta := runtimeClass.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("runtimeClass.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("runtimeClass.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1alpha1.RuntimeClass{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("runtimeclasses").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

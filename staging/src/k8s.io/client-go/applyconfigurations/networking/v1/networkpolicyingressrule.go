@@ -25,52 +25,6 @@ type NetworkPolicyIngressRuleApplyConfiguration struct {
 	From  *NetworkPolicyPeerList `json:"from,omitempty"`
 }
 
-// NetworkPolicyIngressRuleApplyConfiguration constructs an declarative configuration of the NetworkPolicyIngressRule type for use with
-// apply.
-func NetworkPolicyIngressRule() *NetworkPolicyIngressRuleApplyConfiguration {
-	return &NetworkPolicyIngressRuleApplyConfiguration{}
-}
-
-// SetPorts sets the Ports field in the declarative configuration to the given value.
-func (b *NetworkPolicyIngressRuleApplyConfiguration) SetPorts(value NetworkPolicyPortList) *NetworkPolicyIngressRuleApplyConfiguration {
-	b.Ports = &value
-	return b
-}
-
-// RemovePorts removes the Ports field from the declarative configuration.
-func (b *NetworkPolicyIngressRuleApplyConfiguration) RemovePorts() *NetworkPolicyIngressRuleApplyConfiguration {
-	b.Ports = nil
-	return b
-}
-
-// GetPorts gets the Ports field from the declarative configuration.
-func (b *NetworkPolicyIngressRuleApplyConfiguration) GetPorts() (value NetworkPolicyPortList, ok bool) {
-	if v := b.Ports; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetFrom sets the From field in the declarative configuration to the given value.
-func (b *NetworkPolicyIngressRuleApplyConfiguration) SetFrom(value NetworkPolicyPeerList) *NetworkPolicyIngressRuleApplyConfiguration {
-	b.From = &value
-	return b
-}
-
-// RemoveFrom removes the From field from the declarative configuration.
-func (b *NetworkPolicyIngressRuleApplyConfiguration) RemoveFrom() *NetworkPolicyIngressRuleApplyConfiguration {
-	b.From = nil
-	return b
-}
-
-// GetFrom gets the From field from the declarative configuration.
-func (b *NetworkPolicyIngressRuleApplyConfiguration) GetFrom() (value NetworkPolicyPeerList, ok bool) {
-	if v := b.From; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // NetworkPolicyIngressRuleList represents a listAlias of NetworkPolicyIngressRuleApplyConfiguration.
 type NetworkPolicyIngressRuleList []*NetworkPolicyIngressRuleApplyConfiguration
 

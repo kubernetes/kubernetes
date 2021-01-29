@@ -25,52 +25,6 @@ type RuntimeClassStrategyOptionsApplyConfiguration struct {
 	DefaultRuntimeClassName  *string   `json:"defaultRuntimeClassName,omitempty"`
 }
 
-// RuntimeClassStrategyOptionsApplyConfiguration constructs an declarative configuration of the RuntimeClassStrategyOptions type for use with
-// apply.
-func RuntimeClassStrategyOptions() *RuntimeClassStrategyOptionsApplyConfiguration {
-	return &RuntimeClassStrategyOptionsApplyConfiguration{}
-}
-
-// SetAllowedRuntimeClassNames sets the AllowedRuntimeClassNames field in the declarative configuration to the given value.
-func (b *RuntimeClassStrategyOptionsApplyConfiguration) SetAllowedRuntimeClassNames(value []string) *RuntimeClassStrategyOptionsApplyConfiguration {
-	b.AllowedRuntimeClassNames = &value
-	return b
-}
-
-// RemoveAllowedRuntimeClassNames removes the AllowedRuntimeClassNames field from the declarative configuration.
-func (b *RuntimeClassStrategyOptionsApplyConfiguration) RemoveAllowedRuntimeClassNames() *RuntimeClassStrategyOptionsApplyConfiguration {
-	b.AllowedRuntimeClassNames = nil
-	return b
-}
-
-// GetAllowedRuntimeClassNames gets the AllowedRuntimeClassNames field from the declarative configuration.
-func (b *RuntimeClassStrategyOptionsApplyConfiguration) GetAllowedRuntimeClassNames() (value []string, ok bool) {
-	if v := b.AllowedRuntimeClassNames; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetDefaultRuntimeClassName sets the DefaultRuntimeClassName field in the declarative configuration to the given value.
-func (b *RuntimeClassStrategyOptionsApplyConfiguration) SetDefaultRuntimeClassName(value string) *RuntimeClassStrategyOptionsApplyConfiguration {
-	b.DefaultRuntimeClassName = &value
-	return b
-}
-
-// RemoveDefaultRuntimeClassName removes the DefaultRuntimeClassName field from the declarative configuration.
-func (b *RuntimeClassStrategyOptionsApplyConfiguration) RemoveDefaultRuntimeClassName() *RuntimeClassStrategyOptionsApplyConfiguration {
-	b.DefaultRuntimeClassName = nil
-	return b
-}
-
-// GetDefaultRuntimeClassName gets the DefaultRuntimeClassName field from the declarative configuration.
-func (b *RuntimeClassStrategyOptionsApplyConfiguration) GetDefaultRuntimeClassName() (value string, ok bool) {
-	if v := b.DefaultRuntimeClassName; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // RuntimeClassStrategyOptionsList represents a listAlias of RuntimeClassStrategyOptionsApplyConfiguration.
 type RuntimeClassStrategyOptionsList []*RuntimeClassStrategyOptionsApplyConfiguration
 

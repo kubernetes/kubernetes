@@ -25,52 +25,6 @@ type TokenReviewSpecApplyConfiguration struct {
 	Audiences *[]string `json:"audiences,omitempty"`
 }
 
-// TokenReviewSpecApplyConfiguration constructs an declarative configuration of the TokenReviewSpec type for use with
-// apply.
-func TokenReviewSpec() *TokenReviewSpecApplyConfiguration {
-	return &TokenReviewSpecApplyConfiguration{}
-}
-
-// SetToken sets the Token field in the declarative configuration to the given value.
-func (b *TokenReviewSpecApplyConfiguration) SetToken(value string) *TokenReviewSpecApplyConfiguration {
-	b.Token = &value
-	return b
-}
-
-// RemoveToken removes the Token field from the declarative configuration.
-func (b *TokenReviewSpecApplyConfiguration) RemoveToken() *TokenReviewSpecApplyConfiguration {
-	b.Token = nil
-	return b
-}
-
-// GetToken gets the Token field from the declarative configuration.
-func (b *TokenReviewSpecApplyConfiguration) GetToken() (value string, ok bool) {
-	if v := b.Token; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetAudiences sets the Audiences field in the declarative configuration to the given value.
-func (b *TokenReviewSpecApplyConfiguration) SetAudiences(value []string) *TokenReviewSpecApplyConfiguration {
-	b.Audiences = &value
-	return b
-}
-
-// RemoveAudiences removes the Audiences field from the declarative configuration.
-func (b *TokenReviewSpecApplyConfiguration) RemoveAudiences() *TokenReviewSpecApplyConfiguration {
-	b.Audiences = nil
-	return b
-}
-
-// GetAudiences gets the Audiences field from the declarative configuration.
-func (b *TokenReviewSpecApplyConfiguration) GetAudiences() (value []string, ok bool) {
-	if v := b.Audiences; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // TokenReviewSpecList represents a listAlias of TokenReviewSpecApplyConfiguration.
 type TokenReviewSpecList []*TokenReviewSpecApplyConfiguration
 

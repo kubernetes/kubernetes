@@ -150,16 +150,16 @@ func (c *FakeIngresses) Apply(ctx context.Context, ingress *extensionsv1beta1.In
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := ingress.GetObjectMeta()
-	if !ok {
+	meta := ingress.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("ingress.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("ingress.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(ingressesResource, c.ns, name, types.ApplyPatchType, data, subresources...), &v1beta1.Ingress{})
+		Invokes(testing.NewPatchSubresourceAction(ingressesResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &v1beta1.Ingress{})
 
 	if obj == nil {
 		return nil, err

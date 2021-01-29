@@ -30,59 +30,6 @@ type EvictionApplyConfiguration struct {
 	DeleteOptions                 *v1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
 }
 
-// EvictionApplyConfiguration constructs an declarative configuration of the Eviction type for use with
-// apply.
-func Eviction() *EvictionApplyConfiguration {
-	return &EvictionApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *EvictionApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *EvictionApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *EvictionApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *EvictionApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *EvictionApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *EvictionApplyConfiguration) RemoveObjectMeta() *EvictionApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *EvictionApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetDeleteOptions sets the DeleteOptions field in the declarative configuration to the given value.
-func (b *EvictionApplyConfiguration) SetDeleteOptions(value *v1.DeleteOptionsApplyConfiguration) *EvictionApplyConfiguration {
-	b.DeleteOptions = value
-	return b
-}
-
-// RemoveDeleteOptions removes the DeleteOptions field from the declarative configuration.
-func (b *EvictionApplyConfiguration) RemoveDeleteOptions() *EvictionApplyConfiguration {
-	b.DeleteOptions = nil
-	return b
-}
-
-// GetDeleteOptions gets the DeleteOptions field from the declarative configuration.
-func (b *EvictionApplyConfiguration) GetDeleteOptions() (value *v1.DeleteOptionsApplyConfiguration, ok bool) {
-	return b.DeleteOptions, b.DeleteOptions != nil
-}
-
 // EvictionList represents a listAlias of EvictionApplyConfiguration.
 type EvictionList []*EvictionApplyConfiguration
 

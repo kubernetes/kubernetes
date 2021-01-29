@@ -24,32 +24,6 @@ type FlowSchemaStatusApplyConfiguration struct {
 	Conditions *FlowSchemaConditionList `json:"conditions,omitempty"`
 }
 
-// FlowSchemaStatusApplyConfiguration constructs an declarative configuration of the FlowSchemaStatus type for use with
-// apply.
-func FlowSchemaStatus() *FlowSchemaStatusApplyConfiguration {
-	return &FlowSchemaStatusApplyConfiguration{}
-}
-
-// SetConditions sets the Conditions field in the declarative configuration to the given value.
-func (b *FlowSchemaStatusApplyConfiguration) SetConditions(value FlowSchemaConditionList) *FlowSchemaStatusApplyConfiguration {
-	b.Conditions = &value
-	return b
-}
-
-// RemoveConditions removes the Conditions field from the declarative configuration.
-func (b *FlowSchemaStatusApplyConfiguration) RemoveConditions() *FlowSchemaStatusApplyConfiguration {
-	b.Conditions = nil
-	return b
-}
-
-// GetConditions gets the Conditions field from the declarative configuration.
-func (b *FlowSchemaStatusApplyConfiguration) GetConditions() (value FlowSchemaConditionList, ok bool) {
-	if v := b.Conditions; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // FlowSchemaStatusList represents a listAlias of FlowSchemaStatusApplyConfiguration.
 type FlowSchemaStatusList []*FlowSchemaStatusApplyConfiguration
 

@@ -151,16 +151,16 @@ func (c *FakeStatefulSets) Apply(ctx context.Context, statefulSet *applyconfigur
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := statefulSet.GetObjectMeta()
-	if !ok {
+	meta := statefulSet.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("statefulSet.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("statefulSet.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &appsv1.StatefulSet{})
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &appsv1.StatefulSet{})
 
 	if obj == nil {
 		return nil, err

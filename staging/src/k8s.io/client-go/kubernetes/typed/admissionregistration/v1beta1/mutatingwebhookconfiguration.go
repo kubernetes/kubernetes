@@ -178,18 +178,18 @@ func (c *mutatingWebhookConfigurations) Apply(ctx context.Context, mutatingWebho
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := mutatingWebhookConfiguration.GetObjectMeta()
-	if !ok {
+	meta := mutatingWebhookConfiguration.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("mutatingWebhookConfiguration.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("mutatingWebhookConfiguration.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1beta1.MutatingWebhookConfiguration{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("mutatingwebhookconfigurations").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

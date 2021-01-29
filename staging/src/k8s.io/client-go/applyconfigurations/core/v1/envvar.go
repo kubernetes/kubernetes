@@ -26,69 +26,6 @@ type EnvVarApplyConfiguration struct {
 	ValueFrom *EnvVarSourceApplyConfiguration `json:"valueFrom,omitempty"`
 }
 
-// EnvVarApplyConfiguration constructs an declarative configuration of the EnvVar type for use with
-// apply.
-func EnvVar() *EnvVarApplyConfiguration {
-	return &EnvVarApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *EnvVarApplyConfiguration) SetName(value string) *EnvVarApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *EnvVarApplyConfiguration) RemoveName() *EnvVarApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *EnvVarApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetValue sets the Value field in the declarative configuration to the given value.
-func (b *EnvVarApplyConfiguration) SetValue(value string) *EnvVarApplyConfiguration {
-	b.Value = &value
-	return b
-}
-
-// RemoveValue removes the Value field from the declarative configuration.
-func (b *EnvVarApplyConfiguration) RemoveValue() *EnvVarApplyConfiguration {
-	b.Value = nil
-	return b
-}
-
-// GetValue gets the Value field from the declarative configuration.
-func (b *EnvVarApplyConfiguration) GetValue() (value string, ok bool) {
-	if v := b.Value; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetValueFrom sets the ValueFrom field in the declarative configuration to the given value.
-func (b *EnvVarApplyConfiguration) SetValueFrom(value *EnvVarSourceApplyConfiguration) *EnvVarApplyConfiguration {
-	b.ValueFrom = value
-	return b
-}
-
-// RemoveValueFrom removes the ValueFrom field from the declarative configuration.
-func (b *EnvVarApplyConfiguration) RemoveValueFrom() *EnvVarApplyConfiguration {
-	b.ValueFrom = nil
-	return b
-}
-
-// GetValueFrom gets the ValueFrom field from the declarative configuration.
-func (b *EnvVarApplyConfiguration) GetValueFrom() (value *EnvVarSourceApplyConfiguration, ok bool) {
-	return b.ValueFrom, b.ValueFrom != nil
-}
-
 // EnvVarList represents a listAlias of EnvVarApplyConfiguration.
 type EnvVarList []*EnvVarApplyConfiguration
 

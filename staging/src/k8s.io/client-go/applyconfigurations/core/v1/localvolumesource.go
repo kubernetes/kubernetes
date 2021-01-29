@@ -25,52 +25,6 @@ type LocalVolumeSourceApplyConfiguration struct {
 	FSType *string `json:"fsType,omitempty"`
 }
 
-// LocalVolumeSourceApplyConfiguration constructs an declarative configuration of the LocalVolumeSource type for use with
-// apply.
-func LocalVolumeSource() *LocalVolumeSourceApplyConfiguration {
-	return &LocalVolumeSourceApplyConfiguration{}
-}
-
-// SetPath sets the Path field in the declarative configuration to the given value.
-func (b *LocalVolumeSourceApplyConfiguration) SetPath(value string) *LocalVolumeSourceApplyConfiguration {
-	b.Path = &value
-	return b
-}
-
-// RemovePath removes the Path field from the declarative configuration.
-func (b *LocalVolumeSourceApplyConfiguration) RemovePath() *LocalVolumeSourceApplyConfiguration {
-	b.Path = nil
-	return b
-}
-
-// GetPath gets the Path field from the declarative configuration.
-func (b *LocalVolumeSourceApplyConfiguration) GetPath() (value string, ok bool) {
-	if v := b.Path; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetFSType sets the FSType field in the declarative configuration to the given value.
-func (b *LocalVolumeSourceApplyConfiguration) SetFSType(value string) *LocalVolumeSourceApplyConfiguration {
-	b.FSType = &value
-	return b
-}
-
-// RemoveFSType removes the FSType field from the declarative configuration.
-func (b *LocalVolumeSourceApplyConfiguration) RemoveFSType() *LocalVolumeSourceApplyConfiguration {
-	b.FSType = nil
-	return b
-}
-
-// GetFSType gets the FSType field from the declarative configuration.
-func (b *LocalVolumeSourceApplyConfiguration) GetFSType() (value string, ok bool) {
-	if v := b.FSType; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // LocalVolumeSourceList represents a listAlias of LocalVolumeSourceApplyConfiguration.
 type LocalVolumeSourceList []*LocalVolumeSourceApplyConfiguration
 

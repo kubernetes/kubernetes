@@ -30,59 +30,6 @@ type NetworkPolicyApplyConfiguration struct {
 	Spec                          *NetworkPolicySpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// NetworkPolicyApplyConfiguration constructs an declarative configuration of the NetworkPolicy type for use with
-// apply.
-func NetworkPolicy() *NetworkPolicyApplyConfiguration {
-	return &NetworkPolicyApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *NetworkPolicyApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *NetworkPolicyApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *NetworkPolicyApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *NetworkPolicyApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *NetworkPolicyApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *NetworkPolicyApplyConfiguration) RemoveObjectMeta() *NetworkPolicyApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *NetworkPolicyApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetSpec sets the Spec field in the declarative configuration to the given value.
-func (b *NetworkPolicyApplyConfiguration) SetSpec(value *NetworkPolicySpecApplyConfiguration) *NetworkPolicyApplyConfiguration {
-	b.Spec = value
-	return b
-}
-
-// RemoveSpec removes the Spec field from the declarative configuration.
-func (b *NetworkPolicyApplyConfiguration) RemoveSpec() *NetworkPolicyApplyConfiguration {
-	b.Spec = nil
-	return b
-}
-
-// GetSpec gets the Spec field from the declarative configuration.
-func (b *NetworkPolicyApplyConfiguration) GetSpec() (value *NetworkPolicySpecApplyConfiguration, ok bool) {
-	return b.Spec, b.Spec != nil
-}
-
 // NetworkPolicyList represents a listAlias of NetworkPolicyApplyConfiguration.
 type NetworkPolicyList []*NetworkPolicyApplyConfiguration
 

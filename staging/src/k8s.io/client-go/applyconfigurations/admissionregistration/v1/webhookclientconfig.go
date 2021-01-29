@@ -26,69 +26,6 @@ type WebhookClientConfigApplyConfiguration struct {
 	CABundle *[]byte                             `json:"caBundle,omitempty"`
 }
 
-// WebhookClientConfigApplyConfiguration constructs an declarative configuration of the WebhookClientConfig type for use with
-// apply.
-func WebhookClientConfig() *WebhookClientConfigApplyConfiguration {
-	return &WebhookClientConfigApplyConfiguration{}
-}
-
-// SetURL sets the URL field in the declarative configuration to the given value.
-func (b *WebhookClientConfigApplyConfiguration) SetURL(value string) *WebhookClientConfigApplyConfiguration {
-	b.URL = &value
-	return b
-}
-
-// RemoveURL removes the URL field from the declarative configuration.
-func (b *WebhookClientConfigApplyConfiguration) RemoveURL() *WebhookClientConfigApplyConfiguration {
-	b.URL = nil
-	return b
-}
-
-// GetURL gets the URL field from the declarative configuration.
-func (b *WebhookClientConfigApplyConfiguration) GetURL() (value string, ok bool) {
-	if v := b.URL; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetService sets the Service field in the declarative configuration to the given value.
-func (b *WebhookClientConfigApplyConfiguration) SetService(value *ServiceReferenceApplyConfiguration) *WebhookClientConfigApplyConfiguration {
-	b.Service = value
-	return b
-}
-
-// RemoveService removes the Service field from the declarative configuration.
-func (b *WebhookClientConfigApplyConfiguration) RemoveService() *WebhookClientConfigApplyConfiguration {
-	b.Service = nil
-	return b
-}
-
-// GetService gets the Service field from the declarative configuration.
-func (b *WebhookClientConfigApplyConfiguration) GetService() (value *ServiceReferenceApplyConfiguration, ok bool) {
-	return b.Service, b.Service != nil
-}
-
-// SetCABundle sets the CABundle field in the declarative configuration to the given value.
-func (b *WebhookClientConfigApplyConfiguration) SetCABundle(value []byte) *WebhookClientConfigApplyConfiguration {
-	b.CABundle = &value
-	return b
-}
-
-// RemoveCABundle removes the CABundle field from the declarative configuration.
-func (b *WebhookClientConfigApplyConfiguration) RemoveCABundle() *WebhookClientConfigApplyConfiguration {
-	b.CABundle = nil
-	return b
-}
-
-// GetCABundle gets the CABundle field from the declarative configuration.
-func (b *WebhookClientConfigApplyConfiguration) GetCABundle() (value []byte, ok bool) {
-	if v := b.CABundle; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // WebhookClientConfigList represents a listAlias of WebhookClientConfigApplyConfiguration.
 type WebhookClientConfigList []*WebhookClientConfigApplyConfiguration
 

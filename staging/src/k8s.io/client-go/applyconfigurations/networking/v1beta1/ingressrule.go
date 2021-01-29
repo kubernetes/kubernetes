@@ -25,45 +25,6 @@ type IngressRuleApplyConfiguration struct {
 	IngressRuleValueApplyConfiguration `json:",omitempty,inline"`
 }
 
-// IngressRuleApplyConfiguration constructs an declarative configuration of the IngressRule type for use with
-// apply.
-func IngressRule() *IngressRuleApplyConfiguration {
-	return &IngressRuleApplyConfiguration{}
-}
-
-// SetHost sets the Host field in the declarative configuration to the given value.
-func (b *IngressRuleApplyConfiguration) SetHost(value string) *IngressRuleApplyConfiguration {
-	b.Host = &value
-	return b
-}
-
-// RemoveHost removes the Host field from the declarative configuration.
-func (b *IngressRuleApplyConfiguration) RemoveHost() *IngressRuleApplyConfiguration {
-	b.Host = nil
-	return b
-}
-
-// GetHost gets the Host field from the declarative configuration.
-func (b *IngressRuleApplyConfiguration) GetHost() (value string, ok bool) {
-	if v := b.Host; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetIngressRuleValue sets the IngressRuleValue field in the declarative configuration to the given value.
-func (b *IngressRuleApplyConfiguration) SetIngressRuleValue(value *IngressRuleValueApplyConfiguration) *IngressRuleApplyConfiguration {
-	if value != nil {
-		b.IngressRuleValueApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetIngressRuleValue gets the IngressRuleValue field from the declarative configuration.
-func (b *IngressRuleApplyConfiguration) GetIngressRuleValue() (value *IngressRuleValueApplyConfiguration, ok bool) {
-	return &b.IngressRuleValueApplyConfiguration, true
-}
-
 // IngressRuleList represents a listAlias of IngressRuleApplyConfiguration.
 type IngressRuleList []*IngressRuleApplyConfiguration
 

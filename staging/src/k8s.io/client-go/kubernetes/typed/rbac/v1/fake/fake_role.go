@@ -138,16 +138,16 @@ func (c *FakeRoles) Apply(ctx context.Context, role *applyconfigurationsrbacv1.R
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := role.GetObjectMeta()
-	if !ok {
+	meta := role.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("role.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("role.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, name, types.ApplyPatchType, data, subresources...), &rbacv1.Role{})
+		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &rbacv1.Role{})
 
 	if obj == nil {
 		return nil, err

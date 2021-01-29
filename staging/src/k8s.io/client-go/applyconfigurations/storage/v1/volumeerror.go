@@ -29,52 +29,6 @@ type VolumeErrorApplyConfiguration struct {
 	Message *string  `json:"message,omitempty"`
 }
 
-// VolumeErrorApplyConfiguration constructs an declarative configuration of the VolumeError type for use with
-// apply.
-func VolumeError() *VolumeErrorApplyConfiguration {
-	return &VolumeErrorApplyConfiguration{}
-}
-
-// SetTime sets the Time field in the declarative configuration to the given value.
-func (b *VolumeErrorApplyConfiguration) SetTime(value v1.Time) *VolumeErrorApplyConfiguration {
-	b.Time = &value
-	return b
-}
-
-// RemoveTime removes the Time field from the declarative configuration.
-func (b *VolumeErrorApplyConfiguration) RemoveTime() *VolumeErrorApplyConfiguration {
-	b.Time = nil
-	return b
-}
-
-// GetTime gets the Time field from the declarative configuration.
-func (b *VolumeErrorApplyConfiguration) GetTime() (value v1.Time, ok bool) {
-	if v := b.Time; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetMessage sets the Message field in the declarative configuration to the given value.
-func (b *VolumeErrorApplyConfiguration) SetMessage(value string) *VolumeErrorApplyConfiguration {
-	b.Message = &value
-	return b
-}
-
-// RemoveMessage removes the Message field from the declarative configuration.
-func (b *VolumeErrorApplyConfiguration) RemoveMessage() *VolumeErrorApplyConfiguration {
-	b.Message = nil
-	return b
-}
-
-// GetMessage gets the Message field from the declarative configuration.
-func (b *VolumeErrorApplyConfiguration) GetMessage() (value string, ok bool) {
-	if v := b.Message; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // VolumeErrorList represents a listAlias of VolumeErrorApplyConfiguration.
 type VolumeErrorList []*VolumeErrorApplyConfiguration
 

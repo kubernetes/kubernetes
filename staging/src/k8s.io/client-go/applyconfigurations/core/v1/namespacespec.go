@@ -28,32 +28,6 @@ type NamespaceSpecApplyConfiguration struct {
 	Finalizers *[]v1.FinalizerName `json:"finalizers,omitempty"`
 }
 
-// NamespaceSpecApplyConfiguration constructs an declarative configuration of the NamespaceSpec type for use with
-// apply.
-func NamespaceSpec() *NamespaceSpecApplyConfiguration {
-	return &NamespaceSpecApplyConfiguration{}
-}
-
-// SetFinalizers sets the Finalizers field in the declarative configuration to the given value.
-func (b *NamespaceSpecApplyConfiguration) SetFinalizers(value []v1.FinalizerName) *NamespaceSpecApplyConfiguration {
-	b.Finalizers = &value
-	return b
-}
-
-// RemoveFinalizers removes the Finalizers field from the declarative configuration.
-func (b *NamespaceSpecApplyConfiguration) RemoveFinalizers() *NamespaceSpecApplyConfiguration {
-	b.Finalizers = nil
-	return b
-}
-
-// GetFinalizers gets the Finalizers field from the declarative configuration.
-func (b *NamespaceSpecApplyConfiguration) GetFinalizers() (value []v1.FinalizerName, ok bool) {
-	if v := b.Finalizers; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // NamespaceSpecList represents a listAlias of NamespaceSpecApplyConfiguration.
 type NamespaceSpecList []*NamespaceSpecApplyConfiguration
 

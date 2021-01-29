@@ -24,32 +24,6 @@ type LimitRangeSpecApplyConfiguration struct {
 	Limits *LimitRangeItemList `json:"limits,omitempty"`
 }
 
-// LimitRangeSpecApplyConfiguration constructs an declarative configuration of the LimitRangeSpec type for use with
-// apply.
-func LimitRangeSpec() *LimitRangeSpecApplyConfiguration {
-	return &LimitRangeSpecApplyConfiguration{}
-}
-
-// SetLimits sets the Limits field in the declarative configuration to the given value.
-func (b *LimitRangeSpecApplyConfiguration) SetLimits(value LimitRangeItemList) *LimitRangeSpecApplyConfiguration {
-	b.Limits = &value
-	return b
-}
-
-// RemoveLimits removes the Limits field from the declarative configuration.
-func (b *LimitRangeSpecApplyConfiguration) RemoveLimits() *LimitRangeSpecApplyConfiguration {
-	b.Limits = nil
-	return b
-}
-
-// GetLimits gets the Limits field from the declarative configuration.
-func (b *LimitRangeSpecApplyConfiguration) GetLimits() (value LimitRangeItemList, ok bool) {
-	if v := b.Limits; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // LimitRangeSpecList represents a listAlias of LimitRangeSpecApplyConfiguration.
 type LimitRangeSpecList []*LimitRangeSpecApplyConfiguration
 

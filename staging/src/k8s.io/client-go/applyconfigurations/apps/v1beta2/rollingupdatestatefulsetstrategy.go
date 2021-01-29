@@ -24,32 +24,6 @@ type RollingUpdateStatefulSetStrategyApplyConfiguration struct {
 	Partition *int32 `json:"partition,omitempty"`
 }
 
-// RollingUpdateStatefulSetStrategyApplyConfiguration constructs an declarative configuration of the RollingUpdateStatefulSetStrategy type for use with
-// apply.
-func RollingUpdateStatefulSetStrategy() *RollingUpdateStatefulSetStrategyApplyConfiguration {
-	return &RollingUpdateStatefulSetStrategyApplyConfiguration{}
-}
-
-// SetPartition sets the Partition field in the declarative configuration to the given value.
-func (b *RollingUpdateStatefulSetStrategyApplyConfiguration) SetPartition(value int32) *RollingUpdateStatefulSetStrategyApplyConfiguration {
-	b.Partition = &value
-	return b
-}
-
-// RemovePartition removes the Partition field from the declarative configuration.
-func (b *RollingUpdateStatefulSetStrategyApplyConfiguration) RemovePartition() *RollingUpdateStatefulSetStrategyApplyConfiguration {
-	b.Partition = nil
-	return b
-}
-
-// GetPartition gets the Partition field from the declarative configuration.
-func (b *RollingUpdateStatefulSetStrategyApplyConfiguration) GetPartition() (value int32, ok bool) {
-	if v := b.Partition; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // RollingUpdateStatefulSetStrategyList represents a listAlias of RollingUpdateStatefulSetStrategyApplyConfiguration.
 type RollingUpdateStatefulSetStrategyList []*RollingUpdateStatefulSetStrategyApplyConfiguration
 

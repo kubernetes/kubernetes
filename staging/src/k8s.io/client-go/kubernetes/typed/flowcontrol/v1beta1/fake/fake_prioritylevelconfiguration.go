@@ -141,16 +141,16 @@ func (c *FakePriorityLevelConfigurations) Apply(ctx context.Context, priorityLev
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := priorityLevelConfiguration.GetObjectMeta()
-	if !ok {
+	meta := priorityLevelConfiguration.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("priorityLevelConfiguration.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("priorityLevelConfiguration.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(prioritylevelconfigurationsResource, name, types.ApplyPatchType, data, subresources...), &v1beta1.PriorityLevelConfiguration{})
+		Invokes(testing.NewRootPatchSubresourceAction(prioritylevelconfigurationsResource, *name, types.ApplyPatchType, data, subresources...), &v1beta1.PriorityLevelConfiguration{})
 	if obj == nil {
 		return nil, err
 	}

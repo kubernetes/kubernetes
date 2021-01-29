@@ -29,49 +29,6 @@ type IngressClassSpecApplyConfiguration struct {
 	Parameters *v1.TypedLocalObjectReferenceApplyConfiguration `json:"parameters,omitempty"`
 }
 
-// IngressClassSpecApplyConfiguration constructs an declarative configuration of the IngressClassSpec type for use with
-// apply.
-func IngressClassSpec() *IngressClassSpecApplyConfiguration {
-	return &IngressClassSpecApplyConfiguration{}
-}
-
-// SetController sets the Controller field in the declarative configuration to the given value.
-func (b *IngressClassSpecApplyConfiguration) SetController(value string) *IngressClassSpecApplyConfiguration {
-	b.Controller = &value
-	return b
-}
-
-// RemoveController removes the Controller field from the declarative configuration.
-func (b *IngressClassSpecApplyConfiguration) RemoveController() *IngressClassSpecApplyConfiguration {
-	b.Controller = nil
-	return b
-}
-
-// GetController gets the Controller field from the declarative configuration.
-func (b *IngressClassSpecApplyConfiguration) GetController() (value string, ok bool) {
-	if v := b.Controller; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetParameters sets the Parameters field in the declarative configuration to the given value.
-func (b *IngressClassSpecApplyConfiguration) SetParameters(value *v1.TypedLocalObjectReferenceApplyConfiguration) *IngressClassSpecApplyConfiguration {
-	b.Parameters = value
-	return b
-}
-
-// RemoveParameters removes the Parameters field from the declarative configuration.
-func (b *IngressClassSpecApplyConfiguration) RemoveParameters() *IngressClassSpecApplyConfiguration {
-	b.Parameters = nil
-	return b
-}
-
-// GetParameters gets the Parameters field from the declarative configuration.
-func (b *IngressClassSpecApplyConfiguration) GetParameters() (value *v1.TypedLocalObjectReferenceApplyConfiguration, ok bool) {
-	return b.Parameters, b.Parameters != nil
-}
-
 // IngressClassSpecList represents a listAlias of IngressClassSpecApplyConfiguration.
 type IngressClassSpecList []*IngressClassSpecApplyConfiguration
 

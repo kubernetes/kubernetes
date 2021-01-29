@@ -24,32 +24,6 @@ type AllowedFlexVolumeApplyConfiguration struct {
 	Driver *string `json:"driver,omitempty"`
 }
 
-// AllowedFlexVolumeApplyConfiguration constructs an declarative configuration of the AllowedFlexVolume type for use with
-// apply.
-func AllowedFlexVolume() *AllowedFlexVolumeApplyConfiguration {
-	return &AllowedFlexVolumeApplyConfiguration{}
-}
-
-// SetDriver sets the Driver field in the declarative configuration to the given value.
-func (b *AllowedFlexVolumeApplyConfiguration) SetDriver(value string) *AllowedFlexVolumeApplyConfiguration {
-	b.Driver = &value
-	return b
-}
-
-// RemoveDriver removes the Driver field from the declarative configuration.
-func (b *AllowedFlexVolumeApplyConfiguration) RemoveDriver() *AllowedFlexVolumeApplyConfiguration {
-	b.Driver = nil
-	return b
-}
-
-// GetDriver gets the Driver field from the declarative configuration.
-func (b *AllowedFlexVolumeApplyConfiguration) GetDriver() (value string, ok bool) {
-	if v := b.Driver; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // AllowedFlexVolumeList represents a listAlias of AllowedFlexVolumeApplyConfiguration.
 type AllowedFlexVolumeList []*AllowedFlexVolumeApplyConfiguration
 

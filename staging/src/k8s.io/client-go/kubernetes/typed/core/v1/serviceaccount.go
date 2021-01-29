@@ -191,19 +191,19 @@ func (c *serviceAccounts) Apply(ctx context.Context, serviceAccount *corev1.Serv
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := serviceAccount.GetObjectMeta()
-	if !ok {
+	meta := serviceAccount.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("serviceAccount.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("serviceAccount.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.ServiceAccount{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("serviceaccounts").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

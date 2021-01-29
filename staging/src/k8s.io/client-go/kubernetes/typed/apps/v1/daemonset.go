@@ -205,19 +205,19 @@ func (c *daemonSets) Apply(ctx context.Context, daemonSet *appsv1.DaemonSetApply
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := daemonSet.GetObjectMeta()
-	if !ok {
+	meta := daemonSet.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("daemonSet.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("daemonSet.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.DaemonSet{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("daemonsets").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

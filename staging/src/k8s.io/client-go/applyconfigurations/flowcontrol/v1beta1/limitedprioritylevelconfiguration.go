@@ -25,49 +25,6 @@ type LimitedPriorityLevelConfigurationApplyConfiguration struct {
 	LimitResponse            *LimitResponseApplyConfiguration `json:"limitResponse,omitempty"`
 }
 
-// LimitedPriorityLevelConfigurationApplyConfiguration constructs an declarative configuration of the LimitedPriorityLevelConfiguration type for use with
-// apply.
-func LimitedPriorityLevelConfiguration() *LimitedPriorityLevelConfigurationApplyConfiguration {
-	return &LimitedPriorityLevelConfigurationApplyConfiguration{}
-}
-
-// SetAssuredConcurrencyShares sets the AssuredConcurrencyShares field in the declarative configuration to the given value.
-func (b *LimitedPriorityLevelConfigurationApplyConfiguration) SetAssuredConcurrencyShares(value int32) *LimitedPriorityLevelConfigurationApplyConfiguration {
-	b.AssuredConcurrencyShares = &value
-	return b
-}
-
-// RemoveAssuredConcurrencyShares removes the AssuredConcurrencyShares field from the declarative configuration.
-func (b *LimitedPriorityLevelConfigurationApplyConfiguration) RemoveAssuredConcurrencyShares() *LimitedPriorityLevelConfigurationApplyConfiguration {
-	b.AssuredConcurrencyShares = nil
-	return b
-}
-
-// GetAssuredConcurrencyShares gets the AssuredConcurrencyShares field from the declarative configuration.
-func (b *LimitedPriorityLevelConfigurationApplyConfiguration) GetAssuredConcurrencyShares() (value int32, ok bool) {
-	if v := b.AssuredConcurrencyShares; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetLimitResponse sets the LimitResponse field in the declarative configuration to the given value.
-func (b *LimitedPriorityLevelConfigurationApplyConfiguration) SetLimitResponse(value *LimitResponseApplyConfiguration) *LimitedPriorityLevelConfigurationApplyConfiguration {
-	b.LimitResponse = value
-	return b
-}
-
-// RemoveLimitResponse removes the LimitResponse field from the declarative configuration.
-func (b *LimitedPriorityLevelConfigurationApplyConfiguration) RemoveLimitResponse() *LimitedPriorityLevelConfigurationApplyConfiguration {
-	b.LimitResponse = nil
-	return b
-}
-
-// GetLimitResponse gets the LimitResponse field from the declarative configuration.
-func (b *LimitedPriorityLevelConfigurationApplyConfiguration) GetLimitResponse() (value *LimitResponseApplyConfiguration, ok bool) {
-	return b.LimitResponse, b.LimitResponse != nil
-}
-
 // LimitedPriorityLevelConfigurationList represents a listAlias of LimitedPriorityLevelConfigurationApplyConfiguration.
 type LimitedPriorityLevelConfigurationList []*LimitedPriorityLevelConfigurationApplyConfiguration
 

@@ -130,16 +130,16 @@ func (c *FakeCSINodes) Apply(ctx context.Context, cSINode *applyconfigurationsst
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := cSINode.GetObjectMeta()
-	if !ok {
+	meta := cSINode.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("cSINode.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("cSINode.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(csinodesResource, name, types.ApplyPatchType, data, subresources...), &storagev1.CSINode{})
+		Invokes(testing.NewRootPatchSubresourceAction(csinodesResource, *name, types.ApplyPatchType, data, subresources...), &storagev1.CSINode{})
 	if obj == nil {
 		return nil, err
 	}

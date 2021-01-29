@@ -25,52 +25,6 @@ type LabelSelectorApplyConfiguration struct {
 	MatchExpressions *LabelSelectorRequirementList `json:"matchExpressions,omitempty"`
 }
 
-// LabelSelectorApplyConfiguration constructs an declarative configuration of the LabelSelector type for use with
-// apply.
-func LabelSelector() *LabelSelectorApplyConfiguration {
-	return &LabelSelectorApplyConfiguration{}
-}
-
-// SetMatchLabels sets the MatchLabels field in the declarative configuration to the given value.
-func (b *LabelSelectorApplyConfiguration) SetMatchLabels(value map[string]string) *LabelSelectorApplyConfiguration {
-	b.MatchLabels = &value
-	return b
-}
-
-// RemoveMatchLabels removes the MatchLabels field from the declarative configuration.
-func (b *LabelSelectorApplyConfiguration) RemoveMatchLabels() *LabelSelectorApplyConfiguration {
-	b.MatchLabels = nil
-	return b
-}
-
-// GetMatchLabels gets the MatchLabels field from the declarative configuration.
-func (b *LabelSelectorApplyConfiguration) GetMatchLabels() (value map[string]string, ok bool) {
-	if v := b.MatchLabels; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetMatchExpressions sets the MatchExpressions field in the declarative configuration to the given value.
-func (b *LabelSelectorApplyConfiguration) SetMatchExpressions(value LabelSelectorRequirementList) *LabelSelectorApplyConfiguration {
-	b.MatchExpressions = &value
-	return b
-}
-
-// RemoveMatchExpressions removes the MatchExpressions field from the declarative configuration.
-func (b *LabelSelectorApplyConfiguration) RemoveMatchExpressions() *LabelSelectorApplyConfiguration {
-	b.MatchExpressions = nil
-	return b
-}
-
-// GetMatchExpressions gets the MatchExpressions field from the declarative configuration.
-func (b *LabelSelectorApplyConfiguration) GetMatchExpressions() (value LabelSelectorRequirementList, ok bool) {
-	if v := b.MatchExpressions; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // LabelSelectorList represents a listAlias of LabelSelectorApplyConfiguration.
 type LabelSelectorList []*LabelSelectorApplyConfiguration
 

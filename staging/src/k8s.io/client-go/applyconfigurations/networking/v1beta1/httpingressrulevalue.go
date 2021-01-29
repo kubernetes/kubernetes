@@ -24,32 +24,6 @@ type HTTPIngressRuleValueApplyConfiguration struct {
 	Paths *HTTPIngressPathList `json:"paths,omitempty"`
 }
 
-// HTTPIngressRuleValueApplyConfiguration constructs an declarative configuration of the HTTPIngressRuleValue type for use with
-// apply.
-func HTTPIngressRuleValue() *HTTPIngressRuleValueApplyConfiguration {
-	return &HTTPIngressRuleValueApplyConfiguration{}
-}
-
-// SetPaths sets the Paths field in the declarative configuration to the given value.
-func (b *HTTPIngressRuleValueApplyConfiguration) SetPaths(value HTTPIngressPathList) *HTTPIngressRuleValueApplyConfiguration {
-	b.Paths = &value
-	return b
-}
-
-// RemovePaths removes the Paths field from the declarative configuration.
-func (b *HTTPIngressRuleValueApplyConfiguration) RemovePaths() *HTTPIngressRuleValueApplyConfiguration {
-	b.Paths = nil
-	return b
-}
-
-// GetPaths gets the Paths field from the declarative configuration.
-func (b *HTTPIngressRuleValueApplyConfiguration) GetPaths() (value HTTPIngressPathList, ok bool) {
-	if v := b.Paths; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // HTTPIngressRuleValueList represents a listAlias of HTTPIngressRuleValueApplyConfiguration.
 type HTTPIngressRuleValueList []*HTTPIngressRuleValueApplyConfiguration
 

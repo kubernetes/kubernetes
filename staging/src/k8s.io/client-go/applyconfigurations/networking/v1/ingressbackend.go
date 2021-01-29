@@ -29,46 +29,6 @@ type IngressBackendApplyConfiguration struct {
 	Resource *corev1.TypedLocalObjectReferenceApplyConfiguration `json:"resource,omitempty"`
 }
 
-// IngressBackendApplyConfiguration constructs an declarative configuration of the IngressBackend type for use with
-// apply.
-func IngressBackend() *IngressBackendApplyConfiguration {
-	return &IngressBackendApplyConfiguration{}
-}
-
-// SetService sets the Service field in the declarative configuration to the given value.
-func (b *IngressBackendApplyConfiguration) SetService(value *IngressServiceBackendApplyConfiguration) *IngressBackendApplyConfiguration {
-	b.Service = value
-	return b
-}
-
-// RemoveService removes the Service field from the declarative configuration.
-func (b *IngressBackendApplyConfiguration) RemoveService() *IngressBackendApplyConfiguration {
-	b.Service = nil
-	return b
-}
-
-// GetService gets the Service field from the declarative configuration.
-func (b *IngressBackendApplyConfiguration) GetService() (value *IngressServiceBackendApplyConfiguration, ok bool) {
-	return b.Service, b.Service != nil
-}
-
-// SetResource sets the Resource field in the declarative configuration to the given value.
-func (b *IngressBackendApplyConfiguration) SetResource(value *corev1.TypedLocalObjectReferenceApplyConfiguration) *IngressBackendApplyConfiguration {
-	b.Resource = value
-	return b
-}
-
-// RemoveResource removes the Resource field from the declarative configuration.
-func (b *IngressBackendApplyConfiguration) RemoveResource() *IngressBackendApplyConfiguration {
-	b.Resource = nil
-	return b
-}
-
-// GetResource gets the Resource field from the declarative configuration.
-func (b *IngressBackendApplyConfiguration) GetResource() (value *corev1.TypedLocalObjectReferenceApplyConfiguration, ok bool) {
-	return b.Resource, b.Resource != nil
-}
-
 // IngressBackendList represents a listAlias of IngressBackendApplyConfiguration.
 type IngressBackendList []*IngressBackendApplyConfiguration
 

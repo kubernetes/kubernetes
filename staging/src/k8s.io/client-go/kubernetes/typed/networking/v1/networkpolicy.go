@@ -188,19 +188,19 @@ func (c *networkPolicies) Apply(ctx context.Context, networkPolicy *networkingv1
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := networkPolicy.GetObjectMeta()
-	if !ok {
+	meta := networkPolicy.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("networkPolicy.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("networkPolicy.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.NetworkPolicy{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("networkpolicies").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

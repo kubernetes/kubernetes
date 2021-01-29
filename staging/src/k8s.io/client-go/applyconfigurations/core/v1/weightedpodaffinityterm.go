@@ -25,49 +25,6 @@ type WeightedPodAffinityTermApplyConfiguration struct {
 	PodAffinityTerm *PodAffinityTermApplyConfiguration `json:"podAffinityTerm,omitempty"`
 }
 
-// WeightedPodAffinityTermApplyConfiguration constructs an declarative configuration of the WeightedPodAffinityTerm type for use with
-// apply.
-func WeightedPodAffinityTerm() *WeightedPodAffinityTermApplyConfiguration {
-	return &WeightedPodAffinityTermApplyConfiguration{}
-}
-
-// SetWeight sets the Weight field in the declarative configuration to the given value.
-func (b *WeightedPodAffinityTermApplyConfiguration) SetWeight(value int32) *WeightedPodAffinityTermApplyConfiguration {
-	b.Weight = &value
-	return b
-}
-
-// RemoveWeight removes the Weight field from the declarative configuration.
-func (b *WeightedPodAffinityTermApplyConfiguration) RemoveWeight() *WeightedPodAffinityTermApplyConfiguration {
-	b.Weight = nil
-	return b
-}
-
-// GetWeight gets the Weight field from the declarative configuration.
-func (b *WeightedPodAffinityTermApplyConfiguration) GetWeight() (value int32, ok bool) {
-	if v := b.Weight; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetPodAffinityTerm sets the PodAffinityTerm field in the declarative configuration to the given value.
-func (b *WeightedPodAffinityTermApplyConfiguration) SetPodAffinityTerm(value *PodAffinityTermApplyConfiguration) *WeightedPodAffinityTermApplyConfiguration {
-	b.PodAffinityTerm = value
-	return b
-}
-
-// RemovePodAffinityTerm removes the PodAffinityTerm field from the declarative configuration.
-func (b *WeightedPodAffinityTermApplyConfiguration) RemovePodAffinityTerm() *WeightedPodAffinityTermApplyConfiguration {
-	b.PodAffinityTerm = nil
-	return b
-}
-
-// GetPodAffinityTerm gets the PodAffinityTerm field from the declarative configuration.
-func (b *WeightedPodAffinityTermApplyConfiguration) GetPodAffinityTerm() (value *PodAffinityTermApplyConfiguration, ok bool) {
-	return b.PodAffinityTerm, b.PodAffinityTerm != nil
-}
-
 // WeightedPodAffinityTermList represents a listAlias of WeightedPodAffinityTermApplyConfiguration.
 type WeightedPodAffinityTermList []*WeightedPodAffinityTermApplyConfiguration
 

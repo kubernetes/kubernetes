@@ -30,69 +30,6 @@ type ContainerResourceMetricSourceApplyConfiguration struct {
 	Container *string                         `json:"container,omitempty"`
 }
 
-// ContainerResourceMetricSourceApplyConfiguration constructs an declarative configuration of the ContainerResourceMetricSource type for use with
-// apply.
-func ContainerResourceMetricSource() *ContainerResourceMetricSourceApplyConfiguration {
-	return &ContainerResourceMetricSourceApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *ContainerResourceMetricSourceApplyConfiguration) SetName(value v1.ResourceName) *ContainerResourceMetricSourceApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *ContainerResourceMetricSourceApplyConfiguration) RemoveName() *ContainerResourceMetricSourceApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *ContainerResourceMetricSourceApplyConfiguration) GetName() (value v1.ResourceName, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetTarget sets the Target field in the declarative configuration to the given value.
-func (b *ContainerResourceMetricSourceApplyConfiguration) SetTarget(value *MetricTargetApplyConfiguration) *ContainerResourceMetricSourceApplyConfiguration {
-	b.Target = value
-	return b
-}
-
-// RemoveTarget removes the Target field from the declarative configuration.
-func (b *ContainerResourceMetricSourceApplyConfiguration) RemoveTarget() *ContainerResourceMetricSourceApplyConfiguration {
-	b.Target = nil
-	return b
-}
-
-// GetTarget gets the Target field from the declarative configuration.
-func (b *ContainerResourceMetricSourceApplyConfiguration) GetTarget() (value *MetricTargetApplyConfiguration, ok bool) {
-	return b.Target, b.Target != nil
-}
-
-// SetContainer sets the Container field in the declarative configuration to the given value.
-func (b *ContainerResourceMetricSourceApplyConfiguration) SetContainer(value string) *ContainerResourceMetricSourceApplyConfiguration {
-	b.Container = &value
-	return b
-}
-
-// RemoveContainer removes the Container field from the declarative configuration.
-func (b *ContainerResourceMetricSourceApplyConfiguration) RemoveContainer() *ContainerResourceMetricSourceApplyConfiguration {
-	b.Container = nil
-	return b
-}
-
-// GetContainer gets the Container field from the declarative configuration.
-func (b *ContainerResourceMetricSourceApplyConfiguration) GetContainer() (value string, ok bool) {
-	if v := b.Container; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ContainerResourceMetricSourceList represents a listAlias of ContainerResourceMetricSourceApplyConfiguration.
 type ContainerResourceMetricSourceList []*ContainerResourceMetricSourceApplyConfiguration
 

@@ -30,62 +30,6 @@ type MutatingWebhookConfigurationApplyConfiguration struct {
 	Webhooks                      *MutatingWebhookList             `json:"webhooks,omitempty"`
 }
 
-// MutatingWebhookConfigurationApplyConfiguration constructs an declarative configuration of the MutatingWebhookConfiguration type for use with
-// apply.
-func MutatingWebhookConfiguration() *MutatingWebhookConfigurationApplyConfiguration {
-	return &MutatingWebhookConfigurationApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *MutatingWebhookConfigurationApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *MutatingWebhookConfigurationApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *MutatingWebhookConfigurationApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *MutatingWebhookConfigurationApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *MutatingWebhookConfigurationApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *MutatingWebhookConfigurationApplyConfiguration) RemoveObjectMeta() *MutatingWebhookConfigurationApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *MutatingWebhookConfigurationApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetWebhooks sets the Webhooks field in the declarative configuration to the given value.
-func (b *MutatingWebhookConfigurationApplyConfiguration) SetWebhooks(value MutatingWebhookList) *MutatingWebhookConfigurationApplyConfiguration {
-	b.Webhooks = &value
-	return b
-}
-
-// RemoveWebhooks removes the Webhooks field from the declarative configuration.
-func (b *MutatingWebhookConfigurationApplyConfiguration) RemoveWebhooks() *MutatingWebhookConfigurationApplyConfiguration {
-	b.Webhooks = nil
-	return b
-}
-
-// GetWebhooks gets the Webhooks field from the declarative configuration.
-func (b *MutatingWebhookConfigurationApplyConfiguration) GetWebhooks() (value MutatingWebhookList, ok bool) {
-	if v := b.Webhooks; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // MutatingWebhookConfigurationList represents a listAlias of MutatingWebhookConfigurationApplyConfiguration.
 type MutatingWebhookConfigurationList []*MutatingWebhookConfigurationApplyConfiguration
 

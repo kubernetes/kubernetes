@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/pointer"
 )
 
 func TestClient(t *testing.T) {
@@ -812,42 +813,47 @@ func TestSelfLinkOnNamespace(t *testing.T) {
 }
 
 func TestApplyWithApplyConfigurations(t *testing.T) {
-	deploymentConfig := appsv1mf.Deployment().
-		SetTypeMeta(metav1mf.TypeMeta().
-			SetKind("Deployment").
-			SetAPIVersion("apps/v1"),
-		).
-		SetObjectMeta(metav1mf.ObjectMeta().
-			SetName("nginx-deployment-3"),
-		).
-		SetSpec(appsv1mf.DeploymentSpec().
-			SetSelector(metav1mf.LabelSelector().
-				SetMatchLabels(map[string]string{"app": "nginx"}),
-			).
-			SetTemplate(corev1mf.PodTemplateSpec().
-				SetObjectMeta(metav1mf.ObjectMeta().
-					SetLabels(map[string]string{"app": "nginx"}),
-				).
-				SetSpec(corev1mf.PodSpec().
-					SetContainers(corev1mf.ContainerList{
-						corev1mf.Container().
-							SetName("nginx").
-							SetImage("nginx:1.14.2").
-							SetStdin(true).
-							SetPorts(corev1mf.ContainerPortList{
-								corev1mf.ContainerPort().
-									SetContainerPort(8080).
-									SetProtocol(v1.ProtocolTCP),
-							}).
-							SetResources(corev1mf.ResourceRequirements().
-								SetLimits(v1.ResourceList{
+	protocolTCP := v1.ProtocolTCP
+	deploymentConfig := &appsv1mf.DeploymentApplyConfiguration{
+		TypeMetaApplyConfiguration: metav1mf.TypeMetaApplyConfiguration{
+			Kind:       pointer.StringPtr("Deployment"),
+			APIVersion: pointer.StringPtr("apps/v1"),
+		},
+		ObjectMeta: &metav1mf.ObjectMetaApplyConfiguration{
+			Name: pointer.StringPtr("nginx-deployment-3"),
+		},
+		Spec: &appsv1mf.DeploymentSpecApplyConfiguration{
+			Selector: &metav1mf.LabelSelectorApplyConfiguration{
+				MatchLabels: &map[string]string{"app": "nginx"},
+			},
+			Template: &corev1mf.PodTemplateSpecApplyConfiguration{
+				ObjectMeta: &metav1mf.ObjectMetaApplyConfiguration{
+					Labels: &map[string]string{"app": "nginx"},
+				},
+				Spec: &corev1mf.PodSpecApplyConfiguration{
+					Containers: &corev1mf.ContainerList{
+						&corev1mf.ContainerApplyConfiguration{
+							Name:  pointer.StringPtr("nginx"),
+							Image: pointer.StringPtr("nginx:1.14.2"),
+							Stdin: pointer.BoolPtr(true),
+							Ports: &corev1mf.ContainerPortList{
+								&corev1mf.ContainerPortApplyConfiguration{
+									ContainerPort: pointer.Int32Ptr(8080),
+									Protocol:      &protocolTCP,
+								},
+							},
+							Resources: &corev1mf.ResourceRequirementsApplyConfiguration{
+								Limits: &v1.ResourceList{
 									v1.ResourceCPU:    resource.MustParse("4"),
 									v1.ResourceMemory: resource.MustParse("32Gi"),
-								})),
-					}),
-				),
-			),
-		)
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 	expectedDeployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
@@ -911,7 +917,7 @@ func TestApplyWithApplyConfigurations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error when converting Deployment to unstructured: %v", err)
 		}
-		mf := appsv1mf.Deployment()
+		mf := &appsv1mf.DeploymentApplyConfiguration{}
 		err = runtime.DefaultUnstructuredConverter.FromUnstructured(u, mf)
 		if err != nil {
 			t.Fatalf("unexpected error when converting unstructured to manifest: %v", err)
@@ -948,87 +954,5 @@ func TestApplyWithApplyConfigurations(t *testing.T) {
 		if cpu.Value() != int64(4) {
 			t.Errorf("expected resourceCPU limit %d but got %d", 4, cpu.Value())
 		}
-	}
-}
-
-func TestApplyApplyConfigurationAccessors(t *testing.T) {
-	deploymentManifest := appsv1mf.Deployment().
-		SetTypeMeta(metav1mf.TypeMeta().
-			SetKind("Deployment").
-			SetAPIVersion("apps/v1"),
-		).
-		SetObjectMeta(metav1mf.ObjectMeta().
-			SetName("nginx-deployment-3"),
-		).
-		SetSpec(appsv1mf.DeploymentSpec().
-			SetSelector(metav1mf.LabelSelector().
-				SetMatchLabels(map[string]string{"app": "nginx"}),
-			).
-			SetTemplate(corev1mf.PodTemplateSpec().
-				SetObjectMeta(metav1mf.ObjectMeta().
-					SetLabels(map[string]string{"app": "nginx"}),
-				).
-				SetSpec(corev1mf.PodSpec().
-					SetContainers(corev1mf.ContainerList{
-						corev1mf.Container().
-							SetName("nginx").
-							SetImage("nginx:1.14.2").
-							SetStdin(true).
-							SetPorts(corev1mf.ContainerPortList{
-								corev1mf.ContainerPort().
-									SetContainerPort(8080).
-									SetProtocol(v1.ProtocolTCP),
-							}).
-							SetResources(corev1mf.ResourceRequirements().
-								SetLimits(v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("4"),
-									v1.ResourceMemory: resource.MustParse("32Gi"),
-								})),
-					}),
-				),
-			),
-		)
-
-	var name string
-	var apiVersion string
-	if meta, ok := deploymentManifest.GetTypeMeta(); ok {
-		meta.SetKind("foo")
-		apiVersion, _ = meta.GetAPIVersion()
-	}
-	if spec, ok := deploymentManifest.GetSpec(); ok {
-		if template, ok := spec.GetTemplate(); ok {
-			if templateSpec, ok := template.GetSpec(); ok {
-				if containers, ok := templateSpec.GetContainers(); ok {
-					name, _ = containers[0].GetName()
-					containers[0].SetImage("replacement:1.0.0")
-				}
-			}
-		}
-	}
-	var kind string
-	var image string
-	if meta, ok := deploymentManifest.GetTypeMeta(); ok {
-		kind, _ = meta.GetKind()
-	}
-	if spec, ok := deploymentManifest.GetSpec(); ok {
-		if template, ok := spec.GetTemplate(); ok {
-			if templateSpec, ok := template.GetSpec(); ok {
-				if containers, ok := templateSpec.GetContainers(); ok {
-					image, _ = containers[0].GetImage()
-				}
-			}
-		}
-	}
-	if apiVersion != "apps/v1" {
-		t.Errorf("expected apiVersion %s but got %s", "apps/v1", apiVersion)
-	}
-	if kind != "foo" {
-		t.Errorf("expected kind %s but got %s", "foo", kind)
-	}
-	if name != "nginx" {
-		t.Errorf("expected name %s but got %s", "nginx", name)
-	}
-	if image != "replacement:1.0.0" {
-		t.Errorf("expected image %s but got %s", "replacement:1.0.0", image)
 	}
 }

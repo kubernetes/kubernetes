@@ -26,65 +26,6 @@ type SecretProjectionApplyConfiguration struct {
 	Optional                               *bool          `json:"optional,omitempty"`
 }
 
-// SecretProjectionApplyConfiguration constructs an declarative configuration of the SecretProjection type for use with
-// apply.
-func SecretProjection() *SecretProjectionApplyConfiguration {
-	return &SecretProjectionApplyConfiguration{}
-}
-
-// SetLocalObjectReference sets the LocalObjectReference field in the declarative configuration to the given value.
-func (b *SecretProjectionApplyConfiguration) SetLocalObjectReference(value *LocalObjectReferenceApplyConfiguration) *SecretProjectionApplyConfiguration {
-	if value != nil {
-		b.LocalObjectReferenceApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetLocalObjectReference gets the LocalObjectReference field from the declarative configuration.
-func (b *SecretProjectionApplyConfiguration) GetLocalObjectReference() (value *LocalObjectReferenceApplyConfiguration, ok bool) {
-	return &b.LocalObjectReferenceApplyConfiguration, true
-}
-
-// SetItems sets the Items field in the declarative configuration to the given value.
-func (b *SecretProjectionApplyConfiguration) SetItems(value KeyToPathList) *SecretProjectionApplyConfiguration {
-	b.Items = &value
-	return b
-}
-
-// RemoveItems removes the Items field from the declarative configuration.
-func (b *SecretProjectionApplyConfiguration) RemoveItems() *SecretProjectionApplyConfiguration {
-	b.Items = nil
-	return b
-}
-
-// GetItems gets the Items field from the declarative configuration.
-func (b *SecretProjectionApplyConfiguration) GetItems() (value KeyToPathList, ok bool) {
-	if v := b.Items; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetOptional sets the Optional field in the declarative configuration to the given value.
-func (b *SecretProjectionApplyConfiguration) SetOptional(value bool) *SecretProjectionApplyConfiguration {
-	b.Optional = &value
-	return b
-}
-
-// RemoveOptional removes the Optional field from the declarative configuration.
-func (b *SecretProjectionApplyConfiguration) RemoveOptional() *SecretProjectionApplyConfiguration {
-	b.Optional = nil
-	return b
-}
-
-// GetOptional gets the Optional field from the declarative configuration.
-func (b *SecretProjectionApplyConfiguration) GetOptional() (value bool, ok bool) {
-	if v := b.Optional; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // SecretProjectionList represents a listAlias of SecretProjectionApplyConfiguration.
 type SecretProjectionList []*SecretProjectionApplyConfiguration
 

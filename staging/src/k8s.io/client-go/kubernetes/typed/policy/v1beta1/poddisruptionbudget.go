@@ -205,19 +205,19 @@ func (c *podDisruptionBudgets) Apply(ctx context.Context, podDisruptionBudget *p
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := podDisruptionBudget.GetObjectMeta()
-	if !ok {
+	meta := podDisruptionBudget.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("podDisruptionBudget.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("podDisruptionBudget.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

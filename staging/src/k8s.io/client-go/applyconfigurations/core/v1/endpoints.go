@@ -30,62 +30,6 @@ type EndpointsApplyConfiguration struct {
 	Subsets                       *EndpointSubsetList              `json:"subsets,omitempty"`
 }
 
-// EndpointsApplyConfiguration constructs an declarative configuration of the Endpoints type for use with
-// apply.
-func Endpoints() *EndpointsApplyConfiguration {
-	return &EndpointsApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *EndpointsApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *EndpointsApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *EndpointsApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *EndpointsApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *EndpointsApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *EndpointsApplyConfiguration) RemoveObjectMeta() *EndpointsApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *EndpointsApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetSubsets sets the Subsets field in the declarative configuration to the given value.
-func (b *EndpointsApplyConfiguration) SetSubsets(value EndpointSubsetList) *EndpointsApplyConfiguration {
-	b.Subsets = &value
-	return b
-}
-
-// RemoveSubsets removes the Subsets field from the declarative configuration.
-func (b *EndpointsApplyConfiguration) RemoveSubsets() *EndpointsApplyConfiguration {
-	b.Subsets = nil
-	return b
-}
-
-// GetSubsets gets the Subsets field from the declarative configuration.
-func (b *EndpointsApplyConfiguration) GetSubsets() (value EndpointSubsetList, ok bool) {
-	if v := b.Subsets; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // EndpointsList represents a listAlias of EndpointsApplyConfiguration.
 type EndpointsList []*EndpointsApplyConfiguration
 

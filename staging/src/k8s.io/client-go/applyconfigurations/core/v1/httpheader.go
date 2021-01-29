@@ -25,52 +25,6 @@ type HTTPHeaderApplyConfiguration struct {
 	Value *string `json:"value,omitempty"`
 }
 
-// HTTPHeaderApplyConfiguration constructs an declarative configuration of the HTTPHeader type for use with
-// apply.
-func HTTPHeader() *HTTPHeaderApplyConfiguration {
-	return &HTTPHeaderApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *HTTPHeaderApplyConfiguration) SetName(value string) *HTTPHeaderApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *HTTPHeaderApplyConfiguration) RemoveName() *HTTPHeaderApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *HTTPHeaderApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetValue sets the Value field in the declarative configuration to the given value.
-func (b *HTTPHeaderApplyConfiguration) SetValue(value string) *HTTPHeaderApplyConfiguration {
-	b.Value = &value
-	return b
-}
-
-// RemoveValue removes the Value field from the declarative configuration.
-func (b *HTTPHeaderApplyConfiguration) RemoveValue() *HTTPHeaderApplyConfiguration {
-	b.Value = nil
-	return b
-}
-
-// GetValue gets the Value field from the declarative configuration.
-func (b *HTTPHeaderApplyConfiguration) GetValue() (value string, ok bool) {
-	if v := b.Value; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // HTTPHeaderList represents a listAlias of HTTPHeaderApplyConfiguration.
 type HTTPHeaderList []*HTTPHeaderApplyConfiguration
 

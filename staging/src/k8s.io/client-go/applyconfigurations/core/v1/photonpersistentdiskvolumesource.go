@@ -25,52 +25,6 @@ type PhotonPersistentDiskVolumeSourceApplyConfiguration struct {
 	FSType *string `json:"fsType,omitempty"`
 }
 
-// PhotonPersistentDiskVolumeSourceApplyConfiguration constructs an declarative configuration of the PhotonPersistentDiskVolumeSource type for use with
-// apply.
-func PhotonPersistentDiskVolumeSource() *PhotonPersistentDiskVolumeSourceApplyConfiguration {
-	return &PhotonPersistentDiskVolumeSourceApplyConfiguration{}
-}
-
-// SetPdID sets the PdID field in the declarative configuration to the given value.
-func (b *PhotonPersistentDiskVolumeSourceApplyConfiguration) SetPdID(value string) *PhotonPersistentDiskVolumeSourceApplyConfiguration {
-	b.PdID = &value
-	return b
-}
-
-// RemovePdID removes the PdID field from the declarative configuration.
-func (b *PhotonPersistentDiskVolumeSourceApplyConfiguration) RemovePdID() *PhotonPersistentDiskVolumeSourceApplyConfiguration {
-	b.PdID = nil
-	return b
-}
-
-// GetPdID gets the PdID field from the declarative configuration.
-func (b *PhotonPersistentDiskVolumeSourceApplyConfiguration) GetPdID() (value string, ok bool) {
-	if v := b.PdID; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetFSType sets the FSType field in the declarative configuration to the given value.
-func (b *PhotonPersistentDiskVolumeSourceApplyConfiguration) SetFSType(value string) *PhotonPersistentDiskVolumeSourceApplyConfiguration {
-	b.FSType = &value
-	return b
-}
-
-// RemoveFSType removes the FSType field from the declarative configuration.
-func (b *PhotonPersistentDiskVolumeSourceApplyConfiguration) RemoveFSType() *PhotonPersistentDiskVolumeSourceApplyConfiguration {
-	b.FSType = nil
-	return b
-}
-
-// GetFSType gets the FSType field from the declarative configuration.
-func (b *PhotonPersistentDiskVolumeSourceApplyConfiguration) GetFSType() (value string, ok bool) {
-	if v := b.FSType; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // PhotonPersistentDiskVolumeSourceList represents a listAlias of PhotonPersistentDiskVolumeSourceApplyConfiguration.
 type PhotonPersistentDiskVolumeSourceList []*PhotonPersistentDiskVolumeSourceApplyConfiguration
 

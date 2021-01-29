@@ -29,52 +29,6 @@ type NodeAddressApplyConfiguration struct {
 	Address *string             `json:"address,omitempty"`
 }
 
-// NodeAddressApplyConfiguration constructs an declarative configuration of the NodeAddress type for use with
-// apply.
-func NodeAddress() *NodeAddressApplyConfiguration {
-	return &NodeAddressApplyConfiguration{}
-}
-
-// SetType sets the Type field in the declarative configuration to the given value.
-func (b *NodeAddressApplyConfiguration) SetType(value v1.NodeAddressType) *NodeAddressApplyConfiguration {
-	b.Type = &value
-	return b
-}
-
-// RemoveType removes the Type field from the declarative configuration.
-func (b *NodeAddressApplyConfiguration) RemoveType() *NodeAddressApplyConfiguration {
-	b.Type = nil
-	return b
-}
-
-// GetType gets the Type field from the declarative configuration.
-func (b *NodeAddressApplyConfiguration) GetType() (value v1.NodeAddressType, ok bool) {
-	if v := b.Type; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetAddress sets the Address field in the declarative configuration to the given value.
-func (b *NodeAddressApplyConfiguration) SetAddress(value string) *NodeAddressApplyConfiguration {
-	b.Address = &value
-	return b
-}
-
-// RemoveAddress removes the Address field from the declarative configuration.
-func (b *NodeAddressApplyConfiguration) RemoveAddress() *NodeAddressApplyConfiguration {
-	b.Address = nil
-	return b
-}
-
-// GetAddress gets the Address field from the declarative configuration.
-func (b *NodeAddressApplyConfiguration) GetAddress() (value string, ok bool) {
-	if v := b.Address; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // NodeAddressList represents a listAlias of NodeAddressApplyConfiguration.
 type NodeAddressList []*NodeAddressApplyConfiguration
 

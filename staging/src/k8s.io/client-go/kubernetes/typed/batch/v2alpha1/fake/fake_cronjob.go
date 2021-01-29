@@ -150,16 +150,16 @@ func (c *FakeCronJobs) Apply(ctx context.Context, cronJob *batchv2alpha1.CronJob
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := cronJob.GetObjectMeta()
-	if !ok {
+	meta := cronJob.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("cronJob.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("cronJob.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(cronjobsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &v2alpha1.CronJob{})
+		Invokes(testing.NewPatchSubresourceAction(cronjobsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &v2alpha1.CronJob{})
 
 	if obj == nil {
 		return nil, err

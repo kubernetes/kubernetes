@@ -24,29 +24,6 @@ type VolumeNodeAffinityApplyConfiguration struct {
 	Required *NodeSelectorApplyConfiguration `json:"required,omitempty"`
 }
 
-// VolumeNodeAffinityApplyConfiguration constructs an declarative configuration of the VolumeNodeAffinity type for use with
-// apply.
-func VolumeNodeAffinity() *VolumeNodeAffinityApplyConfiguration {
-	return &VolumeNodeAffinityApplyConfiguration{}
-}
-
-// SetRequired sets the Required field in the declarative configuration to the given value.
-func (b *VolumeNodeAffinityApplyConfiguration) SetRequired(value *NodeSelectorApplyConfiguration) *VolumeNodeAffinityApplyConfiguration {
-	b.Required = value
-	return b
-}
-
-// RemoveRequired removes the Required field from the declarative configuration.
-func (b *VolumeNodeAffinityApplyConfiguration) RemoveRequired() *VolumeNodeAffinityApplyConfiguration {
-	b.Required = nil
-	return b
-}
-
-// GetRequired gets the Required field from the declarative configuration.
-func (b *VolumeNodeAffinityApplyConfiguration) GetRequired() (value *NodeSelectorApplyConfiguration, ok bool) {
-	return b.Required, b.Required != nil
-}
-
 // VolumeNodeAffinityList represents a listAlias of VolumeNodeAffinityApplyConfiguration.
 type VolumeNodeAffinityList []*VolumeNodeAffinityApplyConfiguration
 

@@ -25,52 +25,6 @@ type AllowedHostPathApplyConfiguration struct {
 	ReadOnly   *bool   `json:"readOnly,omitempty"`
 }
 
-// AllowedHostPathApplyConfiguration constructs an declarative configuration of the AllowedHostPath type for use with
-// apply.
-func AllowedHostPath() *AllowedHostPathApplyConfiguration {
-	return &AllowedHostPathApplyConfiguration{}
-}
-
-// SetPathPrefix sets the PathPrefix field in the declarative configuration to the given value.
-func (b *AllowedHostPathApplyConfiguration) SetPathPrefix(value string) *AllowedHostPathApplyConfiguration {
-	b.PathPrefix = &value
-	return b
-}
-
-// RemovePathPrefix removes the PathPrefix field from the declarative configuration.
-func (b *AllowedHostPathApplyConfiguration) RemovePathPrefix() *AllowedHostPathApplyConfiguration {
-	b.PathPrefix = nil
-	return b
-}
-
-// GetPathPrefix gets the PathPrefix field from the declarative configuration.
-func (b *AllowedHostPathApplyConfiguration) GetPathPrefix() (value string, ok bool) {
-	if v := b.PathPrefix; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetReadOnly sets the ReadOnly field in the declarative configuration to the given value.
-func (b *AllowedHostPathApplyConfiguration) SetReadOnly(value bool) *AllowedHostPathApplyConfiguration {
-	b.ReadOnly = &value
-	return b
-}
-
-// RemoveReadOnly removes the ReadOnly field from the declarative configuration.
-func (b *AllowedHostPathApplyConfiguration) RemoveReadOnly() *AllowedHostPathApplyConfiguration {
-	b.ReadOnly = nil
-	return b
-}
-
-// GetReadOnly gets the ReadOnly field from the declarative configuration.
-func (b *AllowedHostPathApplyConfiguration) GetReadOnly() (value bool, ok bool) {
-	if v := b.ReadOnly; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // AllowedHostPathList represents a listAlias of AllowedHostPathApplyConfiguration.
 type AllowedHostPathList []*AllowedHostPathApplyConfiguration
 

@@ -24,32 +24,6 @@ type ClientIPConfigApplyConfiguration struct {
 	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
 }
 
-// ClientIPConfigApplyConfiguration constructs an declarative configuration of the ClientIPConfig type for use with
-// apply.
-func ClientIPConfig() *ClientIPConfigApplyConfiguration {
-	return &ClientIPConfigApplyConfiguration{}
-}
-
-// SetTimeoutSeconds sets the TimeoutSeconds field in the declarative configuration to the given value.
-func (b *ClientIPConfigApplyConfiguration) SetTimeoutSeconds(value int32) *ClientIPConfigApplyConfiguration {
-	b.TimeoutSeconds = &value
-	return b
-}
-
-// RemoveTimeoutSeconds removes the TimeoutSeconds field from the declarative configuration.
-func (b *ClientIPConfigApplyConfiguration) RemoveTimeoutSeconds() *ClientIPConfigApplyConfiguration {
-	b.TimeoutSeconds = nil
-	return b
-}
-
-// GetTimeoutSeconds gets the TimeoutSeconds field from the declarative configuration.
-func (b *ClientIPConfigApplyConfiguration) GetTimeoutSeconds() (value int32, ok bool) {
-	if v := b.TimeoutSeconds; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ClientIPConfigList represents a listAlias of ClientIPConfigApplyConfiguration.
 type ClientIPConfigList []*ClientIPConfigApplyConfiguration
 

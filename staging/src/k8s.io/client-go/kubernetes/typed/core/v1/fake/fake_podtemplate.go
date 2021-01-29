@@ -138,16 +138,16 @@ func (c *FakePodTemplates) Apply(ctx context.Context, podTemplate *applyconfigur
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := podTemplate.GetObjectMeta()
-	if !ok {
+	meta := podTemplate.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("podTemplate.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("podTemplate.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podtemplatesResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.PodTemplate{})
+		Invokes(testing.NewPatchSubresourceAction(podtemplatesResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &corev1.PodTemplate{})
 
 	if obj == nil {
 		return nil, err

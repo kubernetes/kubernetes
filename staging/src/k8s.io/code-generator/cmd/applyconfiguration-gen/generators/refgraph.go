@@ -125,7 +125,9 @@ func findReachableTypes(t *types.Type, referencedTypes map[types.Name]*types.Typ
 // in the type system here.
 var excludeTypes = map[types.Name]struct{}{
 	rawExtension.Name: {},
-	unknown.Name:      {},
+	// typeMeta.Name:     {}, // TODO(jpbetz): Exclude TypeMeta and ObjectMeta from apply configuration generation since all their fields are optional already?
+	// objectMeta.Name:   {},
+	unknown.Name: {},
 	// DO NOT ADD TO THIS LIST. If we need to exclude other types, we should consider allowing the
 	// go type declarations to be annotated as excluded from this generator.
 }

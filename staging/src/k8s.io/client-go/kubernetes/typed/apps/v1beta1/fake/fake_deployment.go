@@ -150,16 +150,16 @@ func (c *FakeDeployments) Apply(ctx context.Context, deployment *appsv1beta1.Dep
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := deployment.GetObjectMeta()
-	if !ok {
+	meta := deployment.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("deployment.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("deployment.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &v1beta1.Deployment{})
+		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &v1beta1.Deployment{})
 
 	if obj == nil {
 		return nil, err

@@ -25,52 +25,6 @@ type TokenRequestApplyConfiguration struct {
 	ExpirationSeconds *int64  `json:"expirationSeconds,omitempty"`
 }
 
-// TokenRequestApplyConfiguration constructs an declarative configuration of the TokenRequest type for use with
-// apply.
-func TokenRequest() *TokenRequestApplyConfiguration {
-	return &TokenRequestApplyConfiguration{}
-}
-
-// SetAudience sets the Audience field in the declarative configuration to the given value.
-func (b *TokenRequestApplyConfiguration) SetAudience(value string) *TokenRequestApplyConfiguration {
-	b.Audience = &value
-	return b
-}
-
-// RemoveAudience removes the Audience field from the declarative configuration.
-func (b *TokenRequestApplyConfiguration) RemoveAudience() *TokenRequestApplyConfiguration {
-	b.Audience = nil
-	return b
-}
-
-// GetAudience gets the Audience field from the declarative configuration.
-func (b *TokenRequestApplyConfiguration) GetAudience() (value string, ok bool) {
-	if v := b.Audience; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetExpirationSeconds sets the ExpirationSeconds field in the declarative configuration to the given value.
-func (b *TokenRequestApplyConfiguration) SetExpirationSeconds(value int64) *TokenRequestApplyConfiguration {
-	b.ExpirationSeconds = &value
-	return b
-}
-
-// RemoveExpirationSeconds removes the ExpirationSeconds field from the declarative configuration.
-func (b *TokenRequestApplyConfiguration) RemoveExpirationSeconds() *TokenRequestApplyConfiguration {
-	b.ExpirationSeconds = nil
-	return b
-}
-
-// GetExpirationSeconds gets the ExpirationSeconds field from the declarative configuration.
-func (b *TokenRequestApplyConfiguration) GetExpirationSeconds() (value int64, ok bool) {
-	if v := b.ExpirationSeconds; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // TokenRequestList represents a listAlias of TokenRequestApplyConfiguration.
 type TokenRequestList []*TokenRequestApplyConfiguration
 

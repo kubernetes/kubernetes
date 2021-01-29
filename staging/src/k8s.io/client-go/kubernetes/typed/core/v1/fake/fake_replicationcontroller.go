@@ -151,16 +151,16 @@ func (c *FakeReplicationControllers) Apply(ctx context.Context, replicationContr
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := replicationController.GetObjectMeta()
-	if !ok {
+	meta := replicationController.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("replicationController.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("replicationController.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.ReplicationController{})
+		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &corev1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err

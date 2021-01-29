@@ -24,32 +24,6 @@ type UserSubjectApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// UserSubjectApplyConfiguration constructs an declarative configuration of the UserSubject type for use with
-// apply.
-func UserSubject() *UserSubjectApplyConfiguration {
-	return &UserSubjectApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *UserSubjectApplyConfiguration) SetName(value string) *UserSubjectApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *UserSubjectApplyConfiguration) RemoveName() *UserSubjectApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *UserSubjectApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // UserSubjectList represents a listAlias of UserSubjectApplyConfiguration.
 type UserSubjectList []*UserSubjectApplyConfiguration
 

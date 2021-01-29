@@ -138,16 +138,16 @@ func (c *FakeLeases) Apply(ctx context.Context, lease *coordinationv1beta1.Lease
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := lease.GetObjectMeta()
-	if !ok {
+	meta := lease.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("lease.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("lease.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(leasesResource, c.ns, name, types.ApplyPatchType, data, subresources...), &v1beta1.Lease{})
+		Invokes(testing.NewPatchSubresourceAction(leasesResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &v1beta1.Lease{})
 
 	if obj == nil {
 		return nil, err

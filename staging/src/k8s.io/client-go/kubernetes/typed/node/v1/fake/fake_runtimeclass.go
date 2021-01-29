@@ -130,16 +130,16 @@ func (c *FakeRuntimeClasses) Apply(ctx context.Context, runtimeClass *applyconfi
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := runtimeClass.GetObjectMeta()
-	if !ok {
+	meta := runtimeClass.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("runtimeClass.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("runtimeClass.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(runtimeclassesResource, name, types.ApplyPatchType, data, subresources...), &nodev1.RuntimeClass{})
+		Invokes(testing.NewRootPatchSubresourceAction(runtimeclassesResource, *name, types.ApplyPatchType, data, subresources...), &nodev1.RuntimeClass{})
 	if obj == nil {
 		return nil, err
 	}

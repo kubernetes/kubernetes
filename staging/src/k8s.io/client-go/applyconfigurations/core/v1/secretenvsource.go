@@ -25,45 +25,6 @@ type SecretEnvSourceApplyConfiguration struct {
 	Optional                               *bool `json:"optional,omitempty"`
 }
 
-// SecretEnvSourceApplyConfiguration constructs an declarative configuration of the SecretEnvSource type for use with
-// apply.
-func SecretEnvSource() *SecretEnvSourceApplyConfiguration {
-	return &SecretEnvSourceApplyConfiguration{}
-}
-
-// SetLocalObjectReference sets the LocalObjectReference field in the declarative configuration to the given value.
-func (b *SecretEnvSourceApplyConfiguration) SetLocalObjectReference(value *LocalObjectReferenceApplyConfiguration) *SecretEnvSourceApplyConfiguration {
-	if value != nil {
-		b.LocalObjectReferenceApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetLocalObjectReference gets the LocalObjectReference field from the declarative configuration.
-func (b *SecretEnvSourceApplyConfiguration) GetLocalObjectReference() (value *LocalObjectReferenceApplyConfiguration, ok bool) {
-	return &b.LocalObjectReferenceApplyConfiguration, true
-}
-
-// SetOptional sets the Optional field in the declarative configuration to the given value.
-func (b *SecretEnvSourceApplyConfiguration) SetOptional(value bool) *SecretEnvSourceApplyConfiguration {
-	b.Optional = &value
-	return b
-}
-
-// RemoveOptional removes the Optional field from the declarative configuration.
-func (b *SecretEnvSourceApplyConfiguration) RemoveOptional() *SecretEnvSourceApplyConfiguration {
-	b.Optional = nil
-	return b
-}
-
-// GetOptional gets the Optional field from the declarative configuration.
-func (b *SecretEnvSourceApplyConfiguration) GetOptional() (value bool, ok bool) {
-	if v := b.Optional; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // SecretEnvSourceList represents a listAlias of SecretEnvSourceApplyConfiguration.
 type SecretEnvSourceList []*SecretEnvSourceApplyConfiguration
 

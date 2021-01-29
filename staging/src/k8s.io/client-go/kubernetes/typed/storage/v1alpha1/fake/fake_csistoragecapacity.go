@@ -138,16 +138,16 @@ func (c *FakeCSIStorageCapacities) Apply(ctx context.Context, cSIStorageCapacity
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := cSIStorageCapacity.GetObjectMeta()
-	if !ok {
+	meta := cSIStorageCapacity.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("cSIStorageCapacity.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("cSIStorageCapacity.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(csistoragecapacitiesResource, c.ns, name, types.ApplyPatchType, data, subresources...), &v1alpha1.CSIStorageCapacity{})
+		Invokes(testing.NewPatchSubresourceAction(csistoragecapacitiesResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &v1alpha1.CSIStorageCapacity{})
 
 	if obj == nil {
 		return nil, err

@@ -25,52 +25,6 @@ type TopologySelectorLabelRequirementApplyConfiguration struct {
 	Values *[]string `json:"values,omitempty"`
 }
 
-// TopologySelectorLabelRequirementApplyConfiguration constructs an declarative configuration of the TopologySelectorLabelRequirement type for use with
-// apply.
-func TopologySelectorLabelRequirement() *TopologySelectorLabelRequirementApplyConfiguration {
-	return &TopologySelectorLabelRequirementApplyConfiguration{}
-}
-
-// SetKey sets the Key field in the declarative configuration to the given value.
-func (b *TopologySelectorLabelRequirementApplyConfiguration) SetKey(value string) *TopologySelectorLabelRequirementApplyConfiguration {
-	b.Key = &value
-	return b
-}
-
-// RemoveKey removes the Key field from the declarative configuration.
-func (b *TopologySelectorLabelRequirementApplyConfiguration) RemoveKey() *TopologySelectorLabelRequirementApplyConfiguration {
-	b.Key = nil
-	return b
-}
-
-// GetKey gets the Key field from the declarative configuration.
-func (b *TopologySelectorLabelRequirementApplyConfiguration) GetKey() (value string, ok bool) {
-	if v := b.Key; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetValues sets the Values field in the declarative configuration to the given value.
-func (b *TopologySelectorLabelRequirementApplyConfiguration) SetValues(value []string) *TopologySelectorLabelRequirementApplyConfiguration {
-	b.Values = &value
-	return b
-}
-
-// RemoveValues removes the Values field from the declarative configuration.
-func (b *TopologySelectorLabelRequirementApplyConfiguration) RemoveValues() *TopologySelectorLabelRequirementApplyConfiguration {
-	b.Values = nil
-	return b
-}
-
-// GetValues gets the Values field from the declarative configuration.
-func (b *TopologySelectorLabelRequirementApplyConfiguration) GetValues() (value []string, ok bool) {
-	if v := b.Values; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // TopologySelectorLabelRequirementList represents a listAlias of TopologySelectorLabelRequirementApplyConfiguration.
 type TopologySelectorLabelRequirementList []*TopologySelectorLabelRequirementApplyConfiguration
 

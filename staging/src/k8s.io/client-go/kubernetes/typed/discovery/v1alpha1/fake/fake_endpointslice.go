@@ -138,16 +138,16 @@ func (c *FakeEndpointSlices) Apply(ctx context.Context, endpointSlice *discovery
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := endpointSlice.GetObjectMeta()
-	if !ok {
+	meta := endpointSlice.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("endpointSlice.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("endpointSlice.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(endpointslicesResource, c.ns, name, types.ApplyPatchType, data, subresources...), &v1alpha1.EndpointSlice{})
+		Invokes(testing.NewPatchSubresourceAction(endpointslicesResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &v1alpha1.EndpointSlice{})
 
 	if obj == nil {
 		return nil, err

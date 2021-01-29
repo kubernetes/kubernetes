@@ -25,52 +25,6 @@ type VolumeDeviceApplyConfiguration struct {
 	DevicePath *string `json:"devicePath,omitempty"`
 }
 
-// VolumeDeviceApplyConfiguration constructs an declarative configuration of the VolumeDevice type for use with
-// apply.
-func VolumeDevice() *VolumeDeviceApplyConfiguration {
-	return &VolumeDeviceApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *VolumeDeviceApplyConfiguration) SetName(value string) *VolumeDeviceApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *VolumeDeviceApplyConfiguration) RemoveName() *VolumeDeviceApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *VolumeDeviceApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetDevicePath sets the DevicePath field in the declarative configuration to the given value.
-func (b *VolumeDeviceApplyConfiguration) SetDevicePath(value string) *VolumeDeviceApplyConfiguration {
-	b.DevicePath = &value
-	return b
-}
-
-// RemoveDevicePath removes the DevicePath field from the declarative configuration.
-func (b *VolumeDeviceApplyConfiguration) RemoveDevicePath() *VolumeDeviceApplyConfiguration {
-	b.DevicePath = nil
-	return b
-}
-
-// GetDevicePath gets the DevicePath field from the declarative configuration.
-func (b *VolumeDeviceApplyConfiguration) GetDevicePath() (value string, ok bool) {
-	if v := b.DevicePath; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // VolumeDeviceList represents a listAlias of VolumeDeviceApplyConfiguration.
 type VolumeDeviceList []*VolumeDeviceApplyConfiguration
 

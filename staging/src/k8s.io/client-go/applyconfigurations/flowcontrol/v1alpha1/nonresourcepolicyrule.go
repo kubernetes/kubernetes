@@ -25,52 +25,6 @@ type NonResourcePolicyRuleApplyConfiguration struct {
 	NonResourceURLs *[]string `json:"nonResourceURLs,omitempty"`
 }
 
-// NonResourcePolicyRuleApplyConfiguration constructs an declarative configuration of the NonResourcePolicyRule type for use with
-// apply.
-func NonResourcePolicyRule() *NonResourcePolicyRuleApplyConfiguration {
-	return &NonResourcePolicyRuleApplyConfiguration{}
-}
-
-// SetVerbs sets the Verbs field in the declarative configuration to the given value.
-func (b *NonResourcePolicyRuleApplyConfiguration) SetVerbs(value []string) *NonResourcePolicyRuleApplyConfiguration {
-	b.Verbs = &value
-	return b
-}
-
-// RemoveVerbs removes the Verbs field from the declarative configuration.
-func (b *NonResourcePolicyRuleApplyConfiguration) RemoveVerbs() *NonResourcePolicyRuleApplyConfiguration {
-	b.Verbs = nil
-	return b
-}
-
-// GetVerbs gets the Verbs field from the declarative configuration.
-func (b *NonResourcePolicyRuleApplyConfiguration) GetVerbs() (value []string, ok bool) {
-	if v := b.Verbs; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetNonResourceURLs sets the NonResourceURLs field in the declarative configuration to the given value.
-func (b *NonResourcePolicyRuleApplyConfiguration) SetNonResourceURLs(value []string) *NonResourcePolicyRuleApplyConfiguration {
-	b.NonResourceURLs = &value
-	return b
-}
-
-// RemoveNonResourceURLs removes the NonResourceURLs field from the declarative configuration.
-func (b *NonResourcePolicyRuleApplyConfiguration) RemoveNonResourceURLs() *NonResourcePolicyRuleApplyConfiguration {
-	b.NonResourceURLs = nil
-	return b
-}
-
-// GetNonResourceURLs gets the NonResourceURLs field from the declarative configuration.
-func (b *NonResourcePolicyRuleApplyConfiguration) GetNonResourceURLs() (value []string, ok bool) {
-	if v := b.NonResourceURLs; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // NonResourcePolicyRuleList represents a listAlias of NonResourcePolicyRuleApplyConfiguration.
 type NonResourcePolicyRuleList []*NonResourcePolicyRuleApplyConfiguration
 

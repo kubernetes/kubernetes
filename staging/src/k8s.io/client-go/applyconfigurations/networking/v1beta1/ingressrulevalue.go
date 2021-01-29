@@ -24,29 +24,6 @@ type IngressRuleValueApplyConfiguration struct {
 	HTTP *HTTPIngressRuleValueApplyConfiguration `json:"http,omitempty"`
 }
 
-// IngressRuleValueApplyConfiguration constructs an declarative configuration of the IngressRuleValue type for use with
-// apply.
-func IngressRuleValue() *IngressRuleValueApplyConfiguration {
-	return &IngressRuleValueApplyConfiguration{}
-}
-
-// SetHTTP sets the HTTP field in the declarative configuration to the given value.
-func (b *IngressRuleValueApplyConfiguration) SetHTTP(value *HTTPIngressRuleValueApplyConfiguration) *IngressRuleValueApplyConfiguration {
-	b.HTTP = value
-	return b
-}
-
-// RemoveHTTP removes the HTTP field from the declarative configuration.
-func (b *IngressRuleValueApplyConfiguration) RemoveHTTP() *IngressRuleValueApplyConfiguration {
-	b.HTTP = nil
-	return b
-}
-
-// GetHTTP gets the HTTP field from the declarative configuration.
-func (b *IngressRuleValueApplyConfiguration) GetHTTP() (value *HTTPIngressRuleValueApplyConfiguration, ok bool) {
-	return b.HTTP, b.HTTP != nil
-}
-
 // IngressRuleValueList represents a listAlias of IngressRuleValueApplyConfiguration.
 type IngressRuleValueList []*IngressRuleValueApplyConfiguration
 

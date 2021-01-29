@@ -29,49 +29,6 @@ type StatefulSetUpdateStrategyApplyConfiguration struct {
 	RollingUpdate *RollingUpdateStatefulSetStrategyApplyConfiguration `json:"rollingUpdate,omitempty"`
 }
 
-// StatefulSetUpdateStrategyApplyConfiguration constructs an declarative configuration of the StatefulSetUpdateStrategy type for use with
-// apply.
-func StatefulSetUpdateStrategy() *StatefulSetUpdateStrategyApplyConfiguration {
-	return &StatefulSetUpdateStrategyApplyConfiguration{}
-}
-
-// SetType sets the Type field in the declarative configuration to the given value.
-func (b *StatefulSetUpdateStrategyApplyConfiguration) SetType(value v1.StatefulSetUpdateStrategyType) *StatefulSetUpdateStrategyApplyConfiguration {
-	b.Type = &value
-	return b
-}
-
-// RemoveType removes the Type field from the declarative configuration.
-func (b *StatefulSetUpdateStrategyApplyConfiguration) RemoveType() *StatefulSetUpdateStrategyApplyConfiguration {
-	b.Type = nil
-	return b
-}
-
-// GetType gets the Type field from the declarative configuration.
-func (b *StatefulSetUpdateStrategyApplyConfiguration) GetType() (value v1.StatefulSetUpdateStrategyType, ok bool) {
-	if v := b.Type; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetRollingUpdate sets the RollingUpdate field in the declarative configuration to the given value.
-func (b *StatefulSetUpdateStrategyApplyConfiguration) SetRollingUpdate(value *RollingUpdateStatefulSetStrategyApplyConfiguration) *StatefulSetUpdateStrategyApplyConfiguration {
-	b.RollingUpdate = value
-	return b
-}
-
-// RemoveRollingUpdate removes the RollingUpdate field from the declarative configuration.
-func (b *StatefulSetUpdateStrategyApplyConfiguration) RemoveRollingUpdate() *StatefulSetUpdateStrategyApplyConfiguration {
-	b.RollingUpdate = nil
-	return b
-}
-
-// GetRollingUpdate gets the RollingUpdate field from the declarative configuration.
-func (b *StatefulSetUpdateStrategyApplyConfiguration) GetRollingUpdate() (value *RollingUpdateStatefulSetStrategyApplyConfiguration, ok bool) {
-	return b.RollingUpdate, b.RollingUpdate != nil
-}
-
 // StatefulSetUpdateStrategyList represents a listAlias of StatefulSetUpdateStrategyApplyConfiguration.
 type StatefulSetUpdateStrategyList []*StatefulSetUpdateStrategyApplyConfiguration
 

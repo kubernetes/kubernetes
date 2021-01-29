@@ -25,52 +25,6 @@ type ServiceBackendPortApplyConfiguration struct {
 	Number *int32  `json:"number,omitempty"`
 }
 
-// ServiceBackendPortApplyConfiguration constructs an declarative configuration of the ServiceBackendPort type for use with
-// apply.
-func ServiceBackendPort() *ServiceBackendPortApplyConfiguration {
-	return &ServiceBackendPortApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *ServiceBackendPortApplyConfiguration) SetName(value string) *ServiceBackendPortApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *ServiceBackendPortApplyConfiguration) RemoveName() *ServiceBackendPortApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *ServiceBackendPortApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetNumber sets the Number field in the declarative configuration to the given value.
-func (b *ServiceBackendPortApplyConfiguration) SetNumber(value int32) *ServiceBackendPortApplyConfiguration {
-	b.Number = &value
-	return b
-}
-
-// RemoveNumber removes the Number field from the declarative configuration.
-func (b *ServiceBackendPortApplyConfiguration) RemoveNumber() *ServiceBackendPortApplyConfiguration {
-	b.Number = nil
-	return b
-}
-
-// GetNumber gets the Number field from the declarative configuration.
-func (b *ServiceBackendPortApplyConfiguration) GetNumber() (value int32, ok bool) {
-	if v := b.Number; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ServiceBackendPortList represents a listAlias of ServiceBackendPortApplyConfiguration.
 type ServiceBackendPortList []*ServiceBackendPortApplyConfiguration
 

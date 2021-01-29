@@ -29,49 +29,6 @@ type ResourceMetricStatusApplyConfiguration struct {
 	Current *MetricValueStatusApplyConfiguration `json:"current,omitempty"`
 }
 
-// ResourceMetricStatusApplyConfiguration constructs an declarative configuration of the ResourceMetricStatus type for use with
-// apply.
-func ResourceMetricStatus() *ResourceMetricStatusApplyConfiguration {
-	return &ResourceMetricStatusApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *ResourceMetricStatusApplyConfiguration) SetName(value v1.ResourceName) *ResourceMetricStatusApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *ResourceMetricStatusApplyConfiguration) RemoveName() *ResourceMetricStatusApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *ResourceMetricStatusApplyConfiguration) GetName() (value v1.ResourceName, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetCurrent sets the Current field in the declarative configuration to the given value.
-func (b *ResourceMetricStatusApplyConfiguration) SetCurrent(value *MetricValueStatusApplyConfiguration) *ResourceMetricStatusApplyConfiguration {
-	b.Current = value
-	return b
-}
-
-// RemoveCurrent removes the Current field from the declarative configuration.
-func (b *ResourceMetricStatusApplyConfiguration) RemoveCurrent() *ResourceMetricStatusApplyConfiguration {
-	b.Current = nil
-	return b
-}
-
-// GetCurrent gets the Current field from the declarative configuration.
-func (b *ResourceMetricStatusApplyConfiguration) GetCurrent() (value *MetricValueStatusApplyConfiguration, ok bool) {
-	return b.Current, b.Current != nil
-}
-
 // ResourceMetricStatusList represents a listAlias of ResourceMetricStatusApplyConfiguration.
 type ResourceMetricStatusList []*ResourceMetricStatusApplyConfiguration
 

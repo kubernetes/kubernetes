@@ -141,16 +141,16 @@ func (c *FakePersistentVolumes) Apply(ctx context.Context, persistentVolume *app
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := persistentVolume.GetObjectMeta()
-	if !ok {
+	meta := persistentVolume.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("persistentVolume.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("persistentVolume.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(persistentvolumesResource, name, types.ApplyPatchType, data, subresources...), &corev1.PersistentVolume{})
+		Invokes(testing.NewRootPatchSubresourceAction(persistentvolumesResource, *name, types.ApplyPatchType, data, subresources...), &corev1.PersistentVolume{})
 	if obj == nil {
 		return nil, err
 	}

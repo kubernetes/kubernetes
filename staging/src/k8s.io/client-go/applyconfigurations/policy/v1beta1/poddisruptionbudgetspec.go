@@ -31,69 +31,6 @@ type PodDisruptionBudgetSpecApplyConfiguration struct {
 	MaxUnavailable *intstr.IntOrString                 `json:"maxUnavailable,omitempty"`
 }
 
-// PodDisruptionBudgetSpecApplyConfiguration constructs an declarative configuration of the PodDisruptionBudgetSpec type for use with
-// apply.
-func PodDisruptionBudgetSpec() *PodDisruptionBudgetSpecApplyConfiguration {
-	return &PodDisruptionBudgetSpecApplyConfiguration{}
-}
-
-// SetMinAvailable sets the MinAvailable field in the declarative configuration to the given value.
-func (b *PodDisruptionBudgetSpecApplyConfiguration) SetMinAvailable(value intstr.IntOrString) *PodDisruptionBudgetSpecApplyConfiguration {
-	b.MinAvailable = &value
-	return b
-}
-
-// RemoveMinAvailable removes the MinAvailable field from the declarative configuration.
-func (b *PodDisruptionBudgetSpecApplyConfiguration) RemoveMinAvailable() *PodDisruptionBudgetSpecApplyConfiguration {
-	b.MinAvailable = nil
-	return b
-}
-
-// GetMinAvailable gets the MinAvailable field from the declarative configuration.
-func (b *PodDisruptionBudgetSpecApplyConfiguration) GetMinAvailable() (value intstr.IntOrString, ok bool) {
-	if v := b.MinAvailable; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetSelector sets the Selector field in the declarative configuration to the given value.
-func (b *PodDisruptionBudgetSpecApplyConfiguration) SetSelector(value *v1.LabelSelectorApplyConfiguration) *PodDisruptionBudgetSpecApplyConfiguration {
-	b.Selector = value
-	return b
-}
-
-// RemoveSelector removes the Selector field from the declarative configuration.
-func (b *PodDisruptionBudgetSpecApplyConfiguration) RemoveSelector() *PodDisruptionBudgetSpecApplyConfiguration {
-	b.Selector = nil
-	return b
-}
-
-// GetSelector gets the Selector field from the declarative configuration.
-func (b *PodDisruptionBudgetSpecApplyConfiguration) GetSelector() (value *v1.LabelSelectorApplyConfiguration, ok bool) {
-	return b.Selector, b.Selector != nil
-}
-
-// SetMaxUnavailable sets the MaxUnavailable field in the declarative configuration to the given value.
-func (b *PodDisruptionBudgetSpecApplyConfiguration) SetMaxUnavailable(value intstr.IntOrString) *PodDisruptionBudgetSpecApplyConfiguration {
-	b.MaxUnavailable = &value
-	return b
-}
-
-// RemoveMaxUnavailable removes the MaxUnavailable field from the declarative configuration.
-func (b *PodDisruptionBudgetSpecApplyConfiguration) RemoveMaxUnavailable() *PodDisruptionBudgetSpecApplyConfiguration {
-	b.MaxUnavailable = nil
-	return b
-}
-
-// GetMaxUnavailable gets the MaxUnavailable field from the declarative configuration.
-func (b *PodDisruptionBudgetSpecApplyConfiguration) GetMaxUnavailable() (value intstr.IntOrString, ok bool) {
-	if v := b.MaxUnavailable; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // PodDisruptionBudgetSpecList represents a listAlias of PodDisruptionBudgetSpecApplyConfiguration.
 type PodDisruptionBudgetSpecList []*PodDisruptionBudgetSpecApplyConfiguration
 

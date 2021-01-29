@@ -506,17 +506,17 @@ func (c *Fake$.type|publicPlural$) Apply(ctx context.Context, $.inputType|privat
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := $.inputType|private$.GetObjectMeta()
-    if !ok {
+	meta := $.inputType|private$.ObjectMeta
+    if meta == nil {
         return nil, fmt.Errorf("$.inputType|private$.ObjectMeta must be provided to Apply")
     }
-    name, ok := meta.GetName()
-    if !ok {
+    name := meta.Name
+    if name == nil {
         return nil, fmt.Errorf("$.inputType|private$.ObjectMeta.Name must be provided to Apply")
     }
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, name, $.ApplyPatchType|raw$, data, subresources... ), &$.resultType|raw${})
-		$else$Invokes($.NewRootPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, name, $.ApplyPatchType|raw$, data, subresources...), &$.resultType|raw${})$end$
+		$if .namespaced$Invokes($.NewPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, *name, $.ApplyPatchType|raw$, data, subresources... ), &$.resultType|raw${})
+		$else$Invokes($.NewRootPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, *name, $.ApplyPatchType|raw$, data, subresources...), &$.resultType|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}

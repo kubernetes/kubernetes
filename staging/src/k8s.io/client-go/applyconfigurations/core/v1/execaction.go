@@ -24,32 +24,6 @@ type ExecActionApplyConfiguration struct {
 	Command *[]string `json:"command,omitempty"`
 }
 
-// ExecActionApplyConfiguration constructs an declarative configuration of the ExecAction type for use with
-// apply.
-func ExecAction() *ExecActionApplyConfiguration {
-	return &ExecActionApplyConfiguration{}
-}
-
-// SetCommand sets the Command field in the declarative configuration to the given value.
-func (b *ExecActionApplyConfiguration) SetCommand(value []string) *ExecActionApplyConfiguration {
-	b.Command = &value
-	return b
-}
-
-// RemoveCommand removes the Command field from the declarative configuration.
-func (b *ExecActionApplyConfiguration) RemoveCommand() *ExecActionApplyConfiguration {
-	b.Command = nil
-	return b
-}
-
-// GetCommand gets the Command field from the declarative configuration.
-func (b *ExecActionApplyConfiguration) GetCommand() (value []string, ok bool) {
-	if v := b.Command; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ExecActionList represents a listAlias of ExecActionApplyConfiguration.
 type ExecActionList []*ExecActionApplyConfiguration
 

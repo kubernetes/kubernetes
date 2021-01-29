@@ -25,52 +25,6 @@ type DownwardAPIVolumeSourceApplyConfiguration struct {
 	DefaultMode *int32                     `json:"defaultMode,omitempty"`
 }
 
-// DownwardAPIVolumeSourceApplyConfiguration constructs an declarative configuration of the DownwardAPIVolumeSource type for use with
-// apply.
-func DownwardAPIVolumeSource() *DownwardAPIVolumeSourceApplyConfiguration {
-	return &DownwardAPIVolumeSourceApplyConfiguration{}
-}
-
-// SetItems sets the Items field in the declarative configuration to the given value.
-func (b *DownwardAPIVolumeSourceApplyConfiguration) SetItems(value DownwardAPIVolumeFileList) *DownwardAPIVolumeSourceApplyConfiguration {
-	b.Items = &value
-	return b
-}
-
-// RemoveItems removes the Items field from the declarative configuration.
-func (b *DownwardAPIVolumeSourceApplyConfiguration) RemoveItems() *DownwardAPIVolumeSourceApplyConfiguration {
-	b.Items = nil
-	return b
-}
-
-// GetItems gets the Items field from the declarative configuration.
-func (b *DownwardAPIVolumeSourceApplyConfiguration) GetItems() (value DownwardAPIVolumeFileList, ok bool) {
-	if v := b.Items; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetDefaultMode sets the DefaultMode field in the declarative configuration to the given value.
-func (b *DownwardAPIVolumeSourceApplyConfiguration) SetDefaultMode(value int32) *DownwardAPIVolumeSourceApplyConfiguration {
-	b.DefaultMode = &value
-	return b
-}
-
-// RemoveDefaultMode removes the DefaultMode field from the declarative configuration.
-func (b *DownwardAPIVolumeSourceApplyConfiguration) RemoveDefaultMode() *DownwardAPIVolumeSourceApplyConfiguration {
-	b.DefaultMode = nil
-	return b
-}
-
-// GetDefaultMode gets the DefaultMode field from the declarative configuration.
-func (b *DownwardAPIVolumeSourceApplyConfiguration) GetDefaultMode() (value int32, ok bool) {
-	if v := b.DefaultMode; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // DownwardAPIVolumeSourceList represents a listAlias of DownwardAPIVolumeSourceApplyConfiguration.
 type DownwardAPIVolumeSourceList []*DownwardAPIVolumeSourceApplyConfiguration
 

@@ -208,19 +208,19 @@ func (c *statefulSets) Apply(ctx context.Context, statefulSet *appsv1beta2.State
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := statefulSet.GetObjectMeta()
-	if !ok {
+	meta := statefulSet.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("statefulSet.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("statefulSet.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1beta2.StatefulSet{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("statefulsets").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

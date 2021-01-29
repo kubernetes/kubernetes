@@ -138,16 +138,16 @@ func (c *FakeEndpoints) Apply(ctx context.Context, endpoints *applyconfiguration
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := endpoints.GetObjectMeta()
-	if !ok {
+	meta := endpoints.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("endpoints.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("endpoints.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(endpointsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.Endpoints{})
+		Invokes(testing.NewPatchSubresourceAction(endpointsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &corev1.Endpoints{})
 
 	if obj == nil {
 		return nil, err

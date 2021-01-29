@@ -130,16 +130,16 @@ func (c *FakeMutatingWebhookConfigurations) Apply(ctx context.Context, mutatingW
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := mutatingWebhookConfiguration.GetObjectMeta()
-	if !ok {
+	meta := mutatingWebhookConfiguration.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("mutatingWebhookConfiguration.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("mutatingWebhookConfiguration.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(mutatingwebhookconfigurationsResource, name, types.ApplyPatchType, data, subresources...), &admissionregistrationv1.MutatingWebhookConfiguration{})
+		Invokes(testing.NewRootPatchSubresourceAction(mutatingwebhookconfigurationsResource, *name, types.ApplyPatchType, data, subresources...), &admissionregistrationv1.MutatingWebhookConfiguration{})
 	if obj == nil {
 		return nil, err
 	}

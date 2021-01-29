@@ -31,69 +31,6 @@ type PodsMetricSourceApplyConfiguration struct {
 	Selector           *v1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
 }
 
-// PodsMetricSourceApplyConfiguration constructs an declarative configuration of the PodsMetricSource type for use with
-// apply.
-func PodsMetricSource() *PodsMetricSourceApplyConfiguration {
-	return &PodsMetricSourceApplyConfiguration{}
-}
-
-// SetMetricName sets the MetricName field in the declarative configuration to the given value.
-func (b *PodsMetricSourceApplyConfiguration) SetMetricName(value string) *PodsMetricSourceApplyConfiguration {
-	b.MetricName = &value
-	return b
-}
-
-// RemoveMetricName removes the MetricName field from the declarative configuration.
-func (b *PodsMetricSourceApplyConfiguration) RemoveMetricName() *PodsMetricSourceApplyConfiguration {
-	b.MetricName = nil
-	return b
-}
-
-// GetMetricName gets the MetricName field from the declarative configuration.
-func (b *PodsMetricSourceApplyConfiguration) GetMetricName() (value string, ok bool) {
-	if v := b.MetricName; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetTargetAverageValue sets the TargetAverageValue field in the declarative configuration to the given value.
-func (b *PodsMetricSourceApplyConfiguration) SetTargetAverageValue(value resource.Quantity) *PodsMetricSourceApplyConfiguration {
-	b.TargetAverageValue = &value
-	return b
-}
-
-// RemoveTargetAverageValue removes the TargetAverageValue field from the declarative configuration.
-func (b *PodsMetricSourceApplyConfiguration) RemoveTargetAverageValue() *PodsMetricSourceApplyConfiguration {
-	b.TargetAverageValue = nil
-	return b
-}
-
-// GetTargetAverageValue gets the TargetAverageValue field from the declarative configuration.
-func (b *PodsMetricSourceApplyConfiguration) GetTargetAverageValue() (value resource.Quantity, ok bool) {
-	if v := b.TargetAverageValue; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetSelector sets the Selector field in the declarative configuration to the given value.
-func (b *PodsMetricSourceApplyConfiguration) SetSelector(value *v1.LabelSelectorApplyConfiguration) *PodsMetricSourceApplyConfiguration {
-	b.Selector = value
-	return b
-}
-
-// RemoveSelector removes the Selector field from the declarative configuration.
-func (b *PodsMetricSourceApplyConfiguration) RemoveSelector() *PodsMetricSourceApplyConfiguration {
-	b.Selector = nil
-	return b
-}
-
-// GetSelector gets the Selector field from the declarative configuration.
-func (b *PodsMetricSourceApplyConfiguration) GetSelector() (value *v1.LabelSelectorApplyConfiguration, ok bool) {
-	return b.Selector, b.Selector != nil
-}
-
 // PodsMetricSourceList represents a listAlias of PodsMetricSourceApplyConfiguration.
 type PodsMetricSourceList []*PodsMetricSourceApplyConfiguration
 

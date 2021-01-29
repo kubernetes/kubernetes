@@ -25,52 +25,6 @@ type PodDNSConfigOptionApplyConfiguration struct {
 	Value *string `json:"value,omitempty"`
 }
 
-// PodDNSConfigOptionApplyConfiguration constructs an declarative configuration of the PodDNSConfigOption type for use with
-// apply.
-func PodDNSConfigOption() *PodDNSConfigOptionApplyConfiguration {
-	return &PodDNSConfigOptionApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *PodDNSConfigOptionApplyConfiguration) SetName(value string) *PodDNSConfigOptionApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *PodDNSConfigOptionApplyConfiguration) RemoveName() *PodDNSConfigOptionApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *PodDNSConfigOptionApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetValue sets the Value field in the declarative configuration to the given value.
-func (b *PodDNSConfigOptionApplyConfiguration) SetValue(value string) *PodDNSConfigOptionApplyConfiguration {
-	b.Value = &value
-	return b
-}
-
-// RemoveValue removes the Value field from the declarative configuration.
-func (b *PodDNSConfigOptionApplyConfiguration) RemoveValue() *PodDNSConfigOptionApplyConfiguration {
-	b.Value = nil
-	return b
-}
-
-// GetValue gets the Value field from the declarative configuration.
-func (b *PodDNSConfigOptionApplyConfiguration) GetValue() (value string, ok bool) {
-	if v := b.Value; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // PodDNSConfigOptionList represents a listAlias of PodDNSConfigOptionApplyConfiguration.
 type PodDNSConfigOptionList []*PodDNSConfigOptionApplyConfiguration
 

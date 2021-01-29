@@ -138,16 +138,16 @@ func (c *FakeControllerRevisions) Apply(ctx context.Context, controllerRevision 
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := controllerRevision.GetObjectMeta()
-	if !ok {
+	meta := controllerRevision.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("controllerRevision.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("controllerRevision.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(controllerrevisionsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &appsv1.ControllerRevision{})
+		Invokes(testing.NewPatchSubresourceAction(controllerrevisionsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &appsv1.ControllerRevision{})
 
 	if obj == nil {
 		return nil, err

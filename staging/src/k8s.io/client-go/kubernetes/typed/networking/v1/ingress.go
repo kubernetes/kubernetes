@@ -205,19 +205,19 @@ func (c *ingresses) Apply(ctx context.Context, ingress *networkingv1.IngressAppl
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := ingress.GetObjectMeta()
-	if !ok {
+	meta := ingress.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("ingress.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("ingress.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.Ingress{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("ingresses").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

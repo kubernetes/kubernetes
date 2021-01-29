@@ -29,52 +29,6 @@ type FSGroupStrategyOptionsApplyConfiguration struct {
 	Ranges *IDRangeList                 `json:"ranges,omitempty"`
 }
 
-// FSGroupStrategyOptionsApplyConfiguration constructs an declarative configuration of the FSGroupStrategyOptions type for use with
-// apply.
-func FSGroupStrategyOptions() *FSGroupStrategyOptionsApplyConfiguration {
-	return &FSGroupStrategyOptionsApplyConfiguration{}
-}
-
-// SetRule sets the Rule field in the declarative configuration to the given value.
-func (b *FSGroupStrategyOptionsApplyConfiguration) SetRule(value v1beta1.FSGroupStrategyType) *FSGroupStrategyOptionsApplyConfiguration {
-	b.Rule = &value
-	return b
-}
-
-// RemoveRule removes the Rule field from the declarative configuration.
-func (b *FSGroupStrategyOptionsApplyConfiguration) RemoveRule() *FSGroupStrategyOptionsApplyConfiguration {
-	b.Rule = nil
-	return b
-}
-
-// GetRule gets the Rule field from the declarative configuration.
-func (b *FSGroupStrategyOptionsApplyConfiguration) GetRule() (value v1beta1.FSGroupStrategyType, ok bool) {
-	if v := b.Rule; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetRanges sets the Ranges field in the declarative configuration to the given value.
-func (b *FSGroupStrategyOptionsApplyConfiguration) SetRanges(value IDRangeList) *FSGroupStrategyOptionsApplyConfiguration {
-	b.Ranges = &value
-	return b
-}
-
-// RemoveRanges removes the Ranges field from the declarative configuration.
-func (b *FSGroupStrategyOptionsApplyConfiguration) RemoveRanges() *FSGroupStrategyOptionsApplyConfiguration {
-	b.Ranges = nil
-	return b
-}
-
-// GetRanges gets the Ranges field from the declarative configuration.
-func (b *FSGroupStrategyOptionsApplyConfiguration) GetRanges() (value IDRangeList, ok bool) {
-	if v := b.Ranges; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // FSGroupStrategyOptionsList represents a listAlias of FSGroupStrategyOptionsApplyConfiguration.
 type FSGroupStrategyOptionsList []*FSGroupStrategyOptionsApplyConfiguration
 

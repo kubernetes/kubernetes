@@ -30,62 +30,6 @@ type RoleApplyConfiguration struct {
 	Rules                         *PolicyRuleList                  `json:"rules,omitempty"`
 }
 
-// RoleApplyConfiguration constructs an declarative configuration of the Role type for use with
-// apply.
-func Role() *RoleApplyConfiguration {
-	return &RoleApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *RoleApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *RoleApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *RoleApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *RoleApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *RoleApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *RoleApplyConfiguration) RemoveObjectMeta() *RoleApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *RoleApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetRules sets the Rules field in the declarative configuration to the given value.
-func (b *RoleApplyConfiguration) SetRules(value PolicyRuleList) *RoleApplyConfiguration {
-	b.Rules = &value
-	return b
-}
-
-// RemoveRules removes the Rules field from the declarative configuration.
-func (b *RoleApplyConfiguration) RemoveRules() *RoleApplyConfiguration {
-	b.Rules = nil
-	return b
-}
-
-// GetRules gets the Rules field from the declarative configuration.
-func (b *RoleApplyConfiguration) GetRules() (value PolicyRuleList, ok bool) {
-	if v := b.Rules; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // RoleList represents a listAlias of RoleApplyConfiguration.
 type RoleList []*RoleApplyConfiguration
 

@@ -150,16 +150,16 @@ func (c *FakePodDisruptionBudgets) Apply(ctx context.Context, podDisruptionBudge
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := podDisruptionBudget.GetObjectMeta()
-	if !ok {
+	meta := podDisruptionBudget.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("podDisruptionBudget.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("podDisruptionBudget.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(poddisruptionbudgetsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &v1beta1.PodDisruptionBudget{})
+		Invokes(testing.NewPatchSubresourceAction(poddisruptionbudgetsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &v1beta1.PodDisruptionBudget{})
 
 	if obj == nil {
 		return nil, err

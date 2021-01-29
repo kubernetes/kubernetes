@@ -30,59 +30,6 @@ type PodSecurityPolicyApplyConfiguration struct {
 	Spec                          *PodSecurityPolicySpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// PodSecurityPolicyApplyConfiguration constructs an declarative configuration of the PodSecurityPolicy type for use with
-// apply.
-func PodSecurityPolicy() *PodSecurityPolicyApplyConfiguration {
-	return &PodSecurityPolicyApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *PodSecurityPolicyApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *PodSecurityPolicyApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *PodSecurityPolicyApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *PodSecurityPolicyApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *PodSecurityPolicyApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *PodSecurityPolicyApplyConfiguration) RemoveObjectMeta() *PodSecurityPolicyApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *PodSecurityPolicyApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetSpec sets the Spec field in the declarative configuration to the given value.
-func (b *PodSecurityPolicyApplyConfiguration) SetSpec(value *PodSecurityPolicySpecApplyConfiguration) *PodSecurityPolicyApplyConfiguration {
-	b.Spec = value
-	return b
-}
-
-// RemoveSpec removes the Spec field from the declarative configuration.
-func (b *PodSecurityPolicyApplyConfiguration) RemoveSpec() *PodSecurityPolicyApplyConfiguration {
-	b.Spec = nil
-	return b
-}
-
-// GetSpec gets the Spec field from the declarative configuration.
-func (b *PodSecurityPolicyApplyConfiguration) GetSpec() (value *PodSecurityPolicySpecApplyConfiguration, ok bool) {
-	return b.Spec, b.Spec != nil
-}
-
 // PodSecurityPolicyList represents a listAlias of PodSecurityPolicyApplyConfiguration.
 type PodSecurityPolicyList []*PodSecurityPolicyApplyConfiguration
 

@@ -130,16 +130,16 @@ func (c *FakeCSIDrivers) Apply(ctx context.Context, cSIDriver *storagev1beta1.CS
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := cSIDriver.GetObjectMeta()
-	if !ok {
+	meta := cSIDriver.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("cSIDriver.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("cSIDriver.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(csidriversResource, name, types.ApplyPatchType, data, subresources...), &v1beta1.CSIDriver{})
+		Invokes(testing.NewRootPatchSubresourceAction(csidriversResource, *name, types.ApplyPatchType, data, subresources...), &v1beta1.CSIDriver{})
 	if obj == nil {
 		return nil, err
 	}

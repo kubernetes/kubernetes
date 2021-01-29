@@ -25,52 +25,6 @@ type NonResourceRuleApplyConfiguration struct {
 	NonResourceURLs *[]string `json:"nonResourceURLs,omitempty"`
 }
 
-// NonResourceRuleApplyConfiguration constructs an declarative configuration of the NonResourceRule type for use with
-// apply.
-func NonResourceRule() *NonResourceRuleApplyConfiguration {
-	return &NonResourceRuleApplyConfiguration{}
-}
-
-// SetVerbs sets the Verbs field in the declarative configuration to the given value.
-func (b *NonResourceRuleApplyConfiguration) SetVerbs(value []string) *NonResourceRuleApplyConfiguration {
-	b.Verbs = &value
-	return b
-}
-
-// RemoveVerbs removes the Verbs field from the declarative configuration.
-func (b *NonResourceRuleApplyConfiguration) RemoveVerbs() *NonResourceRuleApplyConfiguration {
-	b.Verbs = nil
-	return b
-}
-
-// GetVerbs gets the Verbs field from the declarative configuration.
-func (b *NonResourceRuleApplyConfiguration) GetVerbs() (value []string, ok bool) {
-	if v := b.Verbs; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetNonResourceURLs sets the NonResourceURLs field in the declarative configuration to the given value.
-func (b *NonResourceRuleApplyConfiguration) SetNonResourceURLs(value []string) *NonResourceRuleApplyConfiguration {
-	b.NonResourceURLs = &value
-	return b
-}
-
-// RemoveNonResourceURLs removes the NonResourceURLs field from the declarative configuration.
-func (b *NonResourceRuleApplyConfiguration) RemoveNonResourceURLs() *NonResourceRuleApplyConfiguration {
-	b.NonResourceURLs = nil
-	return b
-}
-
-// GetNonResourceURLs gets the NonResourceURLs field from the declarative configuration.
-func (b *NonResourceRuleApplyConfiguration) GetNonResourceURLs() (value []string, ok bool) {
-	if v := b.NonResourceURLs; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // NonResourceRuleList represents a listAlias of NonResourceRuleApplyConfiguration.
 type NonResourceRuleList []*NonResourceRuleApplyConfiguration
 

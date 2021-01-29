@@ -30,59 +30,6 @@ type IngressClassApplyConfiguration struct {
 	Spec                          *IngressClassSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// IngressClassApplyConfiguration constructs an declarative configuration of the IngressClass type for use with
-// apply.
-func IngressClass() *IngressClassApplyConfiguration {
-	return &IngressClassApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *IngressClassApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *IngressClassApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *IngressClassApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *IngressClassApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *IngressClassApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *IngressClassApplyConfiguration) RemoveObjectMeta() *IngressClassApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *IngressClassApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetSpec sets the Spec field in the declarative configuration to the given value.
-func (b *IngressClassApplyConfiguration) SetSpec(value *IngressClassSpecApplyConfiguration) *IngressClassApplyConfiguration {
-	b.Spec = value
-	return b
-}
-
-// RemoveSpec removes the Spec field from the declarative configuration.
-func (b *IngressClassApplyConfiguration) RemoveSpec() *IngressClassApplyConfiguration {
-	b.Spec = nil
-	return b
-}
-
-// GetSpec gets the Spec field from the declarative configuration.
-func (b *IngressClassApplyConfiguration) GetSpec() (value *IngressClassSpecApplyConfiguration, ok bool) {
-	return b.Spec, b.Spec != nil
-}
-
 // IngressClassList represents a listAlias of IngressClassApplyConfiguration.
 type IngressClassList []*IngressClassApplyConfiguration
 

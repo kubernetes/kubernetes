@@ -25,52 +25,6 @@ type EventSourceApplyConfiguration struct {
 	Host      *string `json:"host,omitempty"`
 }
 
-// EventSourceApplyConfiguration constructs an declarative configuration of the EventSource type for use with
-// apply.
-func EventSource() *EventSourceApplyConfiguration {
-	return &EventSourceApplyConfiguration{}
-}
-
-// SetComponent sets the Component field in the declarative configuration to the given value.
-func (b *EventSourceApplyConfiguration) SetComponent(value string) *EventSourceApplyConfiguration {
-	b.Component = &value
-	return b
-}
-
-// RemoveComponent removes the Component field from the declarative configuration.
-func (b *EventSourceApplyConfiguration) RemoveComponent() *EventSourceApplyConfiguration {
-	b.Component = nil
-	return b
-}
-
-// GetComponent gets the Component field from the declarative configuration.
-func (b *EventSourceApplyConfiguration) GetComponent() (value string, ok bool) {
-	if v := b.Component; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetHost sets the Host field in the declarative configuration to the given value.
-func (b *EventSourceApplyConfiguration) SetHost(value string) *EventSourceApplyConfiguration {
-	b.Host = &value
-	return b
-}
-
-// RemoveHost removes the Host field from the declarative configuration.
-func (b *EventSourceApplyConfiguration) RemoveHost() *EventSourceApplyConfiguration {
-	b.Host = nil
-	return b
-}
-
-// GetHost gets the Host field from the declarative configuration.
-func (b *EventSourceApplyConfiguration) GetHost() (value string, ok bool) {
-	if v := b.Host; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // EventSourceList represents a listAlias of EventSourceApplyConfiguration.
 type EventSourceList []*EventSourceApplyConfiguration
 

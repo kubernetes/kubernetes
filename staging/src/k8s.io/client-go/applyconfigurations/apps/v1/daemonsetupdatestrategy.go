@@ -29,49 +29,6 @@ type DaemonSetUpdateStrategyApplyConfiguration struct {
 	RollingUpdate *RollingUpdateDaemonSetApplyConfiguration `json:"rollingUpdate,omitempty"`
 }
 
-// DaemonSetUpdateStrategyApplyConfiguration constructs an declarative configuration of the DaemonSetUpdateStrategy type for use with
-// apply.
-func DaemonSetUpdateStrategy() *DaemonSetUpdateStrategyApplyConfiguration {
-	return &DaemonSetUpdateStrategyApplyConfiguration{}
-}
-
-// SetType sets the Type field in the declarative configuration to the given value.
-func (b *DaemonSetUpdateStrategyApplyConfiguration) SetType(value v1.DaemonSetUpdateStrategyType) *DaemonSetUpdateStrategyApplyConfiguration {
-	b.Type = &value
-	return b
-}
-
-// RemoveType removes the Type field from the declarative configuration.
-func (b *DaemonSetUpdateStrategyApplyConfiguration) RemoveType() *DaemonSetUpdateStrategyApplyConfiguration {
-	b.Type = nil
-	return b
-}
-
-// GetType gets the Type field from the declarative configuration.
-func (b *DaemonSetUpdateStrategyApplyConfiguration) GetType() (value v1.DaemonSetUpdateStrategyType, ok bool) {
-	if v := b.Type; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetRollingUpdate sets the RollingUpdate field in the declarative configuration to the given value.
-func (b *DaemonSetUpdateStrategyApplyConfiguration) SetRollingUpdate(value *RollingUpdateDaemonSetApplyConfiguration) *DaemonSetUpdateStrategyApplyConfiguration {
-	b.RollingUpdate = value
-	return b
-}
-
-// RemoveRollingUpdate removes the RollingUpdate field from the declarative configuration.
-func (b *DaemonSetUpdateStrategyApplyConfiguration) RemoveRollingUpdate() *DaemonSetUpdateStrategyApplyConfiguration {
-	b.RollingUpdate = nil
-	return b
-}
-
-// GetRollingUpdate gets the RollingUpdate field from the declarative configuration.
-func (b *DaemonSetUpdateStrategyApplyConfiguration) GetRollingUpdate() (value *RollingUpdateDaemonSetApplyConfiguration, ok bool) {
-	return b.RollingUpdate, b.RollingUpdate != nil
-}
-
 // DaemonSetUpdateStrategyList represents a listAlias of DaemonSetUpdateStrategyApplyConfiguration.
 type DaemonSetUpdateStrategyList []*DaemonSetUpdateStrategyApplyConfiguration
 

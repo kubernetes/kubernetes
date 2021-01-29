@@ -30,52 +30,6 @@ type NetworkPolicyPortApplyConfiguration struct {
 	Port     *intstr.IntOrString `json:"port,omitempty"`
 }
 
-// NetworkPolicyPortApplyConfiguration constructs an declarative configuration of the NetworkPolicyPort type for use with
-// apply.
-func NetworkPolicyPort() *NetworkPolicyPortApplyConfiguration {
-	return &NetworkPolicyPortApplyConfiguration{}
-}
-
-// SetProtocol sets the Protocol field in the declarative configuration to the given value.
-func (b *NetworkPolicyPortApplyConfiguration) SetProtocol(value v1.Protocol) *NetworkPolicyPortApplyConfiguration {
-	b.Protocol = &value
-	return b
-}
-
-// RemoveProtocol removes the Protocol field from the declarative configuration.
-func (b *NetworkPolicyPortApplyConfiguration) RemoveProtocol() *NetworkPolicyPortApplyConfiguration {
-	b.Protocol = nil
-	return b
-}
-
-// GetProtocol gets the Protocol field from the declarative configuration.
-func (b *NetworkPolicyPortApplyConfiguration) GetProtocol() (value v1.Protocol, ok bool) {
-	if v := b.Protocol; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetPort sets the Port field in the declarative configuration to the given value.
-func (b *NetworkPolicyPortApplyConfiguration) SetPort(value intstr.IntOrString) *NetworkPolicyPortApplyConfiguration {
-	b.Port = &value
-	return b
-}
-
-// RemovePort removes the Port field from the declarative configuration.
-func (b *NetworkPolicyPortApplyConfiguration) RemovePort() *NetworkPolicyPortApplyConfiguration {
-	b.Port = nil
-	return b
-}
-
-// GetPort gets the Port field from the declarative configuration.
-func (b *NetworkPolicyPortApplyConfiguration) GetPort() (value intstr.IntOrString, ok bool) {
-	if v := b.Port; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // NetworkPolicyPortList represents a listAlias of NetworkPolicyPortApplyConfiguration.
 type NetworkPolicyPortList []*NetworkPolicyPortApplyConfiguration
 

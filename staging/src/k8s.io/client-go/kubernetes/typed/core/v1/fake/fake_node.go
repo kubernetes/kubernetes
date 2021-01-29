@@ -141,16 +141,16 @@ func (c *FakeNodes) Apply(ctx context.Context, node *applyconfigurationscorev1.N
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := node.GetObjectMeta()
-	if !ok {
+	meta := node.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("node.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("node.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(nodesResource, name, types.ApplyPatchType, data, subresources...), &corev1.Node{})
+		Invokes(testing.NewRootPatchSubresourceAction(nodesResource, *name, types.ApplyPatchType, data, subresources...), &corev1.Node{})
 	if obj == nil {
 		return nil, err
 	}

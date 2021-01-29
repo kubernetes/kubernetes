@@ -26,63 +26,6 @@ type ContainerStateApplyConfiguration struct {
 	Terminated *ContainerStateTerminatedApplyConfiguration `json:"terminated,omitempty"`
 }
 
-// ContainerStateApplyConfiguration constructs an declarative configuration of the ContainerState type for use with
-// apply.
-func ContainerState() *ContainerStateApplyConfiguration {
-	return &ContainerStateApplyConfiguration{}
-}
-
-// SetWaiting sets the Waiting field in the declarative configuration to the given value.
-func (b *ContainerStateApplyConfiguration) SetWaiting(value *ContainerStateWaitingApplyConfiguration) *ContainerStateApplyConfiguration {
-	b.Waiting = value
-	return b
-}
-
-// RemoveWaiting removes the Waiting field from the declarative configuration.
-func (b *ContainerStateApplyConfiguration) RemoveWaiting() *ContainerStateApplyConfiguration {
-	b.Waiting = nil
-	return b
-}
-
-// GetWaiting gets the Waiting field from the declarative configuration.
-func (b *ContainerStateApplyConfiguration) GetWaiting() (value *ContainerStateWaitingApplyConfiguration, ok bool) {
-	return b.Waiting, b.Waiting != nil
-}
-
-// SetRunning sets the Running field in the declarative configuration to the given value.
-func (b *ContainerStateApplyConfiguration) SetRunning(value *ContainerStateRunningApplyConfiguration) *ContainerStateApplyConfiguration {
-	b.Running = value
-	return b
-}
-
-// RemoveRunning removes the Running field from the declarative configuration.
-func (b *ContainerStateApplyConfiguration) RemoveRunning() *ContainerStateApplyConfiguration {
-	b.Running = nil
-	return b
-}
-
-// GetRunning gets the Running field from the declarative configuration.
-func (b *ContainerStateApplyConfiguration) GetRunning() (value *ContainerStateRunningApplyConfiguration, ok bool) {
-	return b.Running, b.Running != nil
-}
-
-// SetTerminated sets the Terminated field in the declarative configuration to the given value.
-func (b *ContainerStateApplyConfiguration) SetTerminated(value *ContainerStateTerminatedApplyConfiguration) *ContainerStateApplyConfiguration {
-	b.Terminated = value
-	return b
-}
-
-// RemoveTerminated removes the Terminated field from the declarative configuration.
-func (b *ContainerStateApplyConfiguration) RemoveTerminated() *ContainerStateApplyConfiguration {
-	b.Terminated = nil
-	return b
-}
-
-// GetTerminated gets the Terminated field from the declarative configuration.
-func (b *ContainerStateApplyConfiguration) GetTerminated() (value *ContainerStateTerminatedApplyConfiguration, ok bool) {
-	return b.Terminated, b.Terminated != nil
-}
-
 // ContainerStateList represents a listAlias of ContainerStateApplyConfiguration.
 type ContainerStateList []*ContainerStateApplyConfiguration
 

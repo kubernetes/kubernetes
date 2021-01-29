@@ -30,59 +30,6 @@ type PodTemplateApplyConfiguration struct {
 	Template                      *PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
 }
 
-// PodTemplateApplyConfiguration constructs an declarative configuration of the PodTemplate type for use with
-// apply.
-func PodTemplate() *PodTemplateApplyConfiguration {
-	return &PodTemplateApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *PodTemplateApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *PodTemplateApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *PodTemplateApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *PodTemplateApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *PodTemplateApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *PodTemplateApplyConfiguration) RemoveObjectMeta() *PodTemplateApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *PodTemplateApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetTemplate sets the Template field in the declarative configuration to the given value.
-func (b *PodTemplateApplyConfiguration) SetTemplate(value *PodTemplateSpecApplyConfiguration) *PodTemplateApplyConfiguration {
-	b.Template = value
-	return b
-}
-
-// RemoveTemplate removes the Template field from the declarative configuration.
-func (b *PodTemplateApplyConfiguration) RemoveTemplate() *PodTemplateApplyConfiguration {
-	b.Template = nil
-	return b
-}
-
-// GetTemplate gets the Template field from the declarative configuration.
-func (b *PodTemplateApplyConfiguration) GetTemplate() (value *PodTemplateSpecApplyConfiguration, ok bool) {
-	return b.Template, b.Template != nil
-}
-
 // PodTemplateList represents a listAlias of PodTemplateApplyConfiguration.
 type PodTemplateList []*PodTemplateApplyConfiguration
 

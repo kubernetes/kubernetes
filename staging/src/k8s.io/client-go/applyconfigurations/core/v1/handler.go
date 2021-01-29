@@ -26,63 +26,6 @@ type HandlerApplyConfiguration struct {
 	TCPSocket *TCPSocketActionApplyConfiguration `json:"tcpSocket,omitempty"`
 }
 
-// HandlerApplyConfiguration constructs an declarative configuration of the Handler type for use with
-// apply.
-func Handler() *HandlerApplyConfiguration {
-	return &HandlerApplyConfiguration{}
-}
-
-// SetExec sets the Exec field in the declarative configuration to the given value.
-func (b *HandlerApplyConfiguration) SetExec(value *ExecActionApplyConfiguration) *HandlerApplyConfiguration {
-	b.Exec = value
-	return b
-}
-
-// RemoveExec removes the Exec field from the declarative configuration.
-func (b *HandlerApplyConfiguration) RemoveExec() *HandlerApplyConfiguration {
-	b.Exec = nil
-	return b
-}
-
-// GetExec gets the Exec field from the declarative configuration.
-func (b *HandlerApplyConfiguration) GetExec() (value *ExecActionApplyConfiguration, ok bool) {
-	return b.Exec, b.Exec != nil
-}
-
-// SetHTTPGet sets the HTTPGet field in the declarative configuration to the given value.
-func (b *HandlerApplyConfiguration) SetHTTPGet(value *HTTPGetActionApplyConfiguration) *HandlerApplyConfiguration {
-	b.HTTPGet = value
-	return b
-}
-
-// RemoveHTTPGet removes the HTTPGet field from the declarative configuration.
-func (b *HandlerApplyConfiguration) RemoveHTTPGet() *HandlerApplyConfiguration {
-	b.HTTPGet = nil
-	return b
-}
-
-// GetHTTPGet gets the HTTPGet field from the declarative configuration.
-func (b *HandlerApplyConfiguration) GetHTTPGet() (value *HTTPGetActionApplyConfiguration, ok bool) {
-	return b.HTTPGet, b.HTTPGet != nil
-}
-
-// SetTCPSocket sets the TCPSocket field in the declarative configuration to the given value.
-func (b *HandlerApplyConfiguration) SetTCPSocket(value *TCPSocketActionApplyConfiguration) *HandlerApplyConfiguration {
-	b.TCPSocket = value
-	return b
-}
-
-// RemoveTCPSocket removes the TCPSocket field from the declarative configuration.
-func (b *HandlerApplyConfiguration) RemoveTCPSocket() *HandlerApplyConfiguration {
-	b.TCPSocket = nil
-	return b
-}
-
-// GetTCPSocket gets the TCPSocket field from the declarative configuration.
-func (b *HandlerApplyConfiguration) GetTCPSocket() (value *TCPSocketActionApplyConfiguration, ok bool) {
-	return b.TCPSocket, b.TCPSocket != nil
-}
-
 // HandlerList represents a listAlias of HandlerApplyConfiguration.
 type HandlerList []*HandlerApplyConfiguration
 

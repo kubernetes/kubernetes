@@ -28,32 +28,6 @@ type AggregationRuleApplyConfiguration struct {
 	ClusterRoleSelectors *v1.LabelSelectorList `json:"clusterRoleSelectors,omitempty"`
 }
 
-// AggregationRuleApplyConfiguration constructs an declarative configuration of the AggregationRule type for use with
-// apply.
-func AggregationRule() *AggregationRuleApplyConfiguration {
-	return &AggregationRuleApplyConfiguration{}
-}
-
-// SetClusterRoleSelectors sets the ClusterRoleSelectors field in the declarative configuration to the given value.
-func (b *AggregationRuleApplyConfiguration) SetClusterRoleSelectors(value v1.LabelSelectorList) *AggregationRuleApplyConfiguration {
-	b.ClusterRoleSelectors = &value
-	return b
-}
-
-// RemoveClusterRoleSelectors removes the ClusterRoleSelectors field from the declarative configuration.
-func (b *AggregationRuleApplyConfiguration) RemoveClusterRoleSelectors() *AggregationRuleApplyConfiguration {
-	b.ClusterRoleSelectors = nil
-	return b
-}
-
-// GetClusterRoleSelectors gets the ClusterRoleSelectors field from the declarative configuration.
-func (b *AggregationRuleApplyConfiguration) GetClusterRoleSelectors() (value v1.LabelSelectorList, ok bool) {
-	if v := b.ClusterRoleSelectors; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // AggregationRuleList represents a listAlias of AggregationRuleApplyConfiguration.
 type AggregationRuleList []*AggregationRuleApplyConfiguration
 

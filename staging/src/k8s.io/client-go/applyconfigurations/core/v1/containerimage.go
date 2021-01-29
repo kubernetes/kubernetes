@@ -25,52 +25,6 @@ type ContainerImageApplyConfiguration struct {
 	SizeBytes *int64    `json:"sizeBytes,omitempty"`
 }
 
-// ContainerImageApplyConfiguration constructs an declarative configuration of the ContainerImage type for use with
-// apply.
-func ContainerImage() *ContainerImageApplyConfiguration {
-	return &ContainerImageApplyConfiguration{}
-}
-
-// SetNames sets the Names field in the declarative configuration to the given value.
-func (b *ContainerImageApplyConfiguration) SetNames(value []string) *ContainerImageApplyConfiguration {
-	b.Names = &value
-	return b
-}
-
-// RemoveNames removes the Names field from the declarative configuration.
-func (b *ContainerImageApplyConfiguration) RemoveNames() *ContainerImageApplyConfiguration {
-	b.Names = nil
-	return b
-}
-
-// GetNames gets the Names field from the declarative configuration.
-func (b *ContainerImageApplyConfiguration) GetNames() (value []string, ok bool) {
-	if v := b.Names; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetSizeBytes sets the SizeBytes field in the declarative configuration to the given value.
-func (b *ContainerImageApplyConfiguration) SetSizeBytes(value int64) *ContainerImageApplyConfiguration {
-	b.SizeBytes = &value
-	return b
-}
-
-// RemoveSizeBytes removes the SizeBytes field from the declarative configuration.
-func (b *ContainerImageApplyConfiguration) RemoveSizeBytes() *ContainerImageApplyConfiguration {
-	b.SizeBytes = nil
-	return b
-}
-
-// GetSizeBytes gets the SizeBytes field from the declarative configuration.
-func (b *ContainerImageApplyConfiguration) GetSizeBytes() (value int64, ok bool) {
-	if v := b.SizeBytes; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ContainerImageList represents a listAlias of ContainerImageApplyConfiguration.
 type ContainerImageList []*ContainerImageApplyConfiguration
 

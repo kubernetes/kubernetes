@@ -29,52 +29,6 @@ type PreconditionsApplyConfiguration struct {
 	ResourceVersion *string    `json:"resourceVersion,omitempty"`
 }
 
-// PreconditionsApplyConfiguration constructs an declarative configuration of the Preconditions type for use with
-// apply.
-func Preconditions() *PreconditionsApplyConfiguration {
-	return &PreconditionsApplyConfiguration{}
-}
-
-// SetUID sets the UID field in the declarative configuration to the given value.
-func (b *PreconditionsApplyConfiguration) SetUID(value types.UID) *PreconditionsApplyConfiguration {
-	b.UID = &value
-	return b
-}
-
-// RemoveUID removes the UID field from the declarative configuration.
-func (b *PreconditionsApplyConfiguration) RemoveUID() *PreconditionsApplyConfiguration {
-	b.UID = nil
-	return b
-}
-
-// GetUID gets the UID field from the declarative configuration.
-func (b *PreconditionsApplyConfiguration) GetUID() (value types.UID, ok bool) {
-	if v := b.UID; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetResourceVersion sets the ResourceVersion field in the declarative configuration to the given value.
-func (b *PreconditionsApplyConfiguration) SetResourceVersion(value string) *PreconditionsApplyConfiguration {
-	b.ResourceVersion = &value
-	return b
-}
-
-// RemoveResourceVersion removes the ResourceVersion field from the declarative configuration.
-func (b *PreconditionsApplyConfiguration) RemoveResourceVersion() *PreconditionsApplyConfiguration {
-	b.ResourceVersion = nil
-	return b
-}
-
-// GetResourceVersion gets the ResourceVersion field from the declarative configuration.
-func (b *PreconditionsApplyConfiguration) GetResourceVersion() (value string, ok bool) {
-	if v := b.ResourceVersion; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // PreconditionsList represents a listAlias of PreconditionsApplyConfiguration.
 type PreconditionsList []*PreconditionsApplyConfiguration
 

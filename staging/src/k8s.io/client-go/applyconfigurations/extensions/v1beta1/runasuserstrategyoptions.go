@@ -29,52 +29,6 @@ type RunAsUserStrategyOptionsApplyConfiguration struct {
 	Ranges *IDRangeList               `json:"ranges,omitempty"`
 }
 
-// RunAsUserStrategyOptionsApplyConfiguration constructs an declarative configuration of the RunAsUserStrategyOptions type for use with
-// apply.
-func RunAsUserStrategyOptions() *RunAsUserStrategyOptionsApplyConfiguration {
-	return &RunAsUserStrategyOptionsApplyConfiguration{}
-}
-
-// SetRule sets the Rule field in the declarative configuration to the given value.
-func (b *RunAsUserStrategyOptionsApplyConfiguration) SetRule(value v1beta1.RunAsUserStrategy) *RunAsUserStrategyOptionsApplyConfiguration {
-	b.Rule = &value
-	return b
-}
-
-// RemoveRule removes the Rule field from the declarative configuration.
-func (b *RunAsUserStrategyOptionsApplyConfiguration) RemoveRule() *RunAsUserStrategyOptionsApplyConfiguration {
-	b.Rule = nil
-	return b
-}
-
-// GetRule gets the Rule field from the declarative configuration.
-func (b *RunAsUserStrategyOptionsApplyConfiguration) GetRule() (value v1beta1.RunAsUserStrategy, ok bool) {
-	if v := b.Rule; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetRanges sets the Ranges field in the declarative configuration to the given value.
-func (b *RunAsUserStrategyOptionsApplyConfiguration) SetRanges(value IDRangeList) *RunAsUserStrategyOptionsApplyConfiguration {
-	b.Ranges = &value
-	return b
-}
-
-// RemoveRanges removes the Ranges field from the declarative configuration.
-func (b *RunAsUserStrategyOptionsApplyConfiguration) RemoveRanges() *RunAsUserStrategyOptionsApplyConfiguration {
-	b.Ranges = nil
-	return b
-}
-
-// GetRanges gets the Ranges field from the declarative configuration.
-func (b *RunAsUserStrategyOptionsApplyConfiguration) GetRanges() (value IDRangeList, ok bool) {
-	if v := b.Ranges; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // RunAsUserStrategyOptionsList represents a listAlias of RunAsUserStrategyOptionsApplyConfiguration.
 type RunAsUserStrategyOptionsList []*RunAsUserStrategyOptionsApplyConfiguration
 

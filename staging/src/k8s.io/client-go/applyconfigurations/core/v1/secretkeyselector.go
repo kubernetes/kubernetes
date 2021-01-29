@@ -26,65 +26,6 @@ type SecretKeySelectorApplyConfiguration struct {
 	Optional                               *bool   `json:"optional,omitempty"`
 }
 
-// SecretKeySelectorApplyConfiguration constructs an declarative configuration of the SecretKeySelector type for use with
-// apply.
-func SecretKeySelector() *SecretKeySelectorApplyConfiguration {
-	return &SecretKeySelectorApplyConfiguration{}
-}
-
-// SetLocalObjectReference sets the LocalObjectReference field in the declarative configuration to the given value.
-func (b *SecretKeySelectorApplyConfiguration) SetLocalObjectReference(value *LocalObjectReferenceApplyConfiguration) *SecretKeySelectorApplyConfiguration {
-	if value != nil {
-		b.LocalObjectReferenceApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetLocalObjectReference gets the LocalObjectReference field from the declarative configuration.
-func (b *SecretKeySelectorApplyConfiguration) GetLocalObjectReference() (value *LocalObjectReferenceApplyConfiguration, ok bool) {
-	return &b.LocalObjectReferenceApplyConfiguration, true
-}
-
-// SetKey sets the Key field in the declarative configuration to the given value.
-func (b *SecretKeySelectorApplyConfiguration) SetKey(value string) *SecretKeySelectorApplyConfiguration {
-	b.Key = &value
-	return b
-}
-
-// RemoveKey removes the Key field from the declarative configuration.
-func (b *SecretKeySelectorApplyConfiguration) RemoveKey() *SecretKeySelectorApplyConfiguration {
-	b.Key = nil
-	return b
-}
-
-// GetKey gets the Key field from the declarative configuration.
-func (b *SecretKeySelectorApplyConfiguration) GetKey() (value string, ok bool) {
-	if v := b.Key; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetOptional sets the Optional field in the declarative configuration to the given value.
-func (b *SecretKeySelectorApplyConfiguration) SetOptional(value bool) *SecretKeySelectorApplyConfiguration {
-	b.Optional = &value
-	return b
-}
-
-// RemoveOptional removes the Optional field from the declarative configuration.
-func (b *SecretKeySelectorApplyConfiguration) RemoveOptional() *SecretKeySelectorApplyConfiguration {
-	b.Optional = nil
-	return b
-}
-
-// GetOptional gets the Optional field from the declarative configuration.
-func (b *SecretKeySelectorApplyConfiguration) GetOptional() (value bool, ok bool) {
-	if v := b.Optional; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // SecretKeySelectorList represents a listAlias of SecretKeySelectorApplyConfiguration.
 type SecretKeySelectorList []*SecretKeySelectorApplyConfiguration
 

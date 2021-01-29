@@ -25,52 +25,6 @@ type CertificateSigningRequestStatusApplyConfiguration struct {
 	Certificate *[]byte                                 `json:"certificate,omitempty"`
 }
 
-// CertificateSigningRequestStatusApplyConfiguration constructs an declarative configuration of the CertificateSigningRequestStatus type for use with
-// apply.
-func CertificateSigningRequestStatus() *CertificateSigningRequestStatusApplyConfiguration {
-	return &CertificateSigningRequestStatusApplyConfiguration{}
-}
-
-// SetConditions sets the Conditions field in the declarative configuration to the given value.
-func (b *CertificateSigningRequestStatusApplyConfiguration) SetConditions(value CertificateSigningRequestConditionList) *CertificateSigningRequestStatusApplyConfiguration {
-	b.Conditions = &value
-	return b
-}
-
-// RemoveConditions removes the Conditions field from the declarative configuration.
-func (b *CertificateSigningRequestStatusApplyConfiguration) RemoveConditions() *CertificateSigningRequestStatusApplyConfiguration {
-	b.Conditions = nil
-	return b
-}
-
-// GetConditions gets the Conditions field from the declarative configuration.
-func (b *CertificateSigningRequestStatusApplyConfiguration) GetConditions() (value CertificateSigningRequestConditionList, ok bool) {
-	if v := b.Conditions; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetCertificate sets the Certificate field in the declarative configuration to the given value.
-func (b *CertificateSigningRequestStatusApplyConfiguration) SetCertificate(value []byte) *CertificateSigningRequestStatusApplyConfiguration {
-	b.Certificate = &value
-	return b
-}
-
-// RemoveCertificate removes the Certificate field from the declarative configuration.
-func (b *CertificateSigningRequestStatusApplyConfiguration) RemoveCertificate() *CertificateSigningRequestStatusApplyConfiguration {
-	b.Certificate = nil
-	return b
-}
-
-// GetCertificate gets the Certificate field from the declarative configuration.
-func (b *CertificateSigningRequestStatusApplyConfiguration) GetCertificate() (value []byte, ok bool) {
-	if v := b.Certificate; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // CertificateSigningRequestStatusList represents a listAlias of CertificateSigningRequestStatusApplyConfiguration.
 type CertificateSigningRequestStatusList []*CertificateSigningRequestStatusApplyConfiguration
 

@@ -138,16 +138,16 @@ func (c *FakeConfigMaps) Apply(ctx context.Context, configMap *applyconfiguratio
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := configMap.GetObjectMeta()
-	if !ok {
+	meta := configMap.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("configMap.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("configMap.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(configmapsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.ConfigMap{})
+		Invokes(testing.NewPatchSubresourceAction(configmapsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &corev1.ConfigMap{})
 
 	if obj == nil {
 		return nil, err

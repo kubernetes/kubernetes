@@ -25,52 +25,6 @@ type NetworkPolicyEgressRuleApplyConfiguration struct {
 	To    *NetworkPolicyPeerList `json:"to,omitempty"`
 }
 
-// NetworkPolicyEgressRuleApplyConfiguration constructs an declarative configuration of the NetworkPolicyEgressRule type for use with
-// apply.
-func NetworkPolicyEgressRule() *NetworkPolicyEgressRuleApplyConfiguration {
-	return &NetworkPolicyEgressRuleApplyConfiguration{}
-}
-
-// SetPorts sets the Ports field in the declarative configuration to the given value.
-func (b *NetworkPolicyEgressRuleApplyConfiguration) SetPorts(value NetworkPolicyPortList) *NetworkPolicyEgressRuleApplyConfiguration {
-	b.Ports = &value
-	return b
-}
-
-// RemovePorts removes the Ports field from the declarative configuration.
-func (b *NetworkPolicyEgressRuleApplyConfiguration) RemovePorts() *NetworkPolicyEgressRuleApplyConfiguration {
-	b.Ports = nil
-	return b
-}
-
-// GetPorts gets the Ports field from the declarative configuration.
-func (b *NetworkPolicyEgressRuleApplyConfiguration) GetPorts() (value NetworkPolicyPortList, ok bool) {
-	if v := b.Ports; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetTo sets the To field in the declarative configuration to the given value.
-func (b *NetworkPolicyEgressRuleApplyConfiguration) SetTo(value NetworkPolicyPeerList) *NetworkPolicyEgressRuleApplyConfiguration {
-	b.To = &value
-	return b
-}
-
-// RemoveTo removes the To field from the declarative configuration.
-func (b *NetworkPolicyEgressRuleApplyConfiguration) RemoveTo() *NetworkPolicyEgressRuleApplyConfiguration {
-	b.To = nil
-	return b
-}
-
-// GetTo gets the To field from the declarative configuration.
-func (b *NetworkPolicyEgressRuleApplyConfiguration) GetTo() (value NetworkPolicyPeerList, ok bool) {
-	if v := b.To; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // NetworkPolicyEgressRuleList represents a listAlias of NetworkPolicyEgressRuleApplyConfiguration.
 type NetworkPolicyEgressRuleList []*NetworkPolicyEgressRuleApplyConfiguration
 

@@ -25,49 +25,6 @@ type EphemeralVolumeSourceApplyConfiguration struct {
 	ReadOnly            *bool                                            `json:"readOnly,omitempty"`
 }
 
-// EphemeralVolumeSourceApplyConfiguration constructs an declarative configuration of the EphemeralVolumeSource type for use with
-// apply.
-func EphemeralVolumeSource() *EphemeralVolumeSourceApplyConfiguration {
-	return &EphemeralVolumeSourceApplyConfiguration{}
-}
-
-// SetVolumeClaimTemplate sets the VolumeClaimTemplate field in the declarative configuration to the given value.
-func (b *EphemeralVolumeSourceApplyConfiguration) SetVolumeClaimTemplate(value *PersistentVolumeClaimTemplateApplyConfiguration) *EphemeralVolumeSourceApplyConfiguration {
-	b.VolumeClaimTemplate = value
-	return b
-}
-
-// RemoveVolumeClaimTemplate removes the VolumeClaimTemplate field from the declarative configuration.
-func (b *EphemeralVolumeSourceApplyConfiguration) RemoveVolumeClaimTemplate() *EphemeralVolumeSourceApplyConfiguration {
-	b.VolumeClaimTemplate = nil
-	return b
-}
-
-// GetVolumeClaimTemplate gets the VolumeClaimTemplate field from the declarative configuration.
-func (b *EphemeralVolumeSourceApplyConfiguration) GetVolumeClaimTemplate() (value *PersistentVolumeClaimTemplateApplyConfiguration, ok bool) {
-	return b.VolumeClaimTemplate, b.VolumeClaimTemplate != nil
-}
-
-// SetReadOnly sets the ReadOnly field in the declarative configuration to the given value.
-func (b *EphemeralVolumeSourceApplyConfiguration) SetReadOnly(value bool) *EphemeralVolumeSourceApplyConfiguration {
-	b.ReadOnly = &value
-	return b
-}
-
-// RemoveReadOnly removes the ReadOnly field from the declarative configuration.
-func (b *EphemeralVolumeSourceApplyConfiguration) RemoveReadOnly() *EphemeralVolumeSourceApplyConfiguration {
-	b.ReadOnly = nil
-	return b
-}
-
-// GetReadOnly gets the ReadOnly field from the declarative configuration.
-func (b *EphemeralVolumeSourceApplyConfiguration) GetReadOnly() (value bool, ok bool) {
-	if v := b.ReadOnly; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // EphemeralVolumeSourceList represents a listAlias of EphemeralVolumeSourceApplyConfiguration.
 type EphemeralVolumeSourceList []*EphemeralVolumeSourceApplyConfiguration
 

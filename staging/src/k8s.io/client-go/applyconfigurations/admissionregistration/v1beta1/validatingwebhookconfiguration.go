@@ -30,62 +30,6 @@ type ValidatingWebhookConfigurationApplyConfiguration struct {
 	Webhooks                      *ValidatingWebhookList           `json:"webhooks,omitempty"`
 }
 
-// ValidatingWebhookConfigurationApplyConfiguration constructs an declarative configuration of the ValidatingWebhookConfiguration type for use with
-// apply.
-func ValidatingWebhookConfiguration() *ValidatingWebhookConfigurationApplyConfiguration {
-	return &ValidatingWebhookConfigurationApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *ValidatingWebhookConfigurationApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *ValidatingWebhookConfigurationApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *ValidatingWebhookConfigurationApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *ValidatingWebhookConfigurationApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *ValidatingWebhookConfigurationApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *ValidatingWebhookConfigurationApplyConfiguration) RemoveObjectMeta() *ValidatingWebhookConfigurationApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *ValidatingWebhookConfigurationApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetWebhooks sets the Webhooks field in the declarative configuration to the given value.
-func (b *ValidatingWebhookConfigurationApplyConfiguration) SetWebhooks(value ValidatingWebhookList) *ValidatingWebhookConfigurationApplyConfiguration {
-	b.Webhooks = &value
-	return b
-}
-
-// RemoveWebhooks removes the Webhooks field from the declarative configuration.
-func (b *ValidatingWebhookConfigurationApplyConfiguration) RemoveWebhooks() *ValidatingWebhookConfigurationApplyConfiguration {
-	b.Webhooks = nil
-	return b
-}
-
-// GetWebhooks gets the Webhooks field from the declarative configuration.
-func (b *ValidatingWebhookConfigurationApplyConfiguration) GetWebhooks() (value ValidatingWebhookList, ok bool) {
-	if v := b.Webhooks; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ValidatingWebhookConfigurationList represents a listAlias of ValidatingWebhookConfigurationApplyConfiguration.
 type ValidatingWebhookConfigurationList []*ValidatingWebhookConfigurationApplyConfiguration
 

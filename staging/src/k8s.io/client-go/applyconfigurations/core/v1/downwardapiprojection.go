@@ -24,32 +24,6 @@ type DownwardAPIProjectionApplyConfiguration struct {
 	Items *DownwardAPIVolumeFileList `json:"items,omitempty"`
 }
 
-// DownwardAPIProjectionApplyConfiguration constructs an declarative configuration of the DownwardAPIProjection type for use with
-// apply.
-func DownwardAPIProjection() *DownwardAPIProjectionApplyConfiguration {
-	return &DownwardAPIProjectionApplyConfiguration{}
-}
-
-// SetItems sets the Items field in the declarative configuration to the given value.
-func (b *DownwardAPIProjectionApplyConfiguration) SetItems(value DownwardAPIVolumeFileList) *DownwardAPIProjectionApplyConfiguration {
-	b.Items = &value
-	return b
-}
-
-// RemoveItems removes the Items field from the declarative configuration.
-func (b *DownwardAPIProjectionApplyConfiguration) RemoveItems() *DownwardAPIProjectionApplyConfiguration {
-	b.Items = nil
-	return b
-}
-
-// GetItems gets the Items field from the declarative configuration.
-func (b *DownwardAPIProjectionApplyConfiguration) GetItems() (value DownwardAPIVolumeFileList, ok bool) {
-	if v := b.Items; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // DownwardAPIProjectionList represents a listAlias of DownwardAPIProjectionApplyConfiguration.
 type DownwardAPIProjectionList []*DownwardAPIProjectionApplyConfiguration
 

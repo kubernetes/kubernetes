@@ -24,32 +24,6 @@ type SelfSubjectRulesReviewSpecApplyConfiguration struct {
 	Namespace *string `json:"namespace,omitempty"`
 }
 
-// SelfSubjectRulesReviewSpecApplyConfiguration constructs an declarative configuration of the SelfSubjectRulesReviewSpec type for use with
-// apply.
-func SelfSubjectRulesReviewSpec() *SelfSubjectRulesReviewSpecApplyConfiguration {
-	return &SelfSubjectRulesReviewSpecApplyConfiguration{}
-}
-
-// SetNamespace sets the Namespace field in the declarative configuration to the given value.
-func (b *SelfSubjectRulesReviewSpecApplyConfiguration) SetNamespace(value string) *SelfSubjectRulesReviewSpecApplyConfiguration {
-	b.Namespace = &value
-	return b
-}
-
-// RemoveNamespace removes the Namespace field from the declarative configuration.
-func (b *SelfSubjectRulesReviewSpecApplyConfiguration) RemoveNamespace() *SelfSubjectRulesReviewSpecApplyConfiguration {
-	b.Namespace = nil
-	return b
-}
-
-// GetNamespace gets the Namespace field from the declarative configuration.
-func (b *SelfSubjectRulesReviewSpecApplyConfiguration) GetNamespace() (value string, ok bool) {
-	if v := b.Namespace; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // SelfSubjectRulesReviewSpecList represents a listAlias of SelfSubjectRulesReviewSpecApplyConfiguration.
 type SelfSubjectRulesReviewSpecList []*SelfSubjectRulesReviewSpecApplyConfiguration
 

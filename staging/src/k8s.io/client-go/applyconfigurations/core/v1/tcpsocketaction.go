@@ -29,52 +29,6 @@ type TCPSocketActionApplyConfiguration struct {
 	Host *string             `json:"host,omitempty"`
 }
 
-// TCPSocketActionApplyConfiguration constructs an declarative configuration of the TCPSocketAction type for use with
-// apply.
-func TCPSocketAction() *TCPSocketActionApplyConfiguration {
-	return &TCPSocketActionApplyConfiguration{}
-}
-
-// SetPort sets the Port field in the declarative configuration to the given value.
-func (b *TCPSocketActionApplyConfiguration) SetPort(value intstr.IntOrString) *TCPSocketActionApplyConfiguration {
-	b.Port = &value
-	return b
-}
-
-// RemovePort removes the Port field from the declarative configuration.
-func (b *TCPSocketActionApplyConfiguration) RemovePort() *TCPSocketActionApplyConfiguration {
-	b.Port = nil
-	return b
-}
-
-// GetPort gets the Port field from the declarative configuration.
-func (b *TCPSocketActionApplyConfiguration) GetPort() (value intstr.IntOrString, ok bool) {
-	if v := b.Port; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetHost sets the Host field in the declarative configuration to the given value.
-func (b *TCPSocketActionApplyConfiguration) SetHost(value string) *TCPSocketActionApplyConfiguration {
-	b.Host = &value
-	return b
-}
-
-// RemoveHost removes the Host field from the declarative configuration.
-func (b *TCPSocketActionApplyConfiguration) RemoveHost() *TCPSocketActionApplyConfiguration {
-	b.Host = nil
-	return b
-}
-
-// GetHost gets the Host field from the declarative configuration.
-func (b *TCPSocketActionApplyConfiguration) GetHost() (value string, ok bool) {
-	if v := b.Host; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // TCPSocketActionList represents a listAlias of TCPSocketActionApplyConfiguration.
 type TCPSocketActionList []*TCPSocketActionApplyConfiguration
 

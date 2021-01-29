@@ -205,19 +205,19 @@ func (c *resourceQuotas) Apply(ctx context.Context, resourceQuota *corev1.Resour
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := resourceQuota.GetObjectMeta()
-	if !ok {
+	meta := resourceQuota.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("resourceQuota.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("resourceQuota.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.ResourceQuota{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("resourcequotas").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

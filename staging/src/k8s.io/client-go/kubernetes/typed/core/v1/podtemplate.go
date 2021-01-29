@@ -188,19 +188,19 @@ func (c *podTemplates) Apply(ctx context.Context, podTemplate *corev1.PodTemplat
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := podTemplate.GetObjectMeta()
-	if !ok {
+	meta := podTemplate.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("podTemplate.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("podTemplate.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.PodTemplate{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("podtemplates").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

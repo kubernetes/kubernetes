@@ -30,59 +30,6 @@ type CSINodeApplyConfiguration struct {
 	Spec                          *CSINodeSpecApplyConfiguration   `json:"spec,omitempty"`
 }
 
-// CSINodeApplyConfiguration constructs an declarative configuration of the CSINode type for use with
-// apply.
-func CSINode() *CSINodeApplyConfiguration {
-	return &CSINodeApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *CSINodeApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *CSINodeApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *CSINodeApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *CSINodeApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *CSINodeApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *CSINodeApplyConfiguration) RemoveObjectMeta() *CSINodeApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *CSINodeApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetSpec sets the Spec field in the declarative configuration to the given value.
-func (b *CSINodeApplyConfiguration) SetSpec(value *CSINodeSpecApplyConfiguration) *CSINodeApplyConfiguration {
-	b.Spec = value
-	return b
-}
-
-// RemoveSpec removes the Spec field from the declarative configuration.
-func (b *CSINodeApplyConfiguration) RemoveSpec() *CSINodeApplyConfiguration {
-	b.Spec = nil
-	return b
-}
-
-// GetSpec gets the Spec field from the declarative configuration.
-func (b *CSINodeApplyConfiguration) GetSpec() (value *CSINodeSpecApplyConfiguration, ok bool) {
-	return b.Spec, b.Spec != nil
-}
-
 // CSINodeList represents a listAlias of CSINodeApplyConfiguration.
 type CSINodeList []*CSINodeApplyConfiguration
 

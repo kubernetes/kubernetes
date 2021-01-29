@@ -25,46 +25,6 @@ type PodsMetricSourceApplyConfiguration struct {
 	Target *MetricTargetApplyConfiguration     `json:"target,omitempty"`
 }
 
-// PodsMetricSourceApplyConfiguration constructs an declarative configuration of the PodsMetricSource type for use with
-// apply.
-func PodsMetricSource() *PodsMetricSourceApplyConfiguration {
-	return &PodsMetricSourceApplyConfiguration{}
-}
-
-// SetMetric sets the Metric field in the declarative configuration to the given value.
-func (b *PodsMetricSourceApplyConfiguration) SetMetric(value *MetricIdentifierApplyConfiguration) *PodsMetricSourceApplyConfiguration {
-	b.Metric = value
-	return b
-}
-
-// RemoveMetric removes the Metric field from the declarative configuration.
-func (b *PodsMetricSourceApplyConfiguration) RemoveMetric() *PodsMetricSourceApplyConfiguration {
-	b.Metric = nil
-	return b
-}
-
-// GetMetric gets the Metric field from the declarative configuration.
-func (b *PodsMetricSourceApplyConfiguration) GetMetric() (value *MetricIdentifierApplyConfiguration, ok bool) {
-	return b.Metric, b.Metric != nil
-}
-
-// SetTarget sets the Target field in the declarative configuration to the given value.
-func (b *PodsMetricSourceApplyConfiguration) SetTarget(value *MetricTargetApplyConfiguration) *PodsMetricSourceApplyConfiguration {
-	b.Target = value
-	return b
-}
-
-// RemoveTarget removes the Target field from the declarative configuration.
-func (b *PodsMetricSourceApplyConfiguration) RemoveTarget() *PodsMetricSourceApplyConfiguration {
-	b.Target = nil
-	return b
-}
-
-// GetTarget gets the Target field from the declarative configuration.
-func (b *PodsMetricSourceApplyConfiguration) GetTarget() (value *MetricTargetApplyConfiguration, ok bool) {
-	return b.Target, b.Target != nil
-}
-
 // PodsMetricSourceList represents a listAlias of PodsMetricSourceApplyConfiguration.
 type PodsMetricSourceList []*PodsMetricSourceApplyConfiguration
 

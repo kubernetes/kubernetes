@@ -25,52 +25,6 @@ type IPBlockApplyConfiguration struct {
 	Except *[]string `json:"except,omitempty"`
 }
 
-// IPBlockApplyConfiguration constructs an declarative configuration of the IPBlock type for use with
-// apply.
-func IPBlock() *IPBlockApplyConfiguration {
-	return &IPBlockApplyConfiguration{}
-}
-
-// SetCIDR sets the CIDR field in the declarative configuration to the given value.
-func (b *IPBlockApplyConfiguration) SetCIDR(value string) *IPBlockApplyConfiguration {
-	b.CIDR = &value
-	return b
-}
-
-// RemoveCIDR removes the CIDR field from the declarative configuration.
-func (b *IPBlockApplyConfiguration) RemoveCIDR() *IPBlockApplyConfiguration {
-	b.CIDR = nil
-	return b
-}
-
-// GetCIDR gets the CIDR field from the declarative configuration.
-func (b *IPBlockApplyConfiguration) GetCIDR() (value string, ok bool) {
-	if v := b.CIDR; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetExcept sets the Except field in the declarative configuration to the given value.
-func (b *IPBlockApplyConfiguration) SetExcept(value []string) *IPBlockApplyConfiguration {
-	b.Except = &value
-	return b
-}
-
-// RemoveExcept removes the Except field from the declarative configuration.
-func (b *IPBlockApplyConfiguration) RemoveExcept() *IPBlockApplyConfiguration {
-	b.Except = nil
-	return b
-}
-
-// GetExcept gets the Except field from the declarative configuration.
-func (b *IPBlockApplyConfiguration) GetExcept() (value []string, ok bool) {
-	if v := b.Except; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // IPBlockList represents a listAlias of IPBlockApplyConfiguration.
 type IPBlockList []*IPBlockApplyConfiguration
 

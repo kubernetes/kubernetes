@@ -150,16 +150,16 @@ func (c *FakeHorizontalPodAutoscalers) Apply(ctx context.Context, horizontalPodA
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := horizontalPodAutoscaler.GetObjectMeta()
-	if !ok {
+	meta := horizontalPodAutoscaler.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("horizontalPodAutoscaler.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("horizontalPodAutoscaler.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, name, types.ApplyPatchType, data, subresources...), &autoscalingv1.HorizontalPodAutoscaler{})
+		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &autoscalingv1.HorizontalPodAutoscaler{})
 
 	if obj == nil {
 		return nil, err

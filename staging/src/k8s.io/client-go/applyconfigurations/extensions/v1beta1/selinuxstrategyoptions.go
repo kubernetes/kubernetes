@@ -30,49 +30,6 @@ type SELinuxStrategyOptionsApplyConfiguration struct {
 	SELinuxOptions *v1.SELinuxOptionsApplyConfiguration `json:"seLinuxOptions,omitempty"`
 }
 
-// SELinuxStrategyOptionsApplyConfiguration constructs an declarative configuration of the SELinuxStrategyOptions type for use with
-// apply.
-func SELinuxStrategyOptions() *SELinuxStrategyOptionsApplyConfiguration {
-	return &SELinuxStrategyOptionsApplyConfiguration{}
-}
-
-// SetRule sets the Rule field in the declarative configuration to the given value.
-func (b *SELinuxStrategyOptionsApplyConfiguration) SetRule(value v1beta1.SELinuxStrategy) *SELinuxStrategyOptionsApplyConfiguration {
-	b.Rule = &value
-	return b
-}
-
-// RemoveRule removes the Rule field from the declarative configuration.
-func (b *SELinuxStrategyOptionsApplyConfiguration) RemoveRule() *SELinuxStrategyOptionsApplyConfiguration {
-	b.Rule = nil
-	return b
-}
-
-// GetRule gets the Rule field from the declarative configuration.
-func (b *SELinuxStrategyOptionsApplyConfiguration) GetRule() (value v1beta1.SELinuxStrategy, ok bool) {
-	if v := b.Rule; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetSELinuxOptions sets the SELinuxOptions field in the declarative configuration to the given value.
-func (b *SELinuxStrategyOptionsApplyConfiguration) SetSELinuxOptions(value *v1.SELinuxOptionsApplyConfiguration) *SELinuxStrategyOptionsApplyConfiguration {
-	b.SELinuxOptions = value
-	return b
-}
-
-// RemoveSELinuxOptions removes the SELinuxOptions field from the declarative configuration.
-func (b *SELinuxStrategyOptionsApplyConfiguration) RemoveSELinuxOptions() *SELinuxStrategyOptionsApplyConfiguration {
-	b.SELinuxOptions = nil
-	return b
-}
-
-// GetSELinuxOptions gets the SELinuxOptions field from the declarative configuration.
-func (b *SELinuxStrategyOptionsApplyConfiguration) GetSELinuxOptions() (value *v1.SELinuxOptionsApplyConfiguration, ok bool) {
-	return b.SELinuxOptions, b.SELinuxOptions != nil
-}
-
 // SELinuxStrategyOptionsList represents a listAlias of SELinuxStrategyOptionsApplyConfiguration.
 type SELinuxStrategyOptionsList []*SELinuxStrategyOptionsApplyConfiguration
 

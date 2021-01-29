@@ -645,19 +645,19 @@ func (c *$.type|privatePlural$) Apply(ctx context.Context, $.inputType|private$ 
 	if err != nil {
 		return nil, err
 	}
-    meta, ok := $.inputType|private$.GetObjectMeta()
-    if !ok {
-        return nil, fmt.Errorf("$.inputType|private$.ObjectMeta must be provided to Apply")
-    }
-    name, ok := meta.GetName()
-    if !ok {
-        return nil, fmt.Errorf("$.inputType|private$.ObjectMeta.Name must be provided to Apply")
-    }
+	meta := $.inputType|private$.ObjectMeta
+	if meta == nil {
+		return nil, fmt.Errorf("$.inputType|private$.ObjectMeta must be provided to Apply")
+	}
+	name := meta.Name
+	if name == nil {
+		return nil, fmt.Errorf("$.inputType|private$.ObjectMeta.Name must be provided to Apply")
+	}
 	result = &$.resultType|raw${}
 	err = c.client.Patch($.ApplyPatchType|raw$).
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, $.schemeParameterCodec|raw$).
 		Body(data).

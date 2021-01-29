@@ -28,32 +28,6 @@ type OverheadApplyConfiguration struct {
 	PodFixed *v1.ResourceList `json:"podFixed,omitempty"`
 }
 
-// OverheadApplyConfiguration constructs an declarative configuration of the Overhead type for use with
-// apply.
-func Overhead() *OverheadApplyConfiguration {
-	return &OverheadApplyConfiguration{}
-}
-
-// SetPodFixed sets the PodFixed field in the declarative configuration to the given value.
-func (b *OverheadApplyConfiguration) SetPodFixed(value v1.ResourceList) *OverheadApplyConfiguration {
-	b.PodFixed = &value
-	return b
-}
-
-// RemovePodFixed removes the PodFixed field from the declarative configuration.
-func (b *OverheadApplyConfiguration) RemovePodFixed() *OverheadApplyConfiguration {
-	b.PodFixed = nil
-	return b
-}
-
-// GetPodFixed gets the PodFixed field from the declarative configuration.
-func (b *OverheadApplyConfiguration) GetPodFixed() (value v1.ResourceList, ok bool) {
-	if v := b.PodFixed; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // OverheadList represents a listAlias of OverheadApplyConfiguration.
 type OverheadList []*OverheadApplyConfiguration
 

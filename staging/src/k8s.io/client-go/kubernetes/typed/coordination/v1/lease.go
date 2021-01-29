@@ -188,19 +188,19 @@ func (c *leases) Apply(ctx context.Context, lease *coordinationv1.LeaseApplyConf
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := lease.GetObjectMeta()
-	if !ok {
+	meta := lease.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("lease.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("lease.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.Lease{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("leases").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

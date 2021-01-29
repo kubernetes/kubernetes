@@ -29,52 +29,6 @@ type NamespaceStatusApplyConfiguration struct {
 	Conditions *NamespaceConditionList `json:"conditions,omitempty"`
 }
 
-// NamespaceStatusApplyConfiguration constructs an declarative configuration of the NamespaceStatus type for use with
-// apply.
-func NamespaceStatus() *NamespaceStatusApplyConfiguration {
-	return &NamespaceStatusApplyConfiguration{}
-}
-
-// SetPhase sets the Phase field in the declarative configuration to the given value.
-func (b *NamespaceStatusApplyConfiguration) SetPhase(value v1.NamespacePhase) *NamespaceStatusApplyConfiguration {
-	b.Phase = &value
-	return b
-}
-
-// RemovePhase removes the Phase field from the declarative configuration.
-func (b *NamespaceStatusApplyConfiguration) RemovePhase() *NamespaceStatusApplyConfiguration {
-	b.Phase = nil
-	return b
-}
-
-// GetPhase gets the Phase field from the declarative configuration.
-func (b *NamespaceStatusApplyConfiguration) GetPhase() (value v1.NamespacePhase, ok bool) {
-	if v := b.Phase; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetConditions sets the Conditions field in the declarative configuration to the given value.
-func (b *NamespaceStatusApplyConfiguration) SetConditions(value NamespaceConditionList) *NamespaceStatusApplyConfiguration {
-	b.Conditions = &value
-	return b
-}
-
-// RemoveConditions removes the Conditions field from the declarative configuration.
-func (b *NamespaceStatusApplyConfiguration) RemoveConditions() *NamespaceStatusApplyConfiguration {
-	b.Conditions = nil
-	return b
-}
-
-// GetConditions gets the Conditions field from the declarative configuration.
-func (b *NamespaceStatusApplyConfiguration) GetConditions() (value NamespaceConditionList, ok bool) {
-	if v := b.Conditions; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // NamespaceStatusList represents a listAlias of NamespaceStatusApplyConfiguration.
 type NamespaceStatusList []*NamespaceStatusApplyConfiguration
 

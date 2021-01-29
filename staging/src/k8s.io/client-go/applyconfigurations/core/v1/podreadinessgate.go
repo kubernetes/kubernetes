@@ -28,32 +28,6 @@ type PodReadinessGateApplyConfiguration struct {
 	ConditionType *v1.PodConditionType `json:"conditionType,omitempty"`
 }
 
-// PodReadinessGateApplyConfiguration constructs an declarative configuration of the PodReadinessGate type for use with
-// apply.
-func PodReadinessGate() *PodReadinessGateApplyConfiguration {
-	return &PodReadinessGateApplyConfiguration{}
-}
-
-// SetConditionType sets the ConditionType field in the declarative configuration to the given value.
-func (b *PodReadinessGateApplyConfiguration) SetConditionType(value v1.PodConditionType) *PodReadinessGateApplyConfiguration {
-	b.ConditionType = &value
-	return b
-}
-
-// RemoveConditionType removes the ConditionType field from the declarative configuration.
-func (b *PodReadinessGateApplyConfiguration) RemoveConditionType() *PodReadinessGateApplyConfiguration {
-	b.ConditionType = nil
-	return b
-}
-
-// GetConditionType gets the ConditionType field from the declarative configuration.
-func (b *PodReadinessGateApplyConfiguration) GetConditionType() (value v1.PodConditionType, ok bool) {
-	if v := b.ConditionType; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // PodReadinessGateList represents a listAlias of PodReadinessGateApplyConfiguration.
 type PodReadinessGateList []*PodReadinessGateApplyConfiguration
 

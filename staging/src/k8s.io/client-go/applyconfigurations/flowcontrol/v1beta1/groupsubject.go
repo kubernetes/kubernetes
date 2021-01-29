@@ -24,32 +24,6 @@ type GroupSubjectApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// GroupSubjectApplyConfiguration constructs an declarative configuration of the GroupSubject type for use with
-// apply.
-func GroupSubject() *GroupSubjectApplyConfiguration {
-	return &GroupSubjectApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *GroupSubjectApplyConfiguration) SetName(value string) *GroupSubjectApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *GroupSubjectApplyConfiguration) RemoveName() *GroupSubjectApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *GroupSubjectApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // GroupSubjectList represents a listAlias of GroupSubjectApplyConfiguration.
 type GroupSubjectList []*GroupSubjectApplyConfiguration
 

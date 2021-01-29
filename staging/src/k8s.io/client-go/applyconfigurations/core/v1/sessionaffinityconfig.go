@@ -24,29 +24,6 @@ type SessionAffinityConfigApplyConfiguration struct {
 	ClientIP *ClientIPConfigApplyConfiguration `json:"clientIP,omitempty"`
 }
 
-// SessionAffinityConfigApplyConfiguration constructs an declarative configuration of the SessionAffinityConfig type for use with
-// apply.
-func SessionAffinityConfig() *SessionAffinityConfigApplyConfiguration {
-	return &SessionAffinityConfigApplyConfiguration{}
-}
-
-// SetClientIP sets the ClientIP field in the declarative configuration to the given value.
-func (b *SessionAffinityConfigApplyConfiguration) SetClientIP(value *ClientIPConfigApplyConfiguration) *SessionAffinityConfigApplyConfiguration {
-	b.ClientIP = value
-	return b
-}
-
-// RemoveClientIP removes the ClientIP field from the declarative configuration.
-func (b *SessionAffinityConfigApplyConfiguration) RemoveClientIP() *SessionAffinityConfigApplyConfiguration {
-	b.ClientIP = nil
-	return b
-}
-
-// GetClientIP gets the ClientIP field from the declarative configuration.
-func (b *SessionAffinityConfigApplyConfiguration) GetClientIP() (value *ClientIPConfigApplyConfiguration, ok bool) {
-	return b.ClientIP, b.ClientIP != nil
-}
-
 // SessionAffinityConfigList represents a listAlias of SessionAffinityConfigApplyConfiguration.
 type SessionAffinityConfigList []*SessionAffinityConfigApplyConfiguration
 

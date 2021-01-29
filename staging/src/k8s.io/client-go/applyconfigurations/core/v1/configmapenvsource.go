@@ -25,45 +25,6 @@ type ConfigMapEnvSourceApplyConfiguration struct {
 	Optional                               *bool `json:"optional,omitempty"`
 }
 
-// ConfigMapEnvSourceApplyConfiguration constructs an declarative configuration of the ConfigMapEnvSource type for use with
-// apply.
-func ConfigMapEnvSource() *ConfigMapEnvSourceApplyConfiguration {
-	return &ConfigMapEnvSourceApplyConfiguration{}
-}
-
-// SetLocalObjectReference sets the LocalObjectReference field in the declarative configuration to the given value.
-func (b *ConfigMapEnvSourceApplyConfiguration) SetLocalObjectReference(value *LocalObjectReferenceApplyConfiguration) *ConfigMapEnvSourceApplyConfiguration {
-	if value != nil {
-		b.LocalObjectReferenceApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetLocalObjectReference gets the LocalObjectReference field from the declarative configuration.
-func (b *ConfigMapEnvSourceApplyConfiguration) GetLocalObjectReference() (value *LocalObjectReferenceApplyConfiguration, ok bool) {
-	return &b.LocalObjectReferenceApplyConfiguration, true
-}
-
-// SetOptional sets the Optional field in the declarative configuration to the given value.
-func (b *ConfigMapEnvSourceApplyConfiguration) SetOptional(value bool) *ConfigMapEnvSourceApplyConfiguration {
-	b.Optional = &value
-	return b
-}
-
-// RemoveOptional removes the Optional field from the declarative configuration.
-func (b *ConfigMapEnvSourceApplyConfiguration) RemoveOptional() *ConfigMapEnvSourceApplyConfiguration {
-	b.Optional = nil
-	return b
-}
-
-// GetOptional gets the Optional field from the declarative configuration.
-func (b *ConfigMapEnvSourceApplyConfiguration) GetOptional() (value bool, ok bool) {
-	if v := b.Optional; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ConfigMapEnvSourceList represents a listAlias of ConfigMapEnvSourceApplyConfiguration.
 type ConfigMapEnvSourceList []*ConfigMapEnvSourceApplyConfiguration
 

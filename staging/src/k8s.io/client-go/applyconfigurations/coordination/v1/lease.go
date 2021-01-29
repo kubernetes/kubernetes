@@ -30,59 +30,6 @@ type LeaseApplyConfiguration struct {
 	Spec                          *LeaseSpecApplyConfiguration     `json:"spec,omitempty"`
 }
 
-// LeaseApplyConfiguration constructs an declarative configuration of the Lease type for use with
-// apply.
-func Lease() *LeaseApplyConfiguration {
-	return &LeaseApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *LeaseApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *LeaseApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *LeaseApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *LeaseApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *LeaseApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *LeaseApplyConfiguration) RemoveObjectMeta() *LeaseApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *LeaseApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetSpec sets the Spec field in the declarative configuration to the given value.
-func (b *LeaseApplyConfiguration) SetSpec(value *LeaseSpecApplyConfiguration) *LeaseApplyConfiguration {
-	b.Spec = value
-	return b
-}
-
-// RemoveSpec removes the Spec field from the declarative configuration.
-func (b *LeaseApplyConfiguration) RemoveSpec() *LeaseApplyConfiguration {
-	b.Spec = nil
-	return b
-}
-
-// GetSpec gets the Spec field from the declarative configuration.
-func (b *LeaseApplyConfiguration) GetSpec() (value *LeaseSpecApplyConfiguration, ok bool) {
-	return b.Spec, b.Spec != nil
-}
-
 // LeaseList represents a listAlias of LeaseApplyConfiguration.
 type LeaseList []*LeaseApplyConfiguration
 

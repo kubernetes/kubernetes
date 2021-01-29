@@ -30,59 +30,6 @@ type RuntimeClassApplyConfiguration struct {
 	Spec                          *RuntimeClassSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// RuntimeClassApplyConfiguration constructs an declarative configuration of the RuntimeClass type for use with
-// apply.
-func RuntimeClass() *RuntimeClassApplyConfiguration {
-	return &RuntimeClassApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *RuntimeClassApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *RuntimeClassApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *RuntimeClassApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *RuntimeClassApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *RuntimeClassApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *RuntimeClassApplyConfiguration) RemoveObjectMeta() *RuntimeClassApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *RuntimeClassApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetSpec sets the Spec field in the declarative configuration to the given value.
-func (b *RuntimeClassApplyConfiguration) SetSpec(value *RuntimeClassSpecApplyConfiguration) *RuntimeClassApplyConfiguration {
-	b.Spec = value
-	return b
-}
-
-// RemoveSpec removes the Spec field from the declarative configuration.
-func (b *RuntimeClassApplyConfiguration) RemoveSpec() *RuntimeClassApplyConfiguration {
-	b.Spec = nil
-	return b
-}
-
-// GetSpec gets the Spec field from the declarative configuration.
-func (b *RuntimeClassApplyConfiguration) GetSpec() (value *RuntimeClassSpecApplyConfiguration, ok bool) {
-	return b.Spec, b.Spec != nil
-}
-
 // RuntimeClassList represents a listAlias of RuntimeClassApplyConfiguration.
 type RuntimeClassList []*RuntimeClassApplyConfiguration
 

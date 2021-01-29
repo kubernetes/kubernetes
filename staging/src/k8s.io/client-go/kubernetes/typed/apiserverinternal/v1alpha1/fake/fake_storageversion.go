@@ -141,16 +141,16 @@ func (c *FakeStorageVersions) Apply(ctx context.Context, storageVersion *apiserv
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := storageVersion.GetObjectMeta()
-	if !ok {
+	meta := storageVersion.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("storageVersion.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("storageVersion.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storageversionsResource, name, types.ApplyPatchType, data, subresources...), &v1alpha1.StorageVersion{})
+		Invokes(testing.NewRootPatchSubresourceAction(storageversionsResource, *name, types.ApplyPatchType, data, subresources...), &v1alpha1.StorageVersion{})
 	if obj == nil {
 		return nil, err
 	}

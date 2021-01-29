@@ -141,16 +141,16 @@ func (c *FakeCertificateSigningRequests) Apply(ctx context.Context, certificateS
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := certificateSigningRequest.GetObjectMeta()
-	if !ok {
+	meta := certificateSigningRequest.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("certificateSigningRequest.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("certificateSigningRequest.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(certificatesigningrequestsResource, name, types.ApplyPatchType, data, subresources...), &v1beta1.CertificateSigningRequest{})
+		Invokes(testing.NewRootPatchSubresourceAction(certificatesigningrequestsResource, *name, types.ApplyPatchType, data, subresources...), &v1beta1.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}

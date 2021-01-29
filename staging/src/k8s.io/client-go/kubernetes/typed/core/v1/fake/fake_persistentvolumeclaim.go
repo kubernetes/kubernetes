@@ -150,16 +150,16 @@ func (c *FakePersistentVolumeClaims) Apply(ctx context.Context, persistentVolume
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := persistentVolumeClaim.GetObjectMeta()
-	if !ok {
+	meta := persistentVolumeClaim.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("persistentVolumeClaim.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("persistentVolumeClaim.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.PersistentVolumeClaim{})
+		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &corev1.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err

@@ -24,32 +24,6 @@ type ImageReviewContainerSpecApplyConfiguration struct {
 	Image *string `json:"image,omitempty"`
 }
 
-// ImageReviewContainerSpecApplyConfiguration constructs an declarative configuration of the ImageReviewContainerSpec type for use with
-// apply.
-func ImageReviewContainerSpec() *ImageReviewContainerSpecApplyConfiguration {
-	return &ImageReviewContainerSpecApplyConfiguration{}
-}
-
-// SetImage sets the Image field in the declarative configuration to the given value.
-func (b *ImageReviewContainerSpecApplyConfiguration) SetImage(value string) *ImageReviewContainerSpecApplyConfiguration {
-	b.Image = &value
-	return b
-}
-
-// RemoveImage removes the Image field from the declarative configuration.
-func (b *ImageReviewContainerSpecApplyConfiguration) RemoveImage() *ImageReviewContainerSpecApplyConfiguration {
-	b.Image = nil
-	return b
-}
-
-// GetImage gets the Image field from the declarative configuration.
-func (b *ImageReviewContainerSpecApplyConfiguration) GetImage() (value string, ok bool) {
-	if v := b.Image; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ImageReviewContainerSpecList represents a listAlias of ImageReviewContainerSpecApplyConfiguration.
 type ImageReviewContainerSpecList []*ImageReviewContainerSpecApplyConfiguration
 

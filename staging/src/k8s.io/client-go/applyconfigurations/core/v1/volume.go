@@ -25,45 +25,6 @@ type VolumeApplyConfiguration struct {
 	VolumeSourceApplyConfiguration `json:",inline"`
 }
 
-// VolumeApplyConfiguration constructs an declarative configuration of the Volume type for use with
-// apply.
-func Volume() *VolumeApplyConfiguration {
-	return &VolumeApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *VolumeApplyConfiguration) SetName(value string) *VolumeApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *VolumeApplyConfiguration) RemoveName() *VolumeApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *VolumeApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetVolumeSource sets the VolumeSource field in the declarative configuration to the given value.
-func (b *VolumeApplyConfiguration) SetVolumeSource(value *VolumeSourceApplyConfiguration) *VolumeApplyConfiguration {
-	if value != nil {
-		b.VolumeSourceApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetVolumeSource gets the VolumeSource field from the declarative configuration.
-func (b *VolumeApplyConfiguration) GetVolumeSource() (value *VolumeSourceApplyConfiguration, ok bool) {
-	return &b.VolumeSourceApplyConfiguration, true
-}
-
 // VolumeList represents a listAlias of VolumeApplyConfiguration.
 type VolumeList []*VolumeApplyConfiguration
 

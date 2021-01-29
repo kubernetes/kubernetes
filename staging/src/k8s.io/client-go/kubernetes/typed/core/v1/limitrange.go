@@ -188,19 +188,19 @@ func (c *limitRanges) Apply(ctx context.Context, limitRange *corev1.LimitRangeAp
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := limitRange.GetObjectMeta()
-	if !ok {
+	meta := limitRange.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("limitRange.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("limitRange.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.LimitRange{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("limitranges").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

@@ -24,32 +24,6 @@ type VolumeNodeResourcesApplyConfiguration struct {
 	Count *int32 `json:"count,omitempty"`
 }
 
-// VolumeNodeResourcesApplyConfiguration constructs an declarative configuration of the VolumeNodeResources type for use with
-// apply.
-func VolumeNodeResources() *VolumeNodeResourcesApplyConfiguration {
-	return &VolumeNodeResourcesApplyConfiguration{}
-}
-
-// SetCount sets the Count field in the declarative configuration to the given value.
-func (b *VolumeNodeResourcesApplyConfiguration) SetCount(value int32) *VolumeNodeResourcesApplyConfiguration {
-	b.Count = &value
-	return b
-}
-
-// RemoveCount removes the Count field from the declarative configuration.
-func (b *VolumeNodeResourcesApplyConfiguration) RemoveCount() *VolumeNodeResourcesApplyConfiguration {
-	b.Count = nil
-	return b
-}
-
-// GetCount gets the Count field from the declarative configuration.
-func (b *VolumeNodeResourcesApplyConfiguration) GetCount() (value int32, ok bool) {
-	if v := b.Count; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // VolumeNodeResourcesList represents a listAlias of VolumeNodeResourcesApplyConfiguration.
 type VolumeNodeResourcesList []*VolumeNodeResourcesApplyConfiguration
 

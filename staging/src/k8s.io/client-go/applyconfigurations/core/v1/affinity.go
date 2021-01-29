@@ -26,63 +26,6 @@ type AffinityApplyConfiguration struct {
 	PodAntiAffinity *PodAntiAffinityApplyConfiguration `json:"podAntiAffinity,omitempty"`
 }
 
-// AffinityApplyConfiguration constructs an declarative configuration of the Affinity type for use with
-// apply.
-func Affinity() *AffinityApplyConfiguration {
-	return &AffinityApplyConfiguration{}
-}
-
-// SetNodeAffinity sets the NodeAffinity field in the declarative configuration to the given value.
-func (b *AffinityApplyConfiguration) SetNodeAffinity(value *NodeAffinityApplyConfiguration) *AffinityApplyConfiguration {
-	b.NodeAffinity = value
-	return b
-}
-
-// RemoveNodeAffinity removes the NodeAffinity field from the declarative configuration.
-func (b *AffinityApplyConfiguration) RemoveNodeAffinity() *AffinityApplyConfiguration {
-	b.NodeAffinity = nil
-	return b
-}
-
-// GetNodeAffinity gets the NodeAffinity field from the declarative configuration.
-func (b *AffinityApplyConfiguration) GetNodeAffinity() (value *NodeAffinityApplyConfiguration, ok bool) {
-	return b.NodeAffinity, b.NodeAffinity != nil
-}
-
-// SetPodAffinity sets the PodAffinity field in the declarative configuration to the given value.
-func (b *AffinityApplyConfiguration) SetPodAffinity(value *PodAffinityApplyConfiguration) *AffinityApplyConfiguration {
-	b.PodAffinity = value
-	return b
-}
-
-// RemovePodAffinity removes the PodAffinity field from the declarative configuration.
-func (b *AffinityApplyConfiguration) RemovePodAffinity() *AffinityApplyConfiguration {
-	b.PodAffinity = nil
-	return b
-}
-
-// GetPodAffinity gets the PodAffinity field from the declarative configuration.
-func (b *AffinityApplyConfiguration) GetPodAffinity() (value *PodAffinityApplyConfiguration, ok bool) {
-	return b.PodAffinity, b.PodAffinity != nil
-}
-
-// SetPodAntiAffinity sets the PodAntiAffinity field in the declarative configuration to the given value.
-func (b *AffinityApplyConfiguration) SetPodAntiAffinity(value *PodAntiAffinityApplyConfiguration) *AffinityApplyConfiguration {
-	b.PodAntiAffinity = value
-	return b
-}
-
-// RemovePodAntiAffinity removes the PodAntiAffinity field from the declarative configuration.
-func (b *AffinityApplyConfiguration) RemovePodAntiAffinity() *AffinityApplyConfiguration {
-	b.PodAntiAffinity = nil
-	return b
-}
-
-// GetPodAntiAffinity gets the PodAntiAffinity field from the declarative configuration.
-func (b *AffinityApplyConfiguration) GetPodAntiAffinity() (value *PodAntiAffinityApplyConfiguration, ok bool) {
-	return b.PodAntiAffinity, b.PodAntiAffinity != nil
-}
-
 // AffinityList represents a listAlias of AffinityApplyConfiguration.
 type AffinityList []*AffinityApplyConfiguration
 

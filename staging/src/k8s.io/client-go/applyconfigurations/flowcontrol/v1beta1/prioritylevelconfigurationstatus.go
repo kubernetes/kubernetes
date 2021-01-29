@@ -24,32 +24,6 @@ type PriorityLevelConfigurationStatusApplyConfiguration struct {
 	Conditions *PriorityLevelConfigurationConditionList `json:"conditions,omitempty"`
 }
 
-// PriorityLevelConfigurationStatusApplyConfiguration constructs an declarative configuration of the PriorityLevelConfigurationStatus type for use with
-// apply.
-func PriorityLevelConfigurationStatus() *PriorityLevelConfigurationStatusApplyConfiguration {
-	return &PriorityLevelConfigurationStatusApplyConfiguration{}
-}
-
-// SetConditions sets the Conditions field in the declarative configuration to the given value.
-func (b *PriorityLevelConfigurationStatusApplyConfiguration) SetConditions(value PriorityLevelConfigurationConditionList) *PriorityLevelConfigurationStatusApplyConfiguration {
-	b.Conditions = &value
-	return b
-}
-
-// RemoveConditions removes the Conditions field from the declarative configuration.
-func (b *PriorityLevelConfigurationStatusApplyConfiguration) RemoveConditions() *PriorityLevelConfigurationStatusApplyConfiguration {
-	b.Conditions = nil
-	return b
-}
-
-// GetConditions gets the Conditions field from the declarative configuration.
-func (b *PriorityLevelConfigurationStatusApplyConfiguration) GetConditions() (value PriorityLevelConfigurationConditionList, ok bool) {
-	if v := b.Conditions; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // PriorityLevelConfigurationStatusList represents a listAlias of PriorityLevelConfigurationStatusApplyConfiguration.
 type PriorityLevelConfigurationStatusList []*PriorityLevelConfigurationStatusApplyConfiguration
 

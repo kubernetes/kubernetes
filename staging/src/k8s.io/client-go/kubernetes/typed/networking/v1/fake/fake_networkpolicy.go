@@ -138,16 +138,16 @@ func (c *FakeNetworkPolicies) Apply(ctx context.Context, networkPolicy *applycon
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := networkPolicy.GetObjectMeta()
-	if !ok {
+	meta := networkPolicy.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("networkPolicy.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("networkPolicy.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, name, types.ApplyPatchType, data, subresources...), &networkingv1.NetworkPolicy{})
+		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &networkingv1.NetworkPolicy{})
 
 	if obj == nil {
 		return nil, err

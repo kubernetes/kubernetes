@@ -25,52 +25,6 @@ type ObjectFieldSelectorApplyConfiguration struct {
 	FieldPath  *string `json:"fieldPath,omitempty"`
 }
 
-// ObjectFieldSelectorApplyConfiguration constructs an declarative configuration of the ObjectFieldSelector type for use with
-// apply.
-func ObjectFieldSelector() *ObjectFieldSelectorApplyConfiguration {
-	return &ObjectFieldSelectorApplyConfiguration{}
-}
-
-// SetAPIVersion sets the APIVersion field in the declarative configuration to the given value.
-func (b *ObjectFieldSelectorApplyConfiguration) SetAPIVersion(value string) *ObjectFieldSelectorApplyConfiguration {
-	b.APIVersion = &value
-	return b
-}
-
-// RemoveAPIVersion removes the APIVersion field from the declarative configuration.
-func (b *ObjectFieldSelectorApplyConfiguration) RemoveAPIVersion() *ObjectFieldSelectorApplyConfiguration {
-	b.APIVersion = nil
-	return b
-}
-
-// GetAPIVersion gets the APIVersion field from the declarative configuration.
-func (b *ObjectFieldSelectorApplyConfiguration) GetAPIVersion() (value string, ok bool) {
-	if v := b.APIVersion; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetFieldPath sets the FieldPath field in the declarative configuration to the given value.
-func (b *ObjectFieldSelectorApplyConfiguration) SetFieldPath(value string) *ObjectFieldSelectorApplyConfiguration {
-	b.FieldPath = &value
-	return b
-}
-
-// RemoveFieldPath removes the FieldPath field from the declarative configuration.
-func (b *ObjectFieldSelectorApplyConfiguration) RemoveFieldPath() *ObjectFieldSelectorApplyConfiguration {
-	b.FieldPath = nil
-	return b
-}
-
-// GetFieldPath gets the FieldPath field from the declarative configuration.
-func (b *ObjectFieldSelectorApplyConfiguration) GetFieldPath() (value string, ok bool) {
-	if v := b.FieldPath; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ObjectFieldSelectorList represents a listAlias of ObjectFieldSelectorApplyConfiguration.
 type ObjectFieldSelectorList []*ObjectFieldSelectorApplyConfiguration
 

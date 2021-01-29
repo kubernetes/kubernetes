@@ -188,19 +188,19 @@ func (c *secrets) Apply(ctx context.Context, secret *corev1.SecretApplyConfigura
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := secret.GetObjectMeta()
-	if !ok {
+	meta := secret.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("secret.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("secret.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.Secret{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("secrets").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

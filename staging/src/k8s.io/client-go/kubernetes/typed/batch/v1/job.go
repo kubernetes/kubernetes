@@ -205,19 +205,19 @@ func (c *jobs) Apply(ctx context.Context, job *batchv1.JobApplyConfiguration, fi
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := job.GetObjectMeta()
-	if !ok {
+	meta := job.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("job.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("job.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.Job{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("jobs").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

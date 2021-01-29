@@ -130,16 +130,16 @@ func (c *FakeClusterRoleBindings) Apply(ctx context.Context, clusterRoleBinding 
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := clusterRoleBinding.GetObjectMeta()
-	if !ok {
+	meta := clusterRoleBinding.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("clusterRoleBinding.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("clusterRoleBinding.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterrolebindingsResource, name, types.ApplyPatchType, data, subresources...), &rbacv1.ClusterRoleBinding{})
+		Invokes(testing.NewRootPatchSubresourceAction(clusterrolebindingsResource, *name, types.ApplyPatchType, data, subresources...), &rbacv1.ClusterRoleBinding{})
 	if obj == nil {
 		return nil, err
 	}

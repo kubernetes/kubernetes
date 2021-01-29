@@ -25,52 +25,6 @@ type ServiceAccountSubjectApplyConfiguration struct {
 	Name      *string `json:"name,omitempty"`
 }
 
-// ServiceAccountSubjectApplyConfiguration constructs an declarative configuration of the ServiceAccountSubject type for use with
-// apply.
-func ServiceAccountSubject() *ServiceAccountSubjectApplyConfiguration {
-	return &ServiceAccountSubjectApplyConfiguration{}
-}
-
-// SetNamespace sets the Namespace field in the declarative configuration to the given value.
-func (b *ServiceAccountSubjectApplyConfiguration) SetNamespace(value string) *ServiceAccountSubjectApplyConfiguration {
-	b.Namespace = &value
-	return b
-}
-
-// RemoveNamespace removes the Namespace field from the declarative configuration.
-func (b *ServiceAccountSubjectApplyConfiguration) RemoveNamespace() *ServiceAccountSubjectApplyConfiguration {
-	b.Namespace = nil
-	return b
-}
-
-// GetNamespace gets the Namespace field from the declarative configuration.
-func (b *ServiceAccountSubjectApplyConfiguration) GetNamespace() (value string, ok bool) {
-	if v := b.Namespace; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *ServiceAccountSubjectApplyConfiguration) SetName(value string) *ServiceAccountSubjectApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *ServiceAccountSubjectApplyConfiguration) RemoveName() *ServiceAccountSubjectApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *ServiceAccountSubjectApplyConfiguration) GetName() (value string, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ServiceAccountSubjectList represents a listAlias of ServiceAccountSubjectApplyConfiguration.
 type ServiceAccountSubjectList []*ServiceAccountSubjectApplyConfiguration
 

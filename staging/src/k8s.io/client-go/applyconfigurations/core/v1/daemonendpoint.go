@@ -24,32 +24,6 @@ type DaemonEndpointApplyConfiguration struct {
 	Port *int32 `json:"Port,omitempty"`
 }
 
-// DaemonEndpointApplyConfiguration constructs an declarative configuration of the DaemonEndpoint type for use with
-// apply.
-func DaemonEndpoint() *DaemonEndpointApplyConfiguration {
-	return &DaemonEndpointApplyConfiguration{}
-}
-
-// SetPort sets the Port field in the declarative configuration to the given value.
-func (b *DaemonEndpointApplyConfiguration) SetPort(value int32) *DaemonEndpointApplyConfiguration {
-	b.Port = &value
-	return b
-}
-
-// RemovePort removes the Port field from the declarative configuration.
-func (b *DaemonEndpointApplyConfiguration) RemovePort() *DaemonEndpointApplyConfiguration {
-	b.Port = nil
-	return b
-}
-
-// GetPort gets the Port field from the declarative configuration.
-func (b *DaemonEndpointApplyConfiguration) GetPort() (value int32, ok bool) {
-	if v := b.Port; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // DaemonEndpointList represents a listAlias of DaemonEndpointApplyConfiguration.
 type DaemonEndpointList []*DaemonEndpointApplyConfiguration
 

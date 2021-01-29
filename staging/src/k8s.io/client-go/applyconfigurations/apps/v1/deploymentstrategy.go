@@ -29,49 +29,6 @@ type DeploymentStrategyApplyConfiguration struct {
 	RollingUpdate *RollingUpdateDeploymentApplyConfiguration `json:"rollingUpdate,omitempty"`
 }
 
-// DeploymentStrategyApplyConfiguration constructs an declarative configuration of the DeploymentStrategy type for use with
-// apply.
-func DeploymentStrategy() *DeploymentStrategyApplyConfiguration {
-	return &DeploymentStrategyApplyConfiguration{}
-}
-
-// SetType sets the Type field in the declarative configuration to the given value.
-func (b *DeploymentStrategyApplyConfiguration) SetType(value v1.DeploymentStrategyType) *DeploymentStrategyApplyConfiguration {
-	b.Type = &value
-	return b
-}
-
-// RemoveType removes the Type field from the declarative configuration.
-func (b *DeploymentStrategyApplyConfiguration) RemoveType() *DeploymentStrategyApplyConfiguration {
-	b.Type = nil
-	return b
-}
-
-// GetType gets the Type field from the declarative configuration.
-func (b *DeploymentStrategyApplyConfiguration) GetType() (value v1.DeploymentStrategyType, ok bool) {
-	if v := b.Type; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetRollingUpdate sets the RollingUpdate field in the declarative configuration to the given value.
-func (b *DeploymentStrategyApplyConfiguration) SetRollingUpdate(value *RollingUpdateDeploymentApplyConfiguration) *DeploymentStrategyApplyConfiguration {
-	b.RollingUpdate = value
-	return b
-}
-
-// RemoveRollingUpdate removes the RollingUpdate field from the declarative configuration.
-func (b *DeploymentStrategyApplyConfiguration) RemoveRollingUpdate() *DeploymentStrategyApplyConfiguration {
-	b.RollingUpdate = nil
-	return b
-}
-
-// GetRollingUpdate gets the RollingUpdate field from the declarative configuration.
-func (b *DeploymentStrategyApplyConfiguration) GetRollingUpdate() (value *RollingUpdateDeploymentApplyConfiguration, ok bool) {
-	return b.RollingUpdate, b.RollingUpdate != nil
-}
-
 // DeploymentStrategyList represents a listAlias of DeploymentStrategyApplyConfiguration.
 type DeploymentStrategyList []*DeploymentStrategyApplyConfiguration
 

@@ -130,16 +130,16 @@ func (c *FakePriorityClasses) Apply(ctx context.Context, priorityClass *scheduli
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := priorityClass.GetObjectMeta()
-	if !ok {
+	meta := priorityClass.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("priorityClass.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("priorityClass.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, name, types.ApplyPatchType, data, subresources...), &v1alpha1.PriorityClass{})
+		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, *name, types.ApplyPatchType, data, subresources...), &v1alpha1.PriorityClass{})
 	if obj == nil {
 		return nil, err
 	}

@@ -29,46 +29,6 @@ type PersistentVolumeClaimTemplateApplyConfiguration struct {
 	Spec       *PersistentVolumeClaimSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// PersistentVolumeClaimTemplateApplyConfiguration constructs an declarative configuration of the PersistentVolumeClaimTemplate type for use with
-// apply.
-func PersistentVolumeClaimTemplate() *PersistentVolumeClaimTemplateApplyConfiguration {
-	return &PersistentVolumeClaimTemplateApplyConfiguration{}
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *PersistentVolumeClaimTemplateApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *PersistentVolumeClaimTemplateApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *PersistentVolumeClaimTemplateApplyConfiguration) RemoveObjectMeta() *PersistentVolumeClaimTemplateApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *PersistentVolumeClaimTemplateApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetSpec sets the Spec field in the declarative configuration to the given value.
-func (b *PersistentVolumeClaimTemplateApplyConfiguration) SetSpec(value *PersistentVolumeClaimSpecApplyConfiguration) *PersistentVolumeClaimTemplateApplyConfiguration {
-	b.Spec = value
-	return b
-}
-
-// RemoveSpec removes the Spec field from the declarative configuration.
-func (b *PersistentVolumeClaimTemplateApplyConfiguration) RemoveSpec() *PersistentVolumeClaimTemplateApplyConfiguration {
-	b.Spec = nil
-	return b
-}
-
-// GetSpec gets the Spec field from the declarative configuration.
-func (b *PersistentVolumeClaimTemplateApplyConfiguration) GetSpec() (value *PersistentVolumeClaimSpecApplyConfiguration, ok bool) {
-	return b.Spec, b.Spec != nil
-}
-
 // PersistentVolumeClaimTemplateList represents a listAlias of PersistentVolumeClaimTemplateApplyConfiguration.
 type PersistentVolumeClaimTemplateList []*PersistentVolumeClaimTemplateApplyConfiguration
 

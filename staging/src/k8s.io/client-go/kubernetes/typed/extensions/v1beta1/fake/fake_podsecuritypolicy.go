@@ -130,16 +130,16 @@ func (c *FakePodSecurityPolicies) Apply(ctx context.Context, podSecurityPolicy *
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := podSecurityPolicy.GetObjectMeta()
-	if !ok {
+	meta := podSecurityPolicy.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("podSecurityPolicy.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("podSecurityPolicy.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(podsecuritypoliciesResource, name, types.ApplyPatchType, data, subresources...), &v1beta1.PodSecurityPolicy{})
+		Invokes(testing.NewRootPatchSubresourceAction(podsecuritypoliciesResource, *name, types.ApplyPatchType, data, subresources...), &v1beta1.PodSecurityPolicy{})
 	if obj == nil {
 		return nil, err
 	}

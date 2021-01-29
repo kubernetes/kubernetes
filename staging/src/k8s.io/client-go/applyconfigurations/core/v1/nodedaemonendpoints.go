@@ -24,29 +24,6 @@ type NodeDaemonEndpointsApplyConfiguration struct {
 	KubeletEndpoint *DaemonEndpointApplyConfiguration `json:"kubeletEndpoint,omitempty"`
 }
 
-// NodeDaemonEndpointsApplyConfiguration constructs an declarative configuration of the NodeDaemonEndpoints type for use with
-// apply.
-func NodeDaemonEndpoints() *NodeDaemonEndpointsApplyConfiguration {
-	return &NodeDaemonEndpointsApplyConfiguration{}
-}
-
-// SetKubeletEndpoint sets the KubeletEndpoint field in the declarative configuration to the given value.
-func (b *NodeDaemonEndpointsApplyConfiguration) SetKubeletEndpoint(value *DaemonEndpointApplyConfiguration) *NodeDaemonEndpointsApplyConfiguration {
-	b.KubeletEndpoint = value
-	return b
-}
-
-// RemoveKubeletEndpoint removes the KubeletEndpoint field from the declarative configuration.
-func (b *NodeDaemonEndpointsApplyConfiguration) RemoveKubeletEndpoint() *NodeDaemonEndpointsApplyConfiguration {
-	b.KubeletEndpoint = nil
-	return b
-}
-
-// GetKubeletEndpoint gets the KubeletEndpoint field from the declarative configuration.
-func (b *NodeDaemonEndpointsApplyConfiguration) GetKubeletEndpoint() (value *DaemonEndpointApplyConfiguration, ok bool) {
-	return b.KubeletEndpoint, b.KubeletEndpoint != nil
-}
-
 // NodeDaemonEndpointsList represents a listAlias of NodeDaemonEndpointsApplyConfiguration.
 type NodeDaemonEndpointsList []*NodeDaemonEndpointsApplyConfiguration
 

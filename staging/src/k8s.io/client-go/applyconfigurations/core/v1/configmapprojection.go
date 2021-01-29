@@ -26,65 +26,6 @@ type ConfigMapProjectionApplyConfiguration struct {
 	Optional                               *bool          `json:"optional,omitempty"`
 }
 
-// ConfigMapProjectionApplyConfiguration constructs an declarative configuration of the ConfigMapProjection type for use with
-// apply.
-func ConfigMapProjection() *ConfigMapProjectionApplyConfiguration {
-	return &ConfigMapProjectionApplyConfiguration{}
-}
-
-// SetLocalObjectReference sets the LocalObjectReference field in the declarative configuration to the given value.
-func (b *ConfigMapProjectionApplyConfiguration) SetLocalObjectReference(value *LocalObjectReferenceApplyConfiguration) *ConfigMapProjectionApplyConfiguration {
-	if value != nil {
-		b.LocalObjectReferenceApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetLocalObjectReference gets the LocalObjectReference field from the declarative configuration.
-func (b *ConfigMapProjectionApplyConfiguration) GetLocalObjectReference() (value *LocalObjectReferenceApplyConfiguration, ok bool) {
-	return &b.LocalObjectReferenceApplyConfiguration, true
-}
-
-// SetItems sets the Items field in the declarative configuration to the given value.
-func (b *ConfigMapProjectionApplyConfiguration) SetItems(value KeyToPathList) *ConfigMapProjectionApplyConfiguration {
-	b.Items = &value
-	return b
-}
-
-// RemoveItems removes the Items field from the declarative configuration.
-func (b *ConfigMapProjectionApplyConfiguration) RemoveItems() *ConfigMapProjectionApplyConfiguration {
-	b.Items = nil
-	return b
-}
-
-// GetItems gets the Items field from the declarative configuration.
-func (b *ConfigMapProjectionApplyConfiguration) GetItems() (value KeyToPathList, ok bool) {
-	if v := b.Items; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetOptional sets the Optional field in the declarative configuration to the given value.
-func (b *ConfigMapProjectionApplyConfiguration) SetOptional(value bool) *ConfigMapProjectionApplyConfiguration {
-	b.Optional = &value
-	return b
-}
-
-// RemoveOptional removes the Optional field from the declarative configuration.
-func (b *ConfigMapProjectionApplyConfiguration) RemoveOptional() *ConfigMapProjectionApplyConfiguration {
-	b.Optional = nil
-	return b
-}
-
-// GetOptional gets the Optional field from the declarative configuration.
-func (b *ConfigMapProjectionApplyConfiguration) GetOptional() (value bool, ok bool) {
-	if v := b.Optional; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ConfigMapProjectionList represents a listAlias of ConfigMapProjectionApplyConfiguration.
 type ConfigMapProjectionList []*ConfigMapProjectionApplyConfiguration
 

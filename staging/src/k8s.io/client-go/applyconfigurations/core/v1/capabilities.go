@@ -29,52 +29,6 @@ type CapabilitiesApplyConfiguration struct {
 	Drop *[]v1.Capability `json:"drop,omitempty"`
 }
 
-// CapabilitiesApplyConfiguration constructs an declarative configuration of the Capabilities type for use with
-// apply.
-func Capabilities() *CapabilitiesApplyConfiguration {
-	return &CapabilitiesApplyConfiguration{}
-}
-
-// SetAdd sets the Add field in the declarative configuration to the given value.
-func (b *CapabilitiesApplyConfiguration) SetAdd(value []v1.Capability) *CapabilitiesApplyConfiguration {
-	b.Add = &value
-	return b
-}
-
-// RemoveAdd removes the Add field from the declarative configuration.
-func (b *CapabilitiesApplyConfiguration) RemoveAdd() *CapabilitiesApplyConfiguration {
-	b.Add = nil
-	return b
-}
-
-// GetAdd gets the Add field from the declarative configuration.
-func (b *CapabilitiesApplyConfiguration) GetAdd() (value []v1.Capability, ok bool) {
-	if v := b.Add; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetDrop sets the Drop field in the declarative configuration to the given value.
-func (b *CapabilitiesApplyConfiguration) SetDrop(value []v1.Capability) *CapabilitiesApplyConfiguration {
-	b.Drop = &value
-	return b
-}
-
-// RemoveDrop removes the Drop field from the declarative configuration.
-func (b *CapabilitiesApplyConfiguration) RemoveDrop() *CapabilitiesApplyConfiguration {
-	b.Drop = nil
-	return b
-}
-
-// GetDrop gets the Drop field from the declarative configuration.
-func (b *CapabilitiesApplyConfiguration) GetDrop() (value []v1.Capability, ok bool) {
-	if v := b.Drop; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // CapabilitiesList represents a listAlias of CapabilitiesApplyConfiguration.
 type CapabilitiesList []*CapabilitiesApplyConfiguration
 

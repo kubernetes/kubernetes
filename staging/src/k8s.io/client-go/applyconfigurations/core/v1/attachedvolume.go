@@ -29,52 +29,6 @@ type AttachedVolumeApplyConfiguration struct {
 	DevicePath *string              `json:"devicePath,omitempty"`
 }
 
-// AttachedVolumeApplyConfiguration constructs an declarative configuration of the AttachedVolume type for use with
-// apply.
-func AttachedVolume() *AttachedVolumeApplyConfiguration {
-	return &AttachedVolumeApplyConfiguration{}
-}
-
-// SetName sets the Name field in the declarative configuration to the given value.
-func (b *AttachedVolumeApplyConfiguration) SetName(value v1.UniqueVolumeName) *AttachedVolumeApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// RemoveName removes the Name field from the declarative configuration.
-func (b *AttachedVolumeApplyConfiguration) RemoveName() *AttachedVolumeApplyConfiguration {
-	b.Name = nil
-	return b
-}
-
-// GetName gets the Name field from the declarative configuration.
-func (b *AttachedVolumeApplyConfiguration) GetName() (value v1.UniqueVolumeName, ok bool) {
-	if v := b.Name; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetDevicePath sets the DevicePath field in the declarative configuration to the given value.
-func (b *AttachedVolumeApplyConfiguration) SetDevicePath(value string) *AttachedVolumeApplyConfiguration {
-	b.DevicePath = &value
-	return b
-}
-
-// RemoveDevicePath removes the DevicePath field from the declarative configuration.
-func (b *AttachedVolumeApplyConfiguration) RemoveDevicePath() *AttachedVolumeApplyConfiguration {
-	b.DevicePath = nil
-	return b
-}
-
-// GetDevicePath gets the DevicePath field from the declarative configuration.
-func (b *AttachedVolumeApplyConfiguration) GetDevicePath() (value string, ok bool) {
-	if v := b.DevicePath; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // AttachedVolumeList represents a listAlias of AttachedVolumeApplyConfiguration.
 type AttachedVolumeList []*AttachedVolumeApplyConfiguration
 

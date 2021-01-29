@@ -150,16 +150,16 @@ func (c *FakeDaemonSets) Apply(ctx context.Context, daemonSet *appsv1beta2.Daemo
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := daemonSet.GetObjectMeta()
-	if !ok {
+	meta := daemonSet.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("daemonSet.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("daemonSet.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(daemonsetsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &v1beta2.DaemonSet{})
+		Invokes(testing.NewPatchSubresourceAction(daemonsetsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &v1beta2.DaemonSet{})
 
 	if obj == nil {
 		return nil, err

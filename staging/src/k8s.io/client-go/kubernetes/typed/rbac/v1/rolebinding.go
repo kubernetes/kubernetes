@@ -188,19 +188,19 @@ func (c *roleBindings) Apply(ctx context.Context, roleBinding *rbacv1.RoleBindin
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := roleBinding.GetObjectMeta()
-	if !ok {
+	meta := roleBinding.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("roleBinding.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("roleBinding.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.RoleBinding{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("rolebindings").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

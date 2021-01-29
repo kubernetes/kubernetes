@@ -30,59 +30,6 @@ type LimitRangeApplyConfiguration struct {
 	Spec                          *LimitRangeSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// LimitRangeApplyConfiguration constructs an declarative configuration of the LimitRange type for use with
-// apply.
-func LimitRange() *LimitRangeApplyConfiguration {
-	return &LimitRangeApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *LimitRangeApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *LimitRangeApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *LimitRangeApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *LimitRangeApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *LimitRangeApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *LimitRangeApplyConfiguration) RemoveObjectMeta() *LimitRangeApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *LimitRangeApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetSpec sets the Spec field in the declarative configuration to the given value.
-func (b *LimitRangeApplyConfiguration) SetSpec(value *LimitRangeSpecApplyConfiguration) *LimitRangeApplyConfiguration {
-	b.Spec = value
-	return b
-}
-
-// RemoveSpec removes the Spec field from the declarative configuration.
-func (b *LimitRangeApplyConfiguration) RemoveSpec() *LimitRangeApplyConfiguration {
-	b.Spec = nil
-	return b
-}
-
-// GetSpec gets the Spec field from the declarative configuration.
-func (b *LimitRangeApplyConfiguration) GetSpec() (value *LimitRangeSpecApplyConfiguration, ok bool) {
-	return b.Spec, b.Spec != nil
-}
-
 // LimitRangeList represents a listAlias of LimitRangeApplyConfiguration.
 type LimitRangeList []*LimitRangeApplyConfiguration
 

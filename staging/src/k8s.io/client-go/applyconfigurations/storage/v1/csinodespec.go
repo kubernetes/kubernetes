@@ -24,32 +24,6 @@ type CSINodeSpecApplyConfiguration struct {
 	Drivers *CSINodeDriverList `json:"drivers,omitempty"`
 }
 
-// CSINodeSpecApplyConfiguration constructs an declarative configuration of the CSINodeSpec type for use with
-// apply.
-func CSINodeSpec() *CSINodeSpecApplyConfiguration {
-	return &CSINodeSpecApplyConfiguration{}
-}
-
-// SetDrivers sets the Drivers field in the declarative configuration to the given value.
-func (b *CSINodeSpecApplyConfiguration) SetDrivers(value CSINodeDriverList) *CSINodeSpecApplyConfiguration {
-	b.Drivers = &value
-	return b
-}
-
-// RemoveDrivers removes the Drivers field from the declarative configuration.
-func (b *CSINodeSpecApplyConfiguration) RemoveDrivers() *CSINodeSpecApplyConfiguration {
-	b.Drivers = nil
-	return b
-}
-
-// GetDrivers gets the Drivers field from the declarative configuration.
-func (b *CSINodeSpecApplyConfiguration) GetDrivers() (value CSINodeDriverList, ok bool) {
-	if v := b.Drivers; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // CSINodeSpecList represents a listAlias of CSINodeSpecApplyConfiguration.
 type CSINodeSpecList []*CSINodeSpecApplyConfiguration
 

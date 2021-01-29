@@ -25,52 +25,6 @@ type PodAffinityApplyConfiguration struct {
 	PreferredDuringSchedulingIgnoredDuringExecution *WeightedPodAffinityTermList `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty"`
 }
 
-// PodAffinityApplyConfiguration constructs an declarative configuration of the PodAffinity type for use with
-// apply.
-func PodAffinity() *PodAffinityApplyConfiguration {
-	return &PodAffinityApplyConfiguration{}
-}
-
-// SetRequiredDuringSchedulingIgnoredDuringExecution sets the RequiredDuringSchedulingIgnoredDuringExecution field in the declarative configuration to the given value.
-func (b *PodAffinityApplyConfiguration) SetRequiredDuringSchedulingIgnoredDuringExecution(value PodAffinityTermList) *PodAffinityApplyConfiguration {
-	b.RequiredDuringSchedulingIgnoredDuringExecution = &value
-	return b
-}
-
-// RemoveRequiredDuringSchedulingIgnoredDuringExecution removes the RequiredDuringSchedulingIgnoredDuringExecution field from the declarative configuration.
-func (b *PodAffinityApplyConfiguration) RemoveRequiredDuringSchedulingIgnoredDuringExecution() *PodAffinityApplyConfiguration {
-	b.RequiredDuringSchedulingIgnoredDuringExecution = nil
-	return b
-}
-
-// GetRequiredDuringSchedulingIgnoredDuringExecution gets the RequiredDuringSchedulingIgnoredDuringExecution field from the declarative configuration.
-func (b *PodAffinityApplyConfiguration) GetRequiredDuringSchedulingIgnoredDuringExecution() (value PodAffinityTermList, ok bool) {
-	if v := b.RequiredDuringSchedulingIgnoredDuringExecution; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetPreferredDuringSchedulingIgnoredDuringExecution sets the PreferredDuringSchedulingIgnoredDuringExecution field in the declarative configuration to the given value.
-func (b *PodAffinityApplyConfiguration) SetPreferredDuringSchedulingIgnoredDuringExecution(value WeightedPodAffinityTermList) *PodAffinityApplyConfiguration {
-	b.PreferredDuringSchedulingIgnoredDuringExecution = &value
-	return b
-}
-
-// RemovePreferredDuringSchedulingIgnoredDuringExecution removes the PreferredDuringSchedulingIgnoredDuringExecution field from the declarative configuration.
-func (b *PodAffinityApplyConfiguration) RemovePreferredDuringSchedulingIgnoredDuringExecution() *PodAffinityApplyConfiguration {
-	b.PreferredDuringSchedulingIgnoredDuringExecution = nil
-	return b
-}
-
-// GetPreferredDuringSchedulingIgnoredDuringExecution gets the PreferredDuringSchedulingIgnoredDuringExecution field from the declarative configuration.
-func (b *PodAffinityApplyConfiguration) GetPreferredDuringSchedulingIgnoredDuringExecution() (value WeightedPodAffinityTermList, ok bool) {
-	if v := b.PreferredDuringSchedulingIgnoredDuringExecution; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // PodAffinityList represents a listAlias of PodAffinityApplyConfiguration.
 type PodAffinityList []*PodAffinityApplyConfiguration
 

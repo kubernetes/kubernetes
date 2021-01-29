@@ -357,15 +357,15 @@ func (m *FakeNodeHandler) Apply(ctx context.Context, node *v1apply.NodeApplyConf
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := node.GetObjectMeta()
-	if !ok {
+	meta := node.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("node.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("node.ObjectMeta.Name must be provided to Apply")
 	}
-	return m.Patch(ctx, name, types.ApplyPatchType, data, patchOpts, subresources...)
+	return m.Patch(ctx, *name, types.ApplyPatchType, data, patchOpts, subresources...)
 }
 
 // FakeRecorder is used as a fake during testing.

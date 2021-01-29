@@ -30,59 +30,6 @@ type CSIDriverApplyConfiguration struct {
 	Spec                          *CSIDriverSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// CSIDriverApplyConfiguration constructs an declarative configuration of the CSIDriver type for use with
-// apply.
-func CSIDriver() *CSIDriverApplyConfiguration {
-	return &CSIDriverApplyConfiguration{}
-}
-
-// SetTypeMeta sets the TypeMeta field in the declarative configuration to the given value.
-func (b *CSIDriverApplyConfiguration) SetTypeMeta(value *v1.TypeMetaApplyConfiguration) *CSIDriverApplyConfiguration {
-	if value != nil {
-		b.TypeMetaApplyConfiguration = *value
-	}
-	return b
-}
-
-// GetTypeMeta gets the TypeMeta field from the declarative configuration.
-func (b *CSIDriverApplyConfiguration) GetTypeMeta() (value *v1.TypeMetaApplyConfiguration, ok bool) {
-	return &b.TypeMetaApplyConfiguration, true
-}
-
-// SetObjectMeta sets the ObjectMeta field in the declarative configuration to the given value.
-func (b *CSIDriverApplyConfiguration) SetObjectMeta(value *v1.ObjectMetaApplyConfiguration) *CSIDriverApplyConfiguration {
-	b.ObjectMeta = value
-	return b
-}
-
-// RemoveObjectMeta removes the ObjectMeta field from the declarative configuration.
-func (b *CSIDriverApplyConfiguration) RemoveObjectMeta() *CSIDriverApplyConfiguration {
-	b.ObjectMeta = nil
-	return b
-}
-
-// GetObjectMeta gets the ObjectMeta field from the declarative configuration.
-func (b *CSIDriverApplyConfiguration) GetObjectMeta() (value *v1.ObjectMetaApplyConfiguration, ok bool) {
-	return b.ObjectMeta, b.ObjectMeta != nil
-}
-
-// SetSpec sets the Spec field in the declarative configuration to the given value.
-func (b *CSIDriverApplyConfiguration) SetSpec(value *CSIDriverSpecApplyConfiguration) *CSIDriverApplyConfiguration {
-	b.Spec = value
-	return b
-}
-
-// RemoveSpec removes the Spec field from the declarative configuration.
-func (b *CSIDriverApplyConfiguration) RemoveSpec() *CSIDriverApplyConfiguration {
-	b.Spec = nil
-	return b
-}
-
-// GetSpec gets the Spec field from the declarative configuration.
-func (b *CSIDriverApplyConfiguration) GetSpec() (value *CSIDriverSpecApplyConfiguration, ok bool) {
-	return b.Spec, b.Spec != nil
-}
-
 // CSIDriverList represents a listAlias of CSIDriverApplyConfiguration.
 type CSIDriverList []*CSIDriverApplyConfiguration
 

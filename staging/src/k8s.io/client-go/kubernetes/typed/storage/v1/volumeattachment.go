@@ -194,18 +194,18 @@ func (c *volumeAttachments) Apply(ctx context.Context, volumeAttachment *storage
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := volumeAttachment.GetObjectMeta()
-	if !ok {
+	meta := volumeAttachment.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("volumeAttachment.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("volumeAttachment.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.VolumeAttachment{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("volumeattachments").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

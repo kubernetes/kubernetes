@@ -24,32 +24,6 @@ type NodeSelectorApplyConfiguration struct {
 	NodeSelectorTerms *NodeSelectorTermList `json:"nodeSelectorTerms,omitempty"`
 }
 
-// NodeSelectorApplyConfiguration constructs an declarative configuration of the NodeSelector type for use with
-// apply.
-func NodeSelector() *NodeSelectorApplyConfiguration {
-	return &NodeSelectorApplyConfiguration{}
-}
-
-// SetNodeSelectorTerms sets the NodeSelectorTerms field in the declarative configuration to the given value.
-func (b *NodeSelectorApplyConfiguration) SetNodeSelectorTerms(value NodeSelectorTermList) *NodeSelectorApplyConfiguration {
-	b.NodeSelectorTerms = &value
-	return b
-}
-
-// RemoveNodeSelectorTerms removes the NodeSelectorTerms field from the declarative configuration.
-func (b *NodeSelectorApplyConfiguration) RemoveNodeSelectorTerms() *NodeSelectorApplyConfiguration {
-	b.NodeSelectorTerms = nil
-	return b
-}
-
-// GetNodeSelectorTerms gets the NodeSelectorTerms field from the declarative configuration.
-func (b *NodeSelectorApplyConfiguration) GetNodeSelectorTerms() (value NodeSelectorTermList, ok bool) {
-	if v := b.NodeSelectorTerms; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // NodeSelectorList represents a listAlias of NodeSelectorApplyConfiguration.
 type NodeSelectorList []*NodeSelectorApplyConfiguration
 

@@ -26,63 +26,6 @@ type ObjectMetricSourceApplyConfiguration struct {
 	Metric          *MetricIdentifierApplyConfiguration            `json:"metric,omitempty"`
 }
 
-// ObjectMetricSourceApplyConfiguration constructs an declarative configuration of the ObjectMetricSource type for use with
-// apply.
-func ObjectMetricSource() *ObjectMetricSourceApplyConfiguration {
-	return &ObjectMetricSourceApplyConfiguration{}
-}
-
-// SetDescribedObject sets the DescribedObject field in the declarative configuration to the given value.
-func (b *ObjectMetricSourceApplyConfiguration) SetDescribedObject(value *CrossVersionObjectReferenceApplyConfiguration) *ObjectMetricSourceApplyConfiguration {
-	b.DescribedObject = value
-	return b
-}
-
-// RemoveDescribedObject removes the DescribedObject field from the declarative configuration.
-func (b *ObjectMetricSourceApplyConfiguration) RemoveDescribedObject() *ObjectMetricSourceApplyConfiguration {
-	b.DescribedObject = nil
-	return b
-}
-
-// GetDescribedObject gets the DescribedObject field from the declarative configuration.
-func (b *ObjectMetricSourceApplyConfiguration) GetDescribedObject() (value *CrossVersionObjectReferenceApplyConfiguration, ok bool) {
-	return b.DescribedObject, b.DescribedObject != nil
-}
-
-// SetTarget sets the Target field in the declarative configuration to the given value.
-func (b *ObjectMetricSourceApplyConfiguration) SetTarget(value *MetricTargetApplyConfiguration) *ObjectMetricSourceApplyConfiguration {
-	b.Target = value
-	return b
-}
-
-// RemoveTarget removes the Target field from the declarative configuration.
-func (b *ObjectMetricSourceApplyConfiguration) RemoveTarget() *ObjectMetricSourceApplyConfiguration {
-	b.Target = nil
-	return b
-}
-
-// GetTarget gets the Target field from the declarative configuration.
-func (b *ObjectMetricSourceApplyConfiguration) GetTarget() (value *MetricTargetApplyConfiguration, ok bool) {
-	return b.Target, b.Target != nil
-}
-
-// SetMetric sets the Metric field in the declarative configuration to the given value.
-func (b *ObjectMetricSourceApplyConfiguration) SetMetric(value *MetricIdentifierApplyConfiguration) *ObjectMetricSourceApplyConfiguration {
-	b.Metric = value
-	return b
-}
-
-// RemoveMetric removes the Metric field from the declarative configuration.
-func (b *ObjectMetricSourceApplyConfiguration) RemoveMetric() *ObjectMetricSourceApplyConfiguration {
-	b.Metric = nil
-	return b
-}
-
-// GetMetric gets the Metric field from the declarative configuration.
-func (b *ObjectMetricSourceApplyConfiguration) GetMetric() (value *MetricIdentifierApplyConfiguration, ok bool) {
-	return b.Metric, b.Metric != nil
-}
-
 // ObjectMetricSourceList represents a listAlias of ObjectMetricSourceApplyConfiguration.
 type ObjectMetricSourceList []*ObjectMetricSourceApplyConfiguration
 

@@ -25,52 +25,6 @@ type FlockerVolumeSourceApplyConfiguration struct {
 	DatasetUUID *string `json:"datasetUUID,omitempty"`
 }
 
-// FlockerVolumeSourceApplyConfiguration constructs an declarative configuration of the FlockerVolumeSource type for use with
-// apply.
-func FlockerVolumeSource() *FlockerVolumeSourceApplyConfiguration {
-	return &FlockerVolumeSourceApplyConfiguration{}
-}
-
-// SetDatasetName sets the DatasetName field in the declarative configuration to the given value.
-func (b *FlockerVolumeSourceApplyConfiguration) SetDatasetName(value string) *FlockerVolumeSourceApplyConfiguration {
-	b.DatasetName = &value
-	return b
-}
-
-// RemoveDatasetName removes the DatasetName field from the declarative configuration.
-func (b *FlockerVolumeSourceApplyConfiguration) RemoveDatasetName() *FlockerVolumeSourceApplyConfiguration {
-	b.DatasetName = nil
-	return b
-}
-
-// GetDatasetName gets the DatasetName field from the declarative configuration.
-func (b *FlockerVolumeSourceApplyConfiguration) GetDatasetName() (value string, ok bool) {
-	if v := b.DatasetName; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetDatasetUUID sets the DatasetUUID field in the declarative configuration to the given value.
-func (b *FlockerVolumeSourceApplyConfiguration) SetDatasetUUID(value string) *FlockerVolumeSourceApplyConfiguration {
-	b.DatasetUUID = &value
-	return b
-}
-
-// RemoveDatasetUUID removes the DatasetUUID field from the declarative configuration.
-func (b *FlockerVolumeSourceApplyConfiguration) RemoveDatasetUUID() *FlockerVolumeSourceApplyConfiguration {
-	b.DatasetUUID = nil
-	return b
-}
-
-// GetDatasetUUID gets the DatasetUUID field from the declarative configuration.
-func (b *FlockerVolumeSourceApplyConfiguration) GetDatasetUUID() (value string, ok bool) {
-	if v := b.DatasetUUID; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // FlockerVolumeSourceList represents a listAlias of FlockerVolumeSourceApplyConfiguration.
 type FlockerVolumeSourceList []*FlockerVolumeSourceApplyConfiguration
 

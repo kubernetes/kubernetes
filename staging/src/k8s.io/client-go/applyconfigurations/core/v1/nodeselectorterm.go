@@ -25,52 +25,6 @@ type NodeSelectorTermApplyConfiguration struct {
 	MatchFields      *NodeSelectorRequirementList `json:"matchFields,omitempty"`
 }
 
-// NodeSelectorTermApplyConfiguration constructs an declarative configuration of the NodeSelectorTerm type for use with
-// apply.
-func NodeSelectorTerm() *NodeSelectorTermApplyConfiguration {
-	return &NodeSelectorTermApplyConfiguration{}
-}
-
-// SetMatchExpressions sets the MatchExpressions field in the declarative configuration to the given value.
-func (b *NodeSelectorTermApplyConfiguration) SetMatchExpressions(value NodeSelectorRequirementList) *NodeSelectorTermApplyConfiguration {
-	b.MatchExpressions = &value
-	return b
-}
-
-// RemoveMatchExpressions removes the MatchExpressions field from the declarative configuration.
-func (b *NodeSelectorTermApplyConfiguration) RemoveMatchExpressions() *NodeSelectorTermApplyConfiguration {
-	b.MatchExpressions = nil
-	return b
-}
-
-// GetMatchExpressions gets the MatchExpressions field from the declarative configuration.
-func (b *NodeSelectorTermApplyConfiguration) GetMatchExpressions() (value NodeSelectorRequirementList, ok bool) {
-	if v := b.MatchExpressions; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetMatchFields sets the MatchFields field in the declarative configuration to the given value.
-func (b *NodeSelectorTermApplyConfiguration) SetMatchFields(value NodeSelectorRequirementList) *NodeSelectorTermApplyConfiguration {
-	b.MatchFields = &value
-	return b
-}
-
-// RemoveMatchFields removes the MatchFields field from the declarative configuration.
-func (b *NodeSelectorTermApplyConfiguration) RemoveMatchFields() *NodeSelectorTermApplyConfiguration {
-	b.MatchFields = nil
-	return b
-}
-
-// GetMatchFields gets the MatchFields field from the declarative configuration.
-func (b *NodeSelectorTermApplyConfiguration) GetMatchFields() (value NodeSelectorRequirementList, ok bool) {
-	if v := b.MatchFields; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // NodeSelectorTermList represents a listAlias of NodeSelectorTermApplyConfiguration.
 type NodeSelectorTermList []*NodeSelectorTermApplyConfiguration
 

@@ -28,29 +28,6 @@ type IngressStatusApplyConfiguration struct {
 	LoadBalancer *v1.LoadBalancerStatusApplyConfiguration `json:"loadBalancer,omitempty"`
 }
 
-// IngressStatusApplyConfiguration constructs an declarative configuration of the IngressStatus type for use with
-// apply.
-func IngressStatus() *IngressStatusApplyConfiguration {
-	return &IngressStatusApplyConfiguration{}
-}
-
-// SetLoadBalancer sets the LoadBalancer field in the declarative configuration to the given value.
-func (b *IngressStatusApplyConfiguration) SetLoadBalancer(value *v1.LoadBalancerStatusApplyConfiguration) *IngressStatusApplyConfiguration {
-	b.LoadBalancer = value
-	return b
-}
-
-// RemoveLoadBalancer removes the LoadBalancer field from the declarative configuration.
-func (b *IngressStatusApplyConfiguration) RemoveLoadBalancer() *IngressStatusApplyConfiguration {
-	b.LoadBalancer = nil
-	return b
-}
-
-// GetLoadBalancer gets the LoadBalancer field from the declarative configuration.
-func (b *IngressStatusApplyConfiguration) GetLoadBalancer() (value *v1.LoadBalancerStatusApplyConfiguration, ok bool) {
-	return b.LoadBalancer, b.LoadBalancer != nil
-}
-
 // IngressStatusList represents a listAlias of IngressStatusApplyConfiguration.
 type IngressStatusList []*IngressStatusApplyConfiguration
 

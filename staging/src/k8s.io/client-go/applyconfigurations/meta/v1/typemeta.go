@@ -25,52 +25,6 @@ type TypeMetaApplyConfiguration struct {
 	APIVersion *string `json:"apiVersion,omitempty"`
 }
 
-// TypeMetaApplyConfiguration constructs an declarative configuration of the TypeMeta type for use with
-// apply.
-func TypeMeta() *TypeMetaApplyConfiguration {
-	return &TypeMetaApplyConfiguration{}
-}
-
-// SetKind sets the Kind field in the declarative configuration to the given value.
-func (b *TypeMetaApplyConfiguration) SetKind(value string) *TypeMetaApplyConfiguration {
-	b.Kind = &value
-	return b
-}
-
-// RemoveKind removes the Kind field from the declarative configuration.
-func (b *TypeMetaApplyConfiguration) RemoveKind() *TypeMetaApplyConfiguration {
-	b.Kind = nil
-	return b
-}
-
-// GetKind gets the Kind field from the declarative configuration.
-func (b *TypeMetaApplyConfiguration) GetKind() (value string, ok bool) {
-	if v := b.Kind; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetAPIVersion sets the APIVersion field in the declarative configuration to the given value.
-func (b *TypeMetaApplyConfiguration) SetAPIVersion(value string) *TypeMetaApplyConfiguration {
-	b.APIVersion = &value
-	return b
-}
-
-// RemoveAPIVersion removes the APIVersion field from the declarative configuration.
-func (b *TypeMetaApplyConfiguration) RemoveAPIVersion() *TypeMetaApplyConfiguration {
-	b.APIVersion = nil
-	return b
-}
-
-// GetAPIVersion gets the APIVersion field from the declarative configuration.
-func (b *TypeMetaApplyConfiguration) GetAPIVersion() (value string, ok bool) {
-	if v := b.APIVersion; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // TypeMetaList represents a listAlias of TypeMetaApplyConfiguration.
 type TypeMetaList []*TypeMetaApplyConfiguration
 

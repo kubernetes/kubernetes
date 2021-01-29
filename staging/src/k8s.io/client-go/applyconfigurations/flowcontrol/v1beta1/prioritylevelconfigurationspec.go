@@ -29,49 +29,6 @@ type PriorityLevelConfigurationSpecApplyConfiguration struct {
 	Limited *LimitedPriorityLevelConfigurationApplyConfiguration `json:"limited,omitempty"`
 }
 
-// PriorityLevelConfigurationSpecApplyConfiguration constructs an declarative configuration of the PriorityLevelConfigurationSpec type for use with
-// apply.
-func PriorityLevelConfigurationSpec() *PriorityLevelConfigurationSpecApplyConfiguration {
-	return &PriorityLevelConfigurationSpecApplyConfiguration{}
-}
-
-// SetType sets the Type field in the declarative configuration to the given value.
-func (b *PriorityLevelConfigurationSpecApplyConfiguration) SetType(value v1beta1.PriorityLevelEnablement) *PriorityLevelConfigurationSpecApplyConfiguration {
-	b.Type = &value
-	return b
-}
-
-// RemoveType removes the Type field from the declarative configuration.
-func (b *PriorityLevelConfigurationSpecApplyConfiguration) RemoveType() *PriorityLevelConfigurationSpecApplyConfiguration {
-	b.Type = nil
-	return b
-}
-
-// GetType gets the Type field from the declarative configuration.
-func (b *PriorityLevelConfigurationSpecApplyConfiguration) GetType() (value v1beta1.PriorityLevelEnablement, ok bool) {
-	if v := b.Type; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetLimited sets the Limited field in the declarative configuration to the given value.
-func (b *PriorityLevelConfigurationSpecApplyConfiguration) SetLimited(value *LimitedPriorityLevelConfigurationApplyConfiguration) *PriorityLevelConfigurationSpecApplyConfiguration {
-	b.Limited = value
-	return b
-}
-
-// RemoveLimited removes the Limited field from the declarative configuration.
-func (b *PriorityLevelConfigurationSpecApplyConfiguration) RemoveLimited() *PriorityLevelConfigurationSpecApplyConfiguration {
-	b.Limited = nil
-	return b
-}
-
-// GetLimited gets the Limited field from the declarative configuration.
-func (b *PriorityLevelConfigurationSpecApplyConfiguration) GetLimited() (value *LimitedPriorityLevelConfigurationApplyConfiguration, ok bool) {
-	return b.Limited, b.Limited != nil
-}
-
 // PriorityLevelConfigurationSpecList represents a listAlias of PriorityLevelConfigurationSpecApplyConfiguration.
 type PriorityLevelConfigurationSpecList []*PriorityLevelConfigurationSpecApplyConfiguration
 

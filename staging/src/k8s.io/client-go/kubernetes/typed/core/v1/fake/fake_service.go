@@ -142,16 +142,16 @@ func (c *FakeServices) Apply(ctx context.Context, service *applyconfigurationsco
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := service.GetObjectMeta()
-	if !ok {
+	meta := service.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("service.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("service.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(servicesResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.Service{})
+		Invokes(testing.NewPatchSubresourceAction(servicesResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &corev1.Service{})
 
 	if obj == nil {
 		return nil, err

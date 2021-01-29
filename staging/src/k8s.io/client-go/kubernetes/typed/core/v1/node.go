@@ -194,18 +194,18 @@ func (c *nodes) Apply(ctx context.Context, node *corev1.NodeApplyConfiguration, 
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := node.GetObjectMeta()
-	if !ok {
+	meta := node.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("node.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("node.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.Node{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("nodes").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

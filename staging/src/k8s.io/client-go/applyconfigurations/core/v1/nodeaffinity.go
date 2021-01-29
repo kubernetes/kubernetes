@@ -25,49 +25,6 @@ type NodeAffinityApplyConfiguration struct {
 	PreferredDuringSchedulingIgnoredDuringExecution *PreferredSchedulingTermList    `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty"`
 }
 
-// NodeAffinityApplyConfiguration constructs an declarative configuration of the NodeAffinity type for use with
-// apply.
-func NodeAffinity() *NodeAffinityApplyConfiguration {
-	return &NodeAffinityApplyConfiguration{}
-}
-
-// SetRequiredDuringSchedulingIgnoredDuringExecution sets the RequiredDuringSchedulingIgnoredDuringExecution field in the declarative configuration to the given value.
-func (b *NodeAffinityApplyConfiguration) SetRequiredDuringSchedulingIgnoredDuringExecution(value *NodeSelectorApplyConfiguration) *NodeAffinityApplyConfiguration {
-	b.RequiredDuringSchedulingIgnoredDuringExecution = value
-	return b
-}
-
-// RemoveRequiredDuringSchedulingIgnoredDuringExecution removes the RequiredDuringSchedulingIgnoredDuringExecution field from the declarative configuration.
-func (b *NodeAffinityApplyConfiguration) RemoveRequiredDuringSchedulingIgnoredDuringExecution() *NodeAffinityApplyConfiguration {
-	b.RequiredDuringSchedulingIgnoredDuringExecution = nil
-	return b
-}
-
-// GetRequiredDuringSchedulingIgnoredDuringExecution gets the RequiredDuringSchedulingIgnoredDuringExecution field from the declarative configuration.
-func (b *NodeAffinityApplyConfiguration) GetRequiredDuringSchedulingIgnoredDuringExecution() (value *NodeSelectorApplyConfiguration, ok bool) {
-	return b.RequiredDuringSchedulingIgnoredDuringExecution, b.RequiredDuringSchedulingIgnoredDuringExecution != nil
-}
-
-// SetPreferredDuringSchedulingIgnoredDuringExecution sets the PreferredDuringSchedulingIgnoredDuringExecution field in the declarative configuration to the given value.
-func (b *NodeAffinityApplyConfiguration) SetPreferredDuringSchedulingIgnoredDuringExecution(value PreferredSchedulingTermList) *NodeAffinityApplyConfiguration {
-	b.PreferredDuringSchedulingIgnoredDuringExecution = &value
-	return b
-}
-
-// RemovePreferredDuringSchedulingIgnoredDuringExecution removes the PreferredDuringSchedulingIgnoredDuringExecution field from the declarative configuration.
-func (b *NodeAffinityApplyConfiguration) RemovePreferredDuringSchedulingIgnoredDuringExecution() *NodeAffinityApplyConfiguration {
-	b.PreferredDuringSchedulingIgnoredDuringExecution = nil
-	return b
-}
-
-// GetPreferredDuringSchedulingIgnoredDuringExecution gets the PreferredDuringSchedulingIgnoredDuringExecution field from the declarative configuration.
-func (b *NodeAffinityApplyConfiguration) GetPreferredDuringSchedulingIgnoredDuringExecution() (value PreferredSchedulingTermList, ok bool) {
-	if v := b.PreferredDuringSchedulingIgnoredDuringExecution; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // NodeAffinityList represents a listAlias of NodeAffinityApplyConfiguration.
 type NodeAffinityList []*NodeAffinityApplyConfiguration
 

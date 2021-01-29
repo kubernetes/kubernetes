@@ -25,46 +25,6 @@ type PodsMetricStatusApplyConfiguration struct {
 	Current *MetricValueStatusApplyConfiguration `json:"current,omitempty"`
 }
 
-// PodsMetricStatusApplyConfiguration constructs an declarative configuration of the PodsMetricStatus type for use with
-// apply.
-func PodsMetricStatus() *PodsMetricStatusApplyConfiguration {
-	return &PodsMetricStatusApplyConfiguration{}
-}
-
-// SetMetric sets the Metric field in the declarative configuration to the given value.
-func (b *PodsMetricStatusApplyConfiguration) SetMetric(value *MetricIdentifierApplyConfiguration) *PodsMetricStatusApplyConfiguration {
-	b.Metric = value
-	return b
-}
-
-// RemoveMetric removes the Metric field from the declarative configuration.
-func (b *PodsMetricStatusApplyConfiguration) RemoveMetric() *PodsMetricStatusApplyConfiguration {
-	b.Metric = nil
-	return b
-}
-
-// GetMetric gets the Metric field from the declarative configuration.
-func (b *PodsMetricStatusApplyConfiguration) GetMetric() (value *MetricIdentifierApplyConfiguration, ok bool) {
-	return b.Metric, b.Metric != nil
-}
-
-// SetCurrent sets the Current field in the declarative configuration to the given value.
-func (b *PodsMetricStatusApplyConfiguration) SetCurrent(value *MetricValueStatusApplyConfiguration) *PodsMetricStatusApplyConfiguration {
-	b.Current = value
-	return b
-}
-
-// RemoveCurrent removes the Current field from the declarative configuration.
-func (b *PodsMetricStatusApplyConfiguration) RemoveCurrent() *PodsMetricStatusApplyConfiguration {
-	b.Current = nil
-	return b
-}
-
-// GetCurrent gets the Current field from the declarative configuration.
-func (b *PodsMetricStatusApplyConfiguration) GetCurrent() (value *MetricValueStatusApplyConfiguration, ok bool) {
-	return b.Current, b.Current != nil
-}
-
 // PodsMetricStatusList represents a listAlias of PodsMetricStatusApplyConfiguration.
 type PodsMetricStatusList []*PodsMetricStatusApplyConfiguration
 

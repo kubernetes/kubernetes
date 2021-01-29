@@ -208,19 +208,19 @@ func (c *replicaSets) Apply(ctx context.Context, replicaSet *extensionsv1beta1.R
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := replicaSet.GetObjectMeta()
-	if !ok {
+	meta := replicaSet.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("replicaSet.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("replicaSet.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1beta1.ReplicaSet{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("replicasets").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

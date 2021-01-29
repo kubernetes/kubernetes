@@ -31,69 +31,6 @@ type IngressBackendApplyConfiguration struct {
 	Resource    *v1.TypedLocalObjectReferenceApplyConfiguration `json:"resource,omitempty"`
 }
 
-// IngressBackendApplyConfiguration constructs an declarative configuration of the IngressBackend type for use with
-// apply.
-func IngressBackend() *IngressBackendApplyConfiguration {
-	return &IngressBackendApplyConfiguration{}
-}
-
-// SetServiceName sets the ServiceName field in the declarative configuration to the given value.
-func (b *IngressBackendApplyConfiguration) SetServiceName(value string) *IngressBackendApplyConfiguration {
-	b.ServiceName = &value
-	return b
-}
-
-// RemoveServiceName removes the ServiceName field from the declarative configuration.
-func (b *IngressBackendApplyConfiguration) RemoveServiceName() *IngressBackendApplyConfiguration {
-	b.ServiceName = nil
-	return b
-}
-
-// GetServiceName gets the ServiceName field from the declarative configuration.
-func (b *IngressBackendApplyConfiguration) GetServiceName() (value string, ok bool) {
-	if v := b.ServiceName; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetServicePort sets the ServicePort field in the declarative configuration to the given value.
-func (b *IngressBackendApplyConfiguration) SetServicePort(value intstr.IntOrString) *IngressBackendApplyConfiguration {
-	b.ServicePort = &value
-	return b
-}
-
-// RemoveServicePort removes the ServicePort field from the declarative configuration.
-func (b *IngressBackendApplyConfiguration) RemoveServicePort() *IngressBackendApplyConfiguration {
-	b.ServicePort = nil
-	return b
-}
-
-// GetServicePort gets the ServicePort field from the declarative configuration.
-func (b *IngressBackendApplyConfiguration) GetServicePort() (value intstr.IntOrString, ok bool) {
-	if v := b.ServicePort; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetResource sets the Resource field in the declarative configuration to the given value.
-func (b *IngressBackendApplyConfiguration) SetResource(value *v1.TypedLocalObjectReferenceApplyConfiguration) *IngressBackendApplyConfiguration {
-	b.Resource = value
-	return b
-}
-
-// RemoveResource removes the Resource field from the declarative configuration.
-func (b *IngressBackendApplyConfiguration) RemoveResource() *IngressBackendApplyConfiguration {
-	b.Resource = nil
-	return b
-}
-
-// GetResource gets the Resource field from the declarative configuration.
-func (b *IngressBackendApplyConfiguration) GetResource() (value *v1.TypedLocalObjectReferenceApplyConfiguration, ok bool) {
-	return b.Resource, b.Resource != nil
-}
-
 // IngressBackendList represents a listAlias of IngressBackendApplyConfiguration.
 type IngressBackendList []*IngressBackendApplyConfiguration
 

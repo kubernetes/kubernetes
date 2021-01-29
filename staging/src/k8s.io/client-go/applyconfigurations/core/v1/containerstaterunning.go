@@ -28,32 +28,6 @@ type ContainerStateRunningApplyConfiguration struct {
 	StartedAt *v1.Time `json:"startedAt,omitempty"`
 }
 
-// ContainerStateRunningApplyConfiguration constructs an declarative configuration of the ContainerStateRunning type for use with
-// apply.
-func ContainerStateRunning() *ContainerStateRunningApplyConfiguration {
-	return &ContainerStateRunningApplyConfiguration{}
-}
-
-// SetStartedAt sets the StartedAt field in the declarative configuration to the given value.
-func (b *ContainerStateRunningApplyConfiguration) SetStartedAt(value v1.Time) *ContainerStateRunningApplyConfiguration {
-	b.StartedAt = &value
-	return b
-}
-
-// RemoveStartedAt removes the StartedAt field from the declarative configuration.
-func (b *ContainerStateRunningApplyConfiguration) RemoveStartedAt() *ContainerStateRunningApplyConfiguration {
-	b.StartedAt = nil
-	return b
-}
-
-// GetStartedAt gets the StartedAt field from the declarative configuration.
-func (b *ContainerStateRunningApplyConfiguration) GetStartedAt() (value v1.Time, ok bool) {
-	if v := b.StartedAt; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // ContainerStateRunningList represents a listAlias of ContainerStateRunningApplyConfiguration.
 type ContainerStateRunningList []*ContainerStateRunningApplyConfiguration
 

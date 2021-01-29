@@ -24,32 +24,6 @@ type TopologySelectorTermApplyConfiguration struct {
 	MatchLabelExpressions *TopologySelectorLabelRequirementList `json:"matchLabelExpressions,omitempty"`
 }
 
-// TopologySelectorTermApplyConfiguration constructs an declarative configuration of the TopologySelectorTerm type for use with
-// apply.
-func TopologySelectorTerm() *TopologySelectorTermApplyConfiguration {
-	return &TopologySelectorTermApplyConfiguration{}
-}
-
-// SetMatchLabelExpressions sets the MatchLabelExpressions field in the declarative configuration to the given value.
-func (b *TopologySelectorTermApplyConfiguration) SetMatchLabelExpressions(value TopologySelectorLabelRequirementList) *TopologySelectorTermApplyConfiguration {
-	b.MatchLabelExpressions = &value
-	return b
-}
-
-// RemoveMatchLabelExpressions removes the MatchLabelExpressions field from the declarative configuration.
-func (b *TopologySelectorTermApplyConfiguration) RemoveMatchLabelExpressions() *TopologySelectorTermApplyConfiguration {
-	b.MatchLabelExpressions = nil
-	return b
-}
-
-// GetMatchLabelExpressions gets the MatchLabelExpressions field from the declarative configuration.
-func (b *TopologySelectorTermApplyConfiguration) GetMatchLabelExpressions() (value TopologySelectorLabelRequirementList, ok bool) {
-	if v := b.MatchLabelExpressions; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // TopologySelectorTermList represents a listAlias of TopologySelectorTermApplyConfiguration.
 type TopologySelectorTermList []*TopologySelectorTermApplyConfiguration
 

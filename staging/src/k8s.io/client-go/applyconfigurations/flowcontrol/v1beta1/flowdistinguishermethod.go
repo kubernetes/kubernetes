@@ -28,32 +28,6 @@ type FlowDistinguisherMethodApplyConfiguration struct {
 	Type *v1beta1.FlowDistinguisherMethodType `json:"type,omitempty"`
 }
 
-// FlowDistinguisherMethodApplyConfiguration constructs an declarative configuration of the FlowDistinguisherMethod type for use with
-// apply.
-func FlowDistinguisherMethod() *FlowDistinguisherMethodApplyConfiguration {
-	return &FlowDistinguisherMethodApplyConfiguration{}
-}
-
-// SetType sets the Type field in the declarative configuration to the given value.
-func (b *FlowDistinguisherMethodApplyConfiguration) SetType(value v1beta1.FlowDistinguisherMethodType) *FlowDistinguisherMethodApplyConfiguration {
-	b.Type = &value
-	return b
-}
-
-// RemoveType removes the Type field from the declarative configuration.
-func (b *FlowDistinguisherMethodApplyConfiguration) RemoveType() *FlowDistinguisherMethodApplyConfiguration {
-	b.Type = nil
-	return b
-}
-
-// GetType gets the Type field from the declarative configuration.
-func (b *FlowDistinguisherMethodApplyConfiguration) GetType() (value v1beta1.FlowDistinguisherMethodType, ok bool) {
-	if v := b.Type; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // FlowDistinguisherMethodList represents a listAlias of FlowDistinguisherMethodApplyConfiguration.
 type FlowDistinguisherMethodList []*FlowDistinguisherMethodApplyConfiguration
 

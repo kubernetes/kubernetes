@@ -209,19 +209,19 @@ func (c *replicationControllers) Apply(ctx context.Context, replicationControlle
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := replicationController.GetObjectMeta()
-	if !ok {
+	meta := replicationController.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("replicationController.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("replicationController.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.ReplicationController{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

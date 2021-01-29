@@ -139,16 +139,16 @@ func (c *FakeServiceAccounts) Apply(ctx context.Context, serviceAccount *applyco
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := serviceAccount.GetObjectMeta()
-	if !ok {
+	meta := serviceAccount.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("serviceAccount.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("serviceAccount.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(serviceaccountsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.ServiceAccount{})
+		Invokes(testing.NewPatchSubresourceAction(serviceaccountsResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &corev1.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err

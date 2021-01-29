@@ -205,19 +205,19 @@ func (c *deployments) Apply(ctx context.Context, deployment *appsv1beta1.Deploym
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := deployment.GetObjectMeta()
-	if !ok {
+	meta := deployment.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("deployment.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("deployment.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1beta1.Deployment{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("deployments").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

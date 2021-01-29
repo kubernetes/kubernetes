@@ -178,18 +178,18 @@ func (c *priorityClasses) Apply(ctx context.Context, priorityClass *schedulingv1
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := priorityClass.GetObjectMeta()
-	if !ok {
+	meta := priorityClass.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("priorityClass.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("priorityClass.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.PriorityClass{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("priorityclasses").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

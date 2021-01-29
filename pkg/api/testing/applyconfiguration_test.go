@@ -134,7 +134,7 @@ func BenchmarkApplyConfigurationsFromUnstructured(b *testing.B) {
 	size := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		builder := v1mf.Pod()
+		builder := &v1mf.PodApplyConfiguration{}
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstr[i%size], builder); err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
@@ -151,7 +151,7 @@ func BenchmarkApplyConfigurationsToUnstructured(b *testing.B) {
 		if err != nil || item == nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
-		builder := v1mf.Pod()
+		builder := &v1mf.PodApplyConfiguration{}
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item, builder); err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}

@@ -25,52 +25,6 @@ type IDRangeApplyConfiguration struct {
 	Max *int64 `json:"max,omitempty"`
 }
 
-// IDRangeApplyConfiguration constructs an declarative configuration of the IDRange type for use with
-// apply.
-func IDRange() *IDRangeApplyConfiguration {
-	return &IDRangeApplyConfiguration{}
-}
-
-// SetMin sets the Min field in the declarative configuration to the given value.
-func (b *IDRangeApplyConfiguration) SetMin(value int64) *IDRangeApplyConfiguration {
-	b.Min = &value
-	return b
-}
-
-// RemoveMin removes the Min field from the declarative configuration.
-func (b *IDRangeApplyConfiguration) RemoveMin() *IDRangeApplyConfiguration {
-	b.Min = nil
-	return b
-}
-
-// GetMin gets the Min field from the declarative configuration.
-func (b *IDRangeApplyConfiguration) GetMin() (value int64, ok bool) {
-	if v := b.Min; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetMax sets the Max field in the declarative configuration to the given value.
-func (b *IDRangeApplyConfiguration) SetMax(value int64) *IDRangeApplyConfiguration {
-	b.Max = &value
-	return b
-}
-
-// RemoveMax removes the Max field from the declarative configuration.
-func (b *IDRangeApplyConfiguration) RemoveMax() *IDRangeApplyConfiguration {
-	b.Max = nil
-	return b
-}
-
-// GetMax gets the Max field from the declarative configuration.
-func (b *IDRangeApplyConfiguration) GetMax() (value int64, ok bool) {
-	if v := b.Max; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // IDRangeList represents a listAlias of IDRangeApplyConfiguration.
 type IDRangeList []*IDRangeApplyConfiguration
 

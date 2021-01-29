@@ -178,18 +178,18 @@ func (c *componentStatuses) Apply(ctx context.Context, componentStatus *corev1.C
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := componentStatus.GetObjectMeta()
-	if !ok {
+	meta := componentStatus.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("componentStatus.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("componentStatus.ObjectMeta.Name must be provided to Apply")
 	}
 	result = &v1.ComponentStatus{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("componentstatuses").
-		Name(name).
+		Name(*name).
 		SubResource(subresources...).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).

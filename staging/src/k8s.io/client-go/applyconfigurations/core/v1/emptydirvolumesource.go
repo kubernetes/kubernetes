@@ -30,52 +30,6 @@ type EmptyDirVolumeSourceApplyConfiguration struct {
 	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty"`
 }
 
-// EmptyDirVolumeSourceApplyConfiguration constructs an declarative configuration of the EmptyDirVolumeSource type for use with
-// apply.
-func EmptyDirVolumeSource() *EmptyDirVolumeSourceApplyConfiguration {
-	return &EmptyDirVolumeSourceApplyConfiguration{}
-}
-
-// SetMedium sets the Medium field in the declarative configuration to the given value.
-func (b *EmptyDirVolumeSourceApplyConfiguration) SetMedium(value v1.StorageMedium) *EmptyDirVolumeSourceApplyConfiguration {
-	b.Medium = &value
-	return b
-}
-
-// RemoveMedium removes the Medium field from the declarative configuration.
-func (b *EmptyDirVolumeSourceApplyConfiguration) RemoveMedium() *EmptyDirVolumeSourceApplyConfiguration {
-	b.Medium = nil
-	return b
-}
-
-// GetMedium gets the Medium field from the declarative configuration.
-func (b *EmptyDirVolumeSourceApplyConfiguration) GetMedium() (value v1.StorageMedium, ok bool) {
-	if v := b.Medium; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetSizeLimit sets the SizeLimit field in the declarative configuration to the given value.
-func (b *EmptyDirVolumeSourceApplyConfiguration) SetSizeLimit(value resource.Quantity) *EmptyDirVolumeSourceApplyConfiguration {
-	b.SizeLimit = &value
-	return b
-}
-
-// RemoveSizeLimit removes the SizeLimit field from the declarative configuration.
-func (b *EmptyDirVolumeSourceApplyConfiguration) RemoveSizeLimit() *EmptyDirVolumeSourceApplyConfiguration {
-	b.SizeLimit = nil
-	return b
-}
-
-// GetSizeLimit gets the SizeLimit field from the declarative configuration.
-func (b *EmptyDirVolumeSourceApplyConfiguration) GetSizeLimit() (value resource.Quantity, ok bool) {
-	if v := b.SizeLimit; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // EmptyDirVolumeSourceList represents a listAlias of EmptyDirVolumeSourceApplyConfiguration.
 type EmptyDirVolumeSourceList []*EmptyDirVolumeSourceApplyConfiguration
 

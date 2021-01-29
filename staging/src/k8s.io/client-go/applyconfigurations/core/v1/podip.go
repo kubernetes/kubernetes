@@ -24,32 +24,6 @@ type PodIPApplyConfiguration struct {
 	IP *string `json:"ip,omitempty"`
 }
 
-// PodIPApplyConfiguration constructs an declarative configuration of the PodIP type for use with
-// apply.
-func PodIP() *PodIPApplyConfiguration {
-	return &PodIPApplyConfiguration{}
-}
-
-// SetIP sets the IP field in the declarative configuration to the given value.
-func (b *PodIPApplyConfiguration) SetIP(value string) *PodIPApplyConfiguration {
-	b.IP = &value
-	return b
-}
-
-// RemoveIP removes the IP field from the declarative configuration.
-func (b *PodIPApplyConfiguration) RemoveIP() *PodIPApplyConfiguration {
-	b.IP = nil
-	return b
-}
-
-// GetIP gets the IP field from the declarative configuration.
-func (b *PodIPApplyConfiguration) GetIP() (value string, ok bool) {
-	if v := b.IP; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // PodIPList represents a listAlias of PodIPApplyConfiguration.
 type PodIPList []*PodIPApplyConfiguration
 

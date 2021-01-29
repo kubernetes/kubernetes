@@ -30,69 +30,6 @@ type ResourceQuotaSpecApplyConfiguration struct {
 	ScopeSelector *ScopeSelectorApplyConfiguration `json:"scopeSelector,omitempty"`
 }
 
-// ResourceQuotaSpecApplyConfiguration constructs an declarative configuration of the ResourceQuotaSpec type for use with
-// apply.
-func ResourceQuotaSpec() *ResourceQuotaSpecApplyConfiguration {
-	return &ResourceQuotaSpecApplyConfiguration{}
-}
-
-// SetHard sets the Hard field in the declarative configuration to the given value.
-func (b *ResourceQuotaSpecApplyConfiguration) SetHard(value v1.ResourceList) *ResourceQuotaSpecApplyConfiguration {
-	b.Hard = &value
-	return b
-}
-
-// RemoveHard removes the Hard field from the declarative configuration.
-func (b *ResourceQuotaSpecApplyConfiguration) RemoveHard() *ResourceQuotaSpecApplyConfiguration {
-	b.Hard = nil
-	return b
-}
-
-// GetHard gets the Hard field from the declarative configuration.
-func (b *ResourceQuotaSpecApplyConfiguration) GetHard() (value v1.ResourceList, ok bool) {
-	if v := b.Hard; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetScopes sets the Scopes field in the declarative configuration to the given value.
-func (b *ResourceQuotaSpecApplyConfiguration) SetScopes(value []v1.ResourceQuotaScope) *ResourceQuotaSpecApplyConfiguration {
-	b.Scopes = &value
-	return b
-}
-
-// RemoveScopes removes the Scopes field from the declarative configuration.
-func (b *ResourceQuotaSpecApplyConfiguration) RemoveScopes() *ResourceQuotaSpecApplyConfiguration {
-	b.Scopes = nil
-	return b
-}
-
-// GetScopes gets the Scopes field from the declarative configuration.
-func (b *ResourceQuotaSpecApplyConfiguration) GetScopes() (value []v1.ResourceQuotaScope, ok bool) {
-	if v := b.Scopes; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetScopeSelector sets the ScopeSelector field in the declarative configuration to the given value.
-func (b *ResourceQuotaSpecApplyConfiguration) SetScopeSelector(value *ScopeSelectorApplyConfiguration) *ResourceQuotaSpecApplyConfiguration {
-	b.ScopeSelector = value
-	return b
-}
-
-// RemoveScopeSelector removes the ScopeSelector field from the declarative configuration.
-func (b *ResourceQuotaSpecApplyConfiguration) RemoveScopeSelector() *ResourceQuotaSpecApplyConfiguration {
-	b.ScopeSelector = nil
-	return b
-}
-
-// GetScopeSelector gets the ScopeSelector field from the declarative configuration.
-func (b *ResourceQuotaSpecApplyConfiguration) GetScopeSelector() (value *ScopeSelectorApplyConfiguration, ok bool) {
-	return b.ScopeSelector, b.ScopeSelector != nil
-}
-
 // ResourceQuotaSpecList represents a listAlias of ResourceQuotaSpecApplyConfiguration.
 type ResourceQuotaSpecList []*ResourceQuotaSpecApplyConfiguration
 

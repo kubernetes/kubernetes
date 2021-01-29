@@ -29,52 +29,6 @@ type SeccompProfileApplyConfiguration struct {
 	LocalhostProfile *string                `json:"localhostProfile,omitempty"`
 }
 
-// SeccompProfileApplyConfiguration constructs an declarative configuration of the SeccompProfile type for use with
-// apply.
-func SeccompProfile() *SeccompProfileApplyConfiguration {
-	return &SeccompProfileApplyConfiguration{}
-}
-
-// SetType sets the Type field in the declarative configuration to the given value.
-func (b *SeccompProfileApplyConfiguration) SetType(value v1.SeccompProfileType) *SeccompProfileApplyConfiguration {
-	b.Type = &value
-	return b
-}
-
-// RemoveType removes the Type field from the declarative configuration.
-func (b *SeccompProfileApplyConfiguration) RemoveType() *SeccompProfileApplyConfiguration {
-	b.Type = nil
-	return b
-}
-
-// GetType gets the Type field from the declarative configuration.
-func (b *SeccompProfileApplyConfiguration) GetType() (value v1.SeccompProfileType, ok bool) {
-	if v := b.Type; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
-// SetLocalhostProfile sets the LocalhostProfile field in the declarative configuration to the given value.
-func (b *SeccompProfileApplyConfiguration) SetLocalhostProfile(value string) *SeccompProfileApplyConfiguration {
-	b.LocalhostProfile = &value
-	return b
-}
-
-// RemoveLocalhostProfile removes the LocalhostProfile field from the declarative configuration.
-func (b *SeccompProfileApplyConfiguration) RemoveLocalhostProfile() *SeccompProfileApplyConfiguration {
-	b.LocalhostProfile = nil
-	return b
-}
-
-// GetLocalhostProfile gets the LocalhostProfile field from the declarative configuration.
-func (b *SeccompProfileApplyConfiguration) GetLocalhostProfile() (value string, ok bool) {
-	if v := b.LocalhostProfile; v != nil {
-		return *v, true
-	}
-	return value, false
-}
-
 // SeccompProfileList represents a listAlias of SeccompProfileApplyConfiguration.
 type SeccompProfileList []*SeccompProfileApplyConfiguration
 

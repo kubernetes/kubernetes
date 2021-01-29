@@ -150,16 +150,16 @@ func (c *FakeResourceQuotas) Apply(ctx context.Context, resourceQuota *applyconf
 	if err != nil {
 		return nil, err
 	}
-	meta, ok := resourceQuota.GetObjectMeta()
-	if !ok {
+	meta := resourceQuota.ObjectMeta
+	if meta == nil {
 		return nil, fmt.Errorf("resourceQuota.ObjectMeta must be provided to Apply")
 	}
-	name, ok := meta.GetName()
-	if !ok {
+	name := meta.Name
+	if name == nil {
 		return nil, fmt.Errorf("resourceQuota.ObjectMeta.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.ResourceQuota{})
+		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, *name, types.ApplyPatchType, data, subresources...), &corev1.ResourceQuota{})
 
 	if obj == nil {
 		return nil, err
