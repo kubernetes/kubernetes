@@ -33,6 +33,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -55,6 +57,8 @@ const (
 	testProfileName = "test-profile"
 	nodeName        = "testNode"
 )
+
+var enablePodOverhead = utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead)
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
 // TestScorePlugin only implements ScorePlugin interface.
@@ -540,15 +544,18 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 					HardPodAffinityWeight: 1,
 				},
 				"NodeLabel":        &config.NodeLabelArgs{},
-				"NodeResourcesFit": &config.NodeResourcesFitArgs{},
+				"NodeResourcesFit": &config.NodeResourcesFitArgs{EnablePodOverhead: enablePodOverhead},
 				"NodeResourcesLeastAllocated": &config.NodeResourcesLeastAllocatedArgs{
-					Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+					Resources:         []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+					EnablePodOverhead: enablePodOverhead,
 				},
 				"NodeResourcesMostAllocated": &config.NodeResourcesMostAllocatedArgs{
-					Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+					Resources:         []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+					EnablePodOverhead: enablePodOverhead,
 				},
 				"RequestedToCapacityRatio": &config.RequestedToCapacityRatioArgs{
-					Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+					Resources:         []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+					EnablePodOverhead: enablePodOverhead,
 				},
 				"PodTopologySpread": &config.PodTopologySpreadArgs{
 					DefaultingType: config.SystemDefaulting,

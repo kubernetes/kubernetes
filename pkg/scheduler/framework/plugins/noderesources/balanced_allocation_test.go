@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -46,7 +46,8 @@ func getExistingVolumeCountForNode(podInfos []*framework.PodInfo, maxVolumes int
 
 func TestNodeResourcesBalancedAllocation(t *testing.T) {
 	// Enable volumesOnNodeForBalancing to do balanced node resource allocation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
+	// featureGate name is defined in k8s.io/kubernetes/pkg/features/kube_features.go
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "BalanceAttachedNodeVolumes", true)()
 	podwithVol1 := v1.PodSpec{
 		Containers: []v1.Container{
 			{
@@ -390,7 +391,10 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 				}
 			}
 			fh, _ := runtime.NewFramework(nil, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
-			p, _ := NewBalancedAllocation(nil, fh)
+			p, _ := NewBalancedAllocation(&config.NodeResourcesBalancedAllocationArgs{
+				EnablePodOverhead:                true,
+				EnableBalanceAttachedNodeVolumes: true,
+			}, fh)
 
 			for i := range test.nodes {
 				hostResult, err := p.(framework.ScorePlugin).Score(context.Background(), nil, test.pod, test.nodes[i].Name)

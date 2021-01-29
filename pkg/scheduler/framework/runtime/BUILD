@@ -40,6 +40,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/features:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
@@ -48,6 +49,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",

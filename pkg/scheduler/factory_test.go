@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	apicore "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
@@ -58,6 +60,9 @@ const (
 	podMaxBackoffDurationSeconds     = 10
 	testSchedulerName                = "test-scheduler"
 )
+
+var enablePodOverhead = utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead)
+var enableBalanceAttachedNodeVolumes = utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes)
 
 func TestCreate(t *testing.T) {
 	client := fake.NewSimpleClientset()
@@ -127,8 +132,15 @@ func TestCreateFromConfig(t *testing.T) {
 					Args: &schedulerapi.NodeAffinityArgs{},
 				},
 				{
+					Name: noderesources.BalancedAllocationName,
+					Args: &schedulerapi.NodeResourcesBalancedAllocationArgs{
+						EnableBalanceAttachedNodeVolumes: enableBalanceAttachedNodeVolumes,
+						EnablePodOverhead:                enablePodOverhead,
+					},
+				},
+				{
 					Name: noderesources.FitName,
-					Args: &schedulerapi.NodeResourcesFitArgs{},
+					Args: &schedulerapi.NodeResourcesFitArgs{EnablePodOverhead: enablePodOverhead},
 				},
 				{
 					Name: noderesources.LeastAllocatedName,
@@ -137,6 +149,7 @@ func TestCreateFromConfig(t *testing.T) {
 							{Name: "cpu", Weight: 1},
 							{Name: "memory", Weight: 1},
 						},
+						EnablePodOverhead: enablePodOverhead,
 					},
 				},
 				{
@@ -349,7 +362,7 @@ func TestCreateFromConfig(t *testing.T) {
 				},
 				{
 					Name: "NodeResourcesFit",
-					Args: &schedulerapi.NodeResourcesFitArgs{},
+					Args: &schedulerapi.NodeResourcesFitArgs{EnablePodOverhead: enablePodOverhead},
 				},
 			},
 			wantPlugins: &schedulerapi.Plugins{

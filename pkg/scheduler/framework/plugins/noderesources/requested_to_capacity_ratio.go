@@ -78,9 +78,10 @@ func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.Handle)
 	return &RequestedToCapacityRatio{
 		handle: handle,
 		resourceAllocationScorer: resourceAllocationScorer{
-			RequestedToCapacityRatioName,
-			buildRequestedToCapacityRatioScorerFunction(shape, resourceToWeightMap),
-			resourceToWeightMap,
+			Name:                RequestedToCapacityRatioName,
+			scorer:              buildRequestedToCapacityRatioScorerFunction(shape, resourceToWeightMap),
+			resourceToWeightMap: resourceToWeightMap,
+			enablePodOverhead:   args.EnablePodOverhead,
 		},
 	}, nil
 }

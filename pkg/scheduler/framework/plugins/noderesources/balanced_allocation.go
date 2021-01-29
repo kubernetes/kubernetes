@@ -19,12 +19,11 @@ package noderesources
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"math"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -67,15 +66,30 @@ func (ba *BalancedAllocation) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewBalancedAllocation initializes a new plugin and returns it.
-func NewBalancedAllocation(_ runtime.Object, h framework.Handle) (framework.Plugin, error) {
+func NewBalancedAllocation(plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
+	args, err := getArgs(plArgs)
+	if err != nil {
+		return nil, err
+	}
 	return &BalancedAllocation{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
-			BalancedAllocationName,
-			balancedResourceScorer,
-			defaultRequestedRatioResources,
+			Name:                             BalancedAllocationName,
+			scorer:                           balancedResourceScorer,
+			resourceToWeightMap:              defaultRequestedRatioResources,
+			enableBalanceAttachedNodeVolumes: args.EnableBalanceAttachedNodeVolumes,
+			enablePodOverhead:                args.EnablePodOverhead,
 		},
 	}, nil
+}
+
+func getArgs(obj runtime.Object) (config.NodeResourcesBalancedAllocationArgs, error) {
+	ptr, ok := obj.(*config.NodeResourcesBalancedAllocationArgs)
+	if !ok {
+		return config.NodeResourcesBalancedAllocationArgs{}, fmt.Errorf("args are not of type NodeResourcesBalancedAllocationArgs, got %T", obj)
+	}
+	// no need to validate, the args are just used to transport internal info on featuregates
+	return *ptr, nil
 }
 
 // todo: use resource weights in the scorer function
@@ -88,7 +102,8 @@ func balancedResourceScorer(requested, allocable resourceToValueMap, includeVolu
 		return 0
 	}
 
-	if includeVolumes && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && allocatableVolumes > 0 {
+	// includeVolumes is only true when BalanceAttachedNodeVolumes feature gate is enabled (see resource_allocation.go#score())
+	if includeVolumes && allocatableVolumes > 0 {
 		volumeFraction := float64(requestedVolumes) / float64(allocatableVolumes)
 		if volumeFraction >= 1 {
 			// if requested >= capacity, the corresponding host should never be preferred.

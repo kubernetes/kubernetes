@@ -29,7 +29,6 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -370,6 +369,7 @@ func TestEnoughRequests(t *testing.T) {
 			name:                      "requests + overhead does not fit for memory",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceMemory)),
 			wantInsufficientResources: []InsufficientResource{{v1.ResourceMemory, getErrReason(v1.ResourceMemory), 16, 5, 20}},
+			args:                      config.NodeResourcesFitArgs{EnablePodOverhead: true},
 		},
 		{
 			pod: newResourcePod(
@@ -418,7 +418,7 @@ func TestEnoughRequests(t *testing.T) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
 
-			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
+			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod, true), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
 			if !reflect.DeepEqual(gotInsufficientResources, test.wantInsufficientResources) {
 				t.Errorf("insufficient resources do not match: %+v, want: %v", gotInsufficientResources, test.wantInsufficientResources)
 			}
@@ -534,7 +534,7 @@ func TestStorageRequests(t *testing.T) {
 				newResourcePod(framework.Resource{MilliCPU: 2, Memory: 2})),
 			name: "ephemeral local storage request is ignored due to disabled feature gate",
 			features: map[featuregate.Feature]bool{
-				features.LocalStorageCapacityIsolation: false,
+				"LocalStorageCapacityIsolation": false,
 			},
 		},
 		{
