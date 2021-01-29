@@ -441,9 +441,9 @@ func findContainerIDByName(status *v1.PodStatus, name string) (string, error) {
 }
 
 func findContainerStatusByName(status *v1.PodStatus, name string) (*v1.ContainerStatus, error) {
-	for _, status := range append(status.InitContainerStatuses, status.ContainerStatuses...) {
-		if status.Name == name {
-			return &status, nil
+	for _, containerStatus := range append(status.InitContainerStatuses, status.ContainerStatuses...) {
+		if containerStatus.Name == name {
+			return &containerStatus, nil
 		}
 	}
 	return nil, fmt.Errorf("unable to find status for container with name %v in pod status (it may not be running)", name)
