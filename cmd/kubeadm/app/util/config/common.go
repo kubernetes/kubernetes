@@ -74,7 +74,7 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) erro
 	}
 
 	if _, present := deprecatedAPIVersions[gvString]; present && !allowDeprecated {
-		klog.Warningf("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv)
+		klog.InfoS("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv)
 	}
 
 	return nil
@@ -112,7 +112,7 @@ func LowercaseSANs(sans []string) {
 	for i, san := range sans {
 		lowercase := strings.ToLower(san)
 		if lowercase != san {
-			klog.V(1).Infof("lowercasing SAN %q to %q", san, lowercase)
+			klog.InfoS("lowercasing SAN %q to %q", san, lowercase)
 			sans[i] = lowercase
 		}
 	}
@@ -145,7 +145,7 @@ func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
 	ip, err := netutil.ResolveBindAddress(bindAddress)
 	if err != nil {
 		if netutil.IsNoRoutesError(err) {
-			klog.Warningf("WARNING: could not obtain a bind address for the API Server: %v; using: %s", err, constants.DefaultAPIServerBindAddress)
+			klog.InfoS("WARNING: could not obtain a bind address for the API Server: %v; using: %s", err, constants.DefaultAPIServerBindAddress)
 			defaultIP := net.ParseIP(constants.DefaultAPIServerBindAddress)
 			if defaultIP == nil {
 				return nil, errors.Errorf("cannot parse default IP address: %s", constants.DefaultAPIServerBindAddress)
@@ -155,7 +155,7 @@ func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
 		return nil, err
 	}
 	if bindAddress != nil && !bindAddress.IsUnspecified() && !reflect.DeepEqual(ip, bindAddress) {
-		klog.Warningf("WARNING: overriding requested API server bind address: requested %q, actual %q", bindAddress, ip)
+		klog.InfoS("WARNING: overriding requested API server bind address: requested %q, actual %q", bindAddress, ip)
 	}
 	return ip, nil
 }
