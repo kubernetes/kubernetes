@@ -158,7 +158,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 			nodeV, _ := nodeConstraints[k]
 			volumeVSet, err := volumehelpers.LabelZonesToSet(v)
 			if err != nil {
-				klog.Warningf("Failed to parse label for %q: %q. Ignoring the label. err=%v. ", k, v, err)
+				klog.InfoS("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", k, v), "err", err)
 				continue
 			}
 
