@@ -435,21 +435,6 @@ const (
 	// Implement support for limiting pids in nodes
 	SupportNodePidsLimit featuregate.Feature = "SupportNodePidsLimit"
 
-	// owner: @wk8
-	// alpha: v1.14
-	// beta: v1.16
-	//
-	// Enables GMSA support for Windows workloads.
-	WindowsGMSA featuregate.Feature = "WindowsGMSA"
-
-	// owner: @bclau
-	// alpha: v1.16
-	// beta: v1.17
-	// GA: v1.18
-	//
-	// Enables support for running container entrypoints as different usernames than their default ones.
-	WindowsRunAsUserName featuregate.Feature = "WindowsRunAsUserName"
-
 	// owner: @RobertKrawitz
 	// alpha: v1.15
 	//
@@ -747,8 +732,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ProcMountType:                                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:                               {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:                            {Default: true, PreRelease: featuregate.Beta},
-	WindowsGMSA:                                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
-	WindowsRunAsUserName:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: true, PreRelease: featuregate.Beta},
 	PodOverhead:                                    {Default: true, PreRelease: featuregate.Beta},
