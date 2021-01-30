@@ -27,13 +27,13 @@ import (
 func TestCreateNamespace(t *testing.T) {
 	tests := map[string]struct {
 		options  *NamespaceOptions
-		expected *corev1.ServiceAccount
+		expected *corev1.Namespace
 	}{
 		"namespace": {
 			options: &NamespaceOptions{
 				Name: "my-namespace",
 			},
-			expected: &corev1.ServiceAccount{
+			expected: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Namespace",
 					APIVersion: "v1",
