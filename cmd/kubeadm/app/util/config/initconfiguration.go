@@ -101,7 +101,7 @@ func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions,
 		if err != nil {
 			return err
 		}
-		klog.V(1).Infof("detected and using CRI socket: %s", cfg.CRISocket)
+		klog.V(1).InfoS ("detected and using CRI socket: %s", cfg.CRISocket)
 	}
 
 	return nil
@@ -123,7 +123,7 @@ func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 			return err
 		}
 		if loopbackIP != nil {
-			klog.V(4).Infof("Found active IP %v on loopback interface", loopbackIP.String())
+			klog.V(4).InfoS("Found active IP %v on loopback interface", loopbackIP.String())
 			cfg.AdvertiseAddress = loopbackIP.String()
 			return nil
 		}
@@ -198,7 +198,7 @@ func DefaultedInitConfiguration(versionedInitCfg *kubeadmapiv1beta2.InitConfigur
 
 // LoadInitConfigurationFromFile loads a supported versioned InitConfiguration from a file, converts it into internal config, defaults it and verifies it.
 func LoadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguration, error) {
-	klog.V(1).Infof("loading configuration from %q", cfgPath)
+	klog.V(1).InfoS("loading configuration from %q", cfgPath)
 
 	b, err := ioutil.ReadFile(cfgPath)
 	if err != nil {
