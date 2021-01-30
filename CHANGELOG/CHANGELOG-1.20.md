@@ -264,7 +264,7 @@ filename | sha512 hash
 - Fixed bug in CPUManager with race on container map access ([#97427](https://github.com/kubernetes/kubernetes/pull/97427), [@klueska](https://github.com/klueska)) [SIG Node]
 - GCE Internal LoadBalancer sync loop will now release the ILB IP address upon sync failure. An error in ILB forwarding rule creation will no longer leak IP addresses. ([#97740](https://github.com/kubernetes/kubernetes/pull/97740), [@prameshj](https://github.com/prameshj)) [SIG Cloud Provider and Network]
 - Kubeadm: avoid detection of the container runtime for commands that do not need it ([#97847](https://github.com/kubernetes/kubernetes/pull/97847), [@pacoxu](https://github.com/pacoxu)) [SIG Cluster Lifecycle]
-- Performance regression #97685 has been fixed. ([#97860](https://github.com/kubernetes/kubernetes/pull/97860), [@MikeSpreitzer](https://github.com/MikeSpreitzer)) [SIG API Machinery]
+- Performance regression [#97685](https://github.com/kubernetes/kubernetes/issues/97685) has been fixed. ([#97860](https://github.com/kubernetes/kubernetes/pull/97860), [@MikeSpreitzer](https://github.com/MikeSpreitzer)) [SIG API Machinery]
 - Use network.Interface.VirtualMachine.ID to get the binded VM
   Skip standalone VM when reconciling LoadBalancer ([#97639](https://github.com/kubernetes/kubernetes/pull/97639), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
 
