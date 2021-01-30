@@ -30,14 +30,17 @@ import (
 
 func TestNewResource(t *testing.T) {
 	tests := []struct {
+		name         string
 		resourceList v1.ResourceList
 		expected     *Resource
 	}{
 		{
+			name:         "empty resource",
 			resourceList: map[v1.ResourceName]resource.Quantity{},
 			expected:     &Resource{},
 		},
 		{
+			name: "complex resource",
 			resourceList: map[v1.ResourceName]resource.Quantity{
 				v1.ResourceCPU:                      *resource.NewScaledQuantity(4, -3),
 				v1.ResourceMemory:                   *resource.NewQuantity(2000, resource.BinarySI),
@@ -57,10 +60,12 @@ func TestNewResource(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		r := NewResource(test.resourceList)
-		if !reflect.DeepEqual(test.expected, r) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, r)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			r := NewResource(test.resourceList)
+			if !reflect.DeepEqual(test.expected, r) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, r)
+			}
+		})
 	}
 }
 
@@ -102,11 +107,13 @@ func TestResourceList(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		rl := test.resource.ResourceList()
-		if !reflect.DeepEqual(test.expected, rl) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, rl)
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			rl := test.resource.ResourceList()
+			if !reflect.DeepEqual(test.expected, rl) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, rl)
+			}
+		})
 	}
 }
 
@@ -137,13 +144,15 @@ func TestResourceClone(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		r := test.resource.Clone()
-		// Modify the field to check if the result is a clone of the origin one.
-		test.resource.MilliCPU += 1000
-		if !reflect.DeepEqual(test.expected, r) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, r)
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			r := test.resource.Clone()
+			// Modify the field to check if the result is a clone of the origin one.
+			test.resource.MilliCPU += 1000
+			if !reflect.DeepEqual(test.expected, r) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, r)
+			}
+		})
 	}
 }
 
@@ -183,10 +192,12 @@ func TestResourceAddScalar(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test.resource.AddScalar(test.scalarName, test.scalarQuantity)
-		if !reflect.DeepEqual(test.expected, test.resource) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
-		}
+		t.Run(string(test.scalarName), func(t *testing.T) {
+			test.resource.AddScalar(test.scalarName, test.scalarQuantity)
+			if !reflect.DeepEqual(test.expected, test.resource) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
+			}
+		})
 	}
 }
 
@@ -232,11 +243,13 @@ func TestSetMaxResource(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		test.resource.SetMaxResource(test.resourceList)
-		if !reflect.DeepEqual(test.expected, test.resource) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			test.resource.SetMaxResource(test.resourceList)
+			if !reflect.DeepEqual(test.expected, test.resource) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
+			}
+		})
 	}
 }
 
@@ -540,14 +553,16 @@ func TestNodeInfoClone(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		ni := test.nodeInfo.Clone()
-		// Modify the field to check if the result is a clone of the origin one.
-		test.nodeInfo.Generation += 10
-		test.nodeInfo.UsedPorts.Remove("127.0.0.1", "TCP", 80)
-		if !reflect.DeepEqual(test.expected, ni) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, ni)
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			ni := test.nodeInfo.Clone()
+			// Modify the field to check if the result is a clone of the origin one.
+			test.nodeInfo.Generation += 10
+			test.nodeInfo.UsedPorts.Remove("127.0.0.1", "TCP", 80)
+			if !reflect.DeepEqual(test.expected, ni) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, ni)
+			}
+		})
 	}
 }
 
@@ -1036,30 +1051,32 @@ func TestNodeInfoRemovePod(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		ni := fakeNodeInfo(pods...)
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			ni := fakeNodeInfo(pods...)
 
-		gen := ni.Generation
-		err := ni.RemovePod(test.pod)
-		if err != nil {
-			if test.errExpected {
-				expectedErrorMsg := fmt.Errorf("no corresponding pod %s in pods of node %s", test.pod.Name, ni.Node().Name)
-				if expectedErrorMsg == err {
-					t.Errorf("expected error: %v, got: %v", expectedErrorMsg, err)
+			gen := ni.Generation
+			err := ni.RemovePod(test.pod)
+			if err != nil {
+				if test.errExpected {
+					expectedErrorMsg := fmt.Errorf("no corresponding pod %s in pods of node %s", test.pod.Name, ni.Node().Name)
+					if expectedErrorMsg == err {
+						t.Errorf("expected error: %v, got: %v", expectedErrorMsg, err)
+					}
+				} else {
+					t.Errorf("expected no error, got: %v", err)
 				}
 			} else {
-				t.Errorf("expected no error, got: %v", err)
+				if ni.Generation <= gen {
+					t.Errorf("Generation is not incremented. Prev: %v, current: %v", gen, ni.Generation)
+				}
 			}
-		} else {
-			if ni.Generation <= gen {
-				t.Errorf("Generation is not incremented. Prev: %v, current: %v", gen, ni.Generation)
-			}
-		}
 
-		test.expectedNodeInfo.Generation = ni.Generation
-		if !reflect.DeepEqual(test.expectedNodeInfo, ni) {
-			t.Errorf("expected: %#v, got: %#v", test.expectedNodeInfo, ni)
-		}
+			test.expectedNodeInfo.Generation = ni.Generation
+			if !reflect.DeepEqual(test.expectedNodeInfo, ni) {
+				t.Errorf("expected: %#v, got: %#v", test.expectedNodeInfo, ni)
+			}
+		})
 	}
 }
 
@@ -1169,17 +1186,19 @@ func TestHostPortInfo_AddRemove(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		hp := make(HostPortInfo)
-		for _, param := range test.added {
-			hp.Add(param.ip, param.protocol, param.port)
-		}
-		for _, param := range test.removed {
-			hp.Remove(param.ip, param.protocol, param.port)
-		}
-		if hp.Len() != test.length {
-			t.Errorf("%v failed: expect length %d; got %d", test.desc, test.length, hp.Len())
-			t.Error(hp)
-		}
+		t.Run(test.desc, func(t *testing.T) {
+			hp := make(HostPortInfo)
+			for _, param := range test.added {
+				hp.Add(param.ip, param.protocol, param.port)
+			}
+			for _, param := range test.removed {
+				hp.Remove(param.ip, param.protocol, param.port)
+			}
+			if hp.Len() != test.length {
+				t.Errorf("%v failed: expect length %d; got %d", test.desc, test.length, hp.Len())
+				t.Error(hp)
+			}
+		})
 	}
 }
 
@@ -1273,12 +1292,14 @@ func TestHostPortInfo_Check(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		hp := make(HostPortInfo)
-		for _, param := range test.added {
-			hp.Add(param.ip, param.protocol, param.port)
-		}
-		if hp.CheckConflict(test.check.ip, test.check.protocol, test.check.port) != test.expect {
-			t.Errorf("%v failed, expected %t; got %t", test.desc, test.expect, !test.expect)
-		}
+		t.Run(test.desc, func(t *testing.T) {
+			hp := make(HostPortInfo)
+			for _, param := range test.added {
+				hp.Add(param.ip, param.protocol, param.port)
+			}
+			if hp.CheckConflict(test.check.ip, test.check.protocol, test.check.port) != test.expect {
+				t.Errorf("expected %t; got %t", test.expect, !test.expect)
+			}
+		})
 	}
 }

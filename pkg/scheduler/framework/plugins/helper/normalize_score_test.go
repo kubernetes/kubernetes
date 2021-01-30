@@ -17,6 +17,7 @@ limitations under the License.
 package helper
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -63,19 +64,21 @@ func TestDefaultNormalizeScore(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		scores := framework.NodeScoreList{}
-		for _, score := range test.scores {
-			scores = append(scores, framework.NodeScore{Score: score})
-		}
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			scores := framework.NodeScoreList{}
+			for _, score := range test.scores {
+				scores = append(scores, framework.NodeScore{Score: score})
+			}
 
-		expectedScores := framework.NodeScoreList{}
-		for _, score := range test.expectedScores {
-			expectedScores = append(expectedScores, framework.NodeScore{Score: score})
-		}
+			expectedScores := framework.NodeScoreList{}
+			for _, score := range test.expectedScores {
+				expectedScores = append(expectedScores, framework.NodeScore{Score: score})
+			}
 
-		DefaultNormalizeScore(framework.MaxNodeScore, test.reverse, scores)
-		if !reflect.DeepEqual(scores, expectedScores) {
-			t.Errorf("test %d, expected %v, got %v", i, expectedScores, scores)
-		}
+			DefaultNormalizeScore(framework.MaxNodeScore, test.reverse, scores)
+			if !reflect.DeepEqual(scores, expectedScores) {
+				t.Errorf("expected %v, got %v", expectedScores, scores)
+			}
+		})
 	}
 }

@@ -1716,33 +1716,35 @@ func TestPermitPlugins(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		registry := Registry{}
-		configPlugins := &config.Plugins{Permit: &config.PluginSet{}}
+		t.Run(tt.name, func(t *testing.T) {
+			registry := Registry{}
+			configPlugins := &config.Plugins{Permit: &config.PluginSet{}}
 
-		for _, pl := range tt.plugins {
-			tmpPl := pl
-			if err := registry.Register(pl.name, func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-				return tmpPl, nil
-			}); err != nil {
-				t.Fatalf("Unable to register Permit plugin: %s", pl.name)
+			for _, pl := range tt.plugins {
+				tmpPl := pl
+				if err := registry.Register(pl.name, func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+					return tmpPl, nil
+				}); err != nil {
+					t.Fatalf("Unable to register Permit plugin: %s", pl.name)
+				}
+
+				configPlugins.Permit.Enabled = append(
+					configPlugins.Permit.Enabled,
+					config.Plugin{Name: pl.name},
+				)
 			}
 
-			configPlugins.Permit.Enabled = append(
-				configPlugins.Permit.Enabled,
-				config.Plugin{Name: pl.name},
-			)
-		}
+			f, err := newFrameworkWithQueueSortAndBind(registry, configPlugins, emptyArgs)
+			if err != nil {
+				t.Fatalf("fail to create framework: %s", err)
+			}
 
-		f, err := newFrameworkWithQueueSortAndBind(registry, configPlugins, emptyArgs)
-		if err != nil {
-			t.Fatalf("fail to create framework: %s", err)
-		}
+			status := f.RunPermitPlugins(context.TODO(), nil, pod, "")
 
-		status := f.RunPermitPlugins(context.TODO(), nil, pod, "")
-
-		if !reflect.DeepEqual(status, tt.want) {
-			t.Errorf("wrong status code. got %v, want %v", status, tt.want)
-		}
+			if !reflect.DeepEqual(status, tt.want) {
+				t.Errorf("wrong status code. got %v, want %v", status, tt.want)
+			}
+		})
 	}
 }
 

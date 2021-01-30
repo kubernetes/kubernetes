@@ -635,8 +635,10 @@ func TestValidateFitArgs(t *testing.T) {
 	}
 
 	for _, test := range argsTest {
-		if err := validateFitArgs(test.args); err != nil && !strings.Contains(err.Error(), test.expect) {
-			t.Errorf("case[%v]: error details do not include %v", test.name, err)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			if err := validateFitArgs(test.args); err != nil && !strings.Contains(err.Error(), test.expect) {
+				t.Errorf("case[%v]: error details do not include %v", test.name, err)
+			}
+		})
 	}
 }

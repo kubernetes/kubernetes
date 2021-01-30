@@ -18,6 +18,7 @@ package noderesources
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -173,11 +174,13 @@ func TestBrokenLinearFunction(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		function := buildBrokenLinearFunction(test.points)
-		for _, assertion := range test.assertions {
-			assert.InDelta(t, assertion.expected, function(assertion.p), 0.1, "points=%v, p=%f", test.points, assertion.p)
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			function := buildBrokenLinearFunction(test.points)
+			for _, assertion := range test.assertions {
+				assert.InDelta(t, assertion.expected, function(assertion.p), 0.1, "points=%v, p=%f", test.points, assertion.p)
+			}
+		})
 	}
 }
 

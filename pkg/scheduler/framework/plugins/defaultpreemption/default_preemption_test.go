@@ -1295,14 +1295,16 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		var nodes []*v1.Node
-		for _, n := range test.nodes {
-			nodes = append(nodes, st.MakeNode().Name(n).Obj())
-		}
-		snapshot := internalcache.NewSnapshot(test.pods, nodes)
-		if got := PodEligibleToPreemptOthers(test.pod, snapshot.NodeInfos(), test.nominatedNodeStatus); got != test.expected {
-			t.Errorf("expected %t, got %t for pod: %s", test.expected, got, test.pod.Name)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			var nodes []*v1.Node
+			for _, n := range test.nodes {
+				nodes = append(nodes, st.MakeNode().Name(n).Obj())
+			}
+			snapshot := internalcache.NewSnapshot(test.pods, nodes)
+			if got := PodEligibleToPreemptOthers(test.pod, snapshot.NodeInfos(), test.nominatedNodeStatus); got != test.expected {
+				t.Errorf("expected %t, got %t for pod: %s", test.expected, got, test.pod.Name)
+			}
+		})
 	}
 }
 
