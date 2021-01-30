@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/spf13/cobra"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -177,7 +176,7 @@ func (o *NamespaceOptions) createNamespace() (*corev1.Namespace, error) {
 		return nil, err
 	}
 	namespace := &corev1.Namespace{
-		TypeMeta:   metav1.TypeMeta{APIVersion: batchv1beta1.SchemeGroupVersion.String(), Kind: "Namespace"},
+		TypeMeta:   metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "Namespace"},
 		ObjectMeta: metav1.ObjectMeta{Name: o.Name},
 	}
 	return namespace, nil
