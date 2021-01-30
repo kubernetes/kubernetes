@@ -196,9 +196,6 @@ func (o TopPodOptions) RunTopPod() error {
 			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
 		}
 	}
-	if err != nil {
-		return err
-	}
 
 	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy)
 }
