@@ -71,7 +71,7 @@ func LoadOrDefaultJoinConfiguration(cfgPath string, defaultversionedcfg *kubeadm
 
 // LoadJoinConfigurationFromFile loads versioned JoinConfiguration from file, converts it to internal, defaults and validates it
 func LoadJoinConfigurationFromFile(cfgPath string) (*kubeadmapi.JoinConfiguration, error) {
-	klog.V(1).Infof("loading configuration from %q", cfgPath)
+	klog.V(1).InfoS("loading configuration from %q", cfgPath)
 
 	b, err := ioutil.ReadFile(cfgPath)
 	if err != nil {
