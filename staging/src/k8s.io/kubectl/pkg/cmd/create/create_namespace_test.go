@@ -24,7 +24,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
 
-
 func TestCreateNamespace(t *testing.T) {
 	tests := map[string]struct {
 		options  *NamespaceOptions

@@ -71,7 +71,6 @@ func NewNamespaceOptions(ioStreams genericclioptions.IOStreams) *NamespaceOption
 	}
 }
 
-
 // NewCmdCreateNamespace is a macro command to create a new namespace
 func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 
