@@ -42,7 +42,7 @@ readonly node_ssh_supported_providers="gce gke aws"
 readonly gcloud_supported_providers="gce gke"
 
 readonly master_logfiles="kube-apiserver.log kube-apiserver-audit.log kube-scheduler.log kube-controller-manager.log etcd.log etcd-events.log glbc.log cluster-autoscaler.log kube-addon-manager.log konnectivity-server.log fluentd.log kubelet.cov"
-readonly node_logfiles="kube-proxy.log fluentd.log node-problem-detector.log kubelet.cov"
+readonly node_logfiles="kube-proxy.log fluentd.log node-problem-detector.log kubelet.cov coredns.log"
 readonly node_systemd_services="node-problem-detector"
 readonly hollow_node_logfiles="kubelet-hollow-node-*.log kubeproxy-hollow-node-*.log npd-hollow-node-*.log"
 readonly aws_logfiles="cloud-init-output.log"
@@ -232,6 +232,7 @@ function save-logs() {
     log-dump-ssh "${node_name}" "sudo chmod -R a+r /var/log" || true
 
     echo "Copying '${files[*]}' from ${node_name}"
+    echo "copy-logs-from-node param node_name:${node_name} dir:${dir} files:${files[@]}"
     copy-logs-from-node "${node_name}" "${dir}" "${files[@]}"
 }
 
