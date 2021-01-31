@@ -59,7 +59,7 @@ func (pr execProber) Probe(e exec.Cmd) (probe.Result, string, error) {
 	}
 	data := dataBuffer.Bytes()
 
-	klog.V(4).InfoS("Exec probe response received", "response", string(data))
+	klog.V(4).InfoS("Received probe response", "response", string(data))
 	if err != nil {
 		exit, ok := err.(exec.ExitError)
 		if ok {
