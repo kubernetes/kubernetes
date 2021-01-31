@@ -17,12 +17,16 @@ limitations under the License.
 package ipvs
 
 import (
+	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/klog/v2"
 )
 
 // Interface is an injectable interface for running ipvs commands.  Implementations must be goroutine-safe.
@@ -122,15 +126,44 @@ func (rs *RealServer) Equal(other *RealServer) bool {
 		rs.Port == other.Port
 }
 
-// GetRequiredIPVSModules returns the required ipvs modules for the given linux kernel version.
-func GetRequiredIPVSModules(kernelVersion *version.Version) []string {
+// GetRequiredIPVSModules returns the kernel modules needed to use IPVS; all of the
+// modules in `required` are required, plus one of the modules in `nfconntrack`.
+func GetRequiredIPVSModules() []string {
 	// "nf_conntrack_ipv4" has been removed since v4.19
 	// see https://github.com/torvalds/linux/commit/a0ae2562c6c4b2721d9fddba63b7286c13517d9f
-	if kernelVersion.LessThan(version.MustParseGeneric("4.19")) {
-		return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrackIPV4}
-	}
-	return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrack}
+	return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrack, KernelModuleNfConntrackIPV4}
 
+}
+
+// BuiltinIPVSModules checks modules that are already built-in into the kernel
+func BuiltinIPVSModules(statickernel bool, kernelVersion string) (modules []string, nfconntrack bool, err error) {
+	modulesConfigFile := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersion)
+	regexPrefix, regexSuffix := "", ".ko"
+
+	nfmodules := GetRequiredIPVSModules()
+
+	if statickernel {
+		modulesConfigFile = fmt.Sprintf("/boot/config-%s", kernelVersion)
+		regexPrefix = "CONFIG_"
+		regexSuffix = "=y"
+	}
+
+	modulesFile, err := ioutil.ReadFile(modulesConfigFile)
+	if err != nil && statickernel {
+		return nil, false, fmt.Errorf("Failed to read Kernel Config file %s with error %v", modulesConfigFile, err)
+	} else if err == os.ErrNotExist {
+		klog.Warningf("Failed to read file %s with error %v. You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", modulesConfigFile, err)
+	}
+
+	for _, module := range nfmodules {
+		if match, _ := regexp.Match(regexPrefix+strings.ToUpper(module)+regexSuffix, modulesFile); match {
+			modules = append(modules, module)
+		}
+		if module == KernelModuleNfConntrackIPV4 || module == KernelModuleNfConntrack {
+			nfconntrack = true
+		}
+	}
+	return modules, nfconntrack, nil
 }
 
 // IsRsGracefulTerminationNeeded returns true if protocol requires graceful termination for the stale connections

@@ -25,7 +25,6 @@ import (
 	"net"
 	"os"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -603,17 +602,15 @@ func NewLinuxKernelHandler() *LinuxKernelHandler {
 // GetModules returns all installed kernel modules.
 func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	// Check whether IPVS required kernel modules are built-in
+	var nfconntrack bool
 	kernelVersionStr, err := handle.GetKernelVersion()
 	if err != nil {
 		return nil, err
 	}
-	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
-	}
-	ipvsModules := utilipvs.GetRequiredIPVSModules(kernelVersion)
 
-	var bmods, lmods []string
+	ipvsModules := utilipvs.GetRequiredIPVSModules()
+
+	var bmods []string
 
 	// Find out loaded kernel modules. If this is a full static kernel it will try to verify if the module is compiled using /boot/config-KERNELVERSION
 	modulesFile, err := os.Open("/proc/modules")
@@ -621,16 +618,16 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 		klog.ErrorS(err, "Failed to read file /proc/modules, assuming this is a kernel without loadable modules support enabled")
 		kernelConfigFile := fmt.Sprintf("/boot/config-%s", kernelVersionStr)
 		kConfig, err := ioutil.ReadFile(kernelConfigFile)
+		bmods, nfconntrack, err := utilipvs.BuiltinIPVSModules(true, kernelVersionStr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read Kernel Config file %s with error %w", kernelConfigFile, err)
 		}
-		for _, module := range ipvsModules {
-			if match, _ := regexp.Match("CONFIG_"+strings.ToUpper(module)+"=y", kConfig); match {
-				bmods = append(bmods, module)
-			}
+		if !nfconntrack {
+			klog.Warningf("Failed to load nf_conntrack_ipv4 (or nf_conntrack)")
 		}
 		return bmods, nil
 	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file /proc/modules with error %w", err)
 	}
@@ -641,9 +638,9 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 		return nil, fmt.Errorf("failed to find loaded kernel modules: %v", err)
 	}
 
-	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersionStr)
-	b, err := ioutil.ReadFile(builtinModsFilePath)
+	bmods, nfconntrack, err = utilipvs.BuiltinIPVSModules(false, kernelVersionStr)
 	if err != nil {
+<<<<<<< HEAD
 		klog.ErrorS(err, "Failed to read builtin modules file, you can ignore this message when kube-proxy is running inside container without mounting /lib/modules", "filePath", builtinModsFilePath)
 	}
 
@@ -660,10 +657,48 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 				lmods = append(lmods, module)
 			}
 		}
+||||||| parent of 5b88c3962f3 (Validate nfconntrack regardless of kernel version)
+		klog.Warningf("Failed to read file %s with error %v. You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", builtinModsFilePath, err)
+	}
+
+	for _, module := range ipvsModules {
+		if match, _ := regexp.Match(module+".ko", b); match {
+			bmods = append(bmods, module)
+		} else {
+			// Try to load the required IPVS kernel modules if not built in
+			err := handle.executor.Command("modprobe", "--", module).Run()
+			if err != nil {
+				klog.Warningf("Failed to load kernel module %v with modprobe. "+
+					"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", module)
+			} else {
+				lmods = append(lmods, module)
+			}
+		}
+=======
+		return nil, fmt.Errorf("Failed to get kernel built-in modules")
+>>>>>>> 5b88c3962f3 (Validate nfconntrack regardless of kernel version)
 	}
 
 	mods = append(mods, bmods...)
-	mods = append(mods, lmods...)
+	for _, module := range ipvsModules {
+		// Try to load the required IPVS kernel modules if not built in
+		err := handle.executor.Command("modprobe", "--", module).Run()
+		if err != nil {
+			klog.Warningf("Failed to load kernel module %v with modprobe. "+
+				"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules or if the module is built-in", module)
+		} else {
+			if module == utilipvs.KernelModuleNfConntrack ||
+				module == utilipvs.KernelModuleNfConntrackIPV4 {
+				nfconntrack = true
+			}
+			mods = append(mods, module)
+		}
+	}
+	if !nfconntrack {
+		klog.Warningf("Failed to load nf_conntrack_ipv4 (or nf_conntrack) with modprobe. " +
+			"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules")
+	}
+
 	return mods, nil
 }
 
@@ -709,15 +744,7 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler 
 	loadModules := sets.NewString()
 	loadModules.Insert(mods...)
 
-	kernelVersionStr, err := handle.GetKernelVersion()
-	if err != nil {
-		return false, fmt.Errorf("error determining kernel version to find required kernel modules for ipvs support: %v", err)
-	}
-	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
-	if err != nil {
-		return false, fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
-	}
-	mods = utilipvs.GetRequiredIPVSModules(kernelVersion)
+	mods = utilipvs.GetRequiredIPVSModules()
 	wantModules := sets.NewString()
 	// We check for the existence of the scheduler mod and will trigger a missingMods error if not found
 	if scheduler == "" {
@@ -729,16 +756,13 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler 
 
 	modules := wantModules.Difference(loadModules).UnsortedList()
 	var missingMods []string
-	ConntrackiMissingCounter := 0
+
 	for _, mod := range modules {
-		if strings.Contains(mod, "nf_conntrack") {
-			ConntrackiMissingCounter++
-		} else {
-			missingMods = append(missingMods, mod)
-		}
+		missingMods = append(missingMods, mod)
 	}
-	if ConntrackiMissingCounter == 2 {
-		missingMods = append(missingMods, "nf_conntrack_ipv4(or nf_conntrack for Linux kernel 4.19 and later)")
+
+	if !loadModules.HasAny(utilipvs.KernelModuleNfConntrack, utilipvs.KernelModuleNfConntrackIPV4) {
+		missingMods = append(missingMods, "nf_conntrack (or nf_conntrack_ipv4 for older kernels)")
 	}
 
 	if len(missingMods) != 0 {
