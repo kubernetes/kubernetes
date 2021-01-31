@@ -1392,7 +1392,7 @@ func printIPAddress(obj *allocation.IPAddress, options printers.GenerateOptions)
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, obj.Spec.Address, obj.Spec.IPRangeRef.Name)
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.IPRangeRef.Name)
 	return []metav1.TableRow{row}, nil
 }
 
