@@ -32,7 +32,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to open source file [%s]: %q", os.Args[1], err)
 	}
-	defer sf.Close()
+	defer func() {
+		if err := sf.Close(); err != nil {
+			log.Printf("Error while closing sorce file; Error %v", err)
+		}
+	}()
 	fi, err := sf.Stat()
 	if err != nil {
 		log.Fatalf("unable to stat source file [%s]: %q", os.Args[1], err)
@@ -46,7 +50,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to create destination file [%s]: %q", os.Args[1], err)
 	}
-	defer df.Close()
+	defer func() {
+		if err := df.Close(); err != nil {
+			log.Printf("Error while closing destination file; Error: %v", err)
+		}
+	}()
 
 	_, err = io.Copy(df, sf)
 	if err != nil {
