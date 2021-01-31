@@ -526,6 +526,26 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		})
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterIPAllocatorAPI) {
+		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-allocator-garbage-collector", func(hookContext genericapiserver.PostStartHookContext) error {
+			kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
+			if err != nil {
+				return err
+			}
+			controller := lease.NewController(
+				clock.RealClock{},
+				kubeClient,
+				m.GenericAPIServer.APIServerID,
+				int32(c.ExtraConfig.IdentityLeaseDurationSeconds),
+				nil,
+				time.Duration(c.ExtraConfig.IdentityLeaseRenewIntervalSeconds)*time.Second,
+				metav1.NamespaceSystem,
+				labelAPIServerHeartbeat)
+			go controller.Run(wait.NeverStop)
+			return nil
+		})
+	}
+
 	return m, nil
 }
 
