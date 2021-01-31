@@ -45,12 +45,6 @@ func TestCreateNamespace(t *testing.T) {
 			},
 			expectErr: false,
 		},
-		"create_with_nil_name": {
-			options: &NamespaceOptions{
-				Name: nil,
-			},
-			expectErr: true,
-		},
 		"create_with_empty_name": {
 			options: &NamespaceOptions{
 				Name: "",
