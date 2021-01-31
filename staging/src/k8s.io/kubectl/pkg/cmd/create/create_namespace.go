@@ -85,6 +85,7 @@ func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 		Example:               namespaceExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -172,7 +173,7 @@ func (o *NamespaceOptions) Run() error {
 
 // createNamespace outputs a namespace object using the configured fields
 func (o *NamespaceOptions) createNamespace() (*corev1.Namespace, error) {
-	if err := o.validate(); err != nil {
+	if err := o.Validate(); err != nil {
 		return nil, err
 	}
 	namespace := &corev1.Namespace{
@@ -182,8 +183,8 @@ func (o *NamespaceOptions) createNamespace() (*corev1.Namespace, error) {
 	return namespace, nil
 }
 
-// validate validates required fields are set to support structured generation
-func (o *NamespaceOptions) validate() error {
+// Validate validates required fields are set to support structured generation
+func (o *NamespaceOptions) Validate() error {
 	if len(o.Name) == 0 {
 		return fmt.Errorf("name must be specified")
 	}
