@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"math"
 	"math/big"
 
 	inf "gopkg.in/inf.v0"
@@ -41,16 +42,16 @@ var (
 	decOne  = inf.NewDec(1, 0)
 
 	// Largest (in magnitude) number allowed.
-	maxAllowed = infDecAmount{inf.NewDec((1<<63)-1, 0)} // == max int64
+	maxAllowed = infDecAmount{inf.NewDec(mostPositive, 0)} // == max int64
 
 	// The maximum value we can represent milli-units for.
 	// Compare with the return value of Quantity.Value() to
 	// see if it's safe to use Quantity.MilliValue().
-	MaxMilliValue = int64(((1 << 63) - 1) / 1000)
+	MaxMilliValue = int64(mostPositive / 1000)
 )
 
-const mostNegative = -(mostPositive + 1)
-const mostPositive = 1<<63 - 1
+const mostNegative = math.MinInt64
+const mostPositive = math.MaxInt64
 
 // int64Add returns a+b, or false if that would overflow int64.
 func int64Add(a, b int64) (int64, bool) {
