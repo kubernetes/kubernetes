@@ -26,10 +26,11 @@ import (
 
 func TestCreateNamespace(t *testing.T) {
 	tests := map[string]struct {
-		options  *NamespaceOptions
-		expected *corev1.Namespace
+		options   *NamespaceOptions
+		expected  *corev1.Namespace
+		expectErr bool
 	}{
-		"namespace": {
+		"success_create": {
 			options: &NamespaceOptions{
 				Name: "my-namespace",
 			},
@@ -42,14 +43,35 @@ func TestCreateNamespace(t *testing.T) {
 					Name: "my-namespace",
 				},
 			},
+			expectErr: false,
+		},
+		"create_with_nil_name": {
+			options: &NamespaceOptions{
+				Name: nil,
+			},
+			expectErr: true,
+		},
+		"create_with_empty_name": {
+			options: &NamespaceOptions{
+				Name: "",
+			},
+			expectErr: true,
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			namespace, err := tc.options.createNamespace()
-			if err != nil {
-				t.Errorf("unexpected error:\n%#v\n", err)
-				return
+			switch {
+			case tc.expectErr && err != nil:
+				return // loop, since there's no output to check
+			case tc.expectErr && err == nil:
+				t.Errorf("%v: expected error and didn't get one", name)
+				return // loop, no expected output object
+			case !tc.expectErr && err != nil:
+				t.Errorf("%v: unexpected error %v", name, err)
+				return // loop, no output object
+			case !tc.expectErr && err == nil:
+				// do nothing and drop through
 			}
 			if !apiequality.Semantic.DeepEqual(namespace, tc.expected) {
 				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, namespace)
