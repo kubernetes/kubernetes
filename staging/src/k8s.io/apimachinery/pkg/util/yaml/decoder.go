@@ -343,6 +343,12 @@ func GuessJSONStream(r io.Reader, size int) (io.Reader, []byte, bool) {
 	return buffer, b, hasJSONPrefix(b)
 }
 
+// IsJSONBuffer scans the provided buffer, looking
+// for an open brace indicating this is JSON.
+func IsJSONBuffer(buf []byte) bool {
+	return hasJSONPrefix(buf)
+}
+
 var jsonPrefix = []byte("{")
 
 // hasJSONPrefix returns true if the provided buffer appears to start with

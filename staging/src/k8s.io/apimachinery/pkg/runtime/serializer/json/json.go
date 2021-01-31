@@ -333,13 +333,12 @@ func (s *Serializer) Identifier() runtime.Identifier {
 }
 
 // RecognizesData implements the RecognizingDecoder interface.
-func (s *Serializer) RecognizesData(peek io.Reader) (ok, unknown bool, err error) {
+func (s *Serializer) RecognizesData(data []byte) (ok, unknown bool, err error) {
 	if s.options.Yaml {
 		// we could potentially look for '---'
 		return false, true, nil
 	}
-	_, _, ok = utilyaml.GuessJSONStream(peek, 2048)
-	return ok, false, nil
+	return utilyaml.IsJSONBuffer(data), false, nil
 }
 
 // Framer is the default JSON framing behavior, with newlines delimiting individual objects.
