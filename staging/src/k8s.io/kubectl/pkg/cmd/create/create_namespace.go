@@ -50,7 +50,7 @@ type NamespaceOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	// Name of resource being created
 	Name string
-	// StructuredGenerator is the resource generator for the object being created
+
 	DryRunStrategy   cmdutil.DryRunStrategy
 	DryRunVerifier   *resource.DryRunVerifier
 	CreateAnnotation bool
