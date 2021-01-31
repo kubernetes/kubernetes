@@ -220,6 +220,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/controlplane/controller/apiserverleasegc:all-srcs",
+        "//pkg/controlplane/controller/apiserversllocationgc:all-srcs",
         "//pkg/controlplane/controller/clusterauthenticationtrust:all-srcs",
         "//pkg/controlplane/controller/crdregistration:all-srcs",
         "//pkg/controlplane/reconcilers:all-srcs",

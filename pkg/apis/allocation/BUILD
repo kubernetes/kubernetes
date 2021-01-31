@@ -30,7 +30,6 @@ filegroup(
         ":package-srcs",
         "//pkg/apis/allocation/fuzzer:all-srcs",
         "//pkg/apis/allocation/install:all-srcs",
-        "//pkg/apis/allocation/util:all-srcs",
         "//pkg/apis/allocation/v1alpha1:all-srcs",
         "//pkg/apis/allocation/validation:all-srcs",
     ],

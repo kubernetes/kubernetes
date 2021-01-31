@@ -6,7 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/allocation",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/allocation/util:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//staging/src/k8s.io/api/allocation/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
