@@ -357,7 +357,7 @@ func (kl *Kubelet) getMountedVolumePathListFromDisk(podUID types.UID) ([]string,
 	return mountedVolumes, nil
 }
 
-// podVolumesSubpathsDirExists returns a list of the volume-subpath paths by reading the
+// getPodVolumeSubpathListFromDisk returns a list of the volume-subpath paths by reading the
 // subpath directories for the given pod from the disk.
 func (kl *Kubelet) getPodVolumeSubpathListFromDisk(podUID types.UID) ([]string, error) {
 	volumes := []string{}
