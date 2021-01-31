@@ -56,7 +56,7 @@ func (util *portworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 		return "", 0, nil, err
 	}
 
-	klog.Infof("Creating Portworx volume for PVC: %v", p.options.PVC.Name)
+	klog.InfoS("Creating Portworx volume for PVC", "PVCName", p.options.PVC.Name)
 
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Portworx Volumes are specified in GiB
@@ -113,7 +113,7 @@ func (util *portworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 		return "", 0, nil, err
 	}
 
-	klog.Infof("Successfully created Portworx volume for PVC: %v", p.options.PVC.Name)
+	klog.InfoS("Successfully created Portworx volume for PVC", "PVCName", p.options.PVC.Name)
 	return volumeID, requestGiB, nil, err
 }
 
@@ -305,11 +305,11 @@ func (util *portworxVolumeUtil) getPortworxDriver(volumeHost volume.VolumeHost) 
 			return nil, err
 		}
 
-		klog.Infof("Using portworx cluster service at: %v:%d as api endpoint",
-			svc.Spec.ClusterIP, osdMgmtDefaultPort)
+		klog.InfoS("Using portworx cluster service as api endpoint",
+			"ip", svc.Spec.ClusterIP, "port", osdMgmtDefaultPort)
 	} else {
-		klog.Infof("Using portworx service at: %v:%d as api endpoint",
-			volumeHost.GetHostName(), osdMgmtDefaultPort)
+		klog.InfoS("Using portworx service as api endpoint",
+			"ip", volumeHost.GetHostName(), "port", osdMgmtDefaultPort)
 	}
 
 	return volumeclient.VolumeDriver(util.portworxClient), nil
@@ -340,8 +340,8 @@ func (util *portworxVolumeUtil) getLocalPortworxDriver(volumeHost volume.VolumeH
 		return nil, err
 	}
 
-	klog.Infof("Using portworx local service at: %v:%d as api endpoint",
-		volumeHost.GetHostName(), osgMgmtPort)
+	klog.InfoS("Using portworx local service as api endpoint",
+		"ip", volumeHost.GetHostName(), "port", osgMgmtPort)
 	return volumeclient.VolumeDriver(util.portworxClient), nil
 }
 
