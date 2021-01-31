@@ -50,8 +50,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 
 			ipBytes := ipLen[c.Rand.Intn(2)]
 			ip := generateRandomIP(ipBytes, c)
-			obj.Name = big.NewInt(0).SetBytes(ip.To16()).String()
-			obj.Spec.Address = ip.String()
+			obj.Name = ip.String()
 		},
 	}
 }
