@@ -29,9 +29,8 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 option go_package = "v1alpha1";
 
 // IPAddress represents an IP used by Kubernetes associated to an IPRange.
-// The name of the object is the IP address decimal number, because colons
-// are not allowed and IPv6 addresses have different text representations.
-// xref: https://tools.ietf.org/html/rfc4291
+// The name of the object is canonicalized to the RFC5952 IP address format.
+// xref: https://tools.ietf.org/html/rfc5952
 message IPAddress {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
@@ -53,12 +52,9 @@ message IPAddressList {
 
 // IPAddressSpec describe the attributes in an IP Address,
 message IPAddressSpec {
-  // Address is the text representation of the IP Address.
-  optional string address = 1;
-
   // IPRangeRef references the IPRange associated to this IP Address.
   // All IP addresses has to be associated to one IPRange allocator.
-  optional IPRangeRef ipRangeRef = 2;
+  optional IPRangeRef ipRangeRef = 1;
 }
 
 // IPAddressStatus defines the observed state of IPAddress.

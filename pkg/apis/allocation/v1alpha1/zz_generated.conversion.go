@@ -184,7 +184,6 @@ func Convert_allocation_IPAddressList_To_v1alpha1_IPAddressList(in *allocation.I
 }
 
 func autoConvert_v1alpha1_IPAddressSpec_To_allocation_IPAddressSpec(in *v1alpha1.IPAddressSpec, out *allocation.IPAddressSpec, s conversion.Scope) error {
-	out.Address = in.Address
 	if err := Convert_v1alpha1_IPRangeRef_To_allocation_IPRangeRef(&in.IPRangeRef, &out.IPRangeRef, s); err != nil {
 		return err
 	}
@@ -197,7 +196,6 @@ func Convert_v1alpha1_IPAddressSpec_To_allocation_IPAddressSpec(in *v1alpha1.IPA
 }
 
 func autoConvert_allocation_IPAddressSpec_To_v1alpha1_IPAddressSpec(in *allocation.IPAddressSpec, out *v1alpha1.IPAddressSpec, s conversion.Scope) error {
-	out.Address = in.Address
 	if err := Convert_allocation_IPRangeRef_To_v1alpha1_IPRangeRef(&in.IPRangeRef, &out.IPRangeRef, s); err != nil {
 		return err
 	}
@@ -309,6 +307,7 @@ func Convert_allocation_IPRangeRef_To_v1alpha1_IPRangeRef(in *allocation.IPRange
 
 func autoConvert_v1alpha1_IPRangeSpec_To_allocation_IPRangeSpec(in *v1alpha1.IPRangeSpec, out *allocation.IPRangeSpec, s conversion.Scope) error {
 	out.Range = in.Range
+	out.Primary = in.Primary
 	return nil
 }
 
@@ -319,6 +318,7 @@ func Convert_v1alpha1_IPRangeSpec_To_allocation_IPRangeSpec(in *v1alpha1.IPRange
 
 func autoConvert_allocation_IPRangeSpec_To_v1alpha1_IPRangeSpec(in *allocation.IPRangeSpec, out *v1alpha1.IPRangeSpec, s conversion.Scope) error {
 	out.Range = in.Range
+	out.Primary = in.Primary
 	return nil
 }
 

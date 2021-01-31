@@ -13,7 +13,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/allocation:go_default_library",
-        "//pkg/apis/allocation/util:go_default_library",
         "//staging/src/k8s.io/api/allocation/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -25,14 +24,7 @@ go_test(
     name = "go_default_test",
     srcs = ["defaults_test.go"],
     embed = [":go_default_library"],
-    deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/allocation/install:go_default_library",
-        "//staging/src/k8s.io/api/allocation/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
-    ],
+    deps = ["//pkg/apis/allocation/install:go_default_library"],
 )
 
 filegroup(

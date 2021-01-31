@@ -28,7 +28,7 @@ package v1alpha1
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_IPAddress = map[string]string{
-	"": "IPAddress represents an IP used by Kubernetes associated to an IPRange. The name of the object is the IP address decimal number, because colons are not allowed and IPv6 addresses have different text representations. xref: https://tools.ietf.org/html/rfc4291",
+	"": "IPAddress represents an IP used by Kubernetes associated to an IPRange. The name of the object is canonicalized to the RFC5952 IP address format. xref: https://tools.ietf.org/html/rfc5952",
 }
 
 func (IPAddress) SwaggerDoc() map[string]string {
@@ -45,7 +45,6 @@ func (IPAddressList) SwaggerDoc() map[string]string {
 
 var map_IPAddressSpec = map[string]string{
 	"":           "IPAddressSpec describe the attributes in an IP Address,",
-	"address":    "Address is the text representation of the IP Address.",
 	"ipRangeRef": "IPRangeRef references the IPRange associated to this IP Address. All IP addresses has to be associated to one IPRange allocator.",
 }
 
