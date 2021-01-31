@@ -43,7 +43,7 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 		if m.isDevicePluginResource(resource) {
 			// Only consider devices that actually container topology information.
 			if aligned := m.deviceHasTopologyAlignment(resource); !aligned {
-				klog.Infof("[devicemanager] Resource '%v' does not have a topology preference", resource)
+				klog.InfoS("[devicemanager] Resource does not have a topology preference", "resourceName", resource)
 				deviceHints[resource] = nil
 				continue
 			}
@@ -58,7 +58,7 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 					deviceHints[resource] = []topologymanager.TopologyHint{}
 					continue
 				}
-				klog.Infof("[devicemanager] Regenerating TopologyHints for resource '%v' already allocated to (pod %v, container %v)", resource, format.Pod(pod), container.Name)
+				klog.InfoS("[devicemanager] Regenerating TopologyHints for resource already allocated to pod", "resourceName", resource, "podName", format.Pod(pod), "containerName", container.Name)
 				deviceHints[resource] = m.generateDeviceTopologyHints(resource, allocated, sets.String{}, requested)
 				continue
 			}
@@ -93,7 +93,7 @@ func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymana
 	for resource, requested := range accumulatedResourceRequests {
 		// Only consider devices that actually contain topology information.
 		if aligned := m.deviceHasTopologyAlignment(resource); !aligned {
-			klog.Infof("[devicemanager] Resource '%v' does not have a topology preference", resource)
+			klog.InfoS("[devicemanager] Resource does not have a topology preference", "resourceName", resource)
 			deviceHints[resource] = nil
 			continue
 		}
@@ -108,7 +108,7 @@ func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymana
 				deviceHints[resource] = []topologymanager.TopologyHint{}
 				continue
 			}
-			klog.Infof("[devicemanager] Regenerating TopologyHints for resource '%v' already allocated to (pod %v)", resource, format.Pod(pod))
+			klog.InfoS("[devicemanager] Regenerating TopologyHints for resource already allocated to pod", "resourceName", resource, "podName", format.Pod(pod))
 			deviceHints[resource] = m.generateDeviceTopologyHints(resource, allocated, sets.String{}, requested)
 			continue
 		}
