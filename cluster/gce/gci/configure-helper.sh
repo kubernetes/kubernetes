@@ -1982,6 +1982,12 @@ function run-kube-controller-manager-as-non-root {
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
 function start-kube-controller-manager {
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    if ! deploy-kube-controller-manager-via-kube-up; then
+      echo "kube-controller-manager is configured to not be deployed through kube-up."
+      return
+    fi
+  fi
   echo "Start kubernetes controller-manager"
   create-kubeconfig "kube-controller-manager" "${KUBE_CONTROLLER_MANAGER_TOKEN}"
   prepare-log-file /var/log/kube-controller-manager.log
@@ -2090,9 +2096,11 @@ function start-kube-controller-manager {
 # Assumed vars (which are calculated in compute-master-manifest-variables)
 #   DOCKER_REGISTRY
 function start-kube-scheduler {
-  if [[ "${KUBE_SCHEDULER_CRP:-}" == "true" ]]; then
-    echo "kube-scheduler is configured to be deployed through CRP."
-    return
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    if ! deploy-kube-scheduler-via-kube-up; then
+      echo "kube-scheduler is configured to not be deployed through kube-up."
+      return
+    fi
   fi
   echo "Start kubernetes scheduler"
   create-kubeconfig "kube-scheduler" "${KUBE_SCHEDULER_TOKEN}"

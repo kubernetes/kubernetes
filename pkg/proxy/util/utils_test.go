@@ -17,10 +17,12 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
 	"reflect"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -928,4 +930,68 @@ func TestGetClusterIPByFamily(t *testing.T) {
 		})
 	}
 
+}
+
+func TestWriteLine(t *testing.T) {
+	testCases := []struct {
+		name     string
+		words    []string
+		expected string
+	}{
+		{
+			name:     "write no word",
+			words:    []string{},
+			expected: "",
+		},
+		{
+			name:     "write one word",
+			words:    []string{"test1"},
+			expected: "test1\n",
+		},
+		{
+			name:     "write multi word",
+			words:    []string{"test1", "test2", "test3"},
+			expected: "test1 test2 test3\n",
+		},
+	}
+	testBuffer := bytes.NewBuffer(nil)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testBuffer.Reset()
+			WriteLine(testBuffer, testCase.words...)
+			if !strings.EqualFold(testBuffer.String(), testCase.expected) {
+				t.Fatalf("write word is %v\n expected: %s, got: %s", testCase.words, testCase.expected, testBuffer.String())
+			}
+		})
+	}
+}
+
+func TestWriteBytesLine(t *testing.T) {
+	testCases := []struct {
+		name     string
+		bytes    []byte
+		expected string
+	}{
+		{
+			name:     "empty bytes",
+			bytes:    []byte{},
+			expected: "\n",
+		},
+		{
+			name:     "test bytes",
+			bytes:    []byte("test write bytes line"),
+			expected: "test write bytes line\n",
+		},
+	}
+
+	testBuffer := bytes.NewBuffer(nil)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testBuffer.Reset()
+			WriteBytesLine(testBuffer, testCase.bytes)
+			if !strings.EqualFold(testBuffer.String(), testCase.expected) {
+				t.Fatalf("write word is %v\n expected: %s, got: %s", testCase.bytes, testCase.expected, testBuffer.String())
+			}
+		})
+	}
 }

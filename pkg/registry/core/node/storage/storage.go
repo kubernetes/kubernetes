@@ -88,7 +88,6 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 		CreateStrategy: node.Strategy,
 		UpdateStrategy: node.Strategy,
 		DeleteStrategy: node.Strategy,
-		ExportStrategy: node.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}

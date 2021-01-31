@@ -177,8 +177,8 @@ func (d *DiffProgram) getCommand(args ...string) (string, exec.Cmd) {
 		diff = diffCommand[0]
 
 		if len(diffCommand) > 1 {
-			// Regex accepts: Alphanumeric (case-insensitive) and dash
-			isValidChar := regexp.MustCompile(`^[a-zA-Z0-9-]+$`).MatchString
+			// Regex accepts: Alphanumeric (case-insensitive), dash and equal
+			isValidChar := regexp.MustCompile(`^[a-zA-Z0-9-=]+$`).MatchString
 			for i := 1; i < len(diffCommand); i++ {
 				if isValidChar(diffCommand[i]) {
 					args = append(args, diffCommand[i])

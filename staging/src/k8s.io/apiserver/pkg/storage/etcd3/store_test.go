@@ -226,7 +226,6 @@ func TestGet(t *testing.T) {
 		expectRVTooLarge  bool
 		expectedOut       *example.Pod
 		rv                string
-		expectedRV        string
 	}{{ // test get on existing item
 		name:              "get existing",
 		key:               key,
@@ -286,11 +285,6 @@ func TestGet(t *testing.T) {
 					t.Errorf("expecting resource version too high error, but get: %v", err)
 				}
 				return
-			}
-			if tt.expectedRV != "" {
-				if tt.expectedRV != out.ResourceVersion {
-					t.Errorf("expecting resource version want=%s, got=%s", tt.expectedRV, out.ResourceVersion)
-				}
 			}
 			if err != nil {
 				t.Fatalf("Get failed: %v", err)

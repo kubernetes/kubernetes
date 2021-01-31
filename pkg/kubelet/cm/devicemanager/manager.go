@@ -940,9 +940,9 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 	podUID := string(pod.UID)
 	contName := container.Name
 	needsReAllocate := false
-	for k := range container.Resources.Limits {
+	for k, v := range container.Resources.Limits {
 		resource := string(k)
-		if !m.isDevicePluginResource(resource) {
+		if !m.isDevicePluginResource(resource) || v.Value() == 0 {
 			continue
 		}
 		err := m.callPreStartContainerIfNeeded(podUID, contName, resource)

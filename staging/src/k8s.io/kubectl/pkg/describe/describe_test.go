@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -1694,30 +1695,370 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 }
 
 func TestDescribeDeployment(t *testing.T) {
-	fakeClient := fake.NewSimpleClientset(&appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bar",
-			Namespace: "foo",
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: utilpointer.Int32Ptr(1),
-			Selector: &metav1.LabelSelector{},
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{Image: "mytest-image:latest"},
+	labels := map[string]string{"k8s-app": "bar"}
+	testCases := []struct {
+		name    string
+		objects []runtime.Object
+		expects []string
+	}{
+		{
+			name: "deployment with two mounted volumes",
+			objects: []runtime.Object{
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "bar",
+						Namespace:         "foo",
+						Labels:            labels,
+						UID:               "00000000-0000-0000-0000-000000000001",
+						CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+					},
+					Spec: appsv1.DeploymentSpec{
+						Replicas: utilpointer.Int32Ptr(1),
+						Selector: &metav1.LabelSelector{
+							MatchLabels: labels,
+						},
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "bar",
+								Namespace: "foo",
+								Labels:    labels,
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Image: "mytest-image:latest",
+										VolumeMounts: []corev1.VolumeMount{
+											{
+												Name:      "vol-foo",
+												MountPath: "/tmp/vol-foo",
+											}, {
+												Name:      "vol-bar",
+												MountPath: "/tmp/vol-bar",
+											},
+										},
+									},
+								},
+								Volumes: []corev1.Volume{
+									{
+										Name:         "vol-foo",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+									{
+										Name:         "vol-bar",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+								},
+							},
+						},
+					},
+				}, &appsv1.ReplicaSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-001",
+						Namespace: "foo",
+						Labels:    labels,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Controller: utilpointer.BoolPtr(true),
+								UID:        "00000000-0000-0000-0000-000000000001",
+							},
+						},
+					},
+					Spec: appsv1.ReplicaSetSpec{
+						Replicas: utilpointer.Int32Ptr(1),
+						Selector: &metav1.LabelSelector{
+							MatchLabels: labels,
+						},
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "bar",
+								Namespace: "foo",
+								Labels:    labels,
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Image: "mytest-image:latest",
+										VolumeMounts: []corev1.VolumeMount{
+											{
+												Name:      "vol-foo",
+												MountPath: "/tmp/vol-foo",
+											}, {
+												Name:      "vol-bar",
+												MountPath: "/tmp/vol-bar",
+											},
+										},
+									},
+								},
+								Volumes: []corev1.Volume{
+									{
+										Name:         "vol-foo",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+									{
+										Name:         "vol-bar",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+								},
+							},
+						},
+					},
+					Status: appsv1.ReplicaSetStatus{
+						Replicas:          1,
+						ReadyReplicas:     1,
+						AvailableReplicas: 1,
 					},
 				},
 			},
+			expects: []string{
+				"Name:               bar\nNamespace:          foo",
+				"CreationTimestamp:  Fri, 01 Jan 2021 00:00:00 +0000",
+				"Labels:             k8s-app=bar",
+				"Selector:           k8s-app=bar",
+				"Replicas:           1 desired | 0 updated | 0 total | 0 available | 0 unavailable",
+				"Image:        mytest-image:latest",
+				"Mounts:\n      /tmp/vol-bar from vol-bar (rw)\n      /tmp/vol-foo from vol-foo (rw)",
+				"OldReplicaSets:  <none>",
+				"NewReplicaSet:   bar-001 (1/1 replicas created)",
+				"Events:          <none>",
+			},
 		},
-	})
-	d := DeploymentDescriber{fakeClient}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		{
+			name: "deployment during the process of rolling out",
+			objects: []runtime.Object{
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "bar",
+						Namespace:         "foo",
+						Labels:            labels,
+						UID:               "00000000-0000-0000-0000-000000000001",
+						CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+					},
+					Spec: appsv1.DeploymentSpec{
+						Replicas: utilpointer.Int32Ptr(2),
+						Selector: &metav1.LabelSelector{
+							MatchLabels: labels,
+						},
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "bar",
+								Namespace: "foo",
+								Labels:    labels,
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Image: "mytest-image:v2.0",
+										VolumeMounts: []corev1.VolumeMount{
+											{
+												Name:      "vol-foo",
+												MountPath: "/tmp/vol-foo",
+											}, {
+												Name:      "vol-bar",
+												MountPath: "/tmp/vol-bar",
+											},
+										},
+									},
+								},
+								Volumes: []corev1.Volume{
+									{
+										Name:         "vol-foo",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+									{
+										Name:         "vol-bar",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+								},
+							},
+						},
+					},
+					Status: appsv1.DeploymentStatus{
+						Replicas:            3,
+						UpdatedReplicas:     1,
+						AvailableReplicas:   2,
+						UnavailableReplicas: 1,
+					},
+				}, &appsv1.ReplicaSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-001",
+						Namespace: "foo",
+						Labels:    labels,
+						UID:       "00000000-0000-0000-0000-000000000001",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Controller: utilpointer.BoolPtr(true),
+								UID:        "00000000-0000-0000-0000-000000000001",
+							},
+						},
+					},
+					Spec: appsv1.ReplicaSetSpec{
+						Replicas: utilpointer.Int32Ptr(2),
+						Selector: &metav1.LabelSelector{
+							MatchLabels: labels,
+						},
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "bar",
+								Namespace: "foo",
+								Labels:    labels,
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Image: "mytest-image:v1.0",
+										VolumeMounts: []corev1.VolumeMount{
+											{
+												Name:      "vol-foo",
+												MountPath: "/tmp/vol-foo",
+											}, {
+												Name:      "vol-bar",
+												MountPath: "/tmp/vol-bar",
+											},
+										},
+									},
+								},
+								Volumes: []corev1.Volume{
+									{
+										Name:         "vol-foo",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+									{
+										Name:         "vol-bar",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+								},
+							},
+						},
+					},
+					Status: appsv1.ReplicaSetStatus{
+						Replicas:          2,
+						ReadyReplicas:     2,
+						AvailableReplicas: 2,
+					},
+				}, &appsv1.ReplicaSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-002",
+						Namespace: "foo",
+						Labels:    labels,
+						UID:       "00000000-0000-0000-0000-000000000002",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Controller: utilpointer.BoolPtr(true),
+								UID:        "00000000-0000-0000-0000-000000000001",
+							},
+						},
+					},
+					Spec: appsv1.ReplicaSetSpec{
+						Replicas: utilpointer.Int32Ptr(1),
+						Selector: &metav1.LabelSelector{
+							MatchLabels: labels,
+						},
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "bar",
+								Namespace: "foo",
+								Labels:    labels,
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Image: "mytest-image:v2.0",
+										VolumeMounts: []corev1.VolumeMount{
+											{
+												Name:      "vol-foo",
+												MountPath: "/tmp/vol-foo",
+											}, {
+												Name:      "vol-bar",
+												MountPath: "/tmp/vol-bar",
+											},
+										},
+									},
+								},
+								Volumes: []corev1.Volume{
+									{
+										Name:         "vol-foo",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+									{
+										Name:         "vol-bar",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+								},
+							},
+						},
+					},
+					Status: appsv1.ReplicaSetStatus{
+						Replicas:          1,
+						ReadyReplicas:     0,
+						AvailableReplicas: 1,
+					},
+				}, &corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-001",
+						Namespace: "foo",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "bar",
+						Namespace:  "foo",
+						UID:        "00000000-0000-0000-0000-000000000001",
+					},
+					Type:    corev1.EventTypeNormal,
+					Reason:  "ScalingReplicaSet",
+					Message: "Scaled up replica set bar-001 to 2",
+					Source: corev1.EventSource{
+						Component: "deployment-controller",
+					},
+					FirstTimestamp: metav1.NewTime(time.Now().Add(-10 * time.Minute)),
+				}, &corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-002",
+						Namespace: "foo",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "bar",
+						Namespace:  "foo",
+						UID:        "00000000-0000-0000-0000-000000000001",
+					},
+					Type:    corev1.EventTypeNormal,
+					Reason:  "ScalingReplicaSet",
+					Message: "Scaled up replica set bar-002 to 1",
+					Source: corev1.EventSource{
+						Component: "deployment-controller",
+					},
+					FirstTimestamp: metav1.NewTime(time.Now().Add(-2 * time.Minute)),
+				},
+			},
+			expects: []string{
+				"Replicas:           2 desired | 1 updated | 3 total | 2 available | 1 unavailable",
+				"Image:        mytest-image:v2.0",
+				"OldReplicaSets:  bar-001 (2/2 replicas created)",
+				"NewReplicaSet:   bar-002 (1/1 replicas created)",
+				"Events:\n",
+				"Normal  ScalingReplicaSet  10m   deployment-controller  Scaled up replica set bar-001 to 2",
+				"Normal  ScalingReplicaSet  2m    deployment-controller  Scaled up replica set bar-002 to 1",
+			},
+		},
 	}
-	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") || !strings.Contains(out, "Containers:") || !strings.Contains(out, "mytest-image:latest") {
-		t.Errorf("unexpected out: %s", out)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset(testCase.objects...)
+			d := DeploymentDescriber{fakeClient}
+			out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			for _, expect := range testCase.expects {
+				if !strings.Contains(out, expect) {
+					t.Errorf("expected to find \"%s\" in:\n %s", expect, out)
+				}
+			}
+
+		})
 	}
 }
 

@@ -34,6 +34,6 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Time,Time
 API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,ContentEncoding
 API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,ContentType
 API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,Raw
-API rule violation: names_match,k8s.io/code-generator/_examples/apiserver/apis/example/v1,TestTypeStatus,Blah
-API rule violation: names_match,k8s.io/code-generator/_examples/apiserver/apis/example2/v1,TestTypeStatus,Blah
-API rule violation: names_match,k8s.io/code-generator/_examples/apiserver/apis/example3.io/v1,TestTypeStatus,Blah
+API rule violation: names_match,k8s.io/code-generator/examples/apiserver/apis/example/v1,TestTypeStatus,Blah
+API rule violation: names_match,k8s.io/code-generator/examples/apiserver/apis/example2/v1,TestTypeStatus,Blah
+API rule violation: names_match,k8s.io/code-generator/examples/apiserver/apis/example3.io/v1,TestTypeStatus,Blah

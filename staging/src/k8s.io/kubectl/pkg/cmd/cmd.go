@@ -554,7 +554,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 				proxy.NewCmdProxy(f, ioStreams),
 				cp.NewCmdCp(f, ioStreams),
 				auth.NewCmdAuth(f, ioStreams),
-				debug.NewCmdDebug(f, ioStreams, false),
+				debug.NewCmdDebug(f, ioStreams),
 			},
 		},
 		{

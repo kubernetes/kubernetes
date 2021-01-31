@@ -976,6 +976,21 @@ func TestDevicePreStartContainer(t *testing.T) {
 	as.Equal(len(runContainerOpts.Devices), len(expectedResp.Devices))
 	as.Equal(len(runContainerOpts.Mounts), len(expectedResp.Mounts))
 	as.Equal(len(runContainerOpts.Envs), len(expectedResp.Envs))
+
+	pod2 := makePod(v1.ResourceList{
+		v1.ResourceName(res1.resourceName): *resource.NewQuantity(int64(0), resource.DecimalSI)})
+	activePods = append(activePods, pod2)
+	podsStub.updateActivePods(activePods)
+	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
+	as.Nil(err)
+	_, err = testManager.GetDeviceRunContainerOptions(pod2, &pod2.Spec.Containers[0])
+	as.Nil(err)
+	select {
+	case <-time.After(time.Millisecond):
+		t.Log("When pod resourceQuantity is 0,  PreStartContainer RPC stub will be skipped")
+	case <-ch:
+		break
+	}
 }
 
 func TestResetExtendedResource(t *testing.T) {

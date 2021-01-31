@@ -24,6 +24,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
@@ -442,6 +443,148 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		}
 		if gotDeletions != test.expectedDeletions {
 			t.Errorf("expect %v old replica sets been deleted, but got %v", test.expectedDeletions, gotDeletions)
+			continue
+		}
+	}
+}
+
+func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
+	selector := map[string]string{"foo": "bar"}
+	now := metav1.Now()
+	duration := time.Minute
+
+	newRSWithRevisionAndCreationTimestamp := func(name string, replicas int, selector map[string]string, timestamp time.Time, revision string) *apps.ReplicaSet {
+		rs := rs(name, replicas, selector, metav1.NewTime(timestamp))
+		if revision != "" {
+			rs.Annotations = map[string]string{
+				deploymentutil.RevisionAnnotation: revision,
+			}
+		}
+		rs.Status = apps.ReplicaSetStatus{
+			Replicas: int32(replicas),
+		}
+		return rs
+	}
+
+	// for all test cases, creationTimestamp order keeps as: rs1 < rs2 < rs3 < r4
+	tests := []struct {
+		oldRSs               []*apps.ReplicaSet
+		revisionHistoryLimit int32
+		expectedDeletedRSs   sets.String
+	}{
+		{
+			// revision order: rs1 < rs2, delete rs1
+			oldRSs: []*apps.ReplicaSet{
+				newRSWithRevisionAndCreationTimestamp("foo-1", 0, selector, now.Add(-1*duration), "1"),
+				newRSWithRevisionAndCreationTimestamp("foo-2", 0, selector, now.Time, "2"),
+			},
+			revisionHistoryLimit: 1,
+			expectedDeletedRSs:   sets.NewString("foo-1"),
+		},
+		{
+			// revision order: rs2 < rs1, delete rs2
+			oldRSs: []*apps.ReplicaSet{
+				newRSWithRevisionAndCreationTimestamp("foo-1", 0, selector, now.Add(-1*duration), "2"),
+				newRSWithRevisionAndCreationTimestamp("foo-2", 0, selector, now.Time, "1"),
+			},
+			revisionHistoryLimit: 1,
+			expectedDeletedRSs:   sets.NewString("foo-2"),
+		},
+		{
+			// rs1 has revision but rs2 doesn't have revision, delete rs2
+			oldRSs: []*apps.ReplicaSet{
+				newRSWithRevisionAndCreationTimestamp("foo-1", 0, selector, now.Add(-1*duration), "1"),
+				newRSWithRevisionAndCreationTimestamp("foo-2", 0, selector, now.Time, ""),
+			},
+			revisionHistoryLimit: 1,
+			expectedDeletedRSs:   sets.NewString("foo-2"),
+		},
+		{
+			// rs1 doesn't have revision while rs2 has revision, delete rs1
+			oldRSs: []*apps.ReplicaSet{
+				newRSWithRevisionAndCreationTimestamp("foo-1", 0, selector, now.Add(-1*duration), ""),
+				newRSWithRevisionAndCreationTimestamp("foo-2", 0, selector, now.Time, "2"),
+			},
+			revisionHistoryLimit: 1,
+			expectedDeletedRSs:   sets.NewString("foo-1"),
+		},
+		{
+			// revision order: rs1 < rs2 < r3, but rs1 has replicas, delete rs2
+			oldRSs: []*apps.ReplicaSet{
+				newRSWithRevisionAndCreationTimestamp("foo-1", 1, selector, now.Add(-1*duration), "1"),
+				newRSWithRevisionAndCreationTimestamp("foo-2", 0, selector, now.Time, "2"),
+				newRSWithRevisionAndCreationTimestamp("foo-3", 0, selector, now.Add(duration), "3"),
+			},
+			revisionHistoryLimit: 1,
+			expectedDeletedRSs:   sets.NewString("foo-2"),
+		},
+		{
+			// revision order: rs1 < rs2 < r3, both rs1 && rs2 have replicas, don't delete
+			oldRSs: []*apps.ReplicaSet{
+				newRSWithRevisionAndCreationTimestamp("foo-1", 1, selector, now.Add(-1*duration), "1"),
+				newRSWithRevisionAndCreationTimestamp("foo-2", 1, selector, now.Time, "2"),
+				newRSWithRevisionAndCreationTimestamp("foo-3", 0, selector, now.Add(duration), "3"),
+			},
+			revisionHistoryLimit: 1,
+			expectedDeletedRSs:   sets.NewString(),
+		},
+		{
+			// revision order: rs2 < rs4 < rs1 < rs3, delete rs2 && rs4
+			oldRSs: []*apps.ReplicaSet{
+				newRSWithRevisionAndCreationTimestamp("foo-1", 0, selector, now.Add(-1*duration), "3"),
+				newRSWithRevisionAndCreationTimestamp("foo-2", 0, selector, now.Time, "1"),
+				newRSWithRevisionAndCreationTimestamp("foo-3", 0, selector, now.Add(duration), "4"),
+				newRSWithRevisionAndCreationTimestamp("foo-4", 0, selector, now.Add(2*duration), "2"),
+			},
+			revisionHistoryLimit: 2,
+			expectedDeletedRSs:   sets.NewString("foo-2", "foo-4"),
+		},
+	}
+
+	for i := range tests {
+		test := tests[i]
+		t.Logf("scenario %d", i)
+
+		fake := &fake.Clientset{}
+		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
+		controller, err := NewDeploymentController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
+		if err != nil {
+			t.Fatalf("error creating Deployment controller: %v", err)
+		}
+
+		controller.eventRecorder = &record.FakeRecorder{}
+		controller.dListerSynced = alwaysReady
+		controller.rsListerSynced = alwaysReady
+		controller.podListerSynced = alwaysReady
+		for _, rs := range test.oldRSs {
+			informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs)
+		}
+
+		stopCh := make(chan struct{})
+		defer close(stopCh)
+		informers.Start(stopCh)
+
+		d := newDeployment("foo", 1, &test.revisionHistoryLimit, nil, nil, map[string]string{"foo": "bar"})
+		controller.cleanupDeployment(test.oldRSs, d)
+
+		deletedRSs := sets.String{}
+		for _, action := range fake.Actions() {
+			deleteAction, ok := action.(testclient.DeleteActionImpl)
+			if !ok {
+				t.Logf("Found not-delete action with verb %v. Ignoring.", action.GetVerb())
+				continue
+			}
+
+			if deleteAction.GetResource().Resource != "replicasets" {
+				continue
+			}
+
+			deletedRSs.Insert(deleteAction.GetName())
+		}
+		t.Logf("&test.revisionHistoryLimit: %d, &test.deletedReplicaSets: %v", test.revisionHistoryLimit, deletedRSs)
+
+		if !test.expectedDeletedRSs.Equal(deletedRSs) {
+			t.Errorf("expect to delete old replica sets %v, but got %v", test.expectedDeletedRSs, deletedRSs)
 			continue
 		}
 	}

@@ -433,7 +433,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 				kubeConfig := createKubeConfig(clusterConfig)
 				clientcmd.WriteToFile(*kubeConfig, tempFile.Name())
 				t.KubeConfig = tempFile.Name()
-				klog.Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
+				klog.V(4).Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
 			}
 		}
 		if len(t.KubeConfig) == 0 {
@@ -454,7 +454,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 		t.AllowedNotReadyNodes = t.CloudConfig.NumNodes / 100
 	}
 
-	klog.Infof("Tolerating taints %q when considering if nodes are ready", TestContext.NonblockingTaints)
+	klog.V(4).Infof("Tolerating taints %q when considering if nodes are ready", TestContext.NonblockingTaints)
 
 	// Make sure that all test runs have a valid TestContext.CloudConfig.Provider.
 	// TODO: whether and how long this code is needed is getting discussed

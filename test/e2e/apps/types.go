@@ -28,17 +28,8 @@ const (
 )
 
 var (
-	// CronJobGroupVersionResourceAlpha unambiguously identifies a resource of cronjob with alpha status
-	CronJobGroupVersionResourceAlpha = schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}
-
 	// CronJobGroupVersionResourceBeta unambiguously identifies a resource of cronjob with beta status
 	CronJobGroupVersionResourceBeta = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
-
-	// NautilusImage is the fully qualified URI to the Nautilus image
-	NautilusImage = imageutils.GetE2EImage(imageutils.Nautilus)
-
-	// KittenImage is the fully qualified URI to the Kitten image
-	KittenImage = imageutils.GetE2EImage(imageutils.Kitten)
 
 	// WebserverImage is the fully qualified URI to the Httpd image
 	WebserverImage = imageutils.GetE2EImage(imageutils.Httpd)

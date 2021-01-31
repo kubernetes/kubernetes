@@ -93,9 +93,6 @@ var (
 		# The container will run in the host namespaces and the host's filesystem will be mounted at /host
 		kubectl debug node/mynode -it --image=busybox
 `))
-
-	// TODO(verb): Remove deprecated alpha invocation in 1.21
-	deprecationNotice = i18n.T(`NOTE: "kubectl alpha debug" is deprecated and will be removed in release 1.21. Please use "kubectl debug" instead.`)
 )
 
 var nameSuffixFunc = utilrand.String
@@ -122,7 +119,6 @@ type DebugOptions struct {
 	TTY             bool
 
 	attachChanged         bool
-	deprecatedInvocation  bool
 	shareProcessedChanged bool
 
 	podClient corev1client.PodsGetter
@@ -141,7 +137,7 @@ func NewDebugOptions(streams genericclioptions.IOStreams) *DebugOptions {
 }
 
 // NewCmdDebug returns a cobra command that runs kubectl debug.
-func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams, deprecatedInvocation bool) *cobra.Command {
+func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewDebugOptions(streams)
 
 	cmd := &cobra.Command{
@@ -155,12 +151,6 @@ func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams, depreca
 			cmdutil.CheckErr(o.Validate(cmd))
 			cmdutil.CheckErr(o.Run(f, cmd))
 		},
-		Hidden: deprecatedInvocation,
-	}
-
-	o.deprecatedInvocation = deprecatedInvocation
-	if deprecatedInvocation {
-		cmd.Long = fmt.Sprintf("%s\n\n%s", deprecationNotice, debugLong)
 	}
 
 	addDebugFlags(cmd, o)
@@ -188,10 +178,6 @@ func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
 // Complete finishes run-time initialization of debug.DebugOptions.
 func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
-
-	if o.deprecatedInvocation {
-		cmd.Printf("%s\n\n", deprecationNotice)
-	}
 
 	o.PullPolicy = corev1.PullPolicy(cmdutil.GetFlagString(cmd, "image-pull-policy"))
 

@@ -174,6 +174,13 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		}
 		ginkgo.By(fmt.Sprintf("Create node foo by user: %v", asUser))
 		_, err := c.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+
+		// NOTE: If the test fails and a new node IS created, we need to delete it. If we don't, we'd have
+		// a zombie node in a NotReady state which will delay further tests since we're waiting for all
+		// tests to be in the Ready state.
+		defer func() {
+			f.ClientSet.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{})
+		}()
 		framework.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
