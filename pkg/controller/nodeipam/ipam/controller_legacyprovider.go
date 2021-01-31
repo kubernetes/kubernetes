@@ -111,7 +111,7 @@ func NewController(
 // registers the informers for node changes. This will start synchronization
 // of the node and cloud CIDR range allocations.
 func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
-	klog.V(0).Infof("Starting IPAM controller (config=%+v)", c.config)
+	klog.V(0).InfoS("Starting IPAM controller", "config", c.config)
 
 	nodes, err := listNodes(c.adapter.k8s)
 	if err != nil {
@@ -122,7 +122,7 @@ func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
 			_, cidrRange, err := net.ParseCIDR(node.Spec.PodCIDR)
 			if err == nil {
 				c.set.Occupy(cidrRange)
-				klog.V(3).Infof("Occupying CIDR for node %q (%v)", node.Name, node.Spec.PodCIDR)
+				klog.V(3).InfoS("Occupying CIDR for node", "nodeName", node.Name, "podCIDR", node.Spec.PodCIDR)
 			} else {
 				klog.Errorf("Node %q has an invalid CIDR (%q): %v", node.Name, node.Spec.PodCIDR, err)
 			}
