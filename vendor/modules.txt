@@ -228,9 +228,9 @@ github.com/clusterhq/flocker-go
 # github.com/codegangsta/negroni v1.0.0 => github.com/codegangsta/negroni v1.0.0
 ## explicit
 # github.com/codegangsta/negroni => github.com/codegangsta/negroni v1.0.0
-# github.com/container-storage-interface/spec v1.2.0 => github.com/container-storage-interface/spec v1.2.0
+# github.com/container-storage-interface/spec v1.3.0 => github.com/container-storage-interface/spec v1.3.0
 ## explicit
-# github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.2.0
+# github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.3.0
 github.com/container-storage-interface/spec/lib/go/csi
 # github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59 => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 # github.com/containerd/cgroups => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
@@ -355,10 +355,6 @@ github.com/docker/go-connections/tlsconfig
 ## explicit
 github.com/docker/go-units
 # github.com/docker/go-units => github.com/docker/go-units v0.4.0
-# github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96 => github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
-github.com/docker/spdystream
-# github.com/docker/spdystream => github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
-github.com/docker/spdystream/spdy
 # github.com/docopt/docopt-go => github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
 # github.com/dustin/go-humanize v1.0.0 => github.com/dustin/go-humanize v1.0.0
 github.com/dustin/go-humanize
@@ -412,9 +408,9 @@ github.com/go-bindata/go-bindata/go-bindata
 # github.com/go-gl/glfw/v3.3/glfw => github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4
 # github.com/go-kit/kit => github.com/go-kit/kit v0.9.0
 # github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.4.0
-# github.com/go-logr/logr v0.2.0 => github.com/go-logr/logr v0.2.0
+# github.com/go-logr/logr v0.4.0 => github.com/go-logr/logr v0.4.0
 github.com/go-logr/logr
-# github.com/go-logr/logr => github.com/go-logr/logr v0.2.0
+# github.com/go-logr/logr => github.com/go-logr/logr v0.4.0
 # github.com/go-openapi/analysis v0.19.5 => github.com/go-openapi/analysis v0.19.5
 github.com/go-openapi/analysis
 # github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.19.5
@@ -808,6 +804,10 @@ github.com/mitchellh/mapstructure
 ## explicit
 github.com/moby/ipvs
 # github.com/moby/ipvs => github.com/moby/ipvs v1.0.1
+# github.com/moby/spdystream v0.2.0 => github.com/moby/spdystream v0.2.0
+github.com/moby/spdystream
+# github.com/moby/spdystream => github.com/moby/spdystream v0.2.0
+github.com/moby/spdystream/spdy
 # github.com/moby/sys/mountinfo v0.1.3 => github.com/moby/sys/mountinfo v0.1.3
 github.com/moby/sys/mountinfo
 # github.com/moby/sys/mountinfo => github.com/moby/sys/mountinfo v0.1.3
@@ -2288,10 +2288,10 @@ k8s.io/gengo/types
 ## explicit
 # k8s.io/heapster => k8s.io/heapster v1.2.0-beta.1
 k8s.io/heapster/metrics/api/v1/types
-# k8s.io/klog/v2 v2.4.0 => k8s.io/klog/v2 v2.4.0
+# k8s.io/klog/v2 v2.5.0 => k8s.io/klog/v2 v2.5.0
 ## explicit
 k8s.io/klog/v2
-# k8s.io/klog/v2 => k8s.io/klog/v2 v2.4.0
+# k8s.io/klog/v2 => k8s.io/klog/v2 v2.5.0
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
 ## explicit
 # k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator

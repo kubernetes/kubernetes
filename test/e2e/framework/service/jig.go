@@ -988,13 +988,16 @@ func (j *TestJig) checkExternalServiceReachability(svc *v1.Service, pod *v1.Pod)
 	svcName := fmt.Sprintf("%s.%s.svc.%s", svc.Name, svc.Namespace, framework.TestContext.ClusterDNSDomain)
 	// Service must resolve to IP
 	cmd := fmt.Sprintf("nslookup %s", svcName)
-	_, stderr, err := framework.RunHostCmdWithFullOutput(pod.Namespace, pod.Name, cmd)
-	// NOTE(claudiub): nslookup may return 0 on Windows, even though the DNS name was not found. In this case,
-	// we can check stderr for the error.
-	if err != nil || (framework.NodeOSDistroIs("windows") && strings.Contains(stderr, fmt.Sprintf("can't find %s", svcName))) {
-		return fmt.Errorf("ExternalName service %q must resolve to IP", pod.Namespace+"/"+pod.Name)
-	}
-	return nil
+	return wait.PollImmediate(framework.Poll, ServiceReachabilityShortPollTimeout, func() (done bool, err error) {
+		_, stderr, err := framework.RunHostCmdWithFullOutput(pod.Namespace, pod.Name, cmd)
+		// NOTE(claudiub): nslookup may return 0 on Windows, even though the DNS name was not found. In this case,
+		// we can check stderr for the error.
+		if err != nil || (framework.NodeOSDistroIs("windows") && strings.Contains(stderr, fmt.Sprintf("can't find %s", svcName))) {
+			framework.Logf("ExternalName service %q failed to resolve to IP", pod.Namespace+"/"+pod.Name)
+			return false, nil
+		}
+		return true, nil
+	})
 }
 
 // CheckServiceReachability ensures that request are served by the services. Only supports Services with type ClusterIP, NodePort and ExternalName.

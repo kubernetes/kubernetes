@@ -44,13 +44,13 @@ func RegisterProcessStartTime(registrationFunc func(Registerable) error) error {
 		start = float64(time.Now().Unix())
 	}
 	// processStartTime is a lazy metric which only get initialized after registered.
-	// so we have to explicitly create it before setting the label value. Otherwise
-	// it is a noop.
-	if !processStartTime.IsCreated() {
-		processStartTime.initializeMetric()
+	// so we need to register the metric first and then set the value for it
+	if err = registrationFunc(processStartTime); err != nil {
+		return err
 	}
+
 	processStartTime.WithLabelValues().Set(start)
-	return registrationFunc(processStartTime)
+	return nil
 }
 
 func getProcessStart() (float64, error) {

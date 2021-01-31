@@ -1873,7 +1873,7 @@ Prior to 1.17 and for existing nodes created by `kubeadm init` where kubelet cli
  `http_requests_total, http_response_size_bytes`
  `http_response_size_bytes_sum`
  `http_response_size_bytes_count`
- due to removal from the prometheus client library. Prometheus http request meta-metrics are now generated from [`promhttp.InstrumentMetricHandler`](https://godoc.org/github.com/prometheus/client_golang/prometheus/promhttp&#35;InstrumentMetricHandler) instead.
+ due to removal from the prometheus client library. Prometheus http request meta-metrics are now generated from [`promhttp.InstrumentMetricHandler`](https://godoc.org/github.com/prometheus/client_golang/prometheus/promhttp#InstrumentMetricHandler) instead.
 - Following metrics from kube-controller-manager are now marked as with the ALPHA stability level:
   `storage_count_attachable_volumes_in_use`
   `attachdetach_controller_total_volumes`

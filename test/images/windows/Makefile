@@ -17,7 +17,7 @@ REMOTE_DOCKER_URL ?=
 DOCKER_CERT_PATH ?= "$(HOME)/.docker"
 export
 
-ALL_IMAGES = busybox-helper powershell-helper
+ALL_IMAGES = powershell-helper
 
 sub-build-%:
 	img_version=$(shell cat $*/VERSION); \

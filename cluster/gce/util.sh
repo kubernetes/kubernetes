@@ -121,6 +121,8 @@ fi
 NODE_INSTANCE_PREFIX=${NODE_INSTANCE_PREFIX:-"${INSTANCE_PREFIX}-minion"}
 WINDOWS_NODE_INSTANCE_PREFIX=${WINDOWS_NODE_INSTANCE_PREFIX:-"${INSTANCE_PREFIX}-windows-node"}
 
+# NODE_TAG (expected to be) defined by caller
+# shellcheck disable=SC2153
 NODE_TAGS="${NODE_TAG}"
 
 ALLOCATE_NODE_CIDRS=true
@@ -151,6 +153,8 @@ function verify-prereqs() {
   if [ "$(openssl version | cut -d\  -f1)" == "LibreSSL" ]; then
     echo "LibreSSL is not supported. Please ensure openssl points to an OpenSSL binary"
     if [ "$(uname -s)" == "Darwin" ]; then
+      # We want this print just the way it is
+      # shellcheck disable=SC2016
       echo 'On macOS we recommend using homebrew and adding "$(brew --prefix openssl)/bin" to your PATH'
     fi
     exit 1
@@ -1218,7 +1222,7 @@ CONTAINER_RUNTIME_TEST_HANDLER: $(yaml-quote "${CONTAINER_RUNTIME_TEST_HANDLER:-
 UBUNTU_INSTALL_CONTAINERD_VERSION: $(yaml-quote "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}")
 UBUNTU_INSTALL_RUNC_VERSION: $(yaml-quote "${UBUNTU_INSTALL_RUNC_VERSION:-}")
 NODE_LOCAL_SSDS_EXT: $(yaml-quote "${NODE_LOCAL_SSDS_EXT:-}")
-NODE_LOCAL_SSDS_EPHEMERAL: "$(yaml-quote ${NODE_LOCAL_SSDS_EPHEMERAL:-})"
+NODE_LOCAL_SSDS_EPHEMERAL: $(yaml-quote "${NODE_LOCAL_SSDS_EPHEMERAL:-}")
 LOAD_IMAGE_COMMAND: $(yaml-quote "${LOAD_IMAGE_COMMAND:-}")
 ZONE: $(yaml-quote "${ZONE}")
 REGION: $(yaml-quote "${REGION}")
@@ -1686,7 +1690,7 @@ function setup-easyrsa {
 # Runs the easy RSA commands to generate certificate files.
 # The generated files are IN ${CERT_DIR}
 #
-# Assumed vars
+# Assumed vars (see shellcheck disable directives below)
 #   KUBE_TEMP
 #   MASTER_NAME
 #   CERT_DIR
@@ -1701,7 +1705,11 @@ function generate-certs {
     cd "${CERT_DIR}"
     ./easyrsa init-pki
     # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
+    # PRIMARY_CN (expected to be) defined by caller
+    # shellcheck disable=SC2153
     ./easyrsa --batch "--req-cn=${PRIMARY_CN}@$(date +%s)" build-ca nopass
+    # SANS (expected to be) defined by caller
+    # shellcheck disable=SC2153
     ./easyrsa --subject-alt-name="${SANS}" build-server-full "${MASTER_NAME}" nopass
     ./easyrsa build-client-full kube-apiserver nopass
 
@@ -1858,6 +1866,8 @@ function update-or-verify-gcloud() {
     sudo_prefix="sudo"
   fi
   # update and install components as needed
+  # (deliberately word split $gcloud_prompt)
+  # shellcheck disable=SC2086
   if [[ "${KUBE_PROMPT_FOR_UPDATE}" == "y" ]]; then
     ${sudo_prefix} gcloud ${gcloud_prompt:-} components install alpha
     ${sudo_prefix} gcloud ${gcloud_prompt:-} components install beta
@@ -2131,6 +2141,8 @@ function create-node-template() {
   local attempt=1
   while true; do
     echo "Attempt ${attempt} to create ${1}" >&2
+    # Deliberately word split ${network}, $2 and ${metadata_flag}
+    # shellcheck disable=SC2086
     if ! ${gcloud} compute instance-templates create \
       "${template_name}" \
       --project "${PROJECT}" \
@@ -2857,6 +2869,8 @@ function detach-internal-master-ip() {
   # Detach ${MASTER_NAME}-internal-ip from ${name}
   gcloud compute instances network-interfaces update "${name}" --project "${PROJECT}" --zone "${zone}" --aliases="${aliases}"
   gcloud compute instances remove-metadata "${name}" --zone "${zone}" --keys=kube-master-internal-ip
+  # We want ip route to be run in the cloud and not this host
+  # shellcheck disable=SC2016
   run-gcloud-command "${name}" "${zone}" 'sudo ip route del to local '${ip}'/32 dev $(ip route | grep default | awk '\''{print $5}'\'')' || true
   return $?
 }
@@ -3162,6 +3176,8 @@ function create-heapster-node() {
       "${ENABLE_IP_ALIASES:-}" \
       "${IP_ALIAS_SIZE:-}")
 
+  # Deliberately word split ${network} and $(get-scope-flags)
+  # shellcheck disable=SC2086 disable=SC2046
   ${gcloud} compute instances \
       create "${NODE_INSTANCE_PREFIX}-heapster" \
       --project "${PROJECT}" \
@@ -3374,7 +3390,11 @@ function kube-down() {
     # change during a cluster upgrade.)
     local templates=$(get-template "${PROJECT}")
 
+    # Deliberately allow globbing, do not change unless a bug is found
+    # shellcheck disable=SC2206
     local all_instance_groups=(${INSTANCE_GROUPS[@]:-} ${WINDOWS_INSTANCE_GROUPS[@]:-})
+    # Deliberately do not quote, do not change unless a bug is found
+    # shellcheck disable=SC2068
     for group in ${all_instance_groups[@]:-}; do
       {
         if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
@@ -3392,6 +3412,8 @@ function kube-down() {
       echo -e "Failed to delete instance group(s)." >&2
     }
 
+    # Deliberately do not quote, do not change unless a bug is found
+    # shellcheck disable=SC2068
     for template in ${templates[@]:-}; do
       {
         if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
@@ -3618,6 +3640,8 @@ function kube-down() {
 #
 # NOTE: Must be in sync with get-replica-name-regexp and set-replica-name.
 function get-replica-name() {
+  # Ignore if gcloud compute fails and successfully echo any outcome
+  # shellcheck disable=SC2005
   echo $(gcloud compute instances list \
     --project "${PROJECT}" \
     --filter="name ~ '$(get-replica-name-regexp)' AND zone:(${ZONE})" \
@@ -3632,6 +3656,8 @@ function get-replica-name() {
 #
 # NOTE: Must be in sync with get-replica-name-regexp and set-replica-name.
 function get-all-replica-names() {
+  # Ignore if gcloud compute fails and successfully echo any outcome
+  # shellcheck disable=SC2005
   echo $(gcloud compute instances list \
     --project "${PROJECT}" \
     --filter="name ~ '$(get-replica-name-regexp)'" \

@@ -181,23 +181,25 @@ var ipsetWithIptablesChain = []struct {
 	{kubeLoadBalancerSourceCIDRSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
 	{kubeLoadBalancerSourceIPSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
 	{kubeLoadBalancerLocalSet, string(KubeLoadBalancerChain), "RETURN", "dst,dst", ""},
-	{kubeNodePortLocalSetTCP, string(KubeNodePortChain), "RETURN", "dst", "tcp"},
-	{kubeNodePortSetTCP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "tcp"},
-	{kubeNodePortLocalSetUDP, string(KubeNodePortChain), "RETURN", "dst", "udp"},
-	{kubeNodePortSetUDP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "udp"},
-	{kubeNodePortSetSCTP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst,dst", "sctp"},
-	{kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst,dst", "sctp"},
+	{kubeNodePortLocalSetTCP, string(KubeNodePortChain), "RETURN", "dst", utilipset.ProtocolTCP},
+	{kubeNodePortSetTCP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", utilipset.ProtocolTCP},
+	{kubeNodePortLocalSetUDP, string(KubeNodePortChain), "RETURN", "dst", utilipset.ProtocolUDP},
+	{kubeNodePortSetUDP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", utilipset.ProtocolUDP},
+	{kubeNodePortSetSCTP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst,dst", utilipset.ProtocolSCTP},
+	{kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst,dst", utilipset.ProtocolSCTP},
 }
 
 // In IPVS proxy mode, the following flags need to be set
-const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
-const sysctlVSConnTrack = "net/ipv4/vs/conntrack"
-const sysctlConnReuse = "net/ipv4/vs/conn_reuse_mode"
-const sysctlExpireNoDestConn = "net/ipv4/vs/expire_nodest_conn"
-const sysctlExpireQuiescentTemplate = "net/ipv4/vs/expire_quiescent_template"
-const sysctlForward = "net/ipv4/ip_forward"
-const sysctlArpIgnore = "net/ipv4/conf/all/arp_ignore"
-const sysctlArpAnnounce = "net/ipv4/conf/all/arp_announce"
+const (
+	sysctlBridgeCallIPTables      = "net/bridge/bridge-nf-call-iptables"
+	sysctlVSConnTrack             = "net/ipv4/vs/conntrack"
+	sysctlConnReuse               = "net/ipv4/vs/conn_reuse_mode"
+	sysctlExpireNoDestConn        = "net/ipv4/vs/expire_nodest_conn"
+	sysctlExpireQuiescentTemplate = "net/ipv4/vs/expire_quiescent_template"
+	sysctlForward                 = "net/ipv4/ip_forward"
+	sysctlArpIgnore               = "net/ipv4/conf/all/arp_ignore"
+	sysctlArpAnnounce             = "net/ipv4/conf/all/arp_announce"
+)
 
 // Proxier is an ipvs based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
@@ -1037,16 +1039,6 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.V(4).Infof("syncProxyRules took %v", time.Since(start))
 	}()
 
-	localAddrs, err := utilproxy.GetLocalAddrs()
-	if err != nil {
-		klog.Errorf("Failed to get local addresses during proxy sync: %v, assuming external IPs are not local", err)
-	} else if len(localAddrs) == 0 {
-		klog.Warning("No local addresses found, assuming all external IPs are not local")
-	}
-
-	localAddrSet := utilnet.IPSet{}
-	localAddrSet.Insert(localAddrs...)
-
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
@@ -1083,7 +1075,7 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.createAndLinkKubeChain()
 
 	// make sure dummy interface exists in the system where ipvs Proxier will bind service address on it
-	_, err = proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	_, err := proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
 	if err != nil {
 		klog.Errorf("Failed to create dummy interface: %s, error: %v", DefaultDummyDevice, err)
 		return
@@ -1158,6 +1150,8 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	// reset slice to filtered entries
 	nodeIPs = nodeIPs[:idx]
+
+	localAddrSet := utilproxy.GetLocalAddrSet()
 
 	// Build IPVS rules for each service.
 	for svcName, svc := range proxier.serviceMap {
@@ -1480,7 +1474,7 @@ func (proxier *Proxier) syncProxyRules() {
 			)
 
 			switch protocol {
-			case "tcp":
+			case utilipset.ProtocolTCP:
 				nodePortSet = proxier.ipsetList[kubeNodePortSetTCP]
 				entries = []*utilipset.Entry{{
 					// No need to provide ip info
@@ -1488,7 +1482,7 @@ func (proxier *Proxier) syncProxyRules() {
 					Protocol: protocol,
 					SetType:  utilipset.BitmapPort,
 				}}
-			case "udp":
+			case utilipset.ProtocolUDP:
 				nodePortSet = proxier.ipsetList[kubeNodePortSetUDP]
 				entries = []*utilipset.Entry{{
 					// No need to provide ip info
@@ -1496,7 +1490,7 @@ func (proxier *Proxier) syncProxyRules() {
 					Protocol: protocol,
 					SetType:  utilipset.BitmapPort,
 				}}
-			case "sctp":
+			case utilipset.ProtocolSCTP:
 				nodePortSet = proxier.ipsetList[kubeNodePortSetSCTP]
 				// Since hash ip:port is used for SCTP, all the nodeIPs to be used in the SCTP ipset entries.
 				entries = []*utilipset.Entry{}
@@ -1531,11 +1525,11 @@ func (proxier *Proxier) syncProxyRules() {
 			if svcInfo.OnlyNodeLocalEndpoints() {
 				var nodePortLocalSet *IPSet
 				switch protocol {
-				case "tcp":
+				case utilipset.ProtocolTCP:
 					nodePortLocalSet = proxier.ipsetList[kubeNodePortLocalSetTCP]
-				case "udp":
+				case utilipset.ProtocolUDP:
 					nodePortLocalSet = proxier.ipsetList[kubeNodePortLocalSetUDP]
-				case "sctp":
+				case utilipset.ProtocolSCTP:
 					nodePortLocalSet = proxier.ipsetList[kubeNodePortLocalSetSCTP]
 				default:
 					// It should never hit

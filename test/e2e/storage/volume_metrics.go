@@ -151,7 +151,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 		}
 
-		ginkgo.By("Geting default storageclass")
+		ginkgo.By("Getting default storageclass")
 		defaultClass, err := c.StorageV1().StorageClasses().Get(context.TODO(), defaultScName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Error getting default storageclass: %v", err)
 		pluginName := defaultClass.Provisioner

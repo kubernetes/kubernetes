@@ -35,41 +35,51 @@ import (
 
 type probeFn func() []volume.VolumePlugin
 
-func appendPluginBasedOnMigrationFeatureFlags(plugins []volume.VolumePlugin, inTreePluginName string, featureGate featuregate.FeatureGate, pluginMigration, pluginMigrationComplete featuregate.Feature, fn probeFn) ([]volume.VolumePlugin, error) {
+func appendPluginBasedOnFeatureFlags(plugins []volume.VolumePlugin, inTreePluginName string,
+	featureGate featuregate.FeatureGate, pluginInfo pluginInfo) ([]volume.VolumePlugin, error) {
 	// Skip appending the in-tree plugin to the list of plugins to be probed/initialized
 	// if the CSIMigration feature flag and plugin specific feature flag indicating
 	// CSI migration is complete
-	err := csimigration.CheckMigrationFeatureFlags(featureGate, pluginMigration, pluginMigrationComplete)
+	migrationComplete, err := csimigration.CheckMigrationFeatureFlags(featureGate, pluginInfo.pluginMigrationFeature,
+		pluginInfo.pluginMigrationCompleteFeature, pluginInfo.pluginUnregisterFeature)
 	if err != nil {
 		klog.Warningf("Unexpected CSI Migration Feature Flags combination detected: %v. CSI Migration may not take effect", err)
 		// TODO: fail and return here once alpha only tests can set the feature flags for a plugin correctly
 	}
-	if featureGate.Enabled(features.CSIMigration) && featureGate.Enabled(pluginMigration) && featureGate.Enabled(pluginMigrationComplete) {
-		klog.Infof("Skip registration of plugin %s since feature flag %v is enabled", inTreePluginName, pluginMigrationComplete)
+	// TODO: This can be removed after feature flag CSIMigrationvSphereComplete is removed.
+	if migrationComplete {
+		klog.Infof("Skip registration of plugin %s since migration is complete", inTreePluginName)
 		return plugins, nil
 	}
-	plugins = append(plugins, fn()...)
+	if featureGate.Enabled(pluginInfo.pluginUnregisterFeature) {
+		klog.Infof("Skip registration of plugin %s since feature flag %v is enabled", inTreePluginName, pluginInfo.pluginUnregisterFeature)
+		return plugins, nil
+	}
+
+	plugins = append(plugins, pluginInfo.pluginProbeFunction()...)
 	return plugins, nil
 }
 
 type pluginInfo struct {
-	pluginMigrationFeature         featuregate.Feature
+	pluginMigrationFeature featuregate.Feature
+	// deprecated, only to keep here for vSphere
 	pluginMigrationCompleteFeature featuregate.Feature
+	pluginUnregisterFeature        featuregate.Feature
 	pluginProbeFunction            probeFn
 }
 
 func appendLegacyProviderVolumes(allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	pluginMigrationStatus := make(map[string]pluginInfo)
-	pluginMigrationStatus[plugins.AWSEBSInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAWS, pluginMigrationCompleteFeature: features.CSIMigrationAWSComplete, pluginProbeFunction: awsebs.ProbeVolumePlugins}
-	pluginMigrationStatus[plugins.GCEPDInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationGCE, pluginMigrationCompleteFeature: features.CSIMigrationGCEComplete, pluginProbeFunction: gcepd.ProbeVolumePlugins}
-	pluginMigrationStatus[plugins.CinderInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationOpenStack, pluginMigrationCompleteFeature: features.CSIMigrationOpenStackComplete, pluginProbeFunction: cinder.ProbeVolumePlugins}
-	pluginMigrationStatus[plugins.AzureDiskInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAzureDisk, pluginMigrationCompleteFeature: features.CSIMigrationAzureDiskComplete, pluginProbeFunction: azuredd.ProbeVolumePlugins}
-	pluginMigrationStatus[plugins.AzureFileInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAzureFile, pluginMigrationCompleteFeature: features.CSIMigrationAzureFileComplete, pluginProbeFunction: azure_file.ProbeVolumePlugins}
-	pluginMigrationStatus[plugins.VSphereInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationvSphere, pluginMigrationCompleteFeature: features.CSIMigrationvSphereComplete, pluginProbeFunction: vsphere_volume.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.AWSEBSInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAWS, pluginUnregisterFeature: features.InTreePluginAWSUnregister, pluginProbeFunction: awsebs.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.GCEPDInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationGCE, pluginUnregisterFeature: features.InTreePluginGCEUnregister, pluginProbeFunction: gcepd.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.CinderInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationOpenStack, pluginUnregisterFeature: features.InTreePluginOpenStackUnregister, pluginProbeFunction: cinder.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.AzureDiskInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAzureDisk, pluginUnregisterFeature: features.InTreePluginAzureDiskUnregister, pluginProbeFunction: azuredd.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.AzureFileInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAzureFile, pluginUnregisterFeature: features.InTreePluginAzureFileUnregister, pluginProbeFunction: azure_file.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.VSphereInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationvSphere, pluginMigrationCompleteFeature: features.CSIMigrationvSphereComplete, pluginUnregisterFeature: features.InTreePluginvSphereUnregister, pluginProbeFunction: vsphere_volume.ProbeVolumePlugins}
 
 	var err error
 	for pluginName, pluginInfo := range pluginMigrationStatus {
-		allPlugins, err = appendPluginBasedOnMigrationFeatureFlags(allPlugins, pluginName, featureGate, pluginInfo.pluginMigrationFeature, pluginInfo.pluginMigrationCompleteFeature, pluginInfo.pluginProbeFunction)
+		allPlugins, err = appendPluginBasedOnFeatureFlags(allPlugins, pluginName, featureGate, pluginInfo)
 		if err != nil {
 			return allPlugins, err
 		}

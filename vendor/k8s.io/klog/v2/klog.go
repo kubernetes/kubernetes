@@ -772,7 +772,7 @@ func (l *loggingT) printWithFileLine(s severity, logr logr.Logger, filter LogFil
 }
 
 // if loggr is specified, will call loggr.Error, otherwise output with logging module.
-func (l *loggingT) errorS(err error, loggr logr.Logger, filter LogFilter, msg string, keysAndValues ...interface{}) {
+func (l *loggingT) errorS(err error, loggr logr.Logger, filter LogFilter, depth int, msg string, keysAndValues ...interface{}) {
 	if filter != nil {
 		msg, keysAndValues = filter.FilterS(msg, keysAndValues)
 	}
@@ -780,11 +780,11 @@ func (l *loggingT) errorS(err error, loggr logr.Logger, filter LogFilter, msg st
 		loggr.Error(err, msg, keysAndValues...)
 		return
 	}
-	l.printS(err, msg, keysAndValues...)
+	l.printS(err, depth+1, msg, keysAndValues...)
 }
 
 // if loggr is specified, will call loggr.Info, otherwise output with logging module.
-func (l *loggingT) infoS(loggr logr.Logger, filter LogFilter, msg string, keysAndValues ...interface{}) {
+func (l *loggingT) infoS(loggr logr.Logger, filter LogFilter, depth int, msg string, keysAndValues ...interface{}) {
 	if filter != nil {
 		msg, keysAndValues = filter.FilterS(msg, keysAndValues)
 	}
@@ -792,12 +792,12 @@ func (l *loggingT) infoS(loggr logr.Logger, filter LogFilter, msg string, keysAn
 		loggr.Info(msg, keysAndValues...)
 		return
 	}
-	l.printS(nil, msg, keysAndValues...)
+	l.printS(nil, depth+1, msg, keysAndValues...)
 }
 
 // printS is called from infoS and errorS if loggr is not specified.
 // if err arguments is specified, will output to errorLog severity
-func (l *loggingT) printS(err error, msg string, keysAndValues ...interface{}) {
+func (l *loggingT) printS(err error, depth int, msg string, keysAndValues ...interface{}) {
 	b := &bytes.Buffer{}
 	b.WriteString(fmt.Sprintf("%q", msg))
 	if err != nil {
@@ -811,7 +811,7 @@ func (l *loggingT) printS(err error, msg string, keysAndValues ...interface{}) {
 	} else {
 		s = errorLog
 	}
-	l.printDepth(s, logging.logr, nil, 2, b)
+	l.printDepth(s, logging.logr, nil, depth+1, b)
 }
 
 const missingValue = "(MISSING)"
@@ -1359,14 +1359,20 @@ func (v Verbose) Infof(format string, args ...interface{}) {
 // See the documentation of V for usage.
 func (v Verbose) InfoS(msg string, keysAndValues ...interface{}) {
 	if v.enabled {
-		logging.infoS(v.logr, v.filter, msg, keysAndValues...)
+		logging.infoS(v.logr, v.filter, 0, msg, keysAndValues...)
 	}
+}
+
+// InfoSDepth acts as InfoS but uses depth to determine which call frame to log.
+// InfoSDepth(0, "msg") is the same as InfoS("msg").
+func InfoSDepth(depth int, msg string, keysAndValues ...interface{}) {
+	logging.infoS(logging.logr, logging.filter, depth, msg, keysAndValues...)
 }
 
 // Deprecated: Use ErrorS instead.
 func (v Verbose) Error(err error, msg string, args ...interface{}) {
 	if v.enabled {
-		logging.errorS(err, v.logr, v.filter, msg, args...)
+		logging.errorS(err, v.logr, v.filter, 0, msg, args...)
 	}
 }
 
@@ -1374,7 +1380,7 @@ func (v Verbose) Error(err error, msg string, args ...interface{}) {
 // See the documentation of V for usage.
 func (v Verbose) ErrorS(err error, msg string, keysAndValues ...interface{}) {
 	if v.enabled {
-		logging.errorS(err, v.logr, v.filter, msg, keysAndValues...)
+		logging.errorS(err, v.logr, v.filter, 0, msg, keysAndValues...)
 	}
 }
 
@@ -1411,7 +1417,7 @@ func Infof(format string, args ...interface{}) {
 // output:
 // >> I1025 00:15:15.525108       1 controller_utils.go:116] "Pod status updated" pod="kubedns" status="ready"
 func InfoS(msg string, keysAndValues ...interface{}) {
-	logging.infoS(logging.logr, logging.filter, msg, keysAndValues...)
+	logging.infoS(logging.logr, logging.filter, 0, msg, keysAndValues...)
 }
 
 // Warning logs to the WARNING and INFO logs.
@@ -1472,7 +1478,13 @@ func Errorf(format string, args ...interface{}) {
 // output:
 // >> E1025 00:15:15.525108       1 controller_utils.go:114] "Failed to update pod status" err="timeout"
 func ErrorS(err error, msg string, keysAndValues ...interface{}) {
-	logging.errorS(err, logging.logr, logging.filter, msg, keysAndValues...)
+	logging.errorS(err, logging.logr, logging.filter, 0, msg, keysAndValues...)
+}
+
+// ErrorSDepth acts as ErrorS but uses depth to determine which call frame to log.
+// ErrorSDepth(0, "msg") is the same as ErrorS("msg").
+func ErrorSDepth(depth int, err error, msg string, keysAndValues ...interface{}) {
+	logging.errorS(err, logging.logr, logging.filter, depth, msg, keysAndValues...)
 }
 
 // Fatal logs to the FATAL, ERROR, WARNING, and INFO logs,

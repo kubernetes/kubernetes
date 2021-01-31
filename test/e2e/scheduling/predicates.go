@@ -19,8 +19,6 @@ package scheduling
 import (
 	"context"
 	"fmt"
-	"net"
-	"strconv"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -657,14 +655,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		Release: v1.16
 		Testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
 		Description: Pods with the same HostPort value MUST be able to be scheduled to the same node
-		if the HostIP or Protocol is different. This test is marked LinuxOnly since hostNetwork is not supported on
-		Windows.
+		if the HostIP or Protocol is different. This test doesn´t test the HostPort functionality.
+		 xref: https://github.com/kubernetes/kubernetes/issues/98075
 	*/
-
-	// TODO: Add a new e2e test to scheduler which validates if hostPort is working and move this test to e2e/network
-	//		 so that appropriate team owns the e2e.
-	//		 xref: https://github.com/kubernetes/kubernetes/issues/98075.
-	framework.ConformanceIt("validates that there is no conflict between pods with same hostPort but different hostIP and protocol [LinuxOnly]", func() {
+	ginkgo.It("validates that there is no conflict between pods with same hostPort but different hostIP and protocol", func() {
 
 		nodeName := GetNodeThatCanRunPod(f)
 		localhost := "127.0.0.1"
@@ -695,66 +689,6 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		ginkgo.By(fmt.Sprintf("Trying to create a third pod(pod3) with hostport %v, hostIP %s but use UDP protocol on the node which pod2 resides", port, hostIP))
 		createHostPortPodOnNode(f, "pod3", ns, hostIP, port, v1.ProtocolUDP, nodeSelector, true)
 
-		// check that the port is being actually exposed to each container
-		// create a pod on the host network in the same node
-		hostExecPod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "e2e-host-exec",
-				Namespace: f.Namespace.Name,
-			},
-			Spec: v1.PodSpec{
-				HostNetwork:  true,
-				NodeSelector: nodeSelector,
-				Containers: []v1.Container{
-					{
-						Name:  "e2e-host-exec",
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					},
-				},
-			},
-		}
-		f.PodClient().CreateSync(hostExecPod)
-
-		// use a 5 seconds timeout per connection
-		timeout := 5
-		// IPv6 doesn't NAT from localhost -> localhost, it doesn't have the route_localnet kernel hack, so we need to specify the source IP
-		cmdPod1 := []string{"/bin/sh", "-c", fmt.Sprintf("curl -g --connect-timeout %v --interface %s http://%s/hostname", timeout, hostIP, net.JoinHostPort(localhost, strconv.Itoa(int(port))))}
-		cmdPod2 := []string{"/bin/sh", "-c", fmt.Sprintf("curl -g --connect-timeout %v http://%s/hostname", timeout, net.JoinHostPort(hostIP, strconv.Itoa(int(port))))}
-		cmdPod3 := []string{"/bin/sh", "-c", fmt.Sprintf("nc -vuz -w %v %s %d", timeout, hostIP, port)}
-		// try 5 times to connect to the exposed ports
-		success := false
-		for i := 0; i < 5; i++ {
-			// check pod1
-			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d", hostExecPod.Name, localhost, port))
-			hostname1, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod1...)
-			if err != nil {
-				framework.Logf("Can not connect from %s to pod(pod1) to serverIP: %s, port: %d", hostExecPod.Name, localhost, port)
-				continue
-			}
-			// check pod2
-			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port))
-			hostname2, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod2...)
-			if err != nil {
-				framework.Logf("Can not connect from %s to pod(pod2) to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port)
-				continue
-			}
-			// the hostname returned has to be different because we are exposing the same port to two different pods
-			if hostname1 == hostname2 {
-				framework.Logf("pods must have different hostname: pod1 has hostname %s, pod2 has hostname %s", hostname1, hostname2)
-				continue
-			}
-			// check pod3
-			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d UDP", hostExecPod.Name, hostIP, port))
-			_, _, err = f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod3...)
-			if err != nil {
-				framework.Logf("Can not connect from %s to pod(pod2) to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port)
-				continue
-			}
-			success = true
-		}
-		if !success {
-			framework.Failf("Failed to connect to exposed host ports")
-		}
 	})
 
 	/*

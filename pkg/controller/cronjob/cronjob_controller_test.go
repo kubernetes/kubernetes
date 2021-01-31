@@ -250,6 +250,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		"prev ran but done, long overdue, past short deadline, F":  {f, F, onTheHour, shortDead, T, F, weekAfterTheHour(), T, F, 1, 0},
 	}
 	for name, tc := range testCases {
+		// Don't delete the redundant define 'name' and 'tc', keep those lines for goroutines.
 		name := name
 		tc := tc
 		t.Run(name, func(t *testing.T) {
@@ -490,6 +491,7 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
+		// Don't delete the redundant define 'name' and 'tc', keep those lines for goroutines.
 		name := name
 		tc := tc
 		t.Run(name, func(t *testing.T) {
@@ -677,6 +679,7 @@ func TestSyncOne_Status(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
+		// Don't delete the redundant define 'name' and 'tc', keep those lines for goroutines.
 		name := name
 		tc := tc
 		t.Run(name, func(t *testing.T) {

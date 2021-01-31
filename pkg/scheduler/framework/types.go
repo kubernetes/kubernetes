@@ -91,11 +91,17 @@ type WeightedAffinityTerm struct {
 	Weight int32
 }
 
+// Diagnosis records the details to diagnose a scheduling failure.
+type Diagnosis struct {
+	NodeToStatusMap      NodeToStatusMap
+	UnschedulablePlugins sets.String
+}
+
 // FitError describes a fit error of a pod.
 type FitError struct {
-	Pod                   *v1.Pod
-	NumAllNodes           int
-	FilteredNodesStatuses NodeToStatusMap
+	Pod         *v1.Pod
+	NumAllNodes int
+	Diagnosis   Diagnosis
 }
 
 const (
@@ -106,7 +112,7 @@ const (
 // Error returns detailed information of why the pod failed to fit on each node
 func (f *FitError) Error() string {
 	reasons := make(map[string]int)
-	for _, status := range f.FilteredNodesStatuses {
+	for _, status := range f.Diagnosis.NodeToStatusMap {
 		for _, reason := range status.Reasons() {
 			reasons[reason]++
 		}
@@ -562,7 +568,7 @@ func removeFromSlice(s []*PodInfo, k string) []*PodInfo {
 	for i := range s {
 		k2, err := GetPodKey(s[i].Pod)
 		if err != nil {
-			klog.Errorf("Cannot get pod key, err: %v", err)
+			klog.ErrorS(err, "Cannot get pod key", "pod", klog.KObj(s[i].Pod))
 			continue
 		}
 		if k == k2 {
@@ -591,7 +597,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 	for i := range n.Pods {
 		k2, err := GetPodKey(n.Pods[i].Pod)
 		if err != nil {
-			klog.Errorf("Cannot get pod key, err: %v", err)
+			klog.ErrorS(err, "Cannot get pod key", "pod", klog.KObj(n.Pods[i].Pod))
 			continue
 		}
 		if k == k2 {

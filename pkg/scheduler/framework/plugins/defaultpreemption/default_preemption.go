@@ -156,7 +156,7 @@ func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.Cycle
 	}
 
 	// 5) Perform preparation work before nominating the selected candidate.
-	if err := PrepareCandidate(bestCandidate, pl.fh, cs, pod); err != nil {
+	if err := PrepareCandidate(bestCandidate, pl.fh, cs, pod, pl.Name()); err != nil {
 		return "", err
 	}
 
@@ -223,9 +223,12 @@ func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framewor
 	// Return a FitError only when there are no candidates that fit the pod.
 	if len(candidates) == 0 {
 		return candidates, &framework.FitError{
-			Pod:                   pod,
-			NumAllNodes:           len(potentialNodes),
-			FilteredNodesStatuses: nodeStatuses,
+			Pod:         pod,
+			NumAllNodes: len(potentialNodes),
+			Diagnosis: framework.Diagnosis{
+				NodeToStatusMap: nodeStatuses,
+				// Leave FailedPlugins as nil as it won't be used on moving Pods.
+			},
 		}
 	}
 	return candidates, nil
@@ -624,7 +627,7 @@ func selectVictimsOnNode(
 		if corev1helpers.PodPriority(pi.Pod) < podPriority {
 			potentialVictims = append(potentialVictims, pi)
 			if err := removePod(pi); err != nil {
-				return nil, 0, framework.NewStatus(framework.Error, err.Error())
+				return nil, 0, framework.AsStatus(err)
 			}
 		}
 	}
@@ -669,7 +672,7 @@ func selectVictimsOnNode(
 	}
 	for _, p := range violatingVictims {
 		if fits, err := reprievePod(p); err != nil {
-			return nil, 0, framework.NewStatus(framework.Error, err.Error())
+			return nil, 0, framework.AsStatus(err)
 		} else if !fits {
 			numViolatingVictim++
 		}
@@ -677,7 +680,7 @@ func selectVictimsOnNode(
 	// Now we try to reprieve non-violating victims.
 	for _, p := range nonViolatingVictims {
 		if _, err := reprievePod(p); err != nil {
-			return nil, 0, framework.NewStatus(framework.Error, err.Error())
+			return nil, 0, framework.AsStatus(err)
 		}
 	}
 	return victims, numViolatingVictim, framework.NewStatus(framework.Success)
@@ -687,7 +690,7 @@ func selectVictimsOnNode(
 // - Evict the victim pods
 // - Reject the victim pods if they are in waitingPod map
 // - Clear the low-priority pods' nominatedNodeName status if needed
-func PrepareCandidate(c Candidate, fh framework.Handle, cs kubernetes.Interface, pod *v1.Pod) error {
+func PrepareCandidate(c Candidate, fh framework.Handle, cs kubernetes.Interface, pod *v1.Pod, pluginName string) error {
 	for _, victim := range c.Victims().Pods {
 		if err := util.DeletePod(cs, victim); err != nil {
 			klog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
@@ -695,7 +698,7 @@ func PrepareCandidate(c Candidate, fh framework.Handle, cs kubernetes.Interface,
 		}
 		// If the victim is a WaitingPod, send a reject message to the PermitPlugin
 		if waitingPod := fh.GetWaitingPod(victim.UID); waitingPod != nil {
-			waitingPod.Reject("preempted")
+			waitingPod.Reject(pluginName, "preempted")
 		}
 		fh.EventRecorder().Eventf(victim, pod, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v",
 			pod.Namespace, pod.Name, c.Name())

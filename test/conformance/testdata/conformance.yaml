@@ -1621,6 +1621,14 @@
     DNS configuration MUST be configured in the Pod.
   release: v1.17
   file: test/e2e/network/dns.go
+- testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
+  codename: '[sig-network] HostPort validates that there is no conflict between pods
+    with same hostPort but different hostIP and protocol [LinuxOnly] [Conformance]'
+  description: Pods with the same HostPort value MUST be able to be scheduled to the
+    same node if the HostIP or Protocol is different. This test is marked LinuxOnly
+    since hostNetwork is not supported on Windows.
+  release: v1.16, v1.20
+  file: test/e2e/network/hostport.go
 - testname: Ingress API
   codename: '[sig-network] Ingress API should support creating Ingress API operations
     [Conformance]'
@@ -2028,15 +2036,6 @@
   description: Pods with the same HostPort and Protocol, but different HostIPs, MUST
     NOT schedule to the same node if one of those IPs is the default HostIP of 0.0.0.0,
     which represents all IPs on the host.
-  release: v1.16
-  file: test/e2e/scheduling/predicates.go
-- testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
-  codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that there is
-    no conflict between pods with same hostPort but different hostIP and protocol
-    [LinuxOnly] [Conformance]'
-  description: Pods with the same HostPort value MUST be able to be scheduled to the
-    same node if the HostIP or Protocol is different. This test is marked LinuxOnly
-    since hostNetwork is not supported on Windows.
   release: v1.16
   file: test/e2e/scheduling/predicates.go
 - testname: Pod preemption verification

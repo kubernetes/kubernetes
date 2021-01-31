@@ -157,6 +157,21 @@ func GetLocalAddrs() ([]net.IP, error) {
 	return localAddrs, nil
 }
 
+// GetLocalAddrSet return a local IPSet.
+// If failed to get local addr, will assume no local ips.
+func GetLocalAddrSet() utilnet.IPSet {
+	localAddrs, err := GetLocalAddrs()
+	if err != nil {
+		klog.ErrorS(err, "Failed to get local addresses assuming no local IPs", err)
+	} else if len(localAddrs) == 0 {
+		klog.InfoS("No local addresses were found")
+	}
+
+	localAddrSet := utilnet.IPSet{}
+	localAddrSet.Insert(localAddrs...)
+	return localAddrSet
+}
+
 // ShouldSkipService checks if a given service should skip proxying
 func ShouldSkipService(service *v1.Service) bool {
 	// if ClusterIP is "None" or empty, skip proxying
@@ -391,7 +406,13 @@ func NewFilteredDialContext(wrapped DialContext, resolv Resolver, opts *Filtered
 		return wrapped
 	}
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
-		resp, err := resolv.LookupIPAddr(ctx, address)
+		// DialContext is given host:port. LookupIPAddress expects host.
+		addressToResolve, _, err := net.SplitHostPort(address)
+		if err != nil {
+			addressToResolve = address
+		}
+
+		resp, err := resolv.LookupIPAddr(ctx, addressToResolve)
 		if err != nil {
 			return nil, err
 		}

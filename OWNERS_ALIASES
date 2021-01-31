@@ -165,9 +165,7 @@ aliases:
     - xmudrii # Release Manager
   changelog-reviewers:
     - wilsonehusin # 1.21 Release Notes Lead
-    # TODO(wilsonehusin): uncomment once ashnehete is an org member
-    #                     https://github.com/kubernetes/kubernetes/pull/97700#issuecomment-766734702
-    #- ashnehete # 1.21 Release Notes shadow
+    - ashnehete # 1.21 Release Notes shadow
     - melodychn # 1.21 Release Notes shadow
     - pmmalinov01 # 1.21 Release Notes shadow
     - soniasingla # 1.21 Release Notes shadow
@@ -178,6 +176,7 @@ aliases:
     - jsafrane
     - gnufied
     - msau42
+    - xing-yang
   # emeritus:
   # - rootfs
   sig-storage-reviewers:
@@ -189,6 +188,7 @@ aliases:
     - gnufied
     - verult
     - humblec
+    - xing-yang
   # emeritus:
   # - davidz627
 
@@ -495,7 +495,7 @@ aliases:
   #   -
 
   sig-contribex-approvers:
-    - castrojo
+    - alisondy
     - mrbobbytables
     - cblecker
     - nikhita
@@ -531,6 +531,7 @@ aliases:
     - saad-ali
     - msau42
     - jsafrane
+    - xing-yang
 
   sig-security-approvers:
     - IanColdwater
@@ -565,6 +566,7 @@ aliases:
     - deads2k         # API Machinery
     - derekwaynecarr  # Node
     - dims            # Architecture
+    - ehashman        # Instrumentation
     - jdumars         # Architecture, Release
     - jsafrane        # Storage
     - kow3ns          # Apps
@@ -575,7 +577,6 @@ aliases:
     - michmike        # Windows
     - msau42          # Storage
     - mwielgus        # Autoscaling
-    - piosz           # Instrumentation
     - prydonius       # Apps
     - pwittrock       # CLI
     - quinton-hoole   # Multicluster

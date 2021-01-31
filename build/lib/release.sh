@@ -375,7 +375,7 @@ function kube::release::create_docker_images_for_server() {
         ln "${KUBE_ROOT}/build/nsswitch.conf" "${docker_build_path}/nsswitch.conf"
         chmod 0644 "${docker_build_path}/nsswitch.conf"
         cat <<EOF > "${docker_file_path}"
-FROM --platform=linux/${arch} ${base_image}
+FROM ${base_image}
 COPY ${binary_name} /usr/local/bin/${binary_name}
 EOF
         # ensure /etc/nsswitch.conf exists so go's resolver respects /etc/hosts
@@ -383,11 +383,13 @@ EOF
           echo "COPY nsswitch.conf /etc/" >> "${docker_file_path}"
         fi
 
-	if [[ "${arch}" == "linux/s390x" || "${arch}" == "linux/ppc64le" ]]; then
-          DOCKER_CLI_EXPERIMENTAL=enabled "${DOCKER[@]}" buildx build --platform linux/"${arch}" --load ${docker_build_opts:+"${docker_build_opts}"} -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
-	else
-          "${DOCKER[@]}" build ${docker_build_opts:+"${docker_build_opts}"} -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
-	fi
+        "${DOCKER[@]}" buildx build \
+          --platform linux/"${arch}" \
+          --load ${docker_build_opts:+"${docker_build_opts}"} \
+          -q \
+          -t "${docker_image_tag}" \
+          "${docker_build_path}" >/dev/null
+
         # If we are building an official/alpha/beta release we want to keep
         # docker images and tag them appropriately.
         local -r release_docker_image_tag="${KUBE_DOCKER_REGISTRY-$docker_registry}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG-$docker_tag}"
