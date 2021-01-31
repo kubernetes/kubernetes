@@ -22,7 +22,6 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/allocation"
-	"k8s.io/kubernetes/pkg/apis/allocation/util"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
@@ -45,42 +44,26 @@ func validateRange(cidr string) field.ErrorList {
 	return allErrs
 }
 
-// ValidateIPAddressName validates that the name is the decimal representation of an IP address
-func ValidateIPAddressName(name string, prefix bool) []string {
+var ValidateIPAddressName = NameIsIPAddress
+
+// NameIsIPAddress validates that the name is the decimal representation of an IP address
+func NameIsIPAddress(name string, prefix bool) []string {
 	var errs []string
 	if prefix {
 		errs = append(errs, "prefix not allowed")
 	}
-	ip := util.DecimalToIP(name)
+	ip := net.ParseIP(name)
 	if ip == nil {
-		errs = append(errs, "not a valid ip decimal format")
+		errs = append(errs, "not a valid ip address")
 	}
 	return errs
 }
 
 func ValidateIPAddress(ipAddress *allocation.IPAddress) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&ipAddress.ObjectMeta, false, ValidateIPAddressName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateAddress(ipAddress.ObjectMeta.Name, ipAddress.Spec.Address)...)
 	allErrs = append(allErrs, validateIPRangeRef(ipAddress.Spec.IPRangeRef)...)
 	return allErrs
 
-}
-
-func validateAddress(ipAddressDecimal, ipAddress string) field.ErrorList {
-	allErrs := field.ErrorList{}
-	ipName := util.DecimalToIP(ipAddressDecimal)
-	if ipName == nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("name"), ipAddressDecimal, "name is not a valid decimal representation of an IP address"))
-	}
-	ip := net.ParseIP(ipAddress)
-	if ip == nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("address"), ipAddress, "address is not a valid IP address"))
-	}
-
-	if !ip.Equal(ipName) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("address"), ipAddress, "IP address decimal representation must match Name"))
-	}
-	return allErrs
 }
 
 func validateIPRangeRef(rangeRegf allocation.IPRangeRef) field.ErrorList {

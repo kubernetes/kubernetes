@@ -127,75 +127,43 @@ func TestValidateIPAddress(t *testing.T) {
 		expectedErrors int
 		ipAddress      *allocation.IPAddress
 	}{
-		"empty-ipaddress-bad-name": {
-			expectedErrors: 3,
-			ipAddress: &allocation.IPAddress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "hello",
-					Namespace: "world",
-				},
-			},
-		},
-		"empty-ipaddress-good-name": {
-			expectedErrors: 2,
-			ipAddress: &allocation.IPAddress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "23432432",
-					Namespace: "world",
-				},
-			},
-		},
-		"good-ipaddress": {
+		"good ipv4": {
 			expectedErrors: 0,
 			ipAddress: &allocation.IPAddress{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "3232235777",
-					Namespace: "world",
-				},
-				Spec: allocation.IPAddressSpec{
-					Address: "192.168.1.1",
+					Name: "1.1.1.1",
 				},
 			},
 		},
-		"good-ipv6address": {
+		"good ipv6 short format": {
 			expectedErrors: 0,
 			ipAddress: &allocation.IPAddress{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "42541956123769884636017138956568135816",
-					Namespace: "world",
-				},
-				Spec: allocation.IPAddressSpec{
-					Address: "2001:4860:4860::8888",
+					Name: "2001::1",
 				},
 			},
 		},
-		"wrong-ipaddress": {
+		"good ipv6 long format": {
+			expectedErrors: 0,
+			ipAddress: &allocation.IPAddress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "2001:0db8:0000:0000:0000:0000:0000:0001",
+				},
+			},
+		},
+		"wrong-ipaddress-nonamespce": {
 			expectedErrors: 1,
 			ipAddress: &allocation.IPAddress{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "3232235777",
-					Namespace: "world",
-				},
-				Spec: allocation.IPAddressSpec{
-					Address: "192.168.1.2",
+					Name: "asdasdsdads",
 				},
 			},
 		},
-		"overflow-name": {
-			expectedErrors: 3,
-			ipAddress: &allocation.IPAddress{
-				ObjectMeta: metav1.ObjectMeta{
-					// "ff:ff:ff:ff:ff:ff:ff:ff" -> 1324055902416102970674609367438786815
-					Name:      "323223578882332323232888888888888888888888888888888888877",
-					Namespace: "world",
-				},
-			},
-		},
-		"negatoive-name": {
+		"wrong-ipaddress-namespace": {
 			expectedErrors: 2,
 			ipAddress: &allocation.IPAddress{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "-1",
+					Name:      "3232235777",
 					Namespace: "world",
 				},
 			},
