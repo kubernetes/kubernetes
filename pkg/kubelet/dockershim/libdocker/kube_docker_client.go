@@ -341,10 +341,10 @@ func (p *progressReporter) start() {
 					p.cancel()
 					return
 				}
-				klog.V(2).Infof("Pulling image %q: %q", p.image, progress)
+				klog.V(2).InfoS("Pulling image", "imageName", p.image, "progress", progress)
 			case <-p.stopCh:
 				progress, _ := p.progress.get()
-				klog.V(2).Infof("Stop pulling image %q: %q", p.image, progress)
+				klog.V(2).InfoS("Stop pulling image", "imageName", p.image, "progress", progress)
 				return
 			}
 		}
