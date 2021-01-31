@@ -23,7 +23,6 @@ import (
 
 	allocation "k8s.io/api/allocation/v1alpha1"
 	allocationclient "k8s.io/client-go/kubernetes/typed/allocation/v1alpha1"
-	utilallocation "k8s.io/kubernetes/pkg/apis/allocation/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -62,7 +61,7 @@ func NewAllocatorCIDRRange(cidr *net.IPNet, client allocationclient.AllocationV1
 func (r *Range) Allocate(ip net.IP) error {
 	ctx := context.Background()
 	// convert IP to name
-	name := utilallocation.IPToDecimal(ip)
+	name := ip.String()
 	ipRangeRef := allocation.IPRangeRef{
 		APIGroup: "allocation.k8s.io",
 		Kind:     "IPRange",
@@ -73,9 +72,15 @@ func (r *Range) Allocate(ip net.IP) error {
 			Name: name,
 		},
 		Spec: allocation.IPAddressSpec{
-			Address:    ip.String(),
 			IPRangeRef: ipRangeRef,
 		},
+	}
+	// get current CIDR
+	cidr := r.CIDR()
+	if !cidr.Contains(ip) {
+		// TODO: can we do this in validation? we have the ref to the IPRange allocator
+		return ipallocator.ErrMismatchedNetwork
+
 	}
 	// TODO: instead of Create the object Updated the Status to Allocated so we can reuse
 	_, err := r.client.IPAddresses().Create(ctx, &ipAddress, metav1.CreateOptions{})
@@ -106,7 +111,7 @@ func (r *Range) AllocateNext() (net.IP, error) {
 	ipset := make(utilnet.IPSet)
 	for _, ipAddress := range ipAddresses.Items {
 		// ip was already validated
-		ip := net.ParseIP(ipAddress.Spec.Address)
+		ip := net.ParseIP(ipAddress.Name)
 		// TODO meanwhile we don't implement a field selector to get only the
 		// IPAddresses that belongs to current allocator, we do it here
 		if cidr.Contains(ip) {
@@ -143,7 +148,7 @@ func (r *Range) AllocateNext() (net.IP, error) {
 func (r *Range) Release(ip net.IP) error {
 	ctx := context.Background()
 	// convert IP to name
-	name := utilallocation.IPToDecimal(ip)
+	name := ip.String()
 	// TODO: instead of Delete the object Updated the Status to Free so we can reuse
 	return r.client.IPAddresses().Delete(ctx, name, metav1.DeleteOptions{})
 }
@@ -170,7 +175,7 @@ func (r *Range) CIDR() net.IPNet {
 func (r *Range) Has(ip net.IP) bool {
 	ctx := context.Background()
 	// convert IP to name
-	name := utilallocation.IPToDecimal(ip)
+	name := ip.String()
 	ipAddress, err := r.client.IPAddresses().Get(ctx, name, metav1.GetOptions{})
 	if err != nil || len(ipAddress.Name) == 0 {
 		return false

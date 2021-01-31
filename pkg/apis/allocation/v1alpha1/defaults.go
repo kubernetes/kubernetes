@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	allocationv1alpha1 "k8s.io/api/allocation/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/allocation/util"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -27,8 +26,4 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 func SetDefaults_IPAddress(obj *allocationv1alpha1.IPAddress) {
-	// The address field is the IP address text representation from the name
-	if len(obj.Spec.Address) == 0 {
-		obj.Spec.Address = util.DecimalToIP(obj.ObjectMeta.Name).String()
-	}
 }
