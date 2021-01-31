@@ -2070,11 +2070,6 @@ func TestValidateDeployment(t *testing.T) {
 	}
 	errorCases["`selector` does not match template `labels`"] = invalidSelectorDeployment
 
-	// RestartPolicy should be always.
-	invalidRestartPolicyDeployment := validDeployment()
-	invalidRestartPolicyDeployment.Spec.Template.Spec.RestartPolicy = api.RestartPolicyNever
-	errorCases["Unsupported value: \"Never\""] = invalidRestartPolicyDeployment
-
 	// must have valid strategy type
 	invalidStrategyDeployment := validDeployment()
 	invalidStrategyDeployment.Spec.Strategy.Type = apps.DeploymentStrategyType("randomType")
@@ -2780,6 +2775,18 @@ func TestValidateReplicaSet(t *testing.T) {
 			},
 		},
 	}
+	restartPolicyNeverPodTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validLabels,
+			},
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyNever,
+				DNSPolicy:     api.DNSClusterFirst,
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+			},
+		},
+	}
 	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -2813,6 +2820,14 @@ func TestValidateReplicaSet(t *testing.T) {
 				Replicas: 1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: readWriteVolumePodTemplate.Template,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.ReplicaSetSpec{
+				Replicas: 1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: restartPolicyNeverPodTemplate.Template,
 			},
 		},
 	}
@@ -2919,25 +2934,6 @@ func TestValidateReplicaSet(t *testing.T) {
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyOnFailure,
-						DNSPolicy:     api.DNSClusterFirst,
-						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: validLabels,
-					},
-				},
-			},
-		},
-		"invalid restart policy 2": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: apps.ReplicaSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: api.PodTemplateSpec{
-					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicyNever,
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 					},
