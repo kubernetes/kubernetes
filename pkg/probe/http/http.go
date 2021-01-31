@@ -120,7 +120,7 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (pr
 	b, err := utilio.ReadAtMost(res.Body, maxRespBodyLength)
 	if err != nil {
 		if err == utilio.ErrLimitReached {
-			klog.V(4).Infof("Non fatal body truncation for %s, Response: %v", url.String(), *res)
+			klog.V(4).InfoS("Non fatal body truncation", "url", url.String(), "response", *res)
 		} else {
 			return probe.Failure, "", err
 		}
@@ -128,13 +128,13 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (pr
 	body := string(b)
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
 		if res.StatusCode >= http.StatusMultipleChoices { // Redirect
-			klog.V(4).Infof("Probe terminated redirects for %s, Response: %v", url.String(), *res)
+			klog.V(4).InfoS("Probe terminated redirects", "url", url.String(), "response", *res)
 			return probe.Warning, body, nil
 		}
-		klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
+		klog.V(4).InfoS("Probe succeeded", "url", url.String(), "response", *res)
 		return probe.Success, body, nil
 	}
-	klog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
+	klog.V(4).InfoS("Probe failed", "url", url.String(), "requestHeaders", headers, "responseBody", body)
 	return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode), nil
 }
 
