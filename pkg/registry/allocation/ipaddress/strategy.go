@@ -18,6 +18,7 @@ package ipaddress
 
 import (
 	"context"
+	"net"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -71,6 +72,11 @@ func (ipAddressStrategy) Validate(ctx context.Context, obj runtime.Object) field
 
 // Canonicalize normalizes the object after validation.
 func (ipAddressStrategy) Canonicalize(obj runtime.Object) {
+	ipAddress := obj.(*allocation.IPAddress)
+	// use the RFC5952 format for the IPAddress Name
+	ip := net.ParseIP(ipAddress.Name)
+	ipAddress.Name = ip.String()
+
 }
 
 // AllowCreateOnUpdate is false for IPAddress; this means POST is needed to create one.
