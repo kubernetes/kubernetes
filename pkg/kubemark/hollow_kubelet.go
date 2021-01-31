@@ -132,7 +132,7 @@ func (hk *HollowKubelet) Run() {
 		KubeletFlags:         *hk.KubeletFlags,
 		KubeletConfiguration: *hk.KubeletConfiguration,
 	}, hk.KubeletDeps, false); err != nil {
-		klog.Fatalf("Failed to run HollowKubelet: %v. Exiting.", err)
+		klog.V(3).ErrorS(err, "Failed to run HollowKubelet. Exiting.")
 	}
 	select {}
 }
@@ -153,7 +153,7 @@ type HollowKubletOptions struct {
 func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
 	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
 	podFilePath := utils.MakeTempDirOrDie("static-pods", testRootDir)
-	klog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
+	klog.InfoS("Using as root dir for hollow-kubelet", "dir", testRootDir)
 
 	// Flags struct
 	f := options.NewKubeletFlags()

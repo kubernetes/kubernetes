@@ -125,7 +125,7 @@ func (kubemarkController *KubemarkController) WaitForCacheSync(stopCh chan struc
 func (kubemarkController *KubemarkController) Run(stopCh chan struct{}) {
 	nodeTemplate, err := kubemarkController.getNodeTemplate()
 	if err != nil {
-		klog.Fatalf("failed to get node template: %s", err)
+		klog.ErrorS(err, "Failed to get node template")
 	}
 	kubemarkController.nodeTemplate = nodeTemplate
 
@@ -239,7 +239,7 @@ func (kubemarkController *KubemarkController) addNodeToNodeGroup(nodeGroup strin
 func (kubemarkController *KubemarkController) RemoveNodeFromNodeGroup(nodeGroup string, node string) error {
 	pod := kubemarkController.getPodByName(node)
 	if pod == nil {
-		klog.Warningf("Can't delete node %s from nodegroup %s. Node does not exist.", node, nodeGroup)
+		klog.V(1).InfoS("Can't delete node from nodegroup. Node does not exist.", "node", node, "nodeGroup", nodeGroup)
 		return nil
 	}
 	if pod.ObjectMeta.Labels[nodeGroupLabel] != nodeGroup {
@@ -251,7 +251,7 @@ func (kubemarkController *KubemarkController) RemoveNodeFromNodeGroup(nodeGroup 
 		err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(namespaceKubemark).Delete(context.TODO(), pod.ObjectMeta.Labels["name"],
 			metav1.DeleteOptions{PropagationPolicy: &policy})
 		if err == nil {
-			klog.Infof("marking node %s for deletion", node)
+			klog.InfoS("marking node for deletion", "node", node)
 			// Mark node for deletion from kubemark cluster.
 			// Once it becomes unready after replication controller
 			// deletion has been noticed, we will delete it explicitly.
@@ -339,7 +339,7 @@ func (kubemarkController *KubemarkController) runNodeCreation(stop <-chan struct
 			kubemarkController.nodeGroupQueueSizeLock.Lock()
 			err := kubemarkController.addNodeToNodeGroup(nodeGroup)
 			if err != nil {
-				klog.Errorf("failed to add node to node group %s: %v", nodeGroup, err)
+				klog.ErrorS(err, "Failed to add node to node group", "nodeGroup", nodeGroup, )
 			} else {
 				kubemarkController.nodeGroupQueueSize[nodeGroup]--
 			}
@@ -376,7 +376,7 @@ func (kubemarkCluster *kubemarkCluster) removeUnneededNodes(oldObj interface{}, 
 			if kubemarkCluster.nodesToDelete[node.Name] {
 				kubemarkCluster.nodesToDelete[node.Name] = false
 				if err := kubemarkCluster.client.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{}); err != nil {
-					klog.Errorf("failed to delete node %s from kubemark cluster, err: %v", node.Name, err)
+					klog.ErrorS(err, "Failed to delete node from kubemark cluster", "node", node.Name)
 				}
 			}
 			return
