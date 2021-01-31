@@ -63,9 +63,8 @@ type IPRangeList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // IPAddress represents an IP used by Kubernetes associated to an IPRange.
-// The name of the object is the IP address decimal number, because colons
-// are not allowed and IPv6 addresses have different text representations.
-// xref: https://tools.ietf.org/html/rfc4291
+// The name of the object is canonicalized to the RFC5952 IP address format.
+// xref: https://tools.ietf.org/html/rfc5952
 type IPAddress struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -86,9 +85,8 @@ type IPRangeRef struct {
 
 // IPAddressSpec describe the attributes in an IP Address,
 type IPAddressSpec struct {
-	// Address is the text representation of the IP Address.
-	Address string `json:"address"`
 	// IPRangeRef references the IPRange associated to this IP Address.
+	// All IP addresses has to be associated to one IPRange allocator.
 	IPRangeRef IPRangeRef `json:"ipRangeRef,omitempty"`
 }
 
@@ -109,6 +107,8 @@ const (
 	IPAllocated IPAddressState = "Allocated"
 	// IPFree means that IP has not been allocated neither persisted.
 	IPFree IPAddressState = "Free"
+	// IPReserved means that IP has been reserved and can not be used for Services ClusterIPs
+	IPReserved IPAddressState = "Reserved"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
