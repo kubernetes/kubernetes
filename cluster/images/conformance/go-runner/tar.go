@@ -20,6 +20,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,7 +40,11 @@ func tarDir(dir, outpath string) error {
 	if err != nil {
 		return errors.Wrapf(err, "creating tarball %v", outpath)
 	}
-	defer outfile.Close()
+	defer func() {
+		if err := outfile.Close(); err != nil {
+			log.Printf("Error occurs when close writing file streaming, error: %v", err)
+		}
+	}()
 
 	gzw := gzip.NewWriter(outfile)
 	defer gzw.Close()
@@ -75,7 +80,11 @@ func tarDir(dir, outpath string) error {
 		if err != nil {
 			return errors.Wrapf(err, "opening file %v for writing into tarball", file)
 		}
-		defer f.Close()
+		defer func() {
+			if err := f.Close(); err != nil {
+				log.Printf("Error occures while closing file stream, Error: %v", err)
+			}
+		}()
 
 		_, err = io.Copy(tw, f)
 		return errors.Wrapf(err, "creating file %v contents into tarball", file)
