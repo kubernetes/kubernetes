@@ -245,7 +245,7 @@ func TestNetworkPolicyStrategy(t *testing.T) {
 
 func TestNetworkPolicyEndPortEnablement(t *testing.T) {
 	// Enable the Feature Gate during the first rule creation
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkPolicyEndPort, true)
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkPolicyEndPort, true)()
 	netPol := makeNetworkPolicy(true, true, true)
 	// We always expect the EndPort to be present, even if the FG is disabled later
 	expectedNetPol := makeNetworkPolicy(true, true, true)
@@ -267,13 +267,13 @@ func TestNetworkPolicyEndPortEnablement(t *testing.T) {
 	}
 
 	// Now let's disable the Feature Gate, update some other field from NetPol and expect the EndPort is already present
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkPolicyEndPort, false)
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkPolicyEndPort, false)()
 	updateNetPol, err := testUpdateEndPort(netPol)
 	if err != nil {
 		t.Errorf("Update with disabled FG failed. %v", err)
 	}
 	// And let's enable the FG again, add another from and check if the EndPort field is still present
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkPolicyEndPort, true)
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkPolicyEndPort, true)()
 	_, err = testUpdateEndPort(updateNetPol)
 	if err != nil {
 		t.Errorf("Update with enabled FG failed. %v", err)
