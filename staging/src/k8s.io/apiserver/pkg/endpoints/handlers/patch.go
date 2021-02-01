@@ -171,7 +171,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			userInfo,
 		)
 
-		mutatingAdmission, _ := fieldmanager.NewManagedFieldsValidatingAdmissionController(admit).(admission.MutationInterface)
+		mutatingAdmission, _ := admit.(admission.MutationInterface)
 		createAuthorizerAttributes := authorizer.AttributesRecord{
 			User:            userInfo,
 			ResourceRequest: true,
