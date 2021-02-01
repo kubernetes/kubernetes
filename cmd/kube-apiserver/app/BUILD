@@ -17,7 +17,6 @@ go_library(
         "//pkg/controlplane/controller/crdregistration:go_default_library",
         "//pkg/controlplane/reconcilers:go_default_library",
         "//pkg/controlplane/tunneler:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/kubeapiserver:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",

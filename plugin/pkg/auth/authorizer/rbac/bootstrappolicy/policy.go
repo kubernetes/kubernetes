@@ -494,18 +494,16 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
-		// Add the cluster role for reading the ServiceAccountIssuerDiscovery endpoints
-		roles = append(roles, rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{Name: "system:service-account-issuer-discovery"},
-			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("get").URLs(
-					"/.well-known/openid-configuration",
-					"/openid/v1/jwks",
-				).RuleOrDie(),
-			},
-		})
-	}
+	// Add the cluster role for reading the ServiceAccountIssuerDiscovery endpoints
+	roles = append(roles, rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "system:service-account-issuer-discovery"},
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get").URLs(
+				"/.well-known/openid-configuration",
+				"/openid/v1/jwks",
+			).RuleOrDie(),
+		},
+	})
 
 	// node-proxier role is used by kube-proxy.
 	nodeProxierRules := []rbacv1.PolicyRule{
@@ -590,19 +588,17 @@ func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 		},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
-		// Allow all in-cluster workloads (via their service accounts) to read the OIDC discovery endpoints.
-		// Users with certain forms of write access (create pods, create secrets, create service accounts, etc)
-		// can gain access to a service account identity which would allow them to access this information.
-		// This includes the issuer URL, which is already present in the SA token JWT.  Similarly, SAs can
-		// already gain this same info via introspection of their own token.  Since this discovery endpoint
-		// points to what issued all service account tokens, it seems fitting for SAs to have this access.
-		// Defer to the cluster admin with regard to binding directly to all authenticated and/or
-		// unauthenticated users.
-		rolebindings = append(rolebindings,
-			rbacv1helpers.NewClusterBinding("system:service-account-issuer-discovery").Groups(serviceaccount.AllServiceAccountsGroup).BindingOrDie(),
-		)
-	}
+	// Allow all in-cluster workloads (via their service accounts) to read the OIDC discovery endpoints.
+	// Users with certain forms of write access (create pods, create secrets, create service accounts, etc)
+	// can gain access to a service account identity which would allow them to access this information.
+	// This includes the issuer URL, which is already present in the SA token JWT.  Similarly, SAs can
+	// already gain this same info via introspection of their own token.  Since this discovery endpoint
+	// points to what issued all service account tokens, it seems fitting for SAs to have this access.
+	// Defer to the cluster admin with regard to binding directly to all authenticated and/or
+	// unauthenticated users.
+	rolebindings = append(rolebindings,
+		rbacv1helpers.NewClusterBinding("system:service-account-issuer-discovery").Groups(serviceaccount.AllServiceAccountsGroup).BindingOrDie(),
+	)
 
 	addClusterRoleBindingLabel(rolebindings)
 
