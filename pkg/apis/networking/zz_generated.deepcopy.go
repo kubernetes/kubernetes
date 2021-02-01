@@ -558,6 +558,11 @@ func (in *NetworkPolicyPort) DeepCopyInto(out *NetworkPolicyPort) {
 		*out = new(intstr.IntOrString)
 		**out = **in
 	}
+	if in.EndPort != nil {
+		in, out := &in.EndPort, &out.EndPort
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 
