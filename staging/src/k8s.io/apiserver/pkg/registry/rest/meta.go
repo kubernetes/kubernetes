@@ -27,7 +27,10 @@ import (
 // FillObjectMetaSystemFields populates fields that are managed by the system on ObjectMeta.
 func FillObjectMetaSystemFields(meta metav1.Object) {
 	meta.SetCreationTimestamp(metav1.Now())
-	meta.SetUID(uuid.NewUUID())
+	// If the UID is set it is a restore and we want to keep the UID
+	if string(meta.GetUID()) == "" {
+		meta.SetUID(uuid.NewUUID())
+	}
 	meta.SetSelfLink("")
 }
 
