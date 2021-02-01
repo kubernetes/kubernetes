@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -566,6 +567,9 @@ type Handle interface {
 
 	// TODO: unroll the wrapped interfaces to Handle.
 	PreemptHandle() PreemptHandle
+
+	// FeatureGates returns if a featuregate is registered and enabled for this handle
+	FeatureGates(feature featuregate.Feature) bool
 }
 
 // PostFilterResult wraps needed info for scheduler framework to act upon PostFilter phase.

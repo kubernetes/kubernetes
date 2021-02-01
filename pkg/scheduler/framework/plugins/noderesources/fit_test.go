@@ -19,6 +19,7 @@ package noderesources
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"reflect"
 	"strings"
 	"testing"
@@ -403,7 +404,13 @@ func TestEnoughRequests(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
-			p, err := NewFit(&test.args, nil)
+			fh, _ := runtime.NewFramework(
+				nil,
+				nil,
+				nil,
+				runtime.WithFeatureGatePodOverhead())
+
+			p, err := NewFit(&test.args, fh)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -418,7 +425,7 @@ func TestEnoughRequests(t *testing.T) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
 
-			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
+			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod, true), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
 			if !reflect.DeepEqual(gotInsufficientResources, test.wantInsufficientResources) {
 				t.Errorf("insufficient resources do not match: %+v, want: %v", gotInsufficientResources, test.wantInsufficientResources)
 			}
@@ -431,7 +438,12 @@ func TestPreFilterDisabled(t *testing.T) {
 	nodeInfo := framework.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
-	p, err := NewFit(&config.NodeResourcesFitArgs{}, nil)
+	fh, _ := runtime.NewFramework(
+		nil,
+		nil,
+		nil,
+		runtime.WithFeatureGatePodOverhead())
+	p, err := NewFit(&config.NodeResourcesFitArgs{}, fh)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -481,7 +493,13 @@ func TestNotEnoughRequests(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1, 0, 0, 0)}}
 			test.nodeInfo.SetNode(&node)
 
-			p, err := NewFit(&config.NodeResourcesFitArgs{}, nil)
+			fh, _ := runtime.NewFramework(
+				nil,
+				nil,
+				nil,
+				runtime.WithFeatureGatePodOverhead())
+
+			p, err := NewFit(&config.NodeResourcesFitArgs{}, fh)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -553,7 +571,13 @@ func TestStorageRequests(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
-			p, err := NewFit(&config.NodeResourcesFitArgs{}, nil)
+			fh, _ := runtime.NewFramework(
+				nil,
+				nil,
+				nil,
+				runtime.WithFeatureGatePodOverhead())
+
+			p, err := NewFit(&config.NodeResourcesFitArgs{}, fh)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -27,12 +27,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-scheduler/config/v1beta1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -93,6 +96,8 @@ type frameworkImpl struct {
 	// Indicates that RunFilterPlugins should accumulate all failed statuses and not return
 	// after the first failure.
 	runAllFilters bool
+
+	featureGates map[featuregate.Feature]bool
 }
 
 // extensionPoint encapsulates desired and applied set of plugins at a specific extension
@@ -133,6 +138,7 @@ type frameworkOptions struct {
 	extenders            []framework.Extender
 	runAllFilters        bool
 	captureProfile       CaptureProfile
+	featureGates         map[featuregate.Feature]bool
 }
 
 // Option for the frameworkImpl.
@@ -215,6 +221,19 @@ func WithCaptureProfile(c CaptureProfile) Option {
 func defaultFrameworkOptions() frameworkOptions {
 	return frameworkOptions{
 		metricsRecorder: newMetricsRecorder(1000, time.Second),
+		featureGates:    make(map[featuregate.Feature]bool),
+	}
+}
+
+func WithFeatureGatePodOverhead() Option {
+	return func(o *frameworkOptions) {
+		o.featureGates[features.PodOverhead] = utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead)
+	}
+}
+
+func WithFeatureGateBalanceAttachedNodeVolumes() Option {
+	return func(o *frameworkOptions) {
+		o.featureGates[features.BalanceAttachedNodeVolumes] = utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes)
 	}
 }
 
@@ -252,6 +271,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		metricsRecorder:       options.metricsRecorder,
 		profileName:           options.profileName,
 		runAllFilters:         options.runAllFilters,
+		featureGates:          options.featureGates,
 	}
 	f.preemptHandle = &preemptHandle{
 		extenders:     options.extenders,
@@ -401,6 +421,14 @@ func updatePluginList(pluginList interface{}, pluginSet *config.PluginSet, plugi
 		plugins.Set(newPlugins)
 	}
 	return nil
+}
+
+// FeatureGates returns whether a feature gate is registered and enabled with the handle
+func (f *frameworkImpl) FeatureGates(feature featuregate.Feature) bool {
+	if enabled, ok := f.featureGates[feature]; ok {
+		return enabled
+	}
+	return false
 }
 
 // QueueSortFunc returns the function to sort pods in scheduling queue

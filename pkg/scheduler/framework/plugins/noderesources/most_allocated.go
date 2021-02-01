@@ -84,6 +84,7 @@ func NewMostAllocated(maArgs runtime.Object, h framework.Handle) (framework.Plug
 			Name:                MostAllocatedName,
 			scorer:              mostResourceScorer(resToWeightMap),
 			resourceToWeightMap: resToWeightMap,
+			enablePodOverhead:   h.FeatureGates("PodOverhead"),
 		},
 	}, nil
 }

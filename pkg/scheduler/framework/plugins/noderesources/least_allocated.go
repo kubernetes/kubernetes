@@ -86,6 +86,7 @@ func NewLeastAllocated(laArgs runtime.Object, h framework.Handle) (framework.Plu
 			Name:                LeastAllocatedName,
 			scorer:              leastResourceScorer(resToWeightMap),
 			resourceToWeightMap: resToWeightMap,
+			enablePodOverhead:   h.FeatureGates("PodOverhead"),
 		},
 	}, nil
 }

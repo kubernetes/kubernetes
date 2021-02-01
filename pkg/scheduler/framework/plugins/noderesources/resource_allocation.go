@@ -33,9 +33,11 @@ var defaultRequestedRatioResources = resourceToWeightMap{v1.ResourceMemory: 1, v
 
 // resourceAllocationScorer contains information to calculate resource allocation score.
 type resourceAllocationScorer struct {
-	Name                string
-	scorer              func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64
-	resourceToWeightMap resourceToWeightMap
+	Name                             string
+	scorer                           func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64
+	resourceToWeightMap              resourceToWeightMap
+	enablePodOverhead                bool
+	enableBalanceAttachedNodeVolumes bool
 }
 
 // resourceToValueMap contains resource name and score.
@@ -55,7 +57,7 @@ func (r *resourceAllocationScorer) score(
 	requested := make(resourceToValueMap, len(r.resourceToWeightMap))
 	allocatable := make(resourceToValueMap, len(r.resourceToWeightMap))
 	for resource := range r.resourceToWeightMap {
-		allocatable[resource], requested[resource] = calculateResourceAllocatableRequest(nodeInfo, pod, resource)
+		allocatable[resource], requested[resource] = calculateResourceAllocatableRequest(nodeInfo, pod, resource, r.enablePodOverhead)
 	}
 	var score int64
 
@@ -88,8 +90,8 @@ func (r *resourceAllocationScorer) score(
 }
 
 // calculateResourceAllocatableRequest returns resources Allocatable and Requested values
-func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.Pod, resource v1.ResourceName) (int64, int64) {
-	podRequest := calculatePodResourceRequest(pod, resource)
+func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.Pod, resource v1.ResourceName, enablePodOverhead bool) (int64, int64) {
+	podRequest := calculatePodResourceRequest(pod, resource, enablePodOverhead)
 	switch resource {
 	case v1.ResourceCPU:
 		return nodeInfo.Allocatable.MilliCPU, (nodeInfo.NonZeroRequested.MilliCPU + podRequest)
@@ -114,7 +116,7 @@ func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.P
 // calculatePodResourceRequest returns the total non-zero requests. If Overhead is defined for the pod and the
 // PodOverhead feature is enabled, the Overhead is added to the result.
 // podResourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
-func calculatePodResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
+func calculatePodResourceRequest(pod *v1.Pod, resource v1.ResourceName, enablePodOverhead bool) int64 {
 	var podRequest int64
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
@@ -131,7 +133,7 @@ func calculatePodResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
-	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if pod.Spec.Overhead != nil && enablePodOverhead {
 		if quantity, found := pod.Spec.Overhead[resource]; found {
 			podRequest += quantity.Value()
 		}

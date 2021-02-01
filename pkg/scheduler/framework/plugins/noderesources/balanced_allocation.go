@@ -23,8 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -71,9 +69,11 @@ func NewBalancedAllocation(_ runtime.Object, h framework.Handle) (framework.Plug
 	return &BalancedAllocation{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
-			BalancedAllocationName,
-			balancedResourceScorer,
-			defaultRequestedRatioResources,
+			Name:                             BalancedAllocationName,
+			scorer:                           balancedResourceScorer,
+			resourceToWeightMap:              defaultRequestedRatioResources,
+			enablePodOverhead:                h.FeatureGates("PodOverhead"),
+			enableBalanceAttachedNodeVolumes: h.FeatureGates("BalanceAttachedNodeVolumes"),
 		},
 	}, nil
 }
@@ -88,7 +88,7 @@ func balancedResourceScorer(requested, allocable resourceToValueMap, includeVolu
 		return 0
 	}
 
-	if includeVolumes && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && allocatableVolumes > 0 {
+	if includeVolumes && allocatableVolumes > 0 {
 		volumeFraction := float64(requestedVolumes) / float64(allocatableVolumes)
 		if volumeFraction >= 1 {
 			// if requested >= capacity, the corresponding host should never be preferred.
