@@ -383,7 +383,7 @@ EOF
           echo "COPY nsswitch.conf /etc/" >> "${docker_file_path}"
         fi
 
-        "${DOCKER[@]}" buildx build \
+        DOCKER_CLI_EXPERIMENTAL=enabled "${DOCKER[@]}" buildx build \
           --platform linux/"${arch}" \
           --load ${docker_build_opts:+"${docker_build_opts}"} \
           -q \

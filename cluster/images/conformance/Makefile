@@ -56,7 +56,7 @@ endif
 
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
 
-	docker buildx build \
+	DOCKER_CLI_EXPERIMENTAL=enabled docker buildx build \
 		--platform linux/${ARCH} \
 		--load \
 		--pull \
