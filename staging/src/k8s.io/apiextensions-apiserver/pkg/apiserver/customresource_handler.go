@@ -1092,6 +1092,18 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		storageVersion:      storageVersion,
 		waitGroup:           &utilwaitgroup.SafeWaitGroup{},
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		// spawn storage version update in background and use channels to make handlers wait
+		processedCh := make(chan struct{})
+		abortedCh := make(chan struct{})
+		r.storageVersionManager.EnqueueStorageVersionUpdate(crd, nil, processedCh, abortedCh)
+		ret.storageVersionUpdate = &storageVersionUpdate{
+			processedCh: processedCh,
+			abortedCh:   abortedCh,
+			timeout:     time.Now().Add(storageVersionUpdateTimeout),
+		}
+	}
 
 	// Copy because we cannot write to storageMap without a race
 	// as it is used without locking elsewhere.
@@ -1100,20 +1112,6 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	storageMap2[crd.UID] = ret
 	r.customStorage.Store(storageMap2)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) ||
-		!utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
-		return ret, nil
-	}
-
-	// spawn storage version update in background and use channels to make handlers wait
-	processedCh := make(chan struct{})
-	abortedCh := make(chan struct{})
-	r.storageVersionManager.EnqueueStorageVersionUpdate(crd, nil, processedCh, abortedCh)
-	ret.storageVersionUpdate = &storageVersionUpdate{
-		processedCh: processedCh,
-		abortedCh:   abortedCh,
-		timeout:     time.Now().Add(storageVersionUpdateTimeout),
-	}
 	return ret, nil
 }
 
