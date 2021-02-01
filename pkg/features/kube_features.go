@@ -297,6 +297,12 @@ const (
 	// Enables SCTP as new protocol for Service ports, NetworkPolicy, and ContainerPort in Pod/Containers definition
 	SCTPSupport featuregate.Feature = "SCTPSupport"
 
+	// owner: @rikatz
+	// alpha: v1.20
+	//
+	// Enables the endPort field in NetworkPolicy to enable a Port Range behavior in Network Policies.
+	NetworkPolicyEndPort featuregate.Feature = "NetworkPolicyEndPort"
+
 	// owner: @xing-yang
 	// alpha: v1.12
 	// beta: v1.17
@@ -728,6 +734,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RuntimeClass:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	NodeLease:                                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	SCTPSupport:                                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
+	NetworkPolicyEndPort:                           {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSnapshotDataSource:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	ProcMountType:                                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:                               {Default: false, PreRelease: featuregate.Alpha},
