@@ -1,0 +1,135 @@
+name: Build and Push k8s Release
+
+on:
+  push:
+    # Sequence of patterns matched against refs/heads
+    tags:
+    # Push events on datadog tags
+    - "*-dd*"
+permissions: write-all
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: ["linux/arm64","linux/amd64"]
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.22
+    - name: Set env
+      run: echo SANITIZED_TARGET_PLATFORM=${KUBE_BUILD_PLATFORM/\//-} >> $GITHUB_ENV
+      env:
+        KUBE_BUILD_PLATFORM: ${{ matrix.platform }}
+    - name: Cleanup disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /usr/local/share/boost
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+        sudo rm -rf /usr/local/.ghcup
+    - name: Build
+      env:
+        KUBE_BUILD_PLATFORMS: ${{ matrix.platform }}
+        KUBE_RELEASE_RUN_TESTS: n
+      run: make quick-release KUBE_BUILD_PLATFORMS=$KUBE_BUILD_PLATFORMS
+    - name: Calculate checksums
+      id: calculate_checksums
+      shell: bash
+      working-directory: _output/release-tars
+      env:
+        KUBE_BUILD_PLATFORM: ${{ matrix.platform }}
+      run: |
+        TARGET_PLATFORM="${KUBE_BUILD_PLATFORM/\//-}"
+        for TARGET_FILE in *"${TARGET_PLATFORM}".tar.gz
+        do
+          sha256sum "$TARGET_FILE" > "${TARGET_FILE}.sha256sum"
+        done
+    - uses: actions/upload-artifact@v4
+      with:
+        name: k8s_output_${{ env.SANITIZED_TARGET_PLATFORM }}
+        path: _output/release-tars
+      env:
+        SANITIZED_TARGET_PLATFORM: ${{ env.SANITIZED_TARGET_PLATFORM }}
+  release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    needs: build
+    outputs:
+      upload_url: ${{ steps.create_release_branch.outputs.upload_url }}${{ steps.create_release_tags.outputs.upload_url }}
+    steps:
+    - name: Extract branch name
+      shell: bash
+      run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+      id: extract_branch
+      env:
+        GITHUB_REF: ${{ github.ref }}
+      if: startsWith(github.ref, 'refs/heads/')
+    - name: Create Release for Branch
+      id: create_release_branch
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/heads/')
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        name: branch@${{ steps.extract_branch.outputs.branch  }}
+        tag_name: branch@${{ steps.extract_branch.outputs.branch  }}
+        draft: false
+        prerelease: false
+    - name: Extract tags name
+      shell: bash
+      run: echo "##[set-output name=tags;]$(echo ${GITHUB_REF#refs/tags/})"
+      id: extract_tags
+      env:
+        GITHUB_REF: ${{ github.ref }}
+      if: startsWith(github.ref, 'refs/tags/')
+    - name: Create Release for Tags
+      id: create_release_tags
+      uses: softprops/action-gh-release@v2
+      if: ${{ startsWith(github.ref, 'refs/tags/') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        name: ${{ steps.extract_tags.outputs.tags }}
+        tag_name: ${{ steps.extract_tags.outputs.tags }}
+        release_name: ${{ steps.extract_tags.outputs.tags }}
+        draft: false
+        prerelease: false
+  releaseassetsarm:
+    runs-on: ubuntu-latest
+    needs: release
+    strategy:
+      matrix:
+        assets: [
+           "kubernetes-client",
+           "kubernetes-node",
+           "kubernetes-server"
+        ]
+        platform: ["linux-arm64","linux-amd64"]
+        extension: ["tar.gz", "tar.gz.sha256sum"]
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        name: k8s_output_${{ matrix.platform }}
+        path: _output/release-tars
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Display structure of downloaded files
+      run: ls -R
+      working-directory: _output
+    - name: Upload Release Asset
+      id: upload-release-asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release.outputs.upload_url }}
+        asset_path: ./_output/release-tars/${{ matrix.assets }}-${{ matrix.platform }}.${{ matrix.extension}}
+        asset_name: ${{ matrix.assets }}-${{ matrix.platform }}.${{ matrix.extension }}
+        asset_content_type: application/tar+gzip
