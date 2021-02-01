@@ -100,7 +100,7 @@ func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn fun
 	// TODO: Check for valid etcd version.
 	etcdPath, err := getEtcdPath()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, installEtcd)
+		fmt.Fprint(os.Stderr, installEtcd)
 		return "", nil, fmt.Errorf("could not find etcd in PATH: %v", err)
 	}
 	etcdPort, err := getAvailablePort()
