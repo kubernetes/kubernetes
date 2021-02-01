@@ -58,7 +58,7 @@ var (
 		A successful message will be printed to stdout indicating when the specified
         condition has been met. One can use -o option to change to output destination.`))
 
-	waitExample = templates.Examples(`
+	waitExample = templates.Examples(i18n.T(`
 		# Wait for the pod "busybox1" to contain the status condition of type "Ready".
 		kubectl wait --for=condition=Ready pod/busybox1
 
@@ -67,7 +67,7 @@ var (
 
 		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command.
 		kubectl delete pod/busybox1
-		kubectl wait --for=delete pod/busybox1 --timeout=60s`)
+		kubectl wait --for=delete pod/busybox1 --timeout=60s`))
 )
 
 // errNoMatchingResources is returned when there is no resources matching a query.
