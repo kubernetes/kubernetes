@@ -1029,7 +1029,7 @@ func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podr
 }
 
 func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
-	return cm.cpuManager.GetCPUs(podUID, containerName)
+	return cm.cpuManager.GetCPUs(podUID, containerName).ToSliceNoSortInt64()
 }
 
 func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
