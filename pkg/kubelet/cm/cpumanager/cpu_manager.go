@@ -310,6 +310,11 @@ func (m *manager) removeStaleState() {
 		return
 	}
 
+	// During early Pod restore there were situation where it crashed without this.
+	if m.activePods == nil {
+		return
+	}
+
 	// We grab the lock to ensure that no new containers will grab CPUs while
 	// executing the code below. Without this lock, its possible that we end up
 	// removing state that is newly added by an asynchronous call to
