@@ -28,6 +28,7 @@ go_test(
     srcs = [
         "expiration_test.go",
         "filerenewer_test.go",
+        "main_test.go",
         "manager_test.go",
         "readwriter_test.go",
     ],
@@ -38,6 +39,7 @@ go_test(
         "//cmd/kubeadm/app/util/certs:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
+        "//cmd/kubeadm/app/util/pkiutil/testing:go_default_library",
         "//cmd/kubeadm/test:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",

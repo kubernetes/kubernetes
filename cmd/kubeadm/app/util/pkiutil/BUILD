@@ -42,6 +42,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubeadm/app/util/pkiutil/testing:all-srcs",
+    ],
     tags = ["automanaged"],
 )

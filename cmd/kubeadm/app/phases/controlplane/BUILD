@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "main_test.go",
         "manifests_test.go",
         "volumes_test.go",
     ],
@@ -18,6 +19,7 @@ go_test(
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/phases/certs:go_default_library",
+        "//cmd/kubeadm/app/util/pkiutil/testing:go_default_library",
         "//cmd/kubeadm/app/util/staticpod:go_default_library",
         "//cmd/kubeadm/test:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

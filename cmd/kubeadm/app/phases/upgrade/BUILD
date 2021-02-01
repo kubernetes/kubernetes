@@ -72,6 +72,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "compute_test.go",
+        "main_test.go",
         "policy_test.go",
         "postupgrade_test.go",
         "staticpods_test.go",
@@ -90,6 +91,7 @@ go_test(
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/etcd:go_default_library",
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
+        "//cmd/kubeadm/app/util/pkiutil/testing:go_default_library",
         "//cmd/kubeadm/test:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

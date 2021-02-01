@@ -44,7 +44,10 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["kubeconfig_test.go"],
+    srcs = [
+        "kubeconfig_test.go",
+        "main_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
@@ -52,6 +55,7 @@ go_test(
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/certs:go_default_library",
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
+        "//cmd/kubeadm/app/util/pkiutil/testing:go_default_library",
         "//cmd/kubeadm/test:go_default_library",
         "//cmd/kubeadm/test/kubeconfig:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",

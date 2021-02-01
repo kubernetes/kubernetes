@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
@@ -85,6 +86,8 @@ func TestCertsWithCSRs(t *testing.T) {
 func TestCreateSparseCerts(t *testing.T) {
 	for _, test := range certstestutil.GetSparseCertTestCases(t) {
 		t.Run(test.Name, func(t *testing.T) {
+			pkiutiltesting.Reset()
+
 			tmpdir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpdir)
 
