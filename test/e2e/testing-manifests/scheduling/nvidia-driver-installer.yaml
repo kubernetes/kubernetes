@@ -76,5 +76,6 @@ spec:
         - name: root-mount
           mountPath: /root
       containers:
-      - image: "k8s.gcr.io/pause:3.2"
+      - image: "k8s.gcr.io/pause:3.4.1"
         name: pause
+
