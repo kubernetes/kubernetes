@@ -371,6 +371,14 @@ func TestCanUseIPVSProxier(t *testing.T) {
 			ipsetVersion:  MinIPSetCheckVersion,
 			ok:            false,
 		},
+		// case 11, missing nf_conntrack_modules
+		{
+			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "ip_vs_dh"},
+			scheduler:     "dh",
+			kernelVersion: "4.19",
+			ipsetVersion:  MinIPSetCheckVersion,
+			ok:            false,
+		},
 	}
 
 	for i := range testCases {

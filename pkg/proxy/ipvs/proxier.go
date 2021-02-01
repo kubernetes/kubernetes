@@ -754,15 +754,23 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler 
 	mods = append(mods, schedulerMod)
 	wantModules.Insert(mods...)
 
+	if loadModules.HasAny(utilipvs.KernelModuleNfConntrack, utilipvs.KernelModuleNfConntrackIPV4) {
+		wantModules.Delete(utilipvs.KernelModuleNfConntrack, utilipvs.KernelModuleNfConntrackIPV4)
+	}
+
 	modules := wantModules.Difference(loadModules).UnsortedList()
 	var missingMods []string
 
+	var missingnfconntrack bool
 	for _, mod := range modules {
+		if mod == utilipvs.KernelModuleNfConntrack || mod == utilipvs.KernelModuleNfConntrackIPV4 {
+			missingnfconntrack = true
+		}
 		missingMods = append(missingMods, mod)
 	}
 
-	if !loadModules.HasAny(utilipvs.KernelModuleNfConntrack, utilipvs.KernelModuleNfConntrackIPV4) {
-		missingMods = append(missingMods, "nf_conntrack (or nf_conntrack_ipv4 for older kernels)")
+	if missingnfconntrack {
+		return false, fmt.Errorf("IPVS proxier will not be used because nf_conntrack or nf_conntrack_v4 modules are missing")
 	}
 
 	if len(missingMods) != 0 {
