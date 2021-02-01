@@ -619,8 +619,10 @@ func EncodePublicKeyPEM(key crypto.PublicKey) ([]byte, error) {
 	return pem.EncodeToMemory(&block), nil
 }
 
-// NewPrivateKey creates an RSA private key
-func NewPrivateKey(keyType x509.PublicKeyAlgorithm) (crypto.Signer, error) {
+// NewPrivateKey returns a new private key.
+var NewPrivateKey = GeneratePrivateKey
+
+func GeneratePrivateKey(keyType x509.PublicKeyAlgorithm) (crypto.Signer, error) {
 	if keyType == x509.ECDSA {
 		return ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	}

@@ -63,6 +63,7 @@ go_test(
     srcs = [
         "certs_test.go",
         "data_test.go",
+        "main_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -71,6 +72,7 @@ go_test(
         "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/util/certs:go_default_library",
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
+        "//cmd/kubeadm/app/util/pkiutil/testing:go_default_library",
         "//cmd/kubeadm/test:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
