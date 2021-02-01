@@ -444,8 +444,23 @@ func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
 			}
 		}
 	}
+
 	for key, value := range containerStateCount {
 		metrics.RunningContainerCount.WithLabelValues(key).Set(float64(value))
+	}
+	if metrics.RunningContainerCount.IsCreated() {
+		// reset runningContainerCount to avoid stale metrics.
+		// For example, in last call, there's 1 container in unknown state, then the container's state changed to running
+		// state in current call, RunningContainerCount metrics should not keep 1 container in unknown state.
+		for _, state := range []kubecontainer.State{
+			kubecontainer.ContainerStateRunning,
+			kubecontainer.ContainerStateCreated,
+			kubecontainer.ContainerStateExited,
+			kubecontainer.ContainerStateUnknown} {
+			if _, ok := containerStateCount[string(state)]; !ok {
+				metrics.RunningContainerCount.DeleteLabelValues(string(state))
+			}
+		}
 	}
 
 	// Set the number of running pods in the parameter

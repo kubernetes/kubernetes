@@ -718,3 +718,139 @@ kubelet_running_pods 2
 		})
 	}
 }
+
+func TestRunningPodAndContainerCountWithContainerStateChanged(t *testing.T) {
+	metrics.Register()
+	testPleg := newTestGenericPLEG()
+	pleg, runtime := testPleg.pleg, testPleg.runtime
+	var newTests = []struct {
+		name                 string
+		podListForEachMoment []*containertest.FakePod
+		expectedMetrics      []struct {
+			metricsName string
+			wants       string
+		}
+	}{
+		{
+			name: "test container count with 1 created container",
+			podListForEachMoment: []*containertest.FakePod{
+				{Pod: &kubecontainer.Pod{
+					ID: "1234",
+					Containers: []*kubecontainer.Container{
+						createTestContainer("c1", kubecontainer.ContainerStateRunning),
+						createTestContainer("c2", kubecontainer.ContainerStateUnknown),
+						createTestContainer("c3", kubecontainer.ContainerStateUnknown),
+						createTestContainer("c4", kubecontainer.ContainerStateCreated),
+					},
+					Sandboxes: []*kubecontainer.Container{
+						createTestContainer("s1", kubecontainer.ContainerStateRunning),
+						createTestContainer("s2", kubecontainer.ContainerStateRunning),
+						createTestContainer("s3", kubecontainer.ContainerStateUnknown),
+					},
+				}},
+				{Pod: &kubecontainer.Pod{
+					ID: "4567",
+					Containers: []*kubecontainer.Container{
+						createTestContainer("c1", kubecontainer.ContainerStateExited),
+					},
+					Sandboxes: []*kubecontainer.Container{
+						createTestContainer("s1", kubecontainer.ContainerStateRunning),
+						createTestContainer("s2", kubecontainer.ContainerStateExited),
+					},
+				}},
+			},
+			expectedMetrics: []struct {
+				metricsName string
+				wants       string
+			}{
+
+				{
+					metricsName: "kubelet_running_pods",
+					wants: `
+# HELP kubelet_running_pods [ALPHA] Number of pods currently running
+# TYPE kubelet_running_pods gauge
+kubelet_running_pods 2
+`,
+				},
+				{
+					metricsName: "kubelet_running_containers",
+					wants: `
+# HELP kubelet_running_containers [ALPHA] Number of containers currently running
+# TYPE kubelet_running_containers gauge
+kubelet_running_containers{container_state="created"} 1
+kubelet_running_containers{container_state="exited"} 1
+kubelet_running_containers{container_state="running"} 1
+kubelet_running_containers{container_state="unknown"} 2
+`,
+				},
+			},
+		},
+		{
+			name: "test container count after created container's state changed to running",
+			podListForEachMoment: []*containertest.FakePod{
+				{Pod: &kubecontainer.Pod{
+					ID: "1234",
+					Containers: []*kubecontainer.Container{
+						createTestContainer("c1", kubecontainer.ContainerStateRunning),
+						createTestContainer("c2", kubecontainer.ContainerStateUnknown),
+						createTestContainer("c3", kubecontainer.ContainerStateUnknown),
+						createTestContainer("c4", kubecontainer.ContainerStateRunning),
+					},
+					Sandboxes: []*kubecontainer.Container{
+						createTestContainer("s1", kubecontainer.ContainerStateRunning),
+						createTestContainer("s2", kubecontainer.ContainerStateRunning),
+						createTestContainer("s3", kubecontainer.ContainerStateUnknown),
+					},
+				}},
+				{Pod: &kubecontainer.Pod{
+					ID: "4567",
+					Containers: []*kubecontainer.Container{
+						createTestContainer("c1", kubecontainer.ContainerStateExited),
+					},
+					Sandboxes: []*kubecontainer.Container{
+						createTestContainer("s1", kubecontainer.ContainerStateRunning),
+						createTestContainer("s2", kubecontainer.ContainerStateExited),
+					},
+				}},
+			},
+			expectedMetrics: []struct {
+				metricsName string
+				wants       string
+			}{
+
+				{
+					metricsName: "kubelet_running_pods",
+					wants: `
+# HELP kubelet_running_pods [ALPHA] Number of pods currently running
+# TYPE kubelet_running_pods gauge
+kubelet_running_pods 2
+`,
+				},
+				{
+					metricsName: "kubelet_running_containers",
+					wants: `
+# HELP kubelet_running_containers [ALPHA] Number of containers currently running
+# TYPE kubelet_running_containers gauge
+kubelet_running_containers{container_state="exited"} 1
+kubelet_running_containers{container_state="running"} 2
+kubelet_running_containers{container_state="unknown"} 2
+`,
+				},
+			},
+		},
+	}
+
+	for _, test := range newTests {
+		tc := test
+		runtime.AllPodList = tc.podListForEachMoment
+		pleg.relist()
+		t.Run(tc.name, func(t *testing.T) {
+			for _, metric := range test.expectedMetrics {
+				testMetric := metric
+				if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(testMetric.wants), testMetric.metricsName); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
+}
