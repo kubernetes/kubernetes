@@ -267,7 +267,17 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedSucceeded:  1,
 			expectedFailed:     1,
 		},
-		"only new failed pod": {
+		"new failed pod": {
+			parallelism:       2,
+			completions:       5,
+			backoffLimit:      6,
+			activePods:        1,
+			failedPods:        1,
+			expectedCreations: 1,
+			expectedActive:    2,
+			expectedFailed:    1,
+		},
+		"only new failed pod with controller error": {
 			parallelism:        2,
 			completions:        5,
 			backoffLimit:       6,
@@ -399,12 +409,18 @@ func TestControllerSyncJob(t *testing.T) {
 			// We need requeue syncJob task if podController error
 			if tc.podControllerError != nil {
 				if err == nil {
-					t.Errorf("Syncing jobs would return error when podController exception")
+					t.Error("Syncing jobs expected to return error on podControl exception")
 				}
-			} else {
-				if err != nil && (tc.podLimit == 0 || fakePodControl.CreateCallCount < tc.podLimit) {
-					t.Errorf("Unexpected error when syncing jobs: %v", err)
+			} else if tc.failedPods > 0 && tc.expectedCondition == nil {
+				if err == nil {
+					t.Error("Syncing jobs expected to return error when there are new failed pods and Job didn't finish")
 				}
+			} else if tc.podLimit != 0 && fakePodControl.CreateCallCount > tc.podLimit {
+				if err == nil {
+					t.Error("Syncing jobs expected to return error when reached the podControl limit")
+				}
+			} else if err != nil {
+				t.Errorf("Unexpected error when syncing jobs: %v", err)
 			}
 			if forget != tc.jobKeyForget {
 				t.Errorf("Unexpected forget value. Expected %v, saw %v\n", tc.jobKeyForget, forget)
