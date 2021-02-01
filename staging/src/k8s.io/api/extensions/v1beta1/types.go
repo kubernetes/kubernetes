@@ -1478,10 +1478,12 @@ type NetworkPolicyPort struct {
 	// +optional
 	Port *intstr.IntOrString `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
 
-	// If set, indicates that a range of ports, from port to endPort inclusive
+	// If set, indicates that the range of ports from port to endPort, inclusive,
 	// should be allowed by the policy. This field cannot be defined if the port field
 	// is not defined or if the port field is defined as a named (string) port.
-	// Also the endPort must be equal or greater than port
+	// The endPort must be equal or greater than port.
+	// This feature is in Alpha state and should be enabled using the Feature Gate 
+	// "NetworkPolicyEndPort".
 	// +optional
 	EndPort *int32 `json:"endPort,omitempty" protobuf:"bytes,3,opt,name=endPort"`
 }

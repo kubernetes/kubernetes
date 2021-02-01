@@ -69,11 +69,11 @@ func ValidateNetworkPolicyPort(port *networking.NetworkPolicyPort, portPath *fie
 				allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.IntVal, msg))
 			}
 			if port.EndPort != nil && *port.EndPort < port.Port.IntVal {
-				allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), port.Port.IntVal, "endPort field must be equal or greater than port field"))
+				allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), port.Port.IntVal, "must be greater than or equal to `port`"))
 			}
 		} else {
 			if port.EndPort != nil {
-				allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), *port.EndPort, "endPort cannot be defined when port is non-numeric"))
+				allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), *port.EndPort, "may not be specified when `port` is non-numeric"))
 			}
 			for _, msg := range validation.IsValidPortName(port.Port.StrVal) {
 				allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.StrVal, msg))
@@ -81,7 +81,7 @@ func ValidateNetworkPolicyPort(port *networking.NetworkPolicyPort, portPath *fie
 		}
 	} else {
 		if port.EndPort != nil {
-			allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), *port.EndPort, "endPort cannot be defined when port is not defined"))
+			allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), *port.EndPort, "may not be specified when `port` is not specified"))
 		}
 	}
 
