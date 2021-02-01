@@ -71,6 +71,8 @@ type CreateCronJobOptions struct {
 	Builder          *resource.Builder
 	FieldManager     string
 	CreateAnnotation bool
+	// Labels to assign to the CronJob (optional)
+	Labels string
 
 	genericclioptions.IOStreams
 }
@@ -110,6 +112,7 @@ func NewCmdCreateCronJob(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 	cmd.MarkFlagRequired("schedule")
 	cmd.Flags().StringVar(&o.Restart, "restart", o.Restart, "job's restart policy. supported values: OnFailure, Never")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
 
 	return cmd
 }
@@ -193,7 +196,10 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 // Run performs the execution of 'create cronjob' sub command
 func (o *CreateCronJobOptions) Run() error {
 	if o.Client != nil {
-		cronJob := o.createCronJob()
+		cronJob, err := o.createCronJob()
+		if err != nil {
+			return err
+		}
 		if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, cronJob, scheme.DefaultJSONEncoder()); err != nil {
 			return err
 		}
@@ -220,7 +226,10 @@ func (o *CreateCronJobOptions) Run() error {
 	}
 
 	// TODO: drop this condition when beta disappears in 1.25
-	cronJobBeta := o.createCronJobBeta()
+	cronJobBeta, err := o.createCronJobBeta()
+	if err != nil {
+		return err
+	}
 	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, cronJobBeta, scheme.DefaultJSONEncoder()); err != nil {
 		return err
 	}
@@ -247,7 +256,7 @@ func (o *CreateCronJobOptions) Run() error {
 
 }
 
-func (o *CreateCronJobOptions) createCronJobBeta() *batchv1beta1.CronJob {
+func (o *CreateCronJobOptions) createCronJobBeta() (*batchv1beta1.CronJob, error) {
 	cronjob := &batchv1beta1.CronJob{
 		TypeMeta: metav1.TypeMeta{APIVersion: batchv1beta1.SchemeGroupVersion.String(), Kind: "CronJob"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -276,13 +285,19 @@ func (o *CreateCronJobOptions) createCronJobBeta() *batchv1beta1.CronJob {
 			},
 		},
 	}
+
+	var err error
+	cronjob.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
+	}
 	if o.EnforceNamespace {
 		cronjob.Namespace = o.Namespace
 	}
-	return cronjob
+	return cronjob, nil
 }
 
-func (o *CreateCronJobOptions) createCronJob() *batchv1.CronJob {
+func (o *CreateCronJobOptions) createCronJob() (*batchv1.CronJob, error) {
 	cronjob := &batchv1.CronJob{
 		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "CronJob"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -314,5 +329,11 @@ func (o *CreateCronJobOptions) createCronJob() *batchv1.CronJob {
 	if o.EnforceNamespace {
 		cronjob.Namespace = o.Namespace
 	}
-	return cronjob
+
+	var err error
+	cronjob.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
+	}
+	return cronjob, nil
 }

@@ -111,6 +111,8 @@ type CreateSecretOptions struct {
 	CreateAnnotation bool
 	Namespace        string
 	EnforceNamespace bool
+	// Labels to assign to the Secret (optional)
+	Labels string
 
 	Client         corev1client.CoreV1Interface
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -156,6 +158,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IO
 	cmd.Flags().BoolVar(&o.AppendHash, "append-hash", o.AppendHash, "Append a hash of the secret to its name.")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
 
 	return cmd
 }
@@ -287,6 +290,12 @@ func (o *CreateSecretOptions) createSecret() (*corev1.Secret, error) {
 			return nil, err
 		}
 		secret.Name = fmt.Sprintf("%s-%s", secret.Name, hash)
+	}
+
+	var err error
+	secret.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
 	}
 
 	return secret, nil

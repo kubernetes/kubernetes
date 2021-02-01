@@ -71,6 +71,8 @@ type CreateDeploymentOptions struct {
 	EnforceNamespace bool
 	FieldManager     string
 	CreateAnnotation bool
+	// Labels to assign to the Deployment (optional)
+	Labels string
 
 	Client         appsv1client.AppsV1Interface
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -117,6 +119,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStr
 	cmd.Flags().Int32Var(&o.Port, "port", o.Port, "The port that this container exposes.")
 	cmd.Flags().Int32VarP(&o.Replicas, "replicas", "r", o.Replicas, "Number of replicas to create. Default is 1.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
 
 	return cmd
 }
@@ -180,7 +183,10 @@ func (o *CreateDeploymentOptions) Validate() error {
 
 // Run performs the execution of 'create deployment' sub command
 func (o *CreateDeploymentOptions) Run() error {
-	deploy := o.createDeployment()
+	deploy, err := o.createDeployment()
+	if err != nil {
+		return err
+	}
 
 	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, deploy, scheme.DefaultJSONEncoder()); err != nil {
 		return err
@@ -207,7 +213,7 @@ func (o *CreateDeploymentOptions) Run() error {
 	return o.PrintObj(deploy)
 }
 
-func (o *CreateDeploymentOptions) createDeployment() *appsv1.Deployment {
+func (o *CreateDeploymentOptions) createDeployment() (*appsv1.Deployment, error) {
 	labels := map[string]string{"app": o.Name}
 	selector := metav1.LabelSelector{MatchLabels: labels}
 	namespace := ""
@@ -237,7 +243,16 @@ func (o *CreateDeploymentOptions) createDeployment() *appsv1.Deployment {
 	if o.Port >= 0 && len(deploy.Spec.Template.Spec.Containers) > 0 {
 		deploy.Spec.Template.Spec.Containers[0].Ports = []corev1.ContainerPort{{ContainerPort: o.Port}}
 	}
-	return deploy
+
+	cliLabels, err := cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range cliLabels {
+		deploy.Labels[k] = v
+	}
+
+	return deploy, nil
 }
 
 // buildPodSpec parses the image strings and assemble them into the Containers

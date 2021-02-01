@@ -31,7 +31,8 @@ func TestCreateServiceAccount(t *testing.T) {
 	}{
 		"service account": {
 			options: &ServiceAccountOpts{
-				Name: "my-service-account",
+				Name:   "my-service-account",
+				Labels: "key1=val1,key2=val2,key3=val3",
 			},
 			expected: &corev1.ServiceAccount{
 				TypeMeta: metav1.TypeMeta{
@@ -40,6 +41,11 @@ func TestCreateServiceAccount(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-service-account",
+					Labels: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+						"key3": "val3",
+					},
 				},
 			},
 		},

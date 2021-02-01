@@ -138,6 +138,8 @@ type CreateRoleOptions struct {
 	PrintObj         func(obj runtime.Object) error
 	FieldManager     string
 	CreateAnnotation bool
+	// Labels to assign to the Role (optional)
+	Labels string
 
 	genericclioptions.IOStreams
 }
@@ -177,6 +179,8 @@ func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) 
 	cmd.Flags().StringSlice("resource", []string{}, "Resource that the rule applies to")
 	cmd.Flags().StringArrayVar(&o.ResourceNames, "resource-name", o.ResourceNames, "Resource in the white list that the rule applies to, repeat this flag for multiple items")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
+
 	return cmd
 }
 
@@ -376,6 +380,11 @@ func (o *CreateRoleOptions) RunCreateRole() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	role.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return err
 	}
 
 	return o.PrintObj(role)

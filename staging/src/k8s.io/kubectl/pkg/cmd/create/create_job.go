@@ -71,6 +71,8 @@ type CreateJobOptions struct {
 	Builder          *resource.Builder
 	FieldManager     string
 	CreateAnnotation bool
+	// Labels to assign to the Job (optional)
+	Labels string
 
 	genericclioptions.IOStreams
 }
@@ -107,6 +109,8 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmd.Flags().StringVar(&o.Image, "image", o.Image, "Image name to run.")
 	cmd.Flags().StringVar(&o.From, "from", o.From, "The name of the resource to create a Job from (only cronjob is supported).")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
+
 	return cmd
 }
 
@@ -172,9 +176,15 @@ func (o *CreateJobOptions) Validate() error {
 
 // Run performs the execution of 'create job' sub command
 func (o *CreateJobOptions) Run() error {
-	var job *batchv1.Job
+	var (
+		job *batchv1.Job
+		err error
+	)
 	if len(o.Image) > 0 {
-		job = o.createJob()
+		job, err = o.createJob()
+		if err != nil {
+			return err
+		}
 	} else {
 		infos, err := o.Builder.
 			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
@@ -226,7 +236,7 @@ func (o *CreateJobOptions) Run() error {
 	return o.PrintObj(job)
 }
 
-func (o *CreateJobOptions) createJob() *batchv1.Job {
+func (o *CreateJobOptions) createJob() (*batchv1.Job, error) {
 	job := &batchv1.Job{
 		// this is ok because we know exactly how we want to be serialized
 		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
@@ -251,7 +261,14 @@ func (o *CreateJobOptions) createJob() *batchv1.Job {
 	if o.EnforceNamespace {
 		job.Namespace = o.Namespace
 	}
-	return job
+
+	var err error
+	job.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
+	}
+
+	return job, nil
 }
 
 func (o *CreateJobOptions) createJobFromCronJobV1Beta1(cronJob *batchv1beta1.CronJob) *batchv1.Job {
@@ -299,7 +316,7 @@ func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1.CronJob) *batch
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        o.Name,
 			Annotations: annotations,
-			Labels:      cronJob.Spec.JobTemplate.Labels,
+			Labels:      cronJob.Labels,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: batchv1beta1.SchemeGroupVersion.String(),

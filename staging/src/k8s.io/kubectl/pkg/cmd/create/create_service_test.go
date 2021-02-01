@@ -37,6 +37,7 @@ func TestCreateServices(t *testing.T) {
 		clusterip    string
 		externalName string
 		nodeport     int
+		labels       string
 		expected     *v1.Service
 		expectErr    bool
 	}{
@@ -45,10 +46,16 @@ func TestCreateServices(t *testing.T) {
 			tcp:         []string{"456", "321:908"},
 			clusterip:   "",
 			serviceType: v1.ServiceTypeClusterIP,
+			labels:      "key1=val1,key2=val2,key3=val3",
 			expected: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:   "clusterip-ok",
-					Labels: map[string]string{"app": "clusterip-ok"},
+					Name: "clusterip-ok",
+					Labels: map[string]string{
+						"app":  "clusterip-ok",
+						"key1": "val1",
+						"key2": "val2",
+						"key3": "val3",
+					},
 				},
 				Spec: v1.ServiceSpec{Type: "ClusterIP",
 					Ports: []v1.ServicePort{{Name: "456", Protocol: "TCP", Port: 456, TargetPort: intstr.IntOrString{Type: 0, IntVal: 456, StrVal: ""}, NodePort: 0},
@@ -250,6 +257,7 @@ func TestCreateServices(t *testing.T) {
 				ClusterIP:    tc.clusterip,
 				NodePort:     tc.nodeport,
 				ExternalName: tc.externalName,
+				Labels:       tc.labels,
 			}
 
 			var service *v1.Service

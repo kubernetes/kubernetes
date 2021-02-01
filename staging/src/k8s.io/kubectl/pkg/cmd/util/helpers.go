@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
+	"k8s.io/kubectl/pkg/util/i18n"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -435,6 +436,11 @@ func AddFieldManagerFlagVar(cmd *cobra.Command, p *string, defaultFieldManager s
 	cmd.Flags().StringVar(p, "field-manager", defaultFieldManager, "Name of the manager used to track field ownership.")
 }
 
+// AddLabelFlagVar adds label flag to a command.
+func AddLabelFlagVar(cmd *cobra.Command, value *string) {
+	cmd.Flags().StringVarP(value, "label", "b", *value, i18n.T("Add labels as key=val pairs (e.g. -b label1=val1,label2=val2,label3=val3)."))
+}
+
 func AddContainerVarFlags(cmd *cobra.Command, p *string, containerName string) {
 	cmd.Flags().StringVarP(p, "container", "c", containerName, "Container name. If omitted, use the kubectl.kubernetes.io/default-container annotation for selecting the container to be attached or the first container in the pod will be chosen")
 }
@@ -745,4 +751,24 @@ func Warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
 		newGeneratorName,
 		oldGeneratorName,
 	)
+}
+
+// ParseLabels turns a string representation of a label set into a map[string]string
+func ParseLabels(labelSpec string) (map[string]string, error) {
+	if len(labelSpec) == 0 {
+		return nil, nil
+	}
+	labels := map[string]string{}
+	labelSpecs := strings.Split(labelSpec, ",")
+	for ix := range labelSpecs {
+		labelSpec := strings.Split(labelSpecs[ix], "=")
+		if len(labelSpec) != 2 {
+			return nil, fmt.Errorf("unexpected label spec: %s", labelSpecs[ix])
+		}
+		if len(labelSpec[0]) == 0 {
+			return nil, fmt.Errorf("unexpected empty label key")
+		}
+		labels[labelSpec[0]] = labelSpec[1]
+	}
+	return labels, nil
 }

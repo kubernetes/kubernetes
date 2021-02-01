@@ -101,6 +101,7 @@ func TestCreateSecretTLS(t *testing.T) {
 		tlsKey        string
 		tlsCert       string
 		appendHash    bool
+		labels        string
 		expected      *corev1.Secret
 		expectErr     bool
 	}{
@@ -108,6 +109,7 @@ func TestCreateSecretTLS(t *testing.T) {
 			tlsSecretName: "foo",
 			tlsKey:        validKeyPath,
 			tlsCert:       validCertPath,
+			labels:        "key1=val1,key2=val2,key3=val3",
 			expected: &corev1.Secret{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: corev1.SchemeGroupVersion.String(),
@@ -115,6 +117,11 @@ func TestCreateSecretTLS(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
+					Labels: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+						"key3": "val3",
+					},
 				},
 				Type: corev1.SecretTypeTLS,
 				Data: map[string][]byte{
@@ -173,6 +180,7 @@ func TestCreateSecretTLS(t *testing.T) {
 				Key:        test.tlsKey,
 				Cert:       test.tlsCert,
 				AppendHash: test.appendHash,
+				Labels:     test.labels,
 			}
 			secretTLS, err := secretTLSOptions.createSecretTLS()
 

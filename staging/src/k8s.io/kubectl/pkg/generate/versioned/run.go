@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/kubectl/pkg/cmd/util"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/generate"
 )
@@ -36,7 +37,7 @@ func getLabels(params map[string]string, name string) (map[string]string, error)
 	var labels map[string]string
 	var err error
 	if found && len(labelString) > 0 {
-		labels, err = generate.ParseLabels(labelString)
+		labels, err = util.ParseLabels(labelString)
 		if err != nil {
 			return nil, err
 		}

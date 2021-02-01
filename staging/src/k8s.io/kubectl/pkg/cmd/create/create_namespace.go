@@ -55,6 +55,8 @@ type NamespaceOptions struct {
 	DryRunVerifier   *resource.DryRunVerifier
 	CreateAnnotation bool
 	FieldManager     string
+	// Labels to assign to the Namespace (optional)
+	Labels string
 
 	Client *coreclient.CoreV1Client
 
@@ -96,6 +98,7 @@ func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
 
 	return cmd
 }
@@ -144,8 +147,11 @@ func (o *NamespaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 
 // Run calls the CreateSubcommandOptions.Run in NamespaceOpts instance
 func (o *NamespaceOptions) Run() error {
-	namespace := o.createNamespace()
-	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, namespace, scheme.DefaultJSONEncoder()); err != nil {
+	namespace, err := o.createNamespace()
+	if err != nil {
+		return err
+	}
+	if err = util.CreateOrUpdateAnnotation(o.CreateAnnotation, namespace, scheme.DefaultJSONEncoder()); err != nil {
 		return err
 	}
 
@@ -160,7 +166,6 @@ func (o *NamespaceOptions) Run() error {
 			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
-		var err error
 		namespace, err = o.Client.Namespaces().Create(context.TODO(), namespace, createOptions)
 		if err != nil {
 			return err
@@ -170,12 +175,18 @@ func (o *NamespaceOptions) Run() error {
 }
 
 // createNamespace outputs a namespace object using the configured fields
-func (o *NamespaceOptions) createNamespace() *corev1.Namespace {
+func (o *NamespaceOptions) createNamespace() (*corev1.Namespace, error) {
 	namespace := &corev1.Namespace{
 		TypeMeta:   metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "Namespace"},
 		ObjectMeta: metav1.ObjectMeta{Name: o.Name},
 	}
-	return namespace
+
+	var err error
+	namespace.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
+	}
+	return namespace, nil
 }
 
 // Validate validates required fields are set to support structured generation

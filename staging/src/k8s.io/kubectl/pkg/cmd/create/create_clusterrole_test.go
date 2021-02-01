@@ -45,6 +45,7 @@ func TestCreateClusterRole(t *testing.T) {
 		resourceNames       string
 		aggregationRule     string
 		expectedClusterRole *rbac.ClusterRole
+		labels              string
 	}{
 		"test-duplicate-resources": {
 			verbs:     "get,watch,list",
@@ -146,6 +147,30 @@ func TestCreateClusterRole(t *testing.T) {
 				},
 			},
 		},
+		"create_clusterrole_with_label_multiple_labels": {
+			verbs:     "get,watch,list",
+			resources: "pods",
+			labels:    "key1=val1,key2=val2,key3=val3",
+			expectedClusterRole: &rbac.ClusterRole{
+				TypeMeta: metav1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "ClusterRole"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterRoleName,
+					Labels: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+						"key3": "val3",
+					},
+				},
+				Rules: []rbac.PolicyRule{
+					{
+						Verbs:         []string{"get", "watch", "list"},
+						Resources:     []string{"pods"},
+						APIGroups:     []string{""},
+						ResourceNames: []string{},
+					},
+				},
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -157,6 +182,7 @@ func TestCreateClusterRole(t *testing.T) {
 		cmd.Flags().Set("resource", test.resources)
 		cmd.Flags().Set("non-resource-url", test.nonResourceURL)
 		cmd.Flags().Set("aggregation-rule", test.aggregationRule)
+		cmd.Flags().Set("label", test.labels)
 		if test.resourceNames != "" {
 			cmd.Flags().Set("resource-name", test.resourceNames)
 		}

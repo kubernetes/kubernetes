@@ -63,6 +63,8 @@ type PriorityClassOptions struct {
 	PreemptionPolicy string
 	FieldManager     string
 	CreateAnnotation bool
+	// Labels to assign to the PriorityClass (optional)
+	Labels string
 
 	Client         *schedulingv1client.SchedulingV1Client
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -108,6 +110,8 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IO
 	cmd.Flags().StringVar(&o.Description, "description", o.Description, i18n.T("description is an arbitrary string that usually provides guidelines on when this priority class should be used."))
 	cmd.Flags().StringVar(&o.PreemptionPolicy, "preemption-policy", o.PreemptionPolicy, i18n.T("preemption-policy is the policy for preempting pods with lower priority."))
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
+
 	return cmd
 }
 
@@ -186,7 +190,7 @@ func (o *PriorityClassOptions) Run() error {
 
 func (o *PriorityClassOptions) createPriorityClass() (*schedulingv1.PriorityClass, error) {
 	preemptionPolicy := corev1.PreemptionPolicy(o.PreemptionPolicy)
-	return &schedulingv1.PriorityClass{
+	priorityClass := &schedulingv1.PriorityClass{
 		// this is ok because we know exactly how we want to be serialized
 		TypeMeta: metav1.TypeMeta{APIVersion: schedulingv1.SchemeGroupVersion.String(), Kind: "PriorityClass"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -196,5 +200,12 @@ func (o *PriorityClassOptions) createPriorityClass() (*schedulingv1.PriorityClas
 		GlobalDefault:    o.GlobalDefault,
 		Description:      o.Description,
 		PreemptionPolicy: &preemptionPolicy,
-	}, nil
+	}
+
+	var err error
+	priorityClass.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
+	}
+	return priorityClass, nil
 }

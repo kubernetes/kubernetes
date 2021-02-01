@@ -90,6 +90,8 @@ type ConfigMapOptions struct {
 	EnvFileSource string
 	// AppendHash; if true, derive a hash from the ConfigMap and append it to the name
 	AppendHash bool
+	// Labels to assign to the ConfigMap (optional)
+	Labels string
 
 	FieldManager     string
 	CreateAnnotation bool
@@ -142,6 +144,8 @@ func NewCmdCreateConfigMap(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	cmd.Flags().BoolVar(&o.AppendHash, "append-hash", o.AppendHash, "Append a hash of the configmap to its name.")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
 
 	return cmd
 }
@@ -283,6 +287,12 @@ func (o *ConfigMapOptions) createConfigMap() (*corev1.ConfigMap, error) {
 			return nil, err
 		}
 		configMap.Name = fmt.Sprintf("%s-%s", configMap.Name, hash)
+	}
+
+	var err error
+	configMap.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
 	}
 
 	return configMap, nil

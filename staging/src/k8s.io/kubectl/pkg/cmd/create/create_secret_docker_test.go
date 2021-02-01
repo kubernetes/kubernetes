@@ -42,6 +42,7 @@ func TestCreateSecretDockerRegistry(t *testing.T) {
 		dockerPassword           string
 		dockerServer             string
 		appendHash               bool
+		labels                   string
 		expected                 *corev1.Secret
 		expectErr                bool
 	}{
@@ -51,6 +52,7 @@ func TestCreateSecretDockerRegistry(t *testing.T) {
 			dockerPassword:           password,
 			dockerEmail:              email,
 			dockerServer:             server,
+			labels:                   "key1=val1,key2=val2,key3=val3",
 			expected: &corev1.Secret{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: corev1.SchemeGroupVersion.String(),
@@ -58,6 +60,11 @@ func TestCreateSecretDockerRegistry(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
+					Labels: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+						"key3": "val3",
+					},
 				},
 				Type: corev1.SecretTypeDockerConfigJson,
 				Data: map[string][]byte{
@@ -165,6 +172,7 @@ func TestCreateSecretDockerRegistry(t *testing.T) {
 				Password:   test.dockerPassword,
 				Server:     test.dockerServer,
 				AppendHash: test.appendHash,
+				Labels:     test.labels,
 			}
 			err := secretDockerRegistryOptions.Validate()
 			if err == nil {

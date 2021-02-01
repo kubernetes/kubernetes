@@ -59,6 +59,7 @@ func TestCreatePriorityClass(t *testing.T) {
 	cmd.Flags().Set("dry-run", "client")
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("preemption-policy", "Never")
+	cmd.Flags().Set("label", "k1=v1,k2=v2")
 
 	printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
 	printFlags.OutputFormat = &outputFormat

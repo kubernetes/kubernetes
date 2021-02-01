@@ -64,6 +64,8 @@ type QuotaOpts struct {
 	FieldManager     string
 	Namespace        string
 	EnforceNamespace bool
+	// Labels to assign to the Quota (optional)
+	Labels string
 
 	Client         *coreclient.CoreV1Client
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -106,6 +108,8 @@ func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 	cmd.Flags().StringVar(&o.Hard, "hard", o.Hard, i18n.T("A comma-delimited set of resource=quantity pairs that define a hard limit."))
 	cmd.Flags().StringVar(&o.Scopes, "scopes", o.Scopes, i18n.T("A comma-delimited set of quota scopes that must all match each object tracked by the quota."))
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
+
 	return cmd
 }
 
@@ -220,6 +224,11 @@ func (o *QuotaOpts) createQuota() (*corev1.ResourceQuota, error) {
 
 	resourceQuota.Spec.Hard = resourceList
 	resourceQuota.Spec.Scopes = scopes
+
+	resourceQuota.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
+	}
 
 	return resourceQuota, nil
 }

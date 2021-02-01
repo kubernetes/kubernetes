@@ -73,6 +73,8 @@ type ServiceOptions struct {
 	CreateAnnotation bool
 	Namespace        string
 	EnforceNamespace bool
+	// Labels to assign to the Service (optional)
+	Labels string
 
 	Client         corev1client.CoreV1Interface
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -171,6 +173,15 @@ func (o *ServiceOptions) createService() (*corev1.Service, error) {
 	// setup default label and selector
 	labels := map[string]string{}
 	labels["app"] = o.Name
+
+	cliLabels, err := cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range cliLabels {
+		labels[k] = v
+	}
+
 	selector := map[string]string{}
 	selector["app"] = o.Name
 
@@ -263,6 +274,7 @@ func NewCmdCreateServiceClusterIP(f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().StringVar(&o.ClusterIP, "clusterip", o.ClusterIP, i18n.T("Assign your own ClusterIP or set to 'None' for a 'headless' service (no loadbalancing)."))
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
 
 	return cmd
 }
@@ -301,6 +313,8 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericclioptions.
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "Port pairs can be specified as '<port>:<targetPort>'.")
 	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
+
 	return cmd
 }
 
@@ -337,6 +351,8 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericcliopti
 	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "Port pairs can be specified as '<port>:<targetPort>'.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
+
 	return cmd
 }
 
@@ -379,6 +395,8 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericcliopti
 	cmd.MarkFlagRequired("external-name")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
+
 	return cmd
 }
 

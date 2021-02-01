@@ -68,6 +68,8 @@ type PodDisruptionBudgetOpts struct {
 	FieldManager     string
 	Namespace        string
 	EnforceNamespace bool
+	// Labels to assign to the PodDisruptionBudget (optional)
+	Labels string
 
 	Client         *policyclient.PolicyV1beta1Client
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -112,6 +114,8 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, ioStreams genericcliopti
 	cmd.Flags().StringVar(&o.MaxUnavailable, "max-unavailable", o.MaxUnavailable, i18n.T("The maximum number or percentage of unavailable pods this budget requires."))
 	cmd.Flags().StringVar(&o.Selector, "selector", o.Selector, i18n.T("A label selector to use for this budget. Only equality-based selector requirements are supported."))
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
+
 	return cmd
 }
 
@@ -261,6 +265,11 @@ func (o *PodDisruptionBudgetOpts) createPodDisruptionBudgets() (*policyv1beta1.P
 	case len(o.MaxUnavailable) > 0:
 		maxUnavailable := intstr.Parse(o.MaxUnavailable)
 		podDisruptionBudget.Spec.MaxUnavailable = &maxUnavailable
+	}
+
+	podDisruptionBudget.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
 	}
 
 	return podDisruptionBudget, nil

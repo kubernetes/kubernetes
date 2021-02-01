@@ -34,6 +34,7 @@ func TestCreateConfigMap(t *testing.T) {
 		fromLiteral   []string
 		fromFile      []string
 		fromEnvFile   string
+		labels        string
 		setup         func(t *testing.T, configMapOptions *ConfigMapOptions) func()
 
 		expected  *corev1.ConfigMap
@@ -395,6 +396,51 @@ func TestCreateConfigMap(t *testing.T) {
 			fromEnvFile:   "foo",
 			expectErr:     true,
 		},
+		"create_configmap_with_label": {
+			configMapName: "foo",
+			labels:        "key1=val1",
+			expected: &corev1.ConfigMap{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: corev1.SchemeGroupVersion.String(),
+					Kind:       "ConfigMap",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+					Labels: map[string]string{
+						"key1": "val1",
+					},
+				},
+				Data:       map[string]string{},
+				BinaryData: map[string][]byte{},
+			},
+			expectErr: false,
+		},
+		"create_configmap_with_label_multiple_labels": {
+			configMapName: "foo",
+			labels:        "key1=val1,key2=val2,key3=val3",
+			expected: &corev1.ConfigMap{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: corev1.SchemeGroupVersion.String(),
+					Kind:       "ConfigMap",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+					Labels: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+						"key3": "val3",
+					},
+				},
+				Data:       map[string]string{},
+				BinaryData: map[string][]byte{},
+			},
+			expectErr: false,
+		},
+		"create_configmap_with_label_invalid_labels": {
+			configMapName: "foo",
+			labels:        "key1=val1,key2-val2,key3=val3",
+			expectErr:     true,
+		},
 	}
 
 	// run all the tests
@@ -407,6 +453,7 @@ func TestCreateConfigMap(t *testing.T) {
 				FileSources:    test.fromFile,
 				LiteralSources: test.fromLiteral,
 				EnvFileSource:  test.fromEnvFile,
+				Labels:         test.labels,
 			}
 
 			if test.setup != nil {

@@ -55,6 +55,7 @@ func TestCreateSecretGeneric(t *testing.T) {
 		fromFile    []string
 		fromEnvFile string
 		appendHash  bool
+		labels      string
 		setup       func(t *testing.T, secretGenericOptions *CreateSecretOptions) func()
 
 		expected  *corev1.Secret
@@ -62,6 +63,7 @@ func TestCreateSecretGeneric(t *testing.T) {
 	}{
 		"create_secret_foo": {
 			secretName: "foo",
+			labels:     "key1=val1,key2=val2,key3=val3",
 			expected: &corev1.Secret{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: corev1.SchemeGroupVersion.String(),
@@ -69,6 +71,11 @@ func TestCreateSecretGeneric(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
+					Labels: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+						"key3": "val3",
+					},
 				},
 				Data: map[string][]byte{},
 			},
@@ -471,6 +478,7 @@ func TestCreateSecretGeneric(t *testing.T) {
 				FileSources:    test.fromFile,
 				LiteralSources: test.fromLiteral,
 				EnvFileSource:  test.fromEnvFile,
+				Labels:         test.labels,
 			}
 			if test.setup != nil {
 				if teardown := test.setup(t, &secretOptions); teardown != nil {

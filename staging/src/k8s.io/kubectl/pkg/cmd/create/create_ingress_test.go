@@ -164,7 +164,9 @@ func TestCreateIngress(t *testing.T) {
 		rules          []string
 		ingressclass   string
 		annotations    []string
+		labels         string
 		expected       *networkingv1.Ingress
+		expectErr      bool
 	}{
 		"catch all host and default backend with default TLS returns empty TLS": {
 			rules: []string{
@@ -173,6 +175,7 @@ func TestCreateIngress(t *testing.T) {
 			ingressclass:   ingressClass,
 			defaultbackend: "service1:https",
 			annotations:    []string{},
+			labels:         "key1=val1,key2=val2,key3=val3",
 			expected: &networkingv1.Ingress{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: networkingv1.SchemeGroupVersion.String(),
@@ -181,6 +184,11 @@ func TestCreateIngress(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        ingressName,
 					Annotations: map[string]string{},
+					Labels: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+						"key3": "val3",
+					},
 				},
 				Spec: networkingv1.IngressSpec{
 					IngressClassName: &ingressClass,
@@ -512,8 +520,15 @@ func TestCreateIngress(t *testing.T) {
 				Annotations:    tc.annotations,
 				DefaultBackend: tc.defaultbackend,
 				Rules:          tc.rules,
+				Labels:         tc.labels,
 			}
-			ingress := o.createIngress()
+			ingress, err := o.createIngress()
+			if !tc.expectErr && err != nil {
+				t.Errorf("test %s, unexpected error: %v", name, err)
+			}
+			if tc.expectErr && err == nil {
+				t.Errorf("test %s was expecting an error but no error occurred", name)
+			}
 			if !apiequality.Semantic.DeepEqual(ingress, tc.expected) {
 				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, ingress)
 			}

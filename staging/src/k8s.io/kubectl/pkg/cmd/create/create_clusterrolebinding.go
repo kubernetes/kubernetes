@@ -57,6 +57,8 @@ type ClusterRoleBindingOptions struct {
 	ServiceAccounts  []string
 	FieldManager     string
 	CreateAnnotation bool
+	// Labels to assign to the ClusterRoleBinding (optional)
+	Labels string
 
 	Client         rbacclientv1.RbacV1Interface
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -104,6 +106,8 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptio
 	cmd.Flags().StringArrayVar(&o.Groups, "group", o.Groups, "Groups to bind to the clusterrole")
 	cmd.Flags().StringArrayVar(&o.ServiceAccounts, "serviceaccount", o.ServiceAccounts, "Service accounts to bind to the clusterrole, in the format <namespace>:<name>")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
+
 	return cmd
 }
 
@@ -188,6 +192,12 @@ func (o *ClusterRoleBindingOptions) createClusterRoleBinding() (*rbacv1.ClusterR
 			Kind:     "ClusterRole",
 			Name:     o.ClusterRole,
 		},
+	}
+
+	var err error
+	clusterRoleBinding.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
 	}
 
 	for _, user := range o.Users {

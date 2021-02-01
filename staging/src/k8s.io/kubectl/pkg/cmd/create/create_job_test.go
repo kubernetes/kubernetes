@@ -68,16 +68,24 @@ func TestCreateJobValidation(t *testing.T) {
 func TestCreateJob(t *testing.T) {
 	jobName := "test-job"
 	tests := map[string]struct {
-		image    string
-		command  []string
-		expected *batchv1.Job
+		image     string
+		command   []string
+		labels    string
+		expected  *batchv1.Job
+		expectErr bool
 	}{
 		"just image": {
-			image: "busybox",
+			image:  "busybox",
+			labels: "key1=val1,key2=val2,key3=val3",
 			expected: &batchv1.Job{
 				TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: jobName,
+					Labels: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+						"key3": "val3",
+					},
 				},
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{
@@ -126,8 +134,15 @@ func TestCreateJob(t *testing.T) {
 				Name:    jobName,
 				Image:   tc.image,
 				Command: tc.command,
+				Labels:  tc.labels,
 			}
-			job := o.createJob()
+			job, err := o.createJob()
+			if !tc.expectErr && err != nil {
+				t.Errorf("test %s, unexpected error: %v", name, err)
+			}
+			if tc.expectErr && err == nil {
+				t.Errorf("test %s was expecting an error but no error occurred", name)
+			}
 			if !apiequality.Semantic.DeepEqual(job, tc.expected) {
 				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, job)
 			}
@@ -204,6 +219,13 @@ func TestCreateJobFromCronJobV1Beta1(t *testing.T) {
 func TestCreateJobFromCronJob(t *testing.T) {
 	jobName := "test-job"
 	cronJob := &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				"key1": "val1",
+				"key2": "val2",
+				"key3": "val3",
+			},
+		},
 		Spec: batchv1.CronJobSpec{
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
@@ -230,6 +252,11 @@ func TestCreateJobFromCronJob(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        jobName,
 					Annotations: map[string]string{"cronjob.kubernetes.io/instantiate": "manual"},
+					Labels: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+						"key3": "val3",
+					},
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							APIVersion: batchv1beta1.SchemeGroupVersion.String(),

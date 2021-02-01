@@ -17,21 +17,24 @@ limitations under the License.
 package create
 
 import (
+	"testing"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
 
 func TestCreateNamespace(t *testing.T) {
 	tests := map[string]struct {
-		options  *NamespaceOptions
-		expected *corev1.Namespace
+		options   *NamespaceOptions
+		expected  *corev1.Namespace
+		expectErr bool
 	}{
 		"success_create": {
 			options: &NamespaceOptions{
-				Name: "my-namespace",
+				Name:   "my-namespace",
+				Labels: "key1=val1,key2=val2,key3=val3",
 			},
 			expected: &corev1.Namespace{
 				TypeMeta: metav1.TypeMeta{
@@ -40,13 +43,24 @@ func TestCreateNamespace(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-namespace",
+					Labels: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+						"key3": "val3",
+					},
 				},
 			},
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			namespace := tc.options.createNamespace()
+			namespace, err := tc.options.createNamespace()
+			if !tc.expectErr && err != nil {
+				t.Errorf("test %s, unexpected error: %v", name, err)
+			}
+			if tc.expectErr && err == nil {
+				t.Errorf("test %s was expecting an error but no error occurred", name)
+			}
 			if !apiequality.Semantic.DeepEqual(namespace, tc.expected) {
 				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, namespace)
 			}

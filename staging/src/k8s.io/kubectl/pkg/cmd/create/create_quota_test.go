@@ -44,6 +44,7 @@ func TestCreateQuota(t *testing.T) {
 				Name:   "my-quota",
 				Hard:   hards[0],
 				Scopes: "",
+				Labels: "key1=val1,key2=val2,key3=val3",
 			},
 			expected: &corev1.ResourceQuota{
 				TypeMeta: metav1.TypeMeta{
@@ -52,6 +53,11 @@ func TestCreateQuota(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-quota",
+					Labels: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+						"key3": "val3",
+					},
 				},
 				Spec: corev1.ResourceQuotaSpec{
 					Hard: resourceQuotaSpecLists[0],

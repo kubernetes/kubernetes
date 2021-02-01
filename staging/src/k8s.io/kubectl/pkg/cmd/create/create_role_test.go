@@ -22,7 +22,7 @@ import (
 
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -44,16 +44,23 @@ func TestCreateRole(t *testing.T) {
 		verbs         string
 		resources     string
 		resourceNames string
+		labels        string
 		expectedRole  *rbac.Role
 	}{
 		"test-duplicate-resources": {
 			verbs:     "get,watch,list",
 			resources: "pods,pods",
+			labels:    "key1=val1,key2=val2,key3=val3",
 			expectedRole: &rbac.Role{
 				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
 					Name:      roleName,
 					Namespace: testNameSpace,
+					Labels: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+						"key3": "val3",
+					},
 				},
 				Rules: []rbac.PolicyRule{
 					{
@@ -138,6 +145,7 @@ func TestCreateRole(t *testing.T) {
 			cmd.Flags().Set("output", "yaml")
 			cmd.Flags().Set("verb", test.verbs)
 			cmd.Flags().Set("resource", test.resources)
+			cmd.Flags().Set("label", test.labels)
 			if test.resourceNames != "" {
 				cmd.Flags().Set("resource-name", test.resourceNames)
 			}

@@ -22,7 +22,7 @@ import (
 
 	rbac "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestCreateRoleBinding(t *testing.T) {
@@ -37,6 +37,7 @@ func TestCreateRoleBinding(t *testing.T) {
 				Groups:          []string{"fake-group"},
 				ServiceAccounts: []string{"fake-namespace:fake-account"},
 				Name:            "fake-binding",
+				Labels:          "key1=val1,key2=val2,key3=val3",
 			},
 			expected: &rbac.RoleBinding{
 				TypeMeta: v1.TypeMeta{
@@ -45,6 +46,11 @@ func TestCreateRoleBinding(t *testing.T) {
 				},
 				ObjectMeta: v1.ObjectMeta{
 					Name: "fake-binding",
+					Labels: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+						"key3": "val3",
+					},
 				},
 				RoleRef: rbac.RoleRef{
 					APIGroup: rbac.GroupName,

@@ -115,6 +115,8 @@ type CreateIngressOptions struct {
 	Namespace        string
 	EnforceNamespace bool
 	CreateAnnotation bool
+	// Labels to assign to the Ingress (optional)
+	Labels string
 
 	Client         networkingv1client.NetworkingV1Interface
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -162,6 +164,7 @@ func NewCmdCreateIngress(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 	cmd.Flags().StringVar(&o.DefaultBackend, "default-backend", o.DefaultBackend, "Default service for backend, in format of svcname:port")
 	cmd.Flags().StringArrayVar(&o.Annotations, "annotation", o.Annotations, "Annotation to insert in the ingress object, in the format annotation=value")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
 
 	return cmd
 }
@@ -243,7 +246,10 @@ func (o *CreateIngressOptions) Validate() error {
 
 // Run performs the execution of 'create ingress' sub command
 func (o *CreateIngressOptions) Run() error {
-	ingress := o.createIngress()
+	ingress, err := o.createIngress()
+	if err != nil {
+		return err
+	}
 
 	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, ingress, scheme.DefaultJSONEncoder()); err != nil {
 		return err
@@ -269,7 +275,7 @@ func (o *CreateIngressOptions) Run() error {
 	return o.PrintObj(ingress)
 }
 
-func (o *CreateIngressOptions) createIngress() *networkingv1.Ingress {
+func (o *CreateIngressOptions) createIngress() (*networkingv1.Ingress, error) {
 	namespace := ""
 	if o.EnforceNamespace {
 		namespace = o.Namespace
@@ -287,7 +293,14 @@ func (o *CreateIngressOptions) createIngress() *networkingv1.Ingress {
 		},
 		Spec: spec,
 	}
-	return ingress
+
+	var err error
+	ingress.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
+	}
+
+	return ingress, nil
 }
 
 func (o *CreateIngressOptions) buildAnnotations() map[string]string {

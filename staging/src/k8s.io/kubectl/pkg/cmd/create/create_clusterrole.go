@@ -67,6 +67,8 @@ type CreateClusterRoleOptions struct {
 	NonResourceURLs []string
 	AggregationRule map[string]string
 	FieldManager    string
+	// Labels to assign to the ClusterRole (optional)
+	Labels string
 }
 
 // NewCmdCreateClusterRole initializes and returns new ClusterRoles command
@@ -99,6 +101,7 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 	cmd.Flags().StringArrayVar(&c.ResourceNames, "resource-name", c.ResourceNames, "Resource in the white list that the rule applies to, repeat this flag for multiple items")
 	cmd.Flags().Var(cliflag.NewMapStringString(&c.AggregationRule), "aggregation-rule", "An aggregation label selector for combining ClusterRoles.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &c.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &c.Labels)
 
 	return cmd
 }
@@ -187,6 +190,11 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 	clusterRole.Name = c.Name
 
 	var err error
+	clusterRole.Labels, err = cmdutil.ParseLabels(c.Labels)
+	if err != nil {
+		return err
+	}
+
 	if len(c.AggregationRule) == 0 {
 		rules, err := generateResourcePolicyRules(c.Mapper, c.Verbs, c.Resources, c.ResourceNames, c.NonResourceURLs)
 		if err != nil {

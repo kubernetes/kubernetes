@@ -68,6 +68,8 @@ type CreateSecretTLSOptions struct {
 	CreateAnnotation bool
 	Namespace        string
 	EnforceNamespace bool
+	// Labels to assign to the Secret (optional)
+	Labels string
 
 	Client         corev1client.CoreV1Interface
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -112,6 +114,7 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	cmd.Flags().BoolVar(&o.AppendHash, "append-hash", o.AppendHash, "Append a hash of the secret to its name.")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
 
 	return cmd
 }
@@ -244,6 +247,11 @@ func (o *CreateSecretTLSOptions) createSecretTLS() (*corev1.Secret, error) {
 			return nil, err
 		}
 		secretTLS.Name = fmt.Sprintf("%s-%s", secretTLS.Name, hash)
+	}
+
+	secretTLS.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
 	}
 
 	return secretTLS, nil

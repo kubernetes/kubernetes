@@ -17,9 +17,7 @@ limitations under the License.
 package generate
 
 import (
-	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -264,95 +262,6 @@ func TestGetBool(t *testing.T) {
 				t.Errorf("%s: expect %v, got %v", tt.name, tt.expected, got)
 			}
 		})
-	}
-}
-
-func makeLabels(labels map[string]string) string {
-	out := []string{}
-	for key, value := range labels {
-		out = append(out, fmt.Sprintf("%s=%s", key, value))
-	}
-	return strings.Join(out, ",")
-}
-
-func TestMakeParseLabels(t *testing.T) {
-	successCases := []struct {
-		name     string
-		labels   map[string]string
-		expected map[string]string
-	}{
-		{
-			name: "test1",
-			labels: map[string]string{
-				"foo": "false",
-			},
-			expected: map[string]string{
-				"foo": "false",
-			},
-		},
-		{
-			name: "test2",
-			labels: map[string]string{
-				"foo": "true",
-				"bar": "123",
-			},
-			expected: map[string]string{
-				"foo": "true",
-				"bar": "123",
-			},
-		},
-	}
-	for _, tt := range successCases {
-		t.Run(tt.name, func(t *testing.T) {
-			labelString := makeLabels(tt.labels)
-			got, err := ParseLabels(labelString)
-			if err != nil {
-				t.Errorf("unexpected error :%v", err)
-			}
-			if !reflect.DeepEqual(tt.expected, got) {
-				t.Errorf("\nexpected:\n%v\ngot:\n%v", tt.expected, got)
-			}
-		})
-	}
-
-	errorCases := []struct {
-		name   string
-		labels interface{}
-	}{
-		{
-			name:   "non-string",
-			labels: 123,
-		},
-		{
-			name:   "empty string",
-			labels: "",
-		},
-		{
-			name:   "error format",
-			labels: "abc=456;bcd=789",
-		},
-		{
-			name:   "error format",
-			labels: "abc=456.bcd=789",
-		},
-		{
-			name:   "error format",
-			labels: "abc,789",
-		},
-		{
-			name:   "error format",
-			labels: "abc",
-		},
-		{
-			name:   "error format",
-			labels: "=abc",
-		},
-	}
-	for _, test := range errorCases {
-		_, err := ParseLabels(test.labels)
-		if err == nil {
-			t.Errorf("labels %s expect error, reason: %s, got nil", test.labels, test.name)
-		}
 	}
 }
 

@@ -59,6 +59,8 @@ type ServiceAccountOpts struct {
 
 	Namespace        string
 	EnforceNamespace bool
+	// Labels to assign to the ServiceAccount (optional)
+	Labels string
 
 	Mapper meta.RESTMapper
 	Client *coreclient.CoreV1Client
@@ -98,6 +100,8 @@ func NewCmdCreateServiceAccount(f cmdutil.Factory, ioStreams genericclioptions.I
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
+
 	return cmd
 }
 
@@ -200,5 +204,12 @@ func (o *ServiceAccountOpts) createServiceAccount() (*corev1.ServiceAccount, err
 		},
 	}
 	serviceAccount.Name = o.Name
+
+	var err error
+	serviceAccount.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
+	}
+
 	return serviceAccount, nil
 }

@@ -60,6 +60,8 @@ type RoleBindingOptions struct {
 	ServiceAccounts  []string
 	FieldManager     string
 	CreateAnnotation bool
+	// Labels to assign to the RoleBinding (optional)
+	Labels string
 
 	Client         rbacclientv1.RbacV1Interface
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -107,6 +109,8 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 	cmd.Flags().StringArrayVar(&o.Groups, "group", o.Groups, "Groups to bind to the role")
 	cmd.Flags().StringArrayVar(&o.ServiceAccounts, "serviceaccount", o.ServiceAccounts, "Service accounts to bind to the role, in the format <namespace>:<name>")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
+
 	return cmd
 }
 
@@ -249,5 +253,12 @@ func (o *RoleBindingOptions) createRoleBinding() (*rbacv1.RoleBinding, error) {
 			Name:      tokens[1],
 		})
 	}
+
+	var err error
+	roleBinding.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
+	}
+
 	return roleBinding, nil
 }

@@ -56,6 +56,7 @@ func TestCreateDeployment(t *testing.T) {
 	cmd.Flags().Set("dry-run", "client")
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("image", "hollywood/jonny.depp:v2")
+	cmd.Flags().Set("label", "k1=v1,k2=v2")
 	cmd.Run(cmd, []string{depName})
 	expectedOutput := "deployment.apps/" + depName + "\n"
 	if buf.String() != expectedOutput {

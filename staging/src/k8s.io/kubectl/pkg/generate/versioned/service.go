@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/generate"
 )
 
@@ -90,7 +91,7 @@ func generateService(genericParams map[string]interface{}) (runtime.Object, erro
 	if !found || len(selectorString) == 0 {
 		return nil, fmt.Errorf("'selector' is a required parameter")
 	}
-	selector, err := generate.ParseLabels(selectorString)
+	selector, err := util.ParseLabels(selectorString)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +99,7 @@ func generateService(genericParams map[string]interface{}) (runtime.Object, erro
 	labelsString, found := params["labels"]
 	var labels map[string]string
 	if found && len(labelsString) > 0 {
-		labels, err = generate.ParseLabels(labelsString)
+		labels, err = util.ParseLabels(labelsString)
 		if err != nil {
 			return nil, err
 		}

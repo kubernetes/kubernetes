@@ -107,6 +107,8 @@ type CreateSecretDockerRegistryOptions struct {
 	CreateAnnotation bool
 	Namespace        string
 	EnforceNamespace bool
+	// Labels to assign to the Secret (optional)
+	Labels string
 
 	Client         corev1client.CoreV1Interface
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -155,6 +157,7 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericcliopt
 	cmd.Flags().StringSliceVar(&o.FileSources, "from-file", o.FileSources, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmdutil.AddLabelFlagVar(cmd, &o.Labels)
 
 	return cmd
 }
@@ -282,6 +285,12 @@ func (o *CreateSecretDockerRegistryOptions) createSecretDockerRegistry() (*corev
 			return nil, err
 		}
 		secretDockerRegistry.Name = fmt.Sprintf("%s-%s", secretDockerRegistry.Name, hash)
+	}
+
+	var err error
+	secretDockerRegistry.Labels, err = cmdutil.ParseLabels(o.Labels)
+	if err != nil {
+		return nil, err
 	}
 	return secretDockerRegistry, nil
 }
