@@ -45,6 +45,7 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	appsconversion "k8s.io/kubernetes/pkg/apis/apps/v1"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -69,12 +70,12 @@ type conversionInformer struct {
 	cache.SharedIndexInformer
 }
 
-func (i conversionInformer) AddEventHandler(handler cache.ResourceEventHandler) {
-	i.SharedIndexInformer.AddEventHandler(conversionEventHandler{handler})
+func (i conversionInformer) AddEventHandler(handler cache.ResourceEventHandler) (*cache.ResourceEventHandlerHandle, error) {
+	return i.SharedIndexInformer.AddEventHandler(conversionEventHandler{handler})
 }
 
-func (i conversionInformer) AddEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration) {
-	i.SharedIndexInformer.AddEventHandlerWithResyncPeriod(conversionEventHandler{handler}, resyncPeriod)
+func (i conversionInformer) AddEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration) (*cache.ResourceEventHandlerHandle, error) {
+	return i.SharedIndexInformer.AddEventHandlerWithResyncPeriod(conversionEventHandler{handler}, resyncPeriod)
 }
 
 type conversionLister struct {

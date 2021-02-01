@@ -130,11 +130,24 @@ import (
 // A delete notification exposes the last locally known non-absent
 // state, except that its ResourceVersion is replaced with a
 // ResourceVersion in which the object is actually absent.
+//
+// The informational methods (EventHandlerCount, IsStopped, IsStarted)
+// are intended to be used to manage informers in any upper informer
+// management layer for creating and destroying informers on-the fly when
+// adding or removing handlers.
+// Beware of race conditions: Such a layer must hide the basic informer
+// objects from its users and offer a closed *synchronized* view for informers.
+// Although these informational methods are synchronized each, in
+// sequences the state queried first might have been changed before
+// calling the next method, if other callers (or the stop channel)
+// are able to interact with the informer interface in parallel.
 type SharedInformer interface {
 	// AddEventHandler adds an event handler to the shared informer using the shared informer's resync
 	// period.  Events to a single handler are delivered sequentially, but there is no coordination
 	// between different handlers.
-	AddEventHandler(handler ResourceEventHandler)
+	// It returns a handle for the handler that can be used to remove
+	// the handler again.
+	AddEventHandler(handler ResourceEventHandler) (*ResourceEventHandlerHandle, error)
 	// AddEventHandlerWithResyncPeriod adds an event handler to the
 	// shared informer with the requested resync period; zero means
 	// this handler does not care about resyncs.  The resync operation
@@ -149,7 +162,20 @@ type SharedInformer interface {
 	// between any two resyncs may be longer than the nominal period
 	// because the implementation takes time to do work and there may
 	// be competing load and scheduling noise.
-	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration)
+	// It returns a handle for the handler that can be used to remove
+	// the handler again and an error if the handler cannot be added.
+	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (*ResourceEventHandlerHandle, error)
+	// RemoveEventHandlerByHandle removes a formerly added event handler given by
+	// its registration handle.
+	// If, for some reason, the same handler has been added multiple
+	// times, only the registration for the given registration handle
+	// will be removed.
+	// It returns an error if the handler cannot be removed,
+	// because the informer is already stopped.
+	// Calling Remove on an already removed handle returns no error
+	// because the handler is finally (still) removed after calling this
+	// method.
+	RemoveEventHandlerByHandle(handle *ResourceEventHandlerHandle) error
 	// GetStore returns the informer's local cache as a Store.
 	GetStore() Store
 	// GetController is deprecated, it does nothing useful
@@ -180,6 +206,35 @@ type SharedInformer interface {
 	// The handler should return quickly - any expensive processing should be
 	// offloaded.
 	SetWatchErrorHandler(handler WatchErrorHandler) error
+
+	// EventHandlerCount return the number of actually registered
+	// event handlers.
+	EventHandlerCount() int
+
+	// IsStopped reports whether the informer has already been stopped.
+	// Adding event handlers to already stopped informers is not possible.
+	IsStopped() bool
+
+	// IsStarted reports whether the informer has already been started
+	IsStarted() bool
+}
+
+// ResourceEventHandlerHandle is a handle returned by the
+// registration methods of SharedInformers for a registered
+// ResourceEventHandler. It can be used later on to remove
+// a registration again.
+// This indirection is required, because the ResourceEventHandler
+// interface can be implemented by non-go-comparable handlers, which
+// could not be removed from a list anymore.
+type ResourceEventHandlerHandle struct {
+	listener *processorListener
+}
+
+// IsActive reports whether this registration is still active
+// meaning that the handler registered with this handle is
+// still registered.
+func (h *ResourceEventHandlerHandle) IsActive() bool {
+	return h.listener != nil
 }
 
 // SharedIndexInformer provides add and get Indexers ability based on SharedInformer.
@@ -463,8 +518,8 @@ func (s *sharedIndexInformer) GetController() Controller {
 	return &dummyController{informer: s}
 }
 
-func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) {
-	s.AddEventHandlerWithResyncPeriod(handler, s.defaultEventHandlerResyncPeriod)
+func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) (*ResourceEventHandlerHandle, error) {
+	return s.AddEventHandlerWithResyncPeriod(handler, s.defaultEventHandlerResyncPeriod)
 }
 
 func determineResyncPeriod(desired, check time.Duration) time.Duration {
@@ -484,13 +539,13 @@ func determineResyncPeriod(desired, check time.Duration) time.Duration {
 
 const minimumResyncPeriod = 1 * time.Second
 
-func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) {
+func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (*ResourceEventHandlerHandle, error) {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
 	if s.stopped {
-		klog.V(2).Infof("Handler %v was not added to shared informer because it has stopped already", handler)
-		return
+		klog.V(2).Infof("Handler %v is not added to shared informer because it has stopped already", handler)
+		return nil, fmt.Errorf("handler %v is not added to shared informer because it has stopped already", handler)
 	}
 
 	if resyncPeriod > 0 {
@@ -514,10 +569,11 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 	}
 
 	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize)
+	handle := &ResourceEventHandlerHandle{listener}
 
 	if !s.started {
 		s.processor.addListener(listener)
-		return
+		return handle, nil
 	}
 
 	// in order to safely join, we have to
@@ -532,6 +588,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 	for _, item := range s.indexer.List() {
 		listener.add(addNotification{newObj: item})
 	}
+	return handle, nil
 }
 
 func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
@@ -579,6 +636,55 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 	return nil
 }
 
+// IsStarted reports whether the informer has already been started
+func (s *sharedIndexInformer) IsStarted() bool {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	return s.started
+}
+
+// IsStopped reports whether the informer has already been stopped
+func (s *sharedIndexInformer) IsStopped() bool {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	return s.stopped
+}
+
+// EventHandlerCount reports whether the informer still has registered
+// event handlers
+func (s *sharedIndexInformer) EventHandlerCount() int {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	return len(s.processor.listeners)
+}
+
+// RemoveEventHandlerByHandle tries to remove a formerly added event handler by its
+// handle returned for its registration.
+// If a handler has been added multiple times, only the registration for the
+// given handle will be removed.
+func (s *sharedIndexInformer) RemoveEventHandlerByHandle(handle *ResourceEventHandlerHandle) error {
+	if handle.listener == nil {
+		return nil
+	}
+
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.stopped {
+		return fmt.Errorf("handler %v is not removed from shared informer because it has stopped already", handle.listener.handler)
+	}
+
+	// in order to safely remove, we have to
+	// 1. stop sending add/update/delete notifications
+	// 2. remove and stop listener
+	// 3. unblock
+	s.blockDeltas.Lock()
+	defer s.blockDeltas.Unlock()
+	s.processor.removeListener(handle.listener)
+	handle.listener = nil
+	return nil
+}
+
 // sharedProcessor has a collection of processorListener and can
 // distribute a notification object to its listeners.  There are two
 // kinds of distribute operations.  The sync distributions go to a
@@ -608,6 +714,33 @@ func (p *sharedProcessor) addListener(listener *processorListener) {
 func (p *sharedProcessor) addListenerLocked(listener *processorListener) {
 	p.listeners = append(p.listeners, listener)
 	p.syncingListeners = append(p.syncingListeners, listener)
+}
+
+func (p *sharedProcessor) removeListener(listener *processorListener) {
+	p.listenersLock.Lock()
+	defer p.listenersLock.Unlock()
+
+	p.removeListenerLocked(listener)
+	if p.listenersStarted {
+		close(listener.addCh)
+	}
+}
+
+func (p *sharedProcessor) removeListenerLocked(listener *processorListener) {
+	for i := 0; i < len(p.listeners); i++ {
+		l := p.listeners[i]
+		if l == listener {
+			p.listeners = append(p.listeners[:i], p.listeners[i+1:]...)
+			i--
+		}
+	}
+	for i := 0; i < len(p.syncingListeners); i++ {
+		l := p.syncingListeners[i]
+		if l == listener {
+			p.syncingListeners = append(p.syncingListeners[:i], p.syncingListeners[i+1:]...)
+			i--
+		}
+	}
 }
 
 func (p *sharedProcessor) distribute(obj interface{}, sync bool) {
