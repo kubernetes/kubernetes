@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -356,4 +356,171 @@ func TestSharedInformerErrorHandling(t *testing.T) {
 		t.Errorf("Timeout waiting for error handler call")
 	}
 	close(stop)
+}
+
+func TestSharedInformerRemoveHandler(t *testing.T) {
+	source := fcache.NewFakeControllerSource()
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+	source.ListError = fmt.Errorf("Access Denied")
+
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
+
+	handler1 := &ResourceEventHandlerFuncs{}
+	informer.AddEventHandler(handler1)
+	handler2 := &ResourceEventHandlerFuncs{}
+	informer.AddEventHandler(handler2)
+
+	if informer.EventHandlerCount() != 2 {
+		t.Errorf("informer has %d registered handler, instead of 2", informer.EventHandlerCount())
+	}
+
+	if err := informer.RemoveEventHandler(handler2); err != nil {
+		t.Errorf("removing of first pointer handler failed: %s", err)
+	}
+	if informer.EventHandlerCount() != 1 {
+		t.Errorf("after removing handler informer has %d registered handler(s), instead of 1", informer.EventHandlerCount())
+	}
+
+	if err := informer.RemoveEventHandler(handler1); err != nil {
+		t.Errorf("removing of second pointer handler failed: %s", err)
+	}
+	if informer.EventHandlerCount() != 0 {
+		t.Errorf("informer still has registered handlers after removing both handlers")
+	}
+}
+
+func TestSharedInformerRemoveHandlerFailure(t *testing.T) {
+	source := fcache.NewFakeControllerSource()
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+	source.ListError = fmt.Errorf("Access Denied")
+
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
+
+	handler1 := ResourceEventHandlerFuncs{}
+	informer.AddEventHandler(handler1)
+	handler2 := &ResourceEventHandlerFuncs{}
+	informer.AddEventHandler(handler2)
+
+	if informer.EventHandlerCount() != 2 {
+		t.Errorf("informer has %d registered handler(s), instead of 2", informer.EventHandlerCount())
+	}
+
+	if err := informer.RemoveEventHandler(handler2); err != nil {
+		t.Errorf("removing of pointer handler failed: %s", err)
+	}
+	if informer.EventHandlerCount() != 1 {
+		t.Errorf("after removal informer has %d registered handler(s), instead of 1", informer.EventHandlerCount())
+	}
+
+	if err := informer.RemoveEventHandler(handler1); err == nil {
+		t.Errorf("removing value handler did not fail")
+	} else {
+		if err.Error() != "Uncomparable handler {<nil> <nil> <nil>} is not removed" {
+			t.Errorf("unexpected remove error: %s", err)
+		}
+	}
+	if informer.EventHandlerCount() != 1 {
+		t.Errorf("after failed removal informer has %d registered handler(s), instead of 1", informer.EventHandlerCount())
+	}
+}
+
+func TestSharedInformerMultipleRegistration(t *testing.T) {
+	source := fcache.NewFakeControllerSource()
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+	source.ListError = fmt.Errorf("Access Denied")
+
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
+
+	handler1 := &ResourceEventHandlerFuncs{}
+	informer.AddEventHandler(handler1)
+	informer.AddEventHandler(handler1)
+
+	if informer.EventHandlerCount() != 2 {
+		t.Errorf("informer has %d registered handler(s), instead of 1", informer.EventHandlerCount())
+	}
+
+	if err := informer.RemoveEventHandler(handler1); err != nil {
+		t.Errorf("removing of duplicate pointer handler failed: %s", err)
+	}
+
+	if informer.EventHandlerCount() != 0 {
+		t.Errorf("informer still has a registered handler after removal of duplicate registrations")
+	}
+}
+
+func TestStateSharedInformer(t *testing.T) {
+	source := fcache.NewFakeControllerSource()
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
+	listener := newTestListener("listener", 0, "pod1")
+	informer.AddEventHandlerWithResyncPeriod(listener, listener.resyncPeriod)
+
+	if informer.IsStarted() {
+		t.Errorf("informer already started after creation")
+		return
+	}
+	if informer.IsStopped() {
+		t.Errorf("informer already stopped after creation")
+		return
+	}
+	stop := make(chan struct{})
+	go informer.Run(stop)
+	if !listener.ok() {
+		t.Errorf("informer did not report initial objects")
+		close(stop)
+		return
+	}
+
+	if !informer.IsStarted() {
+		t.Errorf("informer does not report to be started although handling events")
+		close(stop)
+		return
+	}
+	if informer.IsStopped() {
+		t.Errorf("informer reports to be stopped although stop channel not closed")
+		close(stop)
+		return
+	}
+
+	close(stop)
+	fmt.Println("sleeping")
+	time.Sleep(1 * time.Second)
+
+	if !informer.IsStopped() {
+		t.Errorf("informer reports not to be stopped although stop channel closed")
+		return
+	}
+	if !informer.IsStarted() {
+		t.Errorf("informer reports not to be started after it has been started and stopped")
+		return
+	}
+}
+
+func TestRemoveOnStoppedSharedInformer(t *testing.T) {
+	source := fcache.NewFakeControllerSource()
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
+	listener := newTestListener("listener", 0, "pod1")
+	informer.AddEventHandlerWithResyncPeriod(listener, listener.resyncPeriod)
+
+	stop := make(chan struct{})
+	go informer.Run(stop)
+	close(stop)
+	fmt.Println("sleeping")
+	time.Sleep(1 * time.Second)
+
+	if !informer.IsStopped() {
+		t.Errorf("informer reports not to be stopped although stop channel closed")
+		return
+	}
+	err := informer.RemoveEventHandler(listener)
+	if err == nil {
+		t.Errorf("informer removes handler on stopped informer")
+		return
+	}
+	if !strings.HasSuffix(err.Error(), " is not removed from shared informer because it has stopped already") {
+		t.Errorf("unexpected error for removing handler on stopped informer: %q", err)
+	}
 }

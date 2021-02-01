@@ -18,15 +18,17 @@ package cache
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
+
+	"k8s.io/utils/buffer"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/utils/buffer"
 
 	"k8s.io/klog/v2"
 )
@@ -150,6 +152,15 @@ type SharedInformer interface {
 	// because the implementation takes time to do work and there may
 	// be competing load and scheduling noise.
 	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration)
+	// RemoveEventHandler removes a formerly added event handler, again.
+	// It is possible to remove only event handlers that are (go) comparable,
+	// This means event handlers like ResourceEventHandlerFuncs cannot be removed
+	// if added by value and not by reference, because they contain function pointers
+	// that are not comparable in go. Trying to remove an uncomparable handler
+	// results in an appropriate error.
+	// Please note: If, for some reason, the same handler has been added multiple
+	// times, all registrations will be removed.
+	RemoveEventHandler(handler ResourceEventHandler) error
 	// GetStore returns the informer's local cache as a Store.
 	GetStore() Store
 	// GetController is deprecated, it does nothing useful
@@ -180,6 +191,18 @@ type SharedInformer interface {
 	// The handler should return quickly - any expensive processing should be
 	// offloaded.
 	SetWatchErrorHandler(handler WatchErrorHandler) error
+
+	// EventHandlerCount return the number of actually registered
+	// event handlers.
+	EventHandlerCount() int
+
+	// IsStopped reports whether the informer has already been stopped
+	// Adding event handlers to already stopped informers is not possible
+	// and is silently ignored.
+	IsStopped() bool
+
+	// IsStarted reports whether the informer has already been started
+	IsStarted() bool
 }
 
 // SharedIndexInformer provides add and get Indexers ability based on SharedInformer.
@@ -569,6 +592,54 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 	return nil
 }
 
+// IsStarted reports whether the informer has already been started
+func (s *sharedIndexInformer) IsStarted() bool {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	return s.started
+}
+
+// IsStopped reports whether the informer has already been stopped
+func (s *sharedIndexInformer) IsStopped() bool {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	return s.stopped
+}
+
+// EventHandlerCount reports whether the informer still has registered
+// event handlers
+func (s *sharedIndexInformer) EventHandlerCount() int {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	return len(s.processor.listeners)
+}
+
+// RemoveEventHandler tries to remove a formerly added event handler.
+// Only event handlers that are (go) comparable can be removed.
+// Please note: If, for some reason, the same handler has been added multiple
+// times, all registrations will be removed.
+func (s *sharedIndexInformer) RemoveEventHandler(handler ResourceEventHandler) error {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.stopped {
+		return fmt.Errorf("Handler %v is not removed from shared informer because it has stopped already", handler)
+	}
+
+	if !reflect.ValueOf(handler).Type().Comparable() {
+		return fmt.Errorf("Uncomparable handler %v is not removed", handler)
+	}
+
+	// in order to safely remove, we have to
+	// 1. stop sending add/update/delete notifications
+	// 2. remove and stop listener
+	// 3. unblock
+	s.blockDeltas.Lock()
+	defer s.blockDeltas.Unlock()
+	s.processor.removeListenerFor(handler)
+	return nil
+}
+
 // sharedProcessor has a collection of processorListener and can
 // distribute a notification object to its listeners.  There are two
 // kinds of distribute operations.  The sync distributions go to a
@@ -664,6 +735,38 @@ func (p *sharedProcessor) resyncCheckPeriodChanged(resyncCheckPeriod time.Durati
 		resyncPeriod := determineResyncPeriod(listener.requestedResyncPeriod, resyncCheckPeriod)
 		listener.setResyncPeriod(resyncPeriod)
 	}
+}
+
+func (p *sharedProcessor) removeListenerFor(handler ResourceEventHandler) {
+	p.listenersLock.Lock()
+	defer p.listenersLock.Unlock()
+
+	listeners := p.removeListenerLockedFor(handler)
+	if p.listenersStarted {
+		for _, l := range listeners {
+			close(l.addCh)
+		}
+	}
+}
+
+func (p *sharedProcessor) removeListenerLockedFor(handler ResourceEventHandler) []*processorListener {
+	var listeners []*processorListener
+	for i := 0; i < len(p.listeners); i++ {
+		l := p.listeners[i]
+		if reflect.ValueOf(l.handler).Type().Comparable() && l.handler == handler {
+			listeners = append(listeners, l)
+			p.listeners = append(p.listeners[:i], p.listeners[i+1:]...)
+			i--
+		}
+	}
+	for i := 0; i < len(p.syncingListeners); i++ {
+		l := p.syncingListeners[i]
+		if reflect.ValueOf(l.handler).Type().Comparable() && l.handler == handler {
+			p.syncingListeners = append(p.syncingListeners[:i], p.syncingListeners[i+1:]...)
+			i--
+		}
+	}
+	return listeners
 }
 
 // processorListener relays notifications from a sharedProcessor to
