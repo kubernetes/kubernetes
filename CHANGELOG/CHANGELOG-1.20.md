@@ -479,7 +479,7 @@ Troubleshoot distroless containers by adding a new container with debugging tool
 Troubleshoot on a node by creating a container running in the host namespaces and with access to the host’s filesystem.
 Note that as a new builtin command, `kubectl debug` takes priority over any `kubectl` plugin named “debug”. You will need to rename the affected plugin.
 Invocations using `kubectl alpha debug` are now deprecated and will be removed in a subsequent release. Update your scripts to use `kubectl debug` instead of `kubectl alpha debug`!
-For more information about kubectl debug, see Debugging Running Pods on the Kubernetes website, kubectl help debug, or reach out to SIG CLI by visiting #sig-cli or commenting on [enhancement #1441](https://features.k8s.io/1441).
+For more information about kubectl debug, see [Debugging Running Pods](https://kubernetes.io/docs/tasks/debug-application-cluster/debug-running-pod/) on the Kubernetes website, kubectl help debug, or reach out to SIG CLI by visiting [#sig-cli](https://kubernetes.slack.com/messages/sig-cli) or commenting on [enhancement #1441](https://features.k8s.io/1441).
 
 ### Removing deprecated flags in kubeadm
 
