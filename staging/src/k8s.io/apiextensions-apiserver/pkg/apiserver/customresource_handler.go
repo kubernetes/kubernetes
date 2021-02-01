@@ -364,8 +364,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	terminating := apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating)
 
 	var crdInfo *crdInfo
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) &&
+	if r.storageVersionManager != nil &&
 		(requestInfo.Verb == "create" ||
 			requestInfo.Verb == "update" ||
 			requestInfo.Verb == "patch") {
@@ -557,8 +556,7 @@ func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
 		tearDownFinishedCh = r.removeStorage_locked(crd.UID)
 	}
 	// Update storage version with the latest info in the watch event
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+	if r.storageVersionManager != nil {
 		r.storageVersionManager.EnqueueStorageVersionUpdate(crd, tearDownFinishedCh, nil, nil)
 	}
 }
@@ -586,8 +584,7 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 
 	if oldCRD.UID != newCRD.UID {
 		r.removeStorage_locked(oldCRD.UID)
-		if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
-			utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		if r.storageVersionManager != nil {
 			r.storageVersionManager.TeardownFor(oldCRD.UID)
 		}
 	}
@@ -609,8 +606,7 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 		tearDownFinishedCh = r.removeStorage_locked(newCRD.UID)
 	}
 	// Update storage version with the latest info in the watch event
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+	if r.storageVersionManager != nil {
 		r.storageVersionManager.EnqueueStorageVersionUpdate(newCRD, tearDownFinishedCh, nil, nil)
 	}
 }
@@ -663,7 +659,9 @@ func (r *crdHandler) removeDeadStorage() {
 		if _, ok := storageMap2[uid]; !ok {
 			klog.V(4).Infof("Removing dead CRD storage for %s/%s", crdInfo.spec.Group, crdInfo.spec.Names.Kind)
 			go r.tearDown(crdInfo, nil)
-			r.storageVersionManager.TeardownFor(uid)
+			if r.storageVersionManager != nil {
+				r.storageVersionManager.TeardownFor(uid)
+			}
 		}
 	}
 }
@@ -721,8 +719,7 @@ func (r *crdHandler) getOrCreateServingInfoForWrite(uid types.UID, name string) 
 	// Surface non-nil error early.
 	if err != nil ||
 		// Return early if the StorageVersionAPI feature gate is disabled.
-		!utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) ||
-		!utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) ||
+		r.storageVersionManager == nil ||
 		ret.storageVersionUpdate == nil ||
 		ret.storageVersionUpdate.processedCh == nil {
 		return ret, false, err
@@ -1092,8 +1089,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		storageVersion:      storageVersion,
 		waitGroup:           &utilwaitgroup.SafeWaitGroup{},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+	if r.storageVersionManager != nil {
 		// spawn storage version update in background and use channels to make handlers wait
 		processedCh := make(chan struct{})
 		abortedCh := make(chan struct{})

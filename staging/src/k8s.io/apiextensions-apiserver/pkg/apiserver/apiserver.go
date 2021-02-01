@@ -47,7 +47,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	genericstorageversion "k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes"
@@ -193,14 +192,15 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		delegate:  delegateHandler,
 	}
 	establishingController := establish.NewEstablishingController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
-	var sc genericstorageversion.Client
+	var storageVersionManager storageversion.Manager
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
 		kubeclientset, err := kubernetes.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create clientset for storage versions: %v", err)
 		}
-		sc = kubeclientset.InternalV1alpha1().StorageVersions()
+		sc := kubeclientset.InternalV1alpha1().StorageVersions()
+		storageVersionManager = storageversion.NewManager(sc, c.GenericConfig.APIServerID)
 	}
 	crdHandler, err := NewCustomResourceDefinitionHandler(
 		versionDiscoveryHandler,
@@ -218,7 +218,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		time.Duration(c.GenericConfig.MinRequestTimeout)*time.Second,
 		apiGroupInfo.StaticOpenAPISpec,
 		c.GenericConfig.MaxRequestBodyBytes,
-		storageversion.NewManager(sc, c.GenericConfig.APIServerID),
+		storageVersionManager,
 	)
 	if err != nil {
 		return nil, err
