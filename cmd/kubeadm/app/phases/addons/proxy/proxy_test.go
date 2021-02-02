@@ -27,8 +27,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
@@ -169,20 +168,21 @@ func TestEnsureProxyAddon(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a fake client and set up default test configuration
 			client := clientsetfake.NewSimpleClientset()
+
 			// TODO: Consider using a YAML file instead for this that makes it possible to specify YAML documents for the ComponentConfigs
-			controlPlaneConfig := &kubeadmapiv1beta2.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         1234,
-				},
+			initConfiguration, err := configutil.DefaultedStaticInitConfiguration()
+			if err != nil {
+				t.Errorf("test failed to convert external to internal version: %v", err)
+				return
 			}
-			controlPlaneClusterConfig := &kubeadmapiv1beta2.ClusterConfiguration{
-				Networking: kubeadmapiv1beta2.Networking{
-					PodSubnet: "5.6.7.8/24",
-				},
-				ImageRepository:   "someRepo",
-				KubernetesVersion: constants.MinimumControlPlaneVersion.String(),
+
+			initConfiguration.LocalAPIEndpoint = kubeadmapi.APIEndpoint{
+				AdvertiseAddress: "1.2.3.4",
+				BindPort:         1234,
 			}
+
+			initConfiguration.ClusterConfiguration.Networking.PodSubnet = "5.6.7.8/24"
+			initConfiguration.ClusterConfiguration.ImageRepository = "someRepo"
 
 			// Simulate an error if necessary
 			switch tc.simError {
@@ -191,18 +191,13 @@ func TestEnsureProxyAddon(t *testing.T) {
 					return true, nil, apierrors.NewUnauthorized("")
 				})
 			case InvalidControlPlaneEndpoint:
-				controlPlaneConfig.LocalAPIEndpoint.AdvertiseAddress = "1.2.3"
+				initConfiguration.LocalAPIEndpoint.AdvertiseAddress = "1.2.3"
 			case IPv6SetBindAddress:
-				controlPlaneConfig.LocalAPIEndpoint.AdvertiseAddress = "1:2::3:4"
-				controlPlaneClusterConfig.Networking.PodSubnet = "2001:101::/48"
+				initConfiguration.LocalAPIEndpoint.AdvertiseAddress = "1:2::3:4"
+				initConfiguration.ClusterConfiguration.Networking.PodSubnet = "2001:101::/48"
 			}
 
-			intControlPlane, err := configutil.DefaultedInitConfiguration(controlPlaneConfig, controlPlaneClusterConfig)
-			if err != nil {
-				t.Errorf("test failed to convert external to internal version: %v", err)
-				return
-			}
-			err = EnsureProxyAddon(&intControlPlane.ClusterConfiguration, &intControlPlane.LocalAPIEndpoint, client)
+			err = EnsureProxyAddon(&initConfiguration.ClusterConfiguration, &initConfiguration.LocalAPIEndpoint, client)
 
 			// Compare actual to expected errors
 			actErr := "No error"
