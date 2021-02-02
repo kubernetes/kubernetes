@@ -451,6 +451,12 @@ type ComponentConfig interface {
 
 	// SetUserSupplied sets the state of the component config "user supplied" flag to, either true, or false.
 	SetUserSupplied(userSupplied bool)
+
+	// Set can be used to set the internal configuration in the ComponentConfig
+	Set(interface{})
+
+	// Get can be used to get the internal configuration in the ComponentConfig
+	Get() interface{}
 }
 
 // ComponentConfigMap is a map between a group name (as in GVK group) and a ComponentConfig

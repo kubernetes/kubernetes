@@ -83,6 +83,14 @@ func kubeProxyDefaultBindAddress(localAdvertiseAddress string) string {
 	return kubeadmapiv1beta2.DefaultProxyBindAddressv6
 }
 
+func (kp *kubeProxyConfig) Get() interface{} {
+	return &kp.config
+}
+
+func (kp *kubeProxyConfig) Set(cfg interface{}) {
+	kp.config = *cfg.(*kubeproxyconfig.KubeProxyConfiguration)
+}
+
 func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint *kubeadmapi.APIEndpoint, _ *kubeadmapi.NodeRegistrationOptions) {
 	const kind = "KubeProxyConfiguration"
 
