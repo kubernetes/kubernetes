@@ -23,6 +23,7 @@ import (
 
 func TestStatus(t *testing.T) {
 	tests := []struct {
+		name              string
 		status            *Status
 		expectedCode      Code
 		expectedMessage   string
@@ -30,6 +31,7 @@ func TestStatus(t *testing.T) {
 		expectedAsError   error
 	}{
 		{
+			name:              "success status",
 			status:            NewStatus(Success, ""),
 			expectedCode:      Success,
 			expectedMessage:   "",
@@ -37,6 +39,7 @@ func TestStatus(t *testing.T) {
 			expectedAsError:   nil,
 		},
 		{
+			name:              "error status",
 			status:            NewStatus(Error, "unknown error"),
 			expectedCode:      Error,
 			expectedMessage:   "unknown error",
@@ -44,6 +47,7 @@ func TestStatus(t *testing.T) {
 			expectedAsError:   errors.New("unknown error"),
 		},
 		{
+			name:              "nil status",
 			status:            nil,
 			expectedCode:      Success,
 			expectedMessage:   "",
@@ -52,26 +56,28 @@ func TestStatus(t *testing.T) {
 		},
 	}
 
-	for i, test := range tests {
-		if test.status.Code() != test.expectedCode {
-			t.Errorf("test #%v, expect status.Code() returns %v, but %v", i, test.expectedCode, test.status.Code())
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.status.Code() != test.expectedCode {
+				t.Errorf("expect status.Code() returns %v, but %v", test.expectedCode, test.status.Code())
+			}
 
-		if test.status.Message() != test.expectedMessage {
-			t.Errorf("test #%v, expect status.Message() returns %v, but %v", i, test.expectedMessage, test.status.Message())
-		}
+			if test.status.Message() != test.expectedMessage {
+				t.Errorf("expect status.Message() returns %v, but %v", test.expectedMessage, test.status.Message())
+			}
 
-		if test.status.IsSuccess() != test.expectedIsSuccess {
-			t.Errorf("test #%v, expect status.IsSuccess() returns %v, but %v", i, test.expectedIsSuccess, test.status.IsSuccess())
-		}
+			if test.status.IsSuccess() != test.expectedIsSuccess {
+				t.Errorf("expect status.IsSuccess() returns %v, but %v", test.expectedIsSuccess, test.status.IsSuccess())
+			}
 
-		if test.status.AsError() == test.expectedAsError {
-			continue
-		}
+			if test.status.AsError() == test.expectedAsError {
+				return
+			}
 
-		if test.status.AsError().Error() != test.expectedAsError.Error() {
-			t.Errorf("test #%v, expect status.AsError() returns %v, but %v", i, test.expectedAsError, test.status.AsError())
-		}
+			if test.status.AsError().Error() != test.expectedAsError.Error() {
+				t.Errorf("expect status.AsError() returns %v, but %v", test.expectedAsError, test.status.AsError())
+			}
+		})
 	}
 }
 
@@ -93,30 +99,37 @@ func assertStatusCode(t *testing.T, code Code, value int) {
 
 func TestPluginToStatusMerge(t *testing.T) {
 	tests := []struct {
+		name      string
 		statusMap PluginToStatus
 		wantCode  Code
 	}{
 		{
+			name:      "merge Error and Unschedulable statuses",
 			statusMap: PluginToStatus{"p1": NewStatus(Error), "p2": NewStatus(Unschedulable)},
 			wantCode:  Error,
 		},
 		{
+			name:      "merge Success and Unschedulable statuses",
 			statusMap: PluginToStatus{"p1": NewStatus(Success), "p2": NewStatus(Unschedulable)},
 			wantCode:  Unschedulable,
 		},
 		{
+			name:      "merge Success, UnschedulableAndUnresolvable and Unschedulable statuses",
 			statusMap: PluginToStatus{"p1": NewStatus(Success), "p2": NewStatus(UnschedulableAndUnresolvable), "p3": NewStatus(Unschedulable)},
 			wantCode:  UnschedulableAndUnresolvable,
 		},
 		{
+			name:     "merge nil status",
 			wantCode: Success,
 		},
 	}
 
-	for i, test := range tests {
-		gotStatus := test.statusMap.Merge()
-		if test.wantCode != gotStatus.Code() {
-			t.Errorf("test #%v, wantCode %v, gotCode %v", i, test.wantCode, gotStatus.Code())
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			gotStatus := test.statusMap.Merge()
+			if test.wantCode != gotStatus.Code() {
+				t.Errorf("wantCode %v, gotCode %v", test.wantCode, gotStatus.Code())
+			}
+		})
 	}
 }
