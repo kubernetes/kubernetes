@@ -166,8 +166,8 @@ func (c *RequestHeaderAuthRequestController) Run(workers int, stopCh <-chan stru
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting %s", c.name)
-	defer klog.Infof("Shutting down %s", c.name)
+	klog.InfoS("Starting", c.name)
+	defer klog.InfoS("Shutting down", c.name)
 
 	go c.configmapInformer.Run(stopCh)
 
@@ -241,7 +241,7 @@ func (c *RequestHeaderAuthRequestController) syncConfigMap(configMap *corev1.Con
 	}
 	if hasChanged {
 		c.exportedRequestHeaderBundle.Store(newRequestHeaderBundle)
-		klog.V(2).Infof("Loaded a new request header values for %v", c.name)
+		klog.V(2).InfoS("Loaded a new request header values for", c.name)
 	}
 	return nil
 }
