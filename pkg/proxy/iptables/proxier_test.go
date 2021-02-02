@@ -26,14 +26,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
@@ -454,6 +453,14 @@ func TestDeleteEndpointConnectionsIPv6(t *testing.T) {
 	}
 }
 
+// fakeCloseable implements utilproxy.Closeable
+type fakeCloseable struct{}
+
+// Close fakes out the close() used by syncProxyRules to release a local port.
+func (f *fakeCloseable) Close() error {
+	return nil
+}
+
 // fakePortOpener implements portOpener.
 type fakePortOpener struct {
 	openPorts []*utilproxy.LocalPort
@@ -463,7 +470,7 @@ type fakePortOpener struct {
 // to lock a local port.
 func (f *fakePortOpener) OpenLocalPort(lp *utilproxy.LocalPort, isIPv6 bool) (utilproxy.Closeable, error) {
 	f.openPorts = append(f.openPorts, lp)
-	return nil, nil
+	return &fakeCloseable{}, nil
 }
 
 const testHostname = "test-hostname"
@@ -2680,6 +2687,90 @@ COMMIT
 	fp.OnEndpointSliceDelete(endpointSlice)
 	fp.syncProxyRules()
 	assert.NotEqual(t, expectedIPTablesWithSlice, fp.iptablesData.String())
+}
+
+func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
+	fcmd := fakeexec.FakeCmd{}
+	fexec := fakeexec.FakeExec{
+		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
+	}
+	execFunc := func(cmd string, args ...string) exec.Cmd {
+		return fakeexec.InitFakeCmd(&fcmd, cmd, args...)
+	}
+	cmdOutput := "1 flow entries have been deleted"
+	cmdFunc := func() ([]byte, []byte, error) { return []byte(cmdOutput), nil, nil }
+
+	// Delete ClusterIP entries
+	fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
+	fexec.CommandScript = append(fexec.CommandScript, execFunc)
+	// Delete NodePort entries
+	fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
+	fexec.CommandScript = append(fexec.CommandScript, execFunc)
+
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt, false)
+	fp.exec = &fexec
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	nodePort := 31201
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolUDP,
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolUDP,
+				NodePort: int32(nodePort),
+			}}
+		}),
+	)
+	makeEndpointsMap(fp)
+
+	fp.syncProxyRules()
+	if fexec.CommandCalls != 0 {
+		t.Fatalf("Created service without endpoints must not clear conntrack entries")
+	}
+
+	epIP := "10.180.0.1"
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{
+					IP: epIP,
+				}},
+				Ports: []v1.EndpointPort{{
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolUDP,
+				}},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+	if fexec.CommandCalls != 2 {
+		t.Fatalf("Updated UDP service with new endpoints must clear UDP entries")
+	}
+
+	// Delete ClusterIP Conntrack entries
+	expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s -p %s", svcIP, strings.ToLower(string((v1.ProtocolUDP))))
+	actualCommand := strings.Join(fcmd.CombinedOutputLog[0], " ")
+	if actualCommand != expectCommand {
+		t.Errorf("Expected command: %s, but executed %s", expectCommand, actualCommand)
+	}
+	// Delete NodePort Conntrack entrie
+	expectCommand = fmt.Sprintf("conntrack -D -p %s --dport %d", strings.ToLower(string((v1.ProtocolUDP))), nodePort)
+	actualCommand = strings.Join(fcmd.CombinedOutputLog[1], " ")
+	if actualCommand != expectCommand {
+		t.Errorf("Expected command: %s, but executed %s", expectCommand, actualCommand)
+	}
 }
 
 // TODO(thockin): add *more* tests for syncProxyRules() or break it down further and test the pieces.

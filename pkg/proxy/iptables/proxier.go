@@ -36,6 +36,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -846,14 +847,23 @@ func (proxier *Proxier) syncProxyRules() {
 	serviceUpdateResult := proxy.UpdateServiceMap(proxier.serviceMap, proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
-	staleServices := serviceUpdateResult.UDPStaleClusterIP
+	// We need to detect stale connections to UDP Services so we
+	// can clean dangling conntrack entries that can blackhole traffic.
+	conntrackCleanupServiceIPs := serviceUpdateResult.UDPStaleClusterIP
+	conntrackCleanupServiceNodePorts := sets.NewInt()
 	// merge stale services gathered from updateEndpointsMap
+	// an UDP service that changes from 0 to non-0 endpoints is considered stale.
 	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
 		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
 			klog.V(2).Infof("Stale %s service %v -> %s", strings.ToLower(string(svcInfo.Protocol())), svcPortName, svcInfo.ClusterIP().String())
-			staleServices.Insert(svcInfo.ClusterIP().String())
+			conntrackCleanupServiceIPs.Insert(svcInfo.ClusterIP().String())
 			for _, extIP := range svcInfo.ExternalIPStrings() {
-				staleServices.Insert(extIP)
+				conntrackCleanupServiceIPs.Insert(extIP)
+			}
+			nodePort := svcInfo.NodePort()
+			if svcInfo.Protocol() == v1.ProtocolUDP && nodePort != 0 {
+				klog.V(2).Infof("Stale %s service NodePort %v -> %d", strings.ToLower(string(svcInfo.Protocol())), svcPortName, nodePort)
+				conntrackCleanupServiceNodePorts.Insert(nodePort)
 			}
 		}
 	}
@@ -1278,16 +1288,6 @@ func (proxier *Proxier) syncProxyRules() {
 						klog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
 						continue
 					}
-					if lp.Protocol == "udp" {
-						// TODO: We might have multiple services using the same port, and this will clear conntrack for all of them.
-						// This is very low impact. The NodePort range is intentionally obscure, and unlikely to actually collide with real Services.
-						// This only affects UDP connections, which are not common.
-						// See issue: https://github.com/kubernetes/kubernetes/issues/49881
-						err := conntrack.ClearEntriesForPort(proxier.exec, lp.Port, isIPv6, v1.ProtocolUDP)
-						if err != nil {
-							klog.Errorf("Failed to clear udp conntrack for port %d, error: %v", lp.Port, err)
-						}
-					}
 					replacementPortsMap[lp] = socket
 				}
 			}
@@ -1633,14 +1633,22 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	// Finish housekeeping.
+	// Clear stale conntrack entries for UDP Services, this has to be done AFTER the iptables rules are programmed.
 	// TODO: these could be made more consistent.
-	klog.V(4).Infof("Deleting stale services IPs: %v", staleServices.UnsortedList())
-	for _, svcIP := range staleServices.UnsortedList() {
+	klog.V(4).Infof("Deleting conntrack stale entries for ClusterIP Services: %v", conntrackCleanupServiceIPs.UnsortedList())
+	for _, svcIP := range conntrackCleanupServiceIPs.UnsortedList() {
 		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
 			klog.Errorf("Failed to delete stale service IP %s connections, error: %v", svcIP, err)
 		}
 	}
-	klog.V(4).Infof("Deleting stale endpoint connections: %v", endpointUpdateResult.StaleEndpoints)
+	klog.V(4).Infof("Deleting conntrack stale entries for NodePorts Services: %v", conntrackCleanupServiceNodePorts.UnsortedList())
+	for _, nodePort := range conntrackCleanupServiceNodePorts.UnsortedList() {
+		err := conntrack.ClearEntriesForPort(proxier.exec, nodePort, isIPv6, v1.ProtocolUDP)
+		if err != nil {
+			klog.Errorf("Failed to clear udp conntrack on port %d: %v", nodePort, err)
+		}
+	}
+	klog.V(4).Infof("Deleting stale endpoint connections %v", endpointUpdateResult.StaleEndpoints)
 	proxier.deleteEndpointConnections(endpointUpdateResult.StaleEndpoints)
 }
 
