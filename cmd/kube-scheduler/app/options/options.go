@@ -113,7 +113,6 @@ func NewOptions() (*Options, error) {
 	o.Authentication.TolerateInClusterLookupFailure = true
 	o.Authentication.RemoteKubeConfigFileOptional = true
 	o.Authorization.RemoteKubeConfigFileOptional = true
-	o.Authorization.AlwaysAllowPaths = []string{"/healthz"}
 
 	// Set the PairName but leave certificate directory blank to generate in-memory by default
 	o.SecureServing.ServerCert.CertDirectory = ""
