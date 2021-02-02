@@ -7,7 +7,7 @@ go 1.15
 require (
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/go-openapi/spec v0.19.3
-	github.com/gogo/protobuf v1.3.1
+	github.com/gogo/protobuf v1.3.2
 	github.com/google/go-cmp v0.5.2
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
