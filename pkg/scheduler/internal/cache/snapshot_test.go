@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -82,11 +83,13 @@ func TestGetNodeImageStates(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		imageStates := getNodeImageStates(test.node, test.imageExistenceMap)
-		if !reflect.DeepEqual(test.expected, imageStates) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, imageStates)
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			imageStates := getNodeImageStates(test.node, test.imageExistenceMap)
+			if !reflect.DeepEqual(test.expected, imageStates) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, imageStates)
+			}
+		})
 	}
 }
 
@@ -168,10 +171,12 @@ func TestCreateImageExistenceMap(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		imageMap := createImageExistenceMap(test.nodes)
-		if !reflect.DeepEqual(test.expected, imageMap) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, imageMap)
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			imageMap := createImageExistenceMap(test.nodes)
+			if !reflect.DeepEqual(test.expected, imageMap) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, imageMap)
+			}
+		})
 	}
 }

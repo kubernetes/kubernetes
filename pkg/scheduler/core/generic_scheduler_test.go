@@ -1146,42 +1146,44 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		nodes := makeNodeList([]string{"1"})
+		t.Run(test.name, func(t *testing.T) {
+			nodes := makeNodeList([]string{"1"})
 
-		plugin := st.FakeFilterPlugin{}
-		registerFakeFilterFunc := st.RegisterFilterPlugin(
-			"FakeFilter",
-			func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-				return &plugin, nil
-			},
-		)
-		registerPlugins := []st.RegisterPluginFunc{
-			st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-			registerFakeFilterFunc,
-			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		}
-		fwk, err := st.NewFramework(
-			registerPlugins,
-			frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
+			plugin := st.FakeFilterPlugin{}
+			registerFakeFilterFunc := st.RegisterFilterPlugin(
+				"FakeFilter",
+				func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return &plugin, nil
+				},
+			)
+			registerPlugins := []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				registerFakeFilterFunc,
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+			fwk, err := st.NewFramework(
+				registerPlugins,
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		scheduler := makeScheduler(nodes)
-		if err := scheduler.cache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {
-			t.Fatal(err)
-		}
-		fwk.PreemptHandle().AddNominatedPod(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "nominated"}, Spec: v1.PodSpec{Priority: &midPriority}}, "1")
+			scheduler := makeScheduler(nodes)
+			if err := scheduler.cache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {
+				t.Fatal(err)
+			}
+			fwk.PreemptHandle().AddNominatedPod(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "nominated"}, Spec: v1.PodSpec{Priority: &midPriority}}, "1")
 
-		_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
 
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if test.expectedCount != plugin.NumFilterCalled {
-			t.Errorf("predicate was called %d times, expected is %d", plugin.NumFilterCalled, test.expectedCount)
-		}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if test.expectedCount != plugin.NumFilterCalled {
+				t.Errorf("predicate was called %d times, expected is %d", plugin.NumFilterCalled, test.expectedCount)
+			}
+		})
 	}
 }
 
