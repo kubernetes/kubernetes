@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
@@ -270,24 +270,26 @@ func TestMakePayload(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		actualPayload, err := MakePayload(tc.mappings, tc.configMap, &tc.mode, tc.optional)
-		if err != nil && tc.success {
-			t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
-			continue
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			actualPayload, err := MakePayload(tc.mappings, tc.configMap, &tc.mode, tc.optional)
+			if err != nil && tc.success {
+				t.Errorf("unexpected failure making payload: %v", err)
+				return
+			}
 
-		if err == nil && !tc.success {
-			t.Errorf("%v: unexpected success making payload", tc.name)
-			continue
-		}
+			if err == nil && !tc.success {
+				t.Errorf("unexpected success making payload")
+				return
+			}
 
-		if !tc.success {
-			continue
-		}
+			if !tc.success {
+				return
+			}
 
-		if e, a := tc.payload, actualPayload; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: expected and actual payload do not match", tc.name)
-		}
+			if e, a := tc.payload, actualPayload; !reflect.DeepEqual(e, a) {
+				t.Errorf("expected and actual payload do not match")
+			}
+		})
 	}
 }
 
