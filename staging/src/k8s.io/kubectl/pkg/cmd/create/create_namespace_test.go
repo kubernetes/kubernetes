@@ -26,9 +26,8 @@ import (
 
 func TestCreateNamespace(t *testing.T) {
 	tests := map[string]struct {
-		options   *NamespaceOptions
-		expected  *corev1.Namespace
-		expectErr bool
+		options  *NamespaceOptions
+		expected *corev1.Namespace
 	}{
 		"success_create": {
 			options: &NamespaceOptions{
@@ -43,30 +42,11 @@ func TestCreateNamespace(t *testing.T) {
 					Name: "my-namespace",
 				},
 			},
-			expectErr: false,
-		},
-		"create_with_empty_name": {
-			options: &NamespaceOptions{
-				Name: "",
-			},
-			expectErr: true,
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			namespace, err := tc.options.createNamespace()
-			switch {
-			case tc.expectErr && err != nil:
-				return // loop, since there's no output to check
-			case tc.expectErr && err == nil:
-				t.Errorf("%v: expected error and didn't get one", name)
-				return // loop, no expected output object
-			case !tc.expectErr && err != nil:
-				t.Errorf("%v: unexpected error %v", name, err)
-				return // loop, no output object
-			case !tc.expectErr && err == nil:
-				// do nothing and drop through
-			}
+			namespace := tc.options.createNamespace()
 			if !apiequality.Semantic.DeepEqual(namespace, tc.expected) {
 				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, namespace)
 			}
