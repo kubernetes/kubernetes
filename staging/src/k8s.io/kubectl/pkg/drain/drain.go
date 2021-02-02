@@ -56,6 +56,7 @@ type Helper struct {
 	GracePeriodSeconds int
 
 	IgnoreAllDaemonSets bool
+	IgnoreErrors        bool
 	Timeout             time.Duration
 	DeleteEmptyDirData  bool
 	Selector            string
