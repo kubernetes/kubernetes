@@ -102,12 +102,5 @@ func cloudInitializer(config *cloudcontrollerconfig.CompletedConfig) cloudprovid
 		}
 	}
 
-	// Initialize the cloud provider with a reference to the clientBuilder
-	cloud.Initialize(config.ClientBuilder, make(chan struct{}))
-	// Set the informer on the user cloud object
-	if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
-		informerUserCloud.SetInformers(config.SharedInformers)
-	}
-
 	return cloud
 }

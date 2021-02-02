@@ -88,13 +88,5 @@ func cloudInitializer(config *config.CompletedConfig) cloudprovider.Interface {
 			klog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
 		}
 	}
-
-	// Initialize the cloud provider with a reference to the clientBuilder
-	cloud.Initialize(config.ClientBuilder, make(chan struct{}))
-	// Set the informer on the user cloud object
-	if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
-		informerUserCloud.SetInformers(config.SharedInformers)
-	}
-
 	return cloud
 }
