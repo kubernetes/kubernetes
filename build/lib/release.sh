@@ -383,12 +383,16 @@ EOF
           echo "COPY nsswitch.conf /etc/" >> "${docker_file_path}"
         fi
 
-        DOCKER_CLI_EXPERIMENTAL=enabled "${DOCKER[@]}" buildx build \
+        local build_log="${docker_build_path}/build.log"
+        if ! DOCKER_CLI_EXPERIMENTAL=enabled "${DOCKER[@]}" buildx build \
           --platform linux/"${arch}" \
           --load ${docker_build_opts:+"${docker_build_opts}"} \
-          -q \
           -t "${docker_image_tag}" \
-          "${docker_build_path}" >/dev/null
+          "${docker_build_path}" >"${build_log}" 2>&1; then
+            cat "${build_log}"
+            exit 1
+        fi
+        rm "${build_log}"
 
         # If we are building an official/alpha/beta release we want to keep
         # docker images and tag them appropriately.
