@@ -367,9 +367,9 @@ func TestController2_updateCronJob(t *testing.T) {
 			},
 			args: args{
 				oldJobSchedule: "30 * * * *",
-				newJobSchedule: "1 * * * *",
+				newJobSchedule: "*/1 * * * *",
 			},
-			deltaTimeForQueue:    61*time.Second + nextScheduleDelta,
+			deltaTimeForQueue:    1*time.Second + nextScheduleDelta,
 			roundOffTimeDuration: 750 * time.Millisecond,
 		},
 		// TODO: Add more test cases for updating scheduling.
