@@ -144,10 +144,7 @@ func (o *NamespaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 
 // Run calls the CreateSubcommandOptions.Run in NamespaceOpts instance
 func (o *NamespaceOptions) Run() error {
-	namespace, err := o.createNamespace()
-	if err != nil {
-		return err
-	}
+	namespace := o.createNamespace()
 	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, namespace, scheme.DefaultJSONEncoder()); err != nil {
 		return err
 	}
@@ -163,6 +160,7 @@ func (o *NamespaceOptions) Run() error {
 			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
+		var err error
 		namespace, err = o.Client.Namespaces().Create(context.TODO(), namespace, createOptions)
 		if err != nil {
 			return err
@@ -172,15 +170,12 @@ func (o *NamespaceOptions) Run() error {
 }
 
 // createNamespace outputs a namespace object using the configured fields
-func (o *NamespaceOptions) createNamespace() (*corev1.Namespace, error) {
-	if err := o.Validate(); err != nil {
-		return nil, err
-	}
+func (o *NamespaceOptions) createNamespace() *corev1.Namespace {
 	namespace := &corev1.Namespace{
 		TypeMeta:   metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "Namespace"},
 		ObjectMeta: metav1.ObjectMeta{Name: o.Name},
 	}
-	return namespace, nil
+	return namespace
 }
 
 // Validate validates required fields are set to support structured generation
