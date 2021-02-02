@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit"
-	"k8s.io/kubernetes/plugin/pkg/admission/exec"
 	"k8s.io/kubernetes/plugin/pkg/admission/extendedresourcetoleration"
 	"k8s.io/kubernetes/plugin/pkg/admission/gc"
 	"k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
@@ -80,8 +79,6 @@ var AllOrderedPlugins = []string{
 	podpriority.PluginName,                  // Priority
 	defaulttolerationseconds.PluginName,     // DefaultTolerationSeconds
 	podtolerationrestriction.PluginName,     // PodTolerationRestriction
-	exec.DenyEscalatingExec,                 // DenyEscalatingExec
-	exec.DenyExecOnPrivileged,               // DenyExecOnPrivileged
 	eventratelimit.PluginName,               // EventRateLimit
 	extendedresourcetoleration.PluginName,   // ExtendedResourceToleration
 	label.PluginName,                        // PersistentVolumeLabel
@@ -116,7 +113,6 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	denyserviceexternalips.Register(plugins)
 	deny.Register(plugins) // DEPRECATED as no real meaning
 	eventratelimit.Register(plugins)
-	exec.Register(plugins)
 	extendedresourcetoleration.Register(plugins)
 	gc.Register(plugins)
 	imagepolicy.Register(plugins)

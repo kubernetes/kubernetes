@@ -18,7 +18,6 @@ filegroup(
         "//plugin/pkg/admission/defaulttolerationseconds:all-srcs",
         "//plugin/pkg/admission/deny:all-srcs",
         "//plugin/pkg/admission/eventratelimit:all-srcs",
-        "//plugin/pkg/admission/exec:all-srcs",
         "//plugin/pkg/admission/extendedresourcetoleration:all-srcs",
         "//plugin/pkg/admission/gc:all-srcs",
         "//plugin/pkg/admission/imagepolicy:all-srcs",
