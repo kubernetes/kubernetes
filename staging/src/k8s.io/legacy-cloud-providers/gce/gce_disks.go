@@ -515,7 +515,10 @@ func (g *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume)
 
 	// If the zone is already labeled, honor the hint
 	name := pv.Spec.GCEPersistentDisk.PDName
-	zone := pv.Labels[v1.LabelFailureDomainBetaZone]
+	zone := pv.Labels[v1.LabelTopologyZone]
+	if zone == "" {
+		zone = pv.Labels[v1.LabelFailureDomainBetaZone]
+	}
 
 	disk, err := g.getDiskByNameAndOptionalLabelZones(name, zone)
 	if err != nil {
@@ -848,7 +851,7 @@ func (g *Cloud) ResizeDisk(diskToResize string, oldSize resource.Quantity, newSi
 }
 
 // GetAutoLabelsForPD builds the labels that should be automatically added to a PersistentVolume backed by a GCE PD
-// Specifically, this builds FailureDomain (zone) and Region labels.
+// Specifically, this builds Topology (zone) and Region labels.
 // The PersistentVolumeLabel admission controller calls this and adds the labels when a PV is created.
 func (g *Cloud) GetAutoLabelsForPD(disk *Disk) (map[string]string, error) {
 	labels := make(map[string]string)
@@ -858,16 +861,16 @@ func (g *Cloud) GetAutoLabelsForPD(disk *Disk) (map[string]string, error) {
 			// Unexpected, but sanity-check
 			return nil, fmt.Errorf("PD did not have zone/region information: %v", disk)
 		}
-		labels[v1.LabelFailureDomainBetaZone] = zoneInfo.zone
-		labels[v1.LabelFailureDomainBetaRegion] = disk.Region
+		labels[v1.LabelTopologyZone] = zoneInfo.zone
+		labels[v1.LabelTopologyRegion] = disk.Region
 	case multiZone:
 		if zoneInfo.replicaZones == nil || zoneInfo.replicaZones.Len() <= 0 {
 			// Unexpected, but sanity-check
 			return nil, fmt.Errorf("PD is regional but does not have any replicaZones specified: %v", disk)
 		}
-		labels[v1.LabelFailureDomainBetaZone] =
+		labels[v1.LabelTopologyZone] =
 			volumehelpers.ZonesSetToLabelValue(zoneInfo.replicaZones)
-		labels[v1.LabelFailureDomainBetaRegion] = disk.Region
+		labels[v1.LabelTopologyRegion] = disk.Region
 	case nil:
 		// Unexpected, but sanity-check
 		return nil, fmt.Errorf("PD did not have ZoneInfo: %v", disk)
