@@ -154,7 +154,7 @@ func TestPostFilter(t *testing.T) {
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable),
 			},
 			wantResult: nil,
-			wantStatus: framework.NewStatus(framework.Unschedulable),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "0/1 nodes are available: 1 Preemption is not helpful for scheduling."),
 		},
 		{
 			name: "pod can be made schedulable on one node",
@@ -230,6 +230,26 @@ func TestPostFilter(t *testing.T) {
 			},
 			wantResult: nil,
 			wantStatus: framework.NewStatus(framework.Unschedulable, "0/2 nodes are available: 1 Insufficient cpu, 1 No victims found on node node1 for preemptor pod p."),
+		},
+		{
+			name: "no candidate nodes found with mixed reason, 2 UnschedulableAndUnresolvable nodes and 2 nodes don't have enough CPU resource",
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Node("node2").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(nodeRes).Obj(),
+				st.MakeNode().Name("node2").Capacity(nodeRes).Obj(),
+				st.MakeNode().Name("node3").Capacity(nodeRes).Obj(),
+				st.MakeNode().Name("node4").Capacity(nodeRes).Obj(),
+			},
+			filteredNodesStatuses: framework.NodeToStatusMap{
+				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable),
+				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable),
+			},
+			wantResult: nil,
+			wantStatus: framework.NewStatus(framework.Unschedulable, "0/4 nodes are available: 2 Insufficient cpu, 2 Preemption is not helpful for scheduling."),
 		},
 	}
 
@@ -1411,7 +1431,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				ni.SetNode(st.MakeNode().Name(name).Obj())
 				nodeInfos = append(nodeInfos, ni)
 			}
-			nodes := nodesWherePreemptionMightHelp(nodeInfos, tt.nodesStatuses)
+			nodes, _ := nodesWherePreemptionMightHelp(nodeInfos, tt.nodesStatuses)
 			if len(tt.expected) != len(nodes) {
 				t.Errorf("number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", len(tt.expected), len(nodes), nodes)
 			}
