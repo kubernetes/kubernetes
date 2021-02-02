@@ -432,7 +432,6 @@ package_group(
     name = "vendor_githubcom_prometheus_CONSUMERS",
     packages = [
         "//cluster/images/etcd-version-monitor",
-        "//pkg/scheduler/framework/runtime",
         "//pkg/volume/util/operationexecutor",
         "//staging/src/k8s.io/apiserver/pkg/admission/metrics",
         "//staging/src/k8s.io/component-base/metrics/...",
