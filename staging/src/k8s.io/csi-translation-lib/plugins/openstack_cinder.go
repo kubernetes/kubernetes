@@ -120,7 +120,7 @@ func (t *osCinderCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) 
 		VolumeAttributes: map[string]string{},
 	}
 
-	if err := translateTopology(pv, CinderTopologyKey); err != nil {
+	if err := translateTopologyFromInTreeToCSI(pv, CinderTopologyKey); err != nil {
 		return nil, fmt.Errorf("failed to translate topology: %v", err)
 	}
 
