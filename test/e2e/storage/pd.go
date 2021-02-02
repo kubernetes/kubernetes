@@ -29,7 +29,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -84,7 +83,9 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 		var err error
 		nodes, err = e2enode.GetReadySchedulableNodes(cs)
 		framework.ExpectNoError(err)
-		gomega.Expect(len(nodes.Items)).To(gomega.BeNumerically(">=", minNodes), fmt.Sprintf("Requires at least %d nodes", minNodes))
+		if len(nodes.Items) < minNodes {
+			e2eskipper.Skipf("The test requires %d schedulable nodes, got only %d", minNodes, len(nodes.Items))
+		}
 		host0Name = types.NodeName(nodes.Items[0].ObjectMeta.Name)
 		host1Name = types.NodeName(nodes.Items[1].ObjectMeta.Name)
 	})
