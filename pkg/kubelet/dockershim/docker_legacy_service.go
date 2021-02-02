@@ -43,7 +43,7 @@ import (
 // `DockerLegacyService`, and we want to be able to build the `kubelet` without
 // relying on `github.com/docker/docker` or `pkg/kubelet/dockershim`.
 //
-// See https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/20200205-build-kubelet-without-docker.md
+// See https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/1547-building-kubelet-without-docker/README.md
 // for details.
 
 // GetContainerLogs get container logs directly from docker daemon.

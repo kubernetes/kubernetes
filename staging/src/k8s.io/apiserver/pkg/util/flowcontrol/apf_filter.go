@@ -68,7 +68,7 @@ type Interface interface {
 	Install(c *mux.PathRecorderMux)
 }
 
-// This request filter implements https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190228-priority-and-fairness.md
+// This request filter implements https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/1040-priority-and-fairness/README.md
 
 // New creates a new instance to implement API priority and fairness
 func New(

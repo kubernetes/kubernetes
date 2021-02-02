@@ -25,5 +25,5 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 cd "${KUBE_ROOT}"
 # verify the providerless build
-# https://github.com/kubernetes/enhancements/blob/master/keps/sig-cloud-provider/20190729-building-without-in-tree-providers.md
+# https://github.com/kubernetes/enhancements/blob/master/keps/sig-cloud-provider/1179-building-without-in-tree-providers/README.md
 hack/verify-typecheck.sh --skip-test --tags=providerless --ignore-dirs=test
