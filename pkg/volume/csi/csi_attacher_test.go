@@ -199,11 +199,8 @@ func TestAttacherAttach(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("test case: %s", tc.name)
 			fakeClient := fakeclient.NewSimpleClientset()
-			plug, tmpDir := newTestPlugin(t, fakeClient)
+			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
-
-			fakeWatcher := watch.NewRaceFreeFake()
-			fakeClient.Fake.PrependWatchReactor("volumeattachments", core.DefaultWatchReactor(fakeWatcher, nil))
 
 			attacher, err := plug.NewAttacher()
 			if err != nil {
@@ -234,12 +231,10 @@ func TestAttacherAttach(t *testing.T) {
 				status.AttachError = &storage.VolumeError{
 					Message: "attacher error",
 				}
-				errStatus := apierrors.NewInternalError(fmt.Errorf("we got an error")).Status()
-				fakeWatcher.Error(&errStatus)
 			} else {
 				status.Attached = true
 			}
-			markVolumeAttached(t, csiAttacher.k8s, fakeWatcher, tc.attachID, status)
+			markVolumeAttached(t, csiAttacher.k8s, nil, tc.attachID, status)
 			wg.Wait()
 		})
 	}
@@ -291,11 +286,8 @@ func TestAttacherAttachWithInline(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("test case: %s", tc.name)
 			fakeClient := fakeclient.NewSimpleClientset()
-			plug, tmpDir := newTestPlugin(t, fakeClient)
+			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
-
-			fakeWatcher := watch.NewRaceFreeFake()
-			fakeClient.Fake.PrependWatchReactor("volumeattachments", core.DefaultWatchReactor(fakeWatcher, nil))
 
 			attacher, err := plug.NewAttacher()
 			if err != nil {
@@ -325,7 +317,7 @@ func TestAttacherAttachWithInline(t *testing.T) {
 			} else {
 				status.Attached = true
 			}
-			markVolumeAttached(t, csiAttacher.k8s, fakeWatcher, tc.attachID, status)
+			markVolumeAttached(t, csiAttacher.k8s, nil, tc.attachID, status)
 			wg.Wait()
 		})
 	}
@@ -366,24 +358,8 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 				getTestCSIDriver("attachable", nil, &bTrue, nil),
 				getTestCSIDriver("nil", nil, nil, nil),
 			)
-			plug, tmpDir := newTestPlugin(t, fakeClient)
+			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
-
-			attachmentWatchCreated := make(chan core.Action)
-			// Make sure this is the first reactor
-			fakeClient.Fake.PrependWatchReactor("volumeattachments", func(action core.Action) (bool, watch.Interface, error) {
-				select {
-				case <-attachmentWatchCreated:
-					// already closed
-				default:
-					// The attacher is already watching the attachment, notify the test goroutine to
-					// update the status of attachment.
-					// TODO: In theory this still has a race condition, because the actual watch is created by
-					// the next reactor in the chain and we unblock the test goroutine before returning here.
-					close(attachmentWatchCreated)
-				}
-				return false, nil, nil
-			})
 
 			attacher, err := plug.NewAttacher()
 			if err != nil {
@@ -423,9 +399,6 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 				status := storage.VolumeAttachmentStatus{
 					Attached: true,
 				}
-				// We want to ensure the watcher, which is created in csiAttacher,
-				// has been started before updating the status of attachment.
-				<-attachmentWatchCreated
 				markVolumeAttached(t, csiAttacher.k8s, nil, expectedAttachID, status)
 			}
 			wg.Wait()
@@ -827,7 +800,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			plug, tmpDir := newTestPlugin(t, nil)
+			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, nil)
 			defer os.RemoveAll(tmpDir)
 
 			attacher, err := plug.NewAttacher()
@@ -947,12 +920,11 @@ func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
 func TestAttacherDetach(t *testing.T) {
 	nodeName := "fakeNode"
 	testCases := []struct {
-		name         string
-		volID        string
-		attachID     string
-		shouldFail   bool
-		watcherError bool
-		reactor      func(action core.Action) (handled bool, ret runtime.Object, err error)
+		name       string
+		volID      string
+		attachID   string
+		shouldFail bool
+		reactor    func(action core.Action) (handled bool, ret runtime.Object, err error)
 	}{
 		{name: "normal test", volID: "vol-001", attachID: getAttachmentName("vol-001", testDriver, nodeName)},
 		{name: "normal test 2", volID: "vol-002", attachID: getAttachmentName("vol-002", testDriver, nodeName)},
@@ -970,30 +942,14 @@ func TestAttacherDetach(t *testing.T) {
 				return false, nil, nil
 			},
 		},
-		{
-			name:         "API watch error happen",
-			volID:        "vol-005",
-			attachID:     getAttachmentName("vol-005", testDriver, nodeName),
-			shouldFail:   true,
-			watcherError: true,
-			reactor: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-				if action.Matches("get", "volumeattachments") {
-					return true, makeTestAttachment(getAttachmentName("vol-005", testDriver, nodeName), nodeName, "vol-005"), nil
-				}
-				return false, nil, nil
-			},
-		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("running test: %v", tc.name)
 			fakeClient := fakeclient.NewSimpleClientset()
-			plug, tmpDir := newTestPlugin(t, fakeClient)
+			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
-
-			fakeWatcher := watch.NewRaceFreeFake()
-			fakeClient.Fake.PrependWatchReactor("volumeattachments", core.DefaultWatchReactor(fakeWatcher, nil))
 
 			if tc.reactor != nil {
 				fakeClient.PrependReactor("*", "*", tc.reactor)
@@ -1016,18 +972,7 @@ func TestAttacherDetach(t *testing.T) {
 			if err != nil {
 				t.Errorf("test case %s failed: %v", tc.name, err)
 			}
-			watchError := tc.watcherError
-			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				if watchError {
-					errStatus := apierrors.NewInternalError(fmt.Errorf("we got an error")).Status()
-					fakeWatcher.Error(&errStatus)
-					return
-				}
-				fakeWatcher.Delete(attachment)
-			}()
+
 			err = csiAttacher.Detach(volumeName, types.NodeName(nodeName))
 			if tc.shouldFail && err == nil {
 				t.Fatal("expecting failure, but err = nil")
@@ -1045,7 +990,6 @@ func TestAttacherDetach(t *testing.T) {
 					t.Errorf("expecting attachment not to be nil, but it is")
 				}
 			}
-			wg.Wait()
 		})
 	}
 }
@@ -1239,9 +1183,6 @@ func TestAttacherMountDevice(t *testing.T) {
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
-			fakeWatcher := watch.NewRaceFreeFake()
-			fakeClient.Fake.PrependWatchReactor("volumeattachments", core.DefaultWatchReactor(fakeWatcher, nil))
-
 			attacher, err0 := plug.NewAttacher()
 			if err0 != nil {
 				t.Fatalf("failed to create new attacher: %v", err0)
@@ -1255,7 +1196,6 @@ func TestAttacherMountDevice(t *testing.T) {
 
 			nodeName := string(csiAttacher.plugin.host.GetNodeName())
 			attachID := getAttachmentName(tc.volName, testDriver, nodeName)
-			var wg sync.WaitGroup
 
 			if tc.createAttachment {
 				// Set up volume attachment
@@ -1264,11 +1204,6 @@ func TestAttacherMountDevice(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to attach: %v", err)
 				}
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					fakeWatcher.Delete(attachment)
-				}()
 			}
 
 			parent := filepath.Dir(tc.deviceMountPath)
@@ -1359,8 +1294,6 @@ func TestAttacherMountDevice(t *testing.T) {
 					}
 				}
 			}
-
-			wg.Wait()
 		})
 	}
 }
