@@ -703,7 +703,8 @@ func refEqual(x spec.Ref, y spec.Ref) bool {
 // TestKubeOpenapiRejectionFiltering tests that the CRD openapi schema filtering leads to a spec that the
 // kube-openapi/pkg/util/proto model code support in version used in Kubernetes 1.13.
 func TestKubeOpenapiRejectionFiltering(t *testing.T) {
-	for i := 0; i < 10000; i++ {
+	// 1000 iterations runs for ~2 seconds with race detection enabled
+	for i := 0; i < 1000; i++ {
 		f := fuzz.New()
 		seed := time.Now().UnixNano()
 		randSource := rand.New(rand.NewSource(seed))
