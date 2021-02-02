@@ -24,14 +24,12 @@ import (
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
-	utilsexec "k8s.io/utils/exec"
 	utilpointer "k8s.io/utils/pointer"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 const (
@@ -201,20 +199,6 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 	// There is no way to determine if the user has set this or not, given the field is a non-pointer.
 	kc.config.RotateCertificates = kubeletRotateCertificates
 
-	// TODO: Conditionally set CgroupDriver to either `systemd` or `cgroupfs` for CRI other than Docker
-	if nodeRegOpts.CRISocket == constants.DefaultDockerCRISocket {
-		driver, err := kubeadmutil.GetCgroupDriverDocker(utilsexec.New())
-		if err != nil {
-			klog.Warningf("cannot automatically set CgroupDriver when starting the Kubelet: %v", err)
-		} else {
-			// if we can parse the right cgroup driver from docker info,
-			// we should always override CgroupDriver here no matter user specifies this value explicitly or not
-			if kc.config.CgroupDriver != "" && kc.config.CgroupDriver != driver {
-				klog.Warningf("detected %q as the Docker cgroup driver, the provided value %q in %q will be overrided", driver, kc.config.CgroupDriver, kind)
-			}
-			kc.config.CgroupDriver = driver
-		}
-	}
 	if len(kc.config.CgroupDriver) == 0 {
 		klog.V(1).Infof("the value of KubeletConfiguration.cgroupDriver is empty; setting it to %q", constants.CgroupDriverSystemd)
 		kc.config.CgroupDriver = constants.CgroupDriverSystemd
