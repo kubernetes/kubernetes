@@ -8,6 +8,7 @@ go_library(
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/job:go_default_library",
+        "//pkg/controller/ttlafterfinished/metrics:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -52,6 +53,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/controller/ttlafterfinished/config:all-srcs",
+        "//pkg/controller/ttlafterfinished/metrics:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
