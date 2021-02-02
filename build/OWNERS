@@ -4,8 +4,10 @@ reviewers:
   - bentheelder
   - cblecker
   - fejta
-  - justaugustus
+  - hasheddan # Release Manager / SIG Technical Lead
+  - justaugustus # Release Manager / SIG Chair
   - lavalamp
+  - saschagrunert # Release Manager / SIG Chair
   - spiffxp
 approvers:
   - bentheelder
