@@ -67,12 +67,13 @@ func TestCompatibility(t *testing.T) {
 		{
 			emptyObj: &ExtenderFilterResult{},
 			obj: &ExtenderFilterResult{
-				Nodes:       &corev1.NodeList{Items: []corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "nodename"}}}},
-				NodeNames:   &[]string{"node1"},
-				FailedNodes: FailedNodesMap{"foo": "bar"},
-				Error:       "myerror",
+				Nodes:                      &corev1.NodeList{Items: []corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "nodename"}}}},
+				NodeNames:                  &[]string{"node1"},
+				FailedNodes:                FailedNodesMap{"foo": "bar"},
+				FailedAndUnresolvableNodes: FailedNodesMap{"baz": "qux"},
+				Error:                      "myerror",
 			},
-			expectJSON: `{"Nodes":{"metadata":{},"items":[{"metadata":{"name":"nodename","creationTimestamp":null},"spec":{},"status":{"daemonEndpoints":{"kubeletEndpoint":{"Port":0}},"nodeInfo":{"machineID":"","systemUUID":"","bootID":"","kernelVersion":"","osImage":"","containerRuntimeVersion":"","kubeletVersion":"","kubeProxyVersion":"","operatingSystem":"","architecture":""}}}]},"NodeNames":["node1"],"FailedNodes":{"foo":"bar"},"Error":"myerror"}`,
+			expectJSON: `{"Nodes":{"metadata":{},"items":[{"metadata":{"name":"nodename","creationTimestamp":null},"spec":{},"status":{"daemonEndpoints":{"kubeletEndpoint":{"Port":0}},"nodeInfo":{"machineID":"","systemUUID":"","bootID":"","kernelVersion":"","osImage":"","containerRuntimeVersion":"","kubeletVersion":"","kubeProxyVersion":"","operatingSystem":"","architecture":""}}}]},"NodeNames":["node1"],"FailedNodes":{"foo":"bar"},"FailedAndUnresolvableNodes":{"baz":"qux"},"Error":"myerror"}`,
 		},
 		{
 			emptyObj: &ExtenderBindingArgs{},

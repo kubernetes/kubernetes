@@ -273,6 +273,180 @@ func TestSelectHost(t *testing.T) {
 	}
 }
 
+func TestFindNodesThatPassExtenders(t *testing.T) {
+	tests := []struct {
+		name                  string
+		extenders             []st.FakeExtender
+		nodes                 []*v1.Node
+		filteredNodesStatuses framework.NodeToStatusMap
+		expectsErr            bool
+		expectedNodes         []*v1.Node
+		expectedStatuses      framework.NodeToStatusMap
+	}{
+		{
+			name: "error",
+			extenders: []st.FakeExtender{
+				{
+					Predicates: []st.FitPredicate{st.ErrorPredicateExtender},
+				},
+			},
+			nodes:                 makeNodeList([]string{"a"}),
+			filteredNodesStatuses: make(framework.NodeToStatusMap),
+			expectsErr:            true,
+		},
+		{
+			name: "success",
+			extenders: []st.FakeExtender{
+				{
+					Predicates: []st.FitPredicate{st.TruePredicateExtender},
+				},
+			},
+			nodes:                 makeNodeList([]string{"a"}),
+			filteredNodesStatuses: make(framework.NodeToStatusMap),
+			expectsErr:            false,
+			expectedNodes:         makeNodeList([]string{"a"}),
+			expectedStatuses:      make(framework.NodeToStatusMap),
+		},
+		{
+			name: "unschedulable",
+			extenders: []st.FakeExtender{
+				{
+					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
+						if node.Name == "a" {
+							return framework.NewStatus(framework.Success)
+						}
+						return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+					}},
+				},
+			},
+			nodes:                 makeNodeList([]string{"a", "b"}),
+			filteredNodesStatuses: make(framework.NodeToStatusMap),
+			expectsErr:            false,
+			expectedNodes:         makeNodeList([]string{"a"}),
+			expectedStatuses: framework.NodeToStatusMap{
+				"b": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("FakeExtender: node %q failed", "b")),
+			},
+		},
+		{
+			name: "unschedulable and unresolvable",
+			extenders: []st.FakeExtender{
+				{
+					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
+						if node.Name == "a" {
+							return framework.NewStatus(framework.Success)
+						}
+						if node.Name == "b" {
+							return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+						}
+						return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("node %q is not allowed", node.Name))
+					}},
+				},
+			},
+			nodes:                 makeNodeList([]string{"a", "b", "c"}),
+			filteredNodesStatuses: make(framework.NodeToStatusMap),
+			expectsErr:            false,
+			expectedNodes:         makeNodeList([]string{"a"}),
+			expectedStatuses: framework.NodeToStatusMap{
+				"b": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("FakeExtender: node %q failed", "b")),
+				"c": framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("FakeExtender: node %q failed and unresolvable", "c")),
+			},
+		},
+		{
+			name: "extender may overwrite the statuses",
+			extenders: []st.FakeExtender{
+				{
+					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
+						if node.Name == "a" {
+							return framework.NewStatus(framework.Success)
+						}
+						if node.Name == "b" {
+							return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+						}
+						return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("node %q is not allowed", node.Name))
+					}},
+				},
+			},
+			nodes: makeNodeList([]string{"a", "b", "c"}),
+			filteredNodesStatuses: framework.NodeToStatusMap{
+				"c": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("FakeFilterPlugin: node %q failed", "c")),
+			},
+			expectsErr:    false,
+			expectedNodes: makeNodeList([]string{"a"}),
+			expectedStatuses: framework.NodeToStatusMap{
+				"b": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("FakeExtender: node %q failed", "b")),
+				"c": framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("FakeFilterPlugin: node %q failed", "c"), fmt.Sprintf("FakeExtender: node %q failed and unresolvable", "c")),
+			},
+		},
+		{
+			name: "multiple extenders",
+			extenders: []st.FakeExtender{
+				{
+					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
+						if node.Name == "a" {
+							return framework.NewStatus(framework.Success)
+						}
+						if node.Name == "b" {
+							return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+						}
+						return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("node %q is not allowed", node.Name))
+					}},
+				},
+				{
+					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
+						if node.Name == "a" {
+							return framework.NewStatus(framework.Success)
+						}
+						return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+					}},
+				},
+			},
+			nodes:                 makeNodeList([]string{"a", "b", "c"}),
+			filteredNodesStatuses: make(framework.NodeToStatusMap),
+			expectsErr:            false,
+			expectedNodes:         makeNodeList([]string{"a"}),
+			expectedStatuses: framework.NodeToStatusMap{
+				"b": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("FakeExtender: node %q failed", "b")),
+				"c": framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("FakeExtender: node %q failed and unresolvable", "c")),
+			},
+		},
+	}
+
+	cmpOpts := []cmp.Option{
+		cmp.Comparer(func(s1 framework.Status, s2 framework.Status) bool {
+			return s1.Code() == s2.Code() && reflect.DeepEqual(s1.Reasons(), s2.Reasons())
+		}),
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var extenders []framework.Extender
+			for ii := range tt.extenders {
+				extenders = append(extenders, &tt.extenders[ii])
+			}
+			scheduler := &genericScheduler{
+				extenders: extenders,
+			}
+			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
+			got, err := scheduler.findNodesThatPassExtenders(pod, tt.nodes, tt.filteredNodesStatuses)
+			if tt.expectsErr {
+				if err == nil {
+					t.Error("Unexpected non-error")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if diff := cmp.Diff(tt.expectedNodes, got); diff != "" {
+					t.Errorf("filtered nodes (-want,+got):\n%s", diff)
+				}
+				if diff := cmp.Diff(tt.expectedStatuses, tt.filteredNodesStatuses, cmpOpts...); diff != "" {
+					t.Errorf("filtered statuses (-want,+got):\n%s", diff)
+				}
+			}
+		})
+	}
+}
+
 func TestGenericScheduler(t *testing.T) {
 	tests := []struct {
 		name            string
