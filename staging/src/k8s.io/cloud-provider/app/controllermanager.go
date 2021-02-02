@@ -84,7 +84,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 			cloud := cloudInitializer(completedConfig)
 			controllerInitializers := ConstructControllerInitializers(initFuncConstructor, completedConfig, cloud)
 
-			if err := Run(completedConfig, controllerInitializers, wait.NeverStop); err != nil {
+			if err := Run(completedConfig, cloud, controllerInitializers, wait.NeverStop); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -131,7 +131,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 }
 
 // Run runs the ExternalCMServer.  This should never exit.
-func Run(c *cloudcontrollerconfig.CompletedConfig, controllerInitializers map[string]InitFunc, stopCh <-chan struct{}) error {
+func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface, controllerInitializers map[string]InitFunc, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
@@ -176,7 +176,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, controllerInitializers map[st
 		if err != nil {
 			klog.Fatalf("error building controller context: %v", err)
 		}
-		if err := startControllers(controllerContext, c, ctx.Done(), controllerInitializers); err != nil {
+		if err := startControllers(cloud, controllerContext, c, ctx.Done(), controllerInitializers); err != nil {
 			klog.Fatalf("error running controllers: %v", err)
 		}
 	}
@@ -227,7 +227,13 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, controllerInitializers map[st
 }
 
 // startControllers starts the cloud specific controller loops.
-func startControllers(ctx genericcontrollermanager.ControllerContext, c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}, controllers map[string]InitFunc) error {
+func startControllers(cloud cloudprovider.Interface, ctx genericcontrollermanager.ControllerContext, c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}, controllers map[string]InitFunc) error {
+	// Initialize the cloud provider with a reference to the clientBuilder
+	cloud.Initialize(c.ClientBuilder, stopCh)
+	// Set the informer on the user cloud object
+	if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
+		informerUserCloud.SetInformers(c.SharedInformers)
+	}
 	for controllerName, initFn := range controllers {
 		if !genericcontrollermanager.IsControllerEnabled(controllerName, ControllersDisabledByDefault, c.ComponentConfig.Generic.Controllers) {
 			klog.Warningf("%q is disabled", controllerName)
