@@ -16,7 +16,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/daemon",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/daemon/util:go_default_library",
         "//pkg/scheduler/framework/plugins/helper:go_default_library",
@@ -46,6 +45,7 @@ go_library(
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/prometheus/ratelimiter:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/integer:go_default_library",
     ],

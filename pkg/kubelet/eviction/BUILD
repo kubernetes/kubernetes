@@ -49,7 +49,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/eviction",
     deps = [
         "//pkg/api/v1/resource:go_default_library",
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/core/v1/helper/qos:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
