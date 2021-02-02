@@ -626,6 +626,74 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			message := "n" + strings.Repeat("o", 1999)
 			config.DialEchoFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, message)
 		})
+
+		// if the endpoints pods use hostNetwork, several tests can't run in parallel
+		// because the pods will try to acquire the same port in the host.
+		// We run the test in serial, to avoid port conflicts.
+		ginkgo.It("should function for service endpoints using hostNetwork", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork, e2enetwork.EndpointsUseHostNetwork)
+
+			ginkgo.By("pod-Service(hostNetwork): http")
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			err := config.DialFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.SecondaryNodeIP, config.NodeHTTPPort))
+			err = config.DialFromTestContainer("http", config.SecondaryNodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+
+			ginkgo.By("node-Service(hostNetwork): http")
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (config.clusterIP)", config.SecondaryNodeIP, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			err = config.DialFromNode("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP)", config.SecondaryNodeIP, config.SecondaryNodeIP, config.NodeHTTPPort))
+			err = config.DialFromNode("http", config.SecondaryNodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+
+			ginkgo.By("node-Service(hostNetwork): udp")
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (config.clusterIP)", config.SecondaryNodeIP, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
+
+			err = config.DialFromNode("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				time.Sleep(10 * time.Hour)
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP)", config.SecondaryNodeIP, config.SecondaryNodeIP, config.NodeUDPPort))
+			err = config.DialFromNode("udp", config.SecondaryNodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+
+			ginkgo.By("handle large requests: http(hostNetwork)")
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.SecondaryClusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			message := strings.Repeat("42", 1000)
+			err = config.DialEchoFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, message)
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+
+			ginkgo.By("handle large requests: udp(hostNetwork)")
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.SecondaryClusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
+			message = "n" + strings.Repeat("o", 1999)
+			err = config.DialEchoFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, message)
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+		})
 	})
 })
 
