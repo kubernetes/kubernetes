@@ -63,7 +63,7 @@ var storageOperationErrorMetric = metrics.NewCounterVec(
 	[]string{"volume_plugin", "operation_name"},
 )
 
-var storageOperationStatusMetric = metrics.NewCounterVec(
+var StorageOperationStatusMetric = metrics.NewCounterVec(
 	&metrics.CounterOpts{
 		Name:           "storage_operation_status_count",
 		Help:           "Storage operation return statuses count (Deprecated since 1.21.0)",
@@ -102,7 +102,7 @@ func registerMetrics() {
 	// global registry, used specifically for metric stability enforcement
 	legacyregistry.MustRegister(storageOperationMetric)
 	legacyregistry.MustRegister(storageOperationErrorMetric)
-	legacyregistry.MustRegister(storageOperationStatusMetric)
+	legacyregistry.MustRegister(StorageOperationStatusMetric)
 	legacyregistry.MustRegister(storageOperationEndToEndLatencyMetric)
 	legacyregistry.MustRegister(csiOperationsLatencyMetric)
 }
@@ -125,7 +125,7 @@ func OperationCompleteHook(plugin, operationName string) func(types.CompleteFunc
 			migrated = *c.Migrated
 		}
 		storageOperationMetric.WithLabelValues(plugin, operationName, status, strconv.FormatBool(migrated)).Observe(timeTaken)
-		storageOperationStatusMetric.WithLabelValues(plugin, operationName, status).Inc()
+		StorageOperationStatusMetric.WithLabelValues(plugin, operationName, status).Inc()
 	}
 	return opComplete
 }
