@@ -266,8 +266,8 @@ func isNodeUntainted(node *v1.Node) bool {
 		n = nodeCopy
 	}
 
-	_, tolerated := v1helper.FindMatchingUntoleratedTaint(n.Spec.Taints, fakePod.Spec.Tolerations, func(t *v1.Taint) bool {
+	_, untolerated := v1helper.FindMatchingUntoleratedTaint(n.Spec.Taints, fakePod.Spec.Tolerations, func(t *v1.Taint) bool {
 		return t.Effect == v1.TaintEffectNoExecute || t.Effect == v1.TaintEffectNoSchedule
 	})
-	return tolerated
+	return !untolerated
 }
