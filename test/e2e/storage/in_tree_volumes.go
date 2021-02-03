@@ -38,7 +38,6 @@ var testDrivers = []func() storageframework.TestDriver{
 	drivers.InitGcePdDriver,
 	drivers.InitWindowsGcePdDriver,
 	drivers.InitVSphereDriver,
-	drivers.InitWindowsVSphereDriver,
 	drivers.InitAzureDiskDriver,
 	drivers.InitAwsDriver,
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectory),
