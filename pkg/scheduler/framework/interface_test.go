@@ -18,8 +18,13 @@ package framework
 
 import (
 	"errors"
+	"fmt"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
+
+var errorStatus = NewStatus(Error, "internal error")
 
 func TestStatus(t *testing.T) {
 	tests := []struct {
@@ -129,6 +134,82 @@ func TestPluginToStatusMerge(t *testing.T) {
 			gotStatus := test.statusMap.Merge()
 			if test.wantCode != gotStatus.Code() {
 				t.Errorf("wantCode %v, gotCode %v", test.wantCode, gotStatus.Code())
+			}
+		})
+	}
+}
+
+func TestIsStatusEqual(t *testing.T) {
+	tests := []struct {
+		name string
+		x, y *Status
+		want bool
+	}{
+		{
+			name: "two nil should be equal",
+			x:    nil,
+			y:    nil,
+			want: true,
+		},
+		{
+			name: "nil should be equal to success status",
+			x:    nil,
+			y:    NewStatus(Success),
+			want: true,
+		},
+		{
+			name: "nil should not be equal with status except success",
+			x:    nil,
+			y:    NewStatus(Error, "internal error"),
+			want: false,
+		},
+		{
+			name: "one status should be equal to itself",
+			x:    errorStatus,
+			y:    errorStatus,
+			want: true,
+		},
+		{
+			name: "same type statuses without reasons should be equal",
+			x:    NewStatus(Success),
+			y:    NewStatus(Success),
+			want: true,
+		},
+		{
+			name: "statuses with same message should be equal",
+			x:    NewStatus(Unschedulable, "unschedulable"),
+			y:    NewStatus(Unschedulable, "unschedulable"),
+			want: true,
+		},
+		{
+			name: "error statuses with same message should not be equal",
+			x:    NewStatus(Error, "error"),
+			y:    NewStatus(Error, "error"),
+			want: false,
+		},
+		{
+			name: "statuses with different reasons should not be equal",
+			x:    NewStatus(Unschedulable, "unschedulable"),
+			y:    NewStatus(Unschedulable, "unschedulable", "injected filter status"),
+			want: false,
+		},
+		{
+			name: "statuses with different codes should not be equal",
+			x:    NewStatus(Error, "internal error"),
+			y:    NewStatus(Unschedulable, "internal error"),
+			want: false,
+		},
+		{
+			name: "wrap error status should be equal with original one",
+			x:    errorStatus,
+			y:    AsStatus(fmt.Errorf("error: %w", errorStatus.AsError())),
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := cmp.Equal(tt.x, tt.y); got != tt.want {
+				t.Errorf("cmp.Equal() = %v, want %v", got, tt.want)
 			}
 		})
 	}

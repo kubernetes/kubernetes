@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -178,6 +180,21 @@ func (s *Status) AsError() error {
 		return s.err
 	}
 	return errors.New(s.Message())
+}
+
+// Equal checks equality of two statuses. This is useful for testing with
+// cmp.Equal.
+func (s *Status) Equal(x *Status) bool {
+	if s == nil || x == nil {
+		return s.IsSuccess() && x.IsSuccess()
+	}
+	if s.code != x.code {
+		return false
+	}
+	if s.code == Error {
+		return cmp.Equal(s.err, x.err, cmpopts.EquateErrors())
+	}
+	return cmp.Equal(s.reasons, x.reasons)
 }
 
 // NewStatus makes a Status out of the given arguments and returns its pointer.
