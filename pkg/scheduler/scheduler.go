@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/core"
@@ -328,7 +329,8 @@ func (sched *Scheduler) recordSchedulingFailure(fwk framework.Framework, podInfo
 	}
 
 	pod := podInfo.Pod
-	fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", err.Error())
+	msg := truncateMessage(err.Error())
+	fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 	if err := updatePod(sched.client, pod, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
@@ -337,6 +339,16 @@ func (sched *Scheduler) recordSchedulingFailure(fwk framework.Framework, podInfo
 	}, nominatedNode); err != nil {
 		klog.Errorf("Error updating pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
+}
+
+// truncateMessage truncates a message if it hits the NoteLengthLimit.
+func truncateMessage(message string) string {
+	max := validation.NoteLengthLimit
+	if len(message) <= max {
+		return message
+	}
+	suffix := " ..."
+	return message[:max-len(suffix)] + suffix
 }
 
 func updatePod(client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatedNode string) error {
