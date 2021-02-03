@@ -105,6 +105,10 @@ func (e *resourceExpirationEvaluator) shouldServe(gv schema.GroupVersion, versio
 		return true
 	}
 	majorRemoved, minorRemoved := removed.APILifecycleRemoved()
+	if majorRemoved == 1 && minorRemoved == 22 {
+		// TMP: test 1.22 removals specifically
+		return false
+	}
 	if e.currentMajor < majorRemoved {
 		return true
 	}
