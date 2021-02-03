@@ -445,6 +445,13 @@ func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, e
 		if !found || err != nil {
 			continue
 		}
+		generation, found, _ := unstructured.NestedInt64(obj.Object, "metadata", "generation")
+		if found {
+			observedGeneration, found := getObservedGeneration(obj, condition)
+			if found && observedGeneration < generation {
+				return false, nil
+			}
+		}
 		return strings.EqualFold(status, w.conditionStatus), nil
 	}
 
@@ -469,4 +476,13 @@ func (w ConditionalWait) isConditionMet(event watch.Event) (bool, error) {
 
 func extendErrWaitTimeout(err error, info *resource.Info) error {
 	return fmt.Errorf("%s on %s/%s", err.Error(), info.Mapping.Resource.Resource, info.Name)
+}
+
+func getObservedGeneration(obj *unstructured.Unstructured, condition map[string]interface{}) (int64, bool) {
+	conditionObservedGeneration, found, _ := unstructured.NestedInt64(condition, "observedGeneration")
+	if found {
+		return conditionObservedGeneration, true
+	}
+	statusObservedGeneration, found, _ := unstructured.NestedInt64(obj.Object, "status", "observedGeneration")
+	return statusObservedGeneration, found
 }
