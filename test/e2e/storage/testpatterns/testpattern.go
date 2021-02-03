@@ -255,6 +255,7 @@ var (
 		FsType:                 "ntfs",
 		FeatureTag:             "[sig-windows]",
 		SnapshotDeletionPolicy: DeleteSnapshot,
+		SnapshotType:           DynamicCreatedSnapshot,
 	}
 
 	// Definitions for Filesystem volume mode
@@ -328,6 +329,16 @@ var (
 		VolType:        DynamicPV,
 		AllowExpansion: true,
 	}
+
+	// NtfsDynamicPVAllowExpansion is TestPattern for "Dynamic PV (default fs)(allowExpansion)"
+	NtfsDynamicPVAllowExpansion = TestPattern{
+		Name:           "Dynamic PV (ntfs)(allowExpansion)",
+		VolType:        DynamicPV,
+		AllowExpansion: true,
+		FsType:         "ntfs",
+		FeatureTag:     "[sig-windows]",
+	}
+
 	// BlockVolModeDynamicPVAllowExpansion is TestPattern for "Dynamic PV (block volmode)(allowExpansion)"
 	BlockVolModeDynamicPVAllowExpansion = TestPattern{
 		Name:           "Dynamic PV (block volmode)(allowExpansion)",
