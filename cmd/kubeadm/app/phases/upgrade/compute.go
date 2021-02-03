@@ -101,7 +101,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		fmt.Println("[upgrade/versions] WARNING: Falling back to current kubeadm version as latest stable version")
 		stableVersionStr, stableVersion = kubeadmVersionStr, kubeadmVersion
 	} else {
-		fmt.Printf("[upgrade/versions] Latest %s: %s\n", "stable version", stableVersionStr)
+		fmt.Printf("[upgrade/versions] Target version: %s\n", stableVersionStr)
 	}
 
 	// Get the kubelet versions in the cluster
