@@ -3771,13 +3771,38 @@ func describeHorizontalPodAutoscalerV1(hpa *autoscalingv1.HorizontalPodAutoscale
 }
 
 func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev1.Node, w PrefixWriter) {
-	w.Write(LEVEL_0, "Non-terminated Pods:\t(%d in total)\n", len(nodeNonTerminatedPodsList.Items))
-	w.Write(LEVEL_1, "Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\tAGE\n")
-	w.Write(LEVEL_1, "---------\t----\t\t------------\t----------\t---------------\t-------------\t---\n")
 	allocatable := node.Status.Capacity
 	if len(node.Status.Allocatable) > 0 {
 		allocatable = node.Status.Allocatable
 	}
+
+	hugePageResources := make([]string, 0, len(allocatable))
+	hugePageResourcesNonZero := make([]string, 0, len(allocatable))
+	for resource := range allocatable {
+		if resourcehelper.IsHugePageResourceName(resource) {
+			hugePageResources = append(hugePageResources, string(resource))
+			if hugePageSizeAllocatable := allocatable[resource]; hugePageSizeAllocatable.Value() != 0 {
+				hugePageResourcesNonZero = append(hugePageResourcesNonZero, string(resource))
+			}
+		}
+	}
+	sort.Strings(hugePageResources)
+	sort.Strings(hugePageResourcesNonZero)
+
+	hugePageColumnName := ""
+	dashFilling := ""
+	dashTemplate := "------------------------------------"
+	for _, hugePageResource := range hugePageResourcesNonZero {
+		hugePageName := strings.Replace(hugePageResource, corev1.ResourceHugePagesPrefix, "HugePages-", len("HugePages-"))
+		hugePageColumnName = fmt.Sprintf("%s%s Requests\t%s Limits\t", hugePageColumnName, hugePageName, hugePageName)
+		requestsDash := dashTemplate[0:len(hugePageName+" Requests")]
+		limitsDash := dashTemplate[0:len(hugePageName+" Limits")]
+		dashFilling = fmt.Sprintf("%s%s\t%s\t", dashFilling, requestsDash, limitsDash)
+	}
+
+	w.Write(LEVEL_0, "Non-terminated Pods:\t(%d in total)\n", len(nodeNonTerminatedPodsList.Items))
+	w.Write(LEVEL_1, "Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\t%sAGE\n", hugePageColumnName)
+	w.Write(LEVEL_1, "---------\t----\t\t------------\t----------\t---------------\t-------------\t%s---\n", dashFilling)
 
 	for _, pod := range nodeNonTerminatedPodsList.Items {
 		req, limit := resourcehelper.PodRequestsAndLimits(&pod)
@@ -3786,9 +3811,19 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 		fractionCpuLimit := float64(cpuLimit.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
 		fractionMemoryReq := float64(memoryReq.Value()) / float64(allocatable.Memory().Value()) * 100
 		fractionMemoryLimit := float64(memoryLimit.Value()) / float64(allocatable.Memory().Value()) * 100
-		w.Write(LEVEL_1, "%s\t%s\t\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s\n", pod.Namespace, pod.Name,
+
+		hugePageColumnValue := ""
+		for _, hugePageResource := range hugePageResourcesNonZero {
+			hugePageReq, hugePageLimit := req[corev1.ResourceName(hugePageResource)], limit[corev1.ResourceName(hugePageResource)]
+
+			fractionHugePageSizeReq := float64(hugePageReq.MilliValue()) / float64(allocatable.Hugepage(hugePageResource).MilliValue()) * 100
+			fractionHugePageSizeLimit := float64(hugePageLimit.MilliValue()) / float64(allocatable.Hugepage(hugePageResource).MilliValue()) * 100
+			hugePageColumnValue = fmt.Sprintf("%s%s (%d%%)\t%s (%d%%)\t", hugePageColumnValue, hugePageReq.String(), int64(fractionHugePageSizeReq), hugePageLimit.String(), int64(fractionHugePageSizeLimit))
+		}
+
+		w.Write(LEVEL_1, "%s\t%s\t\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s%s\n", pod.Namespace, pod.Name,
 			cpuReq.String(), int64(fractionCpuReq), cpuLimit.String(), int64(fractionCpuLimit),
-			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit), translateTimestampSince(pod.CreationTimestamp))
+			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit), hugePageColumnValue, translateTimestampSince(pod.CreationTimestamp))
 	}
 
 	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n")
@@ -3823,17 +3858,12 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 		corev1.ResourceEphemeralStorage, ephemeralstorageReqs.String(), int64(fractionEphemeralStorageReqs), ephemeralstorageLimits.String(), int64(fractionEphemeralStorageLimits))
 
 	extResources := make([]string, 0, len(allocatable))
-	hugePageResources := make([]string, 0, len(allocatable))
 	for resource := range allocatable {
-		if resourcehelper.IsHugePageResourceName(resource) {
-			hugePageResources = append(hugePageResources, string(resource))
-		} else if !resourcehelper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods {
+		if !resourcehelper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods {
 			extResources = append(extResources, string(resource))
 		}
 	}
-
 	sort.Strings(extResources)
-	sort.Strings(hugePageResources)
 
 	for _, resource := range hugePageResources {
 		hugePageSizeRequests, hugePageSizeLimits, hugePageSizeAllocable := reqs[corev1.ResourceName(resource)], limits[corev1.ResourceName(resource)], allocatable[corev1.ResourceName(resource)]

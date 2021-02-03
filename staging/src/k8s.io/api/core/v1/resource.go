@@ -50,6 +50,11 @@ func (rl *ResourceList) StorageEphemeral() *resource.Quantity {
 	return rl.Name(ResourceEphemeralStorage, resource.BinarySI)
 }
 
+// Hugepage returns the hugepage-size limit if specified.
+func (rl *ResourceList) Hugepage(hugepage string) *resource.Quantity {
+	return rl.Name(ResourceName(hugepage), resource.BinarySI)
+}
+
 // Name returns the resource with name if specified, otherwise it returns a nil quantity with default format.
 func (rl *ResourceList) Name(name ResourceName, defaultFormat resource.Format) *resource.Quantity {
 	if val, ok := (*rl)[name]; ok {
