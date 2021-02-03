@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Copyright 2019 The Kubernetes Authors.
+
+# Copyright 2020 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,13 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This file is not intended to be run automatically. It is meant to be run
+# immediately before exporting docs. We do not want to check these documents in
+# by default.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 export KUBE_ROOT
+
 source "${KUBE_ROOT}/test/instrumentation/stability-utils.sh"
 
 kube::update::stablemetrics

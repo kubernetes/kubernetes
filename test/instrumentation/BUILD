@@ -48,12 +48,24 @@ genrule(
     tools = [":instrumentation"],
 )
 
+sh_library(
+    name = "stability_utils",
+    srcs = [
+        "stability-utils.sh",
+    ],
+)
+
 sh_test(
     name = "verify_stable_metric",
-    srcs = ["verify-stable-metrics.sh"],
+    srcs = [
+        "verify-stable-metrics.sh",
+    ],
     data = [
         "testdata/stable-metrics-list.yaml",
         ":list_stable_metrics",
+    ],
+    deps = [
+        ":stability_utils",
     ],
 )
 
