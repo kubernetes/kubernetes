@@ -13,7 +13,6 @@ go_library(
     deps = [
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/apis/config/scheme:go_default_library",
-        "//pkg/scheduler/apis/config/v1beta2:go_default_library",
         "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/internal/parallelize:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
@@ -27,6 +26,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/events:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
+        "//staging/src/k8s.io/kube-scheduler/config/v1beta2:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
