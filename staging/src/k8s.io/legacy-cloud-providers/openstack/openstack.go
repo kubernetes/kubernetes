@@ -281,7 +281,7 @@ func (os *OpenStack) setConfigFromSecret() error {
 
 	secret, err := os.secretLister.Secrets(os.secretNamespace).Get(os.secretName)
 	if err != nil {
-		klog.Errorf("Cannot get secret %s in namespace %s. error: %q", os.secretName, os.secretNamespace, err)
+		klog.Errorf("cannot get secret %s in namespace %s. error: %q", os.secretName, os.secretNamespace, err)
 		return err
 	}
 
@@ -290,11 +290,11 @@ func (os *OpenStack) setConfigFromSecret() error {
 
 		err = gcfg.ReadStringInto(cfg, string(content))
 		if err != nil {
-			return fmt.Errorf("cannot parse data from the secret")
+			return fmt.Errorf("cannot parse data from the secret: %s", err)
 		}
 		provider, err := newProvider(*cfg)
 		if err != nil {
-			return fmt.Errorf("cannot initialize cloud provider using data from the secret")
+			return fmt.Errorf("cannot initialize cloud provider using data from the secret: %s", err)
 		}
 		os.provider = provider
 		os.region = cfg.Global.Region
@@ -312,9 +312,10 @@ func (os *OpenStack) ensureCloudProviderWasInitialized() error {
 
 	if os.secretName != "" && os.secretNamespace != "" {
 		err := os.setConfigFromSecret()
-		if err == nil {
-			return nil
+		if err != nil {
+			return fmt.Errorf("cloud provider is not initialized: %s", err)
 		}
+		return nil
 	}
 
 	return fmt.Errorf("cloud provider is not initialized")
@@ -876,6 +877,10 @@ func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 }
 
 func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
+	if err := os.ensureCloudProviderWasInitialized(); err != nil {
+		return nil, err
+	}
+
 	bsVersion := ""
 	if forceVersion == "" {
 		bsVersion = os.bsOpts.BSVersion
