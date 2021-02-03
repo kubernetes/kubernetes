@@ -53,6 +53,9 @@ import (
 )
 
 const (
+	// 34 chose as a number close to 30 that is likely to be unique enough to jump out at me the next time I see a timeout.
+	// Everyone chooses 30.
+	requestTimeoutUpperBound = 34 * time.Second
 	// DuplicateOwnerReferencesWarningFormat is the warning that a client receives when a create/update request contains
 	// duplicate owner reference entries.
 	DuplicateOwnerReferencesWarningFormat = ".metadata.ownerReferences contains duplicate entries; API server dedups owner references in 1.20+, and may reject such requests as early as 1.24; please fix your requests; duplicate UID(s) observed: %v"
@@ -227,7 +230,7 @@ type resultFunc func() (runtime.Object, error)
 
 // finishRequest makes a given resultFunc asynchronous and handles errors returned by the response.
 // An api.Status object with status != success is considered an "error", which interrupts the normal response flow.
-func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object, err error) {
+func finishRequest(ctx context.Context, fn resultFunc) (result runtime.Object, err error) {
 	// these channels need to be buffered to prevent the goroutine below from hanging indefinitely
 	// when the select statement reads something other than the one the goroutine sends on.
 	ch := make(chan runtime.Object, 1)
@@ -271,8 +274,8 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 		return nil, err
 	case p := <-panicCh:
 		panic(p)
-	case <-time.After(timeout):
-		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout %s", timeout), 0)
+	case <-ctx.Done():
+		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout %s", ctx.Err()), 0)
 	}
 }
 
@@ -485,18 +488,6 @@ func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 		return nil, errors.NewRequestEntityTooLargeError(fmt.Sprintf("limit is %d", limit))
 	}
 	return data, nil
-}
-
-func parseTimeout(str string) time.Duration {
-	if str != "" {
-		timeout, err := time.ParseDuration(str)
-		if err == nil {
-			return timeout
-		}
-		klog.Errorf("Failed to parse %q: %v", str, err)
-	}
-	// 34 chose as a number close to 30 that is likely to be unique enough to jump out at me the next time I see a timeout.  Everyone chooses 30.
-	return 34 * time.Second
 }
 
 func isDryRun(url *url.URL) bool {

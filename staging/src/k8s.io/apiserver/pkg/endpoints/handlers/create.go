@@ -57,9 +57,6 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			return
 		}
 
-		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
-		timeout := parseTimeout(req.URL.Query().Get("timeout"))
-
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
 			if includeName {
@@ -76,7 +73,9 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			}
 		}
 
-		ctx, cancel := context.WithTimeout(req.Context(), timeout)
+		// enforce a timeout of at most requestTimeoutUpperBound (34s) or less if the user-provided
+		// timeout inside the parent context is lower than requestTimeoutUpperBound.
+		ctx, cancel := context.WithTimeout(req.Context(), requestTimeoutUpperBound)
 		defer cancel()
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
@@ -157,7 +156,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		}
 		// Dedup owner references before updating managed fields
 		dedupOwnerReferencesAndAddWarning(obj, req.Context(), false)
-		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+		result, err := finishRequest(ctx, func() (runtime.Object, error) {
 			if scope.FieldManager != nil {
 				liveObj, err := scope.Creater.New(scope.Kind)
 				if err != nil {

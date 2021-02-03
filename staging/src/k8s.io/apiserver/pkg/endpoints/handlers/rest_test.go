@@ -456,8 +456,6 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 			codec: codec,
 
-			timeout: 1 * time.Second,
-
 			restPatcher: testPatcher,
 			name:        name,
 			patchType:   patchType,
@@ -466,7 +464,10 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			trace: utiltrace.New("Patch", utiltrace.Field{"name", name}),
 		}
 
+		ctx, cancel := context.WithTimeout(ctx, time.Second)
 		resultObj, _, err := p.patchResource(ctx, &RequestScope{})
+		cancel()
+
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
@@ -825,26 +826,18 @@ func TestHasUID(t *testing.T) {
 	}
 }
 
-func TestParseTimeout(t *testing.T) {
-	if d := parseTimeout(""); d != 34*time.Second {
-		t.Errorf("blank timeout produces %v", d)
-	}
-	if d := parseTimeout("not a timeout"); d != 34*time.Second {
-		t.Errorf("bad timeout produces %v", d)
-	}
-	if d := parseTimeout("10s"); d != 10*time.Second {
-		t.Errorf("10s timeout produced: %v", d)
-	}
-}
-
 func TestFinishRequest(t *testing.T) {
 	exampleObj := &example.Pod{}
 	exampleErr := fmt.Errorf("error")
 	successStatusObj := &metav1.Status{Status: metav1.StatusSuccess, Message: "success message"}
 	errorStatusObj := &metav1.Status{Status: metav1.StatusFailure, Message: "error message"}
+	timeoutFunc := func() (context.Context, context.CancelFunc) {
+		return context.WithTimeout(context.TODO(), time.Second)
+	}
+
 	testcases := []struct {
 		name          string
-		timeout       time.Duration
+		timeout       func() (context.Context, context.CancelFunc)
 		fn            resultFunc
 		expectedObj   runtime.Object
 		expectedErr   error
@@ -854,7 +847,7 @@ func TestFinishRequest(t *testing.T) {
 	}{
 		{
 			name:    "Expected obj is returned",
-			timeout: time.Second,
+			timeout: timeoutFunc,
 			fn: func() (runtime.Object, error) {
 				return exampleObj, nil
 			},
@@ -863,7 +856,7 @@ func TestFinishRequest(t *testing.T) {
 		},
 		{
 			name:    "Expected error is returned",
-			timeout: time.Second,
+			timeout: timeoutFunc,
 			fn: func() (runtime.Object, error) {
 				return nil, exampleErr
 			},
@@ -872,7 +865,7 @@ func TestFinishRequest(t *testing.T) {
 		},
 		{
 			name:    "Successful status object is returned as expected",
-			timeout: time.Second,
+			timeout: timeoutFunc,
 			fn: func() (runtime.Object, error) {
 				return successStatusObj, nil
 			},
@@ -881,7 +874,7 @@ func TestFinishRequest(t *testing.T) {
 		},
 		{
 			name:    "Error status object is converted to StatusError",
-			timeout: time.Second,
+			timeout: timeoutFunc,
 			fn: func() (runtime.Object, error) {
 				return errorStatusObj, nil
 			},
@@ -890,7 +883,7 @@ func TestFinishRequest(t *testing.T) {
 		},
 		{
 			name:    "Panic is propagated up",
-			timeout: time.Second,
+			timeout: timeoutFunc,
 			fn: func() (runtime.Object, error) {
 				panic("my panic")
 			},
@@ -900,7 +893,7 @@ func TestFinishRequest(t *testing.T) {
 		},
 		{
 			name:    "Panic is propagated with stack",
-			timeout: time.Second,
+			timeout: timeoutFunc,
 			fn: func() (runtime.Object, error) {
 				panic("my panic")
 			},
@@ -910,7 +903,7 @@ func TestFinishRequest(t *testing.T) {
 		},
 		{
 			name:    "http.ErrAbortHandler panic is propagated without wrapping with stack",
-			timeout: time.Second,
+			timeout: timeoutFunc,
 			fn: func() (runtime.Object, error) {
 				panic(http.ErrAbortHandler)
 			},
@@ -922,7 +915,10 @@ func TestFinishRequest(t *testing.T) {
 	}
 	for i, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := tc.timeout()
 			defer func() {
+				cancel()
+
 				r := recover()
 				switch {
 				case r == nil && len(tc.expectedPanic) > 0:
@@ -937,7 +933,7 @@ func TestFinishRequest(t *testing.T) {
 					t.Errorf("expected panic obj %#v, got %#v", tc.expectedPanicObj, r)
 				}
 			}()
-			obj, err := finishRequest(tc.timeout, tc.fn)
+			obj, err := finishRequest(ctx, tc.fn)
 			if (err == nil && tc.expectedErr != nil) || (err != nil && tc.expectedErr == nil) || (err != nil && tc.expectedErr != nil && err.Error() != tc.expectedErr.Error()) {
 				t.Errorf("%d: unexpected err. expected: %v, got: %v", i, tc.expectedErr, err)
 			}
