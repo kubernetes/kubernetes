@@ -416,6 +416,13 @@ kube::golang::set_platform_envs() {
         ;;
     esac
   fi
+
+  # if CC is defined for platform then always enable it
+  ccenv=$(echo "$platform" | awk -F/ '{print "KUBE_" toupper($1) "_" toupper($2) "_CC"}')
+  if [ -n "${!ccenv-}" ]; then 
+    export CGO_ENABLED=1
+    export CC="${!ccenv}"
+  fi
 }
 
 kube::golang::unset_platform_envs() {
