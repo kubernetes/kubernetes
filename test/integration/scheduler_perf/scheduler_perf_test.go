@@ -363,15 +363,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 			if err := createPods(namespace, concreteOp, clientset); err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
-			if concreteOp.SkipWaitToCompletion {
-				// Only record those namespaces that may potentially require barriers
-				// in the future.
-				if _, ok := numPodsScheduledPerNamespace[namespace]; ok {
-					numPodsScheduledPerNamespace[namespace] += concreteOp.Count
-				} else {
-					numPodsScheduledPerNamespace[namespace] = concreteOp.Count
-				}
-			} else {
+			if !concreteOp.SkipWaitToCompletion {
 				if err := waitUntilPodsScheduledInNamespace(ctx, podInformer, b.Name(), namespace, concreteOp.Count); err != nil {
 					b.Fatalf("op %d: error in waiting for pods to get scheduled: %v", opIndex, err)
 				}
