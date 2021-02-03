@@ -1293,6 +1293,30 @@ func InitWindowsGcePdDriver() storageframework.TestDriver {
 	}
 }
 
+func InitWindowsVSphereDriver() storageframework.TestDriver {
+	return &vSphereDriver{
+		driverInfo: storageframework.DriverInfo{
+			Name:             "windows-vsphere",
+			InTreePluginName: "kubernetes.io/vsphere-volume",
+			MaxFileSize:      storageframework.FileSizeMedium,
+			SupportedSizeRange: e2evolume.SizeRange{
+				Min: "1Gi",
+			},
+			SupportedFsType: sets.NewString(
+				"ntfs",
+			),
+			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
+			Capabilities: map[storageframework.Capability]bool{
+				storageframework.CapPersistence: true,
+				storageframework.CapFsGroup:     true,
+				storageframework.CapExec:        true,
+				storageframework.CapMultiPODs:   true,
+				storageframework.CapTopology:    true,
+			},
+		},
+	}
+}
+
 func (g *gcePdDriver) GetDriverInfo() *storageframework.DriverInfo {
 	return &g.driverInfo
 }
@@ -1416,6 +1440,7 @@ func InitVSphereDriver() storageframework.TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
+				"ntfs",
 			),
 			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[storageframework.Capability]bool{
