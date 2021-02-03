@@ -100,12 +100,12 @@ func TestPrintAvailableUpgrades(t *testing.T) {
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      AVAILABLE
+COMPONENT   CURRENT      TARGET
 kubelet     1 x v1.8.1   v1.8.3
 
 Upgrade to the latest version in the v1.8 series:
 
-COMPONENT                 CURRENT   AVAILABLE
+COMPONENT                 CURRENT   TARGET
 kube-apiserver            v1.8.1    v1.8.3
 kube-controller-manager   v1.8.1    v1.8.3
 kube-scheduler            v1.8.1    v1.8.3
@@ -148,12 +148,12 @@ _____________________________________________________________________
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      AVAILABLE
+COMPONENT   CURRENT      TARGET
 kubelet     1 x v1.8.3   v1.9.0
 
 Upgrade to the latest stable version:
 
-COMPONENT                 CURRENT   AVAILABLE
+COMPONENT                 CURRENT   TARGET
 kube-apiserver            v1.8.3    v1.9.0
 kube-controller-manager   v1.8.3    v1.9.0
 kube-scheduler            v1.8.3    v1.9.0
@@ -214,12 +214,12 @@ _____________________________________________________________________
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      AVAILABLE
+COMPONENT   CURRENT      TARGET
 kubelet     1 x v1.8.3   v1.8.5
 
 Upgrade to the latest version in the v1.8 series:
 
-COMPONENT                 CURRENT   AVAILABLE
+COMPONENT                 CURRENT   TARGET
 kube-apiserver            v1.8.3    v1.8.5
 kube-controller-manager   v1.8.3    v1.8.5
 kube-scheduler            v1.8.3    v1.8.5
@@ -234,12 +234,12 @@ You can now apply the upgrade by executing the following command:
 _____________________________________________________________________
 
 Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      AVAILABLE
+COMPONENT   CURRENT      TARGET
 kubelet     1 x v1.8.3   v1.9.0
 
 Upgrade to the latest stable version:
 
-COMPONENT                 CURRENT   AVAILABLE
+COMPONENT                 CURRENT   TARGET
 kube-apiserver            v1.8.3    v1.9.0
 kube-controller-manager   v1.8.3    v1.9.0
 kube-scheduler            v1.8.3    v1.9.0
@@ -282,12 +282,12 @@ _____________________________________________________________________
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      AVAILABLE
+COMPONENT   CURRENT      TARGET
 kubelet     1 x v1.8.5   v1.9.0-beta.1
 
 Upgrade to the latest experimental version:
 
-COMPONENT                 CURRENT   AVAILABLE
+COMPONENT                 CURRENT   TARGET
 kube-apiserver            v1.8.5    v1.9.0-beta.1
 kube-controller-manager   v1.8.5    v1.9.0-beta.1
 kube-scheduler            v1.8.5    v1.9.0-beta.1
@@ -330,12 +330,12 @@ _____________________________________________________________________
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      AVAILABLE
+COMPONENT   CURRENT      TARGET
 kubelet     1 x v1.8.5   v1.9.0-rc.1
 
 Upgrade to the latest release candidate version:
 
-COMPONENT                 CURRENT   AVAILABLE
+COMPONENT                 CURRENT   TARGET
 kube-apiserver            v1.8.5    v1.9.0-rc.1
 kube-controller-manager   v1.8.5    v1.9.0-rc.1
 kube-scheduler            v1.8.5    v1.9.0-rc.1
@@ -379,13 +379,13 @@ _____________________________________________________________________
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      AVAILABLE
+COMPONENT   CURRENT      TARGET
 kubelet     1 x v1.9.2   v1.9.3
             2 x v1.9.3   v1.9.3
 
 Upgrade to the latest version in the v1.9 series:
 
-COMPONENT                 CURRENT   AVAILABLE
+COMPONENT                 CURRENT   TARGET
 kube-apiserver            v1.9.2    v1.9.3
 kube-controller-manager   v1.9.2    v1.9.3
 kube-scheduler            v1.9.2    v1.9.3
@@ -430,12 +430,12 @@ _____________________________________________________________________
 			},
 			externalEtcd: true,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      AVAILABLE
+COMPONENT   CURRENT      TARGET
 kubelet     1 x v1.9.2   v1.9.3
 
 Upgrade to the latest version in the v1.9 series:
 
-COMPONENT                 CURRENT   AVAILABLE
+COMPONENT                 CURRENT   TARGET
 kube-apiserver            v1.9.2    v1.9.3
 kube-controller-manager   v1.9.2    v1.9.3
 kube-scheduler            v1.9.2    v1.9.3
@@ -477,12 +477,12 @@ _____________________________________________________________________
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT       AVAILABLE
+COMPONENT   CURRENT       TARGET
 kubelet     1 x v1.10.2   v1.11.0
 
 Upgrade to the latest kubedns to coredns:
 
-COMPONENT                 CURRENT   AVAILABLE
+COMPONENT                 CURRENT   TARGET
 kube-apiserver            v1.10.2   v1.11.0
 kube-controller-manager   v1.10.2   v1.11.0
 kube-scheduler            v1.10.2   v1.11.0
@@ -524,12 +524,12 @@ _____________________________________________________________________
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT       AVAILABLE
+COMPONENT   CURRENT       TARGET
 kubelet     1 x v1.10.2   v1.11.0
 
 Upgrade to the latest coredns:
 
-COMPONENT                 CURRENT   AVAILABLE
+COMPONENT                 CURRENT   TARGET
 kube-apiserver            v1.10.2   v1.11.0
 kube-controller-manager   v1.10.2   v1.11.0
 kube-scheduler            v1.10.2   v1.11.0
@@ -570,12 +570,12 @@ _____________________________________________________________________
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT       AVAILABLE
+COMPONENT   CURRENT       TARGET
 kubelet     1 x v1.10.2   v1.11.0
 
 Upgrade to the latest coredns to kubedns:
 
-COMPONENT                 CURRENT   AVAILABLE
+COMPONENT                 CURRENT   TARGET
 kube-apiserver            v1.10.2   v1.11.0
 kube-controller-manager   v1.10.2   v1.11.0
 kube-scheduler            v1.10.2   v1.11.0

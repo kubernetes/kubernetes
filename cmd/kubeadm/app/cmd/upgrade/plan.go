@@ -224,7 +224,7 @@ func printUpgradePlan(up *upgrade.Upgrade, plan *outputapi.UpgradePlan, unstable
 		} else if component.Name == constants.Kubelet {
 			if printManualUpgradeHeader {
 				fmt.Fprintln(w, "Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':")
-				fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tAVAILABLE")
+				fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tTARGET")
 				fmt.Fprintf(tabw, "%s\t%s\t%s\n", component.Name, component.CurrentVersion, component.NewVersion)
 				printManualUpgradeHeader = false
 			} else {
@@ -237,7 +237,7 @@ func printUpgradePlan(up *upgrade.Upgrade, plan *outputapi.UpgradePlan, unstable
 
 				fmt.Fprintf(w, "Upgrade to the latest %s:\n", up.Description)
 				fmt.Fprintln(w, "")
-				fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tAVAILABLE")
+				fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tTARGET")
 				printHeader = false
 			}
 			fmt.Fprintf(tabw, "%s\t%s\t%s\n", component.Name, component.CurrentVersion, component.NewVersion)
