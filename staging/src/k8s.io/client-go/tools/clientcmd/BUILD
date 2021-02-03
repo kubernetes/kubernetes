@@ -11,6 +11,7 @@ go_test(
     srcs = [
         "client_config_test.go",
         "loader_test.go",
+        "main_test.go",
         "merged_client_builder_test.go",
         "overrides_test.go",
         "validation_test.go",
