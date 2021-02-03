@@ -161,6 +161,20 @@ function Dump-DebugInfoToConsole {
   } Catch { }
 }
 
+# Configures Window Defender preferences
+function Configure-WindowsDefender {
+  if ((Get-WindowsFeature -Name 'Windows-Defender').Installed) {
+    Log-Output "Configuring Windows Defender preferences"
+    Set-MpPreference -SubmitSamplesConsent NeverSend
+    Log-Output "Disabling Windows Defender sample submission"
+    Set-MpPreference -MAPSReporting Disabled
+    Log-Output "Disabling Windows Defender Microsoft Active Protection Service Reporting"
+
+    Log-Output "Defender Preferences"
+    Get-MpPreference
+  }
+}
+
 # Converts the kube-env string in Yaml
 #
 # Returns: a PowerShell Hashtable object containing the key-value pairs from
@@ -307,6 +321,8 @@ function Set-PrerequisiteOptions {
   # Use TLS 1.2: needed for Invoke-WebRequest downloads from github.com.
   [Net.ServicePointManager]::SecurityProtocol = `
       [Net.SecurityProtocolType]::Tls12
+
+  Configure-WindowsDefender
 }
 
 # Creates directories where other functions in this module will read and write
