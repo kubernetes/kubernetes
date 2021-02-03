@@ -17,10 +17,13 @@ limitations under the License.
 package controlplane
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -82,8 +85,21 @@ func newResourceExpirationEvaluator(currentVersion apimachineryversion.Info) (*r
 	return ret, nil
 }
 
-func (e *resourceExpirationEvaluator) shouldServe(resourceServingInfo rest.Storage) bool {
-	versionedPtr := resourceServingInfo.New()
+func (e *resourceExpirationEvaluator) shouldServe(gv schema.GroupVersion, versioner runtime.ObjectVersioner, resourceServingInfo rest.Storage) bool {
+	internalPtr := resourceServingInfo.New()
+
+	target := gv
+	// honor storage that overrides group version (used for things like scale subresources)
+	if versionProvider, ok := resourceServingInfo.(rest.GroupVersionKindProvider); ok {
+		target = versionProvider.GroupVersionKind(target).GroupVersion()
+	}
+
+	versionedPtr, err := versioner.ConvertToVersion(internalPtr, target)
+	if err != nil {
+		fmt.Printf("JTL: cannot get versioned type: %v (target=%v, storage=%T)", err, target, resourceServingInfo)
+		return false
+	}
+
 	removed, ok := versionedPtr.(removedInterface)
 	if !ok {
 		return true
@@ -122,12 +138,12 @@ type removedInterface interface {
 
 // removeDeletedKinds inspects the storage map and modifies it in place by removing storage for kinds that have been deleted.
 // versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
-func (e *resourceExpirationEvaluator) removeDeletedKinds(groupName string, versionedResourcesStorageMap map[string]map[string]rest.Storage) {
+func (e *resourceExpirationEvaluator) removeDeletedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage) {
 	versionsToRemove := sets.NewString()
 	for apiVersion, versionToResource := range versionedResourcesStorageMap {
 		resourcesToRemove := sets.NewString()
 		for resourceName, resourceServingInfo := range versionToResource {
-			if !e.shouldServe(resourceServingInfo) {
+			if !e.shouldServe(schema.GroupVersion{Group: groupName, Version: apiVersion}, versioner, resourceServingInfo) {
 				resourcesToRemove.Insert(resourceName)
 			}
 		}
