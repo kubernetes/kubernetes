@@ -50,7 +50,7 @@ type pluginServiceV1Beta1 struct {
 }
 
 func (s *pluginServiceV1Beta1) GetExampleInfo(ctx context.Context, rqt *v1beta1.ExampleRequest) (*v1beta1.ExampleResponse, error) {
-	klog.Infof("GetExampleInfo v1beta1field: %s", rqt.V1Beta1Field)
+	klog.Infof("GetExampleInfo v1beta1_field: %s", rqt.V1Beta1Field)
 	return &v1beta1.ExampleResponse{}, nil
 }
 
