@@ -51,10 +51,12 @@ func (dc *DeploymentController) sync(d *apps.Deployment, rsList []*apps.ReplicaS
 	if err != nil {
 		return err
 	}
-	if err := dc.scale(d, newRS, oldRSs); err != nil {
-		// If we get an error while trying to scale, the deployment will be requeued
-		// so we can abort this resync
-		return err
+	if !d.Spec.Paused {
+		if err := dc.scale(d, newRS, oldRSs); err != nil {
+			// If we get an error while trying to scale, the deployment will be requeued
+			// so we can abort this resync
+			return err
+		}
 	}
 
 	// Clean up the deployment when it's paused and no rollback is in flight.
