@@ -58,6 +58,9 @@ const (
 	proxyHTTPCallTimeout = 30 * time.Second
 	podRetryPeriod       = 1 * time.Second
 	podRetryTimeout      = 1 * time.Minute
+
+	requestRetryPeriod  = 10 * time.Millisecond
+	requestRetryTimeout = 1 * time.Minute
 )
 
 type jsonResponse struct {
@@ -274,6 +277,8 @@ var _ = SIGDescribe("Proxy", func() {
 
 			ns := f.Namespace.Name
 			msg := "foo"
+			testSvcName := "test-service"
+			testSvcLabels := map[string]string{"test": "response"}
 
 			framework.Logf("Creating pod...")
 			_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), &v1.Pod{
@@ -302,11 +307,9 @@ var _ = SIGDescribe("Proxy", func() {
 			framework.Logf("Creating service...")
 			_, err = f.ClientSet.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-service",
+					Name:      testSvcName,
 					Namespace: ns,
-					Labels: map[string]string{
-						"test": "response",
-					},
+					Labels:    testSvcLabels,
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
@@ -339,32 +342,9 @@ var _ = SIGDescribe("Proxy", func() {
 
 				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy/some/path/with/" + httpVerb
 				framework.Logf("Starting http.Client for %s", urlString)
-				request, err := http.NewRequest(httpVerb, urlString, nil)
-				framework.ExpectNoError(err, "processing request")
 
-				resp, err := client.Do(request)
-				framework.ExpectNoError(err, "processing response")
-				defer resp.Body.Close()
-
-				buf := new(bytes.Buffer)
-				buf.ReadFrom(resp.Body)
-				response := buf.String()
-
-				switch httpVerb {
-				case "HEAD":
-					framework.Logf("http.Client request:%s | StatusCode:%d", httpVerb, resp.StatusCode)
-					framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
-				default:
-					var jr *jsonResponse
-					err = json.Unmarshal([]byte(response), &jr)
-					framework.ExpectNoError(err, "Failed to process jsonResponse: %v | err: %v ", buf.String(), err)
-
-					framework.Logf("http.Client request:%s | StatusCode:%d | Response: %s | Method: %s", httpVerb, resp.StatusCode, jr.Body, jr.Method)
-					framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
-
-					framework.ExpectEqual(msg, jr.Body, "The resp.Body returned: %v", jr.Body)
-					framework.ExpectEqual(httpVerb, jr.Method, "The resp.Body returned: %v", jr.Body)
-				}
+				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
+				framework.ExpectNoError(err, "Service didn't start within time out period. %v", pollErr)
 			}
 
 			// All methods for Service ProxyWithPath return 200
@@ -373,32 +353,9 @@ var _ = SIGDescribe("Proxy", func() {
 
 				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/services/test-service/proxy/some/path/with/" + httpVerb
 				framework.Logf("Starting http.Client for %s", urlString)
-				request, err := http.NewRequest(httpVerb, urlString, nil)
-				framework.ExpectNoError(err, "processing request")
 
-				resp, err := client.Do(request)
-				framework.ExpectNoError(err, "processing response")
-				defer resp.Body.Close()
-
-				buf := new(bytes.Buffer)
-				buf.ReadFrom(resp.Body)
-				response := buf.String()
-
-				switch httpVerb {
-				case "HEAD":
-					framework.Logf("http.Client request:%s | StatusCode:%d", httpVerb, resp.StatusCode)
-					framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
-				default:
-					var jr *jsonResponse
-					err = json.Unmarshal([]byte(response), &jr)
-					framework.ExpectNoError(err, "Failed to process jsonResponse: %v | err: %v ", buf.String(), err)
-
-					framework.Logf("http.Client request:%s | StatusCode:%d | Response: %s | Method: %s", httpVerb, resp.StatusCode, jr.Body, jr.Method)
-					framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
-
-					framework.ExpectEqual(msg, jr.Body, "The resp.Body returned: %v", jr.Body)
-					framework.ExpectEqual(httpVerb, jr.Method, "The resp.Body returned: %v", jr.Body)
-				}
+				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
+				framework.ExpectNoError(err, "Service didn't start within time out period. %v", pollErr)
 			}
 		})
 	})
@@ -421,6 +378,62 @@ func checkPodStatus(f *framework.Framework, label string) func() (bool, error) {
 		}
 		framework.Logf("Pod Status: %v", list.Items[0].Status.Phase)
 		return true, nil
+	}
+}
+
+// validateProxyVerbRequest checks that a http request to a pod
+// or service was valid for any http verb. Requires agnhost image
+// with porter --json-response
+func validateProxyVerbRequest(client *http.Client, urlString string, httpVerb string, msg string) func() (bool, error) {
+	return func() (bool, error) {
+		var err error
+
+		request, err := http.NewRequest(httpVerb, urlString, nil)
+		if err != nil {
+			framework.Logf("Failed to get a new request. %v", err)
+			return false, nil
+		}
+
+		resp, err := client.Do(request)
+		if err != nil {
+			framework.Logf("Failed to get a response. %v", err)
+			return false, nil
+		}
+		defer resp.Body.Close()
+
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		response := buf.String()
+
+		switch httpVerb {
+		case "HEAD":
+			framework.Logf("http.Client request:%s | StatusCode:%d", httpVerb, resp.StatusCode)
+			if resp.StatusCode != 200 {
+				return false, nil
+			}
+			return true, nil
+		default:
+			var jr *jsonResponse
+			err = json.Unmarshal([]byte(response), &jr)
+			if err != nil {
+				framework.Logf("Failed to process jsonResponse. %v", err)
+				return false, nil
+			}
+
+			framework.Logf("http.Client request:%s | StatusCode:%d | Response:%s | Method:%s", httpVerb, resp.StatusCode, jr.Body, jr.Method)
+			if resp.StatusCode != 200 {
+				return false, nil
+			}
+
+			if msg != jr.Body {
+				return false, nil
+			}
+
+			if httpVerb != jr.Method {
+				return false, nil
+			}
+			return true, nil
+		}
 	}
 }
 
