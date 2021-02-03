@@ -64,8 +64,12 @@ func init() {
 	)
 }
 
-// legacyAPIServiceName is the fixed name of the only non-groupified API version
-const legacyAPIServiceName = "v1."
+const (
+	// legacyAPIServiceName is the fixed name of the only non-groupified API version
+	legacyAPIServiceName = "v1."
+	// StorageVersionPostStartHookName is the name of the storage version updater post start hook.
+	StorageVersionPostStartHookName = "built-in-resources-storage-version-updater"
+)
 
 // ExtraConfig represents APIServices-specific configuration
 type ExtraConfig struct {
@@ -269,7 +273,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
 		// Spawn a goroutine in aggregator apiserver to update storage version for
 		// all built-in resources
-		s.GenericAPIServer.AddPostStartHookOrDie("built-in-resources-storage-version-updater", func(hookContext genericapiserver.PostStartHookContext) error {
+		s.GenericAPIServer.AddPostStartHookOrDie(StorageVersionPostStartHookName, func(hookContext genericapiserver.PostStartHookContext) error {
 			// Wait for apiserver-identity to exist first before updating storage
 			// versions, to avoid storage version GC accidentally garbage-collecting
 			// storage versions.

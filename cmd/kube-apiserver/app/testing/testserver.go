@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	testutil "k8s.io/kubernetes/test/utils"
@@ -201,54 +202,60 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		}
 	}(stopCh)
 
-	// skip healthz check when we test the storage version manager poststart hook
-	if instanceOptions.StorageVersionWrapFunc == nil {
-		t.Logf("Waiting for /healthz to be ok...")
+	t.Logf("Waiting for /healthz to be ok...")
 
-		client, err := kubernetes.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
-		if err != nil {
-			return result, fmt.Errorf("failed to create a client: %v", err)
+	client, err := kubernetes.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
+	if err != nil {
+		return result, fmt.Errorf("failed to create a client: %v", err)
+	}
+
+	// wait until healthz endpoint returns ok
+	err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
+		select {
+		case err := <-errCh:
+			return false, err
+		default:
 		}
 
-		// wait until healthz endpoint returns ok
-		err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
-			select {
-			case err := <-errCh:
-				return false, err
-			default:
-			}
+		req := client.CoreV1().RESTClient().Get().AbsPath("/healthz")
+		// The storage version bootstrap test wraps the storage version post-start
+		// hook, so the hook won't become health when the server bootstraps
+		if instanceOptions.StorageVersionWrapFunc != nil {
+			// We hardcode the param instead of having a new instanceOptions field
+			// to avoid confusing users with more options.
+			storageVersionCheck := fmt.Sprintf("poststarthook/%s", apiserver.StorageVersionPostStartHookName)
+			req.Param("exclude", storageVersionCheck)
+		}
+		result := req.Do(context.TODO())
+		status := 0
+		result.StatusCode(&status)
+		if status == 200 {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
+	}
 
-			result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
-			status := 0
-			result.StatusCode(&status)
-			if status == 200 {
-				return true, nil
+	// wait until default namespace is created
+	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		select {
+		case err := <-errCh:
+			return false, err
+		default:
+		}
+
+		if _, err := client.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{}); err != nil {
+			if !errors.IsNotFound(err) {
+				t.Logf("Unable to get default namespace: %v", err)
 			}
 			return false, nil
-		})
-		if err != nil {
-			return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
 		}
-
-		// wait until default namespace is created
-		err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-			select {
-			case err := <-errCh:
-				return false, err
-			default:
-			}
-
-			if _, err := client.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{}); err != nil {
-				if !errors.IsNotFound(err) {
-					t.Logf("Unable to get default namespace: %v", err)
-				}
-				return false, nil
-			}
-			return true, nil
-		})
-		if err != nil {
-			return result, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
-		}
+		return true, nil
+	})
+	if err != nil {
+		return result, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
 	}
 
 	// from here the caller must call tearDown
