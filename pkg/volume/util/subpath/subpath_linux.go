@@ -433,29 +433,29 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		}
 		parentFD = childFD
 		childFD = -1
+
+		// Everything was created. mkdirat(..., perm) above was affected by current
+		// umask and we must apply the right permissions to the all created directory.
+		// (that's the one that will be available to the container as subpath)
+		// so user can read/write it.
+		// parentFD is the last created directory.
+
+		// Translate perm (os.FileMode) to uint32 that fchmod() expects
+		kernelPerm := uint32(perm & os.ModePerm)
+		if perm&os.ModeSetgid > 0 {
+			kernelPerm |= syscall.S_ISGID
+		}
+		if perm&os.ModeSetuid > 0 {
+			kernelPerm |= syscall.S_ISUID
+		}
+		if perm&os.ModeSticky > 0 {
+			kernelPerm |= syscall.S_ISVTX
+		}
+		if err = syscall.Fchmod(parentFD, kernelPerm); err != nil {
+			return fmt.Errorf("chmod %q failed: %s", currentPath, err)
+		}
 	}
 
-	// Everything was created. mkdirat(..., perm) above was affected by current
-	// umask and we must apply the right permissions to the last directory
-	// (that's the one that will be available to the container as subpath)
-	// so user can read/write it. This is the behavior of previous code.
-	// TODO: chmod all created directories, not just the last one.
-	// parentFD is the last created directory.
-
-	// Translate perm (os.FileMode) to uint32 that fchmod() expects
-	kernelPerm := uint32(perm & os.ModePerm)
-	if perm&os.ModeSetgid > 0 {
-		kernelPerm |= syscall.S_ISGID
-	}
-	if perm&os.ModeSetuid > 0 {
-		kernelPerm |= syscall.S_ISUID
-	}
-	if perm&os.ModeSticky > 0 {
-		kernelPerm |= syscall.S_ISVTX
-	}
-	if err = syscall.Fchmod(parentFD, kernelPerm); err != nil {
-		return fmt.Errorf("chmod %q failed: %s", currentPath, err)
-	}
 	return nil
 }
 
