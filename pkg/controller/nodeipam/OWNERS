@@ -1,0 +1,13 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- gmarek
+- bowei
+reviewers:
+- gmarek
+- smarterclayton
+- ingvagabund
+- aveshagarwal
+- k82cn
+labels:
+- sig/network

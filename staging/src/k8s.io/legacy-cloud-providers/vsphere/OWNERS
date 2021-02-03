@@ -1,0 +1,17 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- baludontu
+- divyenpatel
+- frapposelli
+- dougm
+- SandeepPissay
+reviewers:
+- baludontu
+- divyenpatel
+- frapposelli
+- dougm
+- SandeepPissay
+emeritus_approvers:
+- imkin
+- abrarshivani

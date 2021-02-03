@@ -1,0 +1,42 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- erictune
+- lavalamp
+- smarterclayton
+- thockin
+- liggitt
+reviewers:
+- thockin
+- lavalamp
+- smarterclayton
+- wojtek-t
+- deads2k
+- yujuhong
+- brendandburns
+- derekwaynecarr
+- caesarxuchao
+- vishh
+- mikedanese
+- liggitt
+- nikhiljindal
+- gmarek
+- erictune
+- davidopp
+- pmorie
+- sttts
+- dchen1107
+- saad-ali
+- luxas
+- janetkuo
+- justinsb
+- pwittrock
+- ncdc
+- tallclair
+- yifan-gu
+- mwielgus
+- soltysh
+- piosz
+- jsafrane
+labels:
+- sig/apps

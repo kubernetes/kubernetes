@@ -371,9 +371,3 @@ approvers:
 __EOF__
 
 kube::log::status "NOTE: don't forget to handle vendor/* files that were added or removed"
-
-kube::log::status "OpenShift deleting OWNERS files"
-# TODO: remove when Prow is fixed to allow ignoring nested OWNERS.
-# OpenShift: remove nested vendor to prevent Prow from honoring them.
-# openshift/kubernetes has only one top level OWNERS file.
-find ./vendor \( -name 'OWNERS' -or -name 'OWNERS_ALIASES' \) -delete

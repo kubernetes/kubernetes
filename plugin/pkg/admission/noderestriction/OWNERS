@@ -1,0 +1,9 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- sig-auth-node-isolation-approvers
+reviewers:
+- sig-auth-node-isolation-reviewers
+labels:
+- sig/auth
+

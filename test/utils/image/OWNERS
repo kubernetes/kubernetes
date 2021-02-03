@@ -1,0 +1,13 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - justaugustus
+  - luxas
+  - mkumatag
+  - listx
+approvers:
+  - luxas
+  - mkumatag
+  - listx
+emeritus_approvers:
+  - ixdy
