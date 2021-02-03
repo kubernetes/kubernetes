@@ -68,8 +68,13 @@ func ValidateNetworkPolicyPort(port *networking.NetworkPolicyPort, portPath *fie
 			for _, msg := range validation.IsValidPortNum(int(port.Port.IntVal)) {
 				allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.IntVal, msg))
 			}
-			if port.EndPort != nil && *port.EndPort < port.Port.IntVal {
-				allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), port.Port.IntVal, "must be greater than or equal to `port`"))
+			if port.EndPort != nil {
+				if *port.EndPort < port.Port.IntVal {
+					allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), port.Port.IntVal, "must be greater than or equal to `port`"))
+				}
+				for _, msg := range validation.IsValidPortNum(int(*port.EndPort)) {
+					allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), *port.EndPort, msg))
+				}
 			}
 		} else {
 			if port.EndPort != nil {
