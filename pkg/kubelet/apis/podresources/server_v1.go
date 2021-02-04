@@ -18,7 +18,10 @@ package podresources
 
 import (
 	"context"
+	"fmt"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 
 	"k8s.io/kubelet/pkg/apis/podresources/v1"
@@ -73,6 +76,10 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *v1.ListPodResource
 
 // GetAllocatableResources returns information about all the resources known by the server - this more like the capacity, not like the current amount of free resources.
 func (p *v1PodResourcesServer) GetAllocatableResources(ctx context.Context, req *v1.AllocatableResourcesRequest) (*v1.AllocatableResourcesResponse, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.KubeletPodResourcesGetAllocatable) {
+		return nil, fmt.Errorf("Pod Resources API GetAllocatableResources disabled")
+	}
+
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
 
 	return &v1.AllocatableResourcesResponse{

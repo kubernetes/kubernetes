@@ -27,12 +27,17 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
@@ -485,7 +490,7 @@ func podresourcesGetAllocatableResourcesTests(f *framework.Framework, cli kubele
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("POD Resources [Serial] [Feature:PODResources][NodeFeature:PODResources]", func() {
+var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:PodResources]", func() {
 	f := framework.NewDefaultFramework("podresources-test")
 
 	reservedSystemCPUs := cpuset.MustParse("1")
@@ -505,8 +510,8 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PODResources][NodeFeature:P
 			onlineCPUs, err := getOnlineCPUs()
 			framework.ExpectNoError(err)
 
-			// Enable CPU Manager in the kubelet.
-			oldCfg := configureCPUManagerInKubelet(f, true, reservedSystemCPUs)
+			// Make sure all the feature gates and the right settings are in place.
+			oldCfg := configurePodResourcesInKubelet(f, true, reservedSystemCPUs)
 			defer func() {
 				// restore kubelet config
 				setOldKubeletConfig(f, oldCfg)
@@ -528,6 +533,8 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PODResources][NodeFeature:P
 			framework.ExpectNoError(err)
 			defer conn.Close()
 
+			waitForSRIOVResources(f, sd)
+
 			ginkgo.By("checking List()")
 			podresourcesListTests(f, cli, sd)
 			ginkgo.By("checking GetAllocatableResources()")
@@ -542,6 +549,15 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PODResources][NodeFeature:P
 				e2eskipper.Skipf("this test is meant to run on a system with at least one configured VF from SRIOV device")
 			}
 
+			oldCfg := enablePodResourcesFeatureGateInKubelet(f)
+			defer func() {
+				// restore kubelet config
+				setOldKubeletConfig(f, oldCfg)
+
+				// Delete state file to allow repeated runs
+				deleteStateFile()
+			}()
+
 			configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
 			sd := setupSRIOVConfigOrFail(f, configMap)
 			defer teardownSRIOVConfigOrFail(f, sd)
@@ -554,6 +570,8 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PODResources][NodeFeature:P
 			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 			framework.ExpectNoError(err)
 			defer conn.Close()
+
+			waitForSRIOVResources(f, sd)
 
 			// intentionally passing empty cpuset instead of onlineCPUs because with none policy
 			// we should get no allocatable cpus - no exclusively allocatable CPUs, depends on policy static
@@ -577,8 +595,8 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PODResources][NodeFeature:P
 			onlineCPUs, err := getOnlineCPUs()
 			framework.ExpectNoError(err)
 
-			// Enable CPU Manager in the kubelet.
-			oldCfg := configureCPUManagerInKubelet(f, true, reservedSystemCPUs)
+			// Make sure all the feature gates and the right settings are in place.
+			oldCfg := configurePodResourcesInKubelet(f, true, reservedSystemCPUs)
 			defer func() {
 				// restore kubelet config
 				setOldKubeletConfig(f, oldCfg)
@@ -605,6 +623,15 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PODResources][NodeFeature:P
 				e2eskipper.Skipf("this test is meant to run on a system with no configured VF from SRIOV device")
 			}
 
+			oldCfg := enablePodResourcesFeatureGateInKubelet(f)
+			defer func() {
+				// restore kubelet config
+				setOldKubeletConfig(f, oldCfg)
+
+				// Delete state file to allow repeated runs
+				deleteStateFile()
+			}()
+
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 			framework.ExpectNoError(err)
 
@@ -616,6 +643,24 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PODResources][NodeFeature:P
 			// we should get no allocatable cpus - no exclusively allocatable CPUs, depends on policy static
 			podresourcesGetAllocatableResourcesTests(f, cli, nil, cpuset.CPUSet{}, cpuset.CPUSet{})
 		})
+
+		ginkgo.It("should return the expected error with the feature gate disabled", func() {
+			if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.KubeletPodResourcesGetAllocatable) {
+				e2eskipper.Skipf("this test is meant to run with the POD Resources Extensions feature gate disabled")
+			}
+
+			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+			framework.ExpectNoError(err)
+
+			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			framework.ExpectNoError(err)
+			defer conn.Close()
+
+			ginkgo.By("checking GetAllocatableResources fail if the feature gate is not enabled")
+			_, err = cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
+			framework.ExpectError(err, "With feature gate disabled, the call must fail")
+		})
+
 	})
 })
 
@@ -625,4 +670,85 @@ func getOnlineCPUs() (cpuset.CPUSet, error) {
 		return cpuset.CPUSet{}, err
 	}
 	return cpuset.Parse(strings.TrimSpace(string(onlineCPUList)))
+}
+
+func configurePodResourcesInKubelet(f *framework.Framework, cleanStateFile bool, reservedSystemCPUs cpuset.CPUSet) (oldCfg *kubeletconfig.KubeletConfiguration) {
+	// we also need CPUManager with static policy to be able to do meaningful testing
+	oldCfg, err := getCurrentKubeletConfig()
+	framework.ExpectNoError(err)
+	newCfg := oldCfg.DeepCopy()
+	if newCfg.FeatureGates == nil {
+		newCfg.FeatureGates = make(map[string]bool)
+	}
+	newCfg.FeatureGates["CPUManager"] = true
+	newCfg.FeatureGates["KubeletPodResourcesGetAllocatable"] = true
+
+	// After graduation of the CPU Manager feature to Beta, the CPU Manager
+	// "none" policy is ON by default. But when we set the CPU Manager policy to
+	// "static" in this test and the Kubelet is restarted so that "static"
+	// policy can take effect, there will always be a conflict with the state
+	// checkpointed in the disk (i.e., the policy checkpointed in the disk will
+	// be "none" whereas we are trying to restart Kubelet with "static"
+	// policy). Therefore, we delete the state file so that we can proceed
+	// with the tests.
+	// Only delete the state file at the begin of the tests.
+	if cleanStateFile {
+		deleteStateFile()
+	}
+
+	// Set the CPU Manager policy to static.
+	newCfg.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+
+	// Set the CPU Manager reconcile period to 1 second.
+	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
+
+	if reservedSystemCPUs.Size() > 0 {
+		cpus := reservedSystemCPUs.String()
+		framework.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
+		newCfg.ReservedSystemCPUs = cpus
+	} else {
+		// The Kubelet panics if either kube-reserved or system-reserved is not set
+		// when CPU Manager is enabled. Set cpu in kube-reserved > 0 so that
+		// kubelet doesn't panic.
+		if newCfg.KubeReserved == nil {
+			newCfg.KubeReserved = map[string]string{}
+		}
+
+		if _, ok := newCfg.KubeReserved["cpu"]; !ok {
+			newCfg.KubeReserved["cpu"] = "200m"
+		}
+	}
+	// Update the Kubelet configuration.
+	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
+
+	// Wait for the Kubelet to be ready.
+	gomega.Eventually(func() bool {
+		nodes, err := e2enode.TotalReady(f.ClientSet)
+		framework.ExpectNoError(err)
+		return nodes == 1
+	}, time.Minute, time.Second).Should(gomega.BeTrue())
+
+	return oldCfg
+}
+
+func enablePodResourcesFeatureGateInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.KubeletConfiguration) {
+	oldCfg, err := getCurrentKubeletConfig()
+	framework.ExpectNoError(err)
+	newCfg := oldCfg.DeepCopy()
+	if newCfg.FeatureGates == nil {
+		newCfg.FeatureGates = make(map[string]bool)
+	}
+	newCfg.FeatureGates["KubeletPodResourcesGetAllocatable"] = true
+
+	// Update the Kubelet configuration.
+	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
+
+	// Wait for the Kubelet to be ready.
+	gomega.Eventually(func() bool {
+		nodes, err := e2enode.TotalReady(f.ClientSet)
+		framework.ExpectNoError(err)
+		return nodes == 1
+	}, time.Minute, time.Second).Should(gomega.BeTrue())
+
+	return oldCfg
 }
