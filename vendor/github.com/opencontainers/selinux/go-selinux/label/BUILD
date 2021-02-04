@@ -4,7 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "label.go",
-        "label_selinux.go",
+        "label_linux.go",
         "label_stub.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/selinux/go-selinux/label",

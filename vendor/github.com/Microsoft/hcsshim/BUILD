@@ -47,6 +47,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/github.com/Microsoft/hcsshim/computestorage:all-srcs",
         "//vendor/github.com/Microsoft/hcsshim/hcn:all-srcs",
         "//vendor/github.com/Microsoft/hcsshim/internal/cni:all-srcs",
         "//vendor/github.com/Microsoft/hcsshim/internal/cow:all-srcs",
@@ -67,6 +68,7 @@ filegroup(
         "//vendor/github.com/Microsoft/hcsshim/internal/timeout:all-srcs",
         "//vendor/github.com/Microsoft/hcsshim/internal/vmcompute:all-srcs",
         "//vendor/github.com/Microsoft/hcsshim/internal/wclayer:all-srcs",
+        "//vendor/github.com/Microsoft/hcsshim/internal/winapi:all-srcs",
         "//vendor/github.com/Microsoft/hcsshim/osversion:all-srcs",
     ],
     tags = ["automanaged"],

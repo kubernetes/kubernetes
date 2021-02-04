@@ -7,7 +7,7 @@ go_library(
         "selinux.go",
         "selinux_linux.go",
         "selinux_stub.go",
-        "xattrs.go",
+        "xattrs_linux.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/selinux/go-selinux",
     importpath = "github.com/opencontainers/selinux/go-selinux",

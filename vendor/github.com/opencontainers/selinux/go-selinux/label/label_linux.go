@@ -1,5 +1,3 @@
-// +build selinux,linux
-
 package label
 
 import (
@@ -27,14 +25,14 @@ var ErrIncompatibleLabel = errors.New("Bad SELinux option z and Z can not be use
 // the container.  A list of options can be passed into this function to alter
 // the labels.  The labels returned will include a random MCS String, that is
 // guaranteed to be unique.
-func InitLabels(options []string) (plabel string, mlabel string, Err error) {
+func InitLabels(options []string) (plabel string, mlabel string, retErr error) {
 	if !selinux.GetEnabled() {
 		return "", "", nil
 	}
 	processLabel, mountLabel := selinux.ContainerLabels()
 	if processLabel != "" {
 		defer func() {
-			if Err != nil {
+			if retErr != nil {
 				selinux.ReleaseLabel(mountLabel)
 			}
 		}()
@@ -57,7 +55,6 @@ func InitLabels(options []string) (plabel string, mlabel string, Err error) {
 			con := strings.SplitN(opt, ":", 2)
 			if !validOptions[con[0]] {
 				return "", "", errors.Errorf("Bad label option %q, valid options 'disable, user, role, level, type, filetype'", con[0])
-
 			}
 			if con[0] == "filetype" {
 				mcon["type"] = con[1]

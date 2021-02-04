@@ -37,24 +37,26 @@ func errnoErr(e syscall.Errno) error {
 }
 
 var (
-	modVirtDisk = windows.NewLazySystemDLL("VirtDisk.dll")
+	modvirtdisk = windows.NewLazySystemDLL("virtdisk.dll")
 
-	procCreateVirtualDisk = modVirtDisk.NewProc("CreateVirtualDisk")
-	procOpenVirtualDisk   = modVirtDisk.NewProc("OpenVirtualDisk")
-	procDetachVirtualDisk = modVirtDisk.NewProc("DetachVirtualDisk")
+	procCreateVirtualDisk          = modvirtdisk.NewProc("CreateVirtualDisk")
+	procOpenVirtualDisk            = modvirtdisk.NewProc("OpenVirtualDisk")
+	procAttachVirtualDisk          = modvirtdisk.NewProc("AttachVirtualDisk")
+	procDetachVirtualDisk          = modvirtdisk.NewProc("DetachVirtualDisk")
+	procGetVirtualDiskPhysicalPath = modvirtdisk.NewProc("GetVirtualDiskPhysicalPath")
 )
 
-func createVirtualDisk(virtualStorageType *virtualStorageType, path string, virtualDiskAccessMask uint32, securityDescriptor *uintptr, flags uint32, providerSpecificFlags uint32, parameters *createVirtualDiskParameters, o *syscall.Overlapped, handle *syscall.Handle) (err error) {
+func createVirtualDisk(virtualStorageType *VirtualStorageType, path string, virtualDiskAccessMask uint32, securityDescriptor *uintptr, createVirtualDiskFlags uint32, providerSpecificFlags uint32, parameters *CreateVirtualDiskParameters, overlapped *syscall.Overlapped, handle *syscall.Handle) (err error) {
 	var _p0 *uint16
 	_p0, err = syscall.UTF16PtrFromString(path)
 	if err != nil {
 		return
 	}
-	return _createVirtualDisk(virtualStorageType, _p0, virtualDiskAccessMask, securityDescriptor, flags, providerSpecificFlags, parameters, o, handle)
+	return _createVirtualDisk(virtualStorageType, _p0, virtualDiskAccessMask, securityDescriptor, createVirtualDiskFlags, providerSpecificFlags, parameters, overlapped, handle)
 }
 
-func _createVirtualDisk(virtualStorageType *virtualStorageType, path *uint16, virtualDiskAccessMask uint32, securityDescriptor *uintptr, flags uint32, providerSpecificFlags uint32, parameters *createVirtualDiskParameters, o *syscall.Overlapped, handle *syscall.Handle) (err error) {
-	r1, _, e1 := syscall.Syscall9(procCreateVirtualDisk.Addr(), 9, uintptr(unsafe.Pointer(virtualStorageType)), uintptr(unsafe.Pointer(path)), uintptr(virtualDiskAccessMask), uintptr(unsafe.Pointer(securityDescriptor)), uintptr(flags), uintptr(providerSpecificFlags), uintptr(unsafe.Pointer(parameters)), uintptr(unsafe.Pointer(o)), uintptr(unsafe.Pointer(handle)))
+func _createVirtualDisk(virtualStorageType *VirtualStorageType, path *uint16, virtualDiskAccessMask uint32, securityDescriptor *uintptr, createVirtualDiskFlags uint32, providerSpecificFlags uint32, parameters *CreateVirtualDiskParameters, overlapped *syscall.Overlapped, handle *syscall.Handle) (err error) {
+	r1, _, e1 := syscall.Syscall9(procCreateVirtualDisk.Addr(), 9, uintptr(unsafe.Pointer(virtualStorageType)), uintptr(unsafe.Pointer(path)), uintptr(virtualDiskAccessMask), uintptr(unsafe.Pointer(securityDescriptor)), uintptr(createVirtualDiskFlags), uintptr(providerSpecificFlags), uintptr(unsafe.Pointer(parameters)), uintptr(unsafe.Pointer(overlapped)), uintptr(unsafe.Pointer(handle)))
 	if r1 != 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -65,17 +67,17 @@ func _createVirtualDisk(virtualStorageType *virtualStorageType, path *uint16, vi
 	return
 }
 
-func openVirtualDisk(virtualStorageType *virtualStorageType, path string, virtualDiskAccessMask uint32, flags uint32, parameters *openVirtualDiskParameters, handle *syscall.Handle) (err error) {
+func openVirtualDisk(virtualStorageType *VirtualStorageType, path string, virtualDiskAccessMask uint32, openVirtualDiskFlags uint32, parameters *OpenVirtualDiskParameters, handle *syscall.Handle) (err error) {
 	var _p0 *uint16
 	_p0, err = syscall.UTF16PtrFromString(path)
 	if err != nil {
 		return
 	}
-	return _openVirtualDisk(virtualStorageType, _p0, virtualDiskAccessMask, flags, parameters, handle)
+	return _openVirtualDisk(virtualStorageType, _p0, virtualDiskAccessMask, openVirtualDiskFlags, parameters, handle)
 }
 
-func _openVirtualDisk(virtualStorageType *virtualStorageType, path *uint16, virtualDiskAccessMask uint32, flags uint32, parameters *openVirtualDiskParameters, handle *syscall.Handle) (err error) {
-	r1, _, e1 := syscall.Syscall6(procOpenVirtualDisk.Addr(), 6, uintptr(unsafe.Pointer(virtualStorageType)), uintptr(unsafe.Pointer(path)), uintptr(virtualDiskAccessMask), uintptr(flags), uintptr(unsafe.Pointer(parameters)), uintptr(unsafe.Pointer(handle)))
+func _openVirtualDisk(virtualStorageType *VirtualStorageType, path *uint16, virtualDiskAccessMask uint32, openVirtualDiskFlags uint32, parameters *OpenVirtualDiskParameters, handle *syscall.Handle) (err error) {
+	r1, _, e1 := syscall.Syscall6(procOpenVirtualDisk.Addr(), 6, uintptr(unsafe.Pointer(virtualStorageType)), uintptr(unsafe.Pointer(path)), uintptr(virtualDiskAccessMask), uintptr(openVirtualDiskFlags), uintptr(unsafe.Pointer(parameters)), uintptr(unsafe.Pointer(handle)))
 	if r1 != 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
@@ -86,8 +88,32 @@ func _openVirtualDisk(virtualStorageType *virtualStorageType, path *uint16, virt
 	return
 }
 
-func detachVirtualDisk(handle syscall.Handle, flags uint32, providerSpecificFlags uint32) (err error) {
-	r1, _, e1 := syscall.Syscall(procDetachVirtualDisk.Addr(), 3, uintptr(handle), uintptr(flags), uintptr(providerSpecificFlags))
+func attachVirtualDisk(handle syscall.Handle, securityDescriptor *uintptr, attachVirtualDiskFlag uint32, providerSpecificFlags uint32, parameters *AttachVirtualDiskParameters, overlapped *syscall.Overlapped) (err error) {
+	r1, _, e1 := syscall.Syscall6(procAttachVirtualDisk.Addr(), 6, uintptr(handle), uintptr(unsafe.Pointer(securityDescriptor)), uintptr(attachVirtualDiskFlag), uintptr(providerSpecificFlags), uintptr(unsafe.Pointer(parameters)), uintptr(unsafe.Pointer(overlapped)))
+	if r1 != 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func detachVirtualDisk(handle syscall.Handle, detachVirtualDiskFlags uint32, providerSpecificFlags uint32) (err error) {
+	r1, _, e1 := syscall.Syscall(procDetachVirtualDisk.Addr(), 3, uintptr(handle), uintptr(detachVirtualDiskFlags), uintptr(providerSpecificFlags))
+	if r1 != 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func getVirtualDiskPhysicalPath(handle syscall.Handle, diskPathSizeInBytes *uint32, buffer *uint16) (err error) {
+	r1, _, e1 := syscall.Syscall(procGetVirtualDiskPhysicalPath.Addr(), 3, uintptr(handle), uintptr(unsafe.Pointer(diskPathSizeInBytes)), uintptr(unsafe.Pointer(buffer)))
 	if r1 != 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)

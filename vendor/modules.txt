@@ -73,16 +73,18 @@ github.com/JeffAshton/win_pdh
 # github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd => github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
 github.com/MakeNowJust/heredoc
 # github.com/MakeNowJust/heredoc => github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
-# github.com/Microsoft/go-winio v0.4.15 => github.com/Microsoft/go-winio v0.4.15
+# github.com/Microsoft/go-winio v0.4.16-0.20201130162521-d1ffc52c7331 => github.com/Microsoft/go-winio v0.4.16-0.20201130162521-d1ffc52c7331
 ## explicit
 github.com/Microsoft/go-winio
-# github.com/Microsoft/go-winio => github.com/Microsoft/go-winio v0.4.15
+# github.com/Microsoft/go-winio => github.com/Microsoft/go-winio v0.4.16-0.20201130162521-d1ffc52c7331
 github.com/Microsoft/go-winio/pkg/guid
+github.com/Microsoft/go-winio/pkg/security
 github.com/Microsoft/go-winio/vhd
-# github.com/Microsoft/hcsshim v0.8.10-0.20200715222032-5eafd1556990 => github.com/Microsoft/hcsshim v0.8.10-0.20200715222032-5eafd1556990
+# github.com/Microsoft/hcsshim v0.8.14 => github.com/Microsoft/hcsshim v0.8.14
 ## explicit
 github.com/Microsoft/hcsshim
-# github.com/Microsoft/hcsshim => github.com/Microsoft/hcsshim v0.8.10-0.20200715222032-5eafd1556990
+# github.com/Microsoft/hcsshim => github.com/Microsoft/hcsshim v0.8.14
+github.com/Microsoft/hcsshim/computestorage
 github.com/Microsoft/hcsshim/hcn
 github.com/Microsoft/hcsshim/internal/cni
 github.com/Microsoft/hcsshim/internal/cow
@@ -103,6 +105,7 @@ github.com/Microsoft/hcsshim/internal/schema2
 github.com/Microsoft/hcsshim/internal/timeout
 github.com/Microsoft/hcsshim/internal/vmcompute
 github.com/Microsoft/hcsshim/internal/wclayer
+github.com/Microsoft/hcsshim/internal/winapi
 github.com/Microsoft/hcsshim/osversion
 # github.com/NYTimes/gziphandler v1.1.1 => github.com/NYTimes/gziphandler v1.1.1
 github.com/NYTimes/gziphandler
@@ -205,6 +208,10 @@ github.com/chai2010/gettext-go/gettext
 github.com/chai2010/gettext-go/gettext/mo
 github.com/chai2010/gettext-go/gettext/plural
 github.com/chai2010/gettext-go/gettext/po
+# github.com/checkpoint-restore/checkpointctl v0.0.0-20210205082939-2fc3d5639675 => github.com/checkpoint-restore/checkpointctl v0.0.0-20210205082939-2fc3d5639675
+## explicit
+# github.com/checkpoint-restore/checkpointctl => github.com/checkpoint-restore/checkpointctl v0.0.0-20210205082939-2fc3d5639675
+github.com/checkpoint-restore/checkpointctl/lib
 # github.com/checkpoint-restore/go-criu/v4 v4.1.0 => github.com/checkpoint-restore/go-criu/v4 v4.1.0
 github.com/checkpoint-restore/go-criu/v4
 # github.com/checkpoint-restore/go-criu/v4 => github.com/checkpoint-restore/go-criu/v4 v4.1.0
@@ -267,9 +274,10 @@ github.com/containernetworking/cni/pkg/types/020
 github.com/containernetworking/cni/pkg/types/current
 github.com/containernetworking/cni/pkg/utils
 github.com/containernetworking/cni/pkg/version
-# github.com/coredns/corefile-migration v1.0.11 => github.com/coredns/corefile-migration v1.0.11
+# github.com/containers/storage => github.com/containers/storage v1.23.5
+# github.com/coredns/corefile-migration v1.0.10 => github.com/coredns/corefile-migration v1.0.10
 ## explicit
-# github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.11
+# github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.10
 github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile
 # github.com/coreos/bbolt => github.com/coreos/bbolt v1.3.2
@@ -655,7 +663,7 @@ github.com/grpc-ecosystem/grpc-gateway/utilities
 # github.com/hashicorp/go-cleanhttp => github.com/hashicorp/go-cleanhttp v0.5.1
 # github.com/hashicorp/go-immutable-radix => github.com/hashicorp/go-immutable-radix v1.0.0
 # github.com/hashicorp/go-msgpack => github.com/hashicorp/go-msgpack v0.5.3
-# github.com/hashicorp/go-multierror => github.com/hashicorp/go-multierror v1.0.0
+# github.com/hashicorp/go-multierror => github.com/hashicorp/go-multierror v1.1.0
 # github.com/hashicorp/go-rootcerts => github.com/hashicorp/go-rootcerts v1.0.0
 # github.com/hashicorp/go-sockaddr => github.com/hashicorp/go-sockaddr v1.0.0
 # github.com/hashicorp/go-syslog => github.com/hashicorp/go-syslog v1.0.0
@@ -730,10 +738,10 @@ github.com/karrick/godirwalk
 # github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.16.1
 # github.com/kisielk/errcheck => github.com/kisielk/errcheck v1.5.0
 # github.com/kisielk/gotool => github.com/kisielk/gotool v1.0.0
+# github.com/klauspost/compress => github.com/klauspost/compress v1.11.0
 # github.com/klauspost/cpuid => github.com/klauspost/cpuid v1.2.0
-# github.com/konsorten/go-windows-terminal-sequences v1.0.3 => github.com/konsorten/go-windows-terminal-sequences v1.0.3
-github.com/konsorten/go-windows-terminal-sequences
-# github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.3
+# github.com/klauspost/pgzip => github.com/klauspost/pgzip v1.2.5
+# github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.2
 # github.com/kr/logfmt => github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515
 # github.com/kr/pretty => github.com/kr/pretty v0.2.0
 # github.com/kr/pty => github.com/kr/pty v1.1.5
@@ -774,7 +782,8 @@ github.com/mailru/easyjson/jwriter
 # github.com/marten-seemann/qtls => github.com/marten-seemann/qtls v0.2.3
 # github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
 # github.com/mattn/go-isatty => github.com/mattn/go-isatty v0.0.4
-# github.com/mattn/go-runewidth => github.com/mattn/go-runewidth v0.0.2
+# github.com/mattn/go-runewidth => github.com/mattn/go-runewidth v0.0.7
+# github.com/mattn/go-shellwords => github.com/mattn/go-shellwords v1.0.10
 # github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 => github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369
 # github.com/matttproud/golang_protobuf_extensions => github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369
 github.com/matttproud/golang_protobuf_extensions/pbutil
@@ -846,7 +855,7 @@ github.com/mvdan/xurls
 github.com/mxk/go-flowrate/flowrate
 # github.com/naoina/go-stringutil => github.com/naoina/go-stringutil v0.1.0
 # github.com/naoina/toml => github.com/naoina/toml v0.1.1
-# github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5
+# github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.4
 # github.com/onsi/ginkgo v1.11.0 => github.com/onsi/ginkgo v1.11.0
 ## explicit
 github.com/onsi/ginkgo
@@ -927,9 +936,9 @@ github.com/opencontainers/runc/types
 # github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6 => github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6
 # github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6
 github.com/opencontainers/runtime-spec/specs-go
-# github.com/opencontainers/selinux v1.6.0 => github.com/opencontainers/selinux v1.6.0
+# github.com/opencontainers/selinux v1.8.0 => github.com/opencontainers/selinux v1.8.0
 ## explicit
-# github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.6.0
+# github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.8.0
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalk
@@ -953,6 +962,7 @@ github.com/pmezard/go-difflib/difflib
 github.com/pquerna/cachecontrol
 # github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
 github.com/pquerna/cachecontrol/cacheobject
+# github.com/pquerna/ffjson => github.com/pquerna/ffjson v0.0.0-20181028064349-e517b90714f7
 # github.com/prometheus/client_golang v1.7.1 => github.com/prometheus/client_golang v1.7.1
 # github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.7.1
 github.com/prometheus/client_golang/prometheus
@@ -1007,9 +1017,9 @@ github.com/seccomp/libseccomp-golang
 # github.com/shurcooL/sanitized_anchor_name v1.0.0 => github.com/shurcooL/sanitized_anchor_name v1.0.0
 github.com/shurcooL/sanitized_anchor_name
 # github.com/shurcooL/sanitized_anchor_name => github.com/shurcooL/sanitized_anchor_name v1.0.0
-# github.com/sirupsen/logrus v1.6.0 => github.com/sirupsen/logrus v1.6.0
+# github.com/sirupsen/logrus v1.7.0 => github.com/sirupsen/logrus v1.7.0
 github.com/sirupsen/logrus
-# github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.6.0
+# github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.7.0
 # github.com/smartystreets/assertions => github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d
 # github.com/smartystreets/goconvey => github.com/smartystreets/goconvey v1.6.4
 # github.com/soheilhy/cmux v0.1.4 => github.com/soheilhy/cmux v0.1.4
@@ -1062,6 +1072,7 @@ github.com/subosito/gotenv
 # github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
 # github.com/syndtr/gocapability => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
 github.com/syndtr/gocapability/capability
+# github.com/tchap/go-patricia => github.com/tchap/go-patricia v2.3.0+incompatible
 # github.com/thecodeteam/goscaleio v0.1.0 => github.com/thecodeteam/goscaleio v0.1.0
 ## explicit
 github.com/thecodeteam/goscaleio
@@ -1075,6 +1086,7 @@ github.com/tmc/grpc-websocket-proxy/wsproxy
 # github.com/urfave/negroni v1.0.0 => github.com/urfave/negroni v1.0.0
 ## explicit
 # github.com/urfave/negroni => github.com/urfave/negroni v1.0.0
+# github.com/vbatts/tar-split => github.com/vbatts/tar-split v0.11.1
 # github.com/vektah/gqlparser => github.com/vektah/gqlparser v1.1.2
 # github.com/vishvananda/netlink v1.1.0 => github.com/vishvananda/netlink v1.1.0
 ## explicit
@@ -1120,9 +1132,9 @@ github.com/vmware/govmomi/vim25/progress
 github.com/vmware/govmomi/vim25/soap
 github.com/vmware/govmomi/vim25/types
 github.com/vmware/govmomi/vim25/xml
-# github.com/willf/bitset v1.1.11-0.20200630133818-d5bec3311243 => github.com/willf/bitset v1.1.11-0.20200630133818-d5bec3311243
+# github.com/willf/bitset v1.1.11 => github.com/willf/bitset v1.1.11
 github.com/willf/bitset
-# github.com/willf/bitset => github.com/willf/bitset v1.1.11-0.20200630133818-d5bec3311243
+# github.com/willf/bitset => github.com/willf/bitset v1.1.11
 # github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
 github.com/xiang90/probing
 # github.com/xiang90/probing => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
@@ -1318,9 +1330,9 @@ golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9 => golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 # golang.org/x/sync => golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.0.0-20201112073958-5cba982894dd => golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
+# golang.org/x/sys v0.0.0-20201201145000-ef89a241ccb3 => golang.org/x/sys v0.0.0-20201201145000-ef89a241ccb3
 ## explicit
-# golang.org/x/sys => golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
+# golang.org/x/sys => golang.org/x/sys v0.0.0-20201201145000-ef89a241ccb3
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix

@@ -429,10 +429,10 @@ type PipeConfig struct {
 	// when the pipe is in message mode.
 	MessageMode bool
 
-	// InputBufferSize specifies the size the input buffer, in bytes.
+	// InputBufferSize specifies the size of the input buffer, in bytes.
 	InputBufferSize int32
 
-	// OutputBufferSize specifies the size the input buffer, in bytes.
+	// OutputBufferSize specifies the size of the output buffer, in bytes.
 	OutputBufferSize int32
 }
 

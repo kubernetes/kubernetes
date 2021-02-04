@@ -38,6 +38,7 @@ go_library(
         "//vendor/github.com/Microsoft/hcsshim/internal/longpath:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/oc:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/safefile:go_default_library",
+        "//vendor/github.com/Microsoft/hcsshim/internal/winapi:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/osversion:go_default_library",
         "//vendor/github.com/sirupsen/logrus:go_default_library",
         "//vendor/go.opencensus.io/trace:go_default_library",

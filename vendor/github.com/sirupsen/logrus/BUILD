@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "alt_exit.go",
+        "buffer_pool.go",
         "doc.go",
         "entry.go",
         "exported.go",
@@ -57,7 +58,7 @@ go_library(
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
-            "//vendor/github.com/konsorten/go-windows-terminal-sequences:go_default_library",
+            "//vendor/golang.org/x/sys/windows:go_default_library",
         ],
         "//conditions:default": [],
     }),

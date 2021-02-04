@@ -2,13 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "sequences.go",
-        "sequences_dummy.go",
-    ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/konsorten/go-windows-terminal-sequences",
-    importpath = "github.com/konsorten/go-windows-terminal-sequences",
+    srcs = ["metadata.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/checkpoint-restore/checkpointctl/lib",
+    importpath = "github.com/checkpoint-restore/checkpointctl/lib",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/pkg/errors:go_default_library"],
 )
 
 filegroup(

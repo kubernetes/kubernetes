@@ -10,7 +10,7 @@
 package hcsschema
 
 type LogicalProcessor struct {
-	LpIndex     uint32 `json:"LogicalProcessorCount,omitempty"`
+	LpIndex     uint32 `json:"LpIndex,omitempty"`
 	NodeNumber  uint8  `json:"NodeNumber, omitempty"`
 	PackageId   uint32 `json:"PackageId, omitempty"`
 	CoreId      uint32 `json:"CoreId, omitempty"`
