@@ -206,7 +206,7 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	// retrieves resource and annotation args from args
 	// also checks args to verify that all resources are specified before annotations
-	resources, annotationArgs, err := cmdutil.GetResourcesAndPairs(args, "annotation")
+	resources, annotationArgs, err := cmdutil.GetResourcesAndPairs(args, "annotation", o.all, o.Filenames)
 	if err != nil {
 		return err
 	}

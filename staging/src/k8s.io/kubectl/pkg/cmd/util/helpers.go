@@ -588,11 +588,20 @@ func PrintFlagsWithDryRunStrategy(printFlags *genericclioptions.PrintFlags, dryR
 }
 
 // GetResourcesAndPairs retrieves resources and "KEY=VALUE or KEY-" pair args from given args
-func GetResourcesAndPairs(args []string, pairType string) (resources []string, pairArgs []string, err error) {
+func GetResourcesAndPairs(args []string, pairType string, allResources bool, fileNames []string) (resources []string, pairArgs []string, err error) {
 	foundPair := false
-	for _, s := range args {
+	for i, s := range args {
+		// if first arg contains '/' we consider as a '<resource>/<name>'
+		foundFirstResource := strings.Contains(s, "/") && i == 0 &&
+			!allResources && len(fileNames) == 0
+		// if first arg does not contain '/' and this is second argument
+		// we consider as a '<resource> <name>'
+		firstResource := i == 1 && !strings.Contains(args[0], "/") &&
+			!allResources && len(fileNames) == 0
 		nonResource := (strings.Contains(s, "=") && s[0] != '=') || (strings.HasSuffix(s, "-") && s != "-")
 		switch {
+		case foundFirstResource || firstResource:
+			resources = append(resources, s)
 		case !foundPair && nonResource:
 			foundPair = true
 			fallthrough

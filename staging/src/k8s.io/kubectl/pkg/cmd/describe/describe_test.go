@@ -159,7 +159,7 @@ func TestDescribeListObjects(t *testing.T) {
 
 	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.Run(cmd, []string{"pods"})
-	if buf.String() != fmt.Sprintf("%s\n\n%s", d.Output, d.Output) {
+	if buf.String() != fmt.Sprintf("%s\n\n%s\n\n%s", d.Output, d.Output, d.Output) {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

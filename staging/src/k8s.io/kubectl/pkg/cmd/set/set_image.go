@@ -170,7 +170,7 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		return err
 	}
 
-	o.Resources, o.ContainerImages, err = getResourcesAndImages(args)
+	o.Resources, o.ContainerImages, err = getResourcesAndImages(args, o.All, o.Filenames)
 	if err != nil {
 		return err
 	}
@@ -315,9 +315,9 @@ func setImage(containers []v1.Container, containerName string, image string) boo
 }
 
 // getResourcesAndImages retrieves resources and container name:images pair from given args
-func getResourcesAndImages(args []string) (resources []string, containerImages map[string]string, err error) {
+func getResourcesAndImages(args []string, allResources bool, fileNames []string) (resources []string, containerImages map[string]string, err error) {
 	pairType := "image"
-	resources, imageArgs, err := cmdutil.GetResourcesAndPairs(args, pairType)
+	resources, imageArgs, err := cmdutil.GetResourcesAndPairs(args, pairType, allResources, fileNames)
 	if err != nil {
 		return
 	}

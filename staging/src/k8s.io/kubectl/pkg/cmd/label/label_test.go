@@ -308,16 +308,16 @@ func TestLabelErrors(t *testing.T) {
 			args:  []string{"pods=bar"},
 			errFn: func(err error) bool { return strings.Contains(err.Error(), "one or more resources must be specified") },
 		},
-		"resources but no selectors": {
+		"resource selected but not enough labels": {
 			args: []string{"pods", "app=bar"},
 			errFn: func(err error) bool {
-				return strings.Contains(err.Error(), "resource(s) were provided, but no name, label selector, or --all flag specified")
+				return strings.Contains(err.Error(), "at least one label update is required")
 			},
 		},
-		"multiple resources but no selectors": {
+		"multiple resources selected but no labels": {
 			args: []string{"pods,deployments", "app=bar"},
 			errFn: func(err error) bool {
-				return strings.Contains(err.Error(), "resource(s) were provided, but no name, label selector, or --all flag specified")
+				return strings.Contains(err.Error(), "at least one label update is required")
 			},
 		},
 	}
@@ -467,6 +467,8 @@ func TestLabelMultipleObjects(t *testing.T) {
 				case "/namespaces/test/pods/foo":
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
 				case "/namespaces/test/pods/bar":
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[1])}, nil
+				case "/namespaces/test/pods/foo=bar":
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[1])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)

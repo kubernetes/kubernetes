@@ -776,7 +776,7 @@ func TestDeleteMultipleSelector(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"pods,services"})
 
-	if buf.String() != "pod/foo\npod/bar\nservice/baz\n" {
+	if buf.String() != "pod/foo\npod/bar\npod/foo=bar\nservice/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

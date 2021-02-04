@@ -187,7 +187,7 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		return o.PrintFlags.ToPrinter()
 	}
 
-	resources, labelArgs, err := cmdutil.GetResourcesAndPairs(args, "label")
+	resources, labelArgs, err := cmdutil.GetResourcesAndPairs(args, "label", o.all, o.Filenames)
 	if err != nil {
 		return err
 	}

@@ -389,9 +389,10 @@ func TestGetMultipleResourceTypesShowKinds(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"all"})
 
-	expected := `NAME      AGE
-pod/foo   <unknown>
-pod/bar   <unknown>
+	expected := `NAME          AGE
+pod/foo       <unknown>
+pod/bar       <unknown>
+pod/foo=bar   <unknown>
 
 NAME          AGE
 service/baz   <unknown>
@@ -450,9 +451,10 @@ func TestGetMultipleTableResourceTypesShowKinds(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"all"})
 
-	expected := `NAME      READY   STATUS   RESTARTS   AGE
-pod/foo   0/0              0          <unknown>
-pod/bar   0/0              0          <unknown>
+	expected := `NAME          READY   STATUS   RESTARTS   AGE
+pod/foo       0/0              0          <unknown>
+pod/bar       0/0              0          <unknown>
+pod/foo=bar   0/0              0          <unknown>
 
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
@@ -510,9 +512,10 @@ func TestNoBlankLinesForGetMultipleTableResource(t *testing.T) {
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
-	expected := `NAME      READY   STATUS   RESTARTS   AGE
-pod/foo   0/0              0          <unknown>
-pod/bar   0/0              0          <unknown>
+	expected := `NAME          READY   STATUS   RESTARTS   AGE
+pod/foo       0/0              0          <unknown>
+pod/bar       0/0              0          <unknown>
+pod/foo=bar   0/0              0          <unknown>
 
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
@@ -1184,9 +1187,10 @@ func TestGetListObjects(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods"})
 
-	expected := `NAME   AGE
-foo    <unknown>
-bar    <unknown>
+	expected := `NAME      AGE
+foo       <unknown>
+bar       <unknown>
+foo=bar   <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
@@ -1210,9 +1214,10 @@ func TestGetListTableObjects(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods"})
 
-	expected := `NAME   READY   STATUS   RESTARTS   AGE
-foo    0/0              0          <unknown>
-bar    0/0              0          <unknown>
+	expected := `NAME      READY   STATUS   RESTARTS   AGE
+foo       0/0              0          <unknown>
+bar       0/0              0          <unknown>
+foo=bar   0/0              0          <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
@@ -1335,9 +1340,10 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods,services"})
 
-	expected := `NAME      AGE
-pod/foo   <unknown>
-pod/bar   <unknown>
+	expected := `NAME          AGE
+pod/foo       <unknown>
+pod/bar       <unknown>
+pod/foo=bar   <unknown>
 
 NAME          AGE
 service/baz   <unknown>
@@ -1374,9 +1380,10 @@ func TestGetMultipleTypeTableObjects(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods,services"})
 
-	expected := `NAME      READY   STATUS   RESTARTS   AGE
-pod/foo   0/0              0          <unknown>
-pod/bar   0/0              0          <unknown>
+	expected := `NAME          READY   STATUS   RESTARTS   AGE
+pod/foo       0/0              0          <unknown>
+pod/bar       0/0              0          <unknown>
+pod/foo=bar   0/0              0          <unknown>
 
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
@@ -1459,6 +1466,25 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
         },
         {
             "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": null,
+                "name": "foo=bar",
+                "namespace": "test",
+                "resourceVersion": "10"
+            },
+            "spec": {
+                "containers": null,
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "restartPolicy": "Always",
+                "securityContext": {},
+                "terminationGracePeriodSeconds": 30
+            },
+            "status": {}
+        },
+        {
+            "apiVersion": "v1",
             "kind": "Service",
             "metadata": {
                 "creationTimestamp": null,
@@ -1519,9 +1545,10 @@ func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 	cmd.Flags().Set("selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
 
-	expected := `NAME      AGE
-pod/foo   <unknown>
-pod/bar   <unknown>
+	expected := `NAME          AGE
+pod/foo       <unknown>
+pod/bar       <unknown>
+pod/foo=bar   <unknown>
 
 NAME          AGE
 service/baz   <unknown>
@@ -1563,9 +1590,10 @@ func TestGetMultipleTypeTableObjectsWithLabelSelector(t *testing.T) {
 	cmd.Flags().Set("selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
 
-	expected := `NAME      READY   STATUS   RESTARTS   AGE
-pod/foo   0/0              0          <unknown>
-pod/bar   0/0              0          <unknown>
+	expected := `NAME          READY   STATUS   RESTARTS   AGE
+pod/foo       0/0              0          <unknown>
+pod/bar       0/0              0          <unknown>
+pod/foo=bar   0/0              0          <unknown>
 
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
@@ -1607,9 +1635,10 @@ func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 	cmd.Flags().Set("field-selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
 
-	expected := `NAME      AGE
-pod/foo   <unknown>
-pod/bar   <unknown>
+	expected := `NAME          AGE
+pod/foo       <unknown>
+pod/bar       <unknown>
+pod/foo=bar   <unknown>
 
 NAME          AGE
 service/baz   <unknown>
@@ -1651,9 +1680,10 @@ func TestGetMultipleTypeTableObjectsWithFieldSelector(t *testing.T) {
 	cmd.Flags().Set("field-selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
 
-	expected := `NAME      READY   STATUS   RESTARTS   AGE
-pod/foo   0/0              0          <unknown>
-pod/bar   0/0              0          <unknown>
+	expected := `NAME          READY   STATUS   RESTARTS   AGE
+pod/foo       0/0              0          <unknown>
+pod/bar       0/0              0          <unknown>
+pod/foo=bar   0/0              0          <unknown>
 
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>

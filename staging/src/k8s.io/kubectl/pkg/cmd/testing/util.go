@@ -92,6 +92,16 @@ func TestData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationContro
 					EnableServiceLinks:            &enableServiceLinks,
 				},
 			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo=bar", Namespace: "test", ResourceVersion: "10"},
+				Spec: corev1.PodSpec{
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
+				},
+			},
 		},
 	}
 	svc := &corev1.ServiceList{
