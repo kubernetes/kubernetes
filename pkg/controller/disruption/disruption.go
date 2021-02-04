@@ -476,14 +476,14 @@ func (dc *DisruptionController) getPdbForPod(pod *v1.Pod) *policy.PodDisruptionB
 func (dc *DisruptionController) getPodsForPdb(pdb *policy.PodDisruptionBudget) ([]*v1.Pod, error) {
 	sel, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
 	if err != nil {
-		return []*v1.Pod{}, err
+		return nil, err
 	}
 	if sel.Empty() {
-		return []*v1.Pod{}, nil
+		return nil, nil
 	}
 	pods, err := dc.podLister.Pods(pdb.Namespace).List(sel)
 	if err != nil {
-		return []*v1.Pod{}, err
+		return nil, err
 	}
 	return pods, nil
 }
