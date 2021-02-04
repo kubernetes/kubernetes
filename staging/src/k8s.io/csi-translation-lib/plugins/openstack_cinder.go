@@ -18,6 +18,7 @@ package plugins
 
 import (
 	"fmt"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -45,6 +46,30 @@ func NewOpenStackCinderCSITranslator() InTreePlugin {
 
 // TranslateInTreeStorageClassParametersToCSI translates InTree Cinder storage class parameters to CSI storage class
 func (t *osCinderCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
+	var (
+		params = map[string]string{}
+	)
+	for k, v := range sc.Parameters {
+		switch strings.ToLower(k) {
+		case fsTypeKey:
+			params[csiFsTypeKey] = v
+		default:
+			// All other parameters are supported by the CSI driver.
+			// This includes also "availability", therefore do not translate it to sc.AllowedTopologies
+			params[k] = v
+		}
+	}
+
+	if len(sc.AllowedTopologies) > 0 {
+		newTopologies, err := translateAllowedTopologies(sc.AllowedTopologies, CinderTopologyKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed translating allowed topologies: %v", err)
+		}
+		sc.AllowedTopologies = newTopologies
+	}
+
+	sc.Parameters = params
+
 	return sc, nil
 }
 
