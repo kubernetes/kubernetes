@@ -2018,8 +2018,9 @@ func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mir
 	}
 
 	// optimization: avoid invoking the pod worker if no further changes are possible to the pod definition
-	if podWorkerTerminal {
-		klog.V(4).Infof("Pod %q has completed, ignoring remaining sync work: %s", format.Pod(pod), syncType)
+	// (i.e. the pod has completed and its containers have been terminated)
+	if podWorkerTerminal && containersTerminal {
+		klog.V(4).InfoS("Pod has completed and its containers have been terminated, ignoring remaining sync work", "pod", klog.KObj(pod), "syncType", syncType)
 		return
 	}
 
