@@ -181,7 +181,7 @@ func (o *PriorityClassOptions) Run() error {
 		var err error
 		priorityClass, err = o.Client.PriorityClasses().Create(context.TODO(), priorityClass, createOptions)
 		if err != nil {
-			return fmt.Errorf("failed to create clusterrolebinding: %v", err)
+			return fmt.Errorf("failed to create priorityclass: %v", err)
 		}
 	}
 
