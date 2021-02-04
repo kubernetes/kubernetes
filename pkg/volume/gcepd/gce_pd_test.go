@@ -86,7 +86,7 @@ type fakePDManager struct {
 func (fake *fakePDManager) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)
 	labels["fakepdmanager"] = "yes"
-	labels[v1.LabelFailureDomainBetaZone] = "zone1__zone2"
+	labels[v1.LabelTopologyZone] = "zone1__zone2"
 	return "test-gce-volume-name", 100, labels, "", nil
 }
 
@@ -200,8 +200,8 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Provision() returned unexpected value for fakepdmanager: %v", persistentSpec.Labels["fakepdmanager"])
 	}
 
-	if persistentSpec.Labels[v1.LabelFailureDomainBetaZone] != "zone1__zone2" {
-		t.Errorf("Provision() returned unexpected value for %s: %v", v1.LabelFailureDomainBetaZone, persistentSpec.Labels[v1.LabelFailureDomainBetaZone])
+	if persistentSpec.Labels[v1.LabelTopologyZone] != "zone1__zone2" {
+		t.Errorf("Provision() returned unexpected value for %s: %v", v1.LabelTopologyZone, persistentSpec.Labels[v1.LabelTopologyZone])
 	}
 
 	if persistentSpec.Spec.NodeAffinity == nil {
@@ -219,9 +219,9 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("NodeSelectorRequirement fakepdmanager-in-yes not found in volume NodeAffinity")
 	}
 	zones, _ := volumehelpers.ZonesToSet("zone1,zone2")
-	r, _ = getNodeSelectorRequirementWithKey(v1.LabelFailureDomainBetaZone, term)
+	r, _ = getNodeSelectorRequirementWithKey(v1.LabelTopologyZone, term)
 	if r == nil {
-		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelFailureDomainBetaZone, zones)
+		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelTopologyZone, zones)
 	} else {
 		sort.Strings(r.Values)
 		if !reflect.DeepEqual(r.Values, zones.List()) {

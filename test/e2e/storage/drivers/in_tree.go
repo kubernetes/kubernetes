@@ -1243,7 +1243,7 @@ func InitGcePdDriver() storageframework.TestDriver {
 			},
 			SupportedFsType:      supportedTypes,
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
-			TopologyKeys:         []string{v1.LabelFailureDomainBetaZone},
+			TopologyKeys:         []string{v1.LabelTopologyZone},
 			Capabilities: map[storageframework.Capability]bool{
 				storageframework.CapPersistence:         true,
 				storageframework.CapFsGroup:             true,
