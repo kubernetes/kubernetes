@@ -128,6 +128,7 @@ func TestOpenCloseHostports(t *testing.T) {
 	}
 
 	iptables := NewFakeIPTables()
+	iptables.protocol = utiliptables.ProtocolIPv4
 	portOpener := NewFakeSocketManager()
 	manager := &hostportManager{
 		hostPortMap: make(map[hostport]closeable),
@@ -151,7 +152,7 @@ func TestOpenCloseHostports(t *testing.T) {
 		countSctp := 0
 		for _, pm := range tc.podPortMapping.PortMappings {
 			if pm.Protocol == v1.ProtocolSCTP {
-				countSctp += 1
+				countSctp++
 			}
 		}
 		assert.EqualValues(t, len(mapping), len(tc.podPortMapping.PortMappings)-countSctp)
@@ -211,7 +212,8 @@ func TestOpenCloseHostports(t *testing.T) {
 		{
 			portMappings: []*PortMapping{
 				{HostPort: 9999, Protocol: v1.ProtocolTCP},
-				{HostPort: 9999, Protocol: v1.ProtocolUDP}},
+				{HostPort: 9999, Protocol: v1.ProtocolUDP},
+			},
 		},
 	}
 
@@ -230,6 +232,7 @@ func TestOpenCloseHostports(t *testing.T) {
 
 func TestHostportManager(t *testing.T) {
 	iptables := NewFakeIPTables()
+	iptables.protocol = utiliptables.ProtocolIPv4
 	portOpener := NewFakeSocketManager()
 	manager := &hostportManager{
 		hostPortMap: make(map[hostport]closeable),
@@ -237,7 +240,6 @@ func TestHostportManager(t *testing.T) {
 		portOpener:  portOpener.openFakeSocket,
 		execer:      exec.New(),
 	}
-
 	testCases := []struct {
 		mapping     *PodPortMapping
 		expectError bool
@@ -318,7 +320,7 @@ func TestHostportManager(t *testing.T) {
 			mapping: &PodPortMapping{
 				Name:        "pod3",
 				Namespace:   "ns1",
-				IP:          net.ParseIP("2001:beef::2"),
+				IP:          net.ParseIP("192.168.12.12"),
 				HostNetwork: false,
 				PortMappings: []*PortMapping{
 					{
@@ -330,7 +332,7 @@ func TestHostportManager(t *testing.T) {
 			},
 			expectError: true,
 		},
-		// fail HostPort with PodIP and HostIP using different families
+		// skip HostPort with PodIP and HostIP using different families
 		{
 			mapping: &PodPortMapping{
 				Name:        "pod4",
@@ -346,7 +348,7 @@ func TestHostportManager(t *testing.T) {
 					},
 				},
 			},
-			expectError: true,
+			expectError: false,
 		},
 
 		// open same HostPort on different IP
@@ -408,9 +410,15 @@ func TestHostportManager(t *testing.T) {
 	}
 
 	// Check port opened
-	expectedPorts := []hostport{{"", 8080, "tcp"},
-		{"", 8081, "udp"}, {"", 8443, "tcp"}, {"127.0.0.1", 8888, "tcp"},
-		{"127.0.0.2", 8888, "tcp"}, {"", 9999, "tcp"}, {"", 9999, "udp"}}
+	expectedPorts := []hostport{
+		{IPv4, "", 8080, "tcp"},
+		{IPv4, "", 8081, "udp"},
+		{IPv4, "", 8443, "tcp"},
+		{IPv4, "127.0.0.1", 8888, "tcp"},
+		{IPv4, "127.0.0.2", 8888, "tcp"},
+		{IPv4, "", 9999, "tcp"},
+		{IPv4, "", 9999, "udp"},
+	}
 	openedPorts := make(map[hostport]bool)
 	for hp, port := range portOpener.mem {
 		if !port.closed {
@@ -499,8 +507,10 @@ func TestHostportManager(t *testing.T) {
 			remainingChains[strings.TrimSpace(line)] = true
 		}
 	}
-	expectDeletedChains := []string{"KUBE-HP-4YVONL46AKYWSKS3", "KUBE-HP-7THKRFSEH4GIIXK7", "KUBE-HP-5N7UH5JAXCVP5UJR",
-		"KUBE-HP-TUKTZ736U5JD5UTK", "KUBE-HP-CAAJ45HDITK7ARGM", "KUBE-HP-WFUNFVXVDLD5ZVXN", "KUBE-HP-4MFWH2F2NAOMYD6A"}
+	expectDeletedChains := []string{
+		"KUBE-HP-4YVONL46AKYWSKS3", "KUBE-HP-7THKRFSEH4GIIXK7", "KUBE-HP-5N7UH5JAXCVP5UJR",
+		"KUBE-HP-TUKTZ736U5JD5UTK", "KUBE-HP-CAAJ45HDITK7ARGM", "KUBE-HP-WFUNFVXVDLD5ZVXN", "KUBE-HP-4MFWH2F2NAOMYD6A",
+	}
 	for _, chain := range expectDeletedChains {
 		_, ok := remainingChains[chain]
 		assert.EqualValues(t, false, ok)
@@ -537,7 +547,6 @@ func TestHostportManagerIPv6(t *testing.T) {
 		portOpener:  portOpener.openFakeSocket,
 		execer:      exec.New(),
 	}
-
 	testCases := []struct {
 		mapping     *PodPortMapping
 		expectError bool
@@ -639,7 +648,7 @@ func TestHostportManagerIPv6(t *testing.T) {
 	}
 
 	// Check port opened
-	expectedPorts := []hostport{{"", 8080, "tcp"}, {"", 8081, "udp"}, {"", 8443, "tcp"}}
+	expectedPorts := []hostport{{IPv6, "", 8080, "tcp"}, {IPv6, "", 8081, "udp"}, {IPv6, "", 8443, "tcp"}}
 	openedPorts := make(map[hostport]bool)
 	for hp, port := range portOpener.mem {
 		if !port.closed {
@@ -657,7 +666,7 @@ func TestHostportManagerIPv6(t *testing.T) {
 	err := iptables.SaveInto(utiliptables.TableNAT, raw)
 	assert.NoError(t, err)
 
-	lines := strings.Split(string(raw.Bytes()), "\n")
+	lines := strings.Split(raw.String(), "\n")
 	expectedLines := map[string]bool{
 		`*nat`:                              true,
 		`:KUBE-HOSTPORTS - [0:0]`:           true,
@@ -704,7 +713,7 @@ func TestHostportManagerIPv6(t *testing.T) {
 	raw.Reset()
 	err = iptables.SaveInto(utiliptables.TableNAT, raw)
 	assert.NoError(t, err)
-	lines = strings.Split(string(raw.Bytes()), "\n")
+	lines = strings.Split(raw.String(), "\n")
 	remainingChains := make(map[string]bool)
 	for _, line := range lines {
 		if strings.HasPrefix(line, ":") {
