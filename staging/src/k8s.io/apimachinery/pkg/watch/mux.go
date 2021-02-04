@@ -98,6 +98,7 @@ type functionFakeRuntimeObject func()
 func (obj functionFakeRuntimeObject) GetObjectKind() schema.ObjectKind {
 	return schema.EmptyObjectKind
 }
+
 func (obj functionFakeRuntimeObject) DeepCopyObject() runtime.Object {
 	if obj == nil {
 		return nil
@@ -209,16 +210,30 @@ func (m *Broadcaster) closeAll() {
 	m.watchers = map[int64]*broadcasterWatcher{}
 }
 
-// Action distributes the given event among all watchers.
+// Action distributes the given event among all watchers. It panics if Shutdown()
+// has already been called.
 func (m *Broadcaster) Action(action EventType, obj runtime.Object) {
 	m.incoming <- Event{action, obj}
 }
 
 // Action distributes the given event among all watchers, or drops it on the floor
-// if too many incoming actions are queued up.  Returns true if the action was sent,
-// false if dropped.
+// if too many incoming actions are queued up or if Shutdown() has already been called.
+// Returns true if the action was sent, false if dropped.
 func (m *Broadcaster) ActionOrDrop(action EventType, obj runtime.Object) bool {
+	// select ordering is not deterministic, and it would match adding the event to
+	// the incoming channel. A separate select is needed to avoid this problem.
+	// https://golang.org/ref/spec#Select_statements
 	select {
+	case <-m.stopped:
+		return false
+	default:
+	}
+
+	select {
+	// very unlikely that the broadcaster might be stopped while this is called,
+	// but just to be on the safe side.
+	case <-m.stopped:
+		return false
 	case m.incoming <- Event{action, obj}:
 		return true
 	default:

@@ -223,4 +223,16 @@ func TestBroadcasterWatchAfterShutdown(t *testing.T) {
 		m.Action(event1.Type, event1.Object)
 	}
 	action()
+
+	actionOrDrop := func() {
+		defer func() {
+			if err := recover(); err != nil {
+				t.Error("should not cause panic")
+			}
+		}()
+		if m.ActionOrDrop(event1.Type, event1.Object) {
+			t.Error("should return false on closed channel")
+		}
+	}
+	actionOrDrop()
 }
