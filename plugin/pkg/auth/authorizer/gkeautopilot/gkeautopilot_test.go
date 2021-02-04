@@ -256,6 +256,81 @@ func TestAuthorize(t *testing.T) {
 				reason:   fmt.Sprintf(authReasonDeniedResourceManagedNamespace, "ns2", "pod"),
 			},
 		},
+		"ClusterScopedVerbDenied_IsDenied": {
+			input{
+				prepConfig: func(c *config) {
+					c.ManagedNamespaces = []ManagedNamespace{
+						{
+							Name:        "",
+							DeniedVerbs: []string{"verb1", "verb2", "verb3"},
+						},
+					}
+				},
+
+				prepRequest: func() {
+					request.verb = "verb3"
+					request.namespace = ""
+				},
+			},
+			expected{
+				decision: authorizer.DecisionDeny,
+				reason:   fmt.Sprintf(authReasonDeniedVerbClusterScopedResource, "verb3"),
+			},
+		},
+		"ClusterScopedResourceDenied_IsDenied": {
+			input{
+				prepConfig: func(c *config) {
+					c.ManagedNamespaces = []ManagedNamespace{
+						{
+							Name: "",
+							DeniedResources: []ResourceSubresource{
+								{
+									Resource:    "node",
+									Subresource: "proxy",
+								},
+							},
+						},
+					}
+				},
+
+				prepRequest: func() {
+					request.resource = "node"
+					request.subresource = "proxy"
+					request.namespace = ""
+				},
+			},
+			expected{
+				decision: authorizer.DecisionDeny,
+				reason:   fmt.Sprintf(authReasonDeniedClusterScopedResource, "node/proxy"),
+			},
+		},
+		"ClusterScopedSubresourceNotDenied_NoOpinion": {
+			input{
+				prepConfig: func(c *config) {
+					c.ManagedNamespaces = []ManagedNamespace{
+						{
+							Name: "",
+							DeniedResources: []ResourceSubresource{
+								{
+									Resource:    "node",
+									Subresource: "proxy",
+								},
+							},
+						},
+					}
+				},
+
+				prepRequest: func() {
+					request.resource = "node"
+					request.subresource = "subres"
+					request.namespace = ""
+				},
+			},
+			expected{
+				decision: authorizer.DecisionNoOpinion,
+				reason:   authReasonNoOpinion,
+			},
+		},
 		"ResourceDeniedForNamespaceAndSubresourceEmpty_IsDenied": {
 			input{
 				prepConfig: func(c *config) {

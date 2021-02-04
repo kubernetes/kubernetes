@@ -92,20 +92,6 @@ func TestValidateConfig(t *testing.T) {
 		input    input
 		expected expected
 	}{
-		"ManagedNamespaceNameEmpty_ReturnsErr": {
-			input{
-				conf: &config{
-					ManagedNamespaces: []ManagedNamespace{
-						{
-							Name: "",
-						},
-					},
-				},
-			},
-			expected{
-				err: errManagedNamespaceEmptyName,
-			},
-		},
 		"ManagedNamespaceDeniedVerbsHasEmptyItem_ReturnsErr": {
 			input{
 				conf: &config{

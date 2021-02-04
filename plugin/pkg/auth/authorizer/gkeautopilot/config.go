@@ -35,7 +35,6 @@ func newConfigErr(msg string) *configValidationError {
 
 // errors that might be returned for when validating
 var (
-	errManagedNamespaceEmptyName           = newConfigErr("managedNamespace.name cannot be empty")
 	errManagedNamespaceEmptyVerbs          = newConfigErr("managedNamespace.deniedVerbs.[*] cannot be empty")
 	errManagedNamespaceEmptyResource       = newConfigErr("managedNamespace.deniedResources.[*].resource cannot be empty")
 	errManagedResourceEmptyResource        = newConfigErr("managedResource.resource cannot be empty")
@@ -176,10 +175,6 @@ type configHelper struct {
 func (c *config) validate() error {
 	// check for invalid empty fields in managed namespaces
 	for _, mns := range c.ManagedNamespaces {
-		if mns.Name == "" {
-			return errManagedNamespaceEmptyName
-		}
-
 		for _, v := range mns.DeniedVerbs {
 			if v == "" {
 				return errManagedNamespaceEmptyVerbs

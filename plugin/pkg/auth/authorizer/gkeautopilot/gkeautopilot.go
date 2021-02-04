@@ -45,6 +45,8 @@ const (
 	authReasonDeniedPolicyEnforcementNotEnabled string = "GKEAutopilot authz: the request was sent before policy enforcement is enabled"
 	authReasonDeniedVerbManagedNamespace        string = "GKEAutopilot authz: the namespace %q is managed and the request's verb %q is denied"
 	authReasonDeniedResourceManagedNamespace    string = "GKEAutopilot authz: the namespace %q is managed and the request's resource %q is denied"
+	authReasonDeniedVerbClusterScopedResource   string = "GKEAutopilot authz: the verb %q is denied for cluster scoped resources"
+	authReasonDeniedClusterScopedResource       string = "GKEAutopilot authz: cluster scoped resource %q is managed and access is denied"
 	authReasonDeniedSubresourceManagedNamespace string = "GKEAutopilot authz: the namespace %q is managed and the request's subresource %q is denied"
 	authReasonDeniedVerbManagedResource         string = "GKEAutopilot authz: the resource %q is managed and the request's verb %q is not allowed"
 )
@@ -194,28 +196,40 @@ func (a *Authorizer) isIdentityIgnored(request authorizer.Attributes) bool {
 
 // isRequestVerbForNamespaceDenied returns true if:
 // - the namespace is managed AND the verb is not allowed
+//
+// Note: Cluster-scoped resources are treated as resources in the "" (empty)
+// namespace
 func (a *Authorizer) isRequestForNamespaceDenied(request authorizer.Attributes) (bool, string) {
 	reqNamespace := request.GetNamespace()
-	// exit early if not namespaced
-	if reqNamespace == "" {
-		return false, authReasonNoOpinion
-	}
 
 	if ds, ok := a.configHelper.managedNamespacesMap[reqNamespace]; ok {
 		reqVerb := request.GetVerb()
 		if ds.deniedVerbs.Has(reqVerb) {
 			reason := fmt.Sprintf(authReasonDeniedVerbManagedNamespace, reqNamespace, reqVerb)
+			if reqNamespace == "" {
+				reason = fmt.Sprintf(authReasonDeniedVerbClusterScopedResource, reqVerb)
+			}
+
 			return true, reason
 		}
 
 		reqResource := request.GetResource()
 		if ds.deniedResourceSubresource.Has(resSubToString(reqResource, "")) {
 			reason := fmt.Sprintf(authReasonDeniedResourceManagedNamespace, reqNamespace, reqResource)
+			if reqNamespace == "" {
+				reason = fmt.Sprintf(authReasonDeniedClusterScopedResource, resSubToString(reqResource, ""))
+			}
+
 			return true, reason
 		}
+
 		reqResSubres := resSubToString(request.GetResource(), request.GetSubresource())
 		if ds.deniedResourceSubresource.Has(reqResSubres) {
 			reason := fmt.Sprintf(authReasonDeniedSubresourceManagedNamespace, reqNamespace, reqResSubres)
+			if reqNamespace == "" {
+				reason = fmt.Sprintf(authReasonDeniedClusterScopedResource, reqResSubres)
+			}
+
 			return true, reason
 		}
 	}
