@@ -89,7 +89,7 @@ func (err *Error) IsThrottled() bool {
 	return err.HTTPStatusCode == http.StatusTooManyRequests || err.RetryAfter.After(now())
 }
 
-// IsNotFound returns true the if the requested object wasn't found
+// IsNotFound returns true if the requested object wasn't found
 func (err *Error) IsNotFound() bool {
 	if err == nil {
 		return false

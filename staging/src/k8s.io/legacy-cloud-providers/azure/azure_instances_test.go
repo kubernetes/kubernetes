@@ -698,7 +698,7 @@ func TestInstanceExistsByProviderID(t *testing.T) {
 			expected:   true,
 		},
 		{
-			name:       "InstanceExistsByProviderID should return false if VMSS exist but VM doesn't",
+			name:       "InstanceExistsByProviderID should return false if VMSS exists but the VM doesn't",
 			providerID: "azure:///subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmssee6c2/virtualMachines/0",
 			scaleSet:   "vmssee6c2",
 			expected:   false,
