@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -63,37 +64,17 @@ func TestDecodeInto(t *testing.T) {
 			if err := DecodeInto(test.args, &pluginFooConf); err != nil {
 				t.Errorf("DecodeInto(): failed to decode args %+v: %v", test.args, err)
 			}
-			if !reflect.DeepEqual(test.expected, pluginFooConf) {
-				t.Errorf("DecodeInto(): failed to decode plugin config, expected: %+v, got: %+v",
-					test.expected, pluginFooConf)
+			if diff := cmp.Diff(test.expected, pluginFooConf); diff != "" {
+				t.Errorf("DecodeInto(): failed to decode plugin config (-want, +got): %s", diff)
 			}
 		})
 	}
 }
 
-// isRegistryEqual compares two registries for equality. This function is used in place of
-// reflect.DeepEqual() and cmp() as they don't compare function values.
-func isRegistryEqual(registryX, registryY Registry) bool {
-	for name, pluginFactory := range registryY {
-		if val, ok := registryX[name]; ok {
-			if reflect.ValueOf(pluginFactory) != reflect.ValueOf(val) {
-				// pluginFactory functions are not the same.
-				return false
-			}
-		} else {
-			// registryY contains an entry that is not present in registryX
-			return false
-		}
-	}
-
-	for name := range registryX {
-		if _, ok := registryY[name]; !ok {
-			// registryX contains an entry that is not present in registryY
-			return false
-		}
-	}
-
-	return true
+// isPluginFactoryEqual compares two pluginFactories for equality. This function is used with
+// cmp comparer.
+func isPluginFactoryEqual(x, y PluginFactory) bool {
+	return reflect.ValueOf(x) == reflect.ValueOf(y)
 }
 
 type mockNoopPlugin struct{}
@@ -154,8 +135,8 @@ func TestMerge(t *testing.T) {
 				return
 			}
 
-			if !isRegistryEqual(scenario.expected, scenario.primaryRegistry) {
-				t.Errorf("Merge(). Expected %v. Got %v instead.", scenario.expected, scenario.primaryRegistry)
+			if diff := cmp.Diff(scenario.expected, scenario.primaryRegistry, cmp.Comparer(isPluginFactoryEqual)); diff != "" {
+				t.Errorf("Merge(): unexcepted registry (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -203,8 +184,8 @@ func TestRegister(t *testing.T) {
 				return
 			}
 
-			if !isRegistryEqual(scenario.expected, scenario.registry) {
-				t.Errorf("Register(). Expected %v. Got %v instead.", scenario.expected, scenario.registry)
+			if diff := cmp.Diff(scenario.expected, scenario.registry, cmp.Comparer(isPluginFactoryEqual)); diff != "" {
+				t.Errorf("Register(): unexcepted registry (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -248,8 +229,8 @@ func TestUnregister(t *testing.T) {
 				return
 			}
 
-			if !isRegistryEqual(scenario.expected, scenario.registry) {
-				t.Errorf("Unregister(). Expected %v. Got %v instead.", scenario.expected, scenario.registry)
+			if diff := cmp.Diff(scenario.expected, scenario.registry, cmp.Comparer(isPluginFactoryEqual)); diff != "" {
+				t.Errorf("Unregister(): unexcepted registry (-want, +got): %s", diff)
 			}
 		})
 	}

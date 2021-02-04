@@ -18,10 +18,10 @@ package framework
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,8 +62,8 @@ func TestNewResource(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			r := NewResource(test.resourceList)
-			if !reflect.DeepEqual(test.expected, r) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, r)
+			if diff := cmp.Diff(test.expected, r); diff != "" {
+				t.Errorf("unexpected resource (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -110,8 +110,8 @@ func TestResourceList(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			rl := test.resource.ResourceList()
-			if !reflect.DeepEqual(test.expected, rl) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, rl)
+			if diff := cmp.Diff(test.expected, rl); diff != "" {
+				t.Errorf("unexpected resource list (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -149,8 +149,8 @@ func TestResourceClone(t *testing.T) {
 			r := test.resource.Clone()
 			// Modify the field to check if the result is a clone of the origin one.
 			test.resource.MilliCPU += 1000
-			if !reflect.DeepEqual(test.expected, r) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, r)
+			if diff := cmp.Diff(test.expected, r); diff != "" {
+				t.Errorf("unexpected resource (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -194,8 +194,8 @@ func TestResourceAddScalar(t *testing.T) {
 	for _, test := range tests {
 		t.Run(string(test.scalarName), func(t *testing.T) {
 			test.resource.AddScalar(test.scalarName, test.scalarQuantity)
-			if !reflect.DeepEqual(test.expected, test.resource) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
+			if diff := cmp.Diff(test.expected, test.resource); diff != "" {
+				t.Errorf("unexpected resource (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -246,8 +246,8 @@ func TestSetMaxResource(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			test.resource.SetMaxResource(test.resourceList)
-			if !reflect.DeepEqual(test.expected, test.resource) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
+			if diff := cmp.Diff(test.expected, test.resource); diff != "" {
+				t.Errorf("unexpected resource (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -390,8 +390,8 @@ func TestNewNodeInfo(t *testing.T) {
 		t.Errorf("Generation is not incremented. previous: %v, current: %v", gen, ni.Generation)
 	}
 	expected.Generation = ni.Generation
-	if !reflect.DeepEqual(expected, ni) {
-		t.Errorf("expected: %#v, got: %#v", expected, ni)
+	if diff := cmp.Diff(expected, ni); diff != "" {
+		t.Errorf("unexpected nodeInfo (-want, +got): %s", diff)
 	}
 }
 
@@ -559,8 +559,8 @@ func TestNodeInfoClone(t *testing.T) {
 			// Modify the field to check if the result is a clone of the origin one.
 			test.nodeInfo.Generation += 10
 			test.nodeInfo.UsedPorts.Remove("127.0.0.1", "TCP", 80)
-			if !reflect.DeepEqual(test.expected, ni) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, ni)
+			if diff := cmp.Diff(test.expected, ni); diff != "" {
+				t.Errorf("unexpected nodeInfo (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -821,8 +821,8 @@ func TestNodeInfoAddPod(t *testing.T) {
 	}
 
 	expected.Generation = ni.Generation
-	if !reflect.DeepEqual(expected, ni) {
-		t.Errorf("expected: %#v, got: %#v", expected, ni)
+	if diff := cmp.Diff(expected, ni); diff != "" {
+		t.Errorf("unexpected nodeInfo (-want, +got): %s", diff)
 	}
 }
 
@@ -1073,8 +1073,8 @@ func TestNodeInfoRemovePod(t *testing.T) {
 			}
 
 			test.expectedNodeInfo.Generation = ni.Generation
-			if !reflect.DeepEqual(test.expectedNodeInfo, ni) {
-				t.Errorf("expected: %#v, got: %#v", test.expectedNodeInfo, ni)
+			if diff := cmp.Diff(test.expectedNodeInfo, ni); diff != "" {
+				t.Errorf("unexpected nodeInfo (-want, +got): %s", diff)
 			}
 		})
 	}
