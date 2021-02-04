@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -182,12 +183,15 @@ func (s *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	if err != nil {
 		return admission.NewForbidden(a, fmt.Errorf("error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
 	}
-	if s.MountServiceAccountToken && shouldAutomount(serviceAccount, pod) {
-		if err := s.mountServiceAccountToken(serviceAccount, pod); err != nil {
-			if _, ok := err.(errors.APIStatus); ok {
-				return err
+	if s.MountServiceAccountToken {
+		automount, require := shouldAutomount(serviceAccount, pod)
+		if automount {
+			if err := s.mountServiceAccountToken(serviceAccount, pod, require); err != nil {
+				if _, ok := err.(errors.APIStatus); ok {
+					return err
+				}
+				return admission.NewForbidden(a, err)
 			}
-			return admission.NewForbidden(a, err)
 		}
 	}
 	if len(pod.Spec.ImagePullSecrets) == 0 {
@@ -267,17 +271,17 @@ func shouldIgnore(a admission.Attributes) bool {
 	return false
 }
 
-func shouldAutomount(sa *corev1.ServiceAccount, pod *api.Pod) bool {
+func shouldAutomount(sa *corev1.ServiceAccount, pod *api.Pod) (automount bool, require bool) {
 	// Pod's preference wins
 	if pod.Spec.AutomountServiceAccountToken != nil {
-		return *pod.Spec.AutomountServiceAccountToken
+		return *pod.Spec.AutomountServiceAccountToken, true
 	}
 	// Then service account's
 	if sa.AutomountServiceAccountToken != nil {
-		return *sa.AutomountServiceAccountToken
+		return *sa.AutomountServiceAccountToken, true
 	}
 	// Default to true for backwards compatibility
-	return true
+	return true, false
 }
 
 // enforceMountableSecrets indicates whether mountable secrets should be enforced for a particular service account
@@ -424,28 +428,34 @@ func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, po
 	return nil
 }
 
-func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount, pod *api.Pod) error {
+func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount, pod *api.Pod, require bool) error {
 	var (
 		// serviceAccountToken holds the name of a secret containing a legacy service account token
 		serviceAccountToken string
 		err                 error
 	)
+
 	if !s.boundServiceAccountTokenVolume {
 		// Find the name of a referenced ServiceAccountToken secret we can mount
 		serviceAccountToken, err = s.getReferencedServiceAccountToken(serviceAccount)
 		if err != nil {
-			return fmt.Errorf("Error looking up service account token for %s/%s: %v", serviceAccount.Namespace, serviceAccount.Name, err)
+			if s.RequireAPIToken && require {
+				return fmt.Errorf("Error looking up service account token for %s/%s: %v", serviceAccount.Namespace, serviceAccount.Name, err)
+			}
+			klog.Errorf("Error looking up service account token for %s/%s: %v", serviceAccount.Namespace, serviceAccount.Name, err)
+			return nil
 		}
-	}
-	if len(serviceAccountToken) == 0 && !s.boundServiceAccountTokenVolume {
-		// We don't have an API token to mount, so return
-		if s.RequireAPIToken {
-			// If a token is required, this is considered an error
-			err := errors.NewServerTimeout(schema.GroupResource{Resource: "serviceaccounts"}, "create pod", 1)
-			err.ErrStatus.Message = fmt.Sprintf("No API token found for service account %q, retry after the token is automatically created and added to the service account", serviceAccount.Name)
-			return err
+
+		if len(serviceAccountToken) == 0 {
+			// We don't have an API token to mount, so return
+			if s.RequireAPIToken && require {
+				// If a token is required, this is considered an error
+				err := errors.NewServerTimeout(schema.GroupResource{Resource: "serviceaccounts"}, "create pod", 1)
+				err.ErrStatus.Message = fmt.Sprintf("No API token found for service account %q, retry after the token is automatically created and added to the service account", serviceAccount.Name)
+				return err
+			}
+			return nil
 		}
-		return nil
 	}
 
 	// Find the volume and volume name for the ServiceAccountTokenSecret if it already exists
