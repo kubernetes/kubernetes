@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -561,7 +562,11 @@ func getTwoRandomZones(c clientset.Interface) []string {
 // If match is true, check if zones in PV exactly match zones given.
 // Otherwise, check whether zones in PV is superset of zones given.
 func verifyZonesInPV(volume *v1.PersistentVolume, zones sets.String, match bool) error {
-	pvZones, err := volumehelpers.LabelZonesToSet(volume.Labels[v1.LabelFailureDomainBetaZone])
+	zone, ok := volume.Labels[v1.LabelFailureDomainBetaZone]
+	if !ok {
+		zone = volume.Labels[v1.LabelTopologyZone]
+	}
+	pvZones, err := volumehelpers.LabelZonesToSet(zone)
 	if err != nil {
 		return err
 	}
@@ -588,7 +593,10 @@ func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, 
 	}
 	pvLabel, ok := pv.Labels[v1.LabelFailureDomainBetaZone]
 	if !ok {
-		framework.Failf("label %s not found on PV", v1.LabelFailureDomainBetaZone)
+		pvLabel, ok = pv.Labels[v1.LabelTopologyZone]
+		if !ok {
+			framework.Failf("label %s or %s not found on PV", v1.LabelFailureDomainBetaZone, v1.LabelTopologyZone)
+		}
 	}
 
 	zonesFromLabel, err := volumehelpers.LabelZonesToSet(pvLabel)
@@ -611,7 +619,7 @@ func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, 
 	for _, term := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
 		keyFound := false
 		for _, r := range term.MatchExpressions {
-			if r.Key != v1.LabelFailureDomainBetaZone {
+			if r.Key != v1.LabelFailureDomainBetaZone && r.Key != v1.LabelTopologyZone {
 				continue
 			}
 			keyFound = true
@@ -625,7 +633,7 @@ func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, 
 			break
 		}
 		if !keyFound {
-			framework.Failf("label %s not found in term %v", v1.LabelFailureDomainBetaZone, term)
+			framework.Failf("label %s or %s not found in term %v", v1.LabelFailureDomainBetaZone, v1.LabelTopologyZone, term)
 		}
 	}
 }
