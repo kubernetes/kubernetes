@@ -77,6 +77,8 @@ func TestOperationExecutor_MountVolume_ConcurrentMountForNonAttachableAndNonDevi
 }
 
 func TestOperationExecutor_MountVolume_ConcurrentMountForAttachablePlugins(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToMount := make([]VolumeToMount, numVolumesToAttach)
@@ -102,6 +104,8 @@ func TestOperationExecutor_MountVolume_ConcurrentMountForAttachablePlugins(t *te
 }
 
 func TestOperationExecutor_MountVolume_ConcurrentMountForDeviceMountablePlugins(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToMount := make([]VolumeToMount, numVolumesToAttach)
@@ -161,6 +165,8 @@ func TestOperationExecutor_UnmountVolume_ConcurrentUnmountForAllPlugins(t *testi
 }
 
 func TestOperationExecutor_UnmountDeviceConcurrently(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	attachedVolumes := make([]AttachedVolume, numDevicesToUnmount)
@@ -182,6 +188,8 @@ func TestOperationExecutor_UnmountDeviceConcurrently(t *testing.T) {
 }
 
 func TestOperationExecutor_AttachSingleNodeVolumeConcurrentlyToSameNode(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToAttach := make([]VolumeToAttach, numVolumesToAttach)
@@ -210,6 +218,8 @@ func TestOperationExecutor_AttachSingleNodeVolumeConcurrentlyToSameNode(t *testi
 }
 
 func TestOperationExecutor_AttachMultiNodeVolumeConcurrentlyToSameNode(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToAttach := make([]VolumeToAttach, numVolumesToAttach)
@@ -238,6 +248,8 @@ func TestOperationExecutor_AttachMultiNodeVolumeConcurrentlyToSameNode(t *testin
 }
 
 func TestOperationExecutor_AttachSingleNodeVolumeConcurrentlyToDifferentNodes(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToAttach := make([]VolumeToAttach, numVolumesToAttach)
@@ -294,6 +306,8 @@ func TestOperationExecutor_AttachMultiNodeVolumeConcurrentlyToDifferentNodes(t *
 }
 
 func TestOperationExecutor_DetachSingleNodeVolumeConcurrentlyFromSameNode(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	attachedVolumes := make([]AttachedVolume, numVolumesToDetach)
@@ -322,6 +336,8 @@ func TestOperationExecutor_DetachSingleNodeVolumeConcurrentlyFromSameNode(t *tes
 }
 
 func TestOperationExecutor_DetachMultiNodeVolumeConcurrentlyFromSameNode(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	attachedVolumes := make([]AttachedVolume, numVolumesToDetach)
@@ -411,6 +427,8 @@ func TestOperationExecutor_VerifyVolumesAreAttachedConcurrentlyOnDifferentNodes(
 }
 
 func TestOperationExecutor_VerifyControllerAttachedVolumeConcurrently(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToMount := make([]VolumeToMount, numVolumesToVerifyControllerAttached)
@@ -460,6 +478,8 @@ func TestOperationExecutor_MountVolume_ConcurrentMountForNonAttachablePlugins_Vo
 }
 
 func TestOperationExecutor_MountVolume_ConcurrentMountForAttachablePlugins_VolumeMode_Block(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToMount := make([]VolumeToMount, numVolumesToAttach)
@@ -527,6 +547,8 @@ func TestOperationExecutor_UnmountVolume_ConcurrentUnmountForAllPlugins_VolumeMo
 }
 
 func TestOperationExecutor_UnmountDeviceConcurrently_VolumeMode_Block(t *testing.T) {
+	t.Parallel()
+
 	// Arrange
 	ch, quit, oe := setup()
 	attachedVolumes := make([]AttachedVolume, numDevicesToUnmap)
