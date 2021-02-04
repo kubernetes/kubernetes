@@ -21,7 +21,6 @@ import (
 	"errors"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -49,17 +48,6 @@ type TopNodeOptions struct {
 	MetricsClient   metricsclientset.Interface
 
 	genericclioptions.IOStreams
-}
-
-func heapsterTopOptions(flags *pflag.FlagSet) {
-	flags.String("heapster-namespace", "kube-system", "Namespace Heapster service is located in")
-	flags.MarkDeprecated("heapster-namespace", "This flag is currently no-op and will be deleted.")
-	flags.String("heapster-service", "heapster", "Name of Heapster service")
-	flags.MarkDeprecated("heapster-service", "This flag is currently no-op and will be deleted.")
-	flags.String("heapster-scheme", "http", "Scheme (http or https) to connect to Heapster as")
-	flags.MarkDeprecated("heapster-scheme", "This flag is currently no-op and will be deleted.")
-	flags.String("heapster-port", "", "Port name in service to use")
-	flags.MarkDeprecated("heapster-port", "This flag is currently no-op and will be deleted.")
 }
 
 var (
@@ -99,7 +87,6 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.Selector, "If non-empty, sort nodes list using specified field. The field can be either 'cpu' or 'memory'.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers")
-	heapsterTopOptions(cmd.Flags())
 
 	return cmd
 }
