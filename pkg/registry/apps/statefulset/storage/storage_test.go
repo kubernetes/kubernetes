@@ -243,10 +243,10 @@ func TestScaleGet(t *testing.T) {
 		},
 	}
 	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
-	got := obj.(*autoscaling.Scale)
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
+	got := obj.(*autoscaling.Scale)
 	if !apiequality.Semantic.DeepEqual(got, want) {
 		t.Errorf("unexpected scale: %s", diff.ObjectDiff(got, want))
 	}
