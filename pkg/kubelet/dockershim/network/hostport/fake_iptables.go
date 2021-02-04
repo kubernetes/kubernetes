@@ -148,14 +148,14 @@ func (f *fakeIPTables) ensureRule(position utiliptables.RulePosition, tableName 
 		return true, nil
 	}
 
-	if position == utiliptables.Prepend {
+	switch position {
+	case utiliptables.Prepend:
 		chain.rules = append([]string{rule}, chain.rules...)
-	} else if position == utiliptables.Append {
+	case utiliptables.Append:
 		chain.rules = append(chain.rules, rule)
-	} else {
+	default:
 		return false, fmt.Errorf("unknown position argument %q", position)
 	}
-
 	return false, nil
 }
 
@@ -185,7 +185,7 @@ func normalizeRule(rule string) (string, error) {
 
 		// Normalize un-prefixed IP addresses like iptables does
 		if net.ParseIP(arg) != nil {
-			arg = arg + "/32"
+			arg += "/32"
 		}
 
 		if len(normalized) > 0 {
@@ -281,7 +281,10 @@ func (f *fakeIPTables) restore(restoreTableName utiliptables.Table, data []byte,
 			if strings.HasPrefix(line, ":") {
 				chainName := utiliptables.Chain(strings.Split(line[1:], " ")[0])
 				if flush == utiliptables.FlushTables {
-					table, chain, _ := f.getChain(tableName, chainName)
+					table, chain, err := f.getChain(tableName, chainName)
+					if err != nil {
+						return err
+					}
 					if chain != nil {
 						delete(table.chains, string(chainName))
 					}

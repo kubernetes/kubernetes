@@ -59,6 +59,7 @@ type hostportManager struct {
 	mu             sync.Mutex
 }
 
+// NewHostportManager creates a new HostPortManager
 func NewHostportManager(iptables utiliptables.Interface) HostPortManager {
 	h := &hostportManager{
 		hostPortMap: make(map[hostport]closeable),
@@ -78,13 +79,6 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 		return nil
 	}
 	podFullName := getPodFullName(podPortMapping)
-
-	// skip if there is no hostport needed
-	hostportMappings := gatherHostportMappings(podPortMapping)
-	if len(hostportMappings) == 0 {
-		return nil
-	}
-
 	// IP.To16() returns nil if IP is not a valid IPv4 or IPv6 address
 	if podPortMapping.IP.To16() == nil {
 		return fmt.Errorf("invalid or missing IP of pod %s", podFullName)
@@ -92,11 +86,17 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 	podIP := podPortMapping.IP.String()
 	isIPv6 := utilnet.IsIPv6(podPortMapping.IP)
 
+	// skip if there is no hostport needed
+	hostportMappings := gatherHostportMappings(podPortMapping, isIPv6)
+	if len(hostportMappings) == 0 {
+		return nil
+	}
+
 	if isIPv6 != hm.iptables.IsIPv6() {
 		return fmt.Errorf("HostPortManager IP family mismatch: %v, isIPv6 - %v", podIP, isIPv6)
 	}
 
-	if err = ensureKubeHostportChains(hm.iptables, natInterfaceName); err != nil {
+	if err := ensureKubeHostportChains(hm.iptables, natInterfaceName); err != nil {
 		return err
 	}
 
@@ -205,8 +205,8 @@ func (hm *hostportManager) Remove(id string, podPortMapping *PodPortMapping) (er
 		return nil
 	}
 
-	hostportMappings := gatherHostportMappings(podPortMapping)
-	if len(hostportMappings) <= 0 {
+	hostportMappings := gatherHostportMappings(podPortMapping, hm.iptables.IsIPv6())
+	if len(hostportMappings) == 0 {
 		return nil
 	}
 
@@ -238,6 +238,12 @@ func (hm *hostportManager) Remove(id string, podPortMapping *PodPortMapping) (er
 		}
 	}
 
+	// exit if there is nothing to remove
+	// don´t forget to clean up opened pod host ports
+	if len(existingChainsToRemove) == 0 {
+		return hm.closeHostports(hostportMappings)
+	}
+
 	natChains := bytes.NewBuffer(nil)
 	natRules := bytes.NewBuffer(nil)
 	writeLine(natChains, "*nat")
@@ -252,7 +258,7 @@ func (hm *hostportManager) Remove(id string, podPortMapping *PodPortMapping) (er
 	}
 	writeLine(natRules, "COMMIT")
 
-	if err = hm.syncIPTables(append(natChains.Bytes(), natRules.Bytes()...)); err != nil {
+	if err := hm.syncIPTables(append(natChains.Bytes(), natRules.Bytes()...)); err != nil {
 		return err
 	}
 
@@ -286,7 +292,12 @@ func (hm *hostportManager) openHostports(podPortMapping *PodPortMapping) (map[ho
 			continue
 		}
 
-		hp := portMappingToHostport(pm)
+		// HostIP IP family is not handled by this port opener
+		if pm.HostIP != "" && utilnet.IsIPv6String(pm.HostIP) != hm.iptables.IsIPv6() {
+			continue
+		}
+
+		hp := portMappingToHostport(pm, hm.getIPFamily())
 		socket, err := hm.portOpener(&hp)
 		if err != nil {
 			retErr = fmt.Errorf("cannot open hostport %d for pod %s: %v", pm.HostPort, getPodFullName(podPortMapping), err)
@@ -311,7 +322,7 @@ func (hm *hostportManager) openHostports(podPortMapping *PodPortMapping) (map[ho
 func (hm *hostportManager) closeHostports(hostportMappings []*PortMapping) error {
 	errList := []error{}
 	for _, pm := range hostportMappings {
-		hp := portMappingToHostport(pm)
+		hp := portMappingToHostport(pm, hm.getIPFamily())
 		if socket, ok := hm.hostPortMap[hp]; ok {
 			klog.V(2).Infof("Closing host port %s", hp.String())
 			if err := socket.Close(); err != nil {
@@ -324,6 +335,15 @@ func (hm *hostportManager) closeHostports(hostportMappings []*PortMapping) error
 		}
 	}
 	return utilerrors.NewAggregate(errList)
+}
+
+// getIPFamily returns the hostPortManager IP family
+func (hm *hostportManager) getIPFamily() ipFamily {
+	family := IPv4
+	if hm.iptables.IsIPv6() {
+		family = IPv6
+	}
+	return family
 }
 
 // getHostportChain takes id, hostport and protocol for a pod and returns associated iptables chain.
@@ -339,10 +359,14 @@ func getHostportChain(id string, pm *PortMapping) utiliptables.Chain {
 }
 
 // gatherHostportMappings returns all the PortMappings which has hostport for a pod
-func gatherHostportMappings(podPortMapping *PodPortMapping) []*PortMapping {
+// it filters the PortMappings that use HostIP and doesn't match the IP family specified
+func gatherHostportMappings(podPortMapping *PodPortMapping, isIPv6 bool) []*PortMapping {
 	mappings := []*PortMapping{}
 	for _, pm := range podPortMapping.PortMappings {
 		if pm.HostPort <= 0 {
+			continue
+		}
+		if pm.HostIP != "" && utilnet.IsIPv6String(pm.HostIP) != isIPv6 {
 			continue
 		}
 		mappings = append(mappings, pm)
