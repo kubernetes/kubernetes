@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/expose"
 	"k8s.io/kubectl/pkg/cmd/get"
 	"k8s.io/kubectl/pkg/cmd/label"
+	"k8s.io/kubectl/pkg/cmd/lint"
 	"k8s.io/kubectl/pkg/cmd/logs"
 	"k8s.io/kubectl/pkg/cmd/options"
 	"k8s.io/kubectl/pkg/cmd/patch"
@@ -521,6 +522,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 				get.NewCmdGet("kubectl", f, ioStreams),
 				edit.NewCmdEdit(f, ioStreams),
 				delete.NewCmdDelete(f, ioStreams),
+				lint.NewCmdLint(f, ioStreams),
 			},
 		},
 		{

@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mydeployment
+  name: mydeployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mydeployment
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: mydeployment
+    spec:
+      securityContext:
+        runAsUser: 1000
+      containers:
+      - image: myimage
+        name: myimage

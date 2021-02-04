@@ -1,0 +1,1 @@
+testdata/container_running_as_root/pod1.yaml: Pod/myapp2/container nginx is running as root

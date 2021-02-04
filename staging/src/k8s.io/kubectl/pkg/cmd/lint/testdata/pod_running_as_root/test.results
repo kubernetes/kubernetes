@@ -1,0 +1,1 @@
+testdata/pod_running_as_root/pod2.yaml: Pod myapp2 is running as root
