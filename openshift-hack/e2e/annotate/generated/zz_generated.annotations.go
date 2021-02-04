@@ -463,6 +463,12 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-api-machinery] Secrets should patch a secret [Conformance]": "should patch a secret [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[Top Level] [sig-api-machinery] Server request timeout default timeout should be used if the specified timeout in the request URL is 0s": "default timeout should be used if the specified timeout in the request URL is 0s [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-api-machinery] Server request timeout should return HTTP status code 400 if the user specifies an invalid timeout in the request URL": "should return HTTP status code 400 if the user specifies an invalid timeout in the request URL [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-api-machinery] Server request timeout the request should be served with a default timeout if the specified timeout in the request URL exceeds maximum allowed": "the request should be served with a default timeout if the specified timeout in the request URL exceeds maximum allowed [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[Top Level] [sig-api-machinery] Servers with support for API chunking should return chunks of results for list calls": "should return chunks of results for list calls [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-api-machinery] Servers with support for API chunking should support continue listing from the last key if the original version has been compacted away, though the list is inconsistent [Slow]": "should support continue listing from the last key if the original version has been compacted away, though the list is inconsistent [Slow] [Suite:k8s]",
