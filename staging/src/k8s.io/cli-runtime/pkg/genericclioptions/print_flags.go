@@ -157,6 +157,13 @@ func (f *PrintFlags) WithTypeSetter(scheme *runtime.Scheme) *PrintFlags {
 	return f
 }
 
+// WithShowKindOnName sets true on NamePrintFlags in Flags to show
+// ResourceKind on the name
+func (f *PrintFlags) WithShowKindOnName() *PrintFlags {
+	f.NamePrintFlags.ShowKind = true
+	return f
+}
+
 // NewPrintFlags returns a default *PrintFlags
 func NewPrintFlags(operation string) *PrintFlags {
 	outputFormat := ""

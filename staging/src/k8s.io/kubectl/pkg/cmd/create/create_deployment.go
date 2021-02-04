@@ -84,7 +84,7 @@ func NewCreateDeploymentOptions(ioStreams genericclioptions.IOStreams) *CreateDe
 	return &CreateDeploymentOptions{
 		Port:       -1,
 		Replicas:   1,
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  ioStreams,
 	}
 }

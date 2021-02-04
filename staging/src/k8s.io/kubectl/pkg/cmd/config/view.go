@@ -70,7 +70,7 @@ var (
 // NewCmdConfigView returns a Command instance for 'config view' sub command
 func NewCmdConfigView(f cmdutil.Factory, streams genericclioptions.IOStreams, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
 	o := &ViewOptions{
-		PrintFlags:   genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml"),
+		PrintFlags:   genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml").WithShowKindOnName(),
 		ConfigAccess: ConfigAccess,
 
 		IOStreams: streams,

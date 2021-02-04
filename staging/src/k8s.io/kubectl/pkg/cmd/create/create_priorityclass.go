@@ -76,7 +76,7 @@ func NewPriorityClassOptions(ioStreams genericclioptions.IOStreams) *PriorityCla
 	return &PriorityClassOptions{
 		Value:            0,
 		PreemptionPolicy: "PreemptLowerPriority",
-		PrintFlags:       genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags:       genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:        ioStreams,
 	}
 }

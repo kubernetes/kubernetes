@@ -87,7 +87,7 @@ var (
 // NewCreateOptions returns an initialized CreateOptions instance
 func NewCreateOptions(ioStreams genericclioptions.IOStreams) *CreateOptions {
 	return &CreateOptions{
-		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -361,7 +361,7 @@ type CreateSubcommandOptions struct {
 // NewCreateSubcommandOptions returns initialized CreateSubcommandOptions
 func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSubcommandOptions {
 	return &CreateSubcommandOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  ioStreams,
 	}
 }

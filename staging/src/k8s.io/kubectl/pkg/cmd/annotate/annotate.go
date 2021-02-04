@@ -115,7 +115,7 @@ var (
 // NewAnnotateOptions creates the options for annotate
 func NewAnnotateOptions(ioStreams genericclioptions.IOStreams) *AnnotateOptions {
 	return &AnnotateOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("annotated").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("annotated").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		Recorder:    genericclioptions.NoopRecorder{},

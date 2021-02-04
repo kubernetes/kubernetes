@@ -82,7 +82,7 @@ type SetServiceAccountOptions struct {
 // NewSetServiceAccountOptions returns an initialized SetServiceAccountOptions instance
 func NewSetServiceAccountOptions(streams genericclioptions.IOStreams) *SetServiceAccountOptions {
 	return &SetServiceAccountOptions{
-		PrintFlags:  genericclioptions.NewPrintFlags("serviceaccount updated").WithTypeSetter(scheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("serviceaccount updated").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},

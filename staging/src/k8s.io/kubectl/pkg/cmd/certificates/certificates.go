@@ -78,7 +78,7 @@ type CertificateOptions struct {
 // NewCertificateOptions creates CertificateOptions struct for `certificate` command
 func NewCertificateOptions(ioStreams genericclioptions.IOStreams, operation string) *CertificateOptions {
 	return &CertificateOptions{
-		PrintFlags: genericclioptions.NewPrintFlags(operation).WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags(operation).WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  ioStreams,
 	}
 }

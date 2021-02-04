@@ -329,7 +329,7 @@ func TestSelectorTest(t *testing.T) {
 		selector:       labelToSet,
 		ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(info),
 		Recorder:       genericclioptions.NoopRecorder{},
-		PrintObj:       (&printers.NamePrinter{}).PrintObj,
+		PrintObj:       (&printers.NamePrinter{ShowKind: true}).PrintObj,
 		IOStreams:      iostreams,
 	}
 

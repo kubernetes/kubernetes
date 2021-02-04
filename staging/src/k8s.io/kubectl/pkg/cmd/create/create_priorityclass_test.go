@@ -60,14 +60,10 @@ func TestCreatePriorityClass(t *testing.T) {
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("preemption-policy", "Never")
 
-	printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
-	printFlags.OutputFormat = &outputFormat
+	options := NewPriorityClassOptions(ioStreams)
+	options.PrintFlags.OutputFormat = &outputFormat
+	options.Name = pcName
 
-	options := &PriorityClassOptions{
-		PrintFlags: printFlags,
-		Name:       pcName,
-		IOStreams:  ioStreams,
-	}
 	err := options.Complete(tf, cmd, []string{pcName})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

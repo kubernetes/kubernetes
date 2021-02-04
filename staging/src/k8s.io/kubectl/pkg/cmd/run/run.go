@@ -133,7 +133,7 @@ type RunOptions struct {
 
 func NewRunOptions(streams genericclioptions.IOStreams) *RunOptions {
 	return &RunOptions{
-		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		DeleteFlags: delete.NewDeleteFlags("to use to replace the resource."),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 

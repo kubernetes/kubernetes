@@ -145,7 +145,7 @@ type CreateRoleOptions struct {
 // NewCreateRoleOptions returns an initialized CreateRoleOptions instance
 func NewCreateRoleOptions(ioStreams genericclioptions.IOStreams) *CreateRoleOptions {
 	return &CreateRoleOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 
 		IOStreams: ioStreams,
 	}

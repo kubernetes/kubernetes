@@ -69,7 +69,7 @@ var (
 // NewRolloutResumeOptions returns an initialized ResumeOptions instance
 func NewRolloutResumeOptions(streams genericclioptions.IOStreams) *ResumeOptions {
 	return &ResumeOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("resumed").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("resumed").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  streams,
 	}
 }

@@ -58,7 +58,7 @@ func TestSetEnvLocal(t *testing.T) {
 
 	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	opts := NewEnvOptions(streams)
-	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
+	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme).WithShowKindOnName()
 	opts.FilenameOptions = resource.FilenameOptions{
 		Filenames: []string{"../../../testdata/controller.yaml"},
 	}
@@ -132,7 +132,7 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	outputFormat := "name"
 	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	opts := NewEnvOptions(streams)
-	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
+	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme).WithShowKindOnName()
 	opts.FilenameOptions = resource.FilenameOptions{
 		Filenames: []string{"../../../testdata/set/multi-resource-yaml.yaml"},
 	}

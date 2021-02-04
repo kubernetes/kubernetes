@@ -79,7 +79,7 @@ type PodDisruptionBudgetOpts struct {
 // NewPodDisruptionBudgetOpts creates a new *PodDisruptionBudgetOpts with sane defaults
 func NewPodDisruptionBudgetOpts(ioStreams genericclioptions.IOStreams) *PodDisruptionBudgetOpts {
 	return &PodDisruptionBudgetOpts{
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  ioStreams,
 	}
 }

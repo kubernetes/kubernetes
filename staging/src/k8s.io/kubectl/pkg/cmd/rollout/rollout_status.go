@@ -81,7 +81,7 @@ type RolloutStatusOptions struct {
 // NewRolloutStatusOptions returns an initialized RolloutStatusOptions instance
 func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *RolloutStatusOptions {
 	return &RolloutStatusOptions{
-		PrintFlags:      genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
+		PrintFlags:      genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		FilenameOptions: &resource.FilenameOptions{},
 		IOStreams:       streams,
 		Watch:           true,

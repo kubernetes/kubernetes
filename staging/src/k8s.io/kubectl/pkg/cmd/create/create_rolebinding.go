@@ -74,7 +74,7 @@ func NewRoleBindingOptions(ioStreams genericclioptions.IOStreams) *RoleBindingOp
 		Users:           []string{},
 		Groups:          []string{},
 		ServiceAccounts: []string{},
-		PrintFlags:      genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags:      genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:       ioStreams,
 	}
 }

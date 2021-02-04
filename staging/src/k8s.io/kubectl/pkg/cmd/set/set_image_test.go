@@ -65,7 +65,7 @@ func TestImageLocal(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 
 	opts := SetImageOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../testdata/controller.yaml"}},
 		Local:     true,
@@ -87,7 +87,7 @@ func TestImageLocal(t *testing.T) {
 }
 
 func TestSetImageValidation(t *testing.T) {
-	printFlags := genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme)
+	printFlags := genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithShowKindOnName()
 
 	testCases := []struct {
 		name         string
@@ -177,7 +177,7 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 
 	opts := SetImageOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../testdata/set/multi-resource-yaml.yaml"}},
 		Local:     true,

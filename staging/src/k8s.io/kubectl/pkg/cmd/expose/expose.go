@@ -112,7 +112,7 @@ type ExposeServiceOptions struct {
 func NewExposeServiceOptions(ioStreams genericclioptions.IOStreams) *ExposeServiceOptions {
 	return &ExposeServiceOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
-		PrintFlags:  genericclioptions.NewPrintFlags("exposed").WithTypeSetter(scheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("exposed").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 
 		Recorder:  genericclioptions.NoopRecorder{},
 		IOStreams: ioStreams,

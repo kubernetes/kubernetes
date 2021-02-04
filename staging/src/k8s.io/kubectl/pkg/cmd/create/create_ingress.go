@@ -128,7 +128,7 @@ type CreateIngressOptions struct {
 // NewCreateIngressOptions creates the CreateIngressOptions to be used later
 func NewCreateIngressOptions(ioStreams genericclioptions.IOStreams) *CreateIngressOptions {
 	return &CreateIngressOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  ioStreams,
 	}
 }

@@ -91,7 +91,7 @@ var (
 // NewImageOptions returns an initialized SetImageOptions instance
 func NewImageOptions(streams genericclioptions.IOStreams) *SetImageOptions {
 	return &SetImageOptions{
-		PrintFlags:  genericclioptions.NewPrintFlags("image updated").WithTypeSetter(scheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("image updated").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},

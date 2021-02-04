@@ -78,7 +78,7 @@ type CreateJobOptions struct {
 // NewCreateJobOptions initializes and returns new CreateJobOptions instance
 func NewCreateJobOptions(ioStreams genericclioptions.IOStreams) *CreateJobOptions {
 	return &CreateJobOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  ioStreams,
 	}
 }

@@ -87,7 +87,7 @@ var (
 // NewSetLastAppliedOptions takes option arguments from a CLI stream and returns it at SetLastAppliedOptions type.
 func NewSetLastAppliedOptions(ioStreams genericclioptions.IOStreams) *SetLastAppliedOptions {
 	return &SetLastAppliedOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("configured").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("configured").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  ioStreams,
 	}
 }

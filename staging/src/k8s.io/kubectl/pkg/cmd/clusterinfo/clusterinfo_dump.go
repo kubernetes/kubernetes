@@ -64,7 +64,7 @@ type ClusterInfoDumpOptions struct {
 
 func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := &ClusterInfoDumpOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("json"),
+		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("json").WithShowKindOnName(),
 
 		IOStreams: ioStreams,
 	}

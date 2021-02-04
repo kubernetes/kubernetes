@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -63,7 +63,7 @@ func TestNamePrinter(t *testing.T) {
 			"pod/bar\n"},
 	}
 
-	printFlags := NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("name")
+	printFlags := NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("name").WithShowKindOnName()
 	printer, err := printFlags.ToPrinter()
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)

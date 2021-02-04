@@ -70,7 +70,7 @@ var (
 // NewCmdRolloutPause returns a Command instance for 'rollout pause' sub command
 func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &PauseOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("paused").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("paused").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  streams,
 	}
 

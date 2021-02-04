@@ -95,7 +95,7 @@ type SetResourcesOptions struct {
 // pod templates are selected by default.
 func NewResourcesOptions(streams genericclioptions.IOStreams) *SetResourcesOptions {
 	return &SetResourcesOptions{
-		PrintFlags:  genericclioptions.NewPrintFlags("resource requirements updated").WithTypeSetter(scheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("resource requirements updated").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},

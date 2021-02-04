@@ -68,7 +68,7 @@ var (
 // NewRolloutUndoOptions returns an initialized UndoOptions instance
 func NewRolloutUndoOptions(streams genericclioptions.IOStreams) *UndoOptions {
 	return &UndoOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("rolled back").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("rolled back").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  streams,
 		ToRevision: int64(0),
 	}

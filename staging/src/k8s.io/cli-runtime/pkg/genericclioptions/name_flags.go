@@ -33,6 +33,9 @@ type NamePrintFlags struct {
 	// took place on an object, to be included in the
 	// finalized "successful" message.
 	Operation string
+	// ShowKind is a flag to decide whether the resource's
+	// kind should be printed. By default it's false.
+	ShowKind bool
 }
 
 // Complete sets NamePrintFlags operation flag from sucessTemplate
@@ -56,6 +59,7 @@ func (f *NamePrintFlags) AllowedFormats() []string {
 func (f *NamePrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, error) {
 	namePrinter := &printers.NamePrinter{
 		Operation: f.Operation,
+		ShowKind:  f.ShowKind,
 	}
 
 	outputFormat = strings.ToLower(outputFormat)
@@ -79,5 +83,6 @@ func (f *NamePrintFlags) AddFlags(c *cobra.Command) {}
 func NewNamePrintFlags(operation string) *NamePrintFlags {
 	return &NamePrintFlags{
 		Operation: operation,
+		ShowKind:  false, // by default it doesn't show kind
 	}
 }

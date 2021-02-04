@@ -108,7 +108,7 @@ func NewConfigMapOptions(ioStreams genericclioptions.IOStreams) *ConfigMapOption
 	return &ConfigMapOptions{
 		FileSources:    []string{},
 		LiteralSources: []string{},
-		PrintFlags:     genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags:     genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:      ioStreams,
 	}
 }

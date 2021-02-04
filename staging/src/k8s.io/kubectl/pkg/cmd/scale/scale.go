@@ -93,7 +93,7 @@ type ScaleOptions struct {
 
 func NewScaleOptions(ioStreams genericclioptions.IOStreams) *ScaleOptions {
 	return &ScaleOptions{
-		PrintFlags:      genericclioptions.NewPrintFlags("scaled"),
+		PrintFlags:      genericclioptions.NewPrintFlags("scaled").WithShowKindOnName(),
 		RecordFlags:     genericclioptions.NewRecordFlags(),
 		CurrentReplicas: -1,
 		Recorder:        genericclioptions.NoopRecorder{},

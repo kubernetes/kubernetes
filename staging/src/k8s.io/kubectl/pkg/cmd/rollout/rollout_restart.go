@@ -69,7 +69,7 @@ var (
 // NewRolloutRestartOptions returns an initialized RestartOptions instance
 func NewRolloutRestartOptions(streams genericclioptions.IOStreams) *RestartOptions {
 	return &RestartOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("restarted").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("restarted").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  streams,
 	}
 }

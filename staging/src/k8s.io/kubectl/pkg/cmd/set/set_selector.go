@@ -85,7 +85,7 @@ func NewSelectorOptions(streams genericclioptions.IOStreams) *SetSelectorOptions
 			WithAll(false).
 			WithLocal(false).
 			WithLatest(),
-		PrintFlags:  genericclioptions.NewPrintFlags("selector updated").WithTypeSetter(scheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("selector updated").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},

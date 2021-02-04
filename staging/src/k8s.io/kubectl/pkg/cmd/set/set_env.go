@@ -136,7 +136,7 @@ type EnvOptions struct {
 // pod templates are selected by default and allowing environment to be overwritten
 func NewEnvOptions(streams genericclioptions.IOStreams) *EnvOptions {
 	return &EnvOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("env updated").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("env updated").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 
 		ContainerSelector: "*",
 		Overwrite:         true,

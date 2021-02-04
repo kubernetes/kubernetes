@@ -120,7 +120,7 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 	opts := SetServiceAccountOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		fileNameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../testdata/set/multi-resource-yaml.yaml"}},
 		local:     true,

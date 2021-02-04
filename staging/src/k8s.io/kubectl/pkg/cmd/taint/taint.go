@@ -96,7 +96,7 @@ var (
 
 func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	options := &TaintOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("tainted").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("tainted").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  streams,
 	}
 

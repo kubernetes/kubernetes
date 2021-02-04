@@ -142,7 +142,7 @@ func NewApplyOptions(ioStreams genericclioptions.IOStreams) *ApplyOptions {
 	return &ApplyOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		DeleteFlags: delete.NewDeleteFlags("that contains the configuration to apply"),
-		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 
 		Overwrite:    true,
 		OpenAPIPatch: true,
@@ -232,6 +232,7 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	// allow for a success message operation to be specified at print time
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
+		o.PrintFlags.NamePrintFlags.ShowKind = true
 		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 		return o.PrintFlags.ToPrinter()
 	}

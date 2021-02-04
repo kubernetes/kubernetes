@@ -64,7 +64,7 @@ func TestResourcesLocal(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 
 	opts := SetResourcesOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../testdata/controller.yaml"}},
 		Local:             true,
@@ -112,7 +112,7 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 
 	opts := SetResourcesOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../testdata/set/multi-resource-yaml.yaml"}},
 		Local:             true,

@@ -86,7 +86,7 @@ type AutoscaleOptions struct {
 // NewAutoscaleOptions creates the options for autoscale
 func NewAutoscaleOptions(ioStreams genericclioptions.IOStreams) *AutoscaleOptions {
 	return &AutoscaleOptions{
-		PrintFlags:      genericclioptions.NewPrintFlags("autoscaled").WithTypeSetter(scheme.Scheme),
+		PrintFlags:      genericclioptions.NewPrintFlags("autoscaled").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		FilenameOptions: &resource.FilenameOptions{},
 		RecordFlags:     genericclioptions.NewRecordFlags(),
 		Recorder:        genericclioptions.NoopRecorder{},

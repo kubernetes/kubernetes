@@ -65,7 +65,7 @@ type RolloutHistoryOptions struct {
 // NewRolloutHistoryOptions returns an initialized RolloutHistoryOptions instance
 func NewRolloutHistoryOptions(streams genericclioptions.IOStreams) *RolloutHistoryOptions {
 	return &RolloutHistoryOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  streams,
 	}
 }

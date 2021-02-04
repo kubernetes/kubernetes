@@ -84,7 +84,7 @@ type SubjectOptions struct {
 // NewSubjectOptions returns an initialized SubjectOptions instance
 func NewSubjectOptions(streams genericclioptions.IOStreams) *SubjectOptions {
 	return &SubjectOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("subjects updated").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("subjects updated").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 
 		IOStreams: streams,
 	}

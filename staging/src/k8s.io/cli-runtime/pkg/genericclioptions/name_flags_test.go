@@ -35,6 +35,7 @@ func TestNamePrinterSupportsExpectedFormats(t *testing.T) {
 		name           string
 		outputFormat   string
 		operation      string
+		showKind       bool
 		dryRun         bool
 		expectedError  string
 		expectedOutput string
@@ -43,33 +44,45 @@ func TestNamePrinterSupportsExpectedFormats(t *testing.T) {
 		{
 			name:           "valid \"name\" output format with no operation prints resource name",
 			outputFormat:   "name",
+			showKind:       false,
+			expectedOutput: "foo",
+		},
+		{
+			name:           "valid \"kind/name\" output format with no operation prints resource name",
+			outputFormat:   "name",
+			showKind:       true,
 			expectedOutput: "pod/foo",
 		},
 		{
 			name:           "valid \"name\" output format and an operation results in a short-output (non success printer) message",
 			outputFormat:   "name",
 			operation:      "patched",
+			showKind:       true,
 			expectedOutput: "pod/foo",
 		},
 		{
 			name:          "operation and no valid \"name\" output does not match a printer",
 			operation:     "patched",
 			outputFormat:  "invalid",
+			showKind:      true,
 			dryRun:        true,
 			expectNoMatch: true,
 		},
 		{
 			name:           "operation and empty output still matches name printer",
+			showKind:       true,
 			expectedOutput: "pod/foo patched",
 			operation:      "patched",
 		},
 		{
 			name:          "no printer is matched on an invalid outputFormat",
+			showKind:      true,
 			outputFormat:  "invalid",
 			expectNoMatch: true,
 		},
 		{
 			name:          "printer should not match on any other format supported by another printer",
+			showKind:      true,
 			outputFormat:  "go-template",
 			expectNoMatch: true,
 		},
@@ -79,6 +92,7 @@ func TestNamePrinterSupportsExpectedFormats(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			printFlags := NamePrintFlags{
 				Operation: tc.operation,
+				ShowKind:  tc.showKind,
 			}
 
 			p, err := printFlags.ToPrinter(tc.outputFormat)

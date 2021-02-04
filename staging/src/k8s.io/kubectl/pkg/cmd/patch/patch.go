@@ -100,7 +100,7 @@ func NewPatchOptions(ioStreams genericclioptions.IOStreams) *PatchOptions {
 	return &PatchOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		Recorder:    genericclioptions.NoopRecorder{},
-		PrintFlags:  genericclioptions.NewPrintFlags("patched").WithTypeSetter(scheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("patched").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:   ioStreams,
 	}
 }

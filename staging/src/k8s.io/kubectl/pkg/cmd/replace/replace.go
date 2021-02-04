@@ -99,7 +99,7 @@ type ReplaceOptions struct {
 
 func NewReplaceOptions(streams genericclioptions.IOStreams) *ReplaceOptions {
 	return &ReplaceOptions{
-		PrintFlags:  genericclioptions.NewPrintFlags("replaced"),
+		PrintFlags:  genericclioptions.NewPrintFlags("replaced").WithShowKindOnName(),
 		DeleteFlags: delete.NewDeleteFlags("to use to replace the resource."),
 
 		IOStreams: streams,

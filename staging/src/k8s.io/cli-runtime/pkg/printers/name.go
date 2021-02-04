@@ -38,6 +38,9 @@ type NamePrinter struct {
 	// took place on an object, to be included in the
 	// finalized "successful" message.
 	Operation string
+	// ShowKind is a flag to decide whether the resource's
+	// kind should be printed.
+	ShowKind bool
 }
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which decodes the object
@@ -86,7 +89,7 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		}
 	}
 
-	return printObj(w, name, p.Operation, p.ShortOutput, GetObjectGroupKind(obj))
+	return printObj(w, name, p.Operation, p.ShortOutput, p.ShowKind, GetObjectGroupKind(obj))
 }
 
 func GetObjectGroupKind(obj runtime.Object) schema.GroupKind {
@@ -107,7 +110,7 @@ func GetObjectGroupKind(obj runtime.Object) schema.GroupKind {
 	return schema.GroupKind{Kind: "<unknown>"}
 }
 
-func printObj(w io.Writer, name string, operation string, shortOutput bool, groupKind schema.GroupKind) error {
+func printObj(w io.Writer, name string, operation string, shortOutput, showKind bool, groupKind schema.GroupKind) error {
 	if len(groupKind.Kind) == 0 {
 		return fmt.Errorf("missing kind for resource with name %v", name)
 	}
@@ -121,10 +124,18 @@ func printObj(w io.Writer, name string, operation string, shortOutput bool, grou
 	}
 
 	if len(groupKind.Group) == 0 {
-		fmt.Fprintf(w, "%s/%s%s\n", strings.ToLower(groupKind.Kind), name, operation)
+		if showKind {
+			fmt.Fprintf(w, "%s/%s%s\n", strings.ToLower(groupKind.Kind), name, operation)
+		} else {
+			fmt.Fprintf(w, "%s%s\n", name, operation)
+		}
 		return nil
 	}
 
-	fmt.Fprintf(w, "%s.%s/%s%s\n", strings.ToLower(groupKind.Kind), groupKind.Group, name, operation)
+	if showKind {
+		fmt.Fprintf(w, "%s.%s/%s%s\n", strings.ToLower(groupKind.Kind), groupKind.Group, name, operation)
+	} else {
+		fmt.Fprintf(w, "%s%s\n", name, operation)
+	}
 	return nil
 }

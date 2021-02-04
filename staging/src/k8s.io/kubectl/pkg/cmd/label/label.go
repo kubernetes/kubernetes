@@ -116,7 +116,7 @@ func NewLabelOptions(ioStreams genericclioptions.IOStreams) *LabelOptions {
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		Recorder:    genericclioptions.NoopRecorder{},
 
-		PrintFlags: genericclioptions.NewPrintFlags("labeled").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("labeled").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 
 		IOStreams: ioStreams,
 	}

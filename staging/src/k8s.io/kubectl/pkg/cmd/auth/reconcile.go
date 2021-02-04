@@ -79,7 +79,7 @@ var (
 func NewReconcileOptions(ioStreams genericclioptions.IOStreams) *ReconcileOptions {
 	return &ReconcileOptions{
 		FilenameOptions: &resource.FilenameOptions{},
-		PrintFlags:      genericclioptions.NewPrintFlags("reconciled").WithTypeSetter(scheme.Scheme),
+		PrintFlags:      genericclioptions.NewPrintFlags("reconciled").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:       ioStreams,
 	}
 }

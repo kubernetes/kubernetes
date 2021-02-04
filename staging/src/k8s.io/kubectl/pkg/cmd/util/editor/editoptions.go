@@ -92,7 +92,7 @@ func NewEditOptions(editMode EditMode, ioStreams genericclioptions.IOStreams) *E
 
 		EditMode: editMode,
 
-		PrintFlags: genericclioptions.NewPrintFlags("edited").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("edited").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 
 		editPrinterOptions: &editPrinterOptions{
 			// create new editor-specific PrintFlags, with all
@@ -204,6 +204,7 @@ func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Comm
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
+		o.PrintFlags.NamePrintFlags.ShowKind = true
 		return o.PrintFlags.ToPrinter()
 	}
 

@@ -82,7 +82,7 @@ type ServiceOptions struct {
 // NewServiceOptions creates a ServiceOptions struct
 func NewServiceOptions(ioStreams genericclioptions.IOStreams, serviceType corev1.ServiceType) *ServiceOptions {
 	return &ServiceOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  ioStreams,
 		Type:       serviceType,
 	}

@@ -78,7 +78,7 @@ type CreateCronJobOptions struct {
 // NewCreateCronJobOptions returns an initialized CreateCronJobOptions instance
 func NewCreateCronJobOptions(ioStreams genericclioptions.IOStreams) *CreateCronJobOptions {
 	return &CreateCronJobOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  ioStreams,
 	}
 }

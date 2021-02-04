@@ -75,7 +75,7 @@ type QuotaOpts struct {
 // NewQuotaOpts creates a new *QuotaOpts with sane defaults
 func NewQuotaOpts(ioStreams genericclioptions.IOStreams) *QuotaOpts {
 	return &QuotaOpts{
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  ioStreams,
 	}
 }

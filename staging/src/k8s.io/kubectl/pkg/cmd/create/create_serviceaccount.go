@@ -69,7 +69,7 @@ type ServiceAccountOpts struct {
 // NewServiceAccountOpts creates a new *ServiceAccountOpts with sane defaults
 func NewServiceAccountOpts(ioStreams genericclioptions.IOStreams) *ServiceAccountOpts {
 	return &ServiceAccountOpts{
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme).WithShowKindOnName(),
 		IOStreams:  ioStreams,
 	}
 }

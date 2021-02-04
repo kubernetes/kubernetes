@@ -91,7 +91,7 @@ type WaitFlags struct {
 func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *WaitFlags {
 	return &WaitFlags{
 		RESTClientGetter: restClientGetter,
-		PrintFlags:       genericclioptions.NewPrintFlags("condition met"),
+		PrintFlags:       genericclioptions.NewPrintFlags("condition met").WithShowKindOnName(),
 		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().
 			WithLabelSelector("").
 			WithFieldSelector("").
