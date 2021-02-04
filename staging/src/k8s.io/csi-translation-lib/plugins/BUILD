@@ -45,6 +45,7 @@ go_test(
         "azure_file_test.go",
         "gce_pd_test.go",
         "in_tree_volume_test.go",
+        "openstack_cinder_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
