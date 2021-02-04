@@ -163,206 +163,323 @@ func TestControllerSyncJob(t *testing.T) {
 		expectedConditionReason string
 	}{
 		"job start": {
-			2, 5, 6, false, 0,
-			nil, true, 0, 0, 0, 0,
-			2, 0, 2, 0, 0, nil, "",
+			parallelism:       2,
+			completions:       5,
+			backoffLimit:      6,
+			jobKeyForget:      true,
+			expectedCreations: 2,
+			expectedActive:    2,
 		},
 		"WQ job start": {
-			2, -1, 6, false, 0,
-			nil, true, 0, 0, 0, 0,
-			2, 0, 2, 0, 0, nil, "",
+			parallelism:       2,
+			completions:       -1,
+			backoffLimit:      6,
+			jobKeyForget:      true,
+			expectedCreations: 2,
+			expectedActive:    2,
 		},
 		"pending pods": {
-			2, 5, 6, false, 0,
-			nil, true, 2, 0, 0, 0,
-			0, 0, 2, 0, 0, nil, "",
+			parallelism:    2,
+			completions:    5,
+			backoffLimit:   6,
+			jobKeyForget:   true,
+			pendingPods:    2,
+			expectedActive: 2,
 		},
 		"correct # of pods": {
-			2, 5, 6, false, 0,
-			nil, true, 0, 2, 0, 0,
-			0, 0, 2, 0, 0, nil, "",
+			parallelism:    2,
+			completions:    5,
+			backoffLimit:   6,
+			jobKeyForget:   true,
+			activePods:     2,
+			expectedActive: 2,
 		},
 		"WQ job: correct # of pods": {
-			2, -1, 6, false, 0,
-			nil, true, 0, 2, 0, 0,
-			0, 0, 2, 0, 0, nil, "",
+			parallelism:    2,
+			completions:    -1,
+			backoffLimit:   6,
+			jobKeyForget:   true,
+			activePods:     2,
+			expectedActive: 2,
 		},
 		"too few active pods": {
-			2, 5, 6, false, 0,
-			nil, true, 0, 1, 1, 0,
-			1, 0, 2, 1, 0, nil, "",
+			parallelism:       2,
+			completions:       5,
+			backoffLimit:      6,
+			jobKeyForget:      true,
+			activePods:        1,
+			succeededPods:     1,
+			expectedCreations: 1,
+			expectedActive:    2,
+			expectedSucceeded: 1,
 		},
 		"too few active pods with a dynamic job": {
-			2, -1, 6, false, 0,
-			nil, true, 0, 1, 0, 0,
-			1, 0, 2, 0, 0, nil, "",
+			parallelism:       2,
+			completions:       -1,
+			backoffLimit:      6,
+			jobKeyForget:      true,
+			activePods:        1,
+			expectedCreations: 1,
+			expectedActive:    2,
 		},
 		"too few active pods, with controller error": {
-			2, 5, 6, false, 0,
-			fmt.Errorf("fake error"), true, 0, 1, 1, 0,
-			1, 0, 1, 1, 0, nil, "",
+			parallelism:        2,
+			completions:        5,
+			backoffLimit:       6,
+			podControllerError: fmt.Errorf("fake error"),
+			jobKeyForget:       true,
+			activePods:         1,
+			succeededPods:      1,
+			expectedCreations:  1,
+			expectedActive:     1,
+			expectedSucceeded:  1,
 		},
 		"too many active pods": {
-			2, 5, 6, false, 0,
-			nil, true, 0, 3, 0, 0,
-			0, 1, 2, 0, 0, nil, "",
+			parallelism:       2,
+			completions:       5,
+			backoffLimit:      6,
+			jobKeyForget:      true,
+			activePods:        3,
+			expectedDeletions: 1,
+			expectedActive:    2,
 		},
 		"too many active pods, with controller error": {
-			2, 5, 6, false, 0,
-			fmt.Errorf("fake error"), true, 0, 3, 0, 0,
-			0, 1, 3, 0, 0, nil, "",
+			parallelism:        2,
+			completions:        5,
+			backoffLimit:       6,
+			podControllerError: fmt.Errorf("fake error"),
+			jobKeyForget:       true,
+			activePods:         3,
+			expectedDeletions:  1,
+			expectedActive:     3,
 		},
 		"failed + succeed pods: reset backoff delay": {
-			2, 5, 6, false, 0,
-			fmt.Errorf("fake error"), true, 0, 1, 1, 1,
-			1, 0, 1, 1, 1, nil, "",
+			parallelism:        2,
+			completions:        5,
+			backoffLimit:       6,
+			podControllerError: fmt.Errorf("fake error"),
+			jobKeyForget:       true,
+			activePods:         1,
+			succeededPods:      1,
+			failedPods:         1,
+			expectedCreations:  1,
+			expectedActive:     1,
+			expectedSucceeded:  1,
+			expectedFailed:     1,
 		},
-		"only new failed pod": {
-			2, 5, 6, false, 0,
-			fmt.Errorf("fake error"), false, 0, 1, 0, 1,
-			1, 0, 1, 0, 1, nil, "",
+		"new failed pod": {
+			parallelism:       2,
+			completions:       5,
+			backoffLimit:      6,
+			activePods:        1,
+			failedPods:        1,
+			expectedCreations: 1,
+			expectedActive:    2,
+			expectedFailed:    1,
+		},
+		"only new failed pod with controller error": {
+			parallelism:        2,
+			completions:        5,
+			backoffLimit:       6,
+			podControllerError: fmt.Errorf("fake error"),
+			activePods:         1,
+			failedPods:         1,
+			expectedCreations:  1,
+			expectedActive:     1,
+			expectedFailed:     1,
 		},
 		"job finish": {
-			2, 5, 6, false, 0,
-			nil, true, 0, 0, 5, 0,
-			0, 0, 0, 5, 0, nil, "",
+			parallelism:       2,
+			completions:       5,
+			backoffLimit:      6,
+			jobKeyForget:      true,
+			succeededPods:     5,
+			expectedSucceeded: 5,
 		},
 		"WQ job finishing": {
-			2, -1, 6, false, 0,
-			nil, true, 0, 1, 1, 0,
-			0, 0, 1, 1, 0, nil, "",
+			parallelism:       2,
+			completions:       -1,
+			backoffLimit:      6,
+			jobKeyForget:      true,
+			activePods:        1,
+			succeededPods:     1,
+			expectedActive:    1,
+			expectedSucceeded: 1,
 		},
 		"WQ job all finished": {
-			2, -1, 6, false, 0,
-			nil, true, 0, 0, 2, 0,
-			0, 0, 0, 2, 0, &jobConditionComplete, "",
+			parallelism:       2,
+			completions:       -1,
+			backoffLimit:      6,
+			jobKeyForget:      true,
+			succeededPods:     2,
+			expectedSucceeded: 2,
+			expectedCondition: &jobConditionComplete,
 		},
 		"WQ job all finished despite one failure": {
-			2, -1, 6, false, 0,
-			nil, true, 0, 0, 1, 1,
-			0, 0, 0, 1, 1, &jobConditionComplete, "",
+			parallelism:       2,
+			completions:       -1,
+			backoffLimit:      6,
+			jobKeyForget:      true,
+			succeededPods:     1,
+			failedPods:        1,
+			expectedSucceeded: 1,
+			expectedFailed:    1,
+			expectedCondition: &jobConditionComplete,
 		},
 		"more active pods than completions": {
-			2, 5, 6, false, 0,
-			nil, true, 0, 10, 0, 0,
-			0, 8, 2, 0, 0, nil, "",
+			parallelism:       2,
+			completions:       5,
+			backoffLimit:      6,
+			jobKeyForget:      true,
+			activePods:        10,
+			expectedDeletions: 8,
+			expectedActive:    2,
 		},
 		"status change": {
-			2, 5, 6, false, 0,
-			nil, true, 0, 2, 2, 0,
-			0, 0, 2, 2, 0, nil, "",
+			parallelism:       2,
+			completions:       5,
+			backoffLimit:      6,
+			jobKeyForget:      true,
+			activePods:        2,
+			succeededPods:     2,
+			expectedActive:    2,
+			expectedSucceeded: 2,
 		},
 		"deleting job": {
-			2, 5, 6, true, 0,
-			nil, true, 1, 1, 1, 0,
-			0, 0, 2, 1, 0, nil, "",
+			parallelism:       2,
+			completions:       5,
+			backoffLimit:      6,
+			deleting:          true,
+			jobKeyForget:      true,
+			pendingPods:       1,
+			activePods:        1,
+			succeededPods:     1,
+			expectedActive:    2,
+			expectedSucceeded: 1,
 		},
 		"limited pods": {
-			100, 200, 6, false, 10,
-			nil, true, 0, 0, 0, 0,
-			10, 0, 10, 0, 0, nil, "",
+			parallelism:       100,
+			completions:       200,
+			backoffLimit:      6,
+			podLimit:          10,
+			jobKeyForget:      true,
+			expectedCreations: 10,
+			expectedActive:    10,
 		},
 		"too many job failures": {
-			2, 5, 0, true, 0,
-			nil, true, 0, 0, 0, 1,
-			0, 0, 0, 0, 1, &jobConditionFailed, "BackoffLimitExceeded",
+			parallelism:             2,
+			completions:             5,
+			deleting:                true,
+			jobKeyForget:            true,
+			failedPods:              1,
+			expectedFailed:          1,
+			expectedCondition:       &jobConditionFailed,
+			expectedConditionReason: "BackoffLimitExceeded",
 		},
 	}
 
 	for name, tc := range testCases {
-		// job manager setup
-		clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-		manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
-		fakePodControl := controller.FakePodControl{Err: tc.podControllerError, CreateLimit: tc.podLimit}
-		manager.podControl = &fakePodControl
-		manager.podStoreSynced = alwaysReady
-		manager.jobStoreSynced = alwaysReady
-		var actual *batch.Job
-		manager.updateHandler = func(job *batch.Job) error {
-			actual = job
-			return nil
-		}
+		t.Run(name, func(t *testing.T) {
+			// job manager setup
+			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+			manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+			fakePodControl := controller.FakePodControl{Err: tc.podControllerError, CreateLimit: tc.podLimit}
+			manager.podControl = &fakePodControl
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+			var actual *batch.Job
+			manager.updateHandler = func(job *batch.Job) error {
+				actual = job
+				return nil
+			}
 
-		// job & pods setup
-		job := newJob(tc.parallelism, tc.completions, tc.backoffLimit)
-		if tc.deleting {
-			now := metav1.Now()
-			job.DeletionTimestamp = &now
-		}
-		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
-		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
-		setPodsStatuses(podIndexer, job, tc.pendingPods, tc.activePods, tc.succeededPods, tc.failedPods)
+			// job & pods setup
+			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit)
+			if tc.deleting {
+				now := metav1.Now()
+				job.DeletionTimestamp = &now
+			}
+			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
+			setPodsStatuses(podIndexer, job, tc.pendingPods, tc.activePods, tc.succeededPods, tc.failedPods)
 
-		// run
-		forget, err := manager.syncJob(testutil.GetKey(job, t))
+			// run
+			forget, err := manager.syncJob(testutil.GetKey(job, t))
 
-		// We need requeue syncJob task if podController error
-		if tc.podControllerError != nil {
-			if err == nil {
-				t.Errorf("%s: Syncing jobs would return error when podController exception", name)
+			// We need requeue syncJob task if podController error
+			if tc.podControllerError != nil {
+				if err == nil {
+					t.Error("Syncing jobs expected to return error on podControl exception")
+				}
+			} else if tc.failedPods > 0 && tc.expectedCondition == nil {
+				if err == nil {
+					t.Error("Syncing jobs expected to return error when there are new failed pods and Job didn't finish")
+				}
+			} else if tc.podLimit != 0 && fakePodControl.CreateCallCount > tc.podLimit {
+				if err == nil {
+					t.Error("Syncing jobs expected to return error when reached the podControl limit")
+				}
+			} else if err != nil {
+				t.Errorf("Unexpected error when syncing jobs: %v", err)
 			}
-		} else {
-			if err != nil && (tc.podLimit == 0 || fakePodControl.CreateCallCount < tc.podLimit) {
-				t.Errorf("%s: unexpected error when syncing jobs %v", name, err)
+			if forget != tc.jobKeyForget {
+				t.Errorf("Unexpected forget value. Expected %v, saw %v\n", tc.jobKeyForget, forget)
 			}
-		}
-		if forget != tc.jobKeyForget {
-			t.Errorf("%s: unexpected forget value. Expected %v, saw %v\n", name, tc.jobKeyForget, forget)
-		}
-		// validate created/deleted pods
-		if int32(len(fakePodControl.Templates)) != tc.expectedCreations {
-			t.Errorf("%s: unexpected number of creates.  Expected %d, saw %d\n", name, tc.expectedCreations, len(fakePodControl.Templates))
-		}
-		if int32(len(fakePodControl.DeletePodName)) != tc.expectedDeletions {
-			t.Errorf("%s: unexpected number of deletes.  Expected %d, saw %d\n", name, tc.expectedDeletions, len(fakePodControl.DeletePodName))
-		}
-		// Each create should have an accompanying ControllerRef.
-		if len(fakePodControl.ControllerRefs) != int(tc.expectedCreations) {
-			t.Errorf("%s: unexpected number of ControllerRefs.  Expected %d, saw %d\n", name, tc.expectedCreations, len(fakePodControl.ControllerRefs))
-		}
-		// Make sure the ControllerRefs are correct.
-		for _, controllerRef := range fakePodControl.ControllerRefs {
-			if got, want := controllerRef.APIVersion, "batch/v1"; got != want {
-				t.Errorf("controllerRef.APIVersion = %q, want %q", got, want)
+			// validate created/deleted pods
+			if int32(len(fakePodControl.Templates)) != tc.expectedCreations {
+				t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", tc.expectedCreations, len(fakePodControl.Templates))
 			}
-			if got, want := controllerRef.Kind, "Job"; got != want {
-				t.Errorf("controllerRef.Kind = %q, want %q", got, want)
+			if int32(len(fakePodControl.DeletePodName)) != tc.expectedDeletions {
+				t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", tc.expectedDeletions, len(fakePodControl.DeletePodName))
 			}
-			if got, want := controllerRef.Name, job.Name; got != want {
-				t.Errorf("controllerRef.Name = %q, want %q", got, want)
+			// Each create should have an accompanying ControllerRef.
+			if len(fakePodControl.ControllerRefs) != int(tc.expectedCreations) {
+				t.Errorf("Unexpected number of ControllerRefs.  Expected %d, saw %d\n", tc.expectedCreations, len(fakePodControl.ControllerRefs))
 			}
-			if got, want := controllerRef.UID, job.UID; got != want {
-				t.Errorf("controllerRef.UID = %q, want %q", got, want)
+			// Make sure the ControllerRefs are correct.
+			for _, controllerRef := range fakePodControl.ControllerRefs {
+				if got, want := controllerRef.APIVersion, "batch/v1"; got != want {
+					t.Errorf("controllerRef.APIVersion = %q, want %q", got, want)
+				}
+				if got, want := controllerRef.Kind, "Job"; got != want {
+					t.Errorf("controllerRef.Kind = %q, want %q", got, want)
+				}
+				if got, want := controllerRef.Name, job.Name; got != want {
+					t.Errorf("controllerRef.Name = %q, want %q", got, want)
+				}
+				if got, want := controllerRef.UID, job.UID; got != want {
+					t.Errorf("controllerRef.UID = %q, want %q", got, want)
+				}
+				if controllerRef.Controller == nil || *controllerRef.Controller != true {
+					t.Errorf("controllerRef.Controller is not set to true")
+				}
 			}
-			if controllerRef.Controller == nil || *controllerRef.Controller != true {
-				t.Errorf("controllerRef.Controller is not set to true")
+			// validate status
+			if actual.Status.Active != tc.expectedActive {
+				t.Errorf("Unexpected number of active pods.  Expected %d, saw %d\n", tc.expectedActive, actual.Status.Active)
 			}
-		}
-		// validate status
-		if actual.Status.Active != tc.expectedActive {
-			t.Errorf("%s: unexpected number of active pods.  Expected %d, saw %d\n", name, tc.expectedActive, actual.Status.Active)
-		}
-		if actual.Status.Succeeded != tc.expectedSucceeded {
-			t.Errorf("%s: unexpected number of succeeded pods.  Expected %d, saw %d\n", name, tc.expectedSucceeded, actual.Status.Succeeded)
-		}
-		if actual.Status.Failed != tc.expectedFailed {
-			t.Errorf("%s: unexpected number of failed pods.  Expected %d, saw %d\n", name, tc.expectedFailed, actual.Status.Failed)
-		}
-		if actual.Status.StartTime == nil {
-			t.Errorf("%s: .status.startTime was not set", name)
-		}
-		// validate conditions
-		if tc.expectedCondition != nil && !getCondition(actual, *tc.expectedCondition, tc.expectedConditionReason) {
-			t.Errorf("%s: expected completion condition.  Got %#v", name, actual.Status.Conditions)
-		}
-		// validate slow start
-		expectedLimit := 0
-		for pass := uint8(0); expectedLimit <= tc.podLimit; pass++ {
-			expectedLimit += controller.SlowStartInitialBatchSize << pass
-		}
-		if tc.podLimit > 0 && fakePodControl.CreateCallCount > expectedLimit {
-			t.Errorf("%s: Unexpected number of create calls.  Expected <= %d, saw %d\n", name, fakePodControl.CreateLimit*2, fakePodControl.CreateCallCount)
-		}
+			if actual.Status.Succeeded != tc.expectedSucceeded {
+				t.Errorf("Unexpected number of succeeded pods.  Expected %d, saw %d\n", tc.expectedSucceeded, actual.Status.Succeeded)
+			}
+			if actual.Status.Failed != tc.expectedFailed {
+				t.Errorf("Unexpected number of failed pods.  Expected %d, saw %d\n", tc.expectedFailed, actual.Status.Failed)
+			}
+			if actual.Status.StartTime == nil {
+				t.Error("Missing .status.startTime")
+			}
+			// validate conditions
+			if tc.expectedCondition != nil && !getCondition(actual, *tc.expectedCondition, tc.expectedConditionReason) {
+				t.Errorf("Expected completion condition.  Got %#v", actual.Status.Conditions)
+			}
+			// validate slow start
+			expectedLimit := 0
+			for pass := uint8(0); expectedLimit <= tc.podLimit; pass++ {
+				expectedLimit += controller.SlowStartInitialBatchSize << pass
+			}
+			if tc.podLimit > 0 && fakePodControl.CreateCallCount > expectedLimit {
+				t.Errorf("Unexpected number of create calls.  Expected <= %d, saw %d\n", fakePodControl.CreateLimit*2, fakePodControl.CreateCallCount)
+			}
+		})
 	}
 }
 
@@ -389,82 +506,109 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		expectedConditionReason string
 	}{
 		"activeDeadlineSeconds less than single pod execution": {
-			1, 1, 10, 15, 6,
-			1, 0, 0,
-			true, 1, 0, 0, 1, "DeadlineExceeded",
+			parallelism:             1,
+			completions:             1,
+			activeDeadlineSeconds:   10,
+			startTime:               15,
+			backoffLimit:            6,
+			activePods:              1,
+			expectedForGetKey:       true,
+			expectedDeletions:       1,
+			expectedFailed:          1,
+			expectedConditionReason: "DeadlineExceeded",
 		},
 		"activeDeadlineSeconds bigger than single pod execution": {
-			1, 2, 10, 15, 6,
-			1, 1, 0,
-			true, 1, 0, 1, 1, "DeadlineExceeded",
+			parallelism:             1,
+			completions:             2,
+			activeDeadlineSeconds:   10,
+			startTime:               15,
+			backoffLimit:            6,
+			activePods:              1,
+			succeededPods:           1,
+			expectedForGetKey:       true,
+			expectedDeletions:       1,
+			expectedSucceeded:       1,
+			expectedFailed:          1,
+			expectedConditionReason: "DeadlineExceeded",
 		},
 		"activeDeadlineSeconds times-out before any pod starts": {
-			1, 1, 10, 10, 6,
-			0, 0, 0,
-			true, 0, 0, 0, 0, "DeadlineExceeded",
+			parallelism:             1,
+			completions:             1,
+			activeDeadlineSeconds:   10,
+			startTime:               10,
+			backoffLimit:            6,
+			expectedForGetKey:       true,
+			expectedConditionReason: "DeadlineExceeded",
 		},
 		"activeDeadlineSeconds with backofflimit reach": {
-			1, 1, 1, 10, 0,
-			0, 0, 1,
-			true, 0, 0, 0, 1, "BackoffLimitExceeded",
+			parallelism:             1,
+			completions:             1,
+			activeDeadlineSeconds:   1,
+			startTime:               10,
+			failedPods:              1,
+			expectedForGetKey:       true,
+			expectedFailed:          1,
+			expectedConditionReason: "BackoffLimitExceeded",
 		},
 	}
 
 	for name, tc := range testCases {
-		// job manager setup
-		clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-		manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
-		fakePodControl := controller.FakePodControl{}
-		manager.podControl = &fakePodControl
-		manager.podStoreSynced = alwaysReady
-		manager.jobStoreSynced = alwaysReady
-		var actual *batch.Job
-		manager.updateHandler = func(job *batch.Job) error {
-			actual = job
-			return nil
-		}
+		t.Run(name, func(t *testing.T) {
+			// job manager setup
+			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+			manager, sharedInformerFactory := newControllerFromClient(clientSet, controller.NoResyncPeriodFunc)
+			fakePodControl := controller.FakePodControl{}
+			manager.podControl = &fakePodControl
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+			var actual *batch.Job
+			manager.updateHandler = func(job *batch.Job) error {
+				actual = job
+				return nil
+			}
 
-		// job & pods setup
-		job := newJob(tc.parallelism, tc.completions, tc.backoffLimit)
-		job.Spec.ActiveDeadlineSeconds = &tc.activeDeadlineSeconds
-		start := metav1.Unix(metav1.Now().Time.Unix()-tc.startTime, 0)
-		job.Status.StartTime = &start
-		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
-		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
-		setPodsStatuses(podIndexer, job, 0, tc.activePods, tc.succeededPods, tc.failedPods)
+			// job & pods setup
+			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit)
+			job.Spec.ActiveDeadlineSeconds = &tc.activeDeadlineSeconds
+			start := metav1.Unix(metav1.Now().Time.Unix()-tc.startTime, 0)
+			job.Status.StartTime = &start
+			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
+			setPodsStatuses(podIndexer, job, 0, tc.activePods, tc.succeededPods, tc.failedPods)
 
-		// run
-		forget, err := manager.syncJob(testutil.GetKey(job, t))
-		if err != nil {
-			t.Errorf("%s: unexpected error when syncing jobs %v", name, err)
-		}
-		if forget != tc.expectedForGetKey {
-			t.Errorf("%s: unexpected forget value. Expected %v, saw %v\n", name, tc.expectedForGetKey, forget)
-		}
-		// validate created/deleted pods
-		if int32(len(fakePodControl.Templates)) != 0 {
-			t.Errorf("%s: unexpected number of creates.  Expected 0, saw %d\n", name, len(fakePodControl.Templates))
-		}
-		if int32(len(fakePodControl.DeletePodName)) != tc.expectedDeletions {
-			t.Errorf("%s: unexpected number of deletes.  Expected %d, saw %d\n", name, tc.expectedDeletions, len(fakePodControl.DeletePodName))
-		}
-		// validate status
-		if actual.Status.Active != tc.expectedActive {
-			t.Errorf("%s: unexpected number of active pods.  Expected %d, saw %d\n", name, tc.expectedActive, actual.Status.Active)
-		}
-		if actual.Status.Succeeded != tc.expectedSucceeded {
-			t.Errorf("%s: unexpected number of succeeded pods.  Expected %d, saw %d\n", name, tc.expectedSucceeded, actual.Status.Succeeded)
-		}
-		if actual.Status.Failed != tc.expectedFailed {
-			t.Errorf("%s: unexpected number of failed pods.  Expected %d, saw %d\n", name, tc.expectedFailed, actual.Status.Failed)
-		}
-		if actual.Status.StartTime == nil {
-			t.Errorf("%s: .status.startTime was not set", name)
-		}
-		// validate conditions
-		if !getCondition(actual, batch.JobFailed, tc.expectedConditionReason) {
-			t.Errorf("%s: expected fail condition.  Got %#v", name, actual.Status.Conditions)
-		}
+			// run
+			forget, err := manager.syncJob(testutil.GetKey(job, t))
+			if err != nil {
+				t.Errorf("Unexpected error when syncing jobs %v", err)
+			}
+			if forget != tc.expectedForGetKey {
+				t.Errorf("Unexpected forget value. Expected %v, saw %v\n", tc.expectedForGetKey, forget)
+			}
+			// validate created/deleted pods
+			if int32(len(fakePodControl.Templates)) != 0 {
+				t.Errorf("Unexpected number of creates.  Expected 0, saw %d\n", len(fakePodControl.Templates))
+			}
+			if int32(len(fakePodControl.DeletePodName)) != tc.expectedDeletions {
+				t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", tc.expectedDeletions, len(fakePodControl.DeletePodName))
+			}
+			// validate status
+			if actual.Status.Active != tc.expectedActive {
+				t.Errorf("Unexpected number of active pods.  Expected %d, saw %d\n", tc.expectedActive, actual.Status.Active)
+			}
+			if actual.Status.Succeeded != tc.expectedSucceeded {
+				t.Errorf("Unexpected number of succeeded pods.  Expected %d, saw %d\n", tc.expectedSucceeded, actual.Status.Succeeded)
+			}
+			if actual.Status.Failed != tc.expectedFailed {
+				t.Errorf("Unexpected number of failed pods.  Expected %d, saw %d\n", tc.expectedFailed, actual.Status.Failed)
+			}
+			if actual.Status.StartTime == nil {
+				t.Error("Missing .status.startTime")
+			}
+			// validate conditions
+			if !getCondition(actual, batch.JobFailed, tc.expectedConditionReason) {
+				t.Errorf("Expected fail condition.  Got %#v", actual.Status.Conditions)
+			}
+		})
 	}
 }
 
