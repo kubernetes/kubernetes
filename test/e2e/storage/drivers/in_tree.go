@@ -1416,6 +1416,7 @@ func InitVSphereDriver() storageframework.TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
+				"ntfs",
 			),
 			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[storageframework.Capability]bool{
