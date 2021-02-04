@@ -158,8 +158,6 @@ func namespaceLifecycleSetup(t *testing.T) (framework.CloseFunc, *namespace.Name
 		informers.Core().V1().Namespaces(),
 		10*time.Hour,
 		corev1.FinalizerKubernetes)
-	if err != nil {
-		t.Fatalf("error creating Deployment controller: %v", err)
-	}
+
 	return closeFn, controller, informers, clientSet, dynamic.NewForConfigOrDie(&config)
 }
