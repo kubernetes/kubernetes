@@ -21,7 +21,7 @@ import (
 	"io"
 	"sort"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/cli-runtime/pkg/printers"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
@@ -36,6 +36,7 @@ var (
 	PodColumns      = []string{"NAME", "CPU(cores)", "MEMORY(bytes)"}
 	NamespaceColumn = "NAMESPACE"
 	PodColumn       = "POD"
+	HostColumn      = "NODE"
 )
 
 type ResourceMetricsInfo struct {
@@ -190,7 +191,7 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 	return nil
 }
 
-func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool, noHeaders bool, sortBy string) error {
+func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool, noHeaders bool, sortBy string, pods *v1.PodList) error {
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -200,6 +201,9 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 		if withNamespace {
 			printValue(w, NamespaceColumn)
 		}
+		if len(pods.Items) > 0 {
+			printValue(w, HostColumn)
+		}
 		if printContainers {
 			printValue(w, PodColumn)
 		}
@@ -207,16 +211,25 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 	}
 
 	sort.Sort(NewPodMetricsSorter(metrics, withNamespace, sortBy))
-
+	podMap := createPodMap(pods)
 	for _, m := range metrics {
+		pod, ok := podMap[m.Name]
 		if printContainers {
 			sort.Sort(NewContainerMetricsSorter(m.Containers, sortBy))
-			printSinglePodContainerMetrics(w, &m, withNamespace)
+			printSinglePodContainerMetrics(w, &m, withNamespace, pod, ok)
 		} else {
-			printSinglePodMetrics(w, &m, withNamespace)
+			printSinglePodMetrics(w, &m, withNamespace, pod, ok)
 		}
 	}
 	return nil
+}
+
+func createPodMap(pods *v1.PodList) (podMap map[string]v1.Pod) {
+	podMap = make(map[string]v1.Pod)
+	for _, pod := range pods.Items {
+		podMap[pod.Name] = pod
+	}
+	return podMap
 }
 
 func printColumnNames(out io.Writer, names []string) {
@@ -226,10 +239,13 @@ func printColumnNames(out io.Writer, names []string) {
 	fmt.Fprint(out, "\n")
 }
 
-func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool) {
+func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool, pod v1.Pod, podExists bool) {
 	podMetrics := getPodMetrics(m)
 	if withNamespace {
 		printValue(out, m.Namespace)
+	}
+	if podExists {
+		printValue(out, pod.Spec.NodeName)
 	}
 	printMetricsLine(out, &ResourceMetricsInfo{
 		Name:      m.Name,
@@ -238,10 +254,13 @@ func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespac
 	})
 }
 
-func printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool) {
+func printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool, pod v1.Pod, podExists bool) {
 	for _, c := range m.Containers {
 		if withNamespace {
 			printValue(out, m.Namespace)
+		}
+		if podExists {
+			printValue(out, pod.Spec.NodeName)
 		}
 		printValue(out, m.Name)
 		printMetricsLine(out, &ResourceMetricsInfo{

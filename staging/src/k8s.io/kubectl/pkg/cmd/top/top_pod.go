@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/discovery"
@@ -49,6 +49,7 @@ type TopPodOptions struct {
 	PrintContainers    bool
 	NoHeaders          bool
 	UseProtocolBuffers bool
+	NodeName           bool
 
 	PodClient       corev1client.PodsGetter
 	Printer         *metricsutil.TopCmdPrinter
@@ -80,7 +81,10 @@ var (
 		kubectl top pod POD_NAME --containers
 
 		# Show metrics for the pods defined by label name=myLabel
-		kubectl top pod -l name=myLabel`))
+		kubectl top pod -l name=myLabel
+		
+		# Show NodeHame information alongside pod
+		kubectl top pod --node-name`))
 )
 
 func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions.IOStreams) *cobra.Command {
@@ -164,6 +168,8 @@ func (o *TopPodOptions) Validate() error {
 
 func (o TopPodOptions) RunTopPod() error {
 	var err error
+	var pods *v1.PodList = new(v1.PodList)
+
 	selector := labels.Everything()
 	if len(o.Selector) > 0 {
 		selector, err = labels.Parse(o.Selector)
@@ -204,7 +210,16 @@ func (o TopPodOptions) RunTopPod() error {
 		}
 	}
 
-	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy)
+	// check if user wants host information. Get pods from core client to merge with results
+	if o.NodeName == true {
+		pods, err = getPods(o, selector)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, pods)
 }
 
 func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, selector labels.Selector) (*metricsapi.PodMetricsList, error) {
@@ -271,4 +286,18 @@ func checkPodAge(pod *v1.Pod) error {
 		klog.V(2).Infof("Metrics not yet available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
 		return nil
 	}
+}
+
+func getPods(o TopPodOptions, selector labels.Selector) (pods *v1.PodList, err error) {
+	ns := metav1.NamespaceAll
+	if !o.AllNamespaces {
+		ns = o.Namespace
+	}
+	pods, err = o.PodClient.Pods(ns).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
+	if err != nil {
+		return pods, err
+	}
+	return pods, err
 }
