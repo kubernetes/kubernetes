@@ -347,7 +347,7 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 }
 
 // Creates a volume with accessMode ReadWriteMany
-// Populates desiredStateOfWorld cache with two ode/volume/pod tuples pointing to the created volume
+// Populates desiredStateOfWorld cache with two node/volume/pod tuples pointing to the created volume
 // Calls Run()
 // Verifies there are two attach calls and no detach calls.
 // Deletes the first node/volume/pod tuple from desiredStateOfWorld cache without first marking the node/volume as unmounted.
@@ -536,7 +536,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 // Creates a volume with accessMode ReadWriteOnce
 // First create a pod which will try to attach the volume to the a node named "uncertain-node". The attach call for this node will
 // fail for timeout, but the volume will be actually attached to the node after the call.
-// Secondly, delete the this pod.
+// Secondly, delete this pod.
 // Lastly, create a pod scheduled to a normal node which will trigger attach volume to the node. The attach should return successfully.
 func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing.T) {
 	// Arrange
@@ -577,9 +577,9 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	}
 
 	time.Sleep(1 * time.Second)
-	// Volume is added to asw. Because attach operation fails, volume should not reported as attached to the node.
+	// Volume is added to asw. Because attach operation fails, volume should not be reported as attached to the node.
 	waitForVolumeAddedToNode(t, generatedVolumeName, nodeName1, asw)
-	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, true, asw)
+	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
 	verifyVolumeReportedAsAttachedToNode(t, generatedVolumeName, nodeName1, true, asw)
 
 	// When volume is added to the node, it is set to mounted by default. Then the status will be updated by checking node status VolumeInUse.
@@ -596,7 +596,7 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
 	}
 	waitForVolumeAttachedToNode(t, generatedVolumeName, nodeName2, asw)
-	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, true, asw)
+	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, cache.AttachStateAttached, asw)
 
 }
 
@@ -643,9 +643,9 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
 	}
 
-	// Volume is added to asw. Because attach operation fails, volume should not reported as attached to the node.
+	// Volume is added to asw. Because attach operation fails, volume should not be reported as attached to the node.
 	waitForVolumeAddedToNode(t, generatedVolumeName, nodeName1, asw)
-	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, false, asw)
+	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateUncertain, asw)
 	verifyVolumeReportedAsAttachedToNode(t, generatedVolumeName, nodeName1, false, asw)
 
 	// When volume is added to the node, it is set to mounted by default. Then the status will be updated by checking node status VolumeInUse.
@@ -662,7 +662,7 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
 	}
 	waitForVolumeAttachedToNode(t, generatedVolumeName, nodeName2, asw)
-	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, true, asw)
+	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, cache.AttachStateAttached, asw)
 
 }
 
@@ -1048,7 +1048,8 @@ func waitForVolumeAttachedToNode(
 	err := retryWithExponentialBackOff(
 		time.Duration(500*time.Millisecond),
 		func() (bool, error) {
-			if asw.IsVolumeAttachedToNode(volumeName, nodeName) {
+			attachState := asw.GetAttachState(volumeName, nodeName)
+			if attachState == cache.AttachStateAttached {
 				return true, nil
 			}
 			t.Logf(
@@ -1060,7 +1061,8 @@ func waitForVolumeAttachedToNode(
 		},
 	)
 
-	if err != nil && !asw.IsVolumeAttachedToNode(volumeName, nodeName) {
+	attachState := asw.GetAttachState(volumeName, nodeName)
+	if err != nil && attachState != cache.AttachStateAttached {
 		t.Fatalf(
 			"Volume <%v> is not attached to node  <%v>.",
 			volumeName,
@@ -1141,19 +1143,17 @@ func verifyVolumeAttachedToNode(
 	t *testing.T,
 	volumeName v1.UniqueVolumeName,
 	nodeName k8stypes.NodeName,
-	isAttached bool,
+	expectedAttachState cache.AttachState,
 	asw cache.ActualStateOfWorld,
 ) {
-	result := asw.IsVolumeAttachedToNode(volumeName, nodeName)
-	if result == isAttached {
-		return
+	attachState := asw.GetAttachState(volumeName, nodeName)
+	if attachState != expectedAttachState {
+		t.Fatalf("Check volume <%v> is attached to node <%v>, got %v, expected %v",
+			volumeName,
+			nodeName,
+			attachState,
+			expectedAttachState)
 	}
-	t.Fatalf("Check volume <%v> is attached to node <%v>, got %v, expected %v",
-		volumeName,
-		nodeName,
-		result,
-		isAttached)
-
 }
 
 func verifyVolumeReportedAsAttachedToNode(

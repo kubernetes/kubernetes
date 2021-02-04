@@ -96,10 +96,13 @@ type ActualStateOfWorld interface {
 	// nodes, the volume is also deleted.
 	DeleteVolumeNode(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
 
-	// IsVolumeAttachedToNode returns true if the specified volume/node combo exists
-	// in the underlying store indicating the specified volume is attached to
-	// the specified node.
-	IsVolumeAttachedToNode(volumeName v1.UniqueVolumeName, nodeName types.NodeName) bool
+	// GetAttachState returns the attach state for the given volume-node
+	// combination.
+	// Returns AttachStateAttached if the specified volume/node combo exists in
+	// the underlying store indicating the specified volume is attached to the
+	// specified node, AttachStateDetached if the combo does not exist, or
+	// AttachStateUncertain if the attached state is marked as uncertain.
+	GetAttachState(volumeName v1.UniqueVolumeName, nodeName types.NodeName) AttachState
 
 	// GetAttachedVolumes generates and returns a list of volumes/node pairs
 	// reflecting which volumes might attached to which nodes based on the
@@ -151,6 +154,31 @@ type AttachedVolume struct {
 	// was previously set to zero (other wise its value remains the same).
 	// It is reset to zero on ResetDetachRequestTime(...) calls.
 	DetachRequestedTime time.Time
+}
+
+// AttachState represents the attach state of a volume to a node known to the
+// Actual State of World.
+// This type is used as external representation of attach state (specifically
+// as the return type of GetAttachState only); the state is represented
+// differently in the internal cache implementation.
+type AttachState int
+
+const (
+	// AttachStateAttached represents the state in which the volume is attached to
+	// the node.
+	AttachStateAttached AttachState = iota
+
+	// AttachStateUncertain represents the state in which the Actual State of World
+	// does not know whether the volume is attached to the node.
+	AttachStateUncertain
+
+	// AttachStateDetached represents the state in which the volume is not
+	// attached to the node.
+	AttachStateDetached
+)
+
+func (s AttachState) String() string {
+	return []string{"Attached", "Uncertain", "Detached"}[s]
 }
 
 // NewActualStateOfWorld returns a new instance of ActualStateOfWorld.
@@ -530,19 +558,22 @@ func (asw *actualStateOfWorld) DeleteVolumeNode(
 	asw.removeVolumeFromReportAsAttached(volumeName, nodeName)
 }
 
-func (asw *actualStateOfWorld) IsVolumeAttachedToNode(
-	volumeName v1.UniqueVolumeName, nodeName types.NodeName) bool {
+func (asw *actualStateOfWorld) GetAttachState(
+	volumeName v1.UniqueVolumeName, nodeName types.NodeName) AttachState {
 	asw.RLock()
 	defer asw.RUnlock()
 
 	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
 	if volumeExists {
 		if node, nodeExists := volumeObj.nodesAttachedTo[nodeName]; nodeExists {
-			return node.attachedConfirmed
+			if node.attachedConfirmed {
+				return AttachStateAttached
+			}
+			return AttachStateUncertain
 		}
 	}
 
-	return false
+	return AttachStateDetached
 }
 
 func (asw *actualStateOfWorld) GetAttachedVolumes() []AttachedVolume {
