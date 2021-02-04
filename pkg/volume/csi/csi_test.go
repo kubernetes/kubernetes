@@ -60,6 +60,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 		shouldFail                      bool
 		disableFSGroupPolicyFeatureGate bool
 		driverSpec                      *storage.CSIDriverSpec
+		watchTimeout                    time.Duration
 	}{
 		{
 			name:     "PersistentVolume",
@@ -396,7 +397,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			}
 
 			if devMounter != nil {
-				csiDevMounter := getCsiAttacherFromDeviceMounter(devMounter)
+				csiDevMounter := getCsiAttacherFromDeviceMounter(devMounter, test.watchTimeout)
 				csiDevMounter.csiClient = csiClient
 				devMountPath, err := csiDevMounter.GetDeviceMountPath(volSpec)
 				if err != nil {
@@ -559,8 +560,8 @@ func TestCSI_VolumeAll(t *testing.T) {
 				}
 
 				if devMounter != nil && devUnmounter != nil {
-					csiDevMounter := getCsiAttacherFromDeviceMounter(devMounter)
-					csiDevUnmounter := getCsiAttacherFromDeviceUnmounter(devUnmounter)
+					csiDevMounter := getCsiAttacherFromDeviceMounter(devMounter, test.watchTimeout)
+					csiDevUnmounter := getCsiAttacherFromDeviceUnmounter(devUnmounter, test.watchTimeout)
 					csiDevUnmounter.csiClient = csiClient
 
 					devMountPath, err := csiDevMounter.GetDeviceMountPath(volSpec)
@@ -601,7 +602,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				if err != nil {
 					t.Fatal("csiTest.VolumeAll volumePlugin.GetVolumeName failed:", err)
 				}
-				csiDetacher := getCsiAttacherFromVolumeDetacher(volDetacher)
+				csiDetacher := getCsiAttacherFromVolumeDetacher(volDetacher, test.watchTimeout)
 				csiDetacher.csiClient = csiClient
 				if err := csiDetacher.Detach(volName, attachDetachVolumeHost.GetNodeName()); err != nil {
 					t.Fatal("csiTest.VolumeAll detacher.Detach failed:", err)

@@ -910,7 +910,7 @@ func TestPluginNewAttacher(t *testing.T) {
 		t.Fatalf("failed to create new attacher: %v", err)
 	}
 
-	csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
+	csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, testWatchTimeout)
 	if csiAttacher.plugin == nil {
 		t.Error("plugin not set for attacher")
 	}
@@ -931,7 +931,7 @@ func TestPluginNewDetacher(t *testing.T) {
 		t.Fatalf("failed to create new detacher: %v", err)
 	}
 
-	csiDetacher := getCsiAttacherFromVolumeDetacher(detacher)
+	csiDetacher := getCsiAttacherFromVolumeDetacher(detacher, testWatchTimeout)
 	if csiDetacher.plugin == nil {
 		t.Error("plugin not set for detacher")
 	}
