@@ -15,13 +15,15 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-provisioner
-          image: k8s.gcr.io/sig-storage/csi-provisioner:v1.6.0
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v2.1.0
           args:
             - "--csi-address=$(ADDRESS)"
             # Topology support is needed for the pod rescheduling test
             # ("storage capacity" in csi_mock_volume.go).
             - "--feature-gates=Topology=true"
             - "-v=5"
+            # Needed for fsGroup support.
+            - "--default-fstype=ext4"
           env:
             - name: ADDRESS
               value: /csi/csi.sock
@@ -29,7 +31,7 @@ spec:
             - mountPath: /csi
               name: socket-dir
         - name: driver-registrar
-          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v1.3.0
+          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.1.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
