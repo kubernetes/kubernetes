@@ -160,16 +160,6 @@ type Pod struct {
 	Containers []*Container
 }
 
-// FindContainer returns the container matching port and protocol; otherwise, an error
-func (p *Pod) FindContainer(port int32, protocol v1.Protocol) (*Container, error) {
-	for _, cont := range p.Containers {
-		if cont.Port == port && cont.Protocol == protocol {
-			return cont, nil
-		}
-	}
-	return nil, errors.Errorf("unable to find container in pod %s/%s, port %d, protocol %s", p.Namespace, p.Name, port, protocol)
-}
-
 // PodString returns a corresponding pod string
 func (p *Pod) PodString() PodString {
 	return NewPodString(p.Namespace, p.Name)
