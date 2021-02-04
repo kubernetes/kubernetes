@@ -76,6 +76,10 @@ const (
 	updateMaxRetries = 10
 )
 
+// nodePollInterval is used in listing node
+// This is a variable instead of a const to enable testing.
+var nodePollInterval = 10 * time.Second
+
 // CIDRAllocator is an interface implemented by things that know how
 // to allocate/occupy/recycle CIDR for nodes.
 type CIDRAllocator interface {
@@ -123,7 +127,7 @@ func listNodes(kubeClient clientset.Interface) (*v1.NodeList, error) {
 	var nodeList *v1.NodeList
 	// We must poll because apiserver might not be up. This error causes
 	// controller manager to restart.
-	if pollErr := wait.Poll(10*time.Second, apiserverStartupGracePeriod, func() (bool, error) {
+	if pollErr := wait.Poll(nodePollInterval, apiserverStartupGracePeriod, func() (bool, error) {
 		var err error
 		nodeList, err = kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 			FieldSelector: fields.Everything().String(),

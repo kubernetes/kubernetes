@@ -32,9 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
-const (
-	nodePollInterval = 100 * time.Millisecond
-)
+const testNodePollInterval = 10 * time.Millisecond
 
 var alwaysReady = func() bool { return true }
 
@@ -320,6 +318,13 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 }
 
 func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
+	// Non-parallel test (overrides global var)
+	oldNodePollInterval := nodePollInterval
+	nodePollInterval = testNodePollInterval
+	defer func() {
+		nodePollInterval = oldNodePollInterval
+	}()
+
 	// all tests operate on a single node
 	testCases := []testCase{
 		{
@@ -700,6 +705,13 @@ type releaseTestCase struct {
 }
 
 func TestReleaseCIDRSuccess(t *testing.T) {
+	// Non-parallel test (overrides global var)
+	oldNodePollInterval := nodePollInterval
+	nodePollInterval = testNodePollInterval
+	defer func() {
+		nodePollInterval = oldNodePollInterval
+	}()
+
 	testCases := []releaseTestCase{
 		{
 			description: "Correctly release preallocated CIDR",
