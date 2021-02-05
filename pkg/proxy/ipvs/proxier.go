@@ -192,6 +192,9 @@ var ipsetWithIptablesChain = []struct {
 	{utiliptables.TableNAT, kubeNodePortSetSCTP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst,dst", utilipset.ProtocolSCTP},
 	{utiliptables.TableNAT, kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst,dst", utilipset.ProtocolSCTP},
 	{utiliptables.TableFilter, kubeHealthCheckNodePortSet, string(KubeNodePortChain), "ACCEPT", "dst", utilipset.ProtocolTCP},
+	{utiliptables.TableFilter, kubeNodePortSetTCP, string(KubeNodePortChain), "ACCEPT", "dst", utilipset.ProtocolTCP},
+	{utiliptables.TableFilter, kubeNodePortSetUDP, string(KubeNodePortChain), "ACCEPT", "dst", utilipset.ProtocolUDP},
+	{utiliptables.TableFilter, kubeNodePortSetSCTP, string(KubeNodePortChain), "ACCEPT", "dst", utilipset.ProtocolSCTP},
 }
 
 // In IPVS proxy mode, the following flags need to be set
