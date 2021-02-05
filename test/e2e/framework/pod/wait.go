@@ -102,7 +102,14 @@ func errorBadPodsStates(badPods []v1.Pod, desiredPods int, ns, desiredState stri
 // waiting. All pods that are in SUCCESS state are not counted.
 //
 // If ignoreLabels is not empty, pods matching this selector are ignored.
+//
+// If minPods or allowedNotReadyPods are -1, this method returns immediately
+// without waiting.
 func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedNotReadyPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
+	if minPods == -1 || allowedNotReadyPods == -1 {
+		return nil
+	}
+
 	ignoreSelector := labels.SelectorFromSet(map[string]string{})
 	start := time.Now()
 	e2elog.Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",

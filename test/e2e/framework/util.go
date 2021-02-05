@@ -1024,8 +1024,11 @@ func getNodeEvents(c clientset.Interface, nodeName string) []v1.Event {
 // WaitForAllNodesSchedulable waits up to timeout for all
 // (but TestContext.AllowedNotReadyNodes) to become schedulable.
 func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
-	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
+	if TestContext.AllowedNotReadyNodes == -1 {
+		return nil
+	}
 
+	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
 	return wait.PollImmediate(
 		30*time.Second,
 		timeout,
@@ -1118,11 +1121,16 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 	}
 }
 
-// AllNodesReady checks whether all registered nodes are ready.
+// AllNodesReady checks whether all registered nodes are ready. Setting -1 on
+// TestContext.AllowedNotReadyNodes will bypass the post test node readiness check.
 // TODO: we should change the AllNodesReady call in AfterEach to WaitForAllNodesHealthy,
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
 // default test add-ons.
 func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
+	if TestContext.AllowedNotReadyNodes == -1 {
+		return nil
+	}
+
 	Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, TestContext.AllowedNotReadyNodes)
 
 	var notReady []*v1.Node
