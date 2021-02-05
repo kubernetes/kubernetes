@@ -117,7 +117,7 @@ func unsupportedLoggingFlags() []string {
 	klog.InitFlags(fs)
 	fs.VisitAll(func(flag *flag.Flag) {
 		if _, found := supportedLogsFlags[flag.Name]; !found {
-			allFlags = append(allFlags, flag.Name)
+			allFlags = append(allFlags, strings.Replace(flag.Name, "_", "-", -1))
 		}
 	})
 
