@@ -51,7 +51,7 @@ if [ -z "${KUBECTL_PRUNE_WHITELIST_OVERRIDE:-}" ]; then
     apps/v1/Deployment
     apps/v1/ReplicaSet
     apps/v1/StatefulSet
-    extensions/v1beta1/Ingress
+    networking.k8s.io/v1/Ingress
   )
 else
   read -ra KUBECTL_PRUNE_WHITELIST <<< "${KUBECTL_PRUNE_WHITELIST_OVERRIDE}"
