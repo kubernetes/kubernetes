@@ -37,7 +37,10 @@ func GetPodQOS(pod *corev1.Pod) corev1.PodQOSClass {
 	limits := corev1.ResourceList{}
 	zeroQuantity := resource.MustParse("0")
 	isGuaranteed := true
-	for _, container := range pod.Spec.Containers {
+	allContainers := []corev1.Container{}
+	allContainers = append(allContainers, pod.Spec.Containers...)
+	allContainers = append(allContainers, pod.Spec.InitContainers...)
+	for _, container := range allContainers {
 		// process requests
 		for name, quantity := range container.Resources.Requests {
 			if !isSupportedQoSComputeResource(name) {
