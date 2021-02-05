@@ -367,6 +367,10 @@ root = "${sandbox_root}"
   net-raw = "${gvisor_net_raw}"
 EOF
     if [[ "${gvisor_platform}" == "xemu" ]]; then
+      if [[ -f "${CONTAINERD_HOME}/xemu.ko.der" ]]; then
+        keyctl padd asymmetric xemu_key \
+          "%keyring:.secondary_trusted_keys" < "${CONTAINERD_HOME}/xemu.ko.der"
+      fi
       insmod "${CONTAINERD_HOME}/xemu.ko"
     fi
   fi
