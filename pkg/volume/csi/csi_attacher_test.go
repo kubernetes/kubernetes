@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path/filepath"
 	"reflect"
 	"sync"
@@ -1112,15 +1113,16 @@ func TestAttacherMountDevice(t *testing.T) {
 	transientError := volumetypes.NewTransientOperationFailure("")
 
 	testCases := []struct {
-		testName         string
-		volName          string
-		devicePath       string
-		deviceMountPath  string
-		stageUnstageSet  bool
-		shouldFail       bool
-		createAttachment bool
-		exitError        error
-		spec             *volume.Spec
+		testName                string
+		volName                 string
+		devicePath              string
+		deviceMountPath         string
+		stageUnstageSet         bool
+		shouldFail              bool
+		createAttachment        bool
+		populateDeviceMountPath bool
+		exitError               error
+		spec                    *volume.Spec
 	}{
 		{
 			testName:         "normal PV",
@@ -1210,9 +1212,24 @@ func TestAttacherMountDevice(t *testing.T) {
 			exitError:        nonFinalError,
 			shouldFail:       true,
 		},
+		{
+			testName:                "failure PV with existing data",
+			volName:                 "test-vol1",
+			devicePath:              "path1",
+			deviceMountPath:         "path2",
+			stageUnstageSet:         true,
+			createAttachment:        true,
+			populateDeviceMountPath: true,
+			shouldFail:              true,
+			spec:                    volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), true),
+		},
 	}
 
 	for _, tc := range testCases {
+		user, _ := user.Current()
+		if tc.populateDeviceMountPath && user.Uid == "0" {
+			t.Skipf("Skipping intentional failure on existing data when running as root.")
+		}
 		t.Run(tc.testName, func(t *testing.T) {
 			t.Logf("Running test case: %s", tc.testName)
 
@@ -1254,6 +1271,25 @@ func TestAttacherMountDevice(t *testing.T) {
 				}()
 			}
 
+			parent := filepath.Dir(tc.deviceMountPath)
+			filePath := filepath.Join(parent, "newfile")
+			if tc.populateDeviceMountPath {
+				// We need to create the deviceMountPath before we Mount,
+				// so that we can correctly create the file without errors.
+				err := os.MkdirAll(tc.deviceMountPath, 0750)
+				if err != nil {
+					t.Errorf("error attempting to create the directory")
+				}
+				_, err = os.Create(filePath)
+				if err != nil {
+					t.Errorf("error attempting to populate file on parent path: %v", err)
+				}
+				err = os.Chmod(parent, 0555)
+				if err != nil {
+					t.Errorf("error attempting to modify directory permissions: %v", err)
+				}
+			}
+
 			// Run
 			err := csiAttacher.MountDevice(tc.spec, tc.devicePath, tc.deviceMountPath)
 
@@ -1261,6 +1297,22 @@ func TestAttacherMountDevice(t *testing.T) {
 			if err != nil {
 				if !tc.shouldFail {
 					t.Errorf("test should not fail, but error occurred: %v", err)
+				}
+				if tc.populateDeviceMountPath {
+					// We're expecting saveVolumeData to fail, which is responsible
+					// for creating this file. It shouldn't exist.
+					_, err := os.Stat(parent + "/" + volDataFileName)
+					if !os.IsNotExist(err) {
+						t.Errorf("vol_data.json should not exist: %v", err)
+					}
+					_, err = os.Stat(filePath)
+					if os.IsNotExist(err) {
+						t.Errorf("expecting file to exist after err received: %v", err)
+					}
+					err = os.Chmod(parent, 0777)
+					if err != nil {
+						t.Errorf("failed to modify permissions after test: %v", err)
+					}
 				}
 				return
 			}
