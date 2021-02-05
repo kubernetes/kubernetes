@@ -1046,6 +1046,8 @@ func TestSyncService(t *testing.T) {
 // This test uses real time.Sleep, as there is no easy way to mock time in endpoints controller now.
 // TODO(mborsz): Migrate this test to mock clock when possible.
 func TestPodAddsBatching(t *testing.T) {
+	t.Parallel()
+
 	type podAdd struct {
 		delay time.Duration
 	}
@@ -1153,6 +1155,8 @@ func TestPodAddsBatching(t *testing.T) {
 // This test uses real time.Sleep, as there is no easy way to mock time in endpoints controller now.
 // TODO(mborsz): Migrate this test to mock clock when possible.
 func TestPodUpdatesBatching(t *testing.T) {
+	t.Parallel()
+
 	resourceVersion := 1
 	type podUpdate struct {
 		delay   time.Duration
@@ -1299,6 +1303,8 @@ func TestPodUpdatesBatching(t *testing.T) {
 // This test uses real time.Sleep, as there is no easy way to mock time in endpoints controller now.
 // TODO(mborsz): Migrate this test to mock clock when possible.
 func TestPodDeleteBatching(t *testing.T) {
+	t.Parallel()
+
 	type podDelete struct {
 		delay   time.Duration
 		podName string
