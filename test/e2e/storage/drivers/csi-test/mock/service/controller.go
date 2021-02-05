@@ -23,10 +23,11 @@ import (
 	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -148,7 +149,7 @@ func (s *service) DeleteVolume(
 	copy(s.vols[i:], s.vols[i+1:])
 	s.vols[len(s.vols)-1] = csi.Volume{}
 	s.vols = s.vols[:len(s.vols)-1]
-	log.WithField("volumeID", req.VolumeId).Debug("mock delete volume")
+	klog.V(5).InfoS("mock delete volume", "volumeID", req.VolumeId)
 
 	if hookVal, hookMsg := s.execHook("DeleteVolumeEnd"); hookVal != codes.OK {
 		return nil, status.Errorf(hookVal, hookMsg)
@@ -656,7 +657,7 @@ func (s *service) DeleteSnapshot(ctx context.Context,
 	// leaks. The slice's elements may not be pointers, but the structs
 	// themselves have fields that are.
 	s.snapshots.Delete(i)
-	log.WithField("SnapshotId", req.SnapshotId).Debug("mock delete snapshot")
+	klog.V(5).InfoS("mock delete snapshot", "SnapshotId", req.SnapshotId)
 
 	if hookVal, hookMsg := s.execHook("DeleteSnapshotEnd"); hookVal != codes.OK {
 		return nil, status.Errorf(hookVal, hookMsg)
@@ -726,7 +727,7 @@ func (s *service) ControllerExpandVolume(
 
 	// Check to see if the volume already satisfied request size.
 	if v.CapacityBytes == requestBytes {
-		log.WithField("volumeID", v.VolumeId).Infof("Volume capacity is already %d, no need to expand", requestBytes)
+		klog.V(5).InfoS("volume capacity sufficient, no need to expand", "requested", requestBytes, "current", v.CapacityBytes, "volumeID", v.VolumeId)
 		return resp, nil
 	}
 
