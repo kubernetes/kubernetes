@@ -125,9 +125,6 @@ func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replication.
 		replication.BurstReplicas,
 	)
 
-	if err != nil {
-		t.Fatalf("Failed to create replication controller")
-	}
 	return s, closeFn, rm, informers, clientSet
 }
 

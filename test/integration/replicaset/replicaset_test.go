@@ -131,9 +131,6 @@ func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.R
 		replicaset.BurstReplicas,
 	)
 
-	if err != nil {
-		t.Fatalf("Failed to create replicaset controller")
-	}
 	return s, closeFn, rm, informers, clientSet
 }
 
