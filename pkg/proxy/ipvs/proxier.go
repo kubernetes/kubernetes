@@ -167,29 +167,31 @@ var ipsetInfo = []struct {
 }
 
 // ipsetWithIptablesChain is the ipsets list with iptables source chain and the chain jump to
-// `iptables -t nat -A <from> -m set --match-set <name> <matchType> -j <to>`
+// `iptables -t <table> -A <from> -m set --match-set <name> <matchType> -j <to>`
 // example: iptables -t nat -A KUBE-SERVICES -m set --match-set KUBE-NODE-PORT-TCP dst -j KUBE-NODE-PORT
 // ipsets with other match rules will be created Individually.
 // Note: kubeNodePortLocalSetTCP must be prior to kubeNodePortSetTCP, the same for UDP.
 var ipsetWithIptablesChain = []struct {
+	table         utiliptables.Table
 	name          string
 	from          string
 	to            string
 	matchType     string
 	protocolMatch string
 }{
-	{kubeLoopBackIPSet, string(kubePostroutingChain), "MASQUERADE", "dst,dst,src", ""},
-	{kubeLoadBalancerSet, string(kubeServicesChain), string(KubeLoadBalancerChain), "dst,dst", ""},
-	{kubeLoadbalancerFWSet, string(KubeLoadBalancerChain), string(KubeFireWallChain), "dst,dst", ""},
-	{kubeLoadBalancerSourceCIDRSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
-	{kubeLoadBalancerSourceIPSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
-	{kubeLoadBalancerLocalSet, string(KubeLoadBalancerChain), "RETURN", "dst,dst", ""},
-	{kubeNodePortLocalSetTCP, string(KubeNodePortChain), "RETURN", "dst", utilipset.ProtocolTCP},
-	{kubeNodePortSetTCP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", utilipset.ProtocolTCP},
-	{kubeNodePortLocalSetUDP, string(KubeNodePortChain), "RETURN", "dst", utilipset.ProtocolUDP},
-	{kubeNodePortSetUDP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", utilipset.ProtocolUDP},
-	{kubeNodePortSetSCTP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst,dst", utilipset.ProtocolSCTP},
-	{kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst,dst", utilipset.ProtocolSCTP},
+	{utiliptables.TableNAT, kubeLoopBackIPSet, string(kubePostroutingChain), "MASQUERADE", "dst,dst,src", ""},
+	{utiliptables.TableNAT, kubeLoadBalancerSet, string(kubeServicesChain), string(KubeLoadBalancerChain), "dst,dst", ""},
+	{utiliptables.TableNAT, kubeLoadbalancerFWSet, string(KubeLoadBalancerChain), string(KubeFireWallChain), "dst,dst", ""},
+	{utiliptables.TableNAT, kubeLoadBalancerSourceCIDRSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
+	{utiliptables.TableNAT, kubeLoadBalancerSourceIPSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
+	{utiliptables.TableNAT, kubeLoadBalancerLocalSet, string(KubeLoadBalancerChain), "RETURN", "dst,dst", ""},
+	{utiliptables.TableNAT, kubeNodePortLocalSetTCP, string(KubeNodePortChain), "RETURN", "dst", utilipset.ProtocolTCP},
+	{utiliptables.TableNAT, kubeNodePortSetTCP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", utilipset.ProtocolTCP},
+	{utiliptables.TableNAT, kubeNodePortLocalSetUDP, string(KubeNodePortChain), "RETURN", "dst", utilipset.ProtocolUDP},
+	{utiliptables.TableNAT, kubeNodePortSetUDP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", utilipset.ProtocolUDP},
+	{utiliptables.TableNAT, kubeNodePortSetSCTP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst,dst", utilipset.ProtocolSCTP},
+	{utiliptables.TableNAT, kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst,dst", utilipset.ProtocolSCTP},
+	{utiliptables.TableFilter, kubeHealthCheckNodePortSet, string(KubeNodePortChain), "ACCEPT", "dst", utilipset.ProtocolTCP},
 }
 
 // In IPVS proxy mode, the following flags need to be set
@@ -1719,7 +1721,12 @@ func (proxier *Proxier) writeIptablesRules() {
 				"-m", "set", "--match-set", proxier.ipsetList[set.name].Name,
 				set.matchType,
 			)
-			utilproxy.WriteLine(proxier.natRules, append(args, "-j", set.to)...)
+			switch set.table {
+			case utiliptables.TableNAT:
+				utilproxy.WriteLine(proxier.natRules, append(args, "-j", set.to)...)
+			case utiliptables.TableFilter:
+				utilproxy.WriteLine(proxier.filterRules, append(args, "-j", set.to)...)
+			}
 		}
 	}
 
@@ -1837,14 +1844,6 @@ func (proxier *Proxier) writeIptablesRules() {
 		"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod destination rule"`,
 		"-m", "conntrack",
 		"--ctstate", "RELATED,ESTABLISHED",
-		"-j", "ACCEPT",
-	)
-
-	// Add rule to accept traffic towards health check node port
-	utilproxy.WriteLine(proxier.filterRules,
-		"-A", string(KubeNodePortChain),
-		"-m", "comment", "--comment", proxier.ipsetList[kubeHealthCheckNodePortSet].getComment(),
-		"-m", "set", "--match-set", proxier.ipsetList[kubeHealthCheckNodePortSet].Name, "dst",
 		"-j", "ACCEPT",
 	)
 
