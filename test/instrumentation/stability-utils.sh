@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Copyright 2019 The Kubernetes Authors.
+
+# Copyright 2021 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,53 +14,86 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 set -o errexit
 set -o nounset
 set -o pipefail
 
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 
-function kube::update::stablemetrics {
-  BAZEL_OUT_DIR="$KUBE_ROOT/bazel-bin"
-  BAZEL_GEN_DIR="$KUBE_ROOT/bazel-genfiles"
-  METRICS_LIST_PATH="test/instrumentation/stable-metrics-list.yaml"
-
-  bazel build //test/instrumentation:list_stable_metrics
-  if [ -d "$BAZEL_OUT_DIR" ]; then
-    cp "$BAZEL_OUT_DIR/$METRICS_LIST_PATH" "$KUBE_ROOT/test/instrumentation/testdata/stable-metrics-list.yaml"
-  else
-    # Handle bazel < 0.25
-    # https://github.com/bazelbuild/bazel/issues/6761
-    echo "$BAZEL_OUT_DIR not found trying $BAZEL_GEN_DIR"
-    cp "$BAZEL_GEN_DIR/$METRICS_LIST_PATH" "$KUBE_ROOT/test/instrumentation/testdata/stable-metrics-list.yaml"
-  fi
+stability_check_setup() {
+  kube::golang::verify_go_version
+  kube::util::ensure-temp-dir
+  cd "${KUBE_ROOT}"
+  export KUBE_EXTRA_GOPATH=$KUBE_TEMP
+  kube::golang::setup_env
+  pushd "${KUBE_EXTRA_GOPATH}" >/dev/null
+    GO111MODULE=on go get "gopkg.in/yaml.v2"
+  popd >/dev/null
 }
 
+find_files_to_check() {
+  find . -not \( \
+      \( \
+        -wholename './output' \
+        -o -wholename './_output' \
+        -o -wholename './_gopath' \
+        -o -wholename './release' \
+        -o -wholename './target' \
+        -o -wholename '*/third_party/*' \
+        -o -wholename '*/vendor/*' \
+        -o -wholename '*/hack/*' \
+        -o -wholename '**/*_test.go' \
+        \) -prune \
+    \) \
+    \( -wholename '**/*.go' \
+  \)
+}
 
-function kube::verify::metrics {
-  BAZEL_OUT_DIR="$KUBE_ROOT/bazel-bin"
-  BAZEL_GEN_DIR="$KUBE_ROOT/bazel-genfiles"
-  METRICS_LIST_PATH="test/instrumentation/stable-metrics-list.yaml"
+red=$(tput setaf 1)
+green=$(tput setaf 2)
+reset=$(tput sgr0)
 
-  if [ -z "${TEST_BINARY:-}" ]; then
-
-    bazel build //test/instrumentation:list_stable_metrics --verbose_failures
-
-    if [ -d "$BAZEL_OUT_DIR" ]; then
-      OUTPUT_FILE="$BAZEL_OUT_DIR/$METRICS_LIST_PATH"
-    else
-      # Handle bazel < 0.25
-      # https://github.com/bazelbuild/bazel/issues/6761
-      OUTPUT_FILE="$BAZEL_GEN_DIR/$METRICS_LIST_PATH"
+kube::validate::stablemetrics() {
+  stability_check_setup
+  static_checked_files=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go") || true
+  temp_file=$(mktemp)
+  gopathfiles=$(find_files_to_check | grep -E 'test/instrumentation/.*.go' | grep -v "test/instrumentation/main.*go" | cut -c 3-)
+  for i in "${static_checked_files[@]}"
+  do
+    # Deliberately allow word split here
+    # shellcheck disable=SC2086
+    stabilitycheck=$(go run "test/instrumentation/main.go" $gopathfiles -- $i 1>$temp_file)
+    if $stabilitycheck; then 
+      echo -e "${green}Diffing test/instrumentation/testdata/stable-metrics-list.yaml\n${reset}"
+      if diff -u "$KUBE_ROOT/test/instrumentation/testdata/stable-metrics-list.yaml" "$temp_file"; then
+        echo -e "${green}\nPASS metrics stability verification ${reset}"
+        return 0
+      fi
     fi
-  else
-    OUTPUT_FILE="$KUBE_ROOT/$METRICS_LIST_PATH"
-  fi
-
-  if diff -u "$KUBE_ROOT/test/instrumentation/testdata/stable-metrics-list.yaml" "$OUTPUT_FILE"; then
-    echo "PASS metrics stability check"
-  else
-    echo 'Diffs in stable metrics detected, please run "test/instrumentation/update-stable-metrics.sh"'
+    echo "${red}!!! Metrics Stability static analysis has failed!${reset}" >&2
+    echo "${red}!!! Please run ./hack/update-generated-stable-metrics.sh to update the golden list.${reset}" >&2
     exit 1
-  fi
+  done
 }
+
+kube::update::stablemetrics() {
+  stability_check_setup
+  static_checked_files=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go") || true
+  temp_file=$(mktemp)
+  gopathfiles=$(find_files_to_check | grep -E 'test/instrumentation/.*.go' | grep -v "test/instrumentation/main.*go" |     cut -c 3-)
+  for i in "${static_checked_files[@]}"
+  do
+    # Deliberately allow word split here
+    # shellcheck disable=SC2086
+    stabilitycheck=$(go run "test/instrumentation/main.go" $gopathfiles -- $i 1>$temp_file)
+    if ! $stabilitycheck; then
+      echo "${red}!!! updating golden list of metrics has failed! ${reset}" >&2
+      exit 1
+    fi
+    mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/testdata/stable-metrics-list.yaml"
+    echo "${green}Updated golden list of stable metrics.${reset}"
+  done
+}
+
