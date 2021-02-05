@@ -67,7 +67,7 @@ const (
 	csiNodeLimitUpdateTimeout  = 5 * time.Minute
 	csiPodUnschedulableTimeout = 5 * time.Minute
 	csiResizeWaitPeriod        = 5 * time.Minute
-	csiVolumeAttachmentTimeout = 7 * time.Minute
+	csiVolumeAttachmentTimeout = 10 * time.Minute
 	// how long to wait for Resizing Condition on PVC to appear
 	csiResizingConditionWait = 2 * time.Minute
 
@@ -434,7 +434,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 			ginkgo.By(fmt.Sprintf("Wait for the volumeattachment to be deleted up to %v", csiVolumeAttachmentTimeout))
 			// This step can be slow because we have to wait either a NodeUpdate event happens or
-			// the detachment for this volume timeout so that we can do a force detach.
+			// the detachment for this volume timeout so that we can do a force detach. In this test case, since the
+			// volume is staged on the node, the status.VolumesInUse will report the given volume. Attach Detach controller
+			// will detect that the attachability of the driver has changed, and will try a detach of the 'VolumeAttachment'
+			// object. However, detach will be blocked since the volume is still reported in use in node status, and eventually
+			// when the timeout 'maxWaitForUnmountDuration' expires, force detach would be triggered, and the VA object would be
+			// removed.
 			err = waitForVolumeAttachmentTerminated(attachmentName, m.cs)
 			framework.ExpectNoError(err, "Failed to delete VolumeAttachment: %v", err)
 		})

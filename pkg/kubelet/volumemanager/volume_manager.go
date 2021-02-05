@@ -118,13 +118,13 @@ type VolumeManager interface {
 	// from annotations on persistent volumes that the pod depends on.
 	GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64
 
-	// GetVolumesInUse returns a list of all volumes that implement the volume.Attacher
-	// interface and are currently in use according to the actual and desired
+	// GetVolumesInUse returns a list of all volumes that implement the volume.Attacher or
+	// volume.DeviceMounter interface and are currently in use according to the actual and desired
 	// state of the world caches. A volume is considered "in use" as soon as it
 	// is added to the desired state of world, indicating it *should* be
 	// attached to this node and remains "in use" until it is removed from both
 	// the desired state of the world and the actual state of the world, or it
-	// has been unmounted (as indicated in actual state of world).
+	// has been unmounted and unstaged (as indicated in actual state of world).
 	GetVolumesInUse() []v1.UniqueVolumeName
 
 	// ReconcilerStatesHasBeenSynced returns true only after the actual states in reconciler
@@ -316,14 +316,20 @@ func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 func (vm *volumeManager) GetVolumesInUse() []v1.UniqueVolumeName {
 	// Report volumes in desired state of world and actual state of world so
 	// that volumes are marked in use as soon as the decision is made that the
-	// volume *should* be attached to this node until it is safely unmounted.
+	// volume *should* be attached to this node until it is safely unmounted and unstaged.
+	// It is to be noted that for CSI volumes which do not support STAGE_UNSTAGE_VOLUME,
+	// the volume will still be listed in the asw.attachedVolumes map. For such volumes,
+	// the Mount/Unmount Device call is a no-op, since the csi_attacher detects the missing
+	// capability through NodeGetCapabilitiesResponse. The implication of this behavior is
+	// that even for such volumes, which support only NodePublish/Unpublish (aka Mount/Unmount Volume),
+	// it will still be reported in node's status.volumesInUse.
 	desiredVolumes := vm.desiredStateOfWorld.GetVolumesToMount()
 	allAttachedVolumes := vm.actualStateOfWorld.GetAttachedVolumes()
 	volumesToReportInUse := make([]v1.UniqueVolumeName, 0, len(desiredVolumes)+len(allAttachedVolumes))
 	desiredVolumesMap := make(map[v1.UniqueVolumeName]bool, len(desiredVolumes)+len(allAttachedVolumes))
 
 	for _, volume := range desiredVolumes {
-		if volume.PluginIsAttachable {
+		if volume.PluginIsAttachable || volume.PluginIsDeviceMountable {
 			if _, exists := desiredVolumesMap[volume.VolumeName]; !exists {
 				desiredVolumesMap[volume.VolumeName] = true
 				volumesToReportInUse = append(volumesToReportInUse, volume.VolumeName)
@@ -332,7 +338,7 @@ func (vm *volumeManager) GetVolumesInUse() []v1.UniqueVolumeName {
 	}
 
 	for _, volume := range allAttachedVolumes {
-		if volume.PluginIsAttachable {
+		if volume.PluginIsAttachable || volume.DeviceMountState != operationexecutor.DeviceNotMounted {
 			if _, exists := desiredVolumesMap[volume.VolumeName]; !exists {
 				volumesToReportInUse = append(volumesToReportInUse, volume.VolumeName)
 			}
