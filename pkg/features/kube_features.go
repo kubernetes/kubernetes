@@ -379,6 +379,7 @@ const (
 
 	// owner: @andyzhangx
 	// alpha: v1.15
+	// beta: v1.21
 	//
 	// Enables the Azure File in-tree driver to Azure File Driver migration feature.
 	CSIMigrationAzureFile featuregate.Feature = "CSIMigrationAzureFile"
@@ -715,7 +716,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InTreePluginAWSUnregister:                      {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureDisk:                          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Azure Disk CSI driver)
 	InTreePluginAzureDiskUnregister:                {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationAzureFile:                          {Default: false, PreRelease: featuregate.Alpha}, // Off by default (requires Azure File CSI driver)
+	CSIMigrationAzureFile:                          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Azure File CSI driver)
 	InTreePluginAzureFileUnregister:                {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationvSphere:                            {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires vSphere CSI driver)
 	CSIMigrationvSphereComplete:                    {Default: false, PreRelease: featuregate.Beta}, // remove in 1.22
