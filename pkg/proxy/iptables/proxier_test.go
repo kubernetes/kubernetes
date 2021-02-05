@@ -2081,6 +2081,173 @@ func TestClusterIPGeneral(t *testing.T) {
 	})
 }
 
+func TestOpenShiftDNSHackTCP(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+	svcIP := "172.30.0.10"
+	svcPort := 53
+	podPort := 5353
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("openshift-dns", "dns-default"),
+		Port:           "dns-tcp",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: svcPortName.Protocol,
+			}}
+		}),
+	)
+
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				// This endpoint is ignored because it's remote
+				Addresses: []string{"10.180.0.2"},
+				NodeName:  ptr.To("node2"),
+			}, {
+				Addresses: []string{"10.180.0.1"},
+				NodeName:  ptr.To(testHostname),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To[int32](int32(podPort)),
+				Protocol: &svcPortName.Protocol,
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
+		{
+			name:     "TCP DNS only goes to local endpoint",
+			sourceIP: "10.0.0.2",
+			destIP:   "172.30.0.10",
+			destPort: 53,
+			output:   "10.180.0.1:5353",
+		},
+	})
+}
+
+func TestOpenShiftDNSHackUDP(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+	svcIP := "172.30.0.10"
+	svcPort := 53
+	podPort := 5353
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("openshift-dns", "dns-default"),
+		Port:           "dns",
+		Protocol:       v1.ProtocolUDP,
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: svcPortName.Protocol,
+			}}
+		}),
+	)
+
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				// This endpoint is ignored because it's remote
+				Addresses: []string{"10.180.0.2"},
+				NodeName:  ptr.To("node2"),
+			}, {
+				Addresses: []string{"10.180.0.1"},
+				NodeName:  ptr.To(testHostname),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To[int32](int32(podPort)),
+				Protocol: &svcPortName.Protocol,
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
+		{
+			name:     "UDP DNS only goes to local endpoint",
+			sourceIP: "10.0.0.2",
+			protocol: v1.ProtocolUDP,
+			destIP:   "172.30.0.10",
+			destPort: 53,
+			output:   "10.180.0.1:5353",
+		},
+	})
+}
+
+func TestOpenShiftDNSHackFallback(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+	svcIP := "172.30.0.10"
+	svcPort := 53
+	podPort := 5353
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("openshift-dns", "dns-default"),
+		Port:           "dns",
+		Protocol:       v1.ProtocolUDP,
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: svcPortName.Protocol,
+			}}
+		}),
+	)
+
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			// Both endpoints are used because neither is local
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"10.180.1.2"},
+				NodeName:  ptr.To("node2"),
+			}, {
+				Addresses: []string{"10.180.2.3"},
+				NodeName:  ptr.To("node3"),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To[int32](int32(podPort)),
+				Protocol: &svcPortName.Protocol,
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
+		{
+			name:     "DNS goes to all endpoints when none are local",
+			sourceIP: "10.0.0.2",
+			protocol: v1.ProtocolUDP,
+			destIP:   "172.30.0.10",
+			destPort: 53,
+			output:   "10.180.1.2:5353, 10.180.2.3:5353",
+		},
+	})
+}
+
 func TestLoadBalancer(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
