@@ -397,7 +397,7 @@ func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool,
 	for _, s := range subnets {
 		numAddresses := utilnet.RangeSize(s)
 		if numAddresses < minAddrs {
-			allErrs = append(allErrs, field.Invalid(fldPath, s.String(), "subnet is too small"))
+			allErrs = append(allErrs, field.Invalid(fldPath, s.String(), fmt.Sprintf("subnet with %d address(es) is too small, the minimum is %d", numAddresses, minAddrs)))
 		}
 	}
 	return allErrs
@@ -430,19 +430,19 @@ func ValidatePodSubnetNodeMask(subnetStr string, c *kubeadm.ClusterConfiguration
 	for _, podSubnet := range subnets {
 		// obtain podSubnet mask
 		mask := podSubnet.Mask
-		maskSize, _ := mask.Size()
+		podSubnetMaskSize, _ := mask.Size()
 		// obtain node-cidr-mask
-		nodeMask, err := getClusterNodeMask(c, utilnet.IsIPv6(podSubnet.IP))
+		nodeMaskSize, err := getClusterNodeMask(c, utilnet.IsIPv6(podSubnet.IP))
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, podSubnet.String(), err.Error()))
 			continue
 		}
 		// the pod subnet mask needs to allow one or multiple node-masks
 		// i.e. if it has a /24 the node mask must be between 24 and 32 for ipv4
-		if maskSize > nodeMask {
-			allErrs = append(allErrs, field.Invalid(fldPath, podSubnet.String(), "pod subnet size is smaller than the node subnet size"))
-		} else if (nodeMask - maskSize) > constants.PodSubnetNodeMaskMaxDiff {
-			allErrs = append(allErrs, field.Invalid(fldPath, podSubnet.String(), fmt.Sprintf("pod subnet mask and node-mask difference can not be greater than %d", constants.PodSubnetNodeMaskMaxDiff)))
+		if podSubnetMaskSize > nodeMaskSize {
+			allErrs = append(allErrs, field.Invalid(fldPath, podSubnet.String(), fmt.Sprintf("pod subnet mask (%d) is larger than the node subnet mask (%d)", podSubnetMaskSize, nodeMaskSize)))
+		} else if (nodeMaskSize - podSubnetMaskSize) > constants.PodSubnetNodeMaskMaxDiff {
+			allErrs = append(allErrs, field.Invalid(fldPath, podSubnet.String(), fmt.Sprintf("pod subnet mask (%d) and node-mask (%d) difference is greater than %d", podSubnetMaskSize, nodeMaskSize, constants.PodSubnetNodeMaskMaxDiff)))
 		}
 	}
 	return allErrs
