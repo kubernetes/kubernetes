@@ -676,10 +676,12 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	ginkgo.It("ServiceAccountIssuerDiscovery should support OIDC discovery of service account issuer", func() {
 		// Allow the test pod access to the OIDC discovery non-resource URLs.
 		// The role should have already been automatically created as part of the
-		// bootstrap policy, but not the role binding.
+		// RBAC bootstrap policy, but not the role binding. If RBAC is disabled,
+		// we skip creating the binding. We also make sure we clean up the
+		// binding after the test.
 		const clusterRoleName = "system:service-account-issuer-discovery"
 		crbName := fmt.Sprintf("%s-%s", f.Namespace.Name, clusterRoleName)
-		if _, err := f.ClientSet.RbacV1().ClusterRoleBindings().Create(
+		if crb, err := f.ClientSet.RbacV1().ClusterRoleBindings().Create(
 			context.TODO(),
 			&rbacv1.ClusterRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -699,8 +701,16 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 					Kind:     "ClusterRole",
 				},
 			},
-			metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
-			framework.Failf("Unexpected err creating ClusterRoleBinding %s: %v", crbName, err)
+			metav1.CreateOptions{}); err != nil {
+			// Tolerate RBAC not being enabled
+			framework.Logf("error granting ClusterRoleBinding %s: %v", crbName, err)
+		} else {
+			defer func() {
+				framework.ExpectNoError(
+					f.ClientSet.RbacV1().ClusterRoleBindings().Delete(
+						context.TODO(),
+						crb.Name, metav1.DeleteOptions{}))
+			}()
 		}
 
 		// Create the pod with tokens.
