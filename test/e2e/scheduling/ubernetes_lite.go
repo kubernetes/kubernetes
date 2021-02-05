@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -42,6 +43,7 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 	f := framework.NewDefaultFramework("multi-az")
 	var zoneCount int
 	var err error
+	var cleanUp func()
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 		if zoneCount <= 0 {
@@ -52,6 +54,20 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 		msg := fmt.Sprintf("Zone count is %d, only run for multi-zone clusters, skipping test", zoneCount)
 		e2eskipper.SkipUnlessAtLeast(zoneCount, 2, msg)
 		// TODO: SkipUnlessDefaultScheduler() // Non-default schedulers might not spread
+
+		cs := f.ClientSet
+		e2enode.WaitForTotalHealthy(cs, time.Minute)
+		nodeList, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
+
+		// make the nodes have balanced cpu,mem usage
+		cleanUp, err = createBalancedPodForNodes(f, cs, f.Namespace.Name, nodeList.Items, podRequestedResource, 0.0)
+		framework.ExpectNoError(err)
+	})
+	ginkgo.AfterEach(func() {
+		if cleanUp != nil {
+			cleanUp()
+		}
 	})
 	ginkgo.It("should spread the pods of a service across zones", func() {
 		SpreadServiceOrFail(f, 5*zoneCount, imageutils.GetPauseImageName())
