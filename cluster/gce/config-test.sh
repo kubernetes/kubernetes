@@ -556,9 +556,14 @@ ROTATE_CERTIFICATES=${ROTATE_CERTIFICATES:-}
 # into kube-controller-manager via `--concurrent-service-syncs`
 CONCURRENT_SERVICE_SYNCS=${CONCURRENT_SERVICE_SYNCS:-}
 
-# The value kubernetes.default.svc is only usable in Pods and should only be
-# set for tests. DO NOT COPY THIS VALUE FOR PRODUCTION CLUSTERS.
-export SERVICEACCOUNT_ISSUER='https://kubernetes.default.svc'
+# The value kubernetes.default.svc.cluster.local is only usable for full
+# OIDC discovery flows in Pods in the same cluster. For some providers
+# with configurations that support non-traditional KSA authentication methods,
+# this value may make sense, but if the expectation is traditional OIDC, don't
+# use this value in production. If you do use it, the FQDN is preferred to
+# kubernetes.default.svc, to avoid something outside the cluster attempting
+# to resolve the partially qualified name.
+export SERVICEACCOUNT_ISSUER='https://kubernetes.default.svc.cluster.local'
 
 # Optional: Enable Node termination Handler for Preemptible and GPU VMs.
 # https://github.com/GoogleCloudPlatform/k8s-node-termination-handler
@@ -596,6 +601,6 @@ export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-10m}"
 # unzipping the image layers to disk.
 export WINDOWS_ENABLE_PIGZ="${WINDOWS_ENABLE_PIGZ:-true}"
 
-# TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver. 
+# TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver.
 # If this variable is unset or empty, kube-apiserver will allow its default set of cipher suites.
 export TLS_CIPHER_SUITES=""
