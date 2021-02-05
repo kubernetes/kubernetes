@@ -80,7 +80,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 		validatingWebhooks []testWebhook
 		expectInvocations  []invocation
 		expectError        bool
-		errorContains      string
+		errorContainsAnyOf []string
 	}{
 		{
 			name:           "minimum of request timeout or webhook timeout propagated",
@@ -133,8 +133,13 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 			expectInvocations: []invocation{
 				{path: "/mutating/1/5s", timeoutSeconds: 3}, // from request
 			},
-			expectError:   true,
-			errorContains: "the server was unable to return a response in the time allotted",
+			expectError: true,
+			errorContainsAnyOf: []string{
+				// refer to https://github.com/kubernetes/kubernetes/issues/98606#issuecomment-774832633
+				// for the reason for triggering this scenario
+				"stream error",
+				"the server was unable to return a response in the time allotted",
+			},
 		},
 	}
 
@@ -303,10 +308,18 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 				if err == nil {
 					t.Fatalf("expected error but got none")
 				}
-				if tt.errorContains != "" {
-					if !strings.Contains(err.Error(), tt.errorContains) {
-						t.Errorf("expected an error saying %q, but got: %v", tt.errorContains, err)
+
+				expected := false
+				if len(tt.errorContainsAnyOf) != 0 {
+					for _, errStr := range tt.errorContainsAnyOf {
+						if strings.Contains(err.Error(), errStr) {
+							expected = true
+							break
+						}
 					}
+				}
+				if !expected {
+					t.Errorf("expected the error to be any of %q, but got: %v", tt.errorContainsAnyOf, err)
 				}
 				return
 			}
