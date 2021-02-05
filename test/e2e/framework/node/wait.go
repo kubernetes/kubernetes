@@ -202,6 +202,9 @@ func checkWaitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) 
 func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowedNotReadyNodes, largeClusterThreshold int) func() (bool, error) {
 	attempt := 0
 	return func() (bool, error) {
+		if allowedNotReadyNodes == -1 {
+			return true, nil
+		}
 		attempt++
 		var nodesNotReadyYet []v1.Node
 		opts := metav1.ListOptions{
