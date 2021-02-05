@@ -229,7 +229,8 @@ type NodeTestContextType struct {
 type CloudConfig struct {
 	APIEndpoint       string
 	ProjectID         string
-	Zone              string // for multizone tests, arbitrarily chosen zone
+	Zone              string   // for multizone tests, arbitrarily chosen zone
+	Zones             []string // for multizone tests, use this set of zones instead of querying the cloud provider. Must include Zone.
 	Region            string
 	MultiZone         bool
 	MultiMaster       bool
@@ -339,6 +340,7 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.StringVar(&cloudConfig.APIEndpoint, "gce-api-endpoint", "", "The GCE APIEndpoint being used, if applicable")
 	flags.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flags.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
+	flags.Var(cliflag.NewStringSlice(&cloudConfig.Zones), "gce-zones", "The set of zones to use in a multi-zone test instead of querying the cloud provider.")
 	flags.StringVar(&cloudConfig.Region, "gce-region", "", "GCE region being used, if applicable")
 	flags.BoolVar(&cloudConfig.MultiZone, "gce-multizone", false, "If true, start GCE cloud provider with multizone support.")
 	flags.BoolVar(&cloudConfig.MultiMaster, "gce-multimaster", false, "If true, the underlying GCE/GKE cluster is assumed to be multi-master.")
