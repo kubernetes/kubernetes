@@ -17,7 +17,7 @@ steps:
     - TAG=$_GIT_TAG
     - BASE_REF=$_PULL_BASE_REF
     - WHAT=$_WHAT
-    - REGISTRY=gcr.io/k8s-staging-e2e-test-images
+    - REGISTRY=$_REGISTRY
     # The default cloudbuild has HOME=/builder/home and docker buildx is in /root/.docker/cli-plugins/docker-buildx
     # We need to set the HOME to /root explicitly since we're using docker buildx
     - HOME=/root
@@ -40,5 +40,7 @@ substitutions:
   # _PULL_BASE_REF will contain the ref that was pushed to to trigger this build -
   # a branch like 'master' or 'release-0.2', or a tag like 'v0.2'.
   _PULL_BASE_REF: 'master'
+  # _REGISTRY will contain the staging registry.
+  _REGISTRY: 'gcr.io/k8s-staging-e2e-test-images'
   # _WHAT will contain the image name to be built and published to the staging registry.
   _WHAT: 'all-conformance'
