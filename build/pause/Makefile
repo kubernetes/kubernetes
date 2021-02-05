@@ -141,7 +141,7 @@ container: .container-${OS}-$(ARCH)
 orphan: bin/orphan-linux-$(ARCH)
 bin/orphan-linux-$(ARCH): linux/orphan.c
 	mkdir -p bin
-	docker run -u $$(id -u):$$(id -g) -v $$(pwd):/build \
+	docker run --rm -u $$(id -u):$$(id -g) -v $$(pwd):/build \
 		$(KUBE_CROSS_IMAGE):$(KUBE_CROSS_VERSION) \
 		/bin/bash -c "\
 			cd /build && \
