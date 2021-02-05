@@ -148,6 +148,12 @@ function config-ip-firewall {
   # routing. This enables the use of 127/8 for local routing purposes.
   sysctl -w net.ipv4.conf.all.route_localnet=1
 
+  # Per recommendation by COS team, add this to master VM to reduce SSH
+  # flakiness (context: http://b/174052325#comment178).
+  if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
+    sysctl -w net.netfilter.nf_conntrack_tcp_be_liberal=1
+  fi
+
   # The GCI image has host firewall which drop most inbound/forwarded packets.
   # We need to add rules to accept all TCP/UDP/ICMP/SCTP packets.
   if iptables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
