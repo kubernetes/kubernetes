@@ -226,7 +226,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			if err != nil {
 				// Don't pass detailed error back to the user because it could give information about host filesystem
 				klog.Errorf("failed to prepare subPath for volumeMount %q of container %q: %v", mount.Name, container.Name, err)
-				return nil, cleanupAction, fmt.Errorf("failed to prepare subPath for volumeMount %q of container %q", mount.Name, container.Name)
+				return nil, cleanupAction, fmt.Errorf("failed to prepare subPath for volumeMount %q of container %q: %v", mount.Name, container.Name, err)
 			}
 		}
 
