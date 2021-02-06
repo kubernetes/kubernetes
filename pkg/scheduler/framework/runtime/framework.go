@@ -85,8 +85,9 @@ type frameworkImpl struct {
 	eventRecorder   events.EventRecorder
 	informerFactory informers.SharedInformerFactory
 
-	metricsRecorder *metricsRecorder
-	profileName     string
+	metricsRecorder          *metricsRecorder
+	profileName              string
+	percentageOfNodesToScore int32
 
 	preemptHandle framework.PreemptHandle
 
@@ -123,16 +124,17 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 }
 
 type frameworkOptions struct {
-	clientSet            clientset.Interface
-	eventRecorder        events.EventRecorder
-	informerFactory      informers.SharedInformerFactory
-	snapshotSharedLister framework.SharedLister
-	metricsRecorder      *metricsRecorder
-	profileName          string
-	podNominator         framework.PodNominator
-	extenders            []framework.Extender
-	runAllFilters        bool
-	captureProfile       CaptureProfile
+	clientSet                clientset.Interface
+	eventRecorder            events.EventRecorder
+	informerFactory          informers.SharedInformerFactory
+	snapshotSharedLister     framework.SharedLister
+	metricsRecorder          *metricsRecorder
+	profileName              string
+	percentageOfNodesToScore int32
+	podNominator             framework.PodNominator
+	extenders                []framework.Extender
+	runAllFilters            bool
+	captureProfile           CaptureProfile
 }
 
 // Option for the frameworkImpl.
@@ -178,6 +180,13 @@ func WithRunAllFilters(runAllFilters bool) Option {
 func WithProfileName(name string) Option {
 	return func(o *frameworkOptions) {
 		o.profileName = name
+	}
+}
+
+// WithPercentageOfNodesToScore sets the percentageOfNodesToScore for the scheduling frameworkImpl.
+func WithPercentageOfNodesToScore(percentage int32) Option {
+	return func(o *frameworkOptions) {
+		o.percentageOfNodesToScore = percentage
 	}
 }
 
@@ -242,16 +251,17 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	}
 
 	f := &frameworkImpl{
-		registry:              r,
-		snapshotSharedLister:  options.snapshotSharedLister,
-		pluginNameToWeightMap: make(map[string]int),
-		waitingPods:           newWaitingPodsMap(),
-		clientSet:             options.clientSet,
-		eventRecorder:         options.eventRecorder,
-		informerFactory:       options.informerFactory,
-		metricsRecorder:       options.metricsRecorder,
-		profileName:           options.profileName,
-		runAllFilters:         options.runAllFilters,
+		registry:                 r,
+		snapshotSharedLister:     options.snapshotSharedLister,
+		pluginNameToWeightMap:    make(map[string]int),
+		waitingPods:              newWaitingPodsMap(),
+		clientSet:                options.clientSet,
+		eventRecorder:            options.eventRecorder,
+		informerFactory:          options.informerFactory,
+		metricsRecorder:          options.metricsRecorder,
+		profileName:              options.profileName,
+		percentageOfNodesToScore: options.percentageOfNodesToScore,
+		runAllFilters:            options.runAllFilters,
 	}
 	f.preemptHandle = &preemptHandle{
 		extenders:     options.extenders,
@@ -1150,4 +1160,9 @@ func (f *frameworkImpl) PreemptHandle() framework.PreemptHandle {
 // ProfileName returns the profile name associated to this framework.
 func (f *frameworkImpl) ProfileName() string {
 	return f.profileName
+}
+
+// PercentageOfNodesToScore returns the percentageOfNodesToScore associated to this framework.
+func (f *frameworkImpl) PercentageOfNodesToScore() int32 {
+	return f.percentageOfNodesToScore
 }

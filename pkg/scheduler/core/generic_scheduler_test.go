@@ -1356,10 +1356,11 @@ var lowPriority, midPriority, highPriority = int32(0), int32(100), int32(1000)
 
 func TestNumFeasibleNodesToFind(t *testing.T) {
 	tests := []struct {
-		name                     string
-		percentageOfNodesToScore int32
-		numAllNodes              int32
-		wantNumNodes             int32
+		name                            string
+		percentageOfNodesToScore        int32
+		profilePercentageOfNodesToScore int32
+		numAllNodes                     int32
+		wantNumNodes                    int32
 	}{
 		{
 			name:         "not set percentageOfNodesToScore and nodes number not more than 50",
@@ -1394,13 +1395,31 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			numAllNodes:              6000,
 			wantNumNodes:             2400,
 		},
+		{
+			name:                            "the percentageOfNodesToScore of Profile should override the top-level config",
+			percentageOfNodesToScore:        10,
+			profilePercentageOfNodesToScore: 40,
+			numAllNodes:                     6000,
+			wantNumNodes:                    2400,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := &genericScheduler{
 				percentageOfNodesToScore: tt.percentageOfNodesToScore,
 			}
-			if gotNumNodes := g.numFeasibleNodesToFind(tt.numAllNodes); gotNumNodes != tt.wantNumNodes {
+			fwk, err := st.NewFramework(
+				[]st.RegisterPluginFunc{
+					st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				},
+				frameworkruntime.WithPercentageOfNodesToScore(tt.profilePercentageOfNodesToScore),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if gotNumNodes := g.numFeasibleNodesToFind(fwk, tt.numAllNodes); gotNumNodes != tt.wantNumNodes {
 				t.Errorf("genericScheduler.numFeasibleNodesToFind() = %v, want %v", gotNumNodes, tt.wantNumNodes)
 			}
 		})
@@ -1429,7 +1448,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 
 	// To make numAllNodes % nodesToFind != 0
 	g.percentageOfNodesToScore = 30
-	nodesToFind := int(g.numFeasibleNodesToFind(int32(numAllNodes)))
+	nodesToFind := int(g.numFeasibleNodesToFind(fwk, int32(numAllNodes)))
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {

@@ -430,6 +430,9 @@ func autoConvert_v1beta1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in 
 	if err := v1.Convert_Pointer_string_To_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
 		return err
 	}
+	if err := v1.Convert_Pointer_int32_To_int32(&in.PercentageOfNodesToScore, &out.PercentageOfNodesToScore, s); err != nil {
+		return err
+	}
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
 		*out = new(config.Plugins)
@@ -460,6 +463,9 @@ func Convert_v1beta1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *v1b
 
 func autoConvert_config_KubeSchedulerProfile_To_v1beta1_KubeSchedulerProfile(in *config.KubeSchedulerProfile, out *v1beta1.KubeSchedulerProfile, s conversion.Scope) error {
 	if err := v1.Convert_string_To_Pointer_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_int32_To_Pointer_int32(&in.PercentageOfNodesToScore, &out.PercentageOfNodesToScore, s); err != nil {
 		return err
 	}
 	if in.Plugins != nil {

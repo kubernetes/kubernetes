@@ -568,7 +568,8 @@ percentageOfNodesToScore: 0
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0
 profiles:
-- pluginConfig:
+- percentageOfNodesToScore: 0
+  pluginConfig:
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta1
       hardPodAffinityWeight: 5

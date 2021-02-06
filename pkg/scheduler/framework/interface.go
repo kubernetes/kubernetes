@@ -546,6 +546,9 @@ type Framework interface {
 
 	// ProfileName returns the profile name associated to this framework.
 	ProfileName() string
+
+	// PercentageOfNodesToScore returns the PercentageOfNodesToScore associated to this framework.
+	PercentageOfNodesToScore() int32
 }
 
 // Handle provides data and some tools that plugins can use. It is
