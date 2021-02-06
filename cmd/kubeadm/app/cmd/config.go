@@ -119,7 +119,7 @@ func newCmdConfigPrintActionDefaults(out io.Writer, action string, configBytesPr
 
 			Note that sensitive values like the Bootstrap Token fields are replaced with placeholder values like %q in order to pass validation but
 			not perform the real computation for creating a token.
-		`), action, action, configutil.PlaceholderToken),
+		`), action, action, configutil.PlaceholderToken.Token.String()),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			groups, err := mapLegacyKindsToGroups(kinds)
 			if err != nil {
