@@ -1694,7 +1694,7 @@ The main themes of this release are:
 - Added metrics `aggregator_openapi_v2_regeneration_count`, `aggregator_openapi_v2_regeneration_gauge` and `apiextension_openapi_v2_regeneration_count` counting the triggering APIService and CRDs and the reason (add, update, delete) when kube-apiserver regenerates the OpenAPI spec. ([#81786](https://github.com/kubernetes/kubernetes/pull/81786), [@sttts](https://github.com/sttts))
 - Added metrics `authentication_attempts` that can be used to understand the attempts of authentication. ([#81509](https://github.com/kubernetes/kubernetes/pull/81509), [@RainbowMango](https://github.com/RainbowMango))
 - Add a new counter metrics `apiserver_admission_webhook_rejection_count` with details about the causing for a webhook rejection. ([#81399](https://github.com/kubernetes/kubernetes/pull/81399), [@roycaihw](https://github.com/roycaihw))
-- NFS Drivers are now enabled to collect metrics, StatFS metrics provider is used to collect the metrics. (@brahmaroutu) ([#75805](https://github.com/kubernetes/kubernetes/pull/75805), [@brahmaroutu](https://github.com/brahmaroutu))
+- NFS Drivers are now enabled to collect metrics, StatFS metrics provider is used to collect the metrics.([#75805](https://github.com/kubernetes/kubernetes/pull/75805), [@brahmaroutu](https://github.com/brahmaroutu))
 - Add `container_sockets`, `container_threads`, and `container_threads_max` metrics ([#81972](https://github.com/kubernetes/kubernetes/pull/81972), [@dashpole](https://github.com/dashpole))
 - Add `container_state` label to `running_container_count` kubelet metrics, to get count of containers based on their state(running/exited/created/unknown) ([#81573](https://github.com/kubernetes/kubernetes/pull/81573), [@irajdeep](https://github.com/irajdeep))
 - Added metric `apiserver_watch_events_total` that can be used to understand the number of watch events in the system. ([#78732](https://github.com/kubernetes/kubernetes/pull/78732), [@mborsz](https://github.com/mborsz))
@@ -2055,14 +2055,14 @@ The main themes of this release are:
 
 #### Added
 
-- github.com/Azure/go-autorest/autorest/adal: [v0.5.0](https://github.com/Azure/go-autorest/autorest/adal/tree/v0.5.0)
-- github.com/Azure/go-autorest/autorest/date: [v0.1.0](https://github.com/Azure/go-autorest/autorest/date/tree/v0.1.0)
-- github.com/Azure/go-autorest/autorest/mocks: [v0.2.0](https://github.com/Azure/go-autorest/autorest/mocks/tree/v0.2.0)
-- github.com/Azure/go-autorest/autorest/to: [v0.2.0](https://github.com/Azure/go-autorest/autorest/to/tree/v0.2.0)
-- github.com/Azure/go-autorest/autorest/validation: [v0.1.0](https://github.com/Azure/go-autorest/autorest/validation/tree/v0.1.0)
-- github.com/Azure/go-autorest/autorest: [v0.9.0](https://github.com/Azure/go-autorest/autorest/tree/v0.9.0)
-- github.com/Azure/go-autorest/logger: [v0.1.0](https://github.com/Azure/go-autorest/logger/tree/v0.1.0)
-- github.com/Azure/go-autorest/tracing: [v0.5.0](https://github.com/Azure/go-autorest/tracing/tree/v0.5.0)
+- github.com/Azure/go-autorest/autorest/adal: [v0.5.0](https://github.com/Azure/go-autorest/tree/autorest/adal/v0.5.0)
+- github.com/Azure/go-autorest/autorest/date: [v0.1.0](https://github.com/Azure/go-autorest/tree/autorest/date/v0.1.0)
+- github.com/Azure/go-autorest/autorest/mocks: [v0.2.0](https://github.com/Azure/go-autorest/tree/autorest/mocks/v0.2.0)
+- github.com/Azure/go-autorest/autorest/to: [v0.2.0](https://github.com/Azure/go-autorest/tree/autorest/to/v0.2.0)
+- github.com/Azure/go-autorest/autorest/validation: [v0.1.0](https://github.com/Azure/go-autorest/tree/autorest/validation/v0.1.0)
+- github.com/Azure/go-autorest/autorest: [v0.9.0](https://github.com/Azure/go-autorest/tree/autorest/v0.9.0)
+- github.com/Azure/go-autorest/logger: [v0.1.0](https://github.com/Azure/go-autorest/tree/logger/v0.1.0)
+- github.com/Azure/go-autorest/tracing: [v0.5.0](https://github.com/Azure/go-autorest/tree/tracing/v0.5.0)
 - github.com/armon/consul-api: [eb2c6b5](https://github.com/armon/consul-api/tree/eb2c6b5)
 - github.com/bifurcation/mint: [93c51c6](https://github.com/bifurcation/mint/tree/93c51c6)
 - github.com/caddyserver/caddy: [v1.0.3](https://github.com/caddyserver/caddy/tree/v1.0.3)
@@ -2080,7 +2080,7 @@ The main themes of this release are:
 - github.com/google/martian: [v2.1.0+incompatible](https://github.com/google/martian/tree/v2.1.0)
 - github.com/google/pprof: [3ea8567](https://github.com/google/pprof/tree/3ea8567)
 - github.com/google/renameio: [v0.1.0](https://github.com/google/renameio/tree/v0.1.0)
-- github.com/googleapis/gax-go/v2: [v2.0.4](https://github.com/googleapis/gax-go/v2/tree/v2.0.4)
+- github.com/googleapis/gax-go/v2: [v2.0.4](https://github.com/googleapis/gax-go/tree/v2.0.4/v2)
 - github.com/hashicorp/go-syslog: [v1.0.0](https://github.com/hashicorp/go-syslog/tree/v1.0.0)
 - github.com/jimstudt/http-authentication: [3eca13d](https://github.com/jimstudt/http-authentication/tree/3eca13d)
 - github.com/kisielk/errcheck: [v1.2.0](https://github.com/kisielk/errcheck/tree/v1.2.0)
@@ -2103,14 +2103,14 @@ The main themes of this release are:
 - github.com/thecodeteam/goscaleio: [v0.1.0](https://github.com/thecodeteam/goscaleio/tree/v0.1.0)
 - github.com/ugorji/go/codec: [d75b2dc](https://github.com/ugorji/go/codec/tree/d75b2dc)
 - github.com/xordataexchange/crypt: [b2862e3](https://github.com/xordataexchange/crypt/tree/b2862e3)
-- go.opencensus.io: v0.21.0
+- go.opencensus.io: [v0.21.0](https://pkg.go.dev/go.opencensus.io@v0.21.0)
 - golang.org/x/mod: 4bf6d31
-- gopkg.in/airbrake/gobrake.v2: v2.0.9
-- gopkg.in/errgo.v2: v2.1.0
-- gopkg.in/gemnasium/logrus-airbrake-hook.v2: v2.1.2
-- gopkg.in/mcuadros/go-syslog.v2: v2.2.1
-- gotest.tools/gotestsum: v0.3.5
-- honnef.co/go/tools: v0.0.1-2019.2.2
+- gopkg.in/airbrake/gobrake.v2: [v2.0.9](https://gopkg.in/airbrake/gobrake.v2)
+- gopkg.in/errgo.v2: [v2.1.0](https://gopkg.in/errgo.v2)
+- gopkg.in/gemnasium/logrus-airbrake-hook.v2: [v2.1.2](https://gopkg.in/gemnasium/logrus-airbrake-hook.v2)
+- gopkg.in/mcuadros/go-syslog.v2: [v2.2.1](https://gopkg.in/mcuadros/go-syslog.v2 )
+- gotest.tools/gotestsum: [v0.3.5](https://pkg.go.dev/gotest.tools/gotestsum@v0.3.5)
+- honnef.co/go/tools: [v0.0.1-2019.2.2](https://pkg.go.dev/honnef.co/go/tools@v0.0.1-2019.2.2)
 
 #### Changed
 
@@ -2825,7 +2825,7 @@ filename | sha512 hash
 * cpuUsageNanoCores is now reported in the Kubelet summary API on Windows nodes ([#80176](https://github.com/kubernetes/kubernetes/pull/80176), [@liyanhui1228](https://github.com/liyanhui1228))
 * `[]TopologySpreadConstraint` is introduced into PodSpec to support the "Even Pods Spread" alpha feature. ([#77327](https://github.com/kubernetes/kubernetes/pull/77327), [@Huang-Wei](https://github.com/Huang-Wei))
 * kubeadm: fall back to client version in case of certain HTTP errors ([#80024](https://github.com/kubernetes/kubernetes/pull/80024), [@RainbowMango](https://github.com/RainbowMango))
-* NFS Drivers are now enabled to collect metrics, StatFS metrics provider is used to collect the metrics. ([#75805](https://github.com/kubernetes/kubernetes/pull/75805) , [@brahmaroutu](https://github.com/brahmaroutu)) ([#75805](https://github.com/kubernetes/kubernetes/pull/75805), [@brahmaroutu](https://github.com/brahmaroutu))
+* NFS Drivers are now enabled to collect metrics, StatFS metrics provider is used to collect the metrics. ([#75805](https://github.com/kubernetes/kubernetes/pull/75805) , [@brahmaroutu](https://github.com/brahmaroutu)) 
 * make node lease renew interval more heuristic based on node-status-update-frequency in kubelet ([#80173](https://github.com/kubernetes/kubernetes/pull/80173), [@gaorong](https://github.com/gaorong))
 * Introduction of the pod overhead feature to the scheduler.  This functionality is alpha-level as of  ([#78319](https://github.com/kubernetes/kubernetes/pull/78319), [@egernst](https://github.com/egernst))
     * Kubernetes v1.16, and is only honored by servers that enable the PodOverhead feature.gate.
