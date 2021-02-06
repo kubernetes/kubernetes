@@ -19,11 +19,12 @@ package util
 import (
 	"errors"
 	"fmt"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"path"
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestEmptyVersion(t *testing.T) {
@@ -195,9 +196,9 @@ func TestSplitVersion(t *testing.T) {
 		{"release/v1.7.0", "https://dl.k8s.io/release", "v1.7.0", true},
 		{"release/latest-1.7", "https://dl.k8s.io/release", "latest-1.7", true},
 		// CI builds area
-		{"ci/latest", "https://dl.k8s.io/ci", "latest", true},
-		{"ci/k8s-master", "https://dl.k8s.io/ci", "k8s-master", true},
-		{"ci/latest-1.7", "https://dl.k8s.io/ci", "latest-1.7", true},
+		{"ci/latest", "https://storage.googleapis.com/k8s-release-dev/ci", "latest", true},
+		{"ci/k8s-master", "https://storage.googleapis.com/k8s-release-dev/ci", "k8s-master", true},
+		{"ci/latest-1.7", "https://storage.googleapis.com/k8s-release-dev/ci", "latest-1.7", true},
 		// unknown label in default (release) area: splitVersion validate only areas.
 		{"unknown-1", "https://dl.k8s.io/release", "unknown-1", true},
 		// unknown area, not valid input.
