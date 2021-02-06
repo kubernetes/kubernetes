@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"net/url"
+	"os"
 	"reflect"
 	goruntime "runtime"
 	"strconv"
@@ -145,7 +146,7 @@ func ListenAndServeKubeletServer(
 	enableDebuggingHandlers,
 	enableContentionProfiling,
 	enableSystemLogHandler bool) {
-	klog.Infof("Starting to listen on %s:%d", address, port)
+	klog.InfoS("Starting to listen on", "address", address, "port", port)
 	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, enableSystemLogHandler)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -159,15 +160,17 @@ func ListenAndServeKubeletServer(
 		// Passing empty strings as the cert and key files means no
 		// cert/keys are specified and GetCertificate in the TLSConfig
 		// should be called instead.
-		klog.Fatal(s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile))
+		klog.ErrorS(s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile), "Failed listen and Serve TLS")
 	} else {
-		klog.Fatal(s.ListenAndServe())
+		klog.ErrorS(s.ListenAndServe(), "Failed to listen and serve")
 	}
+	os.Exit(1)
+
 }
 
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, enableCAdvisorJSONEndpoints bool) {
-	klog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
+	klog.V(1).InfoS("Starting to listen read-only on", "address", address, "port", port)
 	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false)
 
 	server := &http.Server{
@@ -175,7 +178,8 @@ func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer st
 		Handler:        &s,
 		MaxHeaderBytes: 1 << 20,
 	}
-	klog.Fatal(server.ListenAndServe())
+	klog.ErrorS(server.ListenAndServe(), "Failed listen and serve")
+	os.Exit(1)
 }
 
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
@@ -185,9 +189,11 @@ func ListenAndServePodResources(socket string, podsProvider podresources.PodsPro
 	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewV1PodResourcesServer(podsProvider, devicesProvider, cpusProvider))
 	l, err := util.CreateListener(socket)
 	if err != nil {
-		klog.Fatalf("Failed to create listener for podResources endpoint: %v", err)
+		klog.ErrorS(err, "Failed to create listener for podResources endpoint")
+		os.Exit(1)
 	}
-	klog.Fatal(server.Serve(l))
+	klog.ErrorS(server.Serve(l), "Failed to serve for podResources")
+	os.Exit(1)
 }
 
 // AuthInterface contains all methods required by the auth filters
@@ -256,7 +262,7 @@ func (s *Server) InstallAuthFilter() {
 		// Authenticate
 		info, ok, err := s.auth.AuthenticateRequest(req.Request)
 		if err != nil {
-			klog.Errorf("Unable to authenticate the request due to an error: %v", err)
+			klog.ErrorS(err, "Unable to authenticate the request")
 			resp.WriteErrorString(http.StatusUnauthorized, "Unauthorized")
 			return
 		}
@@ -272,13 +278,13 @@ func (s *Server) InstallAuthFilter() {
 		decision, _, err := s.auth.Authorize(req.Request.Context(), attrs)
 		if err != nil {
 			msg := fmt.Sprintf("Authorization error (user=%s, verb=%s, resource=%s, subresource=%s)", attrs.GetUser().GetName(), attrs.GetVerb(), attrs.GetResource(), attrs.GetSubresource())
-			klog.Errorf(msg, err)
+			klog.ErrorS(err, msg)
 			resp.WriteErrorString(http.StatusInternalServerError, msg)
 			return
 		}
 		if decision != authorizer.DecisionAllow {
 			msg := fmt.Sprintf("Forbidden (user=%s, verb=%s, resource=%s, subresource=%s)", attrs.GetUser().GetName(), attrs.GetVerb(), attrs.GetResource(), attrs.GetSubresource())
-			klog.V(2).Info(msg)
+			klog.V(2).InfoS(msg)
 			resp.WriteErrorString(http.StatusForbidden, msg)
 			return
 		}
@@ -407,7 +413,7 @@ const pprofBasePath = "/debug/pprof/"
 
 // InstallDebuggingHandlers registers the HTTP request patterns that serve logs or run commands/containers
 func (s *Server) InstallDebuggingHandlers() {
-	klog.Infof("Adding debug handlers to kubelet server.")
+	klog.InfoS("Adding debug handlers to kubelet server.")
 
 	s.addMetricsBucketMatcher("run")
 	ws := new(restful.WebService)
@@ -744,7 +750,7 @@ func getPortForwardRequestParams(req *restful.Request) portForwardRequestParams 
 type responder struct{}
 
 func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
-	klog.Errorf("Error while proxying request: %v", err)
+	klog.ErrorS(err, "Error while proxying request")
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
@@ -833,7 +839,7 @@ func writeJSONResponse(response *restful.Response, data []byte) {
 	response.Header().Set(restful.HEADER_ContentType, restful.MIME_JSON)
 	response.WriteHeader(http.StatusOK)
 	if _, err := response.Write(data); err != nil {
-		klog.Errorf("Error writing response: %v", err)
+		klog.ErrorS(err, "Error writing response")
 	}
 }
 
