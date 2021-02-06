@@ -203,9 +203,6 @@ func TestSplitVersion(t *testing.T) {
 		// unknown area, not valid input.
 		{"unknown/latest-1", "", "", false},
 	}
-	// kubeReleaseBucketURL can be overridden during network tests, thus ensure
-	// it will contain value corresponding to expected outcome for this unit test
-	kubeReleaseBucketURL = "https://dl.k8s.io"
 
 	for _, tc := range cases {
 		t.Run(fmt.Sprintf("input:%s/label:%s", tc.input, tc.label), func(t *testing.T) {
