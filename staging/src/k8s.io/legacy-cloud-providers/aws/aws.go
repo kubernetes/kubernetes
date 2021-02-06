@@ -4125,18 +4125,18 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	}
 
 	// We only configure a TCP health-check on the first port
-	var tcpHealthCheckPort int32
+	var healthCheckPort int32
 	for _, listener := range listeners {
 		if listener.InstancePort == nil {
 			continue
 		}
-		tcpHealthCheckPort = int32(*listener.InstancePort)
+		healthCheckPort = int32(*listener.InstancePort)
 		break
 	}
 	if path, healthCheckNodePort := servicehelpers.GetServiceHealthCheckPathPort(apiService); path != "" {
 		klog.V(4).Infof("service %v (%v) needs health checks on :%d%s)", apiService.Name, loadBalancerName, healthCheckNodePort, path)
 		if annotations[ServiceAnnotationLoadBalancerHealthCheckPort] == defaultHealthCheckPort {
-			healthCheckNodePort = tcpHealthCheckPort
+			healthCheckNodePort = healthCheckPort
 		}
 		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "HTTP", healthCheckNodePort, path, annotations)
 		if err != nil {
@@ -4144,15 +4144,30 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		}
 	} else {
 		klog.V(4).Infof("service %v does not need custom health checks", apiService.Name)
+		// In case we have http and https listeners we need to set healthcheck port correctly
 		annotationProtocol := strings.ToLower(annotations[ServiceAnnotationLoadBalancerBEProtocol])
+		var instanceProtocol string
 		var hcProtocol string
 		if annotationProtocol == "https" || annotationProtocol == "ssl" {
 			hcProtocol = "SSL"
 		} else {
 			hcProtocol = "TCP"
 		}
-		// there must be no path on TCP health check
-		err = c.ensureLoadBalancerHealthCheck(loadBalancer, hcProtocol, tcpHealthCheckPort, "", annotations)
+		if hcProtocol == "SSL" {
+			for _, listener := range listeners {
+				if listener.InstancePort == nil {
+					continue
+				}
+				instanceProtocol = strings.ToLower(*listener.InstanceProtocol)
+				if instanceProtocol != "https" && instanceProtocol != "ssl" {
+					continue
+				}
+				healthCheckPort = int32(*listener.InstancePort)
+				break
+			}
+		}
+		// there must be no path on TCP/SSL health check
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, hcProtocol, healthCheckPort, "", annotations)
 		if err != nil {
 			return nil, err
 		}
