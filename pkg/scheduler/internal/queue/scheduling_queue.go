@@ -452,31 +452,32 @@ func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
 		if oldPodInfo, exists, _ := p.podBackoffQ.Get(oldPodInfo); exists {
 			pInfo := updatePod(oldPodInfo, newPod)
 			p.PodNominator.UpdateNominatedPod(oldPod, pInfo.PodInfo)
-			p.podBackoffQ.Delete(oldPodInfo)
-			if err := p.activeQ.Add(pInfo); err != nil {
-				return err
-			}
-			p.cond.Broadcast()
-			return nil
+			return p.podBackoffQ.Update(pInfo)
 		}
 	}
 
 	// If the pod is in the unschedulable queue, updating it may make it schedulable.
 	if usPodInfo := p.unschedulableQ.get(newPod); usPodInfo != nil {
-		if isPodUpdated(oldPod, newPod) {
-			p.unschedulableQ.delete(usPodInfo.Pod)
-			pInfo := updatePod(usPodInfo, newPod)
-			p.PodNominator.UpdateNominatedPod(oldPod, pInfo.PodInfo)
-			if err := p.activeQ.Add(pInfo); err != nil {
-				return err
-			}
-			p.cond.Broadcast()
-			return nil
-		}
 		pInfo := updatePod(usPodInfo, newPod)
 		p.PodNominator.UpdateNominatedPod(oldPod, pInfo.PodInfo)
-		// Pod is already in unschedulable queue and hasn't updated, no need to backoff again
-		p.unschedulableQ.addOrUpdate(pInfo)
+		if isPodUpdated(oldPod, newPod) {
+			if p.isPodBackingoff(usPodInfo) {
+				if err := p.podBackoffQ.Add(pInfo); err != nil {
+					return err
+				}
+				p.unschedulableQ.delete(usPodInfo.Pod)
+			} else {
+				if err := p.activeQ.Add(pInfo); err != nil {
+					return err
+				}
+				p.unschedulableQ.delete(usPodInfo.Pod)
+				p.cond.Broadcast()
+			}
+		} else {
+			// Pod update didn't make it schedulable, keep it in the unschedulable queue.
+			p.unschedulableQ.addOrUpdate(pInfo)
+		}
+
 		return nil
 	}
 	// If pod is not in any of the queues, we put it in the active queue.
