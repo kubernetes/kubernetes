@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
@@ -190,22 +191,22 @@ func NewPodInfo(pod *v1.Pod) *PodInfo {
 	}
 
 	// Attempt to parse the affinity terms
-	var parseErr error
+	var parseErrs []error
 	requiredAffinityTerms, err := getAffinityTerms(pod, schedutil.GetPodAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
-		parseErr = fmt.Errorf("requiredAffinityTerms: %w", err)
+		parseErrs = append(parseErrs, fmt.Errorf("requiredAffinityTerms: %w", err))
 	}
 	requiredAntiAffinityTerms, err := getAffinityTerms(pod, schedutil.GetPodAntiAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
-		parseErr = fmt.Errorf("requiredAntiAffinityTerms: %w", err)
+		parseErrs = append(parseErrs, fmt.Errorf("requiredAntiAffinityTerms: %w", err))
 	}
 	weightedAffinityTerms, err := getWeightedAffinityTerms(pod, preferredAffinityTerms)
 	if err != nil {
-		parseErr = fmt.Errorf("preferredAffinityTerms: %w", err)
+		parseErrs = append(parseErrs, fmt.Errorf("preferredAffinityTerms: %w", err))
 	}
 	weightedAntiAffinityTerms, err := getWeightedAffinityTerms(pod, preferredAntiAffinityTerms)
 	if err != nil {
-		parseErr = fmt.Errorf("preferredAntiAffinityTerms: %w", err)
+		parseErrs = append(parseErrs, fmt.Errorf("preferredAntiAffinityTerms: %w", err))
 	}
 
 	return &PodInfo{
@@ -214,7 +215,7 @@ func NewPodInfo(pod *v1.Pod) *PodInfo {
 		RequiredAntiAffinityTerms:  requiredAntiAffinityTerms,
 		PreferredAffinityTerms:     weightedAffinityTerms,
 		PreferredAntiAffinityTerms: weightedAntiAffinityTerms,
-		ParseError:                 parseErr,
+		ParseError:                 utilerrors.NewAggregate(parseErrs),
 	}
 }
 
