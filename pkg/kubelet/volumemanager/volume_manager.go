@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
@@ -267,15 +266,15 @@ func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 	}
 
 	go vm.desiredStateOfWorldPopulator.Run(sourcesReady, stopCh)
-	klog.V(2).Infof("The desired_state_of_world populator starts")
+	klog.V(2).InfoS("The desired_state_of_world populator starts")
 
-	klog.Infof("Starting Kubelet Volume Manager")
+	klog.InfoS("Starting Kubelet Volume Manager")
 	go vm.reconciler.Run(stopCh)
 
 	metrics.Register(vm.actualStateOfWorld, vm.desiredStateOfWorld, vm.volumePluginMgr)
 
 	<-stopCh
-	klog.Infof("Shutting down Kubelet Volume Manager")
+	klog.InfoS("Shutting down Kubelet Volume Manager")
 }
 
 func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
@@ -371,7 +370,7 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 		return nil
 	}
 
-	klog.V(3).Infof("Waiting for volumes to attach and mount for pod %q", format.Pod(pod))
+	klog.V(3).InfoS("Waiting for volumes to attach and mount for pod", "pod", klog.KObj(pod))
 	uniquePodName := util.GetUniquePodName(pod)
 
 	// Some pods expect to have Setup called over and over again to update.
@@ -402,7 +401,7 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 			err)
 	}
 
-	klog.V(3).Infof("All volumes are attached and mounted for pod %q", format.Pod(pod))
+	klog.V(3).InfoS("All volumes are attached and mounted for pod", "pod", klog.KObj(pod))
 	return nil
 }
 
