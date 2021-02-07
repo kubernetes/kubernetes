@@ -75,7 +75,7 @@ func getUpperPath(path string) string {
 // Check whether a directory/file is a link type or not
 // LinkType could be SymbolicLink, Junction, or HardLink
 func isLinkPath(path string) (bool, error) {
-	cmd := fmt.Sprintf("(Get-Item -Path %s).LinkType", escapeWindowsPath(path))
+	cmd := fmt.Sprintf("(Get-Item -LiteralPath %q).LinkType", path)
 	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
 		return false, err
@@ -84,17 +84,6 @@ func isLinkPath(path string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
-}
-
-// Escape the special character in vsphere windows path
-func escapeWindowsPath(path string) (string) {
-	if strings.Contains(path, "``[") || strings.Contains(path, "``]") || strings.Contains(path, "` ") {
-		return path
-	}
-	escapeLeft := strings.Replace(path, "[", "``[", -1)
-	escapeRight := strings.Replace(escapeLeft, "]", "``]", -1)
-	escapeSpace := strings.Replace(escapeRight, " ", "` ", -1)
-	return escapeSpace
 }
 
 // evalSymlink returns the path name after the evaluation of any symbolic links.
@@ -124,7 +113,7 @@ func evalSymlink(path string) (string, error) {
 		}
 	}
 	// This command will give the target path of a given symlink
-	cmd := fmt.Sprintf("(Get-Item -Path %s).Target", escapeWindowsPath(upperpath))
+	cmd := fmt.Sprintf("(Get-Item -LiteralPath %q).Target", upperpath)
 	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
 		return "", err
