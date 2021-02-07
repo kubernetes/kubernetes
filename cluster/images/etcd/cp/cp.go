@@ -34,7 +34,7 @@ func main() {
 	}
 	defer func() {
 		if err := sf.Close(); err != nil {
-			log.Printf("Error while closing sorce file; Error %v", err)
+			log.Printf("Error while closing source file; Error %v", err)
 		}
 	}()
 	fi, err := sf.Stat()
