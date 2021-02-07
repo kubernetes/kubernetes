@@ -40,6 +40,20 @@ func GetDenyIngress(name string) *networkingv1.NetworkPolicy {
 	}
 }
 
+// GetDenyEgress returns a default deny egress policy.
+func GetDenyEgress(name string) *networkingv1.NetworkPolicy {
+	return &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{},
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeEgress},
+			Egress:      []networkingv1.NetworkPolicyEgressRule{},
+		},
+	}
+}
+
 // GetDenyEgressForTarget returns a default deny egress policy.
 func GetDenyEgressForTarget(name string, targetSelector metav1.LabelSelector) *networkingv1.NetworkPolicy {
 	return &networkingv1.NetworkPolicy{
