@@ -584,6 +584,14 @@ func CreatePodsPerNodeForSimpleApp(c clientset.Interface, namespace, appName str
 	return podLabels
 }
 
+// RemoveTaintsOffNode removes a list of taints from the given node
+// It is simply a helper wrapper for RemoveTaintOffNode
+func RemoveTaintsOffNode(c clientset.Interface, nodeName string, taints []v1.Taint) {
+	for _, taint := range taints {
+		RemoveTaintOffNode(c, nodeName, taint)
+	}
+}
+
 // RemoveTaintOffNode removes the given taint from the given node.
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
 	err := removeNodeTaint(c, nodeName, nil, &taint)
