@@ -840,14 +840,13 @@ kubelet_running_containers{container_state="unknown"} 2
 		},
 	}
 
-	for _, test := range newTests {
-		tc := test
+	for _, tc := range newTests {
 		runtime.AllPodList = tc.podListForEachMoment
 		pleg.relist()
 		t.Run(tc.name, func(t *testing.T) {
-			for _, metric := range test.expectedMetrics {
-				testMetric := metric
-				if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(testMetric.wants), testMetric.metricsName); err != nil {
+			// Test cases in this function should always run in serial, since later test case's result relies on previous one.
+			for _, expectedMetric := range tc.expectedMetrics {
+				if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(expectedMetric.wants), expectedMetric.metricsName); err != nil {
 					t.Fatal(err)
 				}
 			}
