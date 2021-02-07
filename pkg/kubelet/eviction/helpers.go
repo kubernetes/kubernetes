@@ -203,7 +203,7 @@ func parseThresholdStatement(signal evictionapi.Signal, val string) (*evictionap
 		if percentage < 0 {
 			return nil, fmt.Errorf("eviction percentage threshold %v must be >= 0%%: %s", signal, val)
 		}
-		// percentage is a float and should not be greater than 1(100%)
+		// percentage is a float and should not be greater than 1 (100%)
 		if percentage > 1 {
 			return nil, fmt.Errorf("eviction percentage threshold %v must be <= 100%%: %s", signal, val)
 		}
