@@ -107,8 +107,8 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting PVC protection controller")
-	defer klog.Infof("Shutting down PVC protection controller")
+	klog.InfoS("Starting PVC protection controller")
+	defer klog.InfoS("Shutting down PVC protection controller")
 
 	if !cache.WaitForNamedCacheSync("PVC protection", stopCh, c.pvcListerSynced, c.podListerSynced) {
 		return
@@ -153,15 +153,15 @@ func (c *Controller) processNextWorkItem() bool {
 }
 
 func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
-	klog.V(4).Infof("Processing PVC %s/%s", pvcNamespace, pvcName)
+	klog.V(4).InfoS("Processing PVC", "PVC", klog.KRef(pvcNamespace, pvcName))
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished processing PVC %s/%s (%v)", pvcNamespace, pvcName, time.Since(startTime))
+		klog.V(4).InfoS("Finished processing PVC", "PVC", klog.KRef(pvcNamespace, pvcName), fmt.Sprintf("(%v)", time.Since(startTime)))
 	}()
 
 	pvc, err := c.pvcLister.PersistentVolumeClaims(pvcNamespace).Get(pvcName)
 	if apierrors.IsNotFound(err) {
-		klog.V(4).Infof("PVC %s/%s not found, ignoring", pvcNamespace, pvcName)
+		klog.V(4).InfoS("PVC not found, ignoring", "PVC", klog.KRef(pvcNamespace, pvcName))
 		return nil
 	}
 	if err != nil {
@@ -178,7 +178,7 @@ func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
 		if !isUsed {
 			return c.removeFinalizer(pvc)
 		}
-		klog.V(2).Infof("Keeping PVC %s/%s because it is still being used", pvc.Namespace, pvc.Name)
+		klog.V(2).InfoS("Keeping PVC", "PVC", klog.KRef(pvcNamespace, pvcName), " because it is still being used")
 	}
 
 	if protectionutil.NeedToAddFinalizer(pvc, volumeutil.PVCProtectionFinalizer) {
@@ -200,10 +200,10 @@ func (c *Controller) addFinalizer(pvc *v1.PersistentVolumeClaim) error {
 	claimClone.ObjectMeta.Finalizers = append(claimClone.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer)
 	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
-		klog.V(3).Infof("Error adding protection finalizer to PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)
+		klog.ErrorS(err, "Error adding protection finalizer to PVC", "PVC", klog.KObj(pvc))
 		return err
 	}
-	klog.V(3).Infof("Added protection finalizer to PVC %s/%s", pvc.Namespace, pvc.Name)
+	klog.V(3).InfoS("Added protection finalizer to PVC", "PVC", klog.KObj(pvc))
 	return nil
 }
 
@@ -212,10 +212,10 @@ func (c *Controller) removeFinalizer(pvc *v1.PersistentVolumeClaim) error {
 	claimClone.ObjectMeta.Finalizers = slice.RemoveString(claimClone.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)
 	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
-		klog.V(3).Infof("Error removing protection finalizer from PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)
+		klog.ErrorS(err, "Error removing protection finalizer from PVC", "PVC", klog.KObj(pvc))
 		return err
 	}
-	klog.V(3).Infof("Removed protection finalizer from PVC %s/%s", pvc.Namespace, pvc.Name)
+	klog.V(3).InfoS("Removed protection finalizer from PVC", "PVC", klog.KObj(pvc))
 	return nil
 }
 
@@ -238,7 +238,7 @@ func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
 }
 
 func (c *Controller) askInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
-	klog.V(4).Infof("Looking for Pods using PVC %s/%s in the Informer's cache", pvc.Namespace, pvc.Name)
+	klog.V(4).InfoS("Looking for Pods using PVC", "PVC", klog.KObj(pvc), "in the Informer's cache")
 
 	// The indexer is used to find pods which might use the PVC.
 	objs, err := c.podIndexer.ByIndex(common.PodPVCIndex, fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name))
@@ -270,12 +270,12 @@ func (c *Controller) askInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 		return true, nil
 	}
 
-	klog.V(4).Infof("No Pod using PVC %s/%s was found in the Informer's cache", pvc.Namespace, pvc.Name)
+	klog.V(4).InfoS("No Pod using PVC", "PVC", klog.KObj(pvc), "was found in the Informer's cache")
 	return false, nil
 }
 
 func (c *Controller) askAPIServer(pvc *v1.PersistentVolumeClaim) (bool, error) {
-	klog.V(4).Infof("Looking for Pods using PVC %s/%s with a live list", pvc.Namespace, pvc.Name)
+	klog.V(4).InfoS("Looking for Pods using PVC", "PVC", klog.KObj(pvc), "with a live list")
 
 	podsList, err := c.client.CoreV1().Pods(pvc.Namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -288,7 +288,7 @@ func (c *Controller) askAPIServer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 		}
 	}
 
-	klog.V(2).Infof("PVC %s/%s is unused", pvc.Namespace, pvc.Name)
+	klog.V(2).InfoS("PVC is unused", "PVC", klog.KObj(pvc))
 	return false, nil
 }
 
@@ -300,7 +300,7 @@ func (c *Controller) podUsesPVC(pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool
 		for _, volume := range pod.Spec.Volumes {
 			if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvc.Name ||
 				c.genericEphemeralVolumeFeatureEnabled && !podIsShutDown(pod) && volume.Ephemeral != nil && pod.Name+"-"+volume.Name == pvc.Name && metav1.IsControlledBy(pvc, pod) {
-				klog.V(2).Infof("Pod %s/%s uses PVC %s", pod.Namespace, pod.Name, pvc)
+				klog.V(2).InfoS("Pod", "pod", klog.KObj(pod), "uses PVC", "PVC", klog.KObj(pvc))
 				return true
 			}
 		}
@@ -357,7 +357,7 @@ func (c *Controller) pvcAddedUpdated(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for Persistent Volume Claim %#v: %v", pvc, err))
 		return
 	}
-	klog.V(4).Infof("Got event on PVC %s", key)
+	klog.V(4).InfoS("Got event on PVC", key)
 
 	if protectionutil.NeedToAddFinalizer(pvc, volumeutil.PVCProtectionFinalizer) || protectionutil.IsDeletionCandidate(pvc, volumeutil.PVCProtectionFinalizer) {
 		c.queue.Add(key)
@@ -406,7 +406,7 @@ func (c *Controller) enqueuePVCs(pod *v1.Pod, deleted bool) {
 		return
 	}
 
-	klog.V(4).Infof("Enqueuing PVCs for Pod %s/%s (UID=%s)", pod.Namespace, pod.Name, pod.UID)
+	klog.V(4).InfoS("Enqueuing PVCs for Pod", "pod", klog.KObj(pod), "(UID=", pod.UID, ")")
 
 	// Enqueue all PVCs that the pod uses
 	for _, volume := range pod.Spec.Volumes {
