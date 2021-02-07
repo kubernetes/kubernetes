@@ -31,6 +31,7 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 	oomScore := int32(-999)
 	ctMaxPerCore := int32(32768)
 	ctMin := int32(131072)
+	enableProfiling := true
 	testCases := []struct {
 		name     string
 		original *kubeproxyconfigv1alpha1.KubeProxyConfiguration
@@ -42,6 +43,7 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 			expected: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
 				FeatureGates:       map[string]bool{},
 				BindAddress:        "0.0.0.0",
+				EnableProfiling:    &enableProfiling,
 				HealthzBindAddress: "0.0.0.0:10256",
 				MetricsBindAddress: "127.0.0.1:10249",
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
@@ -78,6 +80,7 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 			expected: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
 				FeatureGates:       map[string]bool{},
 				BindAddress:        "0.0.0.0",
+				EnableProfiling:    &enableProfiling,
 				HealthzBindAddress: "127.0.0.1:10256",
 				MetricsBindAddress: "127.0.0.1:10249",
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{

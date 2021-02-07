@@ -375,7 +375,7 @@ func newProxyServer(
 		NodeRef:                nodeRef,
 		MetricsBindAddress:     config.MetricsBindAddress,
 		BindAddressHardFail:    config.BindAddressHardFail,
-		EnableProfiling:        config.EnableProfiling,
+		EnableProfiling:        *config.EnableProfiling,
 		OOMScoreAdj:            config.OOMScoreAdj,
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		HealthzServer:          healthzServer,

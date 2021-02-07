@@ -54,6 +54,10 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 		obj.MetricsBindAddress = proxyutil.AppendPortIfNeeded(obj.MetricsBindAddress, ports.ProxyStatusPort)
 	}
 
+	if obj.EnableProfiling == nil {
+		temp := true
+		obj.EnableProfiling = &temp
+	}
 	if obj.OOMScoreAdj == nil {
 		temp := int32(qos.KubeProxyOOMScoreAdj)
 		obj.OOMScoreAdj = &temp

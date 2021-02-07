@@ -124,7 +124,7 @@ type KubeProxyConfiguration struct {
 	BindAddressHardFail bool
 	// enableProfiling enables profiling via web interface on /debug/pprof handler.
 	// Profiling handlers will be handled by metrics server.
-	EnableProfiling bool
+	EnableProfiling *bool
 	// clusterCIDR is the CIDR range of the pods in the cluster. It is used to
 	// bridge traffic coming from outside of the cluster. If not provided,
 	// no off-cluster bridging will be performed.
