@@ -49,7 +49,7 @@ func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int)
 		for {
 			id := <-buffer
 			if err := runtime.DeleteContainer(id); err != nil {
-				klog.Warningf("[pod_container_deletor] DeleteContainer returned error for (id=%v): %v", id, err)
+				klog.InfoS("DeleteContainer returned error", "containerID", id, "err", err)
 			}
 		}
 	}, 0, wait.NeverStop)
@@ -76,7 +76,7 @@ func getContainersToDeleteInPod(filterContainerID string, podStatus *kubecontain
 	}(filterContainerID, podStatus)
 
 	if filterContainerID != "" && matchedContainer == nil {
-		klog.Warningf("Container %q not found in pod's containers", filterContainerID)
+		klog.InfoS("Container not found in pod's containers", "containerID", filterContainerID)
 		return containerStatusbyCreatedList{}
 	}
 
@@ -110,7 +110,7 @@ func (p *podContainerDeletor) deleteContainersInPod(filterContainerID string, po
 		select {
 		case p.worker <- candidate.ID:
 		default:
-			klog.Warningf("Failed to issue the request to remove container %v", candidate.ID)
+			klog.InfoS("Failed to issue the request to remove container", "containerID", candidate.ID)
 		}
 	}
 }
