@@ -18,8 +18,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-TASK=$1
-WHAT=$2
+TASK=${1}
+WHAT=${2}
 
 # docker buildx command is still experimental as of Docker 19.03.0
 export DOCKER_CLI_EXPERIMENTAL="enabled"
@@ -51,30 +51,30 @@ initWindowsOsVersions
 
 # Returns list of all supported architectures from BASEIMAGE file
 listOsArchs() {
-  image=$1
+  local image=${1}
   cut -d "=" -f 1 "${image}"/BASEIMAGE
 }
 
 splitOsArch() {
-    image=$1
-    os_arch=$2
+  local image=${1}
+  local os_arch=${2}
 
-    if [[ $os_arch =~ .*/.*/.* ]]; then
-      # for Windows, we have to support both LTS and SAC channels, so we're building multiple Windows images.
-      # the format for this case is: OS/ARCH/OS_VERSION.
-      os_name=$(echo "$os_arch" | cut -d "/" -f 1)
-      arch=$(echo "$os_arch" | cut -d "/" -f 2)
-      os_version=$(echo "$os_arch" | cut -d "/" -f 3)
-      suffix="$os_name-$arch-$os_version"
-    elif [[ $os_arch =~ .*/.* ]]; then
-      os_name=$(echo "$os_arch" | cut -d "/" -f 1)
-      arch=$(echo "$os_arch" | cut -d "/" -f 2)
-      os_version=""
-      suffix="$os_name-$arch"
-    else
-      echo "The BASEIMAGE file for the ${image} image is not properly formatted. Expected entries to start with 'os/arch', found '${os_arch}' instead."
-      exit 1
-    fi
+  if [[ $os_arch =~ .*/.*/.* ]]; then
+    # for Windows, we have to support both LTS and SAC channels, so we're building multiple Windows images.
+    # the format for this case is: OS/ARCH/OS_VERSION.
+    os_name=$(echo "$os_arch" | cut -d "/" -f 1)
+    arch=$(echo "$os_arch" | cut -d "/" -f 2)
+    os_version=$(echo "$os_arch" | cut -d "/" -f 3)
+    suffix="$os_name-$arch-$os_version"
+  elif [[ $os_arch =~ .*/.* ]]; then
+    os_name=$(echo "$os_arch" | cut -d "/" -f 1)
+    arch=$(echo "$os_arch" | cut -d "/" -f 2)
+    os_version=""
+    suffix="$os_name-$arch"
+  else
+    echo "The BASEIMAGE file for the ${image} image is not properly formatted. Expected entries to start with 'os/arch', found '${os_arch}' instead."
+    exit 1
+  fi
 }
 
 # Returns baseimage need to used in Dockerfile for any given architecture
@@ -88,9 +88,9 @@ getBaseImage() {
 # it will build for all the supported arch list - amd64, arm,
 # arm64, ppc64le, s390x
 build() {
-  image=$1
-  img_folder=$1
-  output_type=$2
+  local image=${1}
+  local img_folder=${1}
+  local output_type=${2}
   docker_version_check
 
   if [[ -f "${img_folder}/BASEIMAGE" ]]; then
@@ -98,15 +98,6 @@ build() {
   else
     # prepend linux/ to the QEMUARCHS items.
     os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[@]}")
-  fi
-
-  # image tag
-  TAG=$(<"${img_folder}/VERSION")
-
-  alias_name="$(cat "${img_folder}/ALIAS" 2>/dev/null || true)"
-  if [[ -n "${alias_name}" ]]; then
-    echo "Found an alias for '${image}'. Building / tagging image as '${alias_name}.'"
-    image="${alias_name}"
   fi
 
   # image tag
@@ -196,7 +187,7 @@ docker_version_check() {
 
 # This function will push the docker images
 push() {
-  image=$1
+  local image=${1}
   docker_version_check
 
   TAG=$(<"${image}"/VERSION)
@@ -205,13 +196,6 @@ push() {
   else
     # prepend linux/ to the QEMUARCHS items.
     os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[@]}")
-  fi
-
-  pushd "${image}"
-  alias_name="$(cat ALIAS 2>/dev/null || true)"
-  if [[ -n "${alias_name}" ]]; then
-    echo "Found an alias for '${image}'. Pushing image as '${alias_name}.'"
-    image="${alias_name}"
   fi
 
   pushd "${image}"
@@ -261,7 +245,7 @@ push() {
 # This function is for building AND pushing images. Useful if ${WHAT} is "all-conformance".
 # This will allow images to be pushed immediately after they've been built.
 build_and_push() {
-  image=$1
+  local image=${1}
   build "${image}" "registry"
   push "${image}"
 }
