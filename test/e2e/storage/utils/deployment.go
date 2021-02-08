@@ -41,7 +41,6 @@ import (
 // that follow these conventions:
 // - driver and provisioner names are identical
 // - the driver binary accepts a --drivername parameter
-// - the provisioner binary accepts a --provisioner parameter
 // - the paths inside the container are either fixed
 //   and don't need to be patch (for example, --csi-address=/csi/csi.sock is
 //   okay) or are specified directly in a parameter (for example,
@@ -86,10 +85,6 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 			switch container.Name {
 			case o.DriverContainerName:
 				container.Args = append(container.Args, o.DriverContainerArguments...)
-			case o.ProvisionerContainerName:
-				// Driver name is expected to be the same
-				// as the provisioner here.
-				container.Args = append(container.Args, "--provisioner="+o.NewDriverName)
 			}
 		}
 	}
