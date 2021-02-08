@@ -174,7 +174,7 @@ func stop(lock *sync.Mutex, wg *sync.WaitGroup, server *grpc.Server, running boo
 
 // setDefaultCreds sets the default credentials, given a CSICreds instance.
 func setDefaultCreds(creds *CSICreds) {
-	creds = &CSICreds{
+	*creds = CSICreds{
 		CreateVolumeSecret:                         "secretval1",
 		DeleteVolumeSecret:                         "secretval2",
 		ControllerPublishVolumeSecret:              "secretval3",
