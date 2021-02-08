@@ -44,7 +44,7 @@ find_files_to_check() {
         -o -wholename '*/third_party/*' \
         -o -wholename '*/vendor/*' \
         -o -wholename '*/hack/*' \
-        -o -wholename '**/*_test.go' \
+        -o -wholename '*_test.go' \
         \) -prune \
     \) \
     \( -wholename '**/*.go' \
@@ -57,43 +57,32 @@ reset=$(tput sgr0)
 
 kube::validate::stablemetrics() {
   stability_check_setup
-  static_checked_files=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go") || true
   temp_file=$(mktemp)
-  gopathfiles=$(find_files_to_check | grep -E 'test/instrumentation/.*.go' | grep -v "test/instrumentation/main.*go" | cut -c 3-)
-  for i in "${static_checked_files[@]}"
-  do
-    # Deliberately allow word split here
-    # shellcheck disable=SC2086
-    stabilitycheck=$(go run "test/instrumentation/main.go" $gopathfiles -- $i 1>$temp_file)
-    if $stabilitycheck; then 
-      echo -e "${green}Diffing test/instrumentation/testdata/stable-metrics-list.yaml\n${reset}"
-      if diff -u "$KUBE_ROOT/test/instrumentation/testdata/stable-metrics-list.yaml" "$temp_file"; then
-        echo -e "${green}\nPASS metrics stability verification ${reset}"
-        return 0
-      fi
+  doValidate=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go" | sort | xargs -L 200 go run "test/instrumentation/main.go" "test/instrumentation/decode_metric.go" "test/instrumentation/find_stable_metric.go" "test/instrumentation/error.go" "test/instrumentation/metric.go" -- 1>"${temp_file}")
+
+  if $doValidate; then
+    echo -e "${green}Diffing test/instrumentation/testdata/stable-metrics-list.yaml\n${reset}"
+    if diff -u "$KUBE_ROOT/test/instrumentation/testdata/stable-metrics-list.yaml" "$temp_file"; then
+      echo -e "${green}\nPASS metrics stability verification ${reset}"
+      return 0
     fi
-    echo "${red}!!! Metrics Stability static analysis has failed!${reset}" >&2
-    echo "${red}!!! Please run ./hack/update-generated-stable-metrics.sh to update the golden list.${reset}" >&2
-    exit 1
-  done
+  fi
+  
+  echo "${red}!!! Metrics Stability static analysis has failed!${reset}" >&2
+  echo "${red}!!! Please run ./hack/update-generated-stable-metrics.sh to update the golden list.${reset}" >&2
+  exit 1
 }
 
 kube::update::stablemetrics() {
   stability_check_setup
-  static_checked_files=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go") || true
   temp_file=$(mktemp)
-  gopathfiles=$(find_files_to_check | grep -E 'test/instrumentation/.*.go' | grep -v "test/instrumentation/main.*go" |     cut -c 3-)
-  for i in "${static_checked_files[@]}"
-  do
-    # Deliberately allow word split here
-    # shellcheck disable=SC2086
-    stabilitycheck=$(go run "test/instrumentation/main.go" $gopathfiles -- $i 1>$temp_file)
-    if ! $stabilitycheck; then
-      echo "${red}!!! updating golden list of metrics has failed! ${reset}" >&2
-      exit 1
-    fi
-    mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/testdata/stable-metrics-list.yaml"
-    echo "${green}Updated golden list of stable metrics.${reset}"
-  done
+  doCheckStability=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go" | sort | xargs -L 200 go run "test/instrumentation/main.go" "test/instrumentation/decode_metric.go" "test/instrumentation/find_stable_metric.go" "test/instrumentation/error.go" "test/instrumentation/metric.go" -- 1>"${temp_file}")
+
+  if ! $doCheckStability; then
+    echo "${red}!!! updating golden list of metrics has failed! ${reset}" >&2
+    exit 1
+  fi
+  mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/testdata/stable-metrics-list.yaml"
+  echo "${green}Updated golden list of stable metrics.${reset}"
 }
 

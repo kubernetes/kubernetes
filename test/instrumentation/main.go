@@ -74,12 +74,16 @@ func main() {
 	if len(errors) != 0 {
 		os.Exit(1)
 	}
+	if len(stableMetrics) == 0 {
+		os.Exit(0)
+	}
 	sort.Sort(byFQName(stableMetrics))
 	data, err := yaml.Marshal(stableMetrics)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
+
 	fmt.Print(string(data))
 }
 
