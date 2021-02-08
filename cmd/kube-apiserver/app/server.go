@@ -179,7 +179,7 @@ cluster's shared state through which all other components interact.`,
 				return utilerrors.NewAggregate(errs)
 			}
 
-			return Run(completedOptions, genericapiserver.SetupSignalHandler())
+			return Run(completedOptions, genericapiserver.SetupSignalHandlerIgnoringFurtherSignals())
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
