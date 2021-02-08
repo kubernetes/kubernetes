@@ -400,7 +400,9 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 		cmd.Stdin = a.stdin
 	}
 
-	if err := cmd.Run(); err != nil {
+	err = cmd.Run()
+	incrementCallsMetric(err)
+	if err != nil {
 		return a.wrapCmdRunErrorLocked(err)
 	}
 
