@@ -18,6 +18,7 @@ package options
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"path"
@@ -316,6 +317,10 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 		if cert, key, err := certutil.GenerateSelfSignedCertKeyWithFixtures(publicAddress, alternateIPs, alternateDNS, s.ServerCert.FixtureDirectory); err != nil {
 			return fmt.Errorf("unable to generate self signed cert: %v", err)
 		} else if len(keyCert.CertFile) > 0 && len(keyCert.KeyFile) > 0 {
+			// Ensure that the key matches the cert and both are valid
+			if _, err := tls.X509KeyPair(cert, key); err != nil {
+				return err
+			}
 			if err := certutil.WriteCert(keyCert.CertFile, cert); err != nil {
 				return err
 			}
