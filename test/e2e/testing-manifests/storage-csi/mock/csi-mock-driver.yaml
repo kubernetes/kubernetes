@@ -24,6 +24,9 @@ spec:
             - "-v=5"
             # Needed for fsGroup support.
             - "--default-fstype=ext4"
+            # We don't need much concurrency and having many gouroutines
+            # makes klog.Fatal during shutdown very long.
+            - "--worker-threads=5"
           env:
             - name: ADDRESS
               value: /csi/csi.sock
