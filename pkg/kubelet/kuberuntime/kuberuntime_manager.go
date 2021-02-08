@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	goruntime "runtime"
 	"time"
 
@@ -72,6 +73,10 @@ const (
 var (
 	// ErrVersionNotSupported is returned when the api version of runtime interface is not supported
 	ErrVersionNotSupported = errors.New("runtime api version is not supported")
+	// ignore error regexex for sandbox creation
+	ignoreSandboxCreateErrorRegex = []*regexp.Regexp{
+		regexp.MustCompile(`pods\s\"\S+.\"\snot found`),
+	}
 )
 
 // podStateProvider can determine if a pod is deleted ir terminated
@@ -137,6 +142,9 @@ type kubeGenericRuntimeManager struct {
 
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
+
+	// PodState
+	podStateProvider podStateProvider
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -238,6 +246,7 @@ func NewKubeGenericRuntimeManager(
 		}
 	}
 	kubeRuntimeManager.keyring = credentialprovider.NewDockerKeyring()
+	kubeRuntimeManager.podStateProvider = podStateProvider
 
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
@@ -756,6 +765,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 			if referr != nil {
 				klog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), referr)
+			}
+			isDeleted := m.podStateProvider.IsPodDeleted(pod.UID)
+			for _, re := range ignoreSandboxCreateErrorRegex {
+				if isDeleted && re.MatchString(err.Error()) {
+					return
+				}
 			}
 			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed to create pod sandbox: %v", err)
 			return
