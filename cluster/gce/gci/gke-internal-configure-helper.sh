@@ -445,7 +445,12 @@ function gke-configure-node-problem-detector {
 
   local -r sd_exporter_config="${KUBE_HOME}/node-problem-detector/config/exporter/stackdriver-exporter.json"
 
-  local -r system_stats_monitor="${KUBE_HOME}/node-problem-detector/config/system-stats-monitor.json"
+  if [[ "${ENABLE_LATEST_NPD:-}" == "true" ]]; then
+    local -r system_stats_monitor="${KUBE_HOME}/node-problem-detector/config/system-stats-monitor.json,${KUBE_HOME}/node-problem-detector/config/net-cgroup-system-stats-monitor.json"
+  else
+    local -r system_stats_monitor="${KUBE_HOME}/node-problem-detector/config/system-stats-monitor.json"
+  fi
+
   local custom_plugin_monitors="${custom_km_config},${custom_sm_config}"
 
   gke-configure-npd-custom-plugins

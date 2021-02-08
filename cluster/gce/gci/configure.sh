@@ -284,13 +284,19 @@ function install-gci-mounter-tools {
 
 # Install node problem detector binary.
 function install-node-problem-detector {
-  if [[ -n "${NODE_PROBLEM_DETECTOR_VERSION:-}" ]]; then
+  if [[ "${ENABLE_LATEST_NPD:-}" == "true" ]]; then
+    local -r npd_version="${NODE_PROBLEM_DETECTOR_LATEST_VERSION}"
+    local -r npd_hash="${NODE_PROBLEM_DETECTOR_LATEST_TAR_HASH}"
+  else
+    if [[ -n "${NODE_PROBLEM_DETECTOR_VERSION:-}" ]]; then
       local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
       local -r npd_hash="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
-  else
+    else
       local -r npd_version="${DEFAULT_NPD_VERSION}"
       local -r npd_hash="${DEFAULT_NPD_HASH}"
+    fi
   fi
+
   local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
 
   if is-preloaded "${npd_tar}" "${npd_hash}"; then
