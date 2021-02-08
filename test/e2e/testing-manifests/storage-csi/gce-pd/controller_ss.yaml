@@ -51,6 +51,7 @@ spec:
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
+            - "--handle-volume-inuse-error=false"
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
