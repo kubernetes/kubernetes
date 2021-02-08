@@ -172,15 +172,11 @@ func TestEtcdSupportedVersion(t *testing.T) {
 	}
 }
 
-func TestGetKubeDNSVersion(t *testing.T) {
+func TestGetDNSVersion(t *testing.T) {
 	var tests = []struct {
 		dns      kubeadmapi.DNSAddOnType
 		expected string
 	}{
-		{
-			dns:      kubeadmapi.KubeDNS,
-			expected: KubeDNSVersion,
-		},
 		{
 			dns:      kubeadmapi.CoreDNS,
 			expected: CoreDNSVersion,

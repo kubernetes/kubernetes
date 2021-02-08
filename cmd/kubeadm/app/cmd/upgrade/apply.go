@@ -104,7 +104,7 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 // - Upgrades the control plane components
 // - Applies the other resources that'd be created with kubeadm init as well, like
 //   - Creating the RBAC rules for the bootstrap tokens and the cluster-info ConfigMap
-//   - Applying new kube-dns and kube-proxy manifests
+//   - Applying new CorDNS and kube-proxy manifests
 //   - Uploads the newly used configuration to the cluster ConfigMap
 func runApply(flags *applyFlags, args []string) error {
 

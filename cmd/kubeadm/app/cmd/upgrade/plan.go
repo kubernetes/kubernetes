@@ -177,7 +177,6 @@ func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapi.Upgrad
 	components = append(components, newComponentUpgradePlan(constants.KubeProxy, up.Before.KubeVersion, up.After.KubeVersion))
 
 	components = appendDNSComponent(components, up, kubeadmapi.CoreDNS, constants.CoreDNS)
-	components = appendDNSComponent(components, up, kubeadmapi.KubeDNS, constants.KubeDNS)
 
 	if !isExternalEtcd {
 		components = append(components, newComponentUpgradePlan(constants.Etcd, up.Before.EtcdVersion, up.After.EtcdVersion))
