@@ -36,6 +36,7 @@ const (
 	etcHostsOriginalPath       = "/etc/hosts-original"
 )
 
+// KubeletManagedHostConfig defines the types for running managed etc hosts test cases
 type KubeletManagedHostConfig struct {
 	hostNetworkPod *v1.Pod
 	pod            *v1.Pod

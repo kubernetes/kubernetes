@@ -39,7 +39,7 @@ const (
 )
 
 var (
-	nonRootUid = int64(1001)
+	nonRootUID = int64(1001)
 )
 
 var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
@@ -57,11 +57,11 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		})
 
 		ginkgo.It("new files should be created with FSGroup ownership when container is non-root", func() {
-			doTestSetgidFSGroup(f, nonRootUid, v1.StorageMediumMemory)
+			doTestSetgidFSGroup(f, nonRootUID, v1.StorageMediumMemory)
 		})
 
 		ginkgo.It("nonexistent volume subPath should have the correct mode and owner using FSGroup", func() {
-			doTestSubPathFSGroup(f, nonRootUid, v1.StorageMediumMemory)
+			doTestSubPathFSGroup(f, nonRootUID, v1.StorageMediumMemory)
 		})
 
 		ginkgo.It("files with FSGroup ownership should support (root,0644,tmpfs)", func() {
@@ -124,7 +124,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
 	framework.ConformanceIt("should support (non-root,0644,tmpfs) [LinuxOnly] [NodeConformance]", func() {
-		doTest0644(f, nonRootUid, v1.StorageMediumMemory)
+		doTest0644(f, nonRootUID, v1.StorageMediumMemory)
 	})
 
 	/*
@@ -134,7 +134,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
 	framework.ConformanceIt("should support (non-root,0666,tmpfs) [LinuxOnly] [NodeConformance]", func() {
-		doTest0666(f, nonRootUid, v1.StorageMediumMemory)
+		doTest0666(f, nonRootUID, v1.StorageMediumMemory)
 	})
 
 	/*
@@ -144,7 +144,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
 	framework.ConformanceIt("should support (non-root,0777,tmpfs) [LinuxOnly] [NodeConformance]", func() {
-		doTest0777(f, nonRootUid, v1.StorageMediumMemory)
+		doTest0777(f, nonRootUID, v1.StorageMediumMemory)
 	})
 
 	/*
@@ -194,7 +194,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
 	framework.ConformanceIt("should support (non-root,0644,default) [LinuxOnly] [NodeConformance]", func() {
-		doTest0644(f, nonRootUid, v1.StorageMediumDefault)
+		doTest0644(f, nonRootUID, v1.StorageMediumDefault)
 	})
 
 	/*
@@ -204,7 +204,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
 	framework.ConformanceIt("should support (non-root,0666,default) [LinuxOnly] [NodeConformance]", func() {
-		doTest0666(f, nonRootUid, v1.StorageMediumDefault)
+		doTest0666(f, nonRootUID, v1.StorageMediumDefault)
 	})
 
 	/*
@@ -214,7 +214,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
 	framework.ConformanceIt("should support (non-root,0777,default) [LinuxOnly] [NodeConformance]", func() {
-		doTest0777(f, nonRootUid, v1.StorageMediumDefault)
+		doTest0777(f, nonRootUID, v1.StorageMediumDefault)
 	})
 
 	/*
