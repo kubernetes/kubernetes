@@ -250,12 +250,12 @@ aliases:
     - Random-Liu
     - dchen1107
     - derekwaynecarr
-    - vishh
     - yujuhong
     - sjenning
     - mrunalp
   # emeretus:
   # - dashpole
+  # - vishh
   sig-node-reviewers:
     - Random-Liu
     - dchen1107
