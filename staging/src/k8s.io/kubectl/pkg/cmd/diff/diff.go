@@ -18,15 +18,10 @@ package diff
 
 import (
 	"fmt"
-	"io"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
-
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
+	"io"
+	"io/ioutil"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +41,12 @@ import (
 	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/utils/exec"
+	"os"
+	"path/filepath"
+	"regexp"
 	"sigs.k8s.io/yaml"
+	"strings"
+	"sync"
 )
 
 var (
@@ -96,9 +96,10 @@ func diffError(err error) exec.ExitError {
 type DiffOptions struct {
 	FilenameOptions resource.FilenameOptions
 
-	ServerSideApply bool
-	FieldManager    string
-	ForceConflicts  bool
+	ServerSideApply 	bool
+	FieldManager    	string
+	ForceConflicts  	bool
+	ParallelVisitors	int
 
 	Selector         string
 	OpenAPISchema    openapi.Resources
@@ -158,6 +159,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, apply.FieldManagerClientSideApply)
+	cmdutil.AddParallelDiffVisitorsFlag(cmd)
 
 	return cmd
 }
@@ -494,6 +496,8 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
+	o.ParallelVisitors = cmdutil.GetParallelVisitorsFlag(cmd)
+
 	o.Builder = f.NewBuilder()
 	return nil
 }
@@ -521,57 +525,89 @@ func (o *DiffOptions) Run() error {
 		return err
 	}
 
+	errorChan := make(chan(error), 1)
+	poolChan := make(chan(byte), o.ParallelVisitors)
+	wg := sync.WaitGroup{}
+
 	err = r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
+		poolChan <- byte(0)
+		select {
+		case e := <-errorChan:
+			return e
+		default:
+			wg.Add(1)
+			go func() {
+				defer func() {
+					<-poolChan
+					wg.Done()
+				}()
 
-		if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-			return err
-		}
-
-		local := info.Object.DeepCopyObject()
-		for i := 1; i <= maxRetries; i++ {
-			if err = info.Get(); err != nil {
-				if !errors.IsNotFound(err) {
-					return err
+				if err != nil {
+					errorChan <- err
+					return
 				}
-				info.Object = nil
-			}
 
-			force := i == maxRetries
-			if force {
-				klog.Warningf(
-					"Object (%v: %v) keeps changing, diffing without lock",
-					info.Object.GetObjectKind().GroupVersionKind(),
-					info.Name,
-				)
-			}
-			obj := InfoObject{
-				LocalObj:        local,
-				Info:            info,
-				Encoder:         scheme.DefaultJSONEncoder(),
-				OpenAPI:         o.OpenAPISchema,
-				Force:           force,
-				ServerSideApply: o.ServerSideApply,
-				FieldManager:    o.FieldManager,
-				ForceConflicts:  o.ForceConflicts,
-				IOStreams:       o.Diff.IOStreams,
-			}
+				if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+					errorChan <- err
+					return
+				}
 
-			err = differ.Diff(obj, printer)
-			if !isConflict(err) {
-				break
-			}
+				local := info.Object.DeepCopyObject()
+				for i := 1; i <= maxRetries; i++ {
+					if err = info.Get(); err != nil {
+						if !errors.IsNotFound(err) {
+							errorChan <- err
+							return
+						}
+						info.Object = nil
+					}
+
+					force := i == maxRetries
+					if force {
+						klog.Warningf(
+							"Object (%v: %v) keeps changing, diffing without lock",
+							info.Object.GetObjectKind().GroupVersionKind(),
+							info.Name,
+						)
+					}
+					obj := InfoObject{
+						LocalObj:        local,
+						Info:            info,
+						Encoder:         scheme.DefaultJSONEncoder(),
+						OpenAPI:         o.OpenAPISchema,
+						Force:           force,
+						ServerSideApply: o.ServerSideApply,
+						FieldManager:    o.FieldManager,
+						ForceConflicts:  o.ForceConflicts,
+						IOStreams:       o.Diff.IOStreams,
+					}
+
+					err = differ.Diff(obj, printer)
+					if !isConflict(err) {
+						break
+					}
+				}
+
+				apply.WarnIfDeleting(info.Object, o.Diff.ErrOut)
+
+				if err != nil {
+					errorChan <- err
+				}
+				return
+			}()
+
 		}
-
-		apply.WarnIfDeleting(info.Object, o.Diff.ErrOut)
-
-		return err
+		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	return differ.Run(o.Diff)
+	wg.Wait()
+	select {
+	case e := <-errorChan:
+		return e
+	default:
+		return differ.Run(o.Diff)
+	}
 }

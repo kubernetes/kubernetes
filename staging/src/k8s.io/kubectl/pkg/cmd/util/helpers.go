@@ -451,6 +451,10 @@ func AddApplyAnnotationVarFlags(cmd *cobra.Command, applyAnnotation *bool) {
 	cmd.Flags().BoolVar(applyAnnotation, ApplyAnnotationsFlag, *applyAnnotation, "If true, the configuration of current object will be saved in its annotation. Otherwise, the annotation will be unchanged. This flag is useful when you want to perform kubectl apply on this object in the future.")
 }
 
+func AddParallelDiffVisitorsFlag(cmd *cobra.Command) {
+	cmd.Flags().Int("parallel-visitors", 1, "Number of concurrent visitors used by diff cmd to visit objects. Default is 1, mean that objects will be visited one by one. With N visitors we can diff faster, we should care about cpu and parallelism capacity of your machine")
+}
+
 // AddGeneratorFlags adds flags common to resource generation commands
 // TODO: need to take a pass at other generator commands to use this set of flags
 func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
@@ -514,6 +518,10 @@ func GetServerSideApplyFlag(cmd *cobra.Command) bool {
 
 func GetForceConflictsFlag(cmd *cobra.Command) bool {
 	return GetFlagBool(cmd, "force-conflicts")
+}
+
+func GetParallelVisitorsFlag(cmd *cobra.Command) int {
+	return GetFlagInt(cmd, "parallel-visitors")
 }
 
 func GetFieldManagerFlag(cmd *cobra.Command) string {
