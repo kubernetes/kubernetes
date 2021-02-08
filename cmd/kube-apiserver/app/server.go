@@ -71,8 +71,7 @@ func NewAPIServerCommand() *cobra.Command {
 	_, featureGate := featuregate.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
 		featuregate.DefaultKubeComponent, utilversion.DefaultBuildEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
 	s := options.NewServerRunOptions()
-	ctx := genericapiserver.SetupSignalContext()
-
+	ctx := genericapiserver.SetupSignalContextNotExiting()
 	cmd := &cobra.Command{
 		Use: "kube-apiserver",
 		Long: `The Kubernetes API server validates and configures data
@@ -157,6 +156,7 @@ cluster's shared state through which all other components interact.`,
 			return nil
 		},
 	}
+
 	cmd.SetContext(ctx)
 
 	fs := cmd.Flags()
