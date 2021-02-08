@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/instrumentation/monitoring"
 
 	"github.com/onsi/ginkgo"
-	"golang.org/x/oauth2/google"
 )
 
 const (
@@ -232,7 +231,6 @@ func (tc *CustomMetricTestCase) Run() {
 	projectID := framework.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
-	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
 
 	// Hack for running tests locally, needed to authenticate in Stackdriver
 	// If this is your use case, create application default credentials:
@@ -247,7 +245,7 @@ func (tc *CustomMetricTestCase) Run() {
 		client := oauth2.NewClient(oauth2.NoContext, ts)
 	*/
 
-	gcmService, err := gcm.New(client)
+	gcmService, err := gcm.NewService(ctx)
 	if err != nil {
 		framework.Failf("Failed to create gcm service, %v", err)
 	}
