@@ -63,7 +63,11 @@ const (
 	DevicePluginRegistrationCountKey  = "device_plugin_registration_total"
 	DevicePluginAllocationDurationKey = "device_plugin_alloc_duration_seconds"
 	// Metrics keys of pod resources operations
-	PodResourcesEndpointRequestsTotalKey = "pod_resources_endpoint_requests_total"
+	PodResourcesEndpointRequestsTotalKey          = "pod_resources_endpoint_requests_total"
+	PodResourcesEndpointRequestsListKey           = "pod_resources_endpoint_requests_list"
+	PodResourcesEndpointRequestsGetAllocatableKey = "pod_resources_endpoint_requests_get_allocatable"
+	PodResourcesEndpointErrorsListKey             = "pod_resources_endpoint_errors_list"
+	PodResourcesEndpointErrorsGetAllocatableKey   = "pod_resources_endpoint_errors_get_allocatable"
 
 	// Metric keys for node config
 	AssignedConfigKey             = "node_config_assigned"
@@ -288,6 +292,54 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PodResourcesEndpointRequestsTotalKey,
 			Help:           "Cumulative number of requests to the PodResource endpoint. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointRequestsListCount is a Counter that tracks the number of requests to the PodResource List() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointRequestsListCount = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodResourcesEndpointRequestsListKey,
+			Help:           "Number of requests to the PodResource List endpoint. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointRequestsGetAllocatableCount is a Counter that tracks the number of requests to the PodResource GetAllocatableResources() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointRequestsGetAllocatableCount = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodResourcesEndpointRequestsGetAllocatableKey,
+			Help:           "Number of requests to the PodResource GetAllocatableResources endpoint. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointErrorsListCount is a Counter that tracks the number of errors returned by he PodResource List() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointErrorsListCount = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodResourcesEndpointErrorsListKey,
+			Help:           "Number of requests to the PodResource List endpoint which returned error. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointErrorsGetAllocatableCount is a Counter that tracks the number of errors returned by the PodResource GetAllocatableResources() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointErrorsGetAllocatableCount = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodResourcesEndpointErrorsGetAllocatableKey,
+			Help:           "Number of requests to the PodResource GetAllocatableResources endpoint which returned error. Broken down by server api version.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"server_api_version"},
