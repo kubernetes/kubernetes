@@ -126,7 +126,7 @@ controller, and serviceaccounts controller.`,
 				os.Exit(1)
 			}
 
-			stopCh := server.SetupSignalHandler()
+			stopCh := server.SetupSignalHandler(true)
 			if err := Run(c.Complete(), stopCh); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
