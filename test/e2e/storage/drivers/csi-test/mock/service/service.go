@@ -215,7 +215,7 @@ func (s *service) newVolumeFromVolume(name string, capacity int64, volumeID int)
 func (s *service) setTopology(vol *csi.Volume) {
 	if s.config.EnableTopology {
 		vol.AccessibleTopology = []*csi.Topology{
-			&csi.Topology{
+			{
 				Segments: map[string]string{
 					TopologyKey: TopologyValue,
 				},
