@@ -88,9 +88,6 @@ var (
 			"MetricsGrabber should grab all metrics from a ControllerManager",
 			"MetricsGrabber should grab all metrics from a Scheduler",
 
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1906518
-			`\[Feature:VolumeSnapshotDataSource\]`,
-
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1906808
 			`ServiceAccounts should support OIDC discovery of service account issuer`,
 		},
