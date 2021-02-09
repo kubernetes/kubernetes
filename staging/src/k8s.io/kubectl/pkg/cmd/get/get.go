@@ -314,6 +314,12 @@ func (o *GetOptions) Validate(cmd *cobra.Command) error {
 			return fmt.Errorf("--show-labels option cannot be used with %s printer", outputOption)
 		}
 	}
+	if cmdutil.GetFlagBool(cmd, "show-annotations") {
+		outputOption := cmd.Flags().Lookup("output").Value.String()
+		if outputOption != "" && outputOption != "wide" {
+			return fmt.Errorf("--show-annotations option cannot be used with %s printer", outputOption)
+		}
+	}
 	if o.OutputWatchEvents && !(o.Watch || o.WatchOnly) {
 		return cmdutil.UsageErrorf(cmd, "--output-watch-events option can only be used with --watch or --watch-only")
 	}

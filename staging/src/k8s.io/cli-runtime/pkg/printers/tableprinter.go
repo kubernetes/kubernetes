@@ -297,7 +297,9 @@ func decorateTable(table *metav1.Table, options PrintOptions) error {
 	if options.ShowLabels {
 		width++
 	}
-
+	if options.ShowAnnotations {
+		width++
+	}
 	columns := table.ColumnDefinitions
 
 	nameColumn := -1
@@ -331,12 +333,20 @@ func decorateTable(table *metav1.Table, options PrintOptions) error {
 				Type: "string",
 			})
 		}
+		if options.ShowAnnotations {
+			columns = append(columns, metav1.TableColumnDefinition{
+				Name: "Annotations",
+				Type: "string",
+			})
+		}
 	}
 
 	rows := table.Rows
 
 	includeLabels := len(options.ColumnLabels) > 0 || options.ShowLabels
-	if includeLabels || options.WithNamespace || nameColumn != -1 {
+	includeAnnotations := len(options.ColumnLabels) > 0 || options.ShowAnnotations
+
+	if includeLabels || includeAnnotations || options.WithNamespace || nameColumn != -1 {
 		for i := range rows {
 			row := rows[i]
 
@@ -371,6 +381,9 @@ func decorateTable(table *metav1.Table, options PrintOptions) error {
 			if includeLabels {
 				row.Cells = appendLabelCells(row.Cells, m.GetLabels(), options)
 			}
+			if includeAnnotations {
+				row.Cells = appendLabelCells(row.Cells, m.GetAnnotations(), options)
+			}
 			rows[i] = row
 		}
 	}
@@ -401,8 +414,11 @@ func printRowsForHandlerEntry(output io.Writer, handler *printHandler, eventType
 			headers = append(headers, strings.ToUpper(column.Name))
 		}
 		headers = append(headers, formatLabelHeaders(options.ColumnLabels)...)
-		// LABELS is always the last column.
+		headers = append(headers, formatShowAnnotationsHeader(options.ShowAnnotations)...)
+
+		// ANNOTATIONS is always the last column.
 		headers = append(headers, formatShowLabelsHeader(options.ShowLabels)...)
+
 		// prepend namespace header
 		if options.WithNamespace {
 			headers = append(withNamespacePrefixColumns, headers...)
@@ -466,9 +482,14 @@ func printRows(output io.Writer, eventType string, rows []metav1.TableRow, optio
 		}
 
 		hasLabels := len(options.ColumnLabels) > 0
-		if obj := row.Object.Object; obj != nil && (hasLabels || options.ShowLabels) {
+		if obj := row.Object.Object; obj != nil && (hasLabels || options.ShowLabels || options.ShowAnnotations ) {
 			if m, err := meta.Accessor(obj); err == nil {
 				for _, value := range labelValues(m.GetLabels(), options) {
+					output.Write([]byte("\t"))
+					output.Write([]byte(value))
+				}
+
+				for _, value := range labelValues(m.GetAnnotations(), options) {
 					output.Write([]byte("\t"))
 					output.Write([]byte(value))
 				}
@@ -488,10 +509,18 @@ func formatLabelHeaders(columnLabels []string) []string {
 	return formHead
 }
 
-// headers for --show-labels=true
+// formatShowLabelsHeader headers for --show-labels=true
 func formatShowLabelsHeader(showLabels bool) []string {
 	if showLabels {
 		return []string{"LABELS"}
+	}
+	return nil
+}
+
+// formatShowAnnotationsHeader headers for --show-annotations=true
+func formatShowAnnotationsHeader(showAnnotations bool) []string {
+	if showAnnotations {
+		return []string{"ANNOTATIONS"}
 	}
 	return nil
 }
@@ -502,7 +531,7 @@ func labelValues(itemLabels map[string]string, opts PrintOptions) []string {
 	for _, key := range opts.ColumnLabels {
 		values = append(values, itemLabels[key])
 	}
-	if opts.ShowLabels {
+	if opts.ShowLabels || opts.ShowAnnotations {
 		values = append(values, labels.FormatLabels(itemLabels))
 	}
 	return values
@@ -514,7 +543,7 @@ func appendLabelCells(values []interface{}, itemLabels map[string]string, opts P
 	for _, key := range opts.ColumnLabels {
 		values = append(values, itemLabels[key])
 	}
-	if opts.ShowLabels {
+	if opts.ShowLabels || opts.ShowAnnotations {
 		values = append(values, labels.FormatLabels(itemLabels))
 	}
 	return values

@@ -39,13 +39,14 @@ type ResourcePrinter interface {
 
 // PrintOptions struct defines a struct for various print options
 type PrintOptions struct {
-	NoHeaders     bool
-	WithNamespace bool
-	WithKind      bool
-	Wide          bool
-	ShowLabels    bool
-	Kind          schema.GroupKind
-	ColumnLabels  []string
+	NoHeaders     	bool
+	WithNamespace 	bool
+	WithKind      	bool
+	Wide          	bool
+	ShowLabels    	bool
+	ShowAnnotations bool
+	Kind          	schema.GroupKind
+	ColumnLabels  	[]string
 
 	SortBy string
 

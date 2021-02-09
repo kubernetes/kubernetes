@@ -40,6 +40,10 @@ var testPod = &corev1.Pod{
 			"first-label":  "12",
 			"second-label": "label-value",
 		},
+		Annotations: map[string]string{
+			"first-annotation":  "pod",
+			"second-annotation": "127.0.0.1",
+		},
 	},
 }
 
@@ -470,6 +474,93 @@ test1   1/1     podPhase   5         20h   12            label-value
 	}
 }
 
+func TestPrintTable_WithAnnotations(t *testing.T) {
+	tests := []struct {
+		columns  []metav1.TableColumnDefinition
+		rows     []metav1.TableRow
+		options  PrintOptions
+		expected string
+	}{
+		// Test a table "ShowAnnotations" option, appends annotations as columns.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+					Object: runtime.RawExtension{Object: testPod},
+				},
+			},
+			options: PrintOptions{ShowAnnotations: true},
+			expected: `NAME    READY   STATUS     RETRIES   AGE   ANNOTATIONS
+test1   1/1     podPhase   5         20h   first-annotation=pod,second-annotation=127.0.0.1
+`,
+		},
+		// Test a table "ColumnLabels" option, appends labels as columns.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+					Object: runtime.RawExtension{Object: testPod},
+				},
+			},
+			// Print "second-label" as column name, with label value.
+			options: PrintOptions{ColumnLabels: []string{"second-label"}},
+			expected: `NAME    READY   STATUS     RETRIES   AGE   SECOND-LABEL
+test1   1/1     podPhase   5         20h   127.0.0.1
+`,
+		},
+		// Test a table "ColumnLabels" option, appends labels as columns.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+					Object: runtime.RawExtension{Object: testPod},
+				},
+			},
+			// Print multiple-labels as columns, with their values.
+			options: PrintOptions{ColumnLabels: []string{"first-annotation", "second-annotation"}},
+			expected: `NAME    READY   STATUS     RETRIES   AGE   FIRST-ANNOTATION   SECOND-ANNOTATION
+test1   1/1     podPhase   5         20h   12   pod   127.0.0.1
+`,
+		},
+	}
+	for _, test := range tests {
+		// Create the table from the columns and rows.
+		table := &metav1.Table{
+			ColumnDefinitions: test.columns,
+			Rows:              test.rows,
+		}
+		// Print the table
+		out := bytes.NewBuffer([]byte{})
+		printer := NewTablePrinter(test.options)
+		printer.PrintObj(table, out)
+		// Validate the expected output matches the printed table.
+		if test.expected != out.String() {
+			t.Errorf("Table printing error: expected (%s), got (%s)", test.expected, out.String())
+		}
+	}
+}
+
 func TestPrintTable_NonTable(t *testing.T) {
 	tests := []struct {
 		object   runtime.Object
@@ -502,6 +593,14 @@ func TestPrintTable_NonTable(t *testing.T) {
 test-pod-name   <unknown>   first-label=12,second-label=label-value
 `,
 		},
+		// Test non-table default printing for a pod with "ShowAnnotations" option.
+		{
+			object:  testPod,
+			options: PrintOptions{ShowAnnotations: true},
+			expected: `NAME            AGE         ANNOTATIONS
+test-pod-name   <unknown>   first-annotation=pod,second-annotation=127.0.0.1
+`,
+				},
 		// Test non-table default printing for a Status resource.
 		{
 			object:  testStatus,
@@ -556,7 +655,7 @@ func TestPrintTable_WatchEvents(t *testing.T) {
 Added   test1   1/1     podPhase   5         20h
 `,
 		},
-		// Print WatchEvent with Table, and "NoHeaders", "WithNamespace", and "ShowLabels" options.
+		// Print WatchEvent with Table, and "NoHeaders", "WithNamespace", "ShowLabels" and "ShowAnnotations" options.
 		{
 			columns: []metav1.TableColumnDefinition{
 				{Name: "Name", Type: "string"},
@@ -571,8 +670,8 @@ Added   test1   1/1     podPhase   5         20h
 					Object: runtime.RawExtension{Object: testPod},
 				},
 			},
-			options:  PrintOptions{NoHeaders: true, WithNamespace: true, ShowLabels: true},
-			expected: "Added   test-namespace   test1   1/1   podPhase   5     20h   first-label=12,second-label=label-value\n",
+			options:  PrintOptions{NoHeaders: true, WithNamespace: true, ShowLabels: true, ShowAnnotations: true},
+			expected: "Added   test-namespace   test1   1/1   podPhase   5     20h   first-label=12,second-label=label-value   first-annotation=pod,second-annotation=127.0.0.1\n",
 		},
 	}
 	for _, test := range tests {
@@ -612,6 +711,7 @@ func TestPrintUnstructuredObject(t *testing.T) {
 				"uid":               "00000000-0000-0000-0000-000000000001",
 				"dummy3":            "present",
 				"labels":            map[string]interface{}{"test": "other"},
+				"annotations":       map[string]interface{}{"test": "other"},
 			},
 			/*"items": []interface{}{
 				map[string]interface{}{
@@ -649,6 +749,15 @@ func TestPrintUnstructuredObject(t *testing.T) {
 			object:   obj,
 		},
 		{
+			options: PrintOptions{
+				ShowLabels:    		true,
+				ShowAnnotations:    true,
+				WithNamespace: 		true,
+			},
+			expected: "NAMESPACE\\s+NAME\\s+AGE\\s+LABELS\\s+ANNOTATIONS\nMyNamespace\\s+MyName\\s+\\d+\\w+\\s+test\\=other\\s+test\\=other",
+			object:   obj,
+		},
+		{
 			expected: "NAME\\s+AGE\nMyName\\s+\\d+\\w+\nMyName2\\s+\\d+",
 			object: &unstructured.Unstructured{
 				Object: map[string]interface{}{
@@ -666,6 +775,7 @@ func TestPrintUnstructuredObject(t *testing.T) {
 								"uid":               "00000000-0000-0000-0000-000000000001",
 								"dummy3":            "present",
 								"labels":            map[string]interface{}{"test": "other"},
+								"annotations":       map[string]interface{}{"test": "other"},
 							},
 						},
 						map[string]interface{}{
@@ -677,6 +787,7 @@ func TestPrintUnstructuredObject(t *testing.T) {
 								"uid":               "00000000-0000-0000-0000-000000000001",
 								"dummy3":            "present",
 								"labels":            "badlabel",
+								"annotations":       "badannotation",
 							},
 						},
 					},

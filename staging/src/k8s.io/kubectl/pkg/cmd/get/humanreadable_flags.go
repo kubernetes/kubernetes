@@ -28,10 +28,11 @@ import (
 // Given the following flag values, a printer can be requested that knows
 // how to handle printing based on these values.
 type HumanPrintFlags struct {
-	ShowKind     *bool
-	ShowLabels   *bool
-	SortBy       *string
-	ColumnLabels *[]string
+	ShowKind     	*bool
+	ShowLabels   	*bool
+	ShowAnnotations	*bool
+	SortBy       	*string
+	ColumnLabels 	*[]string
 
 	// get.go-specific values
 	NoHeaders bool
@@ -80,19 +81,25 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 		showLabels = *f.ShowLabels
 	}
 
+	ShowAnnotations := false
+	if f.ShowAnnotations != nil {
+		ShowAnnotations = *f.ShowAnnotations
+	}
+
 	columnLabels := []string{}
 	if f.ColumnLabels != nil {
 		columnLabels = *f.ColumnLabels
 	}
 
 	p := printers.NewTablePrinter(printers.PrintOptions{
-		Kind:          f.Kind,
-		WithKind:      showKind,
-		NoHeaders:     f.NoHeaders,
-		Wide:          outputFormat == "wide",
-		WithNamespace: f.WithNamespace,
-		ColumnLabels:  columnLabels,
-		ShowLabels:    showLabels,
+		Kind:          		f.Kind,
+		WithKind:      		showKind,
+		NoHeaders:     		f.NoHeaders,
+		Wide:          		outputFormat == "wide",
+		WithNamespace: 		f.WithNamespace,
+		ColumnLabels:  		columnLabels,
+		ShowLabels:    		showLabels,
+		ShowAnnotations:  	ShowAnnotations,
 	})
 
 	// TODO(juanvallejo): handle sorting here
@@ -115,6 +122,9 @@ func (f *HumanPrintFlags) AddFlags(c *cobra.Command) {
 	if f.ShowKind != nil {
 		c.Flags().BoolVar(f.ShowKind, "show-kind", *f.ShowKind, "If present, list the resource type for the requested object(s).")
 	}
+	if f.ShowAnnotations != nil {
+		c.Flags().BoolVar(f.ShowAnnotations, "show-annotations", *f.ShowAnnotations, "When printing, show all annotations as the last column (default hide labels column)")
+	}
 }
 
 // NewHumanPrintFlags returns flags associated with
@@ -123,16 +133,17 @@ func NewHumanPrintFlags() *HumanPrintFlags {
 	showLabels := false
 	sortBy := ""
 	showKind := false
+	showAnnotations := false
 	columnLabels := []string{}
 
 	return &HumanPrintFlags{
-		NoHeaders:     false,
-		WithNamespace: false,
-		ColumnLabels:  &columnLabels,
-
-		Kind:       schema.GroupKind{},
-		ShowLabels: &showLabels,
-		SortBy:     &sortBy,
-		ShowKind:   &showKind,
+		NoHeaders:     		false,
+		WithNamespace: 		false,
+		ColumnLabels:  		&columnLabels,
+		Kind:       		schema.GroupKind{},
+		ShowLabels: 		&showLabels,
+		SortBy:     		&sortBy,
+		ShowKind:   		&showKind,
+		ShowAnnotations: 	&showAnnotations,
 	}
 }
