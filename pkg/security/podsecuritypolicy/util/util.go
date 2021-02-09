@@ -29,6 +29,8 @@ const (
 	ValidatedPSPAnnotation = "kubernetes.io/psp"
 )
 
+// GetAllFSTypesExcept returns the result of GetAllFSTypesAsSet minus
+// the given exceptions.
 func GetAllFSTypesExcept(exceptions ...string) sets.String {
 	fstypes := GetAllFSTypesAsSet()
 	for _, e := range exceptions {
@@ -37,6 +39,8 @@ func GetAllFSTypesExcept(exceptions ...string) sets.String {
 	return fstypes
 }
 
+// GetAllFSTypesAsSet returns all actual volume types, regardless
+// of feature gates. The special policy.All pseudo type is not included.
 func GetAllFSTypesAsSet() sets.String {
 	fstypes := sets.NewString()
 	fstypes.Insert(
