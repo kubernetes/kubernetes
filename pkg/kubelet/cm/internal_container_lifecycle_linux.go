@@ -19,6 +19,9 @@ limitations under the License.
 package cm
 
 import (
+	"strconv"
+	"strings"
+
 	"k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
@@ -28,6 +31,17 @@ func (i *internalContainerLifecycleImpl) PreCreateContainer(pod *v1.Pod, contain
 		allocatedCPUs := i.cpuManager.GetCPUs(string(pod.UID), container.Name)
 		if !allocatedCPUs.IsEmpty() {
 			containerConfig.Linux.Resources.CpusetCpus = allocatedCPUs.String()
+		}
+	}
+
+	if i.memoryManager != nil {
+		numaNodes := i.memoryManager.GetMemoryNUMANodes(pod, container)
+		if numaNodes.Len() > 0 {
+			var affinity []string
+			for _, numaNode := range numaNodes.List() {
+				affinity = append(affinity, strconv.Itoa(numaNode))
+			}
+			containerConfig.Linux.Resources.CpusetMems = strings.Join(affinity, ",")
 		}
 	}
 
