@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -199,10 +198,17 @@ func (nim *nodeInfoManager) tryUpdateNode(updateFuncs ...nodeUpdateFunc) error {
 	}
 
 	if needUpdate {
-		// PatchNodeStatus can update both node's status and labels or annotations
-		// Updating status by directly updating node does not work
-		_, _, updateErr := nodeutil.PatchNodeStatus(kubeClient.CoreV1(), types.NodeName(node.Name), originalNode, node)
-		return updateErr
+		// Use Update on meta changes
+		originalNode.ObjectMeta = node.ObjectMeta
+		newNode, err := nodeClient.Update(context.TODO(), originalNode, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		// Now fill in status changes
+		newNode.Status = node.Status
+		_, err = nodeClient.UpdateStatus(context.TODO(), newNode, metav1.UpdateOptions{})
+		return err
 	}
 
 	return nil
