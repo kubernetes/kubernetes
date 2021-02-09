@@ -448,6 +448,28 @@ func TestFilterTopologyEndpoint(t *testing.T) {
 				{Endpoint: "1.1.4.2:11", NodeName: "testNode4"},
 			},
 		},
+		{
+			Name:       "empty node label",
+			nodeLabels: map[types.NodeName]map[string]string{},
+			endpoints: []endpoint{
+				{Endpoint: "1.1.1.1:11", NodeName: "testNode1"},
+			},
+			currentNodeName: "testNode1",
+			topologyKeys:    []string{"kubernetes.io/hostname"},
+			expected:        []endpoint{},
+		},
+		{
+			Name:       "empty node label with 'Any' key",
+			nodeLabels: map[types.NodeName]map[string]string{},
+			endpoints: []endpoint{
+				{Endpoint: "1.1.1.1:11", NodeName: "testNode1"},
+			},
+			currentNodeName: "testNode1",
+			topologyKeys:    []string{v1.TopologyKeyAny, "kubernetes.io/hostname"},
+			expected: []endpoint{
+				{Endpoint: "1.1.1.1:11", NodeName: "testNode1"},
+			},
+		},
 	}
 	endpointsToStringArray := func(endpoints []endpoint) []string {
 		result := make([]string, 0, len(endpoints))

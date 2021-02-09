@@ -47,10 +47,12 @@ func FilterTopologyEndpoint(nodeLabels map[string]string, topologyKeys []string,
 	filteredEndpoint := []Endpoint{}
 
 	if len(nodeLabels) == 0 {
-		if topologyKeys[len(topologyKeys)-1] == v1.TopologyKeyAny {
-			// edge case: include all endpoints if topology key "Any" specified
-			// when we cannot determine current node's topology.
-			return endpoints
+		for _, key := range topologyKeys {
+			if key == v1.TopologyKeyAny {
+				// edge case: include all endpoints if topology key "Any" specified
+				// when we cannot determine current node's topology.
+				return endpoints
+			}
 		}
 		// edge case: do not include any endpoints if topology key "Any" is
 		// not specified when we cannot determine current node's topology.
