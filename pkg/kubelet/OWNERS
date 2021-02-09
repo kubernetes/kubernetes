@@ -5,13 +5,13 @@ approvers:
 - Random-Liu
 - dchen1107
 - derekwaynecarr
-- vishh
 - yujuhong
 - sjenning
 - mrunalp
 
 emeritus_approvers:
 - dashpole
+- vishh
 
 reviewers:
 - sig-node-reviewers # see https://github.com/kubernetes/kubernetes/blob/master/OWNERS_ALIASES#LC220:~:text=sig%2Dnode%2Dreviewers
