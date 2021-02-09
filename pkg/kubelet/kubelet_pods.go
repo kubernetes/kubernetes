@@ -78,6 +78,12 @@ const (
 	podKillingChannelCapacity = 50
 )
 
+// Container state reason list
+const (
+	PodInitializing   = "PodInitializing"
+	ContainerCreating = "ContainerCreating"
+)
+
 // Get a list of pods that have data directories.
 func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 	podInfos, err := ioutil.ReadDir(kl.getPodsDir())
@@ -1703,9 +1709,9 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 
 	// Set all container statuses to default waiting state
 	statuses := make(map[string]*v1.ContainerStatus, len(containers))
-	defaultWaitingState := v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "ContainerCreating"}}
+	defaultWaitingState := v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: ContainerCreating}}
 	if hasInitContainers {
-		defaultWaitingState = v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "PodInitializing"}}
+		defaultWaitingState = v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: PodInitializing}}
 	}
 
 	for _, container := range containers {
@@ -1769,9 +1775,9 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		status := statuses[container.Name]
 		// if the status we're about to write indicates the default, the Waiting status will force this pod back into Pending.
 		// That isn't true, we know the pod is going away.
-		isDefaultWaitingStatus := status.State.Waiting != nil && status.State.Waiting.Reason == "ContainerCreating"
+		isDefaultWaitingStatus := status.State.Waiting != nil && status.State.Waiting.Reason == ContainerCreating
 		if hasInitContainers {
-			isDefaultWaitingStatus = status.State.Waiting != nil && status.State.Waiting.Reason == "PodInitializing"
+			isDefaultWaitingStatus = status.State.Waiting != nil && status.State.Waiting.Reason == PodInitializing
 		}
 		if !isDefaultWaitingStatus {
 			// we the status was written, don't override

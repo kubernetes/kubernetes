@@ -1521,8 +1521,6 @@ func verifyContainerStatuses(t *testing.T, statuses []v1.ContainerStatus, state,
 // Test generateAPIPodStatus with different reason cache and old api pod status.
 func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 	// The following waiting reason and message  are generated in convertStatusToAPIStatus()
-	startWaitingReason := "ContainerCreating"
-	initWaitingReason := "PodInitializing"
 	testTimestamp := time.Unix(123456789, 987654321)
 	testErrorReason := fmt.Errorf("test-error")
 	emptyContainerID := (&kubecontainer.ContainerID{}).String()
@@ -1559,18 +1557,18 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 			}},
 			expectedState: map[string]v1.ContainerState{
 				"without-old-record": {Waiting: &v1.ContainerStateWaiting{
-					Reason: startWaitingReason,
+					Reason: ContainerCreating,
 				}},
 				"with-old-record": {Waiting: &v1.ContainerStateWaiting{
-					Reason: startWaitingReason,
+					Reason: ContainerCreating,
 				}},
 			},
 			expectedInitState: map[string]v1.ContainerState{
 				"without-old-record": {Waiting: &v1.ContainerStateWaiting{
-					Reason: initWaitingReason,
+					Reason: PodInitializing,
 				}},
 				"with-old-record": {Waiting: &v1.ContainerStateWaiting{
-					Reason: initWaitingReason,
+					Reason: PodInitializing,
 				}},
 			},
 			expectedLastTerminationState: map[string]v1.ContainerState{
