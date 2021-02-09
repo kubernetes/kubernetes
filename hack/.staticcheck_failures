@@ -1,7 +1,6 @@
 cluster/images/etcd/migrate
 pkg/controller/replicaset
 pkg/kubelet/dockershim
-test/e2e/autoscaling
 test/integration/garbagecollector
 test/integration/scheduler_perf
 vendor/k8s.io/apimachinery/pkg/api/apitesting/roundtrip
