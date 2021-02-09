@@ -1160,6 +1160,44 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 	}
 }
 
+func TestInvalidSelectors(t *testing.T) {
+	testCases := map[string]struct {
+		labelSelector *metav1.LabelSelector
+	}{
+		"illegal value key": {
+			labelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"k8s.io/too/many/slashes": "value",
+				},
+			},
+		},
+		"illegal operator": {
+			labelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOperator("illegal"),
+						Values:   []string{"bar"},
+					},
+				},
+			},
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			dc, ps := newFakeDisruptionController()
+
+			pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(3))
+			pdb.Spec.Selector = tc.labelSelector
+
+			add(t, dc.pdbStore, pdb)
+			dc.sync(pdbName)
+			ps.VerifyPdbStatus(t, pdbName, 0, 0, 0, 0, map[string]metav1.Time{})
+		})
+	}
+}
+
 // waitForCacheCount blocks until the given cache store has the desired number
 // of items in it. This will return an error if the condition is not met after a
 // 10 second timeout.
