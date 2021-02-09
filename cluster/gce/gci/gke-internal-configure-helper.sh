@@ -323,6 +323,7 @@ EOF
     cat >> "${config_path}" <<EOF
 [plugins.cri.containerd]
   snapshotter = "gcfs"
+  disable_snapshot_annotations = false
 [proxy_plugins]
   [proxy_plugins.gcfs]
     type = "snapshot"
