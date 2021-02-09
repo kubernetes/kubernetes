@@ -1215,10 +1215,8 @@ func (pk *podKillerWithChannel) markPodTerminated(uid string) {
 	delete(pk.podTerminationMap, uid)
 }
 
-// checkAndMarkPodPendingTerminationByPod checks to see if the pod is being
-// killed and returns true if it is, otherwise the pod is added to the map and
-// returns false
-func (pk *podKillerWithChannel) checkAndMarkPodPendingTerminationByPod(podPair *kubecontainer.PodPair) bool {
+// markPodPendingTerminationByPod marks the pod to be terminated
+func (pk *podKillerWithChannel) markPodPendingTerminationByPod(podPair *kubecontainer.PodPair) {
 	pk.podKillingLock.Lock()
 	defer pk.podKillingLock.Unlock()
 	var apiPodExists bool
@@ -1249,9 +1247,7 @@ func (pk *podKillerWithChannel) checkAndMarkPodPendingTerminationByPod(podPair *
 		} else {
 			klog.V(4).Infof("running pod %q is pending termination", podPair.RunningPod.ID)
 		}
-		return true
 	}
-	return false
 }
 
 // Close closes the channel through which requests are delivered
@@ -1261,20 +1257,34 @@ func (pk *podKillerWithChannel) Close() {
 
 // KillPod sends pod killing request to the killer
 func (pk *podKillerWithChannel) KillPod(pair *kubecontainer.PodPair) {
+	pk.markPodPendingTerminationByPod(pair)
 	pk.podKillingCh <- pair
 }
 
 // PerformPodKillingWork launches a goroutine to kill a pod received from the channel if
 // another goroutine isn't already in action.
 func (pk *podKillerWithChannel) PerformPodKillingWork() {
+	killing := sets.NewString()
+	var lock sync.Mutex
 	for podPair := range pk.podKillingCh {
-		if pk.checkAndMarkPodPendingTerminationByPod(podPair) {
-			// Pod is already being killed
-			continue
-		}
-
 		runningPod := podPair.RunningPod
 		apiPod := podPair.APIPod
+
+		// isBeingKilled checks whether the given pod is being killed.
+		// If not, add the pod to the killing set.
+		isBeingKilled := func(uid string) bool {
+			lock.Lock()
+			defer lock.Unlock()
+			exists := killing.Has(string(runningPod.ID))
+			if !exists {
+				killing.Insert(string(runningPod.ID))
+			}
+			return exists
+		}
+
+		if isBeingKilled(string(runningPod.ID)) {
+			continue
+		}
 
 		go func(apiPod *v1.Pod, runningPod *kubecontainer.Pod) {
 			klog.V(2).Infof("Killing unwanted pod %q", runningPod.Name)
@@ -1283,6 +1293,9 @@ func (pk *podKillerWithChannel) PerformPodKillingWork() {
 				klog.Errorf("Failed killing the pod %q: %v", runningPod.Name, err)
 			}
 			pk.markPodTerminated(string(runningPod.ID))
+			lock.Lock()
+			defer lock.Unlock()
+			killing.Delete(string(runningPod.ID))
 		}(apiPod, runningPod)
 	}
 }
