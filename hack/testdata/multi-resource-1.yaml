@@ -11,7 +11,7 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause
-    image: k8s.gcr.io/pause:2.0
+    image: k8s.gcr.io/pause:3.4.1
 ---
 apiVersion: v1
 kind: Namespace

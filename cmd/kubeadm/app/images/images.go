@@ -121,3 +121,8 @@ func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 
 	return imgs
 }
+
+// GetPauseImage returns the image for the "pause" container
+func GetPauseImage(cfg *kubeadmapi.ClusterConfiguration) string {
+	return GetGenericImage(cfg.ImageRepository, "pause", constants.PauseVersion)
+}
