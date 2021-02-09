@@ -2371,12 +2371,11 @@ function create-subnetworks() {
 
   # Look for the alias subnet, it must exist and have a secondary
   # range configured.
-  # Deliberately declare and assign at the same time or the CI pipeline fails
-  # shellcheck disable=SC2155
-  local subnet=$(gcloud compute networks subnets describe \
+  local subnet
+  subnet=$(gcloud compute networks subnets describe \
     --project "${NETWORK_PROJECT}" \
     --region ${REGION} \
-    ${IP_ALIAS_SUBNETWORK} 2>/dev/null)
+    ${IP_ALIAS_SUBNETWORK} 2>/dev/null || true)
   if [[ -z ${subnet} ]]; then
     echo "Creating subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
     gcloud compute networks subnets create \
