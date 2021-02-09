@@ -2329,9 +2329,14 @@ func (kl *Kubelet) fastStatusUpdateOnce() {
 
 func (kl *Kubelet) deletePodSandbox(podID types.UID) {
 	if podStatus, err := kl.podCache.Get(podID); err == nil {
-		toKeep := 1
-		if kl.IsPodDeleted(podID) {
-			toKeep = 0
+		toKeep := 0
+		if syncedPod, ok := kl.podManager.GetPodByUID(podID); ok {
+			// generate the api status using the cached runtime status to get up-to-date ContainerStatuses
+			apiPodStatus := kl.generateAPIPodStatus(syncedPod, podStatus)
+			// if pod is not deleted
+			if !(eviction.PodIsEvicted(syncedPod.Status) || (syncedPod.DeletionTimestamp != nil && notRunning(apiPodStatus.ContainerStatuses))) {
+				toKeep = 1
+			}
 		}
 		kl.sandboxDeleter.deleteSandboxesInPod(podStatus, toKeep)
 	}
