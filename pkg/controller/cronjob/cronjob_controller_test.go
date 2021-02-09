@@ -37,8 +37,9 @@ import (
 
 var (
 	// schedule is hourly on the hour
-	onTheHour     = "0 * * * ?"
-	errorSchedule = "obvious error schedule"
+	onTheHour       = "0 * * * ?"
+	errorSchedule   = "obvious error schedule"
+	invalidSchedule = "0 0 31 2 *"
 )
 
 func justBeforeTheHour() time.Time {
@@ -247,6 +248,10 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 
 		"prev ran but done, long overdue, past medium deadline, F": {f, F, onTheHour, mediumDead, T, F, weekAfterTheHour(), T, F, 1, 0},
 		"prev ran but done, long overdue, past short deadline, F":  {f, F, onTheHour, shortDead, T, F, weekAfterTheHour(), T, F, 1, 0},
+
+		"never ran, invalid schedule, A": {A, F, invalidSchedule, longDead, F, F, justBeforeTheHour(), F, F, 0, 1},
+		"never ran, invalid schedule, R": {R, F, invalidSchedule, longDead, F, F, justBeforeTheHour(), F, F, 0, 1},
+		"never ran, invalid schedule, F": {f, F, invalidSchedule, longDead, F, F, justBeforeTheHour(), F, F, 0, 1},
 	}
 	for name, tc := range testCases {
 		name := name

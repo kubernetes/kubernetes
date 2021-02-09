@@ -123,10 +123,18 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 	return starts, nil
 }
 
+var unschedulableDate = time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)
+
 // getLatestMissedSchedule returns the latest start time in the time window (inclusive), and the number of schedules in the time window (capped at 2).
 // The number of missed start times conveys "none, one, multiple".
 func getLatestMissedSchedule(startWindow time.Time, endWindow time.Time, schedule cron.Schedule) (time.Time, int) {
 	nextSchedule := schedule.Next(startWindow)
+
+	// check for invalid case, like "0 0 31 2 *", which would be the
+	// 31st of feb.
+	if nextSchedule == unschedulableDate {
+		return unschedulableDate, 2
+	}
 
 	// If no schedules in window, return.
 	if nextSchedule.After(endWindow) {
