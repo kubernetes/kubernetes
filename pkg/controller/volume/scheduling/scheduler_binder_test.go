@@ -785,7 +785,7 @@ func makePodWithoutPVC() *v1.Pod {
 }
 
 func makeBinding(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) *BindingInfo {
-	return &BindingInfo{pvc: pvc, pv: pv}
+	return &BindingInfo{pvc: pvc.DeepCopy(), pv: pv.DeepCopy()}
 }
 
 func addProvisionAnn(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
@@ -846,6 +846,8 @@ func findPodVolumes(binder SchedulerVolumeBinder, pod *v1.Pod, node *v1.Node) (*
 }
 
 func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
+	t.Parallel()
+
 	type scenarioType struct {
 		// Inputs
 		pvs     []*v1.PersistentVolume
@@ -1016,6 +1018,8 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 }
 
 func TestFindPodVolumesWithProvisioning(t *testing.T) {
+	t.Parallel()
+
 	type scenarioType struct {
 		// Inputs
 		pvs     []*v1.PersistentVolume
@@ -1527,6 +1531,8 @@ func TestBindAPIUpdate(t *testing.T) {
 }
 
 func TestCheckBindings(t *testing.T) {
+	t.Parallel()
+
 	type scenarioType struct {
 		// Inputs
 		initPVs  []*v1.PersistentVolume
@@ -1724,6 +1730,8 @@ func TestCheckBindings(t *testing.T) {
 }
 
 func TestCheckBindingsWithCSIMigration(t *testing.T) {
+	t.Parallel()
+
 	type scenarioType struct {
 		// Inputs
 		initPVs      []*v1.PersistentVolume
@@ -1844,6 +1852,8 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 }
 
 func TestBindPodVolumes(t *testing.T) {
+	t.Parallel()
+
 	type scenarioType struct {
 		// Inputs
 		bindingsNil bool // Pass in nil bindings slice
@@ -2053,7 +2063,11 @@ func TestBindPodVolumes(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		t.Run(name, func(t *testing.T) { run(t, scenario) })
+		scenario := scenario
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			run(t, scenario)
+		})
 	}
 }
 
