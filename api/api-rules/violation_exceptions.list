@@ -392,6 +392,7 @@ API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialP
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,AllowedUnsafeSysctls
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ClusterDNS
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,EnforceNodeAllocatable
+API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ReservedMemory
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,TLSCipherSuites
 API rule violation: list_type_missing,k8s.io/metrics/pkg/apis/metrics/v1alpha1,PodMetrics,Containers
 API rule violation: list_type_missing,k8s.io/metrics/pkg/apis/metrics/v1beta1,PodMetrics,Containers

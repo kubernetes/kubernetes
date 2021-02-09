@@ -62,6 +62,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.KernelMemcgNotification = false
 			obj.MaxOpenFiles = 1000000
 			obj.MaxPods = 110
+			obj.MemoryManagerPolicy = v1beta1.NoneMemoryManagerPolicy
 			obj.PodPidsLimit = -1
 			obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
 			obj.NodeStatusReportFrequency = metav1.Duration{Duration: time.Minute}

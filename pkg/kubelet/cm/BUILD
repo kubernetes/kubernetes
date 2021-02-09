@@ -31,8 +31,10 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/cm/cpumanager:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
+        "//pkg/kubelet/cm/memorymanager:go_default_library",
         "//pkg/kubelet/cm/topologymanager:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -240,6 +242,7 @@ filegroup(
         "//pkg/kubelet/cm/cpumanager:all-srcs",
         "//pkg/kubelet/cm/cpuset:all-srcs",
         "//pkg/kubelet/cm/devicemanager:all-srcs",
+        "//pkg/kubelet/cm/memorymanager:all-srcs",
         "//pkg/kubelet/cm/topologymanager:all-srcs",
         "//pkg/kubelet/cm/util:all-srcs",
     ],

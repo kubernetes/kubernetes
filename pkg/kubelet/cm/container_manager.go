@@ -17,6 +17,9 @@ limitations under the License.
 package cm
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -24,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -32,10 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
-
-	"fmt"
-	"strconv"
-	"strings"
 )
 
 type ActivePodsFunc func() []*v1.Pod
@@ -131,14 +131,16 @@ type NodeConfig struct {
 	KubeletRootDir        string
 	ProtectKernelDefaults bool
 	NodeAllocatableConfig
-	QOSReserved                           map[v1.ResourceName]int64
-	ExperimentalCPUManagerPolicy          string
-	ExperimentalTopologyManagerScope      string
-	ExperimentalCPUManagerReconcilePeriod time.Duration
-	ExperimentalPodPidsLimit              int64
-	EnforceCPULimits                      bool
-	CPUCFSQuotaPeriod                     time.Duration
-	ExperimentalTopologyManagerPolicy     string
+	QOSReserved                             map[v1.ResourceName]int64
+	ExperimentalCPUManagerPolicy            string
+	ExperimentalTopologyManagerScope        string
+	ExperimentalCPUManagerReconcilePeriod   time.Duration
+	ExperimentalMemoryManagerPolicy         string
+	ExperimentalMemoryManagerReservedMemory []kubeletconfig.MemoryReservation
+	ExperimentalPodPidsLimit                int64
+	EnforceCPULimits                        bool
+	CPUCFSQuotaPeriod                       time.Duration
+	ExperimentalTopologyManagerPolicy       string
 }
 
 type NodeAllocatableConfig struct {

@@ -123,6 +123,12 @@ const (
 	// Enable resource managers to make NUMA aligned decisions
 	TopologyManager featuregate.Feature = "TopologyManager"
 
+	// owner: @cynepco3hahue(alukiano) @cezaryzukowski @k-wiatrzyk
+	// alpha:: v1.20
+
+	// Allows setting memory affinity for a container based on NUMA topology
+	MemoryManager featuregate.Feature = "MemoryManager"
+
 	// owner: @sjenning
 	// beta: v1.11
 	//
@@ -697,6 +703,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExpandInUsePersistentVolumes:                   {Default: true, PreRelease: featuregate.Beta},
 	ExpandCSIVolumes:                               {Default: true, PreRelease: featuregate.Beta},
 	CPUManager:                                     {Default: true, PreRelease: featuregate.Beta},
+	MemoryManager:                                  {Default: false, PreRelease: featuregate.Alpha},
 	CPUCFSQuotaPeriod:                              {Default: false, PreRelease: featuregate.Alpha},
 	TopologyManager:                                {Default: true, PreRelease: featuregate.Beta},
 	ServiceNodeExclusion:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
