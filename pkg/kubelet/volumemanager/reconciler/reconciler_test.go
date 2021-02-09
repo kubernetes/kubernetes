@@ -18,13 +18,13 @@ package reconciler
 
 import (
 	"fmt"
+	"path/filepath"
+	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +36,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
@@ -43,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	"k8s.io/mount-utils"
 )
 
 const (
@@ -57,6 +59,14 @@ const (
 	testOperationBackOffDuration = 100 * time.Millisecond
 	reconcilerSyncWaitDuration   = 10 * time.Second
 )
+
+var tmpDirIndex int64
+
+func getTmpKubeletPodsDir() string {
+	return filepath.Join(kubeletPodsDir,
+		strconv.FormatInt(atomic.AddInt64(&tmpDirIndex, 1), 10),
+	)
+}
 
 func hasAddedPods() bool { return true }
 
@@ -90,7 +100,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
-		kubeletPodsDir)
+		getTmpKubeletPodsDir())
 
 	// Act
 	runReconciler(reconciler)
@@ -134,7 +144,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
-		kubeletPodsDir)
+		getTmpKubeletPodsDir())
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
@@ -212,7 +222,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
-		kubeletPodsDir)
+		getTmpKubeletPodsDir())
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
@@ -291,7 +301,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
-		kubeletPodsDir)
+		getTmpKubeletPodsDir())
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
@@ -381,7 +391,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
-		kubeletPodsDir)
+		getTmpKubeletPodsDir())
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
@@ -505,7 +515,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
-		kubeletPodsDir)
+		getTmpKubeletPodsDir())
 
 	volumeSpec := &volume.Spec{
 		PersistentVolume: gcepv,
@@ -608,7 +618,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
-		kubeletPodsDir)
+		getTmpKubeletPodsDir())
 
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
@@ -706,7 +716,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
-		kubeletPodsDir)
+		getTmpKubeletPodsDir())
 
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
@@ -817,7 +827,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
-		kubeletPodsDir)
+		getTmpKubeletPodsDir())
 
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
@@ -1123,7 +1133,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				mount.NewFakeMounter(nil),
 				hostutil.NewFakeHostUtil(nil),
 				volumePluginMgr,
-				kubeletPodsDir)
+				getTmpKubeletPodsDir())
 
 			volumeSpec := &volume.Spec{PersistentVolume: pv}
 			podName := util.GetUniquePodName(pod)
@@ -1181,6 +1191,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 }
 
 func Test_UncertainDeviceGlobalMounts(t *testing.T) {
+	t.Parallel()
 	var tests = []struct {
 		name                   string
 		deviceState            operationexecutor.DeviceMountState
@@ -1224,9 +1235,11 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 
 	for _, mode := range []v1.PersistentVolumeMode{v1.PersistentVolumeBlock, v1.PersistentVolumeFilesystem} {
 		for _, tc := range tests {
+			mode := mode
+			tc := tc
 			testName := fmt.Sprintf("%s [%s]", tc.name, mode)
 			t.Run(testName+"[", func(t *testing.T) {
-
+				t.Parallel()
 				pv := &v1.PersistentVolume{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: tc.volumeName,
@@ -1297,7 +1310,7 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 					&mount.FakeMounter{},
 					hostutil.NewFakeHostUtil(nil),
 					volumePluginMgr,
-					kubeletPodsDir)
+					getTmpKubeletPodsDir())
 				volumeSpec := &volume.Spec{PersistentVolume: pv}
 				podName := util.GetUniquePodName(pod)
 				volumeName, err := dsw.AddPodToVolume(
@@ -1309,11 +1322,10 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 				dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
 
 				// Start the reconciler to fill ASW.
-				stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
-				go func() {
-					reconciler.Run(stopChan)
-					close(stoppedChan)
-				}()
+				stopChan := make(chan struct{})
+				defer close(stopChan)
+				go reconciler.Run(stopChan)
+
 				waitForVolumeToExistInASW(t, volumeName, asw)
 				if tc.volumeName == volumetesting.TimeoutAndFailOnMountDeviceVolumeName {
 					// Wait upto 10s for reconciler to catch up
@@ -1356,6 +1368,7 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 }
 
 func Test_UncertainVolumeMountState(t *testing.T) {
+	t.Parallel()
 	var tests = []struct {
 		name                   string
 		volumeState            operationexecutor.VolumeMountState
@@ -1405,8 +1418,11 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 
 	for _, mode := range []v1.PersistentVolumeMode{v1.PersistentVolumeBlock, v1.PersistentVolumeFilesystem} {
 		for _, tc := range tests {
+			mode := mode
+			tc := tc
 			testName := fmt.Sprintf("%s [%s]", tc.name, mode)
 			t.Run(testName, func(t *testing.T) {
+				t.Parallel()
 				pv := &v1.PersistentVolume{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: tc.volumeName,
@@ -1476,7 +1492,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 					&mount.FakeMounter{},
 					hostutil.NewFakeHostUtil(nil),
 					volumePluginMgr,
-					kubeletPodsDir)
+					getTmpKubeletPodsDir())
 				volumeSpec := &volume.Spec{PersistentVolume: pv}
 				podName := util.GetUniquePodName(pod)
 				volumeName, err := dsw.AddPodToVolume(
@@ -1488,11 +1504,10 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 				dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
 
 				// Start the reconciler to fill ASW.
-				stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
-				go func() {
-					reconciler.Run(stopChan)
-					close(stoppedChan)
-				}()
+				stopChan := make(chan struct{})
+				defer close(stopChan)
+				go reconciler.Run(stopChan)
+
 				waitForVolumeToExistInASW(t, volumeName, asw)
 				if tc.volumeName == volumetesting.TimeoutAndFailOnSetupVolumeName {
 					// Wait upto 10s for reconciler to catchup
@@ -1747,7 +1762,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
-		kubeletPodsDir)
+		getTmpKubeletPodsDir())
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
