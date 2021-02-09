@@ -318,7 +318,7 @@ func TestGetPodStatus(t *testing.T) {
 	}
 
 	// Set fake sandbox and faked containers to fakeRuntime.
-	makeAndSetFakePod(t, m, fakeRuntime, pod)
+	sandbox, _ := makeAndSetFakePod(t, m, fakeRuntime, pod)
 
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
@@ -326,6 +326,9 @@ func TestGetPodStatus(t *testing.T) {
 	assert.Equal(t, pod.Name, podStatus.Name)
 	assert.Equal(t, pod.Namespace, podStatus.Namespace)
 	assert.Equal(t, apitest.FakePodSandboxIPs, podStatus.IPs)
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		assert.Equal(t, sandbox.Id, containerStatus.PodSandboxID)
+	}
 }
 
 func TestGetPods(t *testing.T) {
