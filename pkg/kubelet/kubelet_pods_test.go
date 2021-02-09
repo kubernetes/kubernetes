@@ -368,36 +368,38 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 
 func TestRunInContainer(t *testing.T) {
 	for _, testError := range []error{nil, errors.New("bar")} {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
-		fakeRuntime := testKubelet.fakeRuntime
-		fakeCommandRunner := containertest.FakeContainerCommandRunner{
-			Err:    testError,
-			Stdout: "foo",
-		}
-		kubelet.runner = &fakeCommandRunner
+		t.Run("", func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			fakeRuntime := testKubelet.fakeRuntime
+			fakeCommandRunner := containertest.FakeContainerCommandRunner{
+				Err:    testError,
+				Stdout: "foo",
+			}
+			kubelet.runner = &fakeCommandRunner
 
-		containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
-		fakeRuntime.PodList = []*containertest.FakePod{
-			{Pod: &kubecontainer.Pod{
-				ID:        "12345678",
-				Name:      "podFoo",
-				Namespace: "nsFoo",
-				Containers: []*kubecontainer.Container{
-					{Name: "containerFoo",
-						ID: containerID,
+			containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
+			fakeRuntime.PodList = []*containertest.FakePod{
+				{Pod: &kubecontainer.Pod{
+					ID:        "12345678",
+					Name:      "podFoo",
+					Namespace: "nsFoo",
+					Containers: []*kubecontainer.Container{
+						{Name: "containerFoo",
+							ID: containerID,
+						},
 					},
-				},
-			}},
-		}
-		cmd := []string{"ls"}
-		actualOutput, err := kubelet.RunInContainer("podFoo_nsFoo", "", "containerFoo", cmd)
-		assert.Equal(t, containerID, fakeCommandRunner.ContainerID, "(testError=%v) ID", testError)
-		assert.Equal(t, cmd, fakeCommandRunner.Cmd, "(testError=%v) command", testError)
-		// this isn't 100% foolproof as a bug in a real CommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
-		assert.Equal(t, "foo", string(actualOutput), "(testError=%v) output", testError)
-		assert.Equal(t, err, testError, "(testError=%v) err", testError)
+				}},
+			}
+			cmd := []string{"ls"}
+			actualOutput, err := kubelet.RunInContainer("podFoo_nsFoo", "", "containerFoo", cmd)
+			assert.Equal(t, containerID, fakeCommandRunner.ContainerID, "(testError=%v) ID", testError)
+			assert.Equal(t, cmd, fakeCommandRunner.Cmd, "(testError=%v) command", testError)
+			// this isn't 100% foolproof as a bug in a real CommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
+			assert.Equal(t, "foo", string(actualOutput), "(testError=%v) output", testError)
+			assert.Equal(t, err, testError, "(testError=%v) err", testError)
+		})
 	}
 }
 
@@ -1635,8 +1637,8 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fakeRecorder := record.NewFakeRecorder(1)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-			testKubelet.kubelet.recorder = fakeRecorder
 			defer testKubelet.Cleanup()
+			testKubelet.kubelet.recorder = fakeRecorder
 			kl := testKubelet.kubelet
 			kl.masterServiceNamespace = tc.masterServiceNs
 			if tc.nilLister {
@@ -2117,34 +2119,36 @@ func TestGetExec(t *testing.T) {
 	}}
 
 	for _, tc := range testcases {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
-		testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
-			{Pod: &kubecontainer.Pod{
-				ID:        podUID,
-				Name:      podName,
-				Namespace: podNamespace,
-				Containers: []*kubecontainer.Container{
-					{Name: containerID,
-						ID: kubecontainer.ContainerID{Type: "test", ID: containerID},
+		t.Run(tc.description, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
+				{Pod: &kubecontainer.Pod{
+					ID:        podUID,
+					Name:      podName,
+					Namespace: podNamespace,
+					Containers: []*kubecontainer.Container{
+						{Name: containerID,
+							ID: kubecontainer.ContainerID{Type: "test", ID: containerID},
+						},
 					},
-				},
-			}},
-		}
+				}},
+			}
 
-		description := "streaming - " + tc.description
-		fakeRuntime := &containertest.FakeStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
-		kubelet.containerRuntime = fakeRuntime
-		kubelet.streamingRuntime = fakeRuntime
+			description := "streaming - " + tc.description
+			fakeRuntime := &containertest.FakeStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
+			kubelet.containerRuntime = fakeRuntime
+			kubelet.streamingRuntime = fakeRuntime
 
-		redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, command, remotecommand.Options{})
-		if tc.expectError {
-			assert.Error(t, err, description)
-		} else {
-			assert.NoError(t, err, description)
-			assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
-		}
+			redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, command, remotecommand.Options{})
+			if tc.expectError {
+				assert.Error(t, err, description)
+			} else {
+				assert.NoError(t, err, description)
+				assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
+			}
+		})
 	}
 }
 
@@ -2170,34 +2174,36 @@ func TestGetPortForward(t *testing.T) {
 	}}
 
 	for _, tc := range testcases {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
-		testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
-			{Pod: &kubecontainer.Pod{
-				ID:        podUID,
-				Name:      podName,
-				Namespace: podNamespace,
-				Containers: []*kubecontainer.Container{
-					{Name: "foo",
-						ID: kubecontainer.ContainerID{Type: "test", ID: "foo"},
+		t.Run(tc.description, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
+				{Pod: &kubecontainer.Pod{
+					ID:        podUID,
+					Name:      podName,
+					Namespace: podNamespace,
+					Containers: []*kubecontainer.Container{
+						{Name: "foo",
+							ID: kubecontainer.ContainerID{Type: "test", ID: "foo"},
+						},
 					},
-				},
-			}},
-		}
+				}},
+			}
 
-		description := "streaming - " + tc.description
-		fakeRuntime := &containertest.FakeStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
-		kubelet.containerRuntime = fakeRuntime
-		kubelet.streamingRuntime = fakeRuntime
+			description := "streaming - " + tc.description
+			fakeRuntime := &containertest.FakeStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
+			kubelet.containerRuntime = fakeRuntime
+			kubelet.streamingRuntime = fakeRuntime
 
-		redirect, err := kubelet.GetPortForward(tc.podName, podNamespace, podUID, portforward.V4Options{})
-		if tc.expectError {
-			assert.Error(t, err, description)
-		} else {
-			assert.NoError(t, err, description)
-			assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
-		}
+			redirect, err := kubelet.GetPortForward(tc.podName, podNamespace, podUID, portforward.V4Options{})
+			if tc.expectError {
+				assert.Error(t, err, description)
+			} else {
+				assert.NoError(t, err, description)
+				assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
+			}
+		})
 	}
 }
 
@@ -2233,49 +2239,50 @@ func TestHasHostMountPVC(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		testKubelet := newTestKubelet(t, false)
-		defer testKubelet.Cleanup()
-		pod := &v1.Pod{
-			Spec: v1.PodSpec{},
-		}
+		t.Run(k, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false)
+			defer testKubelet.Cleanup()
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{},
+			}
 
-		volumeToReturn := &v1.PersistentVolume{
-			Spec: v1.PersistentVolumeSpec{},
-		}
+			volumeToReturn := &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{},
+			}
 
-		if v.podHasPVC {
-			pod.Spec.Volumes = []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{},
+			if v.podHasPVC {
+				pod.Spec.Volumes = []v1.Volume{
+					{
+						VolumeSource: v1.VolumeSource{
+							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{},
+						},
 					},
-				},
-			}
-
-			if v.pvcIsHostPath {
-				volumeToReturn.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
-					HostPath: &v1.HostPathVolumeSource{},
 				}
+
+				if v.pvcIsHostPath {
+					volumeToReturn.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
+						HostPath: &v1.HostPathVolumeSource{},
+					}
+				}
+
 			}
 
-		}
+			testKubelet.fakeKubeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+				return true, &v1.PersistentVolumeClaim{
+					Spec: v1.PersistentVolumeClaimSpec{
+						VolumeName: "foo",
+					},
+				}, v.pvcError
+			})
+			testKubelet.fakeKubeClient.AddReactor("get", "persistentvolumes", func(action core.Action) (bool, runtime.Object, error) {
+				return true, volumeToReturn, v.pvError
+			})
 
-		testKubelet.fakeKubeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
-			return true, &v1.PersistentVolumeClaim{
-				Spec: v1.PersistentVolumeClaimSpec{
-					VolumeName: "foo",
-				},
-			}, v.pvcError
+			actual := testKubelet.kubelet.hasHostMountPVC(pod)
+			if actual != v.expected {
+				t.Errorf("%s expected %t but got %t", k, v.expected, actual)
+			}
 		})
-		testKubelet.fakeKubeClient.AddReactor("get", "persistentvolumes", func(action core.Action) (bool, runtime.Object, error) {
-			return true, volumeToReturn, v.pvError
-		})
-
-		actual := testKubelet.kubelet.hasHostMountPVC(pod)
-		if actual != v.expected {
-			t.Errorf("%s expected %t but got %t", k, v.expected, actual)
-		}
-
 	}
 }
 

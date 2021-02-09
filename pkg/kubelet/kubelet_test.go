@@ -171,13 +171,10 @@ func newTestKubeletWithImageList(
 	kubelet.nodeName = types.NodeName(testKubeletHostname)
 	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	kubelet.runtimeState.setNetworkState(nil)
-	if tempDir, err := ioutil.TempDir("", "kubelet_test."); err != nil {
+	if tempDir, err := ioutil.TempDir("", "kubelet_test"); err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	} else {
 		kubelet.rootDirectory = tempDir
-	}
-	if err := os.MkdirAll(kubelet.rootDirectory, 0750); err != nil {
-		t.Fatalf("can't mkdir(%q): %v", kubelet.rootDirectory, err)
 	}
 	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return true })
 	kubelet.masterServiceNamespace = metav1.NamespaceDefault
@@ -411,8 +408,8 @@ func TestSyncPodsDeletesWhenSourcesAreReadyPerQOS(t *testing.T) {
 	ready := false // sources will not be ready initially, enabled later
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	go testKubelet.kubelet.podKiller.PerformPodKillingWork()
 	defer testKubelet.Cleanup()
+	go testKubelet.kubelet.podKiller.PerformPodKillingWork()
 	defer testKubelet.kubelet.podKiller.Close()
 
 	pod := &kubecontainer.Pod{
@@ -1013,24 +1010,26 @@ func TestValidateContainerLogStatus(t *testing.T) {
 
 func TestCreateMirrorPod(t *testing.T) {
 	for _, updateType := range []kubetypes.SyncPodType{kubetypes.SyncPodCreate, kubetypes.SyncPodUpdate} {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		defer testKubelet.Cleanup()
+		t.Run(updateType.String(), func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
 
-		kl := testKubelet.kubelet
-		manager := testKubelet.fakeMirrorClient
-		pod := podWithUIDNameNs("12345678", "bar", "foo")
-		pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
-		pods := []*v1.Pod{pod}
-		kl.podManager.SetPods(pods)
-		err := kl.syncPod(syncPodOptions{
-			pod:        pod,
-			podStatus:  &kubecontainer.PodStatus{},
-			updateType: updateType,
+			kl := testKubelet.kubelet
+			manager := testKubelet.fakeMirrorClient
+			pod := podWithUIDNameNs("12345678", "bar", "foo")
+			pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
+			pods := []*v1.Pod{pod}
+			kl.podManager.SetPods(pods)
+			err := kl.syncPod(syncPodOptions{
+				pod:        pod,
+				podStatus:  &kubecontainer.PodStatus{},
+				updateType: updateType,
+			})
+			assert.NoError(t, err)
+			podFullName := kubecontainer.GetPodFullName(pod)
+			assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
+			assert.Equal(t, 1, manager.NumOfPods(), "Expected only 1 mirror pod %q, got %+v", podFullName, manager.GetPods())
 		})
-		assert.NoError(t, err)
-		podFullName := kubecontainer.GetPodFullName(pod)
-		assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
-		assert.Equal(t, 1, manager.NumOfPods(), "Expected only 1 mirror pod %q, got %+v", podFullName, manager.GetPods())
 	}
 }
 

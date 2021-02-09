@@ -1285,55 +1285,57 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled is a don't-care for this test */)
-		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
-		kubeClient := testKubelet.fakeKubeClient
+		t.Run(tc.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled is a don't-care for this test */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			kubeClient := testKubelet.fakeKubeClient
 
-		kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
-			return true, nil, tc.createError
-		})
-		kubeClient.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
-			// Return an existing (matching) node on get.
-			return true, tc.existingNode, tc.getError
-		})
-		kubeClient.AddReactor("patch", "nodes", func(action core.Action) (bool, runtime.Object, error) {
-			if action.GetSubresource() == "status" {
-				return true, nil, tc.patchError
+			kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+				return true, nil, tc.createError
+			})
+			kubeClient.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+				// Return an existing (matching) node on get.
+				return true, tc.existingNode, tc.getError
+			})
+			kubeClient.AddReactor("patch", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+				if action.GetSubresource() == "status" {
+					return true, nil, tc.patchError
+				}
+				return notImplemented(action)
+			})
+			kubeClient.AddReactor("delete", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+				return true, nil, tc.deleteError
+			})
+			addNotImplatedReaction(kubeClient)
+
+			result := kubelet.tryRegisterWithAPIServer(tc.newNode)
+			require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
+
+			actions := kubeClient.Actions()
+			assert.Len(t, actions, tc.expectedActions, "test [%s]", tc.name)
+
+			if tc.testSavedNode {
+				var savedNode *v1.Node
+
+				t.Logf("actions: %v: %+v", len(actions), actions)
+				action := actions[tc.savedNodeIndex]
+				if action.GetVerb() == "create" {
+					createAction := action.(core.CreateAction)
+					obj := createAction.GetObject()
+					require.IsType(t, &v1.Node{}, obj)
+					savedNode = obj.(*v1.Node)
+				} else if action.GetVerb() == "patch" {
+					patchAction := action.(core.PatchActionImpl)
+					var err error
+					savedNode, err = applyNodeStatusPatch(tc.existingNode, patchAction.GetPatch())
+					require.NoError(t, err)
+				}
+
+				actualCMAD, _ := strconv.ParseBool(savedNode.Annotations[util.ControllerManagedAttachAnnotation])
+				assert.Equal(t, tc.savedNodeCMAD, actualCMAD, "test [%s]", tc.name)
 			}
-			return notImplemented(action)
 		})
-		kubeClient.AddReactor("delete", "nodes", func(action core.Action) (bool, runtime.Object, error) {
-			return true, nil, tc.deleteError
-		})
-		addNotImplatedReaction(kubeClient)
-
-		result := kubelet.tryRegisterWithAPIServer(tc.newNode)
-		require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
-
-		actions := kubeClient.Actions()
-		assert.Len(t, actions, tc.expectedActions, "test [%s]", tc.name)
-
-		if tc.testSavedNode {
-			var savedNode *v1.Node
-
-			t.Logf("actions: %v: %+v", len(actions), actions)
-			action := actions[tc.savedNodeIndex]
-			if action.GetVerb() == "create" {
-				createAction := action.(core.CreateAction)
-				obj := createAction.GetObject()
-				require.IsType(t, &v1.Node{}, obj)
-				savedNode = obj.(*v1.Node)
-			} else if action.GetVerb() == "patch" {
-				patchAction := action.(core.PatchActionImpl)
-				var err error
-				savedNode, err = applyNodeStatusPatch(tc.existingNode, patchAction.GetPatch())
-				require.NoError(t, err)
-			}
-
-			actualCMAD, _ := strconv.ParseBool(savedNode.Annotations[util.ControllerManagedAttachAnnotation])
-			assert.Equal(t, tc.savedNodeCMAD, actualCMAD, "test [%s]", tc.name)
-		}
 	}
 }
 
@@ -1409,6 +1411,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 
 func TestUpdateDefaultLabels(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
 
 	cases := []struct {
@@ -1703,7 +1706,6 @@ func TestUpdateDefaultLabels(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 
 		needsUpdate := kubelet.updateDefaultLabels(tc.initialNode, tc.existingNode)
@@ -1924,6 +1926,7 @@ func TestUpdateDefaultResources(t *testing.T) {
 
 func TestReconcileHugePageResource(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	hugePageResourceName64Ki := v1.ResourceName("hugepages-64Ki")
 	hugePageResourceName2Mi := v1.ResourceName("hugepages-2Mi")
 	hugePageResourceName1Gi := v1.ResourceName("hugepages-1Gi")
@@ -2204,7 +2207,6 @@ func TestReconcileHugePageResource(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(T *testing.T) {
-			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
 
 			needsUpdate := kubelet.reconcileHugePageResource(tc.initialNode, tc.existingNode)
@@ -2216,6 +2218,7 @@ func TestReconcileHugePageResource(t *testing.T) {
 }
 func TestReconcileExtendedResource(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	testKubelet.kubelet.containerManager = cm.NewStubContainerManagerWithExtendedResource(true /* shouldResetExtendedResourceCapacity*/)
 	testKubeletNoReset := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -2392,7 +2395,6 @@ func TestReconcileExtendedResource(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 
 		needsUpdate := kubelet.reconcileExtendedResource(tc.initialNode, tc.existingNode)
