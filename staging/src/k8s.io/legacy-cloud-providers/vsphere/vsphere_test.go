@@ -32,6 +32,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/vmware/govmomi/find"
@@ -1166,6 +1167,23 @@ func fakeSecret(name, namespace, datacenter, user, password string) *v1.Secret {
 	}
 }
 
+type buffer struct {
+	b  bytes.Buffer
+	rw sync.RWMutex
+}
+
+func (b *buffer) String() string {
+	b.rw.RLock()
+	defer b.rw.RUnlock()
+	return b.b.String()
+}
+
+func (b *buffer) Write(p []byte) (n int, err error) {
+	b.rw.Lock()
+	defer b.rw.Unlock()
+	return b.b.Write(p)
+}
+
 func TestSecretUpdated(t *testing.T) {
 	datacenter := "0.0.0.0"
 	secretName := "vccreds"
@@ -1231,8 +1249,8 @@ func TestSecretUpdated(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			buf := new(bytes.Buffer)
-			errBuf := new(bytes.Buffer)
+			buf := new(buffer)
+			errBuf := new(buffer)
 
 			klog.SetOutputBySeverity("INFO", buf)
 			klog.SetOutputBySeverity("WARNING", errBuf)
