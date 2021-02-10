@@ -18,7 +18,8 @@ package common
 
 import (
 	"context"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -30,7 +31,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
+var _ = framework.KubeDescribe("[sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// sysctl is not supported on Windows.

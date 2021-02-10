@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -38,7 +38,7 @@ type PrivilegedPodTestConfig struct {
 	pod *v1.Pod
 }
 
-var _ = framework.KubeDescribe("PrivilegedPod [NodeConformance]", func() {
+var _ = framework.KubeDescribe("[sig-node] PrivilegedPod [NodeConformance]", func() {
 	config := &PrivilegedPodTestConfig{
 		f:                      framework.NewDefaultFramework("e2e-privileged-pod"),
 		privilegedPod:          "privileged-pod",

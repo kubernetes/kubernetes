@@ -284,7 +284,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 	})
 })
 
-var _ = framework.KubeDescribe("Downward API [Serial] [Disruptive] [NodeFeature:EphemeralStorage]", func() {
+var _ = framework.KubeDescribe("[sig-storage] Downward API [Serial] [Disruptive] [NodeFeature:EphemeralStorage]", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	ginkgo.Context("Downward API tests for local ephemeral storage", func() {

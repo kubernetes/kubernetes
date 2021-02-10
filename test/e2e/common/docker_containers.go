@@ -25,7 +25,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
-var _ = framework.KubeDescribe("Docker Containers", func() {
+var _ = framework.KubeDescribe("[sig-node] Docker Containers", func() {
 	f := framework.NewDefaultFramework("containers")
 
 	/*

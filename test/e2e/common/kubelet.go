@@ -32,7 +32,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Kubelet", func() {
+var _ = framework.KubeDescribe("[sig-node] Kubelet", func() {
 	f := framework.NewDefaultFramework("kubelet-test")
 	var podClient *framework.PodClient
 	ginkgo.BeforeEach(func() {
