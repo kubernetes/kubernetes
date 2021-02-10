@@ -28,6 +28,7 @@ import (
 type FakePodContainerManager struct {
 	sync.Mutex
 	CalledFunctions []string
+	Events          []string
 	Cgroups         map[types.UID]CgroupName
 }
 
@@ -73,6 +74,7 @@ func (m *FakePodContainerManager) Destroy(name CgroupName) error {
 	for key, cgname := range m.Cgroups {
 		if reflect.DeepEqual(cgname, name) {
 			delete(m.Cgroups, key)
+			m.Events = append(m.Events, "PodDestroyed")
 			return nil
 		}
 	}

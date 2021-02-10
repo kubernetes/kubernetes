@@ -460,8 +460,9 @@ func TestSyncPodsDeletesWhenSourcesAreReadyPerQOS(t *testing.T) {
 	defer fakeContainerManager.PodContainerManager.Unlock()
 	calledFunctionCount := len(fakeContainerManager.PodContainerManager.CalledFunctions)
 	destroyCount := 0
-	for _, functionName := range fakeContainerManager.PodContainerManager.CalledFunctions {
-		if functionName == "Destroy" {
+	for _, eventName := range fakeContainerManager.PodContainerManager.Events {
+		// We should only see one `PodDestroyed` event.
+		if eventName == "PodDestroyed" {
 			destroyCount = destroyCount + 1
 		}
 	}
