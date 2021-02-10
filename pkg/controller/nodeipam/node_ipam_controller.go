@@ -104,11 +104,6 @@ func NewNodeIpamController(
 			klog.Fatal("Controller: Must specify --cluster-cidr if --allocate-node-cidrs is set")
 		}
 
-		// TODO: (khenidak) IPv6DualStack beta:
-		// - modify mask to allow flexible masks for IPv4 and IPv6
-		// - for alpha status they are the same
-
-		// for each cidr, node mask size must be <= cidr mask
 		for idx, cidr := range clusterCIDRs {
 			mask := cidr.Mask
 			if maskSize, _ := mask.Size(); maskSize > nodeCIDRMaskSizes[idx] {
