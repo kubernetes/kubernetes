@@ -6,7 +6,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/cri-api/pkg/apis",
     importpath = "k8s.io/cri-api/pkg/apis",
     visibility = ["//visibility:public"],
-    deps = ["//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/experimental:go_default_library",
+        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
+    ],
 )
 
 filegroup(
