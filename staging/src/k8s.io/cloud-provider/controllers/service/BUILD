@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "controller.go",
         "doc.go",
+        "metrics.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/controllers/service",
     importpath = "k8s.io/cloud-provider/controllers/service",
@@ -27,6 +28,8 @@ go_library(
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/service/helpers:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/prometheus/ratelimiter:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
