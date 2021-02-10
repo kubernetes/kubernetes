@@ -21,6 +21,7 @@ limitations under the License.
 package main
 
 import (
+	"k8s.io/apimachinery/pkg/util/wait"
 	"math/rand"
 	"os"
 	"time"
@@ -39,13 +40,6 @@ import (
 	// e.g. _"k8s.io/legacy-cloud-providers/<provider>"
 )
 
-const (
-	// The variables below are samples, please edit the value for your case.
-
-	// sampleCloudProviderName shows an sample of using hard coded parameter for CloudProviderName
-	sampleCloudProviderName = "SampleCloudProviderName"
-)
-
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
@@ -54,7 +48,7 @@ func main() {
 		klog.Fatalf("unable to initialize command options: %v", err)
 	}
 
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors)
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors, wait.NeverStop)
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
@@ -71,9 +65,10 @@ func main() {
 }
 
 func cloudInitializer(config *config.CompletedConfig) cloudprovider.Interface {
-	cloudConfigFile := config.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile
+	cloudConfig := config.ComponentConfig.KubeCloudShared.CloudProvider
+
 	// initialize cloud provider with the cloud provider name and config file provided
-	cloud, err := cloudprovider.InitCloudProvider(sampleCloudProviderName, cloudConfigFile)
+	cloud, err := cloudprovider.InitCloudProvider(cloudConfig.Name, cloudConfig.CloudConfigFile)
 	if err != nil {
 		klog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
