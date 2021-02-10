@@ -1,0 +1,101 @@
+/*
+Copyright 2018 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// To regenerate api.pb.go run hack/update-generated-runtime.sh
+syntax = "proto3";
+
+package runtime.experimental;
+option go_package = "experimental";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.goproto_getters_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_unrecognized_all) = false;
+
+// Runtime service defines the experimental public APIs for remote container runtimes
+service RuntimeService {
+    // CheckpointContainer checkpoints a container
+    rpc CheckpointContainer(CheckpointContainerRequest) returns (CheckpointContainerResponse) {}
+    // RestoreContainer restores a container
+    rpc RestoreContainer(RestoreContainerRequest) returns (RestoreContainerResponse) {}
+}
+
+// Common options used for checkpointing and restoring.
+message CheckpointRestoreOptions {
+    // Keep temporary files. Like log files. Helpful for debugging.
+    bool keep = 1;
+    // Checkpoint/Restore the container with established TCP connections.
+    bool tcp_established = 2;
+    // Location of the checkpoint archive used for export/import
+    string archive = 3;
+    // Specify the checkpoint archive compression algorithm
+    // See github.com/containers/storage/pkg/archive/archive.go for
+    // possible values.
+    int64 compression = 4;
+}
+
+message CheckpointContainerOptions {
+    CheckpointRestoreOptions common_options = 1;
+    // Leave the container running after checkpointing
+    bool leave_running = 2;
+}
+
+message CheckpointContainerRequest {
+    // ID of the container or pod to be checkpointed.
+    string id = 1;
+    // Options for checkpointing.
+    CheckpointContainerOptions options = 2;
+}
+
+message CheckpointContainerResponse {
+}
+
+message RestoreContainerOptions {
+    CheckpointRestoreOptions common_options = 1;
+    // ID of the sandbox into which the container should be restored
+    // If this is not specified the container will be restored
+    // in the sandbox it was checkpointed from.
+    string pod_sandbox_id = 2;
+    // Restoring multiple copies of a checkpointed container may
+    // require a new name for the restored container.
+    string name = 3;
+    // The labels and annotations are in the same form as in ContainerConfig
+    // during CreateContainerRequest.
+    map<string, string> labels = 4;
+    map<string, string> annotations = 5;
+}
+
+message RestoreContainerRequest {
+    // ID of the container or pod to be restored.
+    string id = 1;
+    // Options for restoring.
+    RestoreContainerOptions options = 2;
+}
+
+message RestoreContainerResponse {
+    // ID of the restored container or pod
+    string id = 1;
+    // True if the restored container/pod is a pod
+    bool pod = 2;
+    // Only set if a pod has been restored. This contains
+    // a list of restored container IDs in the restored pod.
+    repeated string restored_containers = 3;
+}
