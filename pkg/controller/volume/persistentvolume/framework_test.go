@@ -713,7 +713,7 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 //    of volumes/claims with expected claims/volumes and report differences.
 // Some limit of calls in enforced to prevent endless loops.
 func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass, defaultStorageClass string) {
-	for _, test := range tests {
+	run := func(t *testing.T, test controllerTest) {
 		klog.V(4).Infof("starting multisync test %q", test.name)
 
 		// Initialize the controller
@@ -821,6 +821,13 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 		}
 		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
 		klog.V(4).Infof("test %q finished after %d iterations", test.name, counter)
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			run(t, test)
+		})
 	}
 }
 
