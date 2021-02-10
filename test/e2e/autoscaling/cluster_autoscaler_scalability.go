@@ -59,7 +59,7 @@ type scaleUpTestConfig struct {
 	expectedResult *clusterPredicates
 }
 
-var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", func() {
+var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 	f := framework.NewDefaultFramework("autoscaling")
 	var c clientset.Interface
 	var nodeCount int
