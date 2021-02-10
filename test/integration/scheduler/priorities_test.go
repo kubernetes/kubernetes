@@ -43,7 +43,7 @@ func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *tes
 	prof := schedulerconfig.KubeSchedulerProfile{
 		SchedulerName: v1.DefaultSchedulerName,
 		Plugins: &schedulerconfig.Plugins{
-			Score: &schedulerconfig.PluginSet{
+			Score: schedulerconfig.PluginSet{
 				Enabled: []schedulerconfig.Plugin{
 					{Name: scorePluginName, Weight: 1},
 				},

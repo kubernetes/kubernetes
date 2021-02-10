@@ -100,7 +100,7 @@ type frameworkImpl struct {
 // frameworkImpl.
 type extensionPoint struct {
 	// the set of plugins to be configured at this extension point.
-	plugins *config.PluginSet
+	plugins config.PluginSet
 	// a pointer to the slice storing plugins implementations that will run at this
 	// extension point.
 	slicePtr interface{}
@@ -373,11 +373,7 @@ func getPluginArgsOrDefault(pluginConfig map[string]runtime.Object, name string)
 	return obj, err
 }
 
-func updatePluginList(pluginList interface{}, pluginSet *config.PluginSet, pluginsMap map[string]framework.Plugin) error {
-	if pluginSet == nil {
-		return nil
-	}
-
+func updatePluginList(pluginList interface{}, pluginSet config.PluginSet, pluginsMap map[string]framework.Plugin) error {
 	plugins := reflect.ValueOf(pluginList).Elem()
 	pluginType := plugins.Type().Elem()
 	set := sets.NewString()
@@ -1128,10 +1124,7 @@ func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) map[string]config
 		return pgMap
 	}
 
-	find := func(pgs *config.PluginSet) {
-		if pgs == nil {
-			return
-		}
+	find := func(pgs config.PluginSet) {
 		for _, pg := range pgs.Enabled {
 			pgMap[pg.Name] = pg
 		}

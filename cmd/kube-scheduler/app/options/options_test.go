@@ -534,7 +534,7 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins: &kubeschedulerconfig.Plugins{
-							Reserve: &kubeschedulerconfig.PluginSet{
+							Reserve: kubeschedulerconfig.PluginSet{
 								Enabled: []kubeschedulerconfig.Plugin{
 									{Name: "foo"},
 									{Name: "bar"},
@@ -543,7 +543,7 @@ profiles:
 									{Name: "baz"},
 								},
 							},
-							PreBind: &kubeschedulerconfig.PluginSet{
+							PreBind: kubeschedulerconfig.PluginSet{
 								Enabled: []kubeschedulerconfig.Plugin{
 									{Name: "foo"},
 								},
@@ -609,7 +609,7 @@ profiles:
 					{
 						SchedulerName: "foo-profile",
 						Plugins: &kubeschedulerconfig.Plugins{
-							Reserve: &kubeschedulerconfig.PluginSet{
+							Reserve: kubeschedulerconfig.PluginSet{
 								Enabled: []kubeschedulerconfig.Plugin{
 									{Name: "foo"},
 								},
@@ -619,7 +619,7 @@ profiles:
 					{
 						SchedulerName: "bar-profile",
 						Plugins: &kubeschedulerconfig.Plugins{
-							PreBind: &kubeschedulerconfig.PluginSet{
+							PreBind: kubeschedulerconfig.PluginSet{
 								Disabled: []kubeschedulerconfig.Plugin{
 									{Name: "baz"},
 								},

@@ -524,10 +524,7 @@ func (lr *LegacyRegistry) registerPriorityConfigProducer(name string, producer c
 	lr.priorityToConfigProducer[name] = producer
 }
 
-func appendToPluginSet(set *config.PluginSet, name string, weight *int32) *config.PluginSet {
-	if set == nil {
-		set = &config.PluginSet{}
-	}
+func appendToPluginSet(set config.PluginSet, name string, weight *int32) config.PluginSet {
 	for _, e := range set.Enabled {
 		if e.Name == name {
 			// Keep the max weight.

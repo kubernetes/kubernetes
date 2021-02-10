@@ -90,12 +90,12 @@ func validateKubeSchedulerProfile(path *field.Path, profile *config.KubeSchedule
 
 func validateCommonQueueSort(path *field.Path, profiles []config.KubeSchedulerProfile) field.ErrorList {
 	allErrs := field.ErrorList{}
-	var canon *config.PluginSet
+	var canon config.PluginSet
 	if profiles[0].Plugins != nil {
 		canon = profiles[0].Plugins.QueueSort
 	}
 	for i := 1; i < len(profiles); i++ {
-		var curr *config.PluginSet
+		var curr config.PluginSet
 		if profiles[i].Plugins != nil {
 			curr = profiles[i].Plugins.QueueSort
 		}

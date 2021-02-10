@@ -96,7 +96,7 @@ func (v *cfgValidator) validate(cfg config.KubeSchedulerProfile) error {
 	if v.m[cfg.SchedulerName] != nil {
 		return fmt.Errorf("duplicate profile with scheduler name %q", cfg.SchedulerName)
 	}
-	if cfg.Plugins.QueueSort == nil || len(cfg.Plugins.QueueSort.Enabled) != 1 {
+	if len(cfg.Plugins.QueueSort.Enabled) != 1 {
 		return fmt.Errorf("one queue sort plugin required for profile with scheduler name %q", cfg.SchedulerName)
 	}
 	queueSort := cfg.Plugins.QueueSort.Enabled[0].Name
