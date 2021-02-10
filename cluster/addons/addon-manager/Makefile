@@ -15,8 +15,8 @@
 IMAGE=gcr.io/k8s-staging-addon-manager/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v9.1.3
-KUBECTL_VERSION?=v1.19.3
+VERSION=v9.1.4
+KUBECTL_VERSION?=v1.20.2
 
 BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):v1.0.0
 

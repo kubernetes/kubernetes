@@ -1,3 +1,7 @@
+### Version 9.1.4 (Wed February 10 2021 Jordan Liggitt <liggitt@google.com>)
+ - Update kubectl to v1.20.2.
+ - Fix a bug in leader election (https://github.com/kubernetes/kubernetes/issues/98966)
+
 ### Version 9.1.3 (Mon November 30 2020 Spencer Peterson <spencerjp@google.com>)
  - Update kubectl to v1.19.3.
 
