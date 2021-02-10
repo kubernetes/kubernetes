@@ -259,3 +259,69 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	}
 	return obj3
 }
+
+func TestSetDefaultCronJob(t *testing.T) {
+	tests := map[string]struct {
+		original *batchv1.CronJob
+		expected *batchv1.CronJob
+	}{
+		"empty batchv1.CronJob should default batchv1.ConcurrencyPolicy and Suspend": {
+			original: &batchv1.CronJob{},
+			expected: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					ConcurrencyPolicy:          batchv1.AllowConcurrent,
+					Suspend:                    newBool(false),
+					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(3),
+					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(1),
+				},
+			},
+		},
+		"set fields should not be defaulted": {
+			original: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					ConcurrencyPolicy:          batchv1.ForbidConcurrent,
+					Suspend:                    newBool(true),
+					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(5),
+					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(5),
+				},
+			},
+			expected: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					ConcurrencyPolicy:          batchv1.ForbidConcurrent,
+					Suspend:                    newBool(true),
+					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(5),
+					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(5),
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		original := test.original
+		expected := test.expected
+		obj2 := roundTrip(t, runtime.Object(original))
+		actual, ok := obj2.(*batchv1.CronJob)
+		if !ok {
+			t.Errorf("%s: unexpected object: %v", name, actual)
+			t.FailNow()
+		}
+		if actual.Spec.ConcurrencyPolicy != expected.Spec.ConcurrencyPolicy {
+			t.Errorf("%s: got different concurrencyPolicy than expected: %v %v", name, actual.Spec.ConcurrencyPolicy, expected.Spec.ConcurrencyPolicy)
+		}
+		if *actual.Spec.Suspend != *expected.Spec.Suspend {
+			t.Errorf("%s: got different suspend than expected: %v %v", name, *actual.Spec.Suspend, *expected.Spec.Suspend)
+		}
+		if *actual.Spec.SuccessfulJobsHistoryLimit != *expected.Spec.SuccessfulJobsHistoryLimit {
+			t.Errorf("%s: got different successfulJobsHistoryLimit than expected: %v %v", name, *actual.Spec.SuccessfulJobsHistoryLimit, *expected.Spec.SuccessfulJobsHistoryLimit)
+		}
+		if *actual.Spec.FailedJobsHistoryLimit != *expected.Spec.FailedJobsHistoryLimit {
+			t.Errorf("%s: got different failedJobsHistoryLimit than expected: %v %v", name, *actual.Spec.FailedJobsHistoryLimit, *expected.Spec.FailedJobsHistoryLimit)
+		}
+	}
+}
+
+func newBool(val bool) *bool {
+	p := new(bool)
+	*p = val
+	return p
+}

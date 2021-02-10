@@ -64,6 +64,14 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	storage["jobs"] = jobsStorage
 	storage["jobs/status"] = jobsStatusStorage
 
+	// cronjobs
+	cronJobsStorage, cronJobsStatusStorage, err := cronjobstore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	storage["cronjobs"] = cronJobsStorage
+	storage["cronjobs/status"] = cronJobsStatusStorage
+
 	return storage, err
 }
 
