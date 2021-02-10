@@ -376,16 +376,16 @@ func newFrameworkWithQueueSortAndBind(r Registry, pl *config.Plugins, plc []conf
 	}
 	plugins := &config.Plugins{}
 	plugins.Append(pl)
-	if plugins.QueueSort == nil || len(plugins.QueueSort.Enabled) == 0 {
+	if len(plugins.QueueSort.Enabled) == 0 {
 		plugins.Append(&config.Plugins{
-			QueueSort: &config.PluginSet{
+			QueueSort: config.PluginSet{
 				Enabled: []config.Plugin{{Name: queueSortPlugin}},
 			},
 		})
 	}
-	if plugins.Bind == nil || len(plugins.Bind.Enabled) == 0 {
+	if len(plugins.Bind.Enabled) == 0 {
 		plugins.Append(&config.Plugins{
-			Bind: &config.PluginSet{
+			Bind: config.PluginSet{
 				Enabled: []config.Plugin{{Name: bindPlugin}},
 			},
 		})
@@ -412,7 +412,7 @@ func TestInitFrameworkWithScorePlugins(t *testing.T) {
 		},
 		{
 			name:    "Score plugins are nil",
-			plugins: &config.Plugins{Score: nil},
+			plugins: &config.Plugins{},
 		},
 		{
 			name:    "enabled Score plugin list is empty",
@@ -451,7 +451,7 @@ func TestNewFrameworkErrors(t *testing.T) {
 		{
 			name: "duplicate plugin name",
 			plugins: &config.Plugins{
-				PreFilter: &config.PluginSet{
+				PreFilter: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: duplicatePluginName, Weight: 1},
 						{Name: duplicatePluginName, Weight: 1},
@@ -466,7 +466,7 @@ func TestNewFrameworkErrors(t *testing.T) {
 		{
 			name: "duplicate plugin config",
 			plugins: &config.Plugins{
-				PreFilter: &config.PluginSet{
+				PreFilter: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: duplicatePluginName, Weight: 1},
 					},
@@ -511,9 +511,7 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 		"RequestedToCapacityRatio",
 		"VolumeBinding",
 	}
-	plugins := config.Plugins{
-		Filter: &config.PluginSet{},
-	}
+	plugins := config.Plugins{}
 	// Use all plugins in Filter.
 	// NOTE: This does not mean those plugins implemented `Filter` interfaces.
 	// `TestPlugin` is created in this test to fake the behavior for test purpose.
@@ -521,7 +519,7 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 		plugins.Filter.Enabled = append(plugins.Filter.Enabled, config.Plugin{Name: name})
 	}
 	// Set required extension points.
-	onePlugin := &config.PluginSet{
+	onePlugin := config.PluginSet{
 		Enabled: []config.Plugin{{Name: pluginsWithArgs[0]}},
 	}
 	plugins.QueueSort = onePlugin
@@ -841,7 +839,7 @@ func TestPreFilterPlugins(t *testing.T) {
 		func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 			return preFilter2, nil
 		})
-	plugins := &config.Plugins{PreFilter: &config.PluginSet{Enabled: []config.Plugin{{Name: preFilterWithExtensionsPluginName}, {Name: preFilterPluginName}}}}
+	plugins := &config.Plugins{PreFilter: config.PluginSet{Enabled: []config.Plugin{{Name: preFilterWithExtensionsPluginName}, {Name: preFilterPluginName}}}}
 	t.Run("TestPreFilterPlugin", func(t *testing.T) {
 		f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs)
 		if err != nil {
@@ -1068,7 +1066,7 @@ func TestFilterPlugins(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			registry := Registry{}
-			cfgPls := &config.Plugins{Filter: &config.PluginSet{}}
+			cfgPls := &config.Plugins{}
 			for _, pl := range tt.plugins {
 				// register all plugins
 				tmpPl := pl
@@ -1149,7 +1147,7 @@ func TestPostFilterPlugins(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			registry := Registry{}
-			cfgPls := &config.Plugins{PostFilter: &config.PluginSet{}}
+			cfgPls := &config.Plugins{}
 			for _, pl := range tt.plugins {
 				// register all plugins
 				tmpPl := pl
@@ -1279,10 +1277,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			registry := Registry{}
-			cfgPls := &config.Plugins{
-				PreFilter: &config.PluginSet{},
-				Filter:    &config.PluginSet{},
-			}
+			cfgPls := &config.Plugins{}
 
 			if tt.preFilterPlugin != nil {
 				if err := registry.Register(tt.preFilterPlugin.name,
@@ -1452,7 +1447,7 @@ func TestPreBindPlugins(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			registry := Registry{}
-			configPlugins := &config.Plugins{PreBind: &config.PluginSet{}}
+			configPlugins := &config.Plugins{}
 
 			for _, pl := range tt.plugins {
 				tmpPl := pl
@@ -1608,7 +1603,7 @@ func TestReservePlugins(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			registry := Registry{}
-			configPlugins := &config.Plugins{Reserve: &config.PluginSet{}}
+			configPlugins := &config.Plugins{}
 
 			for _, pl := range tt.plugins {
 				tmpPl := pl
@@ -1732,7 +1727,7 @@ func TestPermitPlugins(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			registry := Registry{}
-			configPlugins := &config.Plugins{Permit: &config.PluginSet{}}
+			configPlugins := &config.Plugins{}
 
 			for _, pl := range tt.plugins {
 				tmpPl := pl
@@ -1898,7 +1893,7 @@ func TestRecordingMetrics(t *testing.T) {
 				func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return plugin, nil
 				})
-			pluginSet := &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}}
+			pluginSet := config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}}
 			plugins := &config.Plugins{
 				Score:     pluginSet,
 				PreFilter: pluginSet,
@@ -2003,7 +1998,7 @@ func TestRunBindPlugins(t *testing.T) {
 			metrics.FrameworkExtensionPointDuration.Reset()
 			metrics.PluginExecutionDuration.Reset()
 
-			pluginSet := &config.PluginSet{}
+			pluginSet := config.PluginSet{}
 			r := make(Registry)
 			for i, inj := range tt.injects {
 				name := fmt.Sprintf("bind-%d", i)
@@ -2067,7 +2062,7 @@ func TestPermitWaitDurationMetric(t *testing.T) {
 				t.Fatal(err)
 			}
 			plugins := &config.Plugins{
-				Permit: &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+				Permit: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
 			}
 			f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs)
 			if err != nil {
@@ -2120,7 +2115,7 @@ func TestWaitOnPermit(t *testing.T) {
 					return testPermitPlugin, nil
 				})
 			plugins := &config.Plugins{
-				Permit: &config.PluginSet{Enabled: []config.Plugin{{Name: permitPlugin, Weight: 1}}},
+				Permit: config.PluginSet{Enabled: []config.Plugin{{Name: permitPlugin, Weight: 1}}},
 			}
 
 			f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs)
@@ -2159,7 +2154,7 @@ func TestListPlugins(t *testing.T) {
 		{
 			name: "Add multiple plugins",
 			plugins: &config.Plugins{
-				Score: &config.PluginSet{Enabled: []config.Plugin{{Name: scorePlugin1}, {Name: scoreWithNormalizePlugin1}}},
+				Score: config.PluginSet{Enabled: []config.Plugin{{Name: scorePlugin1}, {Name: scoreWithNormalizePlugin1}}},
 			},
 			pluginSetCount: 3,
 		},
@@ -2188,7 +2183,7 @@ func buildScoreConfigWithWeights(weights map[string]int32, ps ...string) *config
 	for _, p := range ps {
 		plugins = append(plugins, config.Plugin{Name: p, Weight: weights[p]})
 	}
-	return &config.Plugins{Score: &config.PluginSet{Enabled: plugins}}
+	return &config.Plugins{Score: config.PluginSet{Enabled: plugins}}
 }
 
 type injectedResult struct {

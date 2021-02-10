@@ -46,6 +46,98 @@ func getPluginArgConversionScheme() *runtime.Scheme {
 	return pluginArgConversionScheme
 }
 
+func Convert_v1beta1_Plugins_To_config_Plugins(in *v1beta1.Plugins, out *config.Plugins, s conversion.Scope) error {
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(in.QueueSort, &out.QueueSort, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(in.PreFilter, &out.PreFilter, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(in.Filter, &out.Filter, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(in.PostFilter, &out.PostFilter, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(in.PreScore, &out.PreScore, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(in.Score, &out.Score, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(in.Reserve, &out.Reserve, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(in.Permit, &out.Permit, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(in.PreBind, &out.PreBind, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(in.Bind, &out.Bind, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(in.PostBind, &out.PostBind, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1beta1_PluginSet_To_config_PluginSet(in *v1beta1.PluginSet, out *config.PluginSet, s conversion.Scope) error {
+	if in == nil {
+		return nil
+	}
+	return autoConvert_v1beta1_PluginSet_To_config_PluginSet(in, out, s)
+}
+
+func Convert_config_Plugins_To_v1beta1_Plugins(in *config.Plugins, out *v1beta1.Plugins, s conversion.Scope) error {
+	out.QueueSort = new(v1beta1.PluginSet)
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.QueueSort, out.QueueSort, s); err != nil {
+		return err
+	}
+	out.PreFilter = new(v1beta1.PluginSet)
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.PreFilter, out.PreFilter, s); err != nil {
+		return err
+	}
+	out.Filter = new(v1beta1.PluginSet)
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.Filter, out.Filter, s); err != nil {
+		return err
+	}
+	out.PostFilter = new(v1beta1.PluginSet)
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.PostFilter, out.PostFilter, s); err != nil {
+		return err
+	}
+	out.PreScore = new(v1beta1.PluginSet)
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.PreScore, out.PreScore, s); err != nil {
+		return err
+	}
+	out.Score = new(v1beta1.PluginSet)
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.Score, out.Score, s); err != nil {
+		return err
+	}
+	out.Reserve = new(v1beta1.PluginSet)
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.Reserve, out.Reserve, s); err != nil {
+		return err
+	}
+	out.Permit = new(v1beta1.PluginSet)
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.Permit, out.Permit, s); err != nil {
+		return err
+	}
+	out.PreBind = new(v1beta1.PluginSet)
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.PreBind, out.PreBind, s); err != nil {
+		return err
+	}
+	out.Bind = new(v1beta1.PluginSet)
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.Bind, out.Bind, s); err != nil {
+		return err
+	}
+	out.PostBind = new(v1beta1.PluginSet)
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.PostBind, out.PostBind, s); err != nil {
+		return err
+	}
+	return nil
+}
+
 func Convert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *v1beta1.KubeSchedulerConfiguration, out *config.KubeSchedulerConfiguration, s conversion.Scope) error {
 	if err := autoConvert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in, out, s); err != nil {
 		return err

@@ -151,8 +151,8 @@ func TestCreateFromConfig(t *testing.T) {
 				},
 			},
 			wantPlugins: &schedulerapi.Plugins{
-				QueueSort: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
-				PreFilter: &schedulerapi.PluginSet{
+				QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+				PreFilter: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
@@ -161,7 +161,7 @@ func TestCreateFromConfig(t *testing.T) {
 						{Name: "InterPodAffinity"},
 					},
 				},
-				Filter: &schedulerapi.PluginSet{
+				Filter: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "NodeUnschedulable"},
 						{Name: "NodeResourcesFit"},
@@ -180,8 +180,8 @@ func TestCreateFromConfig(t *testing.T) {
 						{Name: "InterPodAffinity"},
 					},
 				},
-				PostFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
-				PreScore: &schedulerapi.PluginSet{
+				PostFilter: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
+				PreScore: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "PodTopologySpread"},
 						{Name: "InterPodAffinity"},
@@ -189,7 +189,7 @@ func TestCreateFromConfig(t *testing.T) {
 						{Name: "TaintToleration"},
 					},
 				},
-				Score: &schedulerapi.PluginSet{
+				Score: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "NodeResourcesBalancedAllocation", Weight: 1},
 						{Name: "PodTopologySpread", Weight: 2},
@@ -201,11 +201,9 @@ func TestCreateFromConfig(t *testing.T) {
 						{Name: "TaintToleration", Weight: 1},
 					},
 				},
-				Reserve:  &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "VolumeBinding"}}},
-				Permit:   &schedulerapi.PluginSet{},
-				PreBind:  &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "VolumeBinding"}}},
-				Bind:     &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
-				PostBind: &schedulerapi.PluginSet{},
+				Reserve: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "VolumeBinding"}}},
+				PreBind: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "VolumeBinding"}}},
+				Bind:    schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
 			},
 		},
 		{
@@ -286,9 +284,9 @@ func TestCreateFromConfig(t *testing.T) {
 				},
 			},
 			wantPlugins: &schedulerapi.Plugins{
-				QueueSort: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
-				PreFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "ServiceAffinity"}}},
-				Filter: &schedulerapi.PluginSet{
+				QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+				PreFilter: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "ServiceAffinity"}}},
+				Filter: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "NodeUnschedulable"},
 						{Name: "TaintToleration"},
@@ -296,14 +294,14 @@ func TestCreateFromConfig(t *testing.T) {
 						{Name: "ServiceAffinity"},
 					},
 				},
-				PostFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
-				PreScore: &schedulerapi.PluginSet{
+				PostFilter: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
+				PreScore: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "InterPodAffinity"},
 						{Name: "NodeAffinity"},
 					},
 				},
-				Score: &schedulerapi.PluginSet{
+				Score: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "InterPodAffinity", Weight: 1},
 						{Name: "NodeAffinity", Weight: 2},
@@ -312,11 +310,7 @@ func TestCreateFromConfig(t *testing.T) {
 						{Name: "ServiceAffinity", Weight: 6},
 					},
 				},
-				Reserve:  &schedulerapi.PluginSet{},
-				Permit:   &schedulerapi.PluginSet{},
-				PreBind:  &schedulerapi.PluginSet{},
-				Bind:     &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
-				PostBind: &schedulerapi.PluginSet{},
+				Bind: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
 			},
 		},
 		{
@@ -353,12 +347,12 @@ func TestCreateFromConfig(t *testing.T) {
 				},
 			},
 			wantPlugins: &schedulerapi.Plugins{
-				QueueSort: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
-				PreFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{
+				QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+				PreFilter: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
 				}},
-				Filter: &schedulerapi.PluginSet{
+				Filter: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "NodeUnschedulable"},
 						{Name: "NodePorts"},
@@ -366,22 +360,18 @@ func TestCreateFromConfig(t *testing.T) {
 						{Name: "TaintToleration"},
 					},
 				},
-				PostFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
-				PreScore: &schedulerapi.PluginSet{
+				PostFilter: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
+				PreScore: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "InterPodAffinity"},
 					},
 				},
-				Score: &schedulerapi.PluginSet{
+				Score: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "InterPodAffinity", Weight: 1},
 					},
 				},
-				Reserve:  &schedulerapi.PluginSet{},
-				Permit:   &schedulerapi.PluginSet{},
-				PreBind:  &schedulerapi.PluginSet{},
-				Bind:     &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
-				PostBind: &schedulerapi.PluginSet{},
+				Bind: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
 			},
 		},
 	}

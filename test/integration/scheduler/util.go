@@ -92,7 +92,7 @@ func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestCon
 	prof := schedulerconfig.KubeSchedulerProfile{
 		SchedulerName: v1.DefaultSchedulerName,
 		Plugins: &schedulerconfig.Plugins{
-			PostFilter: &schedulerconfig.PluginSet{
+			PostFilter: schedulerconfig.PluginSet{
 				Disabled: []schedulerconfig.Plugin{
 					{Name: defaultpreemption.Name},
 				},

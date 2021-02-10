@@ -70,12 +70,12 @@ func ListAlgorithmProviders() string {
 
 func getDefaultConfig() *schedulerapi.Plugins {
 	return &schedulerapi.Plugins{
-		QueueSort: &schedulerapi.PluginSet{
+		QueueSort: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: queuesort.Name},
 			},
 		},
-		PreFilter: &schedulerapi.PluginSet{
+		PreFilter: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: noderesources.FitName},
 				{Name: nodeports.Name},
@@ -84,7 +84,7 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				{Name: volumebinding.Name},
 			},
 		},
-		Filter: &schedulerapi.PluginSet{
+		Filter: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: nodeunschedulable.Name},
 				{Name: nodename.Name},
@@ -103,12 +103,12 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				{Name: interpodaffinity.Name},
 			},
 		},
-		PostFilter: &schedulerapi.PluginSet{
+		PostFilter: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: defaultpreemption.Name},
 			},
 		},
-		PreScore: &schedulerapi.PluginSet{
+		PreScore: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: interpodaffinity.Name},
 				{Name: podtopologyspread.Name},
@@ -116,7 +116,7 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				{Name: nodeaffinity.Name},
 			},
 		},
-		Score: &schedulerapi.PluginSet{
+		Score: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: noderesources.BalancedAllocationName, Weight: 1},
 				{Name: imagelocality.Name, Weight: 1},
@@ -131,17 +131,17 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				{Name: tainttoleration.Name, Weight: 1},
 			},
 		},
-		Reserve: &schedulerapi.PluginSet{
+		Reserve: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: volumebinding.Name},
 			},
 		},
-		PreBind: &schedulerapi.PluginSet{
+		PreBind: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: volumebinding.Name},
 			},
 		},
-		Bind: &schedulerapi.PluginSet{
+		Bind: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: defaultbinder.Name},
 			},
