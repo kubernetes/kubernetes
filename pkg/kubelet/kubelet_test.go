@@ -405,8 +405,6 @@ func TestSyncPodsStartPod(t *testing.T) {
 }
 
 func TestSyncPodsDeletesWhenSourcesAreReadyPerQOS(t *testing.T) {
-	ready := false // sources will not be ready initially, enabled later
-
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	go testKubelet.kubelet.podKiller.PerformPodKillingWork()
 	defer testKubelet.Cleanup()
@@ -429,7 +427,7 @@ func TestSyncPodsDeletesWhenSourcesAreReadyPerQOS(t *testing.T) {
 	}
 	kubelet := testKubelet.kubelet
 	kubelet.cgroupsPerQOS = true // enable cgroupsPerQOS to turn on the cgroups cleanup
-	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return ready })
+	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return true })
 
 	// HandlePodCleanups gets called every 2 seconds within the Kubelet's
 	// housekeeping routine. This test registers the pod, removes the unwanted pod, then calls into
@@ -437,11 +435,6 @@ func TestSyncPodsDeletesWhenSourcesAreReadyPerQOS(t *testing.T) {
 	// within a goroutine so a two second delay should be enough time to
 	// mark the pod as killed (within this test case).
 
-	kubelet.HandlePodCleanups()
-	time.Sleep(2 * time.Second)
-	fakeRuntime.AssertKilledPods([]string{}) // Sources are not ready yet. Don't remove any pods.
-
-	ready = true // mark sources as ready
 	kubelet.HandlePodCleanups()
 	time.Sleep(2 * time.Second)
 
@@ -453,18 +446,25 @@ func TestSyncPodsDeletesWhenSourcesAreReadyPerQOS(t *testing.T) {
 	kubelet.HandlePodCleanups()
 	time.Sleep(2 * time.Second)
 
-	fakeContainerManager.PodContainerManager.Lock()
-	defer fakeContainerManager.PodContainerManager.Unlock()
-	calledFunctionCount := len(fakeContainerManager.PodContainerManager.CalledFunctions)
 	destroyCount := 0
-	for _, functionName := range fakeContainerManager.PodContainerManager.CalledFunctions {
-		if functionName == "Destroy" {
-			destroyCount = destroyCount + 1
+	err := wait.Poll(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+		fakeContainerManager.PodContainerManager.Lock()
+		defer fakeContainerManager.PodContainerManager.Unlock()
+		destroyCount = 0
+		for _, functionName := range fakeContainerManager.PodContainerManager.CalledFunctions {
+			if functionName == "Destroy" {
+				destroyCount = destroyCount + 1
+			}
 		}
-	}
+		return destroyCount >= 1, nil
+	})
 
-	assert.Equal(t, 1, destroyCount, "Expect only 1 destroy")
-	assert.True(t, calledFunctionCount > 2, "expect more than two PodContainerManager calls")
+	assert.NoError(t, err, "wait should not return error")
+	// housekeeping can get called multiple times. The cgroup Destroy() is
+	// done within a goroutine and can get called multiple times, so the
+	// Destroy() count in not deterministic on the actual number.
+	// https://github.com/kubernetes/kubernetes/blob/29fdbb065b5e0d195299eb2d260b975cbc554673/pkg/kubelet/kubelet_pods.go#L2006
+	assert.True(t, destroyCount >= 1, "Expect 1 or more destroys")
 }
 
 func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
