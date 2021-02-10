@@ -49,7 +49,7 @@ var _ = SIGDescribe("HostPort", func() {
 	})
 
 	/*
-		Release: v1.16, v1.20
+		Release: v1.16, v1.21
 		Testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
 		Description: Pods with the same HostPort value MUST be able to be scheduled to the same node
 		if the HostIP or Protocol is different. This test is marked LinuxOnly since hostNetwork is not supported on
