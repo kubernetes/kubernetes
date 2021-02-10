@@ -953,7 +953,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// merge stale services gathered from updateEndpointsMap
 	// an UDP service that changes from 0 to non-0 endpoints is considered stale.
 	for _, svcPortName := range endpointUpdateResult.NewlyActiveUDPServices {
-		if svcInfo, ok := proxier.svcPortMap[svcPortName]; ok && svcInfo != nil && svcInfo.Protocol() == v1.ProtocolUDP {
+		if svcInfo, ok := proxier.svcPortMap[svcPortName]; ok {
 			klog.V(4).InfoS("Newly-active UDP service may have stale conntrack entries", "servicePortName", svcPortName)
 			conntrackCleanupServiceIPs.Insert(svcInfo.ClusterIP().String())
 			for _, extIP := range svcInfo.ExternalIPStrings() {
@@ -1818,7 +1818,7 @@ func (proxier *Proxier) createAndLinkKubeChain() {
 // TODO: move it to util
 func (proxier *Proxier) deleteUDPEndpointConnections(deletedUDPEndpoints []proxy.ServiceEndpoint) {
 	for _, epSvcPair := range deletedUDPEndpoints {
-		if svcInfo, ok := proxier.svcPortMap[epSvcPair.ServicePortName]; ok && svcInfo.Protocol() == v1.ProtocolUDP {
+		if svcInfo, ok := proxier.svcPortMap[epSvcPair.ServicePortName]; ok {
 			endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
 			nodePort := svcInfo.NodePort()
 			var err error
