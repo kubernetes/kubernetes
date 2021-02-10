@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/component-base/metrics"
@@ -86,7 +87,7 @@ type statsCollector struct{}
 
 var stats = statsCollector{}
 
-func (statsCollector) authenticating() func(hit bool) {
+func (statsCollector) authenticating(ctx context.Context) func(hit bool) {
 	start := time.Now()
 	return func(hit bool) {
 		var tag string
@@ -98,18 +99,18 @@ func (statsCollector) authenticating() func(hit bool) {
 
 		latency := time.Since(start)
 
-		requestCount.WithLabelValues(tag).Inc()
-		requestLatency.WithLabelValues(tag).Observe(float64(latency.Milliseconds()) / 1000)
+		requestCount.WithContext(ctx).WithLabelValues(tag).Inc()
+		requestLatency.WithContext(ctx).WithLabelValues(tag).Observe(float64(latency.Milliseconds()) / 1000)
 	}
 }
 
-func (statsCollector) blocking() func() {
-	activeFetchCount.WithLabelValues(fetchBlockedTag).Inc()
-	return activeFetchCount.WithLabelValues(fetchBlockedTag).Dec
+func (statsCollector) blocking(ctx context.Context) func() {
+	activeFetchCount.WithContext(ctx).WithLabelValues(fetchBlockedTag).Inc()
+	return activeFetchCount.WithContext(ctx).WithLabelValues(fetchBlockedTag).Dec
 }
 
-func (statsCollector) fetching() func(ok bool) {
-	activeFetchCount.WithLabelValues(fetchInFlightTag).Inc()
+func (statsCollector) fetching(ctx context.Context) func(ok bool) {
+	activeFetchCount.WithContext(ctx).WithLabelValues(fetchInFlightTag).Inc()
 	return func(ok bool) {
 		var tag string
 		if ok {
@@ -118,8 +119,8 @@ func (statsCollector) fetching() func(ok bool) {
 			tag = fetchFailedTag
 		}
 
-		fetchCount.WithLabelValues(tag).Inc()
+		fetchCount.WithContext(ctx).WithLabelValues(tag).Inc()
 
-		activeFetchCount.WithLabelValues(fetchInFlightTag).Dec()
+		activeFetchCount.WithContext(ctx).WithLabelValues(fetchInFlightTag).Dec()
 	}
 }

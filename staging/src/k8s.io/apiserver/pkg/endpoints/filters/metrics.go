@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -75,7 +76,7 @@ func init() {
 	legacyregistry.MustRegister(authenticationLatency)
 }
 
-func recordAuthMetrics(resp *authenticator.Response, ok bool, err error, apiAudiences authenticator.Audiences, authStart time.Time) {
+func recordAuthMetrics(ctx context.Context, resp *authenticator.Response, ok bool, err error, apiAudiences authenticator.Audiences, authStart time.Time) {
 	var resultLabel string
 
 	switch {
@@ -85,11 +86,11 @@ func recordAuthMetrics(resp *authenticator.Response, ok bool, err error, apiAudi
 		resultLabel = failureLabel
 	default:
 		resultLabel = successLabel
-		authenticatedUserCounter.WithLabelValues(compressUsername(resp.User.GetName())).Inc()
+		authenticatedUserCounter.WithContext(ctx).WithLabelValues(compressUsername(resp.User.GetName())).Inc()
 	}
 
-	authenticatedAttemptsCounter.WithLabelValues(resultLabel).Inc()
-	authenticationLatency.WithLabelValues(resultLabel).Observe(time.Since(authStart).Seconds())
+	authenticatedAttemptsCounter.WithContext(ctx).WithLabelValues(resultLabel).Inc()
+	authenticationLatency.WithContext(ctx).WithLabelValues(resultLabel).Observe(time.Since(authStart).Seconds())
 }
 
 // compressUsername maps all possible usernames onto a small set of categories
