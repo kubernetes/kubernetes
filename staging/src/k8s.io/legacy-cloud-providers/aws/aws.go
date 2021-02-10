@@ -233,6 +233,16 @@ const ServiceAnnotationLoadBalancerEIPAllocations = "service.beta.kubernetes.io/
 // For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2"
 const ServiceAnnotationLoadBalancerTargetNodeLabels = "service.beta.kubernetes.io/aws-load-balancer-target-node-labels"
 
+// ServiceAnnotationLoadBalancerSubnets is the annotation used on the service to specify the
+// Availability Zone configuration for the load balancer. The values are comma separated list of
+// subnetID or subnetName from different AZs
+// By default, the controller will auto-discover the subnets. If there are multiple subnets per AZ, auto-discovery
+// will break the tie in the following order -
+//   1. prefer the subnet with the correct role tag. kubernetes.io/role/elb for public and kubernetes.io/role/internal-elb for private access
+//   2. prefer the subnet with the cluster tag kubernetes.io/cluster/<Cluster Name>
+//   3. prefer the subnet that is first in lexicographic order
+const ServiceAnnotationLoadBalancerSubnets = "service.beta.kubernetes.io/aws-load-balancer-subnets"
+
 // Event key when a volume is stuck on attaching state when being attached to a volume
 const volumeAttachmentStuck = "VolumeAttachmentStuck"
 
@@ -3368,7 +3378,7 @@ func findTag(tags []*ec2.Tag, key string) (string, bool) {
 	return "", false
 }
 
-// Finds the subnets associated with the cluster, by matching tags.
+// Finds the subnets associated with the cluster, by matching cluster tags if present.
 // For maximal backwards compatibility, if no subnets are tagged, it will fall-back to the current subnet.
 // However, in future this will likely be treated as an error.
 func (c *Cloud) findSubnets() ([]*ec2.Subnet, error) {
@@ -3383,6 +3393,8 @@ func (c *Cloud) findSubnets() ([]*ec2.Subnet, error) {
 	var matches []*ec2.Subnet
 	for _, subnet := range subnets {
 		if c.tagging.hasClusterTag(subnet.Tags) {
+			matches = append(matches, subnet)
+		} else if c.tagging.hasNoClusterPrefixTag(subnet.Tags) {
 			matches = append(matches, subnet)
 		}
 	}
@@ -3447,7 +3459,7 @@ func (c *Cloud) findELBSubnets(internalELB bool) ([]string, error) {
 			continue
 		}
 
-		// Try to break the tie using a tag
+		// Try to break the tie using the role tag
 		var tagName string
 		if internalELB {
 			tagName = TagNameSubnetInternalELB
@@ -3465,8 +3477,17 @@ func (c *Cloud) findELBSubnets(internalELB bool) ([]string, error) {
 			continue
 		}
 
+		// Prefer the one with the cluster Tag
+		existingHasClusterTag := c.tagging.hasClusterTag(existing.Tags)
+		subnetHasClusterTag := c.tagging.hasClusterTag(subnet.Tags)
+		if existingHasClusterTag != subnetHasClusterTag {
+			if subnetHasClusterTag {
+				subnetsByAZ[az] = subnet
+			}
+			continue
+		}
+
 		// If we have two subnets for the same AZ we arbitrarily choose the one that is first lexicographically.
-		// TODO: Should this be an error.
 		if strings.Compare(*existing.SubnetId, *subnet.SubnetId) > 0 {
 			klog.Warningf("Found multiple subnets in AZ %q; choosing %q between subnets %q and %q", az, *subnet.SubnetId, *existing.SubnetId, *subnet.SubnetId)
 			subnetsByAZ[az] = subnet
@@ -3490,6 +3511,90 @@ func (c *Cloud) findELBSubnets(internalELB bool) ([]string, error) {
 	}
 
 	return subnetIDs, nil
+}
+
+func splitCommaSeparatedString(commaSeparatedString string) []string {
+	var result []string
+	parts := strings.Split(commaSeparatedString, ",")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if len(part) == 0 {
+			continue
+		}
+		result = append(result, part)
+	}
+	return result
+}
+
+// parses comma separated values from annotation into string slice, returns true if annotation exists
+func parseStringSliceAnnotation(annotations map[string]string, annotation string, value *[]string) bool {
+	rawValue := ""
+	if exists := parseStringAnnotation(annotations, annotation, &rawValue); !exists {
+		return false
+	}
+	*value = splitCommaSeparatedString(rawValue)
+	return true
+}
+
+func (c *Cloud) getLoadBalancerSubnets(service *v1.Service, internalELB bool) ([]string, error) {
+	var rawSubnetNameOrIDs []string
+	if exists := parseStringSliceAnnotation(service.Annotations, ServiceAnnotationLoadBalancerSubnets, &rawSubnetNameOrIDs); exists {
+		return c.resolveSubnetNameOrIDs(rawSubnetNameOrIDs)
+	}
+	return c.findELBSubnets(internalELB)
+}
+
+func (c *Cloud) resolveSubnetNameOrIDs(subnetNameOrIDs []string) ([]string, error) {
+	var subnetIDs []string
+	var subnetNames []string
+	if len(subnetNameOrIDs) == 0 {
+		return []string{}, fmt.Errorf("unable to resolve empty subnet slice")
+	}
+	for _, nameOrID := range subnetNameOrIDs {
+		if strings.HasPrefix(nameOrID, "subnet-") {
+			subnetIDs = append(subnetIDs, nameOrID)
+		} else {
+			subnetNames = append(subnetNames, nameOrID)
+		}
+	}
+	var resolvedSubnets []*ec2.Subnet
+	if len(subnetIDs) > 0 {
+		req := &ec2.DescribeSubnetsInput{
+			SubnetIds: aws.StringSlice(subnetIDs),
+		}
+		subnets, err := c.ec2.DescribeSubnets(req)
+		if err != nil {
+			return []string{}, err
+		}
+		resolvedSubnets = append(resolvedSubnets, subnets...)
+	}
+	if len(subnetNames) > 0 {
+		req := &ec2.DescribeSubnetsInput{
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("tag:Name"),
+					Values: aws.StringSlice(subnetNames),
+				},
+				{
+					Name:   aws.String("vpc-id"),
+					Values: aws.StringSlice([]string{c.vpcID}),
+				},
+			},
+		}
+		subnets, err := c.ec2.DescribeSubnets(req)
+		if err != nil {
+			return []string{}, err
+		}
+		resolvedSubnets = append(resolvedSubnets, subnets...)
+	}
+	if len(resolvedSubnets) != len(subnetNameOrIDs) {
+		return []string{}, fmt.Errorf("expected to find %v, but found %v subnets", len(subnetNameOrIDs), len(resolvedSubnets))
+	}
+	var subnets []string
+	for _, subnet := range resolvedSubnets {
+		subnets = append(subnets, aws.StringValue(subnet.SubnetId))
+	}
+	return subnets, nil
 }
 
 func isSubnetPublic(rt []*ec2.RouteTable, subnetID string) (bool, error) {
@@ -3869,7 +3974,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 
 	if isNLB(annotations) {
 		// Find the subnets that the ELB will live in
-		subnetIDs, err := c.findELBSubnets(internalELB)
+		subnetIDs, err := c.getLoadBalancerSubnets(apiService, internalELB)
 		if err != nil {
 			klog.Errorf("Error listing subnets in VPC: %q", err)
 			return nil, err
@@ -4036,7 +4141,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	}
 
 	// Find the subnets that the ELB will live in
-	subnetIDs, err := c.findELBSubnets(internalELB)
+	subnetIDs, err := c.getLoadBalancerSubnets(apiService, internalELB)
 	if err != nil {
 		klog.Errorf("Error listing subnets in VPC: %q", err)
 		return nil, err
