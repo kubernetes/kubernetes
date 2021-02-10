@@ -1232,6 +1232,9 @@ type DownwardAPIProjection struct {
 type AzureFileVolumeSource struct {
 	// the name of secret that contains Azure Storage Account Name and Key
 	SecretName string
+	// the namespace of the secret that contains Azure Storage Account Name and Key
+	// +optional
+	SecretNamespace *string
 	// Share Name
 	ShareName string
 	// Defaults to false (read/write). ReadOnly here will force

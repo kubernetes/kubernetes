@@ -375,6 +375,9 @@ func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (stri
 	if spec.Volume != nil && spec.Volume.AzureFile != nil {
 		secretName = spec.Volume.AzureFile.SecretName
 		secretNamespace = defaultNamespace
+		if spec.Volume.AzureFile.SecretNamespace != nil {
+			secretNamespace = *spec.Volume.AzureFile.SecretNamespace
+		}
 
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.AzureFile != nil {
