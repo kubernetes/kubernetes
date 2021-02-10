@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"sort"
 	"testing"
 	"time"
@@ -1398,4 +1399,27 @@ func makeBasePodAndStatusWithInitAndEphemeralContainers() (*v1.Pod, *kubecontain
 		Hash: kubecontainer.HashContainer((*v1.Container)(&pod.Spec.EphemeralContainers[0].EphemeralContainerCommon)),
 	})
 	return pod, status
+}
+
+func TestSandboxCreationErrorRegex(t *testing.T) {
+	reTests := []struct {
+		testString string
+		match      bool
+		regex      *regexp.Regexp
+	}{
+		{
+			testString: `Multus: [e2e-deployment-7897/webserver-9569696c8-gs6c8]: error setting the networks status, pod was already deleted: SetNetworkStatus: failed to query the pod webserver-9569696c8-gs6c8 in out of cluster comm: pods "webserver-9569696c8-gs6c8" not found`,
+			match:      true,
+			regex:      ignoreSandboxCreateErrorRegex[0],
+		},
+		{
+			testString: `this will not match`,
+			match:      false,
+			regex:      ignoreSandboxCreateErrorRegex[0],
+		},
+	}
+
+	for _, test := range reTests {
+		assert.Equal(t, test.match, test.regex.MatchString(test.testString))
+	}
 }
