@@ -1,0 +1,2 @@
+# ensure bugs in test xtables.lock handling does not result in checking these in
+/xtables-*.lock
