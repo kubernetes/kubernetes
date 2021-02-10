@@ -363,6 +363,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &autoscalingv2beta2.ResourceMetricStatusApplyConfiguration{}
 
 		// Group=batch, Version=v1
+	case batchv1.SchemeGroupVersion.WithKind("CronJob"):
+		return &applyconfigurationsbatchv1.CronJobApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("CronJobSpec"):
+		return &applyconfigurationsbatchv1.CronJobSpecApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("CronJobStatus"):
+		return &applyconfigurationsbatchv1.CronJobStatusApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("Job"):
 		return &applyconfigurationsbatchv1.JobApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobCondition"):
@@ -371,6 +377,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsbatchv1.JobSpecApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobStatus"):
 		return &applyconfigurationsbatchv1.JobStatusApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("JobTemplateSpec"):
+		return &applyconfigurationsbatchv1.JobTemplateSpecApplyConfiguration{}
 
 		// Group=batch, Version=v1beta1
 	case batchv1beta1.SchemeGroupVersion.WithKind("CronJob"):
