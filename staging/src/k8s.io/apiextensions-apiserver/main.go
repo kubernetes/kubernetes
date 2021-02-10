@@ -31,7 +31,7 @@ func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	stopCh := genericapiserver.SetupSignalHandler()
+	stopCh := genericapiserver.SetupSignalHandler(true)
 	cmd := server.NewServerCommand(os.Stdout, os.Stderr, stopCh)
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
