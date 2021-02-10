@@ -38,7 +38,7 @@ func DefaultMemorySwap() int64 {
 
 func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
 	if seccompProfile != "" {
-		klog.Warningf("seccomp annotations are not supported on windows")
+		klog.InfoS("seccomp annotations are not supported on windows")
 	}
 	return nil, nil
 }

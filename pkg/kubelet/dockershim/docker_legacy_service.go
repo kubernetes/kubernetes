@@ -85,7 +85,7 @@ func (d *dockerService) GetContainerLogs(_ context.Context, pod *v1.Pod, contain
 	}
 	err = d.client.Logs(containerID.ID, opts, sopts)
 	if errors.Is(err, errMaximumWrite) {
-		klog.V(2).Infof("finished logs, hit byte limit %d", *logOptions.LimitBytes)
+		klog.V(2).InfoS("Finished logs, hit byte limit", "byteLimit", *logOptions.LimitBytes)
 		err = nil
 	}
 	return err
