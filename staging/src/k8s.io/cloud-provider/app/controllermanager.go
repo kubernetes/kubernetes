@@ -64,30 +64,33 @@ const (
 )
 
 // NewCloudControllerManagerCommand creates a *cobra.Command object with default parameters
-func NewCloudControllerManagerCommand(s *options.CloudControllerManagerOptions, cloudInitializer InitCloudFunc, initFuncConstructor map[string]InitFuncConstructor) *cobra.Command {
+func NewCloudControllerManagerCommand(s *options.CloudControllerManagerOptions, cloudInitializer InitCloudFunc, initFuncConstructor map[string]InitFuncConstructor, stopCh <-chan struct{}) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "cloud-controller-manager",
 		Long: `The Cloud controller manager is a daemon that embeds
 the cloud specific control loops shipped with Kubernetes.`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
 
 			c, err := s.Config(ControllerNames(initFuncConstructor), ControllersDisabledByDefault.List())
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
+				return err
+				//os.Exit(1)
 			}
 
 			completedConfig := c.Complete()
 			cloud := cloudInitializer(completedConfig)
 			controllerInitializers := ConstructControllerInitializers(initFuncConstructor, completedConfig, cloud)
 
-			if err := Run(completedConfig, cloud, controllerInitializers, wait.NeverStop); err != nil {
+			if err := Run(completedConfig, cloud, controllerInitializers, stopCh); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
+				return err
+				//os.Exit(1)
 			}
+			return nil
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {

@@ -31,6 +31,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
@@ -42,11 +43,6 @@ import (
 	"k8s.io/klog/v2"
 	// For existing cloud providers, the option to import legacy providers is still available.
 	// e.g. _"k8s.io/legacy-cloud-providers/<provider>"
-)
-
-const (
-	// cloudProviderName shows an sample of using hard coded parameter, please edit the value for your case.
-	cloudProviderName = "SampleCloudProviderName"
 )
 
 func main() {
@@ -67,7 +63,7 @@ func main() {
 	// If you do not need additional controller, please ignore.
 	controllerInitializers["nodeipam"] = startNodeIpamControllerWrapper
 
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers)
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers, wait.NeverStop)
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
@@ -84,9 +80,9 @@ func main() {
 }
 
 func cloudInitializer(config *cloudcontrollerconfig.CompletedConfig) cloudprovider.Interface {
-	cloudConfigFile := config.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile
+	cloudConfig := config.ComponentConfig.KubeCloudShared.CloudProvider
 	// initialize cloud provider with the cloud provider name and config file provided
-	cloud, err := cloudprovider.InitCloudProvider(cloudProviderName, cloudConfigFile)
+	cloud, err := cloudprovider.InitCloudProvider(cloudConfig.Name, cloudConfig.CloudConfigFile)
 	if err != nil {
 		klog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
