@@ -26,8 +26,9 @@ import (
 // CronJobStatusApplyConfiguration represents an declarative configuration of the CronJobStatus type for use
 // with apply.
 type CronJobStatusApplyConfiguration struct {
-	Active           []v1.ObjectReferenceApplyConfiguration `json:"active,omitempty"`
-	LastScheduleTime *metav1.Time                           `json:"lastScheduleTime,omitempty"`
+	Active             []v1.ObjectReferenceApplyConfiguration `json:"active,omitempty"`
+	LastScheduleTime   *metav1.Time                           `json:"lastScheduleTime,omitempty"`
+	LastSuccessfulTime *metav1.Time                           `json:"lastSuccessfulTime,omitempty"`
 }
 
 // CronJobStatusApplyConfiguration constructs an declarative configuration of the CronJobStatus type for use with
@@ -54,5 +55,13 @@ func (b *CronJobStatusApplyConfiguration) WithActive(values ...*v1.ObjectReferen
 // If called multiple times, the LastScheduleTime field is set to the value of the last call.
 func (b *CronJobStatusApplyConfiguration) WithLastScheduleTime(value metav1.Time) *CronJobStatusApplyConfiguration {
 	b.LastScheduleTime = &value
+	return b
+}
+
+// WithLastSuccessfulTime sets the LastSuccessfulTime field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LastSuccessfulTime field is set to the value of the last call.
+func (b *CronJobStatusApplyConfiguration) WithLastSuccessfulTime(value metav1.Time) *CronJobStatusApplyConfiguration {
+	b.LastSuccessfulTime = &value
 	return b
 }
