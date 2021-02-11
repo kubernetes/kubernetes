@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -19,6 +19,13 @@
 
 # For systems without journald
 mkdir -p /var/log/journal
+
+# set ld preload
+if dpkg --print-architecture | grep -q amd64;then
+    export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
+else
+    export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2
+fi
 
 # Use exec to get the signal
 # A non-quoted string and add the comment to prevent shellcheck failures on this line.
