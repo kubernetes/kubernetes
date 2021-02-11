@@ -144,16 +144,18 @@ func newTestKubeletWithImageList(
 	imageList []kubecontainer.Image,
 	controllerAttachDetachEnabled bool,
 	initFakeVolumePlugin bool) *TestKubelet {
-	fakeRuntime := &containertest.FakeRuntime{}
-	fakeRuntime.RuntimeType = "test"
-	fakeRuntime.VersionInfo = "1.5.0"
-	fakeRuntime.ImageList = imageList
-	// Set ready conditions by default.
-	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{
-		Conditions: []kubecontainer.RuntimeCondition{
-			{Type: "RuntimeReady", Status: true},
-			{Type: "NetworkReady", Status: true},
+	fakeRuntime := &containertest.FakeRuntime{
+		ImageList: imageList,
+		// Set ready conditions by default.
+		RuntimeStatus: &kubecontainer.RuntimeStatus{
+			Conditions: []kubecontainer.RuntimeCondition{
+				{Type: "RuntimeReady", Status: true},
+				{Type: "NetworkReady", Status: true},
+			},
 		},
+		VersionInfo: "1.5.0",
+		RuntimeType: "test",
+		T:           t,
 	}
 
 	fakeRecorder := &record.FakeRecorder{}
@@ -658,7 +660,7 @@ func TestKillPodFollwedByIsPodPendingTermination(t *testing.T) {
 		RunningPod: pod,
 	})
 
-	if !(kl.podKiller.IsPodPendingTerminationByUID(pod.ID) || fakeRuntime.AssertKilledPods([]string{"12345678"}) == nil) {
+	if !(kl.podKiller.IsPodPendingTerminationByUID(pod.ID) || fakeRuntime.AssertKilledPods([]string{"12345678"})) {
 		t.Fatal("Race condition: When KillPod is complete, the pod should be pending termination or be killed")
 	}
 }
