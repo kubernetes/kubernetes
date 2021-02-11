@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -68,9 +68,7 @@ type AttachOptions struct {
 	// whether to disable use of standard error when streaming output from tty
 	DisableStderr bool
 
-	CommandName             string
-	ParentCommandName       string
-	EnableSuggestedCmdUsage bool
+	CommandName string
 
 	Pod *corev1.Pod
 
@@ -184,14 +182,6 @@ func (o *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	o.Builder = f.NewBuilder
 	o.Resources = args
 	o.restClientGetter = f
-
-	cmdParent := cmd.Parent()
-	if cmdParent != nil {
-		o.ParentCommandName = cmdParent.CommandPath()
-	}
-	if len(o.ParentCommandName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
-		o.EnableSuggestedCmdUsage = true
-	}
 
 	config, err := f.ToRESTConfig()
 	if err != nil {
@@ -312,32 +302,7 @@ func (o *AttachOptions) findAttachablePod(obj runtime.Object) (*corev1.Pod, erro
 // containerToAttach returns a reference to the container to attach to, given
 // by name or the first container if name is empty.
 func (o *AttachOptions) containerToAttachTo(pod *corev1.Pod) (*corev1.Container, error) {
-	if len(o.ContainerName) > 0 {
-		for i := range pod.Spec.Containers {
-			if pod.Spec.Containers[i].Name == o.ContainerName {
-				return &pod.Spec.Containers[i], nil
-			}
-		}
-		for i := range pod.Spec.InitContainers {
-			if pod.Spec.InitContainers[i].Name == o.ContainerName {
-				return &pod.Spec.InitContainers[i], nil
-			}
-		}
-		for i := range pod.Spec.EphemeralContainers {
-			if pod.Spec.EphemeralContainers[i].Name == o.ContainerName {
-				return (*corev1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon), nil
-			}
-		}
-		return nil, fmt.Errorf("container not found (%s)", o.ContainerName)
-	}
-
-	if o.EnableSuggestedCmdUsage {
-		fmt.Fprintf(o.ErrOut, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
-		fmt.Fprintf(o.ErrOut, "Use '%s describe pod/%s -n %s' to see all of the containers in this pod.\n", o.ParentCommandName, o.PodName, o.Namespace)
-	}
-
-	klog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
-	return &pod.Spec.Containers[0], nil
+	return podcmd.FindOrDefaultContainerByName(pod, o.ContainerName, o.Quiet, o.ErrOut)
 }
 
 // GetContainerName returns the name of the container to attach to, with a fallback.

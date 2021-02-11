@@ -30,7 +30,6 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,7 +44,6 @@ import (
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
-	"k8s.io/kubectl/pkg/util/podutils"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -745,29 +743,4 @@ func Warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
 		newGeneratorName,
 		oldGeneratorName,
 	)
-}
-
-// GetDefaultContainerName returns the default container name for a pod.
-// it checks the annotation kubectl.kubernetes.io/default-container at first and then the first container name.
-func GetDefaultContainerName(pod *corev1.Pod, enableSuggestedCmdUsage bool, w io.Writer) string {
-	if len(pod.Spec.Containers) > 1 {
-		// in case the "kubectl.kubernetes.io/default-container" annotation is present, we preset the opts.Containers to default to selected
-		// container. This gives users ability to preselect the most interesting container in pod.
-		if annotations := pod.Annotations; annotations != nil && len(annotations[podutils.DefaultContainerAnnotationName]) > 0 {
-			containerName := annotations[podutils.DefaultContainerAnnotationName]
-			if exists, _ := podutils.FindContainerByName(pod, containerName); exists != nil {
-				fmt.Fprintf(w, "Defaulting container name to container %s.\n", containerName)
-				return containerName
-			} else {
-				fmt.Fprintf(w, "Default container name %q in annotation not found in a pod\n", containerName)
-			}
-		}
-		fmt.Fprintf(w, "Defaulting container name to first container %s.\n", pod.Spec.Containers[0].Name)
-
-		if enableSuggestedCmdUsage {
-			fmt.Fprintf(w, "Use 'kubectl describe pod/%s -n %s' to see all of the containers in this pod.\n", pod.Name, pod.Namespace)
-		}
-	}
-
-	return pod.Spec.Containers[0].Name
 }
