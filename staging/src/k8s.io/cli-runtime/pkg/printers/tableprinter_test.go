@@ -17,6 +17,7 @@ limitations under the License.
 package printers
 
 import (
+	"fmt"
 	"bytes"
 	"regexp"
 	"testing"
@@ -501,48 +502,6 @@ func TestPrintTable_WithAnnotations(t *testing.T) {
 test1   1/1     podPhase   5         20h   first-annotation=pod,second-annotation=127.0.0.1
 `,
 		},
-		// Test a table "ColumnLabels" option, appends labels as columns.
-		{
-			columns: []metav1.TableColumnDefinition{
-				{Name: "Name", Type: "string"},
-				{Name: "Ready", Type: "string"},
-				{Name: "Status", Type: "string"},
-				{Name: "Retries", Type: "integer"},
-				{Name: "Age", Type: "string"},
-			},
-			rows: []metav1.TableRow{
-				{
-					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
-					Object: runtime.RawExtension{Object: testPod},
-				},
-			},
-			// Print "second-label" as column name, with label value.
-			options: PrintOptions{ColumnLabels: []string{"second-label"}},
-			expected: `NAME    READY   STATUS     RETRIES   AGE   SECOND-LABEL
-test1   1/1     podPhase   5         20h   127.0.0.1
-`,
-		},
-		// Test a table "ColumnLabels" option, appends labels as columns.
-		{
-			columns: []metav1.TableColumnDefinition{
-				{Name: "Name", Type: "string"},
-				{Name: "Ready", Type: "string"},
-				{Name: "Status", Type: "string"},
-				{Name: "Retries", Type: "integer"},
-				{Name: "Age", Type: "string"},
-			},
-			rows: []metav1.TableRow{
-				{
-					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
-					Object: runtime.RawExtension{Object: testPod},
-				},
-			},
-			// Print multiple-labels as columns, with their values.
-			options: PrintOptions{ColumnLabels: []string{"first-annotation", "second-annotation"}},
-			expected: `NAME    READY   STATUS     RETRIES   AGE   FIRST-ANNOTATION   SECOND-ANNOTATION
-test1   1/1     podPhase   5         20h   12   pod   127.0.0.1
-`,
-		},
 	}
 	for _, test := range tests {
 		// Create the table from the columns and rows.
@@ -600,7 +559,15 @@ test-pod-name   <unknown>   first-label=12,second-label=label-value
 			expected: `NAME            AGE         ANNOTATIONS
 test-pod-name   <unknown>   first-annotation=pod,second-annotation=127.0.0.1
 `,
-				},
+		},
+		// Test non-table default printing for a pod with both "ShowAnnotations" and "ShowLabels" option.
+		{
+			object:  testPod,
+			options: PrintOptions{ShowAnnotations: true, ShowLabels: true},
+			expected: `NAME            AGE         LABELS                                    ANNOTATIONS
+test-pod-name   <unknown>   first-label=12,second-label=label-value   first-annotation=pod,second-annotation=127.0.0.1
+`,
+		},
 		// Test non-table default printing for a Status resource.
 		{
 			object:  testStatus,
@@ -622,6 +589,7 @@ Failure   test-status-reason   test-status-message
 		printer := NewTablePrinter(test.options)
 		printer.PrintObj(test.object, out)
 		// Validate the expected output matches the printed table.
+		fmt.Printf("%d\t%d ", len(test.expected), len(out.String()))
 		if test.expected != out.String() {
 			t.Errorf("Table printing error: expected (%s), got (%s)", test.expected, out.String())
 		}

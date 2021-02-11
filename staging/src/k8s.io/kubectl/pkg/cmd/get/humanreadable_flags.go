@@ -111,7 +111,10 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 // flags related to human-readable printing to it
 func (f *HumanPrintFlags) AddFlags(c *cobra.Command) {
 	if f.ShowLabels != nil {
-		c.Flags().BoolVar(f.ShowLabels, "show-labels", *f.ShowLabels, "When printing, show all labels as the last column (default hide labels column)")
+		c.Flags().BoolVar(f.ShowLabels, "show-labels", *f.ShowLabels, "When printing, show all labels (default hide labels column)")
+	}
+	if f.ShowAnnotations != nil {
+		c.Flags().BoolVar(f.ShowAnnotations, "show-annotations", *f.ShowAnnotations, "When printing, show all annotations as the last column (default hide labels column)")
 	}
 	if f.SortBy != nil {
 		c.Flags().StringVar(f.SortBy, "sort-by", *f.SortBy, "If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. '{.metadata.name}'). The field in the API resource specified by this JSONPath expression must be an integer or a string.")
@@ -121,9 +124,6 @@ func (f *HumanPrintFlags) AddFlags(c *cobra.Command) {
 	}
 	if f.ShowKind != nil {
 		c.Flags().BoolVar(f.ShowKind, "show-kind", *f.ShowKind, "If present, list the resource type for the requested object(s).")
-	}
-	if f.ShowAnnotations != nil {
-		c.Flags().BoolVar(f.ShowAnnotations, "show-annotations", *f.ShowAnnotations, "When printing, show all annotations as the last column (default hide labels column)")
 	}
 }
 
