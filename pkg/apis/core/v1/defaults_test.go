@@ -1897,6 +1897,11 @@ func TestSetDefaultIPFamilies(t *testing.T) {
 			}
 		})
 
+		// TODO: @khenidak
+		// with BETA feature is always on. This ensure we test for gate on/off scenarios
+		// as we move to stable this entire test will need to be folded into one test
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, false)()
+
 		// run without gate (families should not change)
 		t.Run(fmt.Sprintf("without-gate:%s", test.name), func(t *testing.T) {
 			obj2 := roundTrip(t, runtime.Object(&test.svc))
@@ -2039,6 +2044,10 @@ func TestSetDefaultServiceIPFamilyPolicy(t *testing.T) {
 
 		// without gate. IPFamilyPolicy should never change
 		t.Run(test.name, func(t *testing.T) {
+			//TODO: @khenidak
+			// BETA feature. gate is on. when we go stable fold the test into one scenario
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, false)()
+
 			obj2 := roundTrip(t, runtime.Object(&test.svc))
 			svc2 := obj2.(*v1.Service)
 

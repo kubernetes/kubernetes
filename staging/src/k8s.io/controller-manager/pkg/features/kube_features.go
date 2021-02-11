@@ -61,5 +61,5 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	LegacyNodeRoleBehavior: {Default: false, PreRelease: featuregate.GA, LockToDefault: true},
 	ServiceNodeExclusion:   {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	IPv6DualStack:          {Default: false, PreRelease: featuregate.Alpha},
+	IPv6DualStack:          {Default: true, PreRelease: featuregate.Beta},
 }
