@@ -444,6 +444,9 @@ func TestSyncPodsDeletesWhenSourcesAreReadyPerQOS(t *testing.T) {
 	// assert that unwanted pods were killed
 	fakeRuntime.AssertKilledPods([]string{"12345678"})
 
+	// simulate Runtime.KillPod
+	fakeRuntime.PodList = nil
+
 	kubelet.HandlePodCleanups()
 	kubelet.HandlePodCleanups()
 	kubelet.HandlePodCleanups()
