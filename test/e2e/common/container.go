@@ -30,10 +30,13 @@ import (
 )
 
 const (
+	// ContainerStatusRetryTimeout represents polling threshold before giving up to get the container status
 	ContainerStatusRetryTimeout = time.Minute * 5
+	// ContainerStatusPollInterval represents duration between polls to get the container status
 	ContainerStatusPollInterval = time.Second * 1
 )
 
+// ConformanceContainer defines the types for running container conformance test cases
 // One pod one container
 type ConformanceContainer struct {
 	Container        v1.Container
@@ -46,6 +49,7 @@ type ConformanceContainer struct {
 	PodSecurityContext *v1.PodSecurityContext
 }
 
+// Create creates the defined conformance container
 func (cc *ConformanceContainer) Create() {
 	cc.podName = cc.Container.Name + string(uuid.NewUUID())
 	imagePullSecrets := []v1.LocalObjectReference{}
@@ -69,10 +73,12 @@ func (cc *ConformanceContainer) Create() {
 	cc.PodClient.Create(pod)
 }
 
+// Delete deletes the defined conformance container
 func (cc *ConformanceContainer) Delete() error {
 	return cc.PodClient.Delete(context.TODO(), cc.podName, *metav1.NewDeleteOptions(0))
 }
 
+// IsReady returns whether this container is ready and error if any
 func (cc *ConformanceContainer) IsReady() (bool, error) {
 	pod, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
 	if err != nil {
@@ -81,6 +87,7 @@ func (cc *ConformanceContainer) IsReady() (bool, error) {
 	return podutil.IsPodReady(pod), nil
 }
 
+// GetPhase returns the phase of the pod lifecycle and error if any
 func (cc *ConformanceContainer) GetPhase() (v1.PodPhase, error) {
 	pod, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
 	if err != nil {
@@ -89,6 +96,7 @@ func (cc *ConformanceContainer) GetPhase() (v1.PodPhase, error) {
 	return pod.Status.Phase, nil
 }
 
+// GetStatus returns the details of the current status of this container and error if any
 func (cc *ConformanceContainer) GetStatus() (v1.ContainerStatus, error) {
 	pod, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
 	if err != nil {
@@ -101,6 +109,7 @@ func (cc *ConformanceContainer) GetStatus() (v1.ContainerStatus, error) {
 	return statuses[0], nil
 }
 
+// Present returns whether this pod is present and error if any
 func (cc *ConformanceContainer) Present() (bool, error) {
 	_, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
 	if err == nil {
@@ -112,15 +121,21 @@ func (cc *ConformanceContainer) Present() (bool, error) {
 	return false, err
 }
 
+// ContainerState represents different states of its lifecycle
 type ContainerState string
 
 const (
-	ContainerStateWaiting    ContainerState = "Waiting"
-	ContainerStateRunning    ContainerState = "Running"
+	// ContainerStateWaiting represents 'Waiting' container state
+	ContainerStateWaiting ContainerState = "Waiting"
+	// ContainerStateRunning represents 'Running' container state
+	ContainerStateRunning ContainerState = "Running"
+	// ContainerStateTerminated represents 'Terminated' container state
 	ContainerStateTerminated ContainerState = "Terminated"
-	ContainerStateUnknown    ContainerState = "Unknown"
+	// ContainerStateUnknown represents 'Unknown' container state
+	ContainerStateUnknown ContainerState = "Unknown"
 )
 
+// GetContainerState returns current state the container represents among its lifecyle
 func GetContainerState(state v1.ContainerState) ContainerState {
 	if state.Waiting != nil {
 		return ContainerStateWaiting

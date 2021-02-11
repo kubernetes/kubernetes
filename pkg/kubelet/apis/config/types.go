@@ -224,6 +224,9 @@ type KubeletConfiguration struct {
 	// CPU Manager reconciliation period.
 	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerReconcilePeriod metav1.Duration
+	// MemoryManagerPolicy is the name of the policy to use.
+	// Requires the MemoryManager feature gate to be enabled.
+	MemoryManagerPolicy string
 	// TopologyManagerPolicy is the name of the policy to use.
 	// Policies other than "none" require the TopologyManager feature gate to be enabled.
 	TopologyManagerPolicy string
@@ -382,6 +385,20 @@ type KubeletConfiguration struct {
 	// Defaults to 10 seconds, requires GracefulNodeShutdown feature gate to be enabled.
 	// For example, if ShutdownGracePeriod=30s, and ShutdownGracePeriodCriticalPods=10s, during a node shutdown the first 20 seconds would be reserved for gracefully terminating normal pods, and the last 10 seconds would be reserved for terminating critical pods.
 	ShutdownGracePeriodCriticalPods metav1.Duration
+	// ReservedMemory specifies a comma-separated list of memory reservations for NUMA nodes.
+	// The parameter makes sense only in the context of the memory manager feature. The memory manager will not allocate reserved memory for container workloads.
+	// For example, if you have a NUMA0 with 10Gi of memory and the ReservedMemory was specified to reserve 1Gi of memory at NUMA0,
+	// the memory manager will assume that only 9Gi is available for allocation.
+	// You can specify a different amount of NUMA node and memory types.
+	// You can omit this parameter at all, but you should be aware that the amount of reserved memory from all NUMA nodes
+	// should be equal to the amount of memory specified by the node allocatable features(https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable).
+	// If at least one node allocatable parameter has a non-zero value, you will need to specify at least one NUMA node.
+	// Also, avoid specifying:
+	// 1. Duplicates, the same NUMA node, and memory type, but with a different value.
+	// 2. zero limits for any memory type.
+	// 3. NUMAs nodes IDs that do not exist under the machine.
+	// 4. memory types except for memory and hugepages-<size>
+	ReservedMemory []MemoryReservation
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
@@ -534,4 +551,10 @@ type CredentialProvider struct {
 type ExecEnvVar struct {
 	Name  string
 	Value string
+}
+
+// MemoryReservation specifies the memory reservation of different types for each NUMA node
+type MemoryReservation struct {
+	NumaNode int32
+	Limits   v1.ResourceList
 }

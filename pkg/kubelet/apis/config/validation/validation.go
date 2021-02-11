@@ -193,6 +193,8 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		}
 	}
 
+	allErrors = append(allErrors, validateReservedMemoryConfiguration(kc)...)
+
 	if err := validateKubeletOSConfiguration(kc); err != nil {
 		allErrors = append(allErrors, err)
 	}

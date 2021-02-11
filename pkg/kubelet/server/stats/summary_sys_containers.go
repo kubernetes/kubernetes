@@ -44,7 +44,7 @@ func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig
 		}
 		s, _, err := sp.provider.GetCgroupStats(cont.name, cont.forceStatsUpdate)
 		if err != nil {
-			klog.Errorf("Failed to get system container stats for %q: %v", cont.name, err)
+			klog.ErrorS(err, "Failed to get system container stats", "containerName", cont.name)
 			continue
 		}
 		// System containers don't have a filesystem associated with them.
@@ -79,7 +79,7 @@ func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(nodeConfig c
 		}
 		s, err := sp.provider.GetCgroupCPUAndMemoryStats(cont.name, cont.forceStatsUpdate)
 		if err != nil {
-			klog.Errorf("Failed to get system container stats for %q: %v", cont.name, err)
+			klog.ErrorS(err, "Failed to get system container stats", "containerName", cont.name)
 			continue
 		}
 		s.Name = sys

@@ -55,6 +55,7 @@ logging:
 makeIPTablesUtilChains: true
 maxOpenFiles: 1000000
 maxPods: 110
+memoryManagerPolicy: None
 nodeLeaseDurationSeconds: 40
 nodeStatusMaxImages: 50
 nodeStatusReportFrequency: 5m0s

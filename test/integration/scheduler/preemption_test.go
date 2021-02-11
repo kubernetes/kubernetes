@@ -135,12 +135,12 @@ func TestPreemption(t *testing.T) {
 	prof := schedulerconfig.KubeSchedulerProfile{
 		SchedulerName: v1.DefaultSchedulerName,
 		Plugins: &schedulerconfig.Plugins{
-			Filter: &schedulerconfig.PluginSet{
+			Filter: schedulerconfig.PluginSet{
 				Enabled: []schedulerconfig.Plugin{
 					{Name: filterPluginName},
 				},
 			},
-			PreFilter: &schedulerconfig.PluginSet{
+			PreFilter: schedulerconfig.PluginSet{
 				Enabled: []schedulerconfig.Plugin{
 					{Name: filterPluginName},
 				},

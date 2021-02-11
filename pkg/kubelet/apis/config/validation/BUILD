@@ -11,14 +11,17 @@ go_library(
     srcs = [
         "validation.go",
         "validation_others.go",
+        "validation_reserved_memory.go",
         "validation_windows.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/apis/config/validation",
     deps = [
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
         "//pkg/kubelet/types:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
@@ -43,10 +46,15 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["validation_test.go"],
+    srcs = [
+        "validation_reserved_memory_test.go",
+        "validation_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/apis/config:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
     ],

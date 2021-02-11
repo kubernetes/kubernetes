@@ -414,6 +414,9 @@ const (
 	ModeRBAC string = "RBAC"
 	// ModeNode is an authorization mode that authorizes API requests made by kubelets.
 	ModeNode string = "Node"
+
+	// PauseVersion indicates the default pause image version for kubeadm
+	PauseVersion = "3.4.1"
 )
 
 var (

@@ -1,7 +1,7 @@
 dependencies:
   # agnhost: bump this one first
   - name: "agnhost"
-    version: "2.27"
+    version: "2.28"
     refPaths:
     - path: test/images/agnhost/VERSION
       match: \d.\d
@@ -160,9 +160,9 @@ dependencies:
       match: TAG =
 
   - name: "k8s.gcr.io/pause: dependents"
-    version: 3.2
+    version: 3.4.1
     refPaths:
-    - path: cmd/kubeadm/app/constants/constants_unix.go
+    - path: cmd/kubeadm/app/constants/constants.go
       match: PauseVersion\s+=
     - path: cmd/kubeadm/app/util/template_test.go
       match: validTmpl\s+=
@@ -209,7 +209,7 @@ dependencies:
     - path: test/utils/runners.go
       match: k8s.gcr.io\/pause:\d+\.\d+
     - path: test/utils/image/manifest.go
-      match: configs\[Pause\] = Config{gcRegistry, "pause", "\d+\.\d+"}
+      match: configs\[Pause\] = Config{gcRegistry, "pause", "\d+\.\d+.\d+"}
 
   # metadata-concealment: bump this one first
   - name: "metadata-concealment"

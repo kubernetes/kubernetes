@@ -84,7 +84,7 @@ func TestRegisterConfigProducers(t *testing.T) {
 	}
 
 	wantPlugins := config.Plugins{
-		Filter: &config.PluginSet{
+		Filter: config.PluginSet{
 			Enabled: []config.Plugin{
 				{Name: nodeunschedulable.Name},
 				{Name: tainttoleration.Name},
@@ -92,7 +92,7 @@ func TestRegisterConfigProducers(t *testing.T) {
 				{Name: testFilterName2},
 			},
 		},
-		Score: &config.PluginSet{
+		Score: config.PluginSet{
 			Enabled: []config.Plugin{
 				{Name: testScoreName1, Weight: 1},
 				{Name: testScoreName2, Weight: 1},
@@ -117,7 +117,7 @@ func TestAppendPriorityConfigs(t *testing.T) {
 		{
 			name: "default priorities",
 			wantPlugins: config.Plugins{
-				PreScore: &config.PluginSet{
+				PreScore: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: podtopologyspread.Name},
 						{Name: interpodaffinity.Name},
@@ -125,7 +125,7 @@ func TestAppendPriorityConfigs(t *testing.T) {
 						{Name: tainttoleration.Name},
 					},
 				},
-				Score: &config.PluginSet{
+				Score: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: noderesources.BalancedAllocationName, Weight: 1},
 						{Name: podtopologyspread.Name, Weight: 2},
@@ -153,12 +153,12 @@ func TestAppendPriorityConfigs(t *testing.T) {
 				SelectorSpreadPriority: 3,
 			},
 			wantPlugins: config.Plugins{
-				PreScore: &config.PluginSet{
+				PreScore: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: podtopologyspread.Name},
 					},
 				},
-				Score: &config.PluginSet{
+				Score: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: podtopologyspread.Name, Weight: 3},
 					},
@@ -179,12 +179,12 @@ func TestAppendPriorityConfigs(t *testing.T) {
 				EvenPodsSpreadPriority: 4,
 			},
 			wantPlugins: config.Plugins{
-				PreScore: &config.PluginSet{
+				PreScore: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: podtopologyspread.Name},
 					},
 				},
-				Score: &config.PluginSet{
+				Score: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: podtopologyspread.Name, Weight: 4},
 					},
@@ -209,13 +209,13 @@ func TestAppendPriorityConfigs(t *testing.T) {
 				EvenPodsSpreadPriority: 2,
 			},
 			wantPlugins: config.Plugins{
-				PreScore: &config.PluginSet{
+				PreScore: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: podtopologyspread.Name},
 						{Name: selectorspread.Name},
 					},
 				},
-				Score: &config.PluginSet{
+				Score: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: podtopologyspread.Name, Weight: 2},
 						{Name: selectorspread.Name, Weight: 1},

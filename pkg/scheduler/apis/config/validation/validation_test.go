@@ -64,10 +64,10 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			{
 				SchedulerName: "me",
 				Plugins: &config.Plugins{
-					QueueSort: &config.PluginSet{
+					QueueSort: config.PluginSet{
 						Enabled: []config.Plugin{{Name: "CustomSort"}},
 					},
-					Score: &config.PluginSet{
+					Score: config.PluginSet{
 						Disabled: []config.Plugin{{Name: "*"}},
 					},
 				},
@@ -75,10 +75,10 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			{
 				SchedulerName: "other",
 				Plugins: &config.Plugins{
-					QueueSort: &config.PluginSet{
+					QueueSort: config.PluginSet{
 						Enabled: []config.Plugin{{Name: "CustomSort"}},
 					},
-					Bind: &config.PluginSet{
+					Bind: config.PluginSet{
 						Enabled: []config.Plugin{{Name: "CustomBind"}},
 					},
 				},

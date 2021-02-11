@@ -387,6 +387,15 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectErr:               true,
 			expectThresholds:        []evictionapi.Threshold{},
 		},
+		"hard-signal-percentage-greater-than-100%": {
+			allocatableConfig:       []string{},
+			evictionHard:            map[string]string{"memory.available": "150%"},
+			evictionSoft:            map[string]string{},
+			evictionSoftGracePeriod: map[string]string{},
+			evictionMinReclaim:      map[string]string{},
+			expectErr:               true,
+			expectThresholds:        []evictionapi.Threshold{},
+		},
 		"soft-signal-negative": {
 			allocatableConfig:       []string{},
 			evictionHard:            map[string]string{},

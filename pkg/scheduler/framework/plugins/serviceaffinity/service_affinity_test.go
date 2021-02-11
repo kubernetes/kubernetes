@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
@@ -86,8 +87,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "service pod on same node",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, UID: types.UID("pod2")}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			labels:   []string{"region"},
@@ -95,8 +96,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "service pod on different node, region match",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, UID: types.UID("pod2")}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			labels:   []string{"region"},
@@ -104,8 +105,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "service pod on different node, region mismatch",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, UID: types.UID("pod2")}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			labels:   []string{"region"},
@@ -113,8 +114,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "service in different namespace, region mismatch",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, Namespace: "ns1", UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, Namespace: "ns1", UID: types.UID("pod2")}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns2"}}},
 			labels:   []string{"region"},
@@ -122,8 +123,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "pod in different namespace, region mismatch",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns2"}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, Namespace: "ns1", UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, Namespace: "ns2", UID: types.UID("pod2")}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns1"}}},
 			labels:   []string{"region"},
@@ -131,8 +132,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "service and pod in same namespace, region mismatch",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, Namespace: "ns1", UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, Namespace: "ns1", UID: types.UID("pod2")}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns1"}}},
 			labels:   []string{"region"},
@@ -140,8 +141,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "service pod on different node, multiple labels, not all match",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, UID: types.UID("pod2")}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			labels:   []string{"region", "zone"},
@@ -149,8 +150,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "service pod on different node, multiple labels, all match",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine5"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine5"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, UID: types.UID("pod2")}}},
 			node:     &node4,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			labels:   []string{"region", "zone"},

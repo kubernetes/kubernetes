@@ -192,7 +192,8 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 				cleanupSteps = append(cleanupSteps, func() {
 					framework.ExpectNoError(sr.CleanupResource(f.Timeouts))
 				})
-				sr = storageframework.CreateSnapshotResource(sDriver, config, pattern, pvc.GetName(), pvc.GetNamespace(), f.Timeouts)
+				parameters := map[string]string{}
+				sr = storageframework.CreateSnapshotResource(sDriver, config, pattern, pvc.GetName(), pvc.GetNamespace(), f.Timeouts, parameters)
 				vs = sr.Vs
 				vscontent = sr.Vscontent
 				vsc = sr.Vsclass

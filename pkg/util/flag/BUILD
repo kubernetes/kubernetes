@@ -11,6 +11,10 @@ go_library(
     srcs = ["flags.go"],
     importpath = "k8s.io/kubernetes/pkg/util/flag",
     deps = [
+        "//pkg/apis/core/v1/helper:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
@@ -34,5 +38,11 @@ go_test(
     name = "go_default_test",
     srcs = ["flags_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
+    deps = [
+        "//pkg/kubelet/apis/config:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
+    ],
 )

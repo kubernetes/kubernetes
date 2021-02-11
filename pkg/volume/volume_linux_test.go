@@ -181,7 +181,7 @@ func TestSkipPermissionChange(t *testing.T) {
 	}
 }
 
-func TestSetVolumeOwnership(t *testing.T) {
+func TestSetVolumeOwnershipMode(t *testing.T) {
 	always := v1.FSGroupChangeAlways
 	onrootMismatch := v1.FSGroupChangeOnRootMismatch
 	expectedMask := rwMask | os.ModeSetgid | execMask
@@ -349,4 +349,134 @@ func verifyDirectoryPermission(path string, readonly bool) bool {
 		return true
 	}
 	return false
+}
+
+func TestSetVolumeOwnershipOwner(t *testing.T) {
+	fsGroup := int64(3000)
+	currentUid := os.Getuid()
+	if currentUid != 0 {
+		t.Skip("running as non-root")
+	}
+	currentGid := os.Getgid()
+
+	tests := []struct {
+		description string
+		fsGroup     *int64
+		setupFunc   func(path string) error
+		assertFunc  func(path string) error
+	}{
+		{
+			description: "fsGroup=nil",
+			fsGroup:     nil,
+			setupFunc: func(path string) error {
+				filename := filepath.Join(path, "file.txt")
+				file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
+				if err != nil {
+					return err
+				}
+				file.Close()
+				return nil
+			},
+			assertFunc: func(path string) error {
+				filename := filepath.Join(path, "file.txt")
+				if !verifyFileOwner(filename, currentUid, currentGid) {
+					return fmt.Errorf("invalid owner on %s", filename)
+				}
+				return nil
+			},
+		},
+		{
+			description: "*fsGroup=3000",
+			fsGroup:     &fsGroup,
+			setupFunc: func(path string) error {
+				filename := filepath.Join(path, "file.txt")
+				file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
+				if err != nil {
+					return err
+				}
+				file.Close()
+				return nil
+			},
+			assertFunc: func(path string) error {
+				filename := filepath.Join(path, "file.txt")
+				if !verifyFileOwner(filename, currentUid, int(fsGroup)) {
+					return fmt.Errorf("invalid owner on %s", filename)
+				}
+				return nil
+			},
+		},
+		{
+			description: "symlink",
+			fsGroup:     &fsGroup,
+			setupFunc: func(path string) error {
+				filename := filepath.Join(path, "file.txt")
+				file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
+				if err != nil {
+					return err
+				}
+				file.Close()
+
+				symname := filepath.Join(path, "file_link.txt")
+				err = os.Symlink(filename, symname)
+				if err != nil {
+					return err
+				}
+
+				return nil
+			},
+			assertFunc: func(path string) error {
+				symname := filepath.Join(path, "file_link.txt")
+				if !verifyFileOwner(symname, currentUid, int(fsGroup)) {
+					return fmt.Errorf("invalid owner on %s", symname)
+				}
+				return nil
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			tmpDir, err := utiltesting.MkTmpdir("volume_linux_ownership")
+			if err != nil {
+				t.Fatalf("error creating temp dir: %v", err)
+			}
+
+			defer os.RemoveAll(tmpDir)
+
+			err = test.setupFunc(tmpDir)
+			if err != nil {
+				t.Errorf("for %s error running setup with: %v", test.description, err)
+			}
+
+			mounter := &localFakeMounter{path: tmpDir}
+			always := v1.FSGroupChangeAlways
+			err = SetVolumeOwnership(mounter, test.fsGroup, &always, nil)
+			if err != nil {
+				t.Errorf("for %s error changing ownership with: %v", test.description, err)
+			}
+			err = test.assertFunc(tmpDir)
+			if err != nil {
+				t.Errorf("for %s error verifying permissions with: %v", test.description, err)
+			}
+		})
+	}
+}
+
+// verifyFileOwner checks if given path is owned by uid and gid.
+// It returns true if it is otherwise false.
+func verifyFileOwner(path string, uid, gid int) bool {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return false
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || stat == nil {
+		return false
+	}
+
+	if int(stat.Uid) != uid || int(stat.Gid) != gid {
+		return false
+	}
+
+	return true
 }

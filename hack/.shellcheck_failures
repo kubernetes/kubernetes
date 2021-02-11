@@ -1,3 +1,1 @@
 ./cluster/gce/gci/configure.sh
-./cluster/gce/gci/master-helper.sh
-./cluster/gce/util.sh

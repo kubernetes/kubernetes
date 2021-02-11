@@ -133,7 +133,7 @@ func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token 
 }
 
 func (a *cachedTokenAuthenticator) doAuthenticateToken(ctx context.Context, token string) *cacheRecord {
-	doneAuthenticating := stats.authenticating()
+	doneAuthenticating := stats.authenticating(ctx)
 
 	auds, audsOk := authenticator.AudiencesFrom(ctx)
 
@@ -145,7 +145,7 @@ func (a *cachedTokenAuthenticator) doAuthenticateToken(ctx context.Context, toke
 	}
 
 	// Record cache miss
-	doneBlocking := stats.blocking()
+	doneBlocking := stats.blocking(ctx)
 	defer doneBlocking()
 	defer doneAuthenticating(false)
 
@@ -153,7 +153,7 @@ func (a *cachedTokenAuthenticator) doAuthenticateToken(ctx context.Context, toke
 		// always use one place to read and write the output of AuthenticateToken
 		record := &cacheRecord{}
 
-		doneFetching := stats.fetching()
+		doneFetching := stats.fetching(ctx)
 		// We're leaving the request handling stack so we need to handle crashes
 		// ourselves. Log a stack trace and return a 500 if something panics.
 		defer func() {

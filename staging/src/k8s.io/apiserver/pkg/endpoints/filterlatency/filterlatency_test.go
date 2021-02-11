@@ -17,6 +17,7 @@ limitations under the License.
 package filterlatency
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -120,7 +121,7 @@ func TestTrackCompletedContextHasFilterRecord(t *testing.T) {
 	})
 
 	requestFilterEndedAt := time.Now()
-	wrapped := trackCompleted(handler, utilclock.NewFakeClock(requestFilterEndedAt), func(fr *requestFilterRecord, completedAt time.Time) {
+	wrapped := trackCompleted(handler, utilclock.NewFakeClock(requestFilterEndedAt), func(_ context.Context, fr *requestFilterRecord, completedAt time.Time) {
 		actionCallCount++
 		filterRecordGot = fr
 		filterCompletedAtGot = completedAt
@@ -156,7 +157,7 @@ func TestTrackCompletedContextDoesNotHaveFilterRecord(t *testing.T) {
 		handlerCallCount++
 	})
 
-	wrapped := trackCompleted(handler, utilclock.NewFakeClock(time.Now()), func(_ *requestFilterRecord, _ time.Time) {
+	wrapped := trackCompleted(handler, utilclock.NewFakeClock(time.Now()), func(_ context.Context, _ *requestFilterRecord, _ time.Time) {
 		actionCallCount++
 	})
 
