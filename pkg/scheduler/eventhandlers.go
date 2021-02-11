@@ -118,14 +118,8 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 		klog.Errorf("scheduler cache UpdateNode failed: %v", err)
 	}
 
-	// Only activate unschedulable pods if the node became more schedulable.
-	// We skip the node property comparison when there is no unschedulable pods in the queue
-	// to save processing cycles. We still trigger a move to active queue to cover the case
-	// that a pod being processed by the scheduler is determined unschedulable. We want this
-	// pod to be reevaluated when a change in the cluster happens.
-	if sched.SchedulingQueue.NumUnschedulablePods() == 0 {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.Unknown)
-	} else if event := nodeSchedulingPropertiesChange(newNode, oldNode); event != "" {
+	// Only requeue unschedulable pods if the node became more schedulable.
+	if event := nodeSchedulingPropertiesChange(newNode, oldNode); event != "" {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(event)
 	}
 }
