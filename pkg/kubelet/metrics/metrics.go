@@ -83,6 +83,19 @@ const (
 	// Metrics keys for RuntimeClass
 	RunPodSandboxDurationKey = "run_podsandbox_duration_seconds"
 	RunPodSandboxErrorsKey   = "run_podsandbox_errors_total"
+
+	// Metrics to keep track of objects under management
+	ManagedPodsKey                  = "managed_pods"
+	ManagedContainersKey            = "managed_containers"
+	StartedPodsTotalKey             = "started_pods_total"
+	StartedPodsErrorsTotalKey       = "started_pods_errors_total"
+	StartedContainersTotalKey       = "started_containers_total"
+	StartedContainersErrorsTotalKey = "started_containers_errors_total"
+
+	// Values used in metric labels
+	Container          = "container"
+	InitContainer      = "init_container"
+	EphemeralContainer = "ephemeral_container"
 )
 
 var (
@@ -431,6 +444,64 @@ var (
 		},
 		[]string{"container_state"},
 	)
+	// StartedPodsTotal is a counter that tracks pod sandbox creation operations
+	StartedPodsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedPodsTotalKey,
+			Help:           "Cumulative number of pods started",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// StartedPodsErrorsTotal is a counter that tracks the number of errors creating pod sandboxes
+	StartedPodsErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedPodsErrorsTotalKey,
+			Help:           "Cumulative number of errors when starting pods",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"message"},
+	)
+	// StartedContainersTotal is a counter that tracks the number of container creation operations
+	StartedContainersTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedContainersTotalKey,
+			Help:           "Cumulative number of containers started",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_type"},
+	)
+	// StartedContainersTotal is a counter that tracks the number of errors creating containers
+	StartedContainersErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedContainersErrorsTotalKey,
+			Help:           "Cumulative number of errors when starting containers",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_type", "code"},
+	)
+	// ManagedPods is a gauge that tracks how many pods are managed by this kubelet
+	ManagedPods = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ManagedPodsKey,
+			Help:           "Number of pods managed by this kubelet",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// ManagedContainers is a gauge that tracks how many containers are managed by this kubelet
+	ManagedContainers = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ManagedContainersKey,
+			Help:           "Number of containers managed by this kubelet",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_type"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -459,6 +530,12 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(DevicePluginAllocationDuration)
 		legacyregistry.MustRegister(RunningContainerCount)
 		legacyregistry.MustRegister(RunningPodCount)
+		legacyregistry.MustRegister(ManagedPods)
+		legacyregistry.MustRegister(ManagedContainers)
+		legacyregistry.MustRegister(StartedPodsTotal)
+		legacyregistry.MustRegister(StartedPodsErrorsTotal)
+		legacyregistry.MustRegister(StartedContainersTotal)
+		legacyregistry.MustRegister(StartedContainersErrorsTotal)
 		legacyregistry.MustRegister(RunPodSandboxDuration)
 		legacyregistry.MustRegister(RunPodSandboxErrors)
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {

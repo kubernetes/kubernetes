@@ -19,10 +19,13 @@ package pod
 import (
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -159,6 +162,45 @@ func isPodInTerminatedState(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded
 }
 
+// updateMetrics updates the gauge metrics that track how many pods and containers this kubelet manages.
+// oldPod or newPod may be nil to signify creation or deletion, respectively.
+func updateMetrics(oldPod, newPod *v1.Pod) {
+	var numC, numIC, numEC int
+	countEC := utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers)
+
+	if oldPod != nil {
+		if newPod == nil {
+			metrics.ManagedPods.Dec()
+		}
+		numC -= len(oldPod.Spec.Containers)
+		numIC -= len(oldPod.Spec.InitContainers)
+		if countEC {
+			numEC -= len(oldPod.Spec.EphemeralContainers)
+		}
+	}
+
+	if newPod != nil {
+		if oldPod == nil {
+			metrics.ManagedPods.Inc()
+		}
+		numC += len(newPod.Spec.Containers)
+		numIC += len(newPod.Spec.InitContainers)
+		if countEC {
+			numEC += len(newPod.Spec.EphemeralContainers)
+		}
+	}
+
+	if numC != 0 {
+		metrics.ManagedContainers.WithLabelValues(metrics.Container).Add(float64(numC))
+	}
+	if numIC != 0 {
+		metrics.ManagedContainers.WithLabelValues(metrics.InitContainer).Add(float64(numIC))
+	}
+	if countEC && numEC != 0 {
+		metrics.ManagedContainers.WithLabelValues(metrics.EphemeralContainer).Add(float64(numEC))
+	}
+}
+
 // updatePodsInternal replaces the given pods in the current state of the
 // manager, updating the various indices. The caller is assumed to hold the
 // lock.
@@ -202,6 +244,7 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 			}
 		} else {
 			resolvedPodUID := kubetypes.ResolvedPodUID(pod.UID)
+			updateMetrics(pm.podByUID[resolvedPodUID], pod)
 			pm.podByUID[resolvedPodUID] = pod
 			pm.podByFullName[podFullName] = pod
 			if mirror, ok := pm.mirrorPodByFullName[podFullName]; ok {
@@ -212,6 +255,7 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 }
 
 func (pm *basicManager) DeletePod(pod *v1.Pod) {
+	updateMetrics(pod, nil)
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	if pm.secretManager != nil {
