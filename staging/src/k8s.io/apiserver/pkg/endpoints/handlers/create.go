@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
@@ -163,6 +164,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 					return nil, fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err)
 				}
 				obj = scope.FieldManager.UpdateNoErrors(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
+				admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
 			}
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
 				if err := mutatingAdmission.Admit(ctx, admissionAttributes, scope); err != nil {

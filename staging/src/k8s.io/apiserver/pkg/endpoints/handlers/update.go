@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
@@ -130,6 +131,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		// allows skipping managedFields update if the resulting object is too big
 		shouldUpdateManagedFields := true
 		if scope.FieldManager != nil {
+			admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
 			transformers = append(transformers, func(_ context.Context, newObj, liveObj runtime.Object) (runtime.Object, error) {
 				if shouldUpdateManagedFields {
 					return scope.FieldManager.UpdateNoErrors(liveObj, newObj, managerOrUserAgent(options.FieldManager, req.UserAgent())), nil
