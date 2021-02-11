@@ -33,7 +33,7 @@ const InvalidManagedFieldsAfterMutatingAdmissionWarningFormat = ".metadata.manag
 // NewManagedFieldsValidatingAdmissionController validates the managedFields after calling
 // the provided admission and resets them to their original state if they got changed to an invalid value
 func NewManagedFieldsValidatingAdmissionController(wrap admission.Interface) admission.Interface {
-	return nil
+	return &managedFieldsValidatingAdmissionController{wrap: wrap}
 }
 
 type managedFieldsValidatingAdmissionController struct {
@@ -62,10 +62,6 @@ func (admit *managedFieldsValidatingAdmissionController) Admit(ctx context.Conte
 	}
 	managedFieldsBeforeAdmission := objectMeta.GetManagedFields()
 	if err := mutationInterface.Admit(ctx, a, o); err != nil {
-		return err
-	}
-	objectMeta, err = meta.Accessor(a.GetObject())
-	if err != nil {
 		return err
 	}
 	managedFieldsAfterAdmission := objectMeta.GetManagedFields()
