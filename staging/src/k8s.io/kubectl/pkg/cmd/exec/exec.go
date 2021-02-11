@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -153,9 +154,6 @@ type ExecOptions struct {
 	Command          []string
 	EnforceNamespace bool
 
-	ParentCommandName       string
-	EnableSuggestedCmdUsage bool
-
 	Builder          func() *resource.Builder
 	ExecutablePodFn  polymorphichelpers.AttachablePodForObjectFunc
 	restClientGetter genericclioptions.RESTClientGetter
@@ -202,14 +200,6 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 
 	p.Builder = f.NewBuilder
 	p.restClientGetter = f
-
-	cmdParent := cmd.Parent()
-	if cmdParent != nil {
-		p.ParentCommandName = cmdParent.CommandPath()
-	}
-	if len(p.ParentCommandName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
-		p.EnableSuggestedCmdUsage = true
-	}
 
 	p.Config, err = f.ToRESTConfig()
 	if err != nil {
@@ -328,7 +318,14 @@ func (p *ExecOptions) Run() error {
 		return fmt.Errorf("cannot exec into a container in a completed pod; current phase is %s", pod.Status.Phase)
 	}
 
-	containerName := getDefaultContainerName(p, pod)
+	containerName := p.ContainerName
+	if len(containerName) == 0 {
+		container, err := podcmd.FindOrDefaultContainerByName(pod, containerName, p.Quiet, p.ErrOut)
+		if err != nil {
+			return err
+		}
+		containerName = container.Name
+	}
 
 	// ensure we can recover the terminal while attached
 	t := p.SetupTTY()
@@ -372,13 +369,4 @@ func (p *ExecOptions) Run() error {
 	}
 
 	return nil
-}
-
-func getDefaultContainerName(p *ExecOptions, pod *corev1.Pod) string {
-	containerName := p.ContainerName
-	if len(containerName) != 0 {
-		return containerName
-	}
-
-	return cmdutil.GetDefaultContainerName(pod, p.EnableSuggestedCmdUsage, p.ErrOut)
 }

@@ -17,17 +17,12 @@ limitations under the License.
 package podutils
 
 import (
-	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/integer"
 )
-
-// DefaultContainerAnnotationName is an annotation name that can be used to preselect the interesting container
-// from a pod when running kubectl.
-const DefaultContainerAnnotationName = "kubectl.kubernetes.io/default-container"
 
 // IsPodAvailable returns true if a pod is available; false otherwise.
 // Precondition for an available pod is that it must be ready. On top
@@ -190,26 +185,4 @@ func maxContainerRestarts(pod *corev1.Pod) int {
 		maxRestarts = integer.IntMax(maxRestarts, int(c.RestartCount))
 	}
 	return maxRestarts
-}
-
-// FindContainerByName searches for a container by name amongst all containers in a pod.
-// Returns a pointer to a container and a field path.
-func FindContainerByName(pod *corev1.Pod, name string) (container *corev1.Container, fieldPath string) {
-	for _, c := range pod.Spec.InitContainers {
-		if c.Name == name {
-			return &c, fmt.Sprintf("spec.initContainers{%s}", c.Name)
-		}
-	}
-	for _, c := range pod.Spec.Containers {
-		if c.Name == name {
-			return &c, fmt.Sprintf("spec.containers{%s}", c.Name)
-		}
-	}
-	for _, c := range pod.Spec.EphemeralContainers {
-		if c.Name == name {
-			containerCommon := corev1.Container(c.EphemeralContainerCommon)
-			return &containerCommon, fmt.Sprintf("spec.ephemeralContainers{%s}", containerCommon.Name)
-		}
-	}
-	return nil, ""
 }
