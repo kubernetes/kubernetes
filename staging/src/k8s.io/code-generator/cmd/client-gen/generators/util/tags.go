@@ -46,6 +46,8 @@ var SupportedVerbs = []string{
 	"list",
 	"watch",
 	"patch",
+	"apply",
+	"applyStatus",
 }
 
 // ReadonlyVerbs represents a list of read-only verbs.
