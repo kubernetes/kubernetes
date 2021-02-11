@@ -30,7 +30,7 @@ import (
 // for a key, it is considered to not match.
 //
 // If topologyKeys is specified, but no endpoints are chosen for any key, the
-// the service has no viable endpoints for clients on this node, and connections
+// service has no viable endpoints for clients on this node, and connections
 // should fail.
 //
 // The special key "*" may be used as the last entry in topologyKeys to indicate
