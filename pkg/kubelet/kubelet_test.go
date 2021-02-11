@@ -353,6 +353,7 @@ func newTestKubeletWithImageList(
 
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	kubelet.AddPodSyncHandler(activeDeadlineHandler)
+	kubelet.lastContainerStartedTime = newTimeCache()
 	return &TestKubelet{kubelet, fakeRuntime, fakeContainerManager, fakeKubeClient, fakeMirrorClient, fakeClock, nil, plug}
 }
 
@@ -627,6 +628,48 @@ func TestHandlePodCleanups(t *testing.T) {
 
 	// assert that unwanted pods were killed
 	fakeRuntime.AssertKilledPods([]string{"12345678"})
+}
+
+func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
+	ready := false
+
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	go testKubelet.kubelet.podKiller.PerformPodKillingWork()
+	defer testKubelet.kubelet.podKiller.Close()
+
+	fakePod := &kubecontainer.Pod{
+		ID:        "1",
+		Name:      "foo",
+		Namespace: "new",
+		Containers: []*kubecontainer.Container{
+			{Name: "bar"},
+		},
+	}
+
+	pods := []*v1.Pod{
+		podWithUIDNameNs("1", "foo", "new"),
+	}
+
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeRuntime.PodList = []*containertest.FakePod{
+		{Pod: fakePod},
+	}
+	kubelet := testKubelet.kubelet
+	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return ready })
+
+	kubelet.HandlePodRemoves(pods)
+	time.Sleep(2 * time.Second)
+
+	// Sources are not ready yet. Don't remove any pods.
+	fakeRuntime.AssertKilledPods(nil)
+
+	ready = true
+	kubelet.HandlePodRemoves(pods)
+	time.Sleep(2 * time.Second)
+
+	// Sources are ready. Remove unwanted pods.
+	fakeRuntime.AssertKilledPods([]string{"1"})
 }
 
 func TestKillPodFollwedByIsPodPendingTermination(t *testing.T) {
