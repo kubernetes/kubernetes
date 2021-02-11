@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -49,6 +50,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
@@ -59,6 +61,9 @@ import (
 
 // Info about an API group.
 type APIGroupInfo struct {
+	// APIGroup is the name of the API group.
+	APIGroup string
+
 	PrioritizedVersions []schema.GroupVersion
 	// Info about the resources in this group. It's a map from version to resource to the storage.
 	VersionedResourcesStorageMap map[string]map[string]rest.Storage
@@ -203,6 +208,10 @@ type GenericAPIServer struct {
 
 	// StorageVersionManager holds the storage versions of the API resources installed by this server.
 	StorageVersionManager storageversion.Manager
+
+	// version of this particular server.  If present, it is used to compute whether to stop serving a particular API
+	// resource.
+	version *apimachineryversion.Info
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -476,7 +485,46 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 }
 
 // Exposes given api groups in the API.
-func (s *GenericAPIServer) InstallAPIGroups(apiGroupInfos ...*APIGroupInfo) error {
+// This method may mutate allPossibleAPIGroupInfos contents as it removes resources that should no longer be served based on version
+func (s *GenericAPIServer) InstallAPIGroups(allPossibleAPIGroupInfos ...*APIGroupInfo) error {
+	// used later in the loop to filter the served resource by those that have expired.
+	resourceExpirationEvaluator, err := newResourceExpirationEvaluator(version.Get())
+	if err != nil {
+		return err
+	}
+
+	// filter out API groups that
+	apiGroupInfos := []*APIGroupInfo{}
+	for i, possibleAPIGroupInfo := range allPossibleAPIGroupInfos {
+		if s.version == nil {
+			apiGroupInfos = append(apiGroupInfos, possibleAPIGroupInfo)
+			continue
+		}
+
+		groupName := possibleAPIGroupInfo.APIGroup
+		if len(groupName) == 0 {
+			return fmt.Errorf("apiGroupInfo[%d] to InstallAPIGroups does not have a groupName specified", i)
+		}
+
+		// shallow copy, not everything here is deep copiable
+		apiGroupInfo := *possibleAPIGroupInfo
+
+		// Remove resources that serving kinds that are removed.
+		// We do this here so that we don't accidentally serve versions without resources or openapi information that for kinds we don't serve.
+		// This is a spot above the construction of individual storage handlers so that no sig accidentally forgets to check.
+		resourceExpirationEvaluator.removeDeletedKinds(groupName, apiGroupInfo.Scheme, apiGroupInfo.VersionedResourcesStorageMap)
+		if len(apiGroupInfo.VersionedResourcesStorageMap) == 0 {
+			klog.V(1).Infof("Removing API group %v because it is time to stop serving it because it has no versions per APILifecycle.", groupName)
+			continue
+		}
+
+		klog.V(1).Infof("Enabling API group %q.", groupName)
+		apiGroupInfos = append(apiGroupInfos, &apiGroupInfo)
+	}
+	if len(apiGroupInfos) == 0 {
+		return nil
+	}
+
 	for _, apiGroupInfo := range apiGroupInfos {
 		// Do not register empty group or empty version.  Doing so claims /apis/ for the wrong entity to be returned.
 		// Catching these here places the error  much closer to its origin
@@ -570,6 +618,7 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 // exposed for easier composition from other packages
 func NewDefaultAPIGroupInfo(group string, scheme *runtime.Scheme, parameterCodec runtime.ParameterCodec, codecs serializer.CodecFactory) APIGroupInfo {
 	return APIGroupInfo{
+		APIGroup:                     group,
 		PrioritizedVersions:          scheme.PrioritizedVersionsForGroup(group),
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
 		// TODO unhardcode this.  It was hardcoded before, but we need to re-evaluate

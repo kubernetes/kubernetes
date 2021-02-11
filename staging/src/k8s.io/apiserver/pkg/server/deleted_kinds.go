@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controlplane
+package server
 
 import (
 	"fmt"
@@ -102,6 +102,7 @@ func (e *resourceExpirationEvaluator) shouldServe(gv schema.GroupVersion, versio
 
 	removed, ok := versionedPtr.(removedInterface)
 	if !ok {
+		fmt.Printf("####   NOT a removed\n")
 		return true
 	}
 	majorRemoved, minorRemoved := removed.APILifecycleRemoved()
@@ -147,7 +148,9 @@ func (e *resourceExpirationEvaluator) removeDeletedKinds(groupName string, versi
 	for apiVersion, versionToResource := range versionedResourcesStorageMap {
 		resourcesToRemove := sets.NewString()
 		for resourceName, resourceServingInfo := range versionToResource {
+			fmt.Printf("#### CHECKING %v.%v.%v \n", resourceName, apiVersion, groupName)
 			if !e.shouldServe(schema.GroupVersion{Group: groupName, Version: apiVersion}, versioner, resourceServingInfo) {
+				fmt.Printf("####   disabled!\n")
 				resourcesToRemove.Insert(resourceName)
 			}
 		}
