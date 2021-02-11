@@ -17,7 +17,6 @@ limitations under the License.
 package csi
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -114,7 +113,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get CSI client: %v", err))
 
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := createCSIOperationContext(c.spec, csiTimeout)
 	defer cancel()
 
 	volSrc, pvSrc, err := getSourceFromSpec(c.spec)
@@ -396,7 +395,8 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 		return errors.New(log("mounter.SetUpAt failed to get CSI client: %v", err))
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	// Could not get spec info on whether this is a migrated operation because c.spec is nil
+	ctx, cancel := createCSIOperationContext(c.spec, csiTimeout)
 	defer cancel()
 
 	if err := csi.NodeUnpublishVolume(ctx, volID, dir); err != nil {

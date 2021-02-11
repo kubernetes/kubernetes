@@ -68,7 +68,6 @@ func (o *GeneratedOperations) Run() (eventErr, detailedErr error) {
 			Err:      &context.DetailedErr,
 			Migrated: &context.Migrated,
 		}
-		c.Err = &detailedErr
 		defer o.CompleteFunc(c)
 	}
 	if o.EventRecorderFunc != nil {

@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -80,6 +82,17 @@ var storageOperationEndToEndLatencyMetric = metrics.NewHistogramVec(
 	[]string{"plugin_name", "operation_name"},
 )
 
+var csiOperationsLatencyMetric = metrics.NewHistogramVec(
+	&metrics.HistogramOpts{
+		Subsystem:      "csi",
+		Name:           "operations_seconds",
+		Help:           "Container Storage Interface operation duration with gRPC error code status total",
+		Buckets:        []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600},
+		StabilityLevel: metrics.ALPHA,
+	},
+	[]string{"driver_name", "method_name", "grpc_status_code", "migrated"},
+)
+
 func init() {
 	registerMetrics()
 }
@@ -91,6 +104,7 @@ func registerMetrics() {
 	legacyregistry.MustRegister(storageOperationErrorMetric)
 	legacyregistry.MustRegister(storageOperationStatusMetric)
 	legacyregistry.MustRegister(storageOperationEndToEndLatencyMetric)
+	legacyregistry.MustRegister(csiOperationsLatencyMetric)
 }
 
 // OperationCompleteHook returns a hook to call when an operation is completed
@@ -142,4 +156,29 @@ func GetFullQualifiedPluginNameForVolume(pluginName string, spec *volume.Spec) s
 // into metric volume_operation_total_seconds
 func RecordOperationLatencyMetric(plugin, operationName string, secondsTaken float64) {
 	storageOperationEndToEndLatencyMetric.WithLabelValues(plugin, operationName).Observe(secondsTaken)
+}
+
+// RecordCSIOperationLatencyMetrics records the CSI operation latency and grpc status
+// into metric csi_kubelet_operations_seconds
+func RecordCSIOperationLatencyMetrics(driverName string,
+	operationName string,
+	operationErr error,
+	operationDuration time.Duration,
+	migrated string) {
+	csiOperationsLatencyMetric.WithLabelValues(driverName, operationName, getErrorCode(operationErr), migrated).Observe(operationDuration.Seconds())
+}
+
+func getErrorCode(err error) string {
+	if err == nil {
+		return codes.OK.String()
+	}
+
+	st, ok := status.FromError(err)
+	if !ok {
+		// This is not gRPC error. The operation must have failed before gRPC
+		// method was called, otherwise we would get gRPC error.
+		return "unknown-non-grpc"
+	}
+
+	return st.Code().String()
 }
