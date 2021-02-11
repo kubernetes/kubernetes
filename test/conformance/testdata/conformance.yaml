@@ -1634,7 +1634,7 @@
   description: Pods with the same HostPort value MUST be able to be scheduled to the
     same node if the HostIP or Protocol is different. This test is marked LinuxOnly
     since hostNetwork is not supported on Windows.
-  release: v1.16, v1.20
+  release: v1.16, v1.21
   file: test/e2e/network/hostport.go
 - testname: Ingress API
   codename: '[sig-network] Ingress API should support creating Ingress API operations
