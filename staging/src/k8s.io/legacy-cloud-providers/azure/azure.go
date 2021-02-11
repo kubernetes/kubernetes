@@ -92,12 +92,6 @@ const (
 
 	externalResourceGroupLabel = "kubernetes.azure.com/resource-group"
 	managedByAzureLabel        = "kubernetes.azure.com/managed"
-
-	// LabelFailureDomainBetaZone refer to https://github.com/kubernetes/api/blob/8519c5ea46199d57724725d5b969c5e8e0533692/core/v1/well_known_labels.go#L22-L23
-	LabelFailureDomainBetaZone = "failure-domain.beta.kubernetes.io/zone"
-
-	// LabelFailureDomainBetaRegion failure-domain region label
-	LabelFailureDomainBetaRegion = "failure-domain.beta.kubernetes.io/region"
 )
 
 const (
@@ -751,8 +745,12 @@ func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 		UpdateFunc: func(prev, obj interface{}) {
 			prevNode := prev.(*v1.Node)
 			newNode := obj.(*v1.Node)
-			if newNode.Labels[LabelFailureDomainBetaZone] ==
-				prevNode.Labels[LabelFailureDomainBetaZone] {
+			if newNode.Labels[v1.LabelFailureDomainBetaZone] ==
+				prevNode.Labels[v1.LabelFailureDomainBetaZone] {
+				return
+			}
+			if newNode.Labels[v1.LabelTopologyZone] ==
+				prevNode.Labels[v1.LabelTopologyZone] {
 				return
 			}
 			az.updateNodeCaches(prevNode, newNode)
@@ -785,12 +783,23 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 	defer az.nodeCachesLock.Unlock()
 
 	if prevNode != nil {
+
 		// Remove from nodeNames cache.
 		az.nodeNames.Delete(prevNode.ObjectMeta.Name)
 
-		// Remove from nodeZones cache.
-		prevZone, ok := prevNode.ObjectMeta.Labels[LabelFailureDomainBetaZone]
+		// Remove from nodeZones cache
+		prevZone, ok := prevNode.ObjectMeta.Labels[v1.LabelTopologyZone]
+
 		if ok && az.isAvailabilityZone(prevZone) {
+			az.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
+			if az.nodeZones[prevZone].Len() == 0 {
+				az.nodeZones[prevZone] = nil
+			}
+		}
+
+		//Remove from nodeZones cache if using depreciated LabelFailureDomainBetaZone
+		prevZoneFailureDomain, ok := prevNode.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
+		if ok && az.isAvailabilityZone(prevZoneFailureDomain) {
 			az.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
 			if az.nodeZones[prevZone].Len() == 0 {
 				az.nodeZones[prevZone] = nil
@@ -815,7 +824,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 		az.nodeNames.Insert(newNode.ObjectMeta.Name)
 
 		// Add to nodeZones cache.
-		newZone, ok := newNode.ObjectMeta.Labels[LabelFailureDomainBetaZone]
+		newZone, ok := newNode.ObjectMeta.Labels[v1.LabelTopologyZone]
 		if ok && az.isAvailabilityZone(newZone) {
 			if az.nodeZones[newZone] == nil {
 				az.nodeZones[newZone] = sets.NewString()
