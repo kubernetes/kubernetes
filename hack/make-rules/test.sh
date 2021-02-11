@@ -277,16 +277,6 @@ runTests() {
   # we spawn a subshell for each PARALLEL process, redirecting the output to
   # separate files.
 
-  # ignore paths:
-  # vendor/k8s.io/code-generator/cmd/generator: is fragile when run under coverage, so ignore it for now.
-  #                            https://github.com/kubernetes/kubernetes/issues/24967
-  # vendor/k8s.io/client-go/1.4/rest: causes cover internal errors
-  #                            https://github.com/golang/go/issues/16540
-  cover_ignore_dirs="vendor/k8s.io/code-generator/cmd/generator|vendor/k8s.io/client-go/1.4/rest"
-  for path in ${cover_ignore_dirs//|/ }; do
-      echo -e "skipped\tk8s.io/kubernetes/${path}"
-  done
-
   printf "%s\n" "${@}" \
     | grep -Ev ${cover_ignore_dirs} \
     | xargs -I{} -n 1 -P "${KUBE_COVERPROCS}" \
