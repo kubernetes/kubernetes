@@ -335,15 +335,13 @@ aliases:
     - RainbowMango
     - serathius
   sig-instrumentation-reviewers:
-    - kawych
+    - brancz
+    - dashpole
+    - ehashman
     - s-urbaniak
     - DirectXMan12
-    - x13n
-    - loburm
-    - huangyuqi
     - andyxning
     - coffeepac
-    - monotek
     - logicalhan
     - RainbowMango
     - serathius
