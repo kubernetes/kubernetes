@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controlplane
+package server
 
 import (
 	"os"
@@ -41,7 +41,16 @@ type resourceExpirationEvaluator struct {
 	serveRemovedAPIsOneMoreRelease bool
 }
 
-func newResourceExpirationEvaluator(currentVersion apimachineryversion.Info) (*resourceExpirationEvaluator, error) {
+// ResourceExpirationEvaluator indicates whether or not a resource should be served.
+type ResourceExpirationEvaluator interface {
+	// RemoveDeletedKinds inspects the storage map and modifies it in place by removing storage for kinds that have been deleted.
+	// versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
+	RemoveDeletedKinds(groupName string, versionedResourcesStorageMap map[string]map[string]rest.Storage)
+	// ShouldServeForVersion returns true if a particular version cut off is after the current version
+	ShouldServeForVersion(majorRemoved, minorRemoved int) bool
+}
+
+func NewResourceExpirationEvaluator(currentVersion apimachineryversion.Info) (ResourceExpirationEvaluator, error) {
 	ret := &resourceExpirationEvaluator{}
 	if len(currentVersion.Major) > 0 {
 		currentMajor64, err := strconv.ParseInt(currentVersion.Major, 10, 32)
@@ -89,6 +98,10 @@ func (e *resourceExpirationEvaluator) shouldServe(resourceServingInfo rest.Stora
 		return true
 	}
 	majorRemoved, minorRemoved := removed.APILifecycleRemoved()
+	return e.ShouldServeForVersion(majorRemoved, minorRemoved)
+}
+
+func (e *resourceExpirationEvaluator) ShouldServeForVersion(majorRemoved, minorRemoved int) bool {
 	if e.currentMajor < majorRemoved {
 		return true
 	}
@@ -122,7 +135,7 @@ type removedInterface interface {
 
 // removeDeletedKinds inspects the storage map and modifies it in place by removing storage for kinds that have been deleted.
 // versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
-func (e *resourceExpirationEvaluator) removeDeletedKinds(groupName string, versionedResourcesStorageMap map[string]map[string]rest.Storage) {
+func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versionedResourcesStorageMap map[string]map[string]rest.Storage) {
 	versionsToRemove := sets.NewString()
 	for apiVersion, versionToResource := range versionedResourcesStorageMap {
 		resourcesToRemove := sets.NewString()

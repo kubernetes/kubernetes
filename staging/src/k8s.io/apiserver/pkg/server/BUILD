@@ -11,6 +11,7 @@ go_test(
     srcs = [
         "config_selfclient_test.go",
         "config_test.go",
+        "deleted_kinds_test.go",
         "genericapiserver_test.go",
         "healthz_test.go",
     ],
@@ -44,6 +45,7 @@ go_test(
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
@@ -57,6 +59,7 @@ go_library(
     srcs = [
         "config.go",
         "config_selfclient.go",
+        "deleted_kinds.go",
         "deprecated_insecure_serving.go",
         "doc.go",
         "genericapiserver.go",
