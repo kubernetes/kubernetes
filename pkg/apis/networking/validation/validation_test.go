@@ -1018,6 +1018,32 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				},
 			},
 		},
+		"invalid endport range defined": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+						Ports: []networking.NetworkPolicyPort{
+							{
+								Protocol: nil,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 30000},
+								EndPort:  utilpointer.Int32Ptr(65537),
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	// Error cases are not expected to pass validation.
