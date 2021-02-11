@@ -100,6 +100,7 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", options.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", options.TTY, "Stdin is a TTY")
+	cmd.Flags().BoolVarP(&options.Quiet, "quiet", "q", options.Quiet, "Only print output from the remote session")
 	return cmd
 }
 
@@ -174,10 +175,14 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 	if argsLenAtDash > -1 {
 		p.Command = argsIn[argsLenAtDash:]
 	} else if len(argsIn) > 1 {
-		fmt.Fprint(p.ErrOut, "kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.\n")
+		if !p.Quiet {
+			fmt.Fprint(p.ErrOut, "kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.\n")
+		}
 		p.Command = argsIn[1:]
 	} else if len(argsIn) > 0 && len(p.FilenameOptions.Filenames) != 0 {
-		fmt.Fprint(p.ErrOut, "kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.\n")
+		if !p.Quiet {
+			fmt.Fprint(p.ErrOut, "kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.\n")
+		}
 		p.Command = argsIn[0:]
 		p.ResourceName = ""
 	}
@@ -260,7 +265,7 @@ func (o *StreamOptions) SetupTTY() term.TTY {
 	if !o.isTerminalIn(t) {
 		o.TTY = false
 
-		if o.ErrOut != nil {
+		if !o.Quiet && o.ErrOut != nil {
 			fmt.Fprintln(o.ErrOut, "Unable to use a TTY - input is not a terminal or the right kind of file")
 		}
 

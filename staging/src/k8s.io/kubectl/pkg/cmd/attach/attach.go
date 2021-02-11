@@ -115,6 +115,7 @@ func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVarP(&o.ContainerName, "container", "c", o.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&o.Stdin, "stdin", "i", o.Stdin, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, "Stdin is a TTY")
+	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, "Only print output from the remote session")
 	return cmd
 }
 
@@ -257,8 +258,8 @@ func (o *AttachOptions) Run() error {
 	}
 	if o.TTY && !containerToAttach.TTY {
 		o.TTY = false
-		if o.ErrOut != nil {
-			fmt.Fprintf(o.ErrOut, "Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
+		if !o.Quiet && o.ErrOut != nil {
+			fmt.Fprintf(o.ErrOut, "error: Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
 		}
 	} else if !o.TTY && containerToAttach.TTY {
 		// the container was launched with a TTY, so we have to force a TTY here, otherwise you'll get
@@ -292,7 +293,7 @@ func (o *AttachOptions) Run() error {
 		return err
 	}
 
-	if o.Stdin && t.Raw && o.Pod.Spec.RestartPolicy == corev1.RestartPolicyAlways {
+	if !o.Quiet && o.Stdin && t.Raw && o.Pod.Spec.RestartPolicy == corev1.RestartPolicyAlways {
 		fmt.Fprintf(o.Out, "Session ended, resume using '%s %s -c %s -i -t' command when the pod is running\n", o.CommandName, o.Pod.Name, containerToAttach.Name)
 	}
 	return nil
