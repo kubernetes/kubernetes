@@ -38,6 +38,7 @@ type RegistryList struct {
 	PromoterE2eRegistry     string `yaml:"promoterE2eRegistry"`
 	BuildImageRegistry      string `yaml:"buildImageRegistry"`
 	InvalidRegistry         string `yaml:"invalidRegistry"`
+	GcEtcdRegistry          string `yaml:"gcEtcdRegistry"`
 	GcRegistry              string `yaml:"gcRegistry"`
 	SigStorageRegistry      string `yaml:"sigStorageRegistry"`
 	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
@@ -78,6 +79,7 @@ func initReg() RegistryList {
 		PromoterE2eRegistry:     "k8s.gcr.io/e2e-test-images",
 		BuildImageRegistry:      "k8s.gcr.io/build-image",
 		InvalidRegistry:         "invalid.com/invalid",
+		GcEtcdRegistry:          "k8s.gcr.io",
 		GcRegistry:              "k8s.gcr.io",
 		SigStorageRegistry:      "k8s.gcr.io/sig-storage",
 		GcrReleaseRegistry:      "gcr.io/gke-release",
@@ -116,6 +118,7 @@ var (
 	promoterE2eRegistry     = registry.PromoterE2eRegistry
 	buildImageRegistry      = registry.BuildImageRegistry
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
+	gcEtcdRegistry          = registry.GcRegistry
 	gcRegistry              = registry.GcRegistry
 	sigStorageRegistry      = registry.SigStorageRegistry
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
@@ -230,7 +233,7 @@ func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs[CudaVectorAdd2] = Config{promoterE2eRegistry, "cuda-vector-add", "2.2"}
 	configs[DebianIptables] = Config{buildImageRegistry, "debian-iptables", "buster-v1.5.0"}
 	configs[EchoServer] = Config{promoterE2eRegistry, "echoserver", "2.3"}
-	configs[Etcd] = Config{gcRegistry, "etcd", "3.4.13-0"}
+	configs[Etcd] = Config{gcEtcdRegistry, "etcd", "3.4.13-0"}
 	configs[GlusterDynamicProvisioner] = Config{dockerGluster, "glusterdynamic-provisioner", "v1.0"}
 	configs[Httpd] = Config{dockerLibraryRegistry, "httpd", "2.4.38-alpine"}
 	configs[HttpdNew] = Config{dockerLibraryRegistry, "httpd", "2.4.39-alpine"}
