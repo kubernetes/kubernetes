@@ -409,7 +409,7 @@ func TestSyncPodsStartPod(t *testing.T) {
 	fakeRuntime.AssertStartedPods([]string{string(pods[0].UID)})
 }
 
-func TestSyncPodsDeletesWhenSourcesAreReadyPerQOS(t *testing.T) {
+func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	go testKubelet.kubelet.podKiller.PerformPodKillingWork()
 	defer testKubelet.Cleanup()
@@ -432,7 +432,6 @@ func TestSyncPodsDeletesWhenSourcesAreReadyPerQOS(t *testing.T) {
 	}
 	kubelet := testKubelet.kubelet
 	kubelet.cgroupsPerQOS = true // enable cgroupsPerQOS to turn on the cgroups cleanup
-	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return true })
 
 	// HandlePodCleanups gets called every 2 seconds within the Kubelet's
 	// housekeeping routine. This test registers the pod, removes the unwanted pod, then calls into
@@ -602,33 +601,31 @@ func TestDispatchWorkOfActivePod(t *testing.T) {
 	}
 }
 
-func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
-	ready := false
-
+func TestHandlePodCleanups(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	go testKubelet.kubelet.podKiller.PerformPodKillingWork()
 	defer testKubelet.Cleanup()
-	fakeRuntime := testKubelet.fakeRuntime
-	kubelet := testKubelet.kubelet
-	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return ready })
+	defer testKubelet.kubelet.podKiller.Close()
 
-	fakeRuntime.PodList = []*containertest.FakePod{
-		{Pod: &kubecontainer.Pod{
-			ID:        "12345678",
-			Name:      "foo",
-			Namespace: "new",
-			Containers: []*kubecontainer.Container{
-				{Name: "bar"},
-			},
-		}},
+	pod := &kubecontainer.Pod{
+		ID:        "12345678",
+		Name:      "foo",
+		Namespace: "new",
+		Containers: []*kubecontainer.Container{
+			{Name: "bar"},
+		},
 	}
-	kubelet.HandlePodCleanups()
-	// Sources are not ready yet. Don't remove any pods.
-	fakeRuntime.AssertKilledPods([]string{})
 
-	ready = true
-	kubelet.HandlePodCleanups()
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeRuntime.PodList = []*containertest.FakePod{
+		{Pod: pod},
+	}
+	kubelet := testKubelet.kubelet
 
-	// Sources are ready. Remove unwanted pods.
+	kubelet.HandlePodCleanups()
+	time.Sleep(2 * time.Second)
+
+	// assert that unwanted pods were killed
 	fakeRuntime.AssertKilledPods([]string{"12345678"})
 }
 
