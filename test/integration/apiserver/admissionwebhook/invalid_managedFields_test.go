@@ -114,7 +114,7 @@ func TestMutatingWebhookResetsInvalidManagedFields(t *testing.T) {
 	}()
 
 	var pod *corev1.Pod
-	var lastErr string
+	var lastErr error
 	// TODO(kwiesmueller): define warning format in the apiserver and use here
 	// expectedWarning := fieldmanager.InvalidManagedFieldsAfterMutatingAdmissionWarningFormat
 
@@ -135,12 +135,15 @@ func TestMutatingWebhookResetsInvalidManagedFields(t *testing.T) {
 		// 	return false, nil
 		// }
 		if err := expectValidManagedFields(pod.ManagedFields); err != nil {
-			lastErr = err.Error()
+			lastErr = err
 			return false, nil
 		}
 		return true, nil
 	}); err != nil {
 		t.Fatalf("failed to wait for apiserver handling webhook mutation: %v, last error: %v", err, lastErr)
+	}
+	if lastErr != nil {
+		t.Fatal(lastErr)
 	}
 	// if warningWriter.WarningCount() != 1 {
 	// 	t.Errorf("expected one warning, got: %v", warningWriter.WarningCount())
@@ -215,7 +218,11 @@ func newInvalidManagedFieldsWebhookHandler(t *testing.T) http.Handler {
 
 		if len(pod.ManagedFields) != 0 {
 			t.Logf("corrupting managedFields %v", pod.ManagedFields)
-			review.Response.Patch = []byte(`[{"op":"remove","path":"/metadata/managedFields/0/apiVersion"},{"op":"remove","path":"/metadata/managedFields/0/fieldsType"}]`)
+			review.Response.Patch = []byte(`[
+				{"op":"remove","path":"/metadata/managedFields/0/apiVersion"},
+				{"op":"remove","path":"/metadata/managedFields/0/fieldsV1"},
+				{"op":"remove","path":"/metadata/managedFields/0/fieldsType"}
+			]`)
 			jsonPatch := v1.PatchTypeJSONPatch
 			review.Response.PatchType = &jsonPatch
 		}
