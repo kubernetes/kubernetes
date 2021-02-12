@@ -66,12 +66,26 @@ func currentMigrationRules() map[string]string {
 	}
 }
 
+// TODO(vorburger) doc
+type Warner interface {
+	// Warningf logs to the WARNING and INFO logs.
+	// Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
+	Warningf(format string, args ...interface{})
+}
+
+type klogWarner struct{}
+
+func (klogWarner) Warningf(format string, args ...interface{}) { klog.Warningf(format, args) }
+
+// TODO(vorburger) doc
+var KlogWarner = klogWarner{}
+
 type ClientConfigLoader interface {
 	ConfigAccess
 	// IsDefaultConfig returns true if the returned config matches the defaults.
 	IsDefaultConfig(*restclient.Config) bool
 	// Load returns the latest config
-	Load() (*clientcmdapi.Config, error)
+	Load(warner Warner) (*clientcmdapi.Config, error)
 }
 
 type KubeconfigGetter func() (*clientcmdapi.Config, error)
@@ -83,7 +97,7 @@ type ClientConfigGetter struct {
 // ClientConfigGetter implements the ClientConfigLoader interface.
 var _ ClientConfigLoader = &ClientConfigGetter{}
 
-func (g *ClientConfigGetter) Load() (*clientcmdapi.Config, error) {
+func (g *ClientConfigGetter) Load(warner Warner) (*clientcmdapi.Config, error) {
 	return g.kubeconfigGetter()
 }
 
@@ -171,7 +185,7 @@ func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 // non-conflicting entries from the second file's "red-user" are discarded.
 // Relative paths inside of the .kubeconfig files are resolved against the .kubeconfig file's parent folder
 // and only absolute file paths are returned.
-func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
+func (rules *ClientConfigLoadingRules) Load(warner Warner) (*clientcmdapi.Config, error) {
 	if err := rules.Migrate(); err != nil {
 		return nil, err
 	}
@@ -217,8 +231,8 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 		kubeconfigs = append(kubeconfigs, config)
 	}
 
-	if rules.WarnIfAllMissing && len(missingList) > 0 && len(kubeconfigs) == 0 {
-		klog.Warningf("Config not found: %s", strings.Join(missingList, ", "))
+	if warner != nil && rules.WarnIfAllMissing && len(missingList) > 0 && len(kubeconfigs) == 0 {
+		warner.Warningf("Config not found: %s", strings.Join(missingList, ", "))
 	}
 
 	// first merge all of our maps

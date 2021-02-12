@@ -66,7 +66,7 @@ func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, e
 	if config.clientConfig != nil {
 		return config.clientConfig, nil
 	}
-	mergedConfig, err := config.loader.Load()
+	mergedConfig, err := config.loader.Load(KlogWarner)
 	if err != nil {
 		return nil, err
 	}

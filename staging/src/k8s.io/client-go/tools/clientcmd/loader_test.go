@@ -111,7 +111,7 @@ func TestNonExistentCommandLineFile(t *testing.T) {
 		ExplicitPath: "bogus_file",
 	}
 
-	_, err := loadingRules.Load()
+	_, err := loadingRules.Load(KlogWarner)
 	if err == nil {
 		t.Fatalf("Expected error for missing command-line file, got none")
 	}
@@ -125,7 +125,7 @@ func TestToleratingMissingFiles(t *testing.T) {
 		Precedence: []string{"bogus1", "bogus2", "bogus3"},
 	}
 
-	_, err := loadingRules.Load()
+	_, err := loadingRules.Load(KlogWarner)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestErrorReadingFile(t *testing.T) {
 		ExplicitPath: commandLineFile.Name(),
 	}
 
-	_, err := loadingRules.Load()
+	_, err := loadingRules.Load(KlogWarner)
 	if err == nil {
 		t.Fatalf("Expected error for unloadable file, got none")
 	}
@@ -163,7 +163,7 @@ func TestErrorReadingNonFile(t *testing.T) {
 		ExplicitPath: tmpdir,
 	}
 
-	_, err = loadingRules.Load()
+	_, err = loadingRules.Load(KlogWarner)
 	if err == nil {
 		t.Fatalf("Expected error for non-file, got none")
 	}
@@ -193,7 +193,7 @@ func TestConflictingCurrentContext(t *testing.T) {
 		Precedence:   []string{envVarFile.Name()},
 	}
 
-	mergedConfig, err := loadingRules.Load()
+	mergedConfig, err := loadingRules.Load(KlogWarner)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -490,7 +490,7 @@ func TestResolveRelativePaths(t *testing.T) {
 		Precedence: []string{configFile1, configFile2},
 	}
 
-	mergedConfig, err := loadingRules.Load()
+	mergedConfig, err := loadingRules.Load(KlogWarner)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -572,7 +572,7 @@ func TestMigratingFile(t *testing.T) {
 		MigrationRules: map[string]string{destinationFile.Name(): sourceFile.Name()},
 	}
 
-	if _, err := loadingRules.Load(); err != nil {
+	if _, err := loadingRules.Load(KlogWarner); err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
 
@@ -605,7 +605,7 @@ func TestMigratingFileLeaveExistingFileAlone(t *testing.T) {
 		MigrationRules: map[string]string{destinationFile.Name(): sourceFile.Name()},
 	}
 
-	if _, err := loadingRules.Load(); err != nil {
+	if _, err := loadingRules.Load(KlogWarner); err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
 
@@ -629,7 +629,7 @@ func TestMigratingFileSourceMissingSkip(t *testing.T) {
 		MigrationRules: map[string]string{destinationFile.Name(): sourceFilename},
 	}
 
-	if _, err := loadingRules.Load(); err != nil {
+	if _, err := loadingRules.Load(KlogWarner); err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
 
@@ -668,7 +668,7 @@ func Example_noMergingOnExplicitPaths() {
 		Precedence:   []string{envVarFile.Name()},
 	}
 
-	mergedConfig, err := loadingRules.Load()
+	mergedConfig, err := loadingRules.Load(KlogWarner)
 
 	json, err := runtime.Encode(clientcmdlatest.Codec, mergedConfig)
 	if err != nil {
@@ -714,7 +714,7 @@ func Example_mergingSomeWithConflict() {
 		Precedence: []string{commandLineFile.Name(), envVarFile.Name()},
 	}
 
-	mergedConfig, err := loadingRules.Load()
+	mergedConfig, err := loadingRules.Load(KlogWarner)
 
 	json, err := runtime.Encode(clientcmdlatest.Codec, mergedConfig)
 	if err != nil {
@@ -773,7 +773,7 @@ func Example_mergingEverythingNoConflicts() {
 		Precedence: []string{commandLineFile.Name(), envVarFile.Name(), currentDirFile.Name(), homeDirFile.Name()},
 	}
 
-	mergedConfig, err := loadingRules.Load()
+	mergedConfig, err := loadingRules.Load(KlogWarner)
 
 	json, err := runtime.Encode(clientcmdlatest.Codec, mergedConfig)
 	if err != nil {
