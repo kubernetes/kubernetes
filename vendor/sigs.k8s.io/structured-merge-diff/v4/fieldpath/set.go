@@ -19,6 +19,8 @@ package fieldpath
 import (
 	"sort"
 	"strings"
+
+	"sigs.k8s.io/structured-merge-diff/v4/schema"
 )
 
 // Set identifies a set of fields.
@@ -107,6 +109,30 @@ func (s *Set) RecursiveDifference(s2 *Set) *Set {
 	return &Set{
 		Members:  *s.Members.Difference(&s2.Members),
 		Children: *s.Children.RecursiveDifference(s2),
+	}
+}
+
+// EnsureNamedFieldsAreMembers returns a Set that contains all the
+// fields in s, as well as all the named fields that are typically not
+// included. For example, a set made of "a.b.c" will end-up also owning
+// "a" if it's a named fields but not "a.b" if it's a map.
+func (s *Set) EnsureNamedFieldsAreMembers(sc *schema.Schema, tr schema.TypeRef) *Set {
+	members := PathElementSet{
+		members: make(sortedPathElements, 0, s.Members.Size()+len(s.Children.members)),
+	}
+	atom, _ := sc.Resolve(tr)
+	members.members = append(members.members, s.Members.members...)
+	for _, node := range s.Children.members {
+		// Only insert named fields.
+		if node.pathElement.FieldName != nil && atom.Map != nil {
+			if _, has := atom.Map.FindField(*node.pathElement.FieldName); has {
+				members.Insert(node.pathElement)
+			}
+		}
+	}
+	return &Set{
+		Members:  members,
+		Children: *s.Children.EnsureNamedFieldsAreMembers(sc, tr),
 	}
 }
 
@@ -389,6 +415,31 @@ func (s *SetNodeMap) RecursiveDifference(s2 *Set) *SetNodeMap {
 	}
 
 	return out
+}
+
+// EnsureNamedFieldsAreMembers returns a set that contains all the named fields along with the leaves.
+func (s *SetNodeMap) EnsureNamedFieldsAreMembers(sc *schema.Schema, tr schema.TypeRef) *SetNodeMap {
+	out := make(sortedSetNode, 0, s.Size())
+	atom, _ := sc.Resolve(tr)
+	for _, member := range s.members {
+		tr := schema.TypeRef{}
+		if member.pathElement.FieldName != nil && atom.Map != nil {
+			tr = atom.Map.ElementType
+			if sf, ok := atom.Map.FindField(*member.pathElement.FieldName); ok {
+				tr = sf.Type
+			}
+		} else if member.pathElement.Key != nil && atom.List != nil {
+			tr = atom.List.ElementType
+		}
+		out = append(out, setNode{
+			pathElement: member.pathElement,
+			set:         member.set.EnsureNamedFieldsAreMembers(sc, tr),
+		})
+	}
+
+	return &SetNodeMap{
+		members: out,
+	}
 }
 
 // Iterate calls f for each PathElement in the set.
