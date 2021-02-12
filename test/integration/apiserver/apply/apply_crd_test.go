@@ -573,11 +573,11 @@ func TestApplyCRDUnhandledSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 
 	// This is a schema that kube-openapi ToProtoModels does not handle correctly.
 	// https://github.com/kubernetes/kubernetes/blob/38752f7f99869ed65fb44378360a517649dc2f83/vendor/k8s.io/kube-openapi/pkg/util/proto/document.go#L184
-	var c apiextensionsv1beta1.CustomResourceValidation
+	var c apiextensionsv1.CustomResourceValidation
 	err = json.Unmarshal([]byte(`{
 		"openAPIV3Schema": {
 			"properties": {
@@ -590,15 +590,15 @@ func TestApplyCRDUnhandledSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	noxuDefinition.Spec.Validation = &c
+	noxuDefinition.Spec.Versions[0].Schema = &c
 
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	kind := noxuDefinition.Spec.Names.Kind
-	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Version
+	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
 	name := "mytest"
 
 	rest := apiExtensionClient.Discovery().RESTClient()
@@ -610,7 +610,7 @@ metadata:
 spec:
   replicas: 1`, apiVersion, kind, name))
 	result, err := rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test").
 		Body(yamlBody).
@@ -622,7 +622,7 @@ spec:
 
 	// Patch object to change the number of replicas
 	result, err = rest.Patch(types.MergePatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Body([]byte(`{"spec":{"replicas": 5}}`)).
 		DoRaw(context.TODO())
@@ -633,7 +633,7 @@ spec:
 
 	// Re-apply, we should get conflicts now, since the number of replicas was changed.
 	result, err = rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test").
 		Body(yamlBody).
@@ -651,7 +651,7 @@ spec:
 
 	// Re-apply with force, should work fine.
 	result, err = rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("force", "true").
 		Param("fieldManager", "apply_test").

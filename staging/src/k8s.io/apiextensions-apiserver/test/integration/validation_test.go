@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	clientschema "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
@@ -44,8 +43,8 @@ func TestForProperValidationErrors(t *testing.T) {
 	}
 	defer tearDown()
 
-	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,13 +90,14 @@ func TestForProperValidationErrors(t *testing.T) {
 	}
 }
 
-func newNoxuValidationCRDs(scope apiextensionsv1beta1.ResourceScope) []*apiextensionsv1beta1.CustomResourceDefinition {
-	validationSchema := &apiextensionsv1beta1.JSONSchemaProps{
+func newNoxuValidationCRDs() []*apiextensionsv1.CustomResourceDefinition {
+	validationSchema := &apiextensionsv1.JSONSchemaProps{
+		Type:     "object",
 		Required: []string{"alpha", "beta"},
-		AdditionalProperties: &apiextensionsv1beta1.JSONSchemaPropsOrBool{
+		AdditionalProperties: &apiextensionsv1.JSONSchemaPropsOrBool{
 			Allows: true,
 		},
-		Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+		Properties: map[string]apiextensionsv1.JSONSchemaProps{
 			"alpha": {
 				Description: "Alpha is an alphanumeric string with underscores",
 				Type:        "string",
@@ -111,7 +111,7 @@ func newNoxuValidationCRDs(scope apiextensionsv1beta1.ResourceScope) []*apiexten
 			"gamma": {
 				Description: "Gamma is restricted to foo, bar and baz",
 				Type:        "string",
-				Enum: []apiextensionsv1beta1.JSON{
+				Enum: []apiextensionsv1.JSON{
 					{
 						Raw: []byte(`"foo"`),
 					},
@@ -125,7 +125,7 @@ func newNoxuValidationCRDs(scope apiextensionsv1beta1.ResourceScope) []*apiexten
 			},
 			"delta": {
 				Description: "Delta is a string with a maximum length of 5 or a number with a minimum value of 0",
-				AnyOf: []apiextensionsv1beta1.JSONSchemaProps{
+				AnyOf: []apiextensionsv1.JSONSchemaProps{
 					{
 						Type:      "string",
 						MaxLength: int64Ptr(5),
@@ -140,56 +140,25 @@ func newNoxuValidationCRDs(scope apiextensionsv1beta1.ResourceScope) []*apiexten
 	}
 	validationSchemaWithDescription := validationSchema.DeepCopy()
 	validationSchemaWithDescription.Description = "test"
-	return []*apiextensionsv1beta1.CustomResourceDefinition{
+	return []*apiextensionsv1.CustomResourceDefinition{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
-			Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-				Group:   "mygroup.example.com",
-				Version: "v1beta1",
-				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: "mygroup.example.com",
+				Names: apiextensionsv1.CustomResourceDefinitionNames{
 					Plural:     "noxus",
 					Singular:   "nonenglishnoxu",
 					Kind:       "WishIHadChosenNoxu",
 					ShortNames: []string{"foo", "bar", "abc", "def"},
 					ListKind:   "NoxuItemList",
 				},
-				Scope: apiextensionsv1beta1.NamespaceScoped,
-				Validation: &apiextensionsv1beta1.CustomResourceValidation{
-					OpenAPIV3Schema: validationSchema,
-				},
-				Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				Scope: apiextensionsv1.NamespaceScoped,
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 					{
 						Name:    "v1beta1",
 						Served:  true,
 						Storage: true,
-					},
-					{
-						Name:    "v1",
-						Served:  true,
-						Storage: false,
-					},
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
-			Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-				Group:   "mygroup.example.com",
-				Version: "v1beta1",
-				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-					Plural:     "noxus",
-					Singular:   "nonenglishnoxu",
-					Kind:       "WishIHadChosenNoxu",
-					ShortNames: []string{"foo", "bar", "abc", "def"},
-					ListKind:   "NoxuItemList",
-				},
-				Scope: apiextensionsv1beta1.NamespaceScoped,
-				Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
-					{
-						Name:    "v1beta1",
-						Served:  true,
-						Storage: true,
-						Schema: &apiextensionsv1beta1.CustomResourceValidation{
+						Schema: &apiextensionsv1.CustomResourceValidation{
 							OpenAPIV3Schema: validationSchema,
 						},
 					},
@@ -197,7 +166,39 @@ func newNoxuValidationCRDs(scope apiextensionsv1beta1.ResourceScope) []*apiexten
 						Name:    "v1",
 						Served:  true,
 						Storage: false,
-						Schema: &apiextensionsv1beta1.CustomResourceValidation{
+						Schema: &apiextensionsv1.CustomResourceValidation{
+							OpenAPIV3Schema: validationSchema,
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
+			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: "mygroup.example.com",
+				Names: apiextensionsv1.CustomResourceDefinitionNames{
+					Plural:     "noxus",
+					Singular:   "nonenglishnoxu",
+					Kind:       "WishIHadChosenNoxu",
+					ShortNames: []string{"foo", "bar", "abc", "def"},
+					ListKind:   "NoxuItemList",
+				},
+				Scope: apiextensionsv1.NamespaceScoped,
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+					{
+						Name:    "v1beta1",
+						Served:  true,
+						Storage: true,
+						Schema: &apiextensionsv1.CustomResourceValidation{
+							OpenAPIV3Schema: validationSchema,
+						},
+					},
+					{
+						Name:    "v1",
+						Served:  true,
+						Storage: false,
+						Schema: &apiextensionsv1.CustomResourceValidation{
 							OpenAPIV3Schema: validationSchemaWithDescription,
 						},
 					},
@@ -231,9 +232,9 @@ func TestCustomResourceValidation(t *testing.T) {
 	}
 	defer tearDown()
 
-	noxuDefinitions := newNoxuValidationCRDs(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinitions := newNoxuValidationCRDs()
 	for _, noxuDefinition := range noxuDefinitions {
-		noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -249,7 +250,7 @@ func TestCustomResourceValidation(t *testing.T) {
 			}
 			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
-		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+		if err := fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -436,9 +437,9 @@ func TestCustomResourceUpdateValidation(t *testing.T) {
 	}
 	defer tearDown()
 
-	noxuDefinitions := newNoxuValidationCRDs(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinitions := newNoxuValidationCRDs()
 	for _, noxuDefinition := range noxuDefinitions {
-		noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -476,7 +477,7 @@ func TestCustomResourceUpdateValidation(t *testing.T) {
 			}
 			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
-		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+		if err := fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -489,9 +490,9 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 	}
 	defer tearDown()
 
-	noxuDefinitions := newNoxuValidationCRDs(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinitions := newNoxuValidationCRDs()
 	for _, noxuDefinition := range noxuDefinitions {
-		noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -580,7 +581,7 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 				}
 			}
 		}
-		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+		if err := fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -593,11 +594,11 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 	}
 	defer tearDown()
 
-	noxuDefinitions := newNoxuValidationCRDs(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinitions := newNoxuValidationCRDs()
 	for i, noxuDefinition := range noxuDefinitions {
 		for _, v := range noxuDefinition.Spec.Versions {
 			// Re-define the CRD to make sure we start with a clean CRD
-			noxuDefinition := newNoxuValidationCRDs(apiextensionsv1beta1.NamespaceScoped)[i]
+			noxuDefinition := newNoxuValidationCRDs()[i]
 			validationSchema, err := getSchemaForVersion(noxuDefinition, v.Name)
 			if err != nil {
 				t.Fatal(err)
@@ -606,7 +607,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 			// set stricter schema
 			validationSchema.OpenAPIV3Schema.Required = []string{"alpha", "beta", "epsilon"}
 
-			noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+			noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -622,7 +623,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 			}
 
 			// update the CRD to a less stricter schema
-			_, err = UpdateCustomResourceDefinitionWithRetry(apiExtensionClient, "noxus.mygroup.example.com", func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
+			_, err = UpdateCustomResourceDefinitionWithRetry(apiExtensionClient, "noxus.mygroup.example.com", func(crd *apiextensionsv1.CustomResourceDefinition) {
 				validationSchema, err := getSchemaForVersion(crd, v.Name)
 				if err != nil {
 					t.Fatal(err)
@@ -650,7 +651,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 				t.Fatal(err)
 			}
 			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
-			if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+			if err := fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -664,51 +665,51 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 	}
 	defer tearDown()
 
-	noxuDefinitions := newNoxuValidationCRDs(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinitions := newNoxuValidationCRDs()
 	for i, noxuDefinition := range noxuDefinitions {
 		for _, v := range noxuDefinition.Spec.Versions {
 			// Re-define the CRD to make sure we start with a clean CRD
-			noxuDefinition := newNoxuValidationCRDs(apiextensionsv1beta1.NamespaceScoped)[i]
+			noxuDefinition := newNoxuValidationCRDs()[i]
 			validationSchema, err := getSchemaForVersion(noxuDefinition, v.Name)
 			if err != nil {
 				t.Fatal(err)
 			}
 			validationSchema.OpenAPIV3Schema.AdditionalProperties.Allows = false
 
-			_, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+			_, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 			if err == nil {
 				t.Fatalf("unexpected non-error: additionalProperties cannot be set to false")
 			}
 
-			validationSchema.OpenAPIV3Schema.Properties["zeta"] = apiextensionsv1beta1.JSONSchemaProps{
+			validationSchema.OpenAPIV3Schema.Properties["zeta"] = apiextensionsv1.JSONSchemaProps{
 				Type:        "array",
 				UniqueItems: true,
 			}
 			validationSchema.OpenAPIV3Schema.AdditionalProperties.Allows = true
 
-			_, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+			_, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 			if err == nil {
 				t.Fatalf("unexpected non-error: uniqueItems cannot be set to true")
 			}
 
 			validationSchema.OpenAPIV3Schema.Ref = strPtr("#/definition/zeta")
-			validationSchema.OpenAPIV3Schema.Properties["zeta"] = apiextensionsv1beta1.JSONSchemaProps{
+			validationSchema.OpenAPIV3Schema.Properties["zeta"] = apiextensionsv1.JSONSchemaProps{
 				Type:        "array",
 				UniqueItems: false,
 			}
 
-			_, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+			_, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 			if err == nil {
 				t.Fatal("unexpected non-error: $ref cannot be non-empty string")
 			}
 
 			validationSchema.OpenAPIV3Schema.Ref = nil
 
-			noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+			noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+			if err := fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -716,6 +717,7 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 }
 
 func TestNonStructuralSchemaConditionUpdate(t *testing.T) {
+	t.Skip("non-structural schemas can no longer be created")
 	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -752,27 +754,27 @@ spec:
 	if err != nil {
 		t.Fatalf("failed decoding of: %v\n\n%s", err, manifest)
 	}
-	crd := obj.(*apiextensionsv1beta1.CustomResourceDefinition)
+	crd := obj.(*apiextensionsv1.CustomResourceDefinition)
 	name := crd.Name
 
 	// save schema for later
-	origSchema := crd.Spec.Validation.OpenAPIV3Schema
+	origSchema := crd.Spec.Versions[0].Schema.OpenAPIV3Schema
 
 	// create CRDs
 	t.Logf("Creating CRD %s", crd.Name)
-	if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
+	if _, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("unexpected create error: %v", err)
 	}
 
 	// wait for condition with violations
 	t.Log("Waiting for NonStructuralSchema condition")
-	var cond *apiextensionsv1beta1.CustomResourceDefinitionCondition
+	var cond *apiextensionsv1.CustomResourceDefinitionCondition
 	err = wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+		obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
-		cond = findCRDCondition(obj, apiextensionsv1beta1.NonStructuralSchema)
+		cond = findCRDCondition(obj, apiextensionsv1.NonStructuralSchema)
 		return cond != nil, nil
 	})
 	if err != nil {
@@ -793,7 +795,7 @@ spec:
 		// 2. preserveUnknownFields validation error
 		patch := []byte("[{\"op\":\"add\",\"path\":\"/spec/validation/openAPIV3Schema/properties/a/type\",\"value\":\"int\"}," +
 			"{\"op\":\"replace\",\"path\":\"/spec/preserveUnknownFields\",\"value\":false}]")
-		if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(context.TODO(), name, types.JSONPatchType, patch, metav1.PatchOptions{}); apierrors.IsConflict(err) {
+		if _, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(context.TODO(), name, types.JSONPatchType, patch, metav1.PatchOptions{}); apierrors.IsConflict(err) {
 			continue
 		}
 		if err != nil {
@@ -808,11 +810,11 @@ spec:
 	// wait for condition to go away
 	t.Log("Wait for condition to disappear")
 	err = wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+		obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
-		cond = findCRDCondition(obj, apiextensionsv1beta1.NonStructuralSchema)
+		cond = findCRDCondition(obj, apiextensionsv1.NonStructuralSchema)
 		return cond == nil, nil
 	})
 	if err != nil {
@@ -822,13 +824,13 @@ spec:
 	// re-add schema
 	t.Log("Re-add schema")
 	for retry := 0; retry < 5; retry++ {
-		crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+		crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("unexpected get error: %v", err)
 		}
-		crd.Spec.PreserveUnknownFields = nil
-		crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{OpenAPIV3Schema: origSchema}
-		if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{}); apierrors.IsConflict(err) {
+		crd.Spec.PreserveUnknownFields = true
+		crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: origSchema}
+		if _, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{}); apierrors.IsConflict(err) {
 			continue
 		}
 		if err != nil {
@@ -843,11 +845,11 @@ spec:
 	// wait for condition with violations
 	t.Log("Wait for condition to reappear")
 	err = wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+		obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
-		cond = findCRDCondition(obj, apiextensionsv1beta1.NonStructuralSchema)
+		cond = findCRDCondition(obj, apiextensionsv1.NonStructuralSchema)
 		return cond != nil, nil
 	})
 	if err != nil {
@@ -862,6 +864,7 @@ spec:
 }
 
 func TestNonStructuralSchemaCondition(t *testing.T) {
+	t.Skip("non-structural schemas can no longer be created")
 	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -1629,12 +1632,12 @@ properties:
 			if err != nil {
 				t.Fatalf("failed decoding of: %v\n\n%s", err, manifest)
 			}
-			crd := obj.(*apiextensionsv1beta1.CustomResourceDefinition)
+			crd := obj.(*apiextensionsv1.CustomResourceDefinition)
 			crd.Spec.Group = fmt.Sprintf("tests-%d.apiextension.k8s.io", i)
 			crd.Name = fmt.Sprintf("foos.%s", crd.Spec.Group)
 
 			// create CRDs
-			crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
+			crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
 			if len(tst.expectedCreateErrors) > 0 && err == nil {
 				t.Fatalf("expected create errors, got none")
 			} else if len(tst.expectedCreateErrors) == 0 && err != nil {
@@ -1657,13 +1660,13 @@ properties:
 
 			if len(tst.expectedViolations) == 0 {
 				// wait for condition to not appear
-				var cond *apiextensionsv1beta1.CustomResourceDefinitionCondition
+				var cond *apiextensionsv1.CustomResourceDefinitionCondition
 				err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-					obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
+					obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
 					if err != nil {
 						return false, err
 					}
-					cond = findCRDCondition(obj, apiextensionsv1beta1.NonStructuralSchema)
+					cond = findCRDCondition(obj, apiextensionsv1.NonStructuralSchema)
 					if cond == nil {
 						return false, nil
 					}
@@ -1676,13 +1679,13 @@ properties:
 			}
 
 			// wait for condition to appear with the given violations
-			var cond *apiextensionsv1beta1.CustomResourceDefinitionCondition
+			var cond *apiextensionsv1.CustomResourceDefinitionCondition
 			err = wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-				obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
+				obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
 				}
-				cond = findCRDCondition(obj, apiextensionsv1beta1.NonStructuralSchema)
+				cond = findCRDCondition(obj, apiextensionsv1.NonStructuralSchema)
 				if cond != nil {
 					return true, nil
 				}
@@ -1696,7 +1699,7 @@ properties:
 			if cond.Reason != "Violations" {
 				t.Errorf("expected reason Violations, got: %v", cond.Reason)
 			}
-			if cond.Status != apiextensionsv1beta1.ConditionTrue {
+			if cond.Status != apiextensionsv1.ConditionTrue {
 				t.Errorf("expected reason True, got: %v", cond.Status)
 			}
 
@@ -1717,7 +1720,7 @@ properties:
 }
 
 // findCRDCondition returns the condition you're looking for or nil.
-func findCRDCondition(crd *apiextensionsv1beta1.CustomResourceDefinition, conditionType apiextensionsv1beta1.CustomResourceDefinitionConditionType) *apiextensionsv1beta1.CustomResourceDefinitionCondition {
+func findCRDCondition(crd *apiextensionsv1.CustomResourceDefinition, conditionType apiextensionsv1.CustomResourceDefinitionConditionType) *apiextensionsv1.CustomResourceDefinitionCondition {
 	for i := range crd.Status.Conditions {
 		if crd.Status.Conditions[i].Type == conditionType {
 			return &crd.Status.Conditions[i]
