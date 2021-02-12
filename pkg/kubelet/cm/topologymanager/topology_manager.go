@@ -167,6 +167,8 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 }
 
 func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	return m.podTopologyHints[podUID][containerName]
 }
 
@@ -256,10 +258,12 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 		}
 
 		klog.Infof("[topologymanager] Topology Affinity for (pod: %v container: %v): %v", pod.UID, container.Name, result)
+		m.mutex.Lock()
 		if m.podTopologyHints[string(pod.UID)] == nil {
 			m.podTopologyHints[string(pod.UID)] = make(map[string]TopologyHint)
 		}
 		m.podTopologyHints[string(pod.UID)][container.Name] = result
+		m.mutex.Unlock()
 
 		err := m.allocateAlignedResources(pod, &container)
 		if err != nil {
