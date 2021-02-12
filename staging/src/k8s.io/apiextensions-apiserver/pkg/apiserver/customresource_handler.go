@@ -94,7 +94,7 @@ const (
 	// If the StorageVersionAPI feature gate is enabled, after a CRD storage
 	// (a.k.a. serving info) is created, the API server will block CR write
 	// requests that hit this storage until the corresponding storage
-	// version update gets processed/aborted by the storage version manager.
+	// version update gets processed by the storage version manager.
 	// The API server will unblock CR write requests if the storage version
 	// update takes longer than storageVersionUpdateTimeout after the
 	// storage is created.
@@ -193,20 +193,16 @@ type crdInfo struct {
 }
 
 // storageVersionUpdate holds information about a storage version update,
-// indicating whether the update gets processed, aborted, or timed-out.
+// indicating whether the update gets processed, or timed-out.
 type storageVersionUpdate struct {
 	// processedCh is closed by the storage version manager after the
 	// storage version update gets processed (either succeeded or failed).
 	// The API server will unblock and allow CR write requests if this
 	// channel is closed.
 	processedCh <-chan struct{}
-	// abortedCh is closed by the storage version manager if the storage
-	// version update gets aborted. The API server will unblock and reject
-	// CR write requests if this channel is closed.
-	abortedCh <-chan struct{}
 	// timeout is the time when the API server will unblock and allow CR
 	// write requests even if the storage version update hasn't been
-	// processed nor aborted.
+	// processed.
 	timeout time.Time
 	// timeoutLogOnce allows the API server to log once when the timeout is
 	// hit.
@@ -368,22 +364,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		(requestInfo.Verb == "create" ||
 			requestInfo.Verb == "update" ||
 			requestInfo.Verb == "patch") {
-		var aborted bool
-		crdInfo, aborted, err = r.getOrCreateServingInfoForWrite(crd.UID, crd.Name)
-		// The server aborted storage version update due to the CRD being deleted.
-		// The CR request is forbidden.
-		if aborted {
-			err = apierrors.NewForbidden(schema.GroupResource{
-				Group:    requestInfo.APIGroup,
-				Resource: requestInfo.Resource,
-			}, requestInfo.Name, fmt.Errorf("storage version update aborted due to CRD deletion"))
-			utilruntime.HandleError(err)
-			responsewriters.ErrorNegotiated(
-				err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup,
-					Version: requestInfo.APIVersion}, w, req,
-			)
-			return
-		}
+		crdInfo, err = r.getOrCreateServingInfoForWrite(crd.UID, crd.Name)
 	} else {
 		crdInfo, err = r.getOrCreateServingInfoFor(crd.UID, crd.Name)
 	}
@@ -557,7 +538,7 @@ func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
 	}
 	// Update storage version with the latest info in the watch event
 	if r.storageVersionManager != nil {
-		r.storageVersionManager.EnqueueStorageVersionUpdate(crd, tearDownFinishedCh, nil, nil)
+		r.storageVersionManager.EnqueueStorageVersionUpdate(crd, tearDownFinishedCh, nil)
 	}
 }
 
@@ -607,7 +588,7 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 	}
 	// Update storage version with the latest info in the watch event
 	if r.storageVersionManager != nil {
-		r.storageVersionManager.EnqueueStorageVersionUpdate(newCRD, tearDownFinishedCh, nil, nil)
+		r.storageVersionManager.EnqueueStorageVersionUpdate(newCRD, tearDownFinishedCh, nil)
 	}
 }
 
@@ -703,17 +684,11 @@ func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions
 }
 
 // getOrCreateServingInfoForWrite is getOrCreateServingInfoFor, but blocks CR
-// write requests until the storage version update is processed, aborted, or
+// write requests until the storage version update is processed, or
 // timed-out.
 // If the storage version update is processed, unblock and allow the write request.
-// If the storage version update is aborted, unblock and reject the write request.
 // If the storage version update timed-out, unblock and allow the write request.
-//
-// If aborted is true, the returned error (403) should be surfaced to the client,
-// indicating that the server forbids the CR request due to the CRD deletion.
-// Otherwise, any non-nil error returned by getOrCreateServingInfoFor may be
-// wrapped by the server as an internal error (500) before surfacing to the client.
-func (r *crdHandler) getOrCreateServingInfoForWrite(uid types.UID, name string) (ret *crdInfo, aborted bool, err error) {
+func (r *crdHandler) getOrCreateServingInfoForWrite(uid types.UID, name string) (ret *crdInfo, err error) {
 	ret, err = r.getOrCreateServingInfoFor(uid, name)
 
 	// Surface non-nil error early.
@@ -722,7 +697,7 @@ func (r *crdHandler) getOrCreateServingInfoForWrite(uid types.UID, name string) 
 		r.storageVersionManager == nil ||
 		ret.storageVersionUpdate == nil ||
 		ret.storageVersionUpdate.processedCh == nil {
-		return ret, false, err
+		return ret, err
 	}
 
 	// NOTE: currently the graceful CRD deletion waits 1s for in-flight requests
@@ -732,10 +707,6 @@ func (r *crdHandler) getOrCreateServingInfoForWrite(uid types.UID, name string) 
 	// first CR request establishes the underlying storage).
 	select {
 	case <-ret.storageVersionUpdate.processedCh:
-	case <-ret.storageVersionUpdate.abortedCh:
-		// Storage version update aborted. The caller knows which error
-		// to return to the client (403).
-		return nil, true, nil
 	// Unblock the requests if the storage version update takes a long time, otherwise
 	// CR requests may stack up and overwhelm the API server.
 	// TODO(roycaihw): benchmark the storage version update latency to adjust the timeout.
@@ -745,7 +716,7 @@ func (r *crdHandler) getOrCreateServingInfoForWrite(uid types.UID, name string) 
 				ret.spec.Group, ret.spec.Names.Plural)
 		})
 	}
-	return ret, false, nil
+	return ret, nil
 }
 
 // getOrCreateServingInfoFor gets the CRD serving info for the given CRD UID if the key exists in the storage map.
@@ -1092,11 +1063,9 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	if r.storageVersionManager != nil {
 		// spawn storage version update in background and use channels to make handlers wait
 		processedCh := make(chan struct{})
-		abortedCh := make(chan struct{})
-		r.storageVersionManager.EnqueueStorageVersionUpdate(crd, nil, processedCh, abortedCh)
+		r.storageVersionManager.EnqueueStorageVersionUpdate(crd, nil, processedCh)
 		ret.storageVersionUpdate = &storageVersionUpdate{
 			processedCh: processedCh,
-			abortedCh:   abortedCh,
 			timeout:     time.Now().Add(storageVersionUpdateTimeout),
 		}
 	}
