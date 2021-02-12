@@ -1,6 +1,11 @@
 #!/bin/bash
 
 function start_internal_cluster_autoscaler {
+  if [[ "${GKE_CLUSTER_AUTOSCALER_ON_CRP:-}" == "true" ]]; then
+    echo "Cluster Autoscaler will be deployed by CRP, nothing to do here."
+    return
+  fi
+
   if [[ "${ENABLE_NAP:-}" == "true" ]]; then
     echo "Start Node Auto-Provisioning (NAP)"
     start_internal_ca "${NAP_CONFIG:-} --node-autoprovisioning-enabled=true"
