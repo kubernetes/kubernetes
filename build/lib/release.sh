@@ -364,7 +364,7 @@ function kube::release::create_docker_images_for_server() {
       local base_image=${wrappable##*,}
       local binary_file_path="${binary_dir}/${binary_name}"
       local docker_build_path="${binary_file_path}.dockerbuild"
-      local docker_file_path="${docker_build_path}/Dockerfile"
+      local docker_file_path="${KUBE_ROOT}/build/server-image/Dockerfile"
       local docker_image_tag="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
 
       kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
@@ -372,22 +372,15 @@ function kube::release::create_docker_images_for_server() {
         rm -rf "${docker_build_path}"
         mkdir -p "${docker_build_path}"
         ln "${binary_file_path}" "${docker_build_path}/${binary_name}"
-        ln "${KUBE_ROOT}/build/nsswitch.conf" "${docker_build_path}/nsswitch.conf"
-        chmod 0644 "${docker_build_path}/nsswitch.conf"
-        cat <<EOF > "${docker_file_path}"
-FROM ${base_image}
-COPY ${binary_name} /usr/local/bin/${binary_name}
-EOF
-        # ensure /etc/nsswitch.conf exists so go's resolver respects /etc/hosts
-        if [[ "${base_image}" =~ busybox ]]; then
-          echo "COPY nsswitch.conf /etc/" >> "${docker_file_path}"
-        fi
 
         local build_log="${docker_build_path}/build.log"
         if ! DOCKER_CLI_EXPERIMENTAL=enabled "${DOCKER[@]}" buildx build \
+          -f "${docker_file_path}" \
           --platform linux/"${arch}" \
           --load ${docker_build_opts:+"${docker_build_opts}"} \
           -t "${docker_image_tag}" \
+          --build-arg BASEIMAGE="${base_image}" \
+          --build-arg BINARY="${binary_name}" \
           "${docker_build_path}" >"${build_log}" 2>&1; then
             cat "${build_log}"
             exit 1
