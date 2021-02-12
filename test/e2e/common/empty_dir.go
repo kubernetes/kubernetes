@@ -42,7 +42,7 @@ var (
 	nonRootUID = int64(1001)
 )
 
-var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
+var _ = SIGStorageDescribe("EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 
 	ginkgo.Context("when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup]", func() {

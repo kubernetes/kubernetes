@@ -33,7 +33,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
+var _ = SIGStorageDescribe("Projected configMap", func() {
 	f := framework.NewDefaultFramework("projected")
 
 	/*

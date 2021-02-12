@@ -31,7 +31,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
+var _ = SIGNodeDescribe("ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
 	/*

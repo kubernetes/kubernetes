@@ -38,7 +38,7 @@ const (
 	podTemplateRetryTimeout = 1 * time.Minute
 )
 
-var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
+var _ = SIGNodeDescribe("PodTemplates", func() {
 	f := framework.NewDefaultFramework("podtemplate")
 	/*
 	   Release: v1.19

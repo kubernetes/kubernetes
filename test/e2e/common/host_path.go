@@ -31,7 +31,7 @@ import (
 
 //TODO : Consolidate this code with the code for emptyDir.
 //This will require some smart.
-var _ = ginkgo.Describe("[sig-storage] HostPath", func() {
+var _ = SIGStorageDescribe("HostPath", func() {
 	f := framework.NewDefaultFramework("hostpath")
 
 	ginkgo.BeforeEach(func() {

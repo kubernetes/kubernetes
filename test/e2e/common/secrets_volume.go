@@ -33,7 +33,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
+var _ = SIGStorageDescribe("Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
 
 	/*

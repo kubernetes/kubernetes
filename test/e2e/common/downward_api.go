@@ -31,7 +31,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = ginkgo.Describe("[sig-node] Downward API", func() {
+var _ = SIGNodeDescribe("Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	/*

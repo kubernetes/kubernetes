@@ -33,7 +33,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
+var _ = SIGStorageDescribe("ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
 	/*
