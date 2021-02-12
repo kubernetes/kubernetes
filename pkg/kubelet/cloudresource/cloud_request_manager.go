@@ -103,7 +103,7 @@ func (m *cloudResourceSyncManager) getNodeAddresses() ([]v1.NodeAddress, error) 
 }
 
 func (m *cloudResourceSyncManager) syncNodeAddresses() {
-	klog.V(5).InfoS("Requesting node addresses from cloud provider for node","nodeName", m.nodeName)
+	klog.V(5).InfoS("Requesting node addresses from cloud provider for node", "nodeName", m.nodeName)
 
 	addrs, err := m.getNodeAddresses()
 
@@ -112,7 +112,7 @@ func (m *cloudResourceSyncManager) syncNodeAddresses() {
 	defer m.nodeAddressesMonitor.Broadcast()
 
 	if err != nil {
-		klog.V(2).InfoS("Node addresses from cloud provider for node not collected","nodeName", m.nodeName, "err", err)
+		klog.V(2).InfoS("Node addresses from cloud provider for node not collected", "nodeName", m.nodeName, "err", err)
 
 		if len(m.nodeAddresses) > 0 {
 			// in the event that a sync loop fails when a previous sync had
@@ -124,7 +124,7 @@ func (m *cloudResourceSyncManager) syncNodeAddresses() {
 		return
 	}
 
-	klog.V(5).InfoS("Node addresses from cloud provider for node collected","nodeName", m.nodeName)
+	klog.V(5).InfoS("Node addresses from cloud provider for node collected", "nodeName", m.nodeName)
 	m.nodeAddressesErr = nil
 	m.nodeAddresses = addrs
 }
