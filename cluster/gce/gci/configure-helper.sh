@@ -608,7 +608,7 @@ function append_or_replace_prefixed_line {
   local -r prefix="${2:-}"
   local -r suffix="${3:-}"
   local -r dirname=$(dirname "${file}")
-  local -r tmpfile=$(mktemp -t filtered.XXXX --tmpdir="${dirname}")
+  local -r tmpfile=$(mktemp "${dirname}/filtered.XXXX")
 
   touch "${file}"
   awk -v pfx="${prefix}" 'substr($0,1,length(pfx)) != pfx { print }' "${file}" > "${tmpfile}"
