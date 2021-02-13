@@ -143,12 +143,13 @@ else
 	cd $(TEMP_DIR) && echo "ENV ETCD_UNSUPPORTED_ARCH=$(ARCH)" >> Dockerfile
 endif
 
-	# Replace BASEIMAGE with the real base image
-	cd $(TEMP_DIR) && sed -i.bak 's|BASEIMAGE|$(BASEIMAGE)|g' Dockerfile
-	cd $(TEMP_DIR) && sed -i.bak 's|RUNNERIMAGE|$(RUNNERIMAGE)|g' Dockerfile
-
 	# And build the image
-	docker build --pull -t $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(TEMP_DIR)
+	docker build \
+		--pull \
+		-t $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) \
+		--build-arg BASEIMAGE=$(BASEIMAGE) \
+		--build-arg RUNNERIMAGE=$(RUNNERIMAGE) \
+		$(TEMP_DIR)
 
 push: build
 	docker tag $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(MANIFEST_IMAGE)-$(ARCH):$(IMAGE_TAG)
@@ -181,8 +182,12 @@ unit-test:
 build-integration-test-image: build
 	cp -r $(TEMP_DIR) $(TEMP_DIR)_integration_test
 	cp Dockerfile $(TEMP_DIR)_integration_test/Dockerfile
-	cd $(TEMP_DIR)_integration_test && sed -i.bak 's|BASEIMAGE|golang:$(GOLANG_VERSION)|g' Dockerfile
-	docker build --pull -t etcd-integration-test $(TEMP_DIR)_integration_test
+	docker build \
+		--pull \
+		-t etcd-integration-test \
+		--build-arg BASEIMAGE=golang:$(GOLANG_VERSION) \
+		--build-arg RUNNERIMAGE=$(RUNNERIMAGE) \
+		$(TEMP_DIR)_integration_test
 
 integration-test:
 	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) etcd-integration-test \
