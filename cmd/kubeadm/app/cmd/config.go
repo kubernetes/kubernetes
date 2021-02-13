@@ -71,7 +71,7 @@ func newCmdConfig(out io.Writer) *cobra.Command {
 		// cobra will print usage information, but still exit cleanly.
 		// We want to return an error code in these cases so that the
 		// user knows that their command was invalid.
-		RunE: cmdutil.SubCmdRunE("config"),
+		PreRunE: cmdutil.SubCmdRunE("config"),
 	}
 
 	options.AddKubeConfigFlag(cmd.PersistentFlags(), &kubeConfigFile)
