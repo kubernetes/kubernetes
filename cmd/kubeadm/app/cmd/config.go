@@ -71,7 +71,7 @@ func newCmdConfig(out io.Writer) *cobra.Command {
 		// cobra will print usage information, but still exit cleanly.
 		// We want to return an error code in these cases so that the
 		// user knows that their command was invalid.
-		RunE: cmdutil.SubCmdRunE("config"),
+		PreRunE: cmdutil.SubCmdRunE("config"),
 	}
 
 	options.AddKubeConfigFlag(cmd.PersistentFlags(), &kubeConfigFile)
@@ -92,7 +92,7 @@ func newCmdConfigPrint(out io.Writer) *cobra.Command {
 		Long: dedent.Dedent(`
 			This command prints configurations for subcommands provided.
 			For details, see: https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2`),
-		RunE: cmdutil.SubCmdRunE("print"),
+		PreRunE: cmdutil.SubCmdRunE("print"),
 	}
 	cmd.AddCommand(newCmdConfigPrintInitDefaults(out))
 	cmd.AddCommand(newCmdConfigPrintJoinDefaults(out))
@@ -245,7 +245,7 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 			In other words, the output of this command is what kubeadm actually would read internally if you
 			submitted this file to "kubeadm init"
 		`), kubeadmapiv1beta2.SchemeGroupVersion, kubeadmapiv1beta2.SchemeGroupVersion),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if len(oldCfgPath) == 0 {
 				return errors.New("the --old-config flag is mandatory")
 			}
@@ -318,7 +318,7 @@ func newCmdConfigImages(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "images",
 		Short: "Interact with container images used by kubeadm",
-		RunE:  cmdutil.SubCmdRunE("images"),
+		PreRunE:  cmdutil.SubCmdRunE("images"),
 	}
 	cmd.AddCommand(newCmdConfigImagesList(out, nil))
 	cmd.AddCommand(newCmdConfigImagesPull())
