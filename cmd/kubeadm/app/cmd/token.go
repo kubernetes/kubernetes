@@ -85,7 +85,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		// cobra will print usage information, but still exit cleanly.
 		// We want to return an error code in these cases so that the
 		// user knows that their command was invalid.
-		RunE: cmdutil.SubCmdRunE("token"),
+		PreRunE: cmdutil.SubCmdRunE("token"),
 	}
 
 	options.AddKubeConfigFlag(tokenCmd.PersistentFlags(), &kubeConfigFile)
