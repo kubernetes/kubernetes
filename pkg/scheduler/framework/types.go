@@ -356,7 +356,7 @@ type ImageStateSummary struct {
 // NodeInfo is node level aggregated information.
 type NodeInfo struct {
 	// Overall node information.
-	node *v1.Node
+	Node *v1.Node
 
 	// Pods running on the node.
 	Pods []*PodInfo
@@ -594,18 +594,10 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 	return ni
 }
 
-// Node returns overall information about this node.
-func (n *NodeInfo) Node() *v1.Node {
-	if n == nil {
-		return nil
-	}
-	return n.node
-}
-
 // Clone returns a copy of this node.
 func (n *NodeInfo) Clone() *NodeInfo {
 	clone := &NodeInfo{
-		node:             n.node,
+		Node:             n.Node,
 		Requested:        n.Requested.Clone(),
 		NonZeroRequested: n.NonZeroRequested.Clone(),
 		Allocatable:      n.Allocatable.Clone(),
@@ -754,7 +746,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
+	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.Node.Name)
 }
 
 // resets the slices to nil so that we can do DeepEqual in unit tests.
@@ -825,7 +817,7 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 
 // SetNode sets the overall node information.
 func (n *NodeInfo) SetNode(node *v1.Node) {
-	n.node = node
+	n.Node = node
 	n.Allocatable = NewResource(node.Status.Allocatable)
 	n.TransientInfo = NewTransientSchedulerInfo()
 	n.Generation = nextGeneration()
@@ -833,7 +825,7 @@ func (n *NodeInfo) SetNode(node *v1.Node) {
 
 // RemoveNode removes the node object, leaving all other tracking information.
 func (n *NodeInfo) RemoveNode() {
-	n.node = nil
+	n.Node = nil
 	n.Generation = nextGeneration()
 }
 
@@ -845,7 +837,7 @@ func (n *NodeInfo) RemoveNode() {
 // on the pods returned from SchedulerCache, so that predicate functions see
 // only the pods that are not removed from the NodeInfo.
 func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
-	node := n.Node()
+	node := n.Node
 	if node == nil {
 		return pods
 	}

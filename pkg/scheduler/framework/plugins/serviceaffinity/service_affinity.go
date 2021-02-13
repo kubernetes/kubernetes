@@ -260,7 +260,7 @@ func (pl *ServiceAffinity) Filter(ctx context.Context, cycleState *framework.Cyc
 		return nil
 	}
 
-	node := nodeInfo.Node()
+	node := nodeInfo.Node
 	if node == nil {
 		return framework.AsStatus(fmt.Errorf("node not found"))
 	}
@@ -282,7 +282,7 @@ func (pl *ServiceAffinity) Filter(ctx context.Context, cycleState *framework.Cyc
 				if err != nil {
 					return framework.AsStatus(fmt.Errorf("node not found"))
 				}
-				addUnsetLabelsToMap(affinityLabels, pl.args.AffinityLabels, labels.Set(nodeWithAffinityLabels.Node().Labels))
+				addUnsetLabelsToMap(affinityLabels, pl.args.AffinityLabels, labels.Set(nodeWithAffinityLabels.Node.Labels))
 			}
 		}
 	}
@@ -301,7 +301,7 @@ func (pl *ServiceAffinity) Score(ctx context.Context, state *framework.CycleStat
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
-	node := nodeInfo.Node()
+	node := nodeInfo.Node
 	if node == nil {
 		return 0, framework.AsStatus(fmt.Errorf("node not found"))
 	}
@@ -370,11 +370,11 @@ func (pl *ServiceAffinity) updateNodeScoresForLabel(sharedLister framework.Share
 		if err != nil {
 			return err
 		}
-		if !labels.Set(nodeInfo.Node().Labels).Has(label) {
+		if !labels.Set(nodeInfo.Node.Labels).Has(label) {
 			continue
 		}
 
-		labelValue = labels.Set(nodeInfo.Node().Labels).Get(label)
+		labelValue = labels.Set(nodeInfo.Node.Labels).Get(label)
 		labelNodesStatus[nodePriority.Name] = labelValue
 		podCounts[labelValue] += nodePriority.Score
 	}

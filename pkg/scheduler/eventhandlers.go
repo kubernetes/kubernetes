@@ -474,7 +474,7 @@ func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 		}
 
 		// Ignore parsing errors for backwards compatibility.
-		matches, _ := nodeaffinity.GetRequiredNodeAffinity(pod).Match(nodeInfo.Node())
+		matches, _ := nodeaffinity.GetRequiredNodeAffinity(pod).Match(nodeInfo.Node)
 		if !matches {
 			return false
 		}
@@ -487,7 +487,7 @@ func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 			return false
 		}
 
-		_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
+		_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(nodeInfo.Node.Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
 			// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
 			return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
 		})

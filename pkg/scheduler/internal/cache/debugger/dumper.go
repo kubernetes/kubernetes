@@ -64,7 +64,7 @@ func (d *CacheDumper) dumpSchedulingQueue() {
 func (d *CacheDumper) printNodeInfo(name string, n *framework.NodeInfo) string {
 	var nodeData strings.Builder
 	nodeData.WriteString(fmt.Sprintf("\nNode name: %s\nDeleted: %t\nRequested Resources: %+v\nAllocatable Resources:%+v\nScheduled Pods(number: %v):\n",
-		name, n.Node() == nil, n.Requested, n.Allocatable, len(n.Pods)))
+		name, n.Node == nil, n.Requested, n.Allocatable, len(n.Pods)))
 	// Dumping Pod Info
 	for _, p := range n.Pods {
 		nodeData.WriteString(printPod(p.Pod))

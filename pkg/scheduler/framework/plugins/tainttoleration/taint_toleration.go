@@ -61,7 +61,7 @@ func (f *TaintToleration) EventsToRegister() []framework.ClusterEvent {
 
 // Filter invoked at the filter extension point.
 func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	if nodeInfo == nil || nodeInfo.Node() == nil {
+	if nodeInfo.Node == nil {
 		return framework.AsStatus(fmt.Errorf("invalid nodeInfo"))
 	}
 
@@ -70,7 +70,7 @@ func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleSta
 		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
 	}
 
-	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, filterPredicate)
+	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(nodeInfo.Node.Spec.Taints, pod.Spec.Tolerations, filterPredicate)
 	if !isUntolerated {
 		return nil
 	}
@@ -146,10 +146,10 @@ func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.
 // Score invoked at the Score extension point.
 func (pl *TaintToleration) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
-	if err != nil || nodeInfo.Node() == nil {
+	if err != nil || nodeInfo.Node == nil {
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
-	node := nodeInfo.Node()
+	node := nodeInfo.Node
 
 	s, err := getPreScoreState(state)
 	if err != nil {

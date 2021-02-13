@@ -83,7 +83,7 @@ func (pl *InterPodAffinity) processExistingPod(
 	incomingPod *v1.Pod,
 	topoScore scoreMap,
 ) {
-	existingPodNode := existingPodNodeInfo.Node()
+	existingPodNode := existingPodNodeInfo.Node
 	if len(existingPodNode.Labels) == 0 {
 		return
 	}
@@ -186,7 +186,7 @@ func (pl *InterPodAffinity) PreScore(
 	index := int32(-1)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
-		if nodeInfo.Node() == nil {
+		if nodeInfo.Node == nil {
 			return
 		}
 		// Unless the pod being scheduled has preferred affinity terms, we only
@@ -237,7 +237,7 @@ func (pl *InterPodAffinity) Score(ctx context.Context, cycleState *framework.Cyc
 	if err != nil {
 		return 0, framework.AsStatus(fmt.Errorf("failed to get node %q from Snapshot: %w", nodeName, err))
 	}
-	node := nodeInfo.Node()
+	node := nodeInfo.Node
 
 	s, err := getPreScoreState(cycleState)
 	if err != nil {

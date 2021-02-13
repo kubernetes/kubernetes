@@ -94,7 +94,7 @@ func (pl *NodeAffinity) PreFilterExtensions() framework.PreFilterExtensions {
 // Filter checks if the Node matches the Pod .spec.affinity.nodeAffinity and
 // the plugin's added affinity.
 func (pl *NodeAffinity) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	node := nodeInfo.Node()
+	node := nodeInfo.Node
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
 	}
@@ -154,7 +154,7 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
-	node := nodeInfo.Node()
+	node := nodeInfo.Node
 	if node == nil {
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}

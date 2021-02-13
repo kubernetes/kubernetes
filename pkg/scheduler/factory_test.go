@@ -564,7 +564,7 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 			gotNodes := schedulerCache.Dump().Nodes
 			gotNodeNames := sets.NewString()
 			for _, nodeInfo := range gotNodes {
-				gotNodeNames.Insert(nodeInfo.Node().Name)
+				gotNodeNames.Insert(nodeInfo.Node.Name)
 			}
 			if diff := cmp.Diff(tt.expectNodeNames, gotNodeNames); diff != "" {
 				t.Errorf("Unexpected nodes (-want, +got): %s", diff)

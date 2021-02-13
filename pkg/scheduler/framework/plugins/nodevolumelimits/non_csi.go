@@ -213,7 +213,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 		return nil
 	}
 
-	node := nodeInfo.Node()
+	node := nodeInfo.Node
 	if node == nil {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("node not found"))
 	}

@@ -227,7 +227,7 @@ type NodeInfoLister []*framework.NodeInfo
 // Get returns a fake node object in the fake nodes.
 func (nodes NodeInfoLister) Get(nodeName string) (*framework.NodeInfo, error) {
 	for _, node := range nodes {
-		if node != nil && node.Node().Name == nodeName {
+		if node != nil && node.Node.Name == nodeName {
 			return node, nil
 		}
 	}

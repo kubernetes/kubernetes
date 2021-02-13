@@ -53,7 +53,7 @@ func (pl *NodeName) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *NodeName) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	if nodeInfo.Node() == nil {
+	if nodeInfo.Node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
 	}
 	if !Fits(pod, nodeInfo) {
@@ -64,7 +64,7 @@ func (pl *NodeName) Filter(ctx context.Context, _ *framework.CycleState, pod *v1
 
 // Fits actually checks if the pod fits the node.
 func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
-	return len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName == nodeInfo.Node().Name
+	return len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName == nodeInfo.Node.Name
 }
 
 // New initializes a new plugin and returns it.

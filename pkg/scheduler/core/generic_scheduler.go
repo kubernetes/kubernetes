@@ -239,7 +239,7 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, fwk framewor
 		// All nodes will have the same status. Some non trivial refactoring is
 		// needed to avoid this copy.
 		for _, n := range allNodes {
-			diagnosis.NodeToStatusMap[n.Node().Name] = s
+			diagnosis.NodeToStatusMap[n.Node.Name] = s
 		}
 		// Status satisfying IsUnschedulable() gets injected into diagnosis.UnschedulablePlugins.
 		diagnosis.UnschedulablePlugins.Insert(s.FailedPlugin())
@@ -287,7 +287,7 @@ func (g *genericScheduler) findNodesThatPassFilters(
 	if !fwk.HasFilterPlugins() {
 		length := len(nodes)
 		for i := range feasibleNodes {
-			feasibleNodes[i] = nodes[(g.nextStartNodeIndex+i)%length].Node()
+			feasibleNodes[i] = nodes[(g.nextStartNodeIndex+i)%length].Node
 		}
 		g.nextStartNodeIndex = (g.nextStartNodeIndex + len(feasibleNodes)) % length
 		return feasibleNodes, nil
@@ -312,11 +312,11 @@ func (g *genericScheduler) findNodesThatPassFilters(
 				cancel()
 				atomic.AddInt32(&feasibleNodesLen, -1)
 			} else {
-				feasibleNodes[length-1] = nodeInfo.Node()
+				feasibleNodes[length-1] = nodeInfo.Node
 			}
 		} else {
 			statusesLock.Lock()
-			diagnosis.NodeToStatusMap[nodeInfo.Node().Name] = status
+			diagnosis.NodeToStatusMap[nodeInfo.Node.Name] = status
 			diagnosis.UnschedulablePlugins.Insert(status.FailedPlugin())
 			statusesLock.Unlock()
 		}

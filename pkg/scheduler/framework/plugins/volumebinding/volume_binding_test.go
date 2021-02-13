@@ -608,7 +608,7 @@ func TestVolumeBinding(t *testing.T) {
 			for i, nodeInfo := range nodeInfos {
 				gotStatus := p.Filter(ctx, state, item.pod, nodeInfo)
 				if !reflect.DeepEqual(gotStatus, item.wantFilterStatus[i]) {
-					t.Errorf("filter status does not match for node %q, got: %v, want: %v", nodeInfo.Node().Name, gotStatus, item.wantFilterStatus)
+					t.Errorf("filter status does not match for node %q, got: %v, want: %v", nodeInfo.Node.Name, gotStatus, item.wantFilterStatus)
 				}
 			}
 

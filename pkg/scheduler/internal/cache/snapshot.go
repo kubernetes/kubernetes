@@ -158,7 +158,7 @@ func (s *Snapshot) HavePodsWithRequiredAntiAffinityList() ([]*framework.NodeInfo
 
 // Get returns the NodeInfo of the given node name.
 func (s *Snapshot) Get(nodeName string) (*framework.NodeInfo, error) {
-	if v, ok := s.nodeInfoMap[nodeName]; ok && v.Node() != nil {
+	if v, ok := s.nodeInfoMap[nodeName]; ok && v.Node != nil {
 		return v, nil
 	}
 	return nil, fmt.Errorf("nodeinfo not found for node name %q", nodeName)

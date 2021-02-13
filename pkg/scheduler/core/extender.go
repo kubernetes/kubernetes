@@ -244,7 +244,7 @@ func (h *HTTPExtender) convertPodUIDToPod(
 		}
 	}
 	return nil, fmt.Errorf("extender: %v claims to preempt pod (UID: %v) on node: %v, but the pod is not found on that node",
-		h.extenderURL, metaPod, nodeInfo.Node().Name)
+		h.extenderURL, metaPod, nodeInfo.Node.Name)
 }
 
 // convertToNodeNameToMetaVictims converts from struct type to meta types.

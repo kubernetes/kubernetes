@@ -83,7 +83,7 @@ func (pl *FakeFilterPlugin) Name() string {
 func (pl *FakeFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	atomic.AddInt32(&pl.NumFilterCalled, 1)
 
-	if returnCode, ok := pl.FailedNodeReturnCodeMap[nodeInfo.Node().Name]; ok {
+	if returnCode, ok := pl.FailedNodeReturnCodeMap[nodeInfo.Node.Name]; ok {
 		return framework.NewStatus(returnCode, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
 
@@ -110,7 +110,7 @@ func (pl *MatchFilterPlugin) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *MatchFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	node := nodeInfo.Node()
+	node := nodeInfo.Node
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
 	}

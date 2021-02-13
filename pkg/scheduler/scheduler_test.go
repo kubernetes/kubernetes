@@ -414,7 +414,7 @@ func (s *fakeNodeSelector) Name() string {
 }
 
 func (s *fakeNodeSelector) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	if nodeInfo.Node().Name != s.NodeName {
+	if nodeInfo.Node.Name != s.NodeName {
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable)
 	}
 	return nil

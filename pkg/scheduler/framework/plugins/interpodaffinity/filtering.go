@@ -161,7 +161,7 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(pod *v1.Pod, nsLabels 
 	index := int32(-1)
 	processNode := func(i int) {
 		nodeInfo := nodes[i]
-		node := nodeInfo.Node()
+		node := nodeInfo.Node
 		if node == nil {
 			klog.Error("node not found")
 			return
@@ -200,7 +200,7 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(podInfo *frame
 	index := int32(-1)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
-		node := nodeInfo.Node()
+		node := nodeInfo.Node
 		if node == nil {
 			klog.Error("node not found")
 			return
@@ -283,7 +283,7 @@ func (pl *InterPodAffinity) AddPod(ctx context.Context, cycleState *framework.Cy
 	if err != nil {
 		return framework.AsStatus(err)
 	}
-	state.updateWithPod(podInfoToAdd, nodeInfo.Node(), 1)
+	state.updateWithPod(podInfoToAdd, nodeInfo.Node, 1)
 	return nil
 }
 
@@ -293,7 +293,7 @@ func (pl *InterPodAffinity) RemovePod(ctx context.Context, cycleState *framework
 	if err != nil {
 		return framework.AsStatus(err)
 	}
-	state.updateWithPod(podInfoToRemove, nodeInfo.Node(), -1)
+	state.updateWithPod(podInfoToRemove, nodeInfo.Node, -1)
 	return nil
 }
 
@@ -317,7 +317,7 @@ func satisfyExistingPodsAntiAffinity(state *preFilterState, nodeInfo *framework.
 	if len(state.existingAntiAffinityCounts) > 0 {
 		// Iterate over topology pairs to get any of the pods being affected by
 		// the scheduled pod anti-affinity terms
-		for topologyKey, topologyValue := range nodeInfo.Node().Labels {
+		for topologyKey, topologyValue := range nodeInfo.Node.Labels {
 			tp := topologyPair{key: topologyKey, value: topologyValue}
 			if state.existingAntiAffinityCounts[tp] > 0 {
 				return false
@@ -331,7 +331,7 @@ func satisfyExistingPodsAntiAffinity(state *preFilterState, nodeInfo *framework.
 func satisfyPodAntiAffinity(state *preFilterState, nodeInfo *framework.NodeInfo) bool {
 	if len(state.antiAffinityCounts) > 0 {
 		for _, term := range state.podInfo.RequiredAntiAffinityTerms {
-			if topologyValue, ok := nodeInfo.Node().Labels[term.TopologyKey]; ok {
+			if topologyValue, ok := nodeInfo.Node.Labels[term.TopologyKey]; ok {
 				tp := topologyPair{key: term.TopologyKey, value: topologyValue}
 				if state.antiAffinityCounts[tp] > 0 {
 					return false
@@ -346,7 +346,7 @@ func satisfyPodAntiAffinity(state *preFilterState, nodeInfo *framework.NodeInfo)
 func satisfyPodAffinity(state *preFilterState, nodeInfo *framework.NodeInfo) bool {
 	podsExist := true
 	for _, term := range state.podInfo.RequiredAffinityTerms {
-		if topologyValue, ok := nodeInfo.Node().Labels[term.TopologyKey]; ok {
+		if topologyValue, ok := nodeInfo.Node.Labels[term.TopologyKey]; ok {
 			tp := topologyPair{key: term.TopologyKey, value: topologyValue}
 			if state.affinityCounts[tp] <= 0 {
 				podsExist = false
@@ -374,7 +374,7 @@ func satisfyPodAffinity(state *preFilterState, nodeInfo *framework.NodeInfo) boo
 // Filter invoked at the filter extension point.
 // It checks if a pod can be scheduled on the specified node with pod affinity/anti-affinity configuration.
 func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	if nodeInfo.Node() == nil {
+	if nodeInfo.Node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
 	}
 

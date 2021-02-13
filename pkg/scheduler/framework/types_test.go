@@ -673,7 +673,7 @@ func TestNodeInfoAddPod(t *testing.T) {
 		},
 	}
 	expected := &NodeInfo{
-		node: &v1.Node{
+		Node: &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-node",
 			},
@@ -853,7 +853,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 			pod:         makeBasePod(t, nodeName, "non-exist", "0", "0", "", []v1.ContainerPort{{}}),
 			errExpected: true,
 			expectedNodeInfo: &NodeInfo{
-				node: &v1.Node{
+				Node: &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-node",
 					},
@@ -986,7 +986,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 			},
 			errExpected: false,
 			expectedNodeInfo: &NodeInfo{
-				node: &v1.Node{
+				Node: &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-node",
 					},
@@ -1061,7 +1061,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 			err := ni.RemovePod(test.pod)
 			if err != nil {
 				if test.errExpected {
-					expectedErrorMsg := fmt.Errorf("no corresponding pod %s in pods of node %s", test.pod.Name, ni.Node().Name)
+					expectedErrorMsg := fmt.Errorf("no corresponding pod %s in pods of node %s", test.pod.Name, ni.Node.Name)
 					if expectedErrorMsg == err {
 						t.Errorf("expected error: %v, got: %v", expectedErrorMsg, err)
 					}

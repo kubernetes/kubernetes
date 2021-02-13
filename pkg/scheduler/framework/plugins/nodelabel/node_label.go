@@ -86,7 +86,7 @@ func (pl *NodeLabel) Name() string {
 // A node may have a label with "retiring" as key and the date as the value
 // and it may be desirable to avoid scheduling new pods on this node.
 func (pl *NodeLabel) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	node := nodeInfo.Node()
+	node := nodeInfo.Node
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
 	}
@@ -120,7 +120,7 @@ func (pl *NodeLabel) Score(ctx context.Context, state *framework.CycleState, pod
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
-	node := nodeInfo.Node()
+	node := nodeInfo.Node
 	if node == nil {
 		return 0, framework.NewStatus(framework.Error, "node not found")
 	}

@@ -45,7 +45,7 @@ type resourceToValueMap map[v1.ResourceName]int64
 func (r *resourceAllocationScorer) score(
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
-	node := nodeInfo.Node()
+	node := nodeInfo.Node
 	if node == nil {
 		return 0, framework.NewStatus(framework.Error, "node not found")
 	}

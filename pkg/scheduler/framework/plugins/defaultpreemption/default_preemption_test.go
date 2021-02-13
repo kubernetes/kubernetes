@@ -1024,7 +1024,7 @@ func TestDryRunPreemption(t *testing.T) {
 				t.Fatal(err)
 			}
 			sort.Slice(nodeInfos, func(i, j int) bool {
-				return nodeInfos[i].Node().Name < nodeInfos[j].Node().Name
+				return nodeInfos[i].Node.Name < nodeInfos[j].Node.Name
 			})
 
 			if tt.args == nil {
@@ -1443,7 +1443,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				t.Errorf("number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", len(tt.expected), len(nodes), nodes)
 			}
 			for _, node := range nodes {
-				name := node.Node().Name
+				name := node.Node.Name
 				if _, found := tt.expected[name]; !found {
 					t.Errorf("node %v is not expected.", name)
 				}

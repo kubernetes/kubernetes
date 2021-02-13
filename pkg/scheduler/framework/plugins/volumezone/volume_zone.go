@@ -83,7 +83,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 	if len(pod.Spec.Volumes) == 0 {
 		return nil
 	}
-	node := nodeInfo.Node()
+	node := nodeInfo.Node
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
 	}

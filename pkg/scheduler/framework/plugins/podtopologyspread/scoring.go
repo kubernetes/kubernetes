@@ -140,7 +140,7 @@ func (pl *PodTopologySpread) PreScore(
 	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
 	processAllNode := func(i int) {
 		nodeInfo := allNodes[i]
-		node := nodeInfo.Node()
+		node := nodeInfo.Node
 		if node == nil {
 			return
 		}
@@ -179,7 +179,7 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.Cy
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
-	node := nodeInfo.Node()
+	node := nodeInfo.Node
 	s, err := getPreScoreState(cycleState)
 	if err != nil {
 		return 0, framework.AsStatus(err)

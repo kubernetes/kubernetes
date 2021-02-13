@@ -125,7 +125,7 @@ func (pl *SelectorSpread) NormalizeScore(ctx context.Context, state *framework.C
 		if err != nil {
 			return framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", scores[i].Name, err))
 		}
-		zoneID := utilnode.GetZoneKey(nodeInfo.Node())
+		zoneID := utilnode.GetZoneKey(nodeInfo.Node)
 		if zoneID == "" {
 			continue
 		}
@@ -157,7 +157,7 @@ func (pl *SelectorSpread) NormalizeScore(ctx context.Context, state *framework.C
 				return framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", scores[i].Name, err))
 			}
 
-			zoneID := utilnode.GetZoneKey(nodeInfo.Node())
+			zoneID := utilnode.GetZoneKey(nodeInfo.Node)
 			if zoneID != "" {
 				zoneScore := MaxNodeScoreFloat64
 				if maxCountByZone > 0 {

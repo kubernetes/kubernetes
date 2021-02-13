@@ -414,7 +414,7 @@ func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state *framework.Cyc
 	}
 	var nodes []*v1.Node
 	for _, nodeInfo := range nodeInfos {
-		nodes = append(nodes, nodeInfo.Node())
+		nodes = append(nodes, nodeInfo.Node)
 	}
 	pp.fh.RunScorePlugins(ctx, state, pod, nodes)
 

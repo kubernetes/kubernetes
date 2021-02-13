@@ -108,7 +108,7 @@ type Cache interface {
 	// The node info contains aggregated information of pods scheduled (including assumed to be)
 	// on this node.
 	// The snapshot only includes Nodes that are not deleted at the time this function is called.
-	// nodeinfo.Node() is guaranteed to be not nil for all the nodes in the snapshot.
+	// nodeInfo.Node is guaranteed to be not nil for all the nodes in the snapshot.
 	UpdateSnapshot(nodeSnapshot *Snapshot) error
 
 	// Dump produces a dump of the current cache.

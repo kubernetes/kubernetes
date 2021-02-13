@@ -881,7 +881,7 @@ func TestRemovePod(t *testing.T) {
 			}
 
 			// Node that owned the Pod should be at the head of the list.
-			if cache.headNode.info.Node().Name != nodeName {
+			if cache.headNode.info.Node.Name != nodeName {
 				t.Errorf("node %q is not at the head of the list", nodeName)
 			}
 		})
@@ -1475,8 +1475,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			var i int
 			// Check that cache is in the expected state.
 			for node := cache.headNode; node != nil; node = node.next {
-				if node.info.Node() != nil && node.info.Node().Name != test.expected[i].Name {
-					t.Errorf("unexpected node. Expected: %v, got: %v, index: %v", test.expected[i].Name, node.info.Node().Name, i)
+				if node.info.Node != nil && node.info.Node.Name != test.expected[i].Name {
+					t.Errorf("unexpected node. Expected: %v, got: %v, index: %v", test.expected[i].Name, node.info.Node.Name, i)
 				}
 				i++
 			}
@@ -1508,7 +1508,7 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *schedulerCache, snaps
 	}
 	for name, ni := range cache.nodes {
 		want := ni.info
-		if want.Node() == nil {
+		if want.Node == nil {
 			want = nil
 		}
 		if !reflect.DeepEqual(snapshot.nodeInfoMap[name], want) {
@@ -1689,7 +1689,7 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 			}
 			nodeNames := make([]string, len(snapshot.nodeInfoList))
 			for i, nodeInfo := range snapshot.nodeInfoList {
-				nodeNames[i] = nodeInfo.Node().Name
+				nodeNames[i] = nodeInfo.Node.Name
 			}
 			if !reflect.DeepEqual(nodeNames, test.expected) {
 				t.Errorf("The nodeInfoList is incorrect. Expected %v , got %v", test.expected, nodeNames)
@@ -1823,5 +1823,5 @@ func (cache *schedulerCache) getNodeInfo(nodeName string) (*v1.Node, error) {
 		return nil, fmt.Errorf("node %q not found in cache", nodeName)
 	}
 
-	return n.info.Node(), nil
+	return n.info.Node, nil
 }

@@ -224,7 +224,7 @@ func (pl *DefaultPreemption) FindCandidates(ctx context.Context, state *framewor
 	if klog.V(5).Enabled() {
 		var sample []string
 		for i := offset; i < offset+10 && i < int32(len(potentialNodes)); i++ {
-			sample = append(sample, potentialNodes[i].Node().Name)
+			sample = append(sample, potentialNodes[i].Node.Name)
 		}
 		klog.Infof("from a pool of %d nodes (offset: %d, sample %d nodes: %v), ~%d candidates will be chosen", len(potentialNodes), offset, len(sample), sample, numCandidates)
 	}
@@ -273,11 +273,11 @@ func nodesWherePreemptionMightHelp(nodes []*framework.NodeInfo, m framework.Node
 	var potentialNodes []*framework.NodeInfo
 	nodeStatuses := make(framework.NodeToStatusMap)
 	for _, node := range nodes {
-		name := node.Node().Name
+		name := node.Node.Name
 		// We rely on the status by each plugin - 'Unschedulable' or 'UnschedulableAndUnresolvable'
 		// to determine whether preemption may help or not on the node.
 		if m[name].Code() == framework.UnschedulableAndUnresolvable {
-			nodeStatuses[node.Node().Name] = framework.NewStatus(framework.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling")
+			nodeStatuses[node.Node.Name] = framework.NewStatus(framework.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling")
 			continue
 		}
 		potentialNodes = append(potentialNodes, node)
@@ -342,7 +342,7 @@ func dryRunPreemption(ctx context.Context, fh framework.Handle,
 			}
 			c := &candidate{
 				victims: &victims,
-				name:    nodeInfoCopy.Node().Name,
+				name:    nodeInfoCopy.Node.Name,
 			}
 			if numPDBViolations == 0 {
 				nonViolatingCandidates.add(c)
@@ -355,7 +355,7 @@ func dryRunPreemption(ctx context.Context, fh framework.Handle,
 			}
 		} else {
 			statusesLock.Lock()
-			nodeStatuses[nodeInfoCopy.Node().Name] = status
+			nodeStatuses[nodeInfoCopy.Node.Name] = status
 			statusesLock.Unlock()
 		}
 	}
@@ -636,7 +636,7 @@ func selectVictimsOnNode(
 
 	// No potential victims are found, and so we don't need to evaluate the node again since its state didn't change.
 	if len(potentialVictims) == 0 {
-		message := fmt.Sprintf("No victims found on node %v for preemptor pod %v", nodeInfo.Node().Name, pod.Name)
+		message := fmt.Sprintf("No victims found on node %v for preemptor pod %v", nodeInfo.Node.Name, pod.Name)
 		return nil, 0, framework.NewStatus(framework.UnschedulableAndUnresolvable, message)
 	}
 
@@ -668,7 +668,7 @@ func selectVictimsOnNode(
 			}
 			rpi := pi.Pod
 			victims = append(victims, rpi)
-			klog.V(5).InfoS("Pod is a potential preemption victim on node", "pod", klog.KObj(rpi), "node", klog.KObj(nodeInfo.Node()))
+			klog.V(5).InfoS("Pod is a potential preemption victim on node", "pod", klog.KObj(rpi), "node", klog.KObj(nodeInfo.Node))
 		}
 		return fits, nil
 	}

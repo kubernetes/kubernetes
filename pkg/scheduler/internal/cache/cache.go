@@ -192,7 +192,7 @@ func (cache *schedulerCache) Dump() *Dump {
 // UpdateSnapshot takes a snapshot of cached NodeInfo map. This is called at
 // beginning of every scheduling cycle.
 // The snapshot only includes Nodes that are not deleted at the time this function is called.
-// nodeinfo.Node() is guaranteed to be not nil for all the nodes in the snapshot.
+// nodeInfo.Node is guaranteed to be not nil for all the nodes in the snapshot.
 // This function tracks generation number of NodeInfo and updates only the
 // entries of an existing snapshot that have changed after the snapshot was taken.
 func (cache *schedulerCache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
@@ -226,7 +226,7 @@ func (cache *schedulerCache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 			// Transient scheduler info is reset here.
 			node.info.TransientInfo.ResetTransientSchedulerInfo()
 		}
-		if np := node.info.Node(); np != nil {
+		if np := node.info.Node; np != nil {
 			existing, ok := nodeSnapshot.nodeInfoMap[np.Name]
 			if !ok {
 				updateAllLists = true
@@ -323,7 +323,7 @@ func (cache *schedulerCache) removeDeletedNodesFromSnapshot(snapshot *Snapshot) 
 		if toDelete <= 0 {
 			break
 		}
-		if n, ok := cache.nodes[name]; !ok || n.info.Node() == nil {
+		if n, ok := cache.nodes[name]; !ok || n.info.Node == nil {
 			delete(snapshot.nodeInfoMap, name)
 			toDelete--
 		}
@@ -460,7 +460,7 @@ func (cache *schedulerCache) removePod(pod *v1.Pod) error {
 	if err := n.info.RemovePod(pod); err != nil {
 		return err
 	}
-	if len(n.info.Pods) == 0 && n.info.Node() == nil {
+	if len(n.info.Pods) == 0 && n.info.Node == nil {
 		cache.removeNodeInfoFromList(pod.Spec.NodeName)
 	} else {
 		cache.moveNodeInfoToHead(pod.Spec.NodeName)
@@ -602,7 +602,7 @@ func (cache *schedulerCache) AddNode(node *v1.Node) *framework.NodeInfo {
 		n = newNodeInfoListItem(framework.NewNodeInfo())
 		cache.nodes[node.Name] = n
 	} else {
-		cache.removeNodeImageStates(n.info.Node())
+		cache.removeNodeImageStates(n.info.Node)
 	}
 	cache.moveNodeInfoToHead(node.Name)
 
@@ -622,7 +622,7 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) *framework.No
 		cache.nodes[newNode.Name] = n
 		cache.nodeTree.addNode(newNode)
 	} else {
-		cache.removeNodeImageStates(n.info.Node())
+		cache.removeNodeImageStates(n.info.Node)
 	}
 	cache.moveNodeInfoToHead(newNode.Name)
 

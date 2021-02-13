@@ -190,7 +190,7 @@ func (f *FakeExtender) ProcessPreemption(
 	for nodeName, victims := range nodeNameToVictimsCopy {
 		// Try to do preemption on extender side.
 		nodeInfo, _ := nodeInfos.Get(nodeName)
-		extenderVictimPods, extenderPDBViolations, fits, err := f.selectVictimsOnNodeByExtender(pod, nodeInfo.Node())
+		extenderVictimPods, extenderPDBViolations, fits, err := f.selectVictimsOnNodeByExtender(pod, nodeInfo.Node)
 		if err != nil {
 			return nil, err
 		}
@@ -251,7 +251,7 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(pod *v1.Pod, node *v1.Node)
 
 	// If the new pod does not fit after removing all the lower priority pods,
 	// we are almost done and this node is not suitable for preemption.
-	status := f.runPredicate(pod, nodeInfoCopy.Node())
+	status := f.runPredicate(pod, nodeInfoCopy.Node)
 	if status.IsSuccess() {
 		// pass
 	} else if status.IsUnschedulable() {
@@ -269,7 +269,7 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(pod *v1.Pod, node *v1.Node)
 
 	reprievePod := func(p *v1.Pod) bool {
 		addPod(p)
-		status := f.runPredicate(pod, nodeInfoCopy.Node())
+		status := f.runPredicate(pod, nodeInfoCopy.Node)
 		if !status.IsSuccess() {
 			removePod(p)
 			victims = append(victims, p)

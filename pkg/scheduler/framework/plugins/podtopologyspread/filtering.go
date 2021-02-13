@@ -163,7 +163,7 @@ func (pl *PodTopologySpread) AddPod(ctx context.Context, cycleState *framework.C
 		return framework.AsStatus(err)
 	}
 
-	s.updateWithPod(podInfoToAdd.Pod, podToSchedule, nodeInfo.Node(), 1)
+	s.updateWithPod(podInfoToAdd.Pod, podToSchedule, nodeInfo.Node, 1)
 	return nil
 }
 
@@ -174,7 +174,7 @@ func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState *framewor
 		return framework.AsStatus(err)
 	}
 
-	s.updateWithPod(podInfoToRemove.Pod, podToSchedule, nodeInfo.Node(), -1)
+	s.updateWithPod(podInfoToRemove.Pod, podToSchedule, nodeInfo.Node, -1)
 	return nil
 }
 
@@ -224,7 +224,7 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 	}
 	requiredSchedulingTerm := nodeaffinity.GetRequiredNodeAffinity(pod)
 	for _, n := range allNodes {
-		node := n.Node()
+		node := n.Node
 		if node == nil {
 			klog.Error("node not found")
 			continue
@@ -248,7 +248,7 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
-		node := nodeInfo.Node()
+		node := nodeInfo.Node
 
 		for _, constraint := range constraints {
 			pair := topologyPair{key: constraint.TopologyKey, value: node.Labels[constraint.TopologyKey]}
@@ -276,7 +276,7 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 
 // Filter invoked at the filter extension point.
 func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	node := nodeInfo.Node()
+	node := nodeInfo.Node
 	if node == nil {
 		return framework.AsStatus(fmt.Errorf("node not found"))
 	}
