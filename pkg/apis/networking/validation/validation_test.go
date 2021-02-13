@@ -33,12 +33,172 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
+func makeValidNetworkPolicy() *networking.NetworkPolicy {
+	return &networking.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+		Spec: networking.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{"a": "b"},
+			},
+		},
+	}
+}
+
 func TestValidateNetworkPolicy(t *testing.T) {
 	protocolTCP := api.ProtocolTCP
 	protocolUDP := api.ProtocolUDP
 	protocolICMP := api.Protocol("ICMP")
 	protocolSCTP := api.ProtocolSCTP
 	endPort := int32(32768)
+	// Tweaks used below.
+	setIngressEmptyIngressRule := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{}
+	}
+	setIngressEmptyFrom := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From = []networking.NetworkPolicyPeer{}
+	}
+	setIngressEmptyPorts := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].Ports = []networking.NetworkPolicyPort{}
+	}
+
+	setIngressPorts := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].Ports = []networking.NetworkPolicyPort{
+			{
+				Protocol: nil,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+			},
+			{
+				Protocol: &protocolTCP,
+				Port:     nil,
+			},
+			{
+				Protocol: &protocolTCP,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 443},
+			},
+			{
+				Protocol: &protocolUDP,
+				Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
+			},
+			{
+				Protocol: &protocolSCTP,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 7777},
+			},
+		}
+	}
+
+	setIngressPortsHigher := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].Ports =  []networking.NetworkPolicyPort{
+			{
+				Protocol: &protocolTCP,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 65535},
+				EndPort:  &endPort,
+			},
+		}
+	}
+
+	setIngressFromPodSelector := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From[0].PodSelector = &metav1.LabelSelector{
+			MatchLabels: map[string]string{"c": "d"},
+		}
+	}
+
+	setAlternativeIngressFromPodSelector := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From[0].PodSelector = &metav1.LabelSelector{
+			MatchLabels: map[string]string{"e": "f"},
+		}
+	}
+	
+	setIngressFromNamespaceSelector := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From[0].NamespaceSelector = &metav1.LabelSelector{
+			MatchLabels: map[string]string{"c": "d"},
+		}
+	}
+
+	setIngressFromIPBlock := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From[0].IPBlock = &networking.IPBlock{
+			CIDR:   "192.168.0.0/16",
+			Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+		}
+	}
+	
+	setEgressEmptyTo := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].To = []networking.NetworkPolicyPeer{}
+	}
+
+	setEgressToNamespaceSelector := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].To[0].NamespaceSelector =&metav1.LabelSelector{
+			MatchLabels: map[string]string{"c": "d"},
+		}
+	}
+	setEgressPorts := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].Ports = []networking.NetworkPolicyPort{
+			{
+				Protocol: nil,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+			},
+			{
+				Protocol: &protocolTCP,
+				Port:     nil,
+			},
+			{
+				Protocol: &protocolTCP,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 443},
+			},
+			{
+				Protocol: &protocolUDP,
+				Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
+			},
+			{
+				Protocol: &protocolSCTP,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 7777},
+			},
+		}
+	}
+
+	setEgressPortsUDPandHigh := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].Ports =  []networking.NetworkPolicyPort{
+			{
+				Protocol: nil,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32000},
+				EndPort:  &endPort,
+			},
+			{
+				Protocol: &protocolUDP,
+				Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
+			},
+		}
+	}
+
+	setEgressPortsBothHigh := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].Ports =  []networking.NetworkPolicyPort{
+			{
+				Protocol: nil,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 30000},
+				EndPort:  &endPort,
+			},
+			{
+				Protocol: nil,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32000},
+				EndPort:  &endPort,
+			},
+		}
+	}
+	
+	setEgressToIPBlock := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].To[0].IPBlock = &networking.IPBlock{
+			CIDR:   "192.168.0.0/16",
+			Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+		}
+	}
+
+	setPolicyTypesIngressEgress := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.PolicyTypes = []networking.PolicyType{networking.PolicyTypeIngress, networking.PolicyTypeEgress}
+	}
+
+	setPolicyTypesEgress := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.PolicyTypes = []networking.PolicyType{networking.PolicyTypeEgress}
+	}
+
 	successCases := []networking.NetworkPolicy{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
