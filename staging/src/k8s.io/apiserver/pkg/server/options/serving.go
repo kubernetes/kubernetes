@@ -23,6 +23,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
@@ -71,6 +72,9 @@ type SecureServingOptions struct {
 	// PermitPortSharing controls if SO_REUSEPORT is used when binding the port, which allows
 	// more than one instance to bind on the same address and port.
 	PermitPortSharing bool
+
+	// PermitAddressSharing controls if SO_REUSEADDR is used when binding the port.
+	PermitAddressSharing bool
 }
 
 type CertKey struct {
@@ -203,6 +207,11 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.PermitPortSharing, "permit-port-sharing", s.PermitPortSharing,
 		"If true, SO_REUSEPORT will be used when binding the port, which allows "+
 			"more than one instance to bind on the same address and port. [default=false]")
+
+	fs.BoolVar(&s.PermitAddressSharing, "permit-address-sharing", s.PermitAddressSharing,
+		"If true, SO_REUSEADDR will be used when binding the port. This allows binding "+
+			"to wildcard IPs like 0.0.0.0 and specific IPs in parallel, and it avoids waiting "+
+			"for the kernel to release sockets in TIME_WAIT state. [default=false]")
 }
 
 // ApplyTo fills up serving information in the server configuration.
@@ -220,8 +229,15 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 
 		c := net.ListenConfig{}
 
+		ctls := multipleControls{}
 		if s.PermitPortSharing {
-			c.Control = permitPortReuse
+			ctls = append(ctls, permitPortReuse)
+		}
+		if s.PermitAddressSharing {
+			ctls = append(ctls, permitAddressReuse)
+		}
+		if len(ctls) > 0 {
+			c.Control = ctls.Control
 		}
 
 		s.Listener, s.BindPort, err = CreateListener(s.BindNetwork, addr, c)
@@ -353,4 +369,15 @@ func CreateListener(network, addr string, config net.ListenConfig) (net.Listener
 	}
 
 	return ln, tcpAddr.Port, nil
+}
+
+type multipleControls []func(network, addr string, conn syscall.RawConn) error
+
+func (mcs multipleControls) Control(network, addr string, conn syscall.RawConn) error {
+	for _, c := range mcs {
+		if err := c(network, addr, conn); err != nil {
+			return err
+		}
+	}
+	return nil
 }
