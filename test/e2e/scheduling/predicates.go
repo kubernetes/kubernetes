@@ -651,13 +651,6 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		verifyResult(cs, 1, 0, ns)
 	})
 
-	/*
-		Release: v1.16
-		Testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
-		Description: Pods with the same HostPort value MUST be able to be scheduled to the same node
-		if the HostIP or Protocol is different. This test doesn´t test the HostPort functionality.
-		 xref: https://github.com/kubernetes/kubernetes/issues/98075
-	*/
 	ginkgo.It("validates that there is no conflict between pods with same hostPort but different hostIP and protocol", func() {
 
 		nodeName := GetNodeThatCanRunPod(f)

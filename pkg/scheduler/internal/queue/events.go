@@ -18,8 +18,6 @@ package queue
 
 // Events that trigger scheduler queue to change.
 const (
-	// Unknown event
-	Unknown = "Unknown"
 	// PodAdd is the event when a new pod is added to API server.
 	PodAdd = "PodAdd"
 	// NodeAdd is the event when a new node is added to the cluster.
@@ -63,9 +61,9 @@ const (
 	NodeSpecUnschedulableChange = "NodeSpecUnschedulableChange"
 	// NodeAllocatableChange is the event when node allocatable is changed.
 	NodeAllocatableChange = "NodeAllocatableChange"
-	// NodeLabelsChange is the event when node label is changed.
+	// NodeLabelChange is the event when node label is changed.
 	NodeLabelChange = "NodeLabelChange"
-	// NodeTaintsChange is the event when node taint is changed.
+	// NodeTaintChange is the event when node taint is changed.
 	NodeTaintChange = "NodeTaintChange"
 	// NodeConditionChange is the event when node condition is changed.
 	NodeConditionChange = "NodeConditionChange"

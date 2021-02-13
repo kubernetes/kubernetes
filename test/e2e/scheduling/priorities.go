@@ -637,7 +637,7 @@ func createRC(ns, rsName string, replicas int32, rcPodLabels map[string]string, 
 
 func getRandomTaint() v1.Taint {
 	return v1.Taint{
-		Key:    fmt.Sprintf("kubernetes.io/scheduling-priorities-e2e-taint-key-%s", string(uuid.NewUUID())),
+		Key:    fmt.Sprintf("kubernetes.io/e2e-scheduling-priorities-%s", string(uuid.NewUUID()[:23])),
 		Value:  fmt.Sprintf("testing-taint-value-%s", string(uuid.NewUUID())),
 		Effect: v1.TaintEffectPreferNoSchedule,
 	}

@@ -1,4 +1,4 @@
-# Copyright 2017 The Kubernetes Authors.
+# Copyright 2021 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY:	build push
+# Dockerfile used for the server images.
 
-PREFIX = quay.io/fluentd_elasticsearch
-IMAGE = fluentd
-TAG = v3.2.0
+ARG BASEIMAGE
+ARG BINARY
 
-build:
-	docker build --tag ${PREFIX}/${IMAGE}:${TAG} .
-	docker build --tag ${PREFIX}/${IMAGE}:latest .
-
-push:
-	docker push ${PREFIX}/${IMAGE}:${TAG}
-	docker push ${PREFIX}/${IMAGE}:latest
+FROM ${BASEIMAGE}
+COPY ${BINARY} /usr/local/bin/${BINARY}

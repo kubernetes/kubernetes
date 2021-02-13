@@ -31,13 +31,12 @@ import (
 // RegistryList holds public and private image registries
 type RegistryList struct {
 	GcAuthenticatedRegistry string `yaml:"gcAuthenticatedRegistry"`
-	DockerLibraryRegistry   string `yaml:"dockerLibraryRegistry"`
-	DockerGluster           string `yaml:"dockerGluster"`
 	E2eRegistry             string `yaml:"e2eRegistry"`
 	E2eVolumeRegistry       string `yaml:"e2eVolumeRegistry"`
 	PromoterE2eRegistry     string `yaml:"promoterE2eRegistry"`
 	BuildImageRegistry      string `yaml:"buildImageRegistry"`
 	InvalidRegistry         string `yaml:"invalidRegistry"`
+	GcEtcdRegistry          string `yaml:"gcEtcdRegistry"`
 	GcRegistry              string `yaml:"gcRegistry"`
 	SigStorageRegistry      string `yaml:"sigStorageRegistry"`
 	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
@@ -71,13 +70,12 @@ func (i *Config) SetVersion(version string) {
 func initReg() RegistryList {
 	registry := RegistryList{
 		GcAuthenticatedRegistry: "gcr.io/authenticated-image-pulling",
-		DockerLibraryRegistry:   "docker.io/library",
-		DockerGluster:           "docker.io/gluster",
 		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
 		E2eVolumeRegistry:       "gcr.io/kubernetes-e2e-test-images/volume",
 		PromoterE2eRegistry:     "k8s.gcr.io/e2e-test-images",
 		BuildImageRegistry:      "k8s.gcr.io/build-image",
 		InvalidRegistry:         "invalid.com/invalid",
+		GcEtcdRegistry:          "k8s.gcr.io",
 		GcRegistry:              "k8s.gcr.io",
 		SigStorageRegistry:      "k8s.gcr.io/sig-storage",
 		GcrReleaseRegistry:      "gcr.io/gke-release",
@@ -109,13 +107,13 @@ var (
 	PrivateRegistry = registry.PrivateRegistry
 
 	// Preconfigured image configs
-	dockerLibraryRegistry   = registry.DockerLibraryRegistry
-	dockerGluster           = registry.DockerGluster
+	dockerLibraryRegistry   = "docker.io/library"
 	e2eRegistry             = registry.E2eRegistry
 	e2eVolumeRegistry       = registry.E2eVolumeRegistry
 	promoterE2eRegistry     = registry.PromoterE2eRegistry
 	buildImageRegistry      = registry.BuildImageRegistry
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
+	gcEtcdRegistry          = registry.GcRegistry
 	gcRegistry              = registry.GcRegistry
 	sigStorageRegistry      = registry.SigStorageRegistry
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
@@ -224,24 +222,24 @@ func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs[AuthenticatedWindowsNanoServer] = Config{gcAuthenticatedRegistry, "windows-nanoserver", "v1"}
 	configs[APIServer] = Config{promoterE2eRegistry, "sample-apiserver", "1.17.4"}
 	configs[AppArmorLoader] = Config{promoterE2eRegistry, "apparmor-loader", "1.3"}
-	configs[BusyBox] = Config{dockerLibraryRegistry, "busybox", "1.29"}
+	configs[BusyBox] = Config{promoterE2eRegistry, "busybox", "1.29"}
 	configs[CheckMetadataConcealment] = Config{promoterE2eRegistry, "metadata-concealment", "1.6"}
 	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{promoterE2eRegistry, "cuda-vector-add", "2.2"}
 	configs[DebianIptables] = Config{buildImageRegistry, "debian-iptables", "buster-v1.5.0"}
 	configs[EchoServer] = Config{promoterE2eRegistry, "echoserver", "2.3"}
-	configs[Etcd] = Config{gcRegistry, "etcd", "3.4.13-0"}
-	configs[GlusterDynamicProvisioner] = Config{dockerGluster, "glusterdynamic-provisioner", "v1.0"}
-	configs[Httpd] = Config{dockerLibraryRegistry, "httpd", "2.4.38-alpine"}
-	configs[HttpdNew] = Config{dockerLibraryRegistry, "httpd", "2.4.39-alpine"}
+	configs[Etcd] = Config{gcEtcdRegistry, "etcd", "3.4.13-0"}
+	configs[GlusterDynamicProvisioner] = Config{promoterE2eRegistry, "glusterdynamic-provisioner", "v1.0"}
+	configs[Httpd] = Config{promoterE2eRegistry, "httpd", "2.4.38-alpine"}
+	configs[HttpdNew] = Config{promoterE2eRegistry, "httpd", "2.4.39-alpine"}
 	configs[InvalidRegistryImage] = Config{invalidRegistry, "alpine", "3.1"}
 	configs[IpcUtils] = Config{promoterE2eRegistry, "ipc-utils", "1.2"}
 	configs[JessieDnsutils] = Config{promoterE2eRegistry, "jessie-dnsutils", "1.4"}
 	configs[Kitten] = Config{promoterE2eRegistry, "kitten", "1.4"}
 	configs[Nautilus] = Config{promoterE2eRegistry, "nautilus", "1.4"}
 	configs[NFSProvisioner] = Config{sigStorageRegistry, "nfs-provisioner", "v2.2.2"}
-	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
-	configs[NginxNew] = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
+	configs[Nginx] = Config{promoterE2eRegistry, "nginx", "1.14-alpine"}
+	configs[NginxNew] = Config{promoterE2eRegistry, "nginx", "1.15-alpine"}
 	configs[NodePerfNpbEp] = Config{promoterE2eRegistry, "node-perf/npb-ep", "1.1"}
 	configs[NodePerfNpbIs] = Config{promoterE2eRegistry, "node-perf/npb-is", "1.1"}
 	configs[NodePerfTfWideDeep] = Config{promoterE2eRegistry, "node-perf/tf-wide-deep", "1.1"}
@@ -249,7 +247,7 @@ func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs[NonRoot] = Config{promoterE2eRegistry, "nonroot", "1.1"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
 	configs[Pause] = Config{gcRegistry, "pause", "3.4.1"}
-	configs[Perl] = Config{dockerLibraryRegistry, "perl", "5.26"}
+	configs[Perl] = Config{promoterE2eRegistry, "perl", "5.26"}
 	configs[PrometheusDummyExporter] = Config{gcRegistry, "prometheus-dummy-exporter", "v0.1.0"}
 	configs[PrometheusToSd] = Config{gcRegistry, "prometheus-to-sd", "v0.5.0"}
 	configs[Redis] = Config{promoterE2eRegistry, "redis", "5.0.5-alpine"}
