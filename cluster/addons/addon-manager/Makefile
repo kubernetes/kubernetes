@@ -30,14 +30,13 @@ build:
 	cp ./* $(TEMP_DIR)
 	curl -sSL --retry 5 https://dl.k8s.io/release/$(KUBECTL_VERSION)/bin/linux/$(ARCH)/kubectl > $(TEMP_DIR)/kubectl
 	chmod a+rx $(TEMP_DIR)/kube-addons.sh $(TEMP_DIR)/kube-addons-main.sh $(TEMP_DIR)/kubectl
-	cd $(TEMP_DIR) && sed -i.back "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
 
 ifneq ($(ARCH),amd64)
 	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
 	$(SUDO) ../../../third_party/multiarch/qemu-user-static/register/register.sh --reset
 endif
 
-	docker build --pull -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR)
+	docker build --pull -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR) --build-arg BASEIMAGE=$(BASEIMAGE)
 
 push: build
 	docker push $(IMAGE)-$(ARCH):$(VERSION)
