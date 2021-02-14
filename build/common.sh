@@ -197,15 +197,6 @@ function kube::build::ensure_rsync() {
   fi
 }
 
-function kube::build::update_dockerfile() {
-  if kube::build::is_gnu_sed; then
-    sed_opts=(-i)
-  else
-    sed_opts=(-i '')
-  fi
-  sed "${sed_opts[@]}" "s/KUBE_BUILD_IMAGE_CROSS_TAG/${KUBE_BUILD_IMAGE_CROSS_TAG}/" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-}
-
 function kube::build::ensure_docker_in_path() {
   if [[ -z "$(which docker)" ]]; then
     kube::log::error "Can't find 'docker' in PATH, please fix and retry."
@@ -367,8 +358,7 @@ function kube::build::build_image() {
   dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
   chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
 
-  kube::build::update_dockerfile
-  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
+  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false' "--build-arg=KUBE_BUILD_IMAGE_CROSS_TAG=${KUBE_BUILD_IMAGE_CROSS_TAG}"
 
   # Clean up old versions of everything
   kube::build::docker_delete_old_containers "${KUBE_BUILD_CONTAINER_NAME_BASE}" "${KUBE_BUILD_CONTAINER_NAME}"
@@ -384,11 +374,13 @@ function kube::build::build_image() {
 # $1 is the name of the image to build
 # $2 is the location of the "context" directory, with the Dockerfile at the root.
 # $3 is the value to set the --pull flag for docker build; true by default
+# $4 is the set of --build-args for docker.
 function kube::build::docker_build() {
   local -r image=$1
   local -r context_dir=$2
   local -r pull="${3:-true}"
-  local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "--pull=${pull}" "${context_dir}")
+  local -r build_args=$4
+  local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "--pull=${pull}" "${build_args}" "${context_dir}")
 
   kube::log::status "Building Docker image ${image}"
   local docker_output
