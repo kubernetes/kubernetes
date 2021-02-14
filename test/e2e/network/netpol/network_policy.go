@@ -961,6 +961,80 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 	})
 })
 
+var _ = SIGDescribeCopy("Netpol [Feature:UDPConnectivity][LinuxOnly]", func() {
+	f := framework.NewDefaultFramework("udp-network-policy")
+
+	ginkgo.BeforeEach(func() {
+		// Windows does not support UDP testing via agnhost.
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
+	})
+
+	ginkgo.Context("NetworkPolicy between server and client using UDP", func() {
+		ginkgo.BeforeEach(func() {
+			initializeResourcesByFixedNS(f)
+		})
+
+		ginkgo.AfterEach(func() {
+			if !useFixedNamespaces {
+				_, _, _, model, k8s := getK8SModel(f)
+				framework.ExpectNoError(k8s.deleteNamespaces(model.NamespaceNames), "unable to clean up UDP netpol namespaces")
+			}
+		})
+
+		ginkgo.It("should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]", func() {
+			nsX, _, _, model, k8s := getK8SModel(f)
+			policy := GetDenyIngress("deny-all")
+			CreatePolicy(k8s, policy, nsX)
+
+			reachability := NewReachability(model.AllPods(), true)
+			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
+
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 80, Protocol: v1.ProtocolUDP, Reachability: reachability})
+		})
+
+		ginkgo.It("should enforce policy based on Ports [Feature:NetworkPolicy]", func() {
+			ginkgo.By("Creating a network policy allowPort81Policy which only allows allow listed namespaces (y) to connect on exactly one port (81)")
+			nsX, nsY, nsZ, model, k8s := getK8SModel(f)
+			allowedLabels := &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"ns": nsY,
+				},
+			}
+
+			allowPort81Policy := GetAllowIngressByNamespaceAndPort("allow-ingress-on-port-81-ns-x", map[string]string{"pod": "a"}, allowedLabels, &intstr.IntOrString{IntVal: 81}, &protocolUDP)
+			CreatePolicy(k8s, allowPort81Policy, nsX)
+
+			reachability := NewReachability(model.AllPods(), true)
+			reachability.ExpectPeer(&Peer{Namespace: nsX}, &Peer{Namespace: nsX, Pod: "a"}, false)
+			reachability.ExpectPeer(&Peer{Namespace: nsZ}, &Peer{Namespace: nsX, Pod: "a"}, false)
+
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 81, Protocol: v1.ProtocolUDP, Reachability: reachability})
+		})
+
+		ginkgo.It("should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func() {
+			nsX, nsY, _, model, k8s := getK8SModel(f)
+			allowedNamespaces := &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"ns": nsY,
+				},
+			}
+			allowedPods := &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"pod": "a",
+				},
+			}
+			policy := GetAllowIngressByNamespaceAndPod("allow-ns-y-pod-a-via-namespace-pod-selector", map[string]string{"pod": "a"}, allowedNamespaces, allowedPods)
+			CreatePolicy(k8s, policy, nsX)
+
+			reachability := NewReachability(model.AllPods(), true)
+			reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
+			reachability.Expect(NewPodString(nsY, "a"), NewPodString(nsX, "a"), true)
+
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 80, Protocol: v1.ProtocolUDP, Reachability: reachability})
+		})
+	})
+})
+
 var _ = SIGDescribeCopy("Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive]", func() {
 	f := framework.NewDefaultFramework("sctp-network-policy")
 
