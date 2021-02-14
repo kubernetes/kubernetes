@@ -219,7 +219,7 @@ func TestMergePodResourceRequirements(t *testing.T) {
 	}
 	verifyAnnotation(t, &pod, "LimitRanger plugin set: cpu, memory request for container foo-0; cpu, memory limit for container foo-0")
 
-	// pod with some resources enumerated should only merge empty
+	// pod with some resources enumerated should only merge empty, only default cpu
 	input := getResourceRequirements(getComputeResourceList("", "512Mi"), getComputeResourceList("", ""))
 	pod = validPodInit(validPod("limit-memory", 1, input), input)
 	expected = api.ResourceRequirements{
@@ -245,6 +245,33 @@ func TestMergePodResourceRequirements(t *testing.T) {
 		}
 	}
 	verifyAnnotation(t, &pod, "LimitRanger plugin set: cpu request for container foo-0; cpu limit for container foo-0")
+
+	// pod with some resources enumerated should only merge empty, only default memory
+	input = getResourceRequirements(getComputeResourceList("80m", ""), getComputeResourceList("", ""))
+	pod = validPodInit(validPod("limit-memory", 1, input), input)
+	expected = api.ResourceRequirements{
+		Requests: api.ResourceList{
+			api.ResourceCPU:    resource.MustParse("80m"),
+			api.ResourceMemory: defaultRequirements.Requests[api.ResourceMemory],
+		},
+		Limits: api.ResourceList{
+			api.ResourceMemory: defaultRequirements.Limits[api.ResourceMemory],
+		},
+	}
+	mergePodResourceRequirements(&pod, &defaultRequirements)
+	for i := range pod.Spec.Containers {
+		actual := pod.Spec.Containers[i].Resources
+		if !apiequality.Semantic.DeepEqual(expected, actual) {
+			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
+		}
+	}
+	for i := range pod.Spec.InitContainers {
+		actual := pod.Spec.InitContainers[i].Resources
+		if !apiequality.Semantic.DeepEqual(expected, actual) {
+			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
+		}
+	}
+	verifyAnnotation(t, &pod, "LimitRanger plugin set: memory request for container foo-0; memory limit for container foo-0")
 
 	// pod with all resources enumerated should not merge anything
 	input = getResourceRequirements(getComputeResourceList("100m", "512Mi"), getComputeResourceList("200m", "1G"))

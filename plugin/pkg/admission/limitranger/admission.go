@@ -558,7 +558,10 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 					}
 				}
 			}
-		} else if limitType == corev1.LimitTypePod { // enforce pod limits on init containers
+		}
+
+		// enforce pod limits on init containers
+		if limitType == corev1.LimitTypePod {
 			containerRequests, containerLimits := []api.ResourceList{}, []api.ResourceList{}
 			for j := range pod.Spec.Containers {
 				container := &pod.Spec.Containers[j]
