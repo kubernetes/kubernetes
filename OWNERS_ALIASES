@@ -36,13 +36,11 @@ aliases:
     - dims
     - enj
     - erictune
-    - jianhuiz
     - lavalamp
     - liggitt
     - mikedanese
     - mml
     - ncdc
-    - nikhiljindal
     - smarterclayton
     - sttts
     - thockin
@@ -59,7 +57,6 @@ aliases:
     - dims
     - enj
     - errordeveloper
-    - jianhuiz
     - lavalamp
     - liggitt
     - mikedanese
@@ -97,9 +94,7 @@ aliases:
     - tallclair
   sig-auth-policy-reviewers:
     - deads2k
-    - jianhuiz
     - liggitt
-    - mbohlool
     - tallclair
     - krmayankk
 
@@ -425,8 +420,6 @@ aliases:
     - caesarxuchao
     - vishh
     - mikedanese
-    - nikhiljindal
-    - gmarek
     - davidopp
     - pmorie
     - sttts
@@ -542,7 +535,6 @@ aliases:
     - calebamiles     # Release
     - caseydavenport  # Network
     - countspongebob  # Scalability
-    - csbell          # Multicluster
     - dcbw            # Network
     - dchen1107       # Node
     - deads2k         # API Machinery
