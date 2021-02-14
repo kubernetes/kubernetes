@@ -143,6 +143,19 @@ func newProxyServer(
 	}
 
 	iptInterface = utiliptables.New(execer, protocol)
+	maybeDualStack := utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack)
+	var ipt [2]utiliptables.Interface
+	if maybeDualStack {
+		// Create iptables handlers for both families, one is already created
+		// Always ordered as IPv4, IPv6
+		if iptInterface.IsIPv6() {
+			ipt[1] = iptInterface
+			ipt[0] = utiliptables.New(execer, utiliptables.ProtocolIPv4)
+		} else {
+			ipt[0] = iptInterface
+			ipt[1] = utiliptables.New(execer, utiliptables.ProtocolIPv6)
+		}
+	}
 
 	// Create event recorder
 	eventBroadcaster := record.NewBroadcaster()
@@ -181,6 +194,18 @@ func newProxyServer(
 
 	klog.V(2).Info("DetectLocalMode: '", string(detectLocalMode), "'")
 
+	// Always ordered to match []ipt IPv4, IPv6
+	var localDetectors [2]proxyutiliptables.LocalTrafficDetector
+	var localDetector proxyutiliptables.LocalTrafficDetector
+	if !maybeDualStack {
+		localDetector, err = getLocalDetector(detectLocalMode, config, iptInterface, nodeInfo)
+	} else {
+		localDetectors, err = getDualStackLocalDetectorTuple(detectLocalMode, config, ipt, nodeInfo)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("unable to discriminate local traffic, can't create proxier: %v", err)
+	}
+
 	if proxyMode == proxyModeIPTables {
 		klog.V(0).Info("Using iptables Proxier.")
 		if config.IPTables.MasqueradeBit == nil {
@@ -188,27 +213,8 @@ func newProxyServer(
 			return nil, fmt.Errorf("unable to read IPTables MasqueradeBit from config")
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		if maybeDualStack {
 			klog.V(0).Info("creating dualStackProxier for iptables.")
-
-			// Create iptables handlers for both families, one is already created
-			// Always ordered as IPv4, IPv6
-			var ipt [2]utiliptables.Interface
-			if iptInterface.IsIPv6() {
-				ipt[1] = iptInterface
-				ipt[0] = utiliptables.New(execer, utiliptables.ProtocolIPv4)
-			} else {
-				ipt[0] = iptInterface
-				ipt[1] = utiliptables.New(execer, utiliptables.ProtocolIPv6)
-			}
-
-			// Always ordered to match []ipt
-			var localDetectors [2]proxyutiliptables.LocalTrafficDetector
-			localDetectors, err = getDualStackLocalDetectorTuple(detectLocalMode, config, ipt, nodeInfo)
-			if err != nil {
-				return nil, fmt.Errorf("unable to create proxier: %v", err)
-			}
-
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewDualStackProxier(
 				ipt,
@@ -226,12 +232,6 @@ func newProxyServer(
 				config.NodePortAddresses,
 			)
 		} else { // Create a single-stack proxier.
-			var localDetector proxyutiliptables.LocalTrafficDetector
-			localDetector, err = getLocalDetector(detectLocalMode, config, iptInterface, nodeInfo)
-			if err != nil {
-				return nil, fmt.Errorf("unable to create proxier: %v", err)
-			}
-
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewProxier(
 				iptInterface,
@@ -256,28 +256,10 @@ func newProxyServer(
 		proxymetrics.RegisterMetrics()
 	} else if proxyMode == proxyModeIPVS {
 		klog.V(0).Info("Using ipvs Proxier.")
-		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		if maybeDualStack {
 			klog.V(0).Info("creating dualStackProxier for ipvs.")
 
-			// Create iptables handlers for both families, one is already created
-			// Always ordered as IPv4, IPv6
-			var ipt [2]utiliptables.Interface
-			if iptInterface.IsIPv6() {
-				ipt[1] = iptInterface
-				ipt[0] = utiliptables.New(execer, utiliptables.ProtocolIPv4)
-			} else {
-				ipt[0] = iptInterface
-				ipt[1] = utiliptables.New(execer, utiliptables.ProtocolIPv6)
-			}
-
 			nodeIPs := nodeIPTuple(config.BindAddress)
-
-			// Always ordered to match []ipt
-			var localDetectors [2]proxyutiliptables.LocalTrafficDetector
-			localDetectors, err = getDualStackLocalDetectorTuple(detectLocalMode, config, ipt, nodeInfo)
-			if err != nil {
-				return nil, fmt.Errorf("unable to create proxier: %v", err)
-			}
 
 			proxier, err = ipvs.NewDualStackProxier(
 				ipt,
@@ -304,12 +286,6 @@ func newProxyServer(
 				kernelHandler,
 			)
 		} else {
-			var localDetector proxyutiliptables.LocalTrafficDetector
-			localDetector, err = getLocalDetector(detectLocalMode, config, iptInterface, nodeInfo)
-			if err != nil {
-				return nil, fmt.Errorf("unable to create proxier: %v", err)
-			}
-
 			proxier, err = ipvs.NewProxier(
 				iptInterface,
 				ipvsInterface,
