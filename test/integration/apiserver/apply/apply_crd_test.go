@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,163 +37,6 @@ import (
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
-
-// TestApplyCRDNoSchema tests that CRDs and CRs can both be applied to with a PATCH request with the apply content type
-// when there is no validation field provided.
-func TestApplyCRDNoSchema(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer server.TearDownFn()
-	config := server.ClientConfig
-
-	apiExtensionClient, err := clientset.NewForConfig(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dynamicClient, err := dynamic.NewForConfig(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
-
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	kind := noxuDefinition.Spec.Names.Kind
-	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Version
-	name := "mytest"
-
-	rest := apiExtensionClient.Discovery().RESTClient()
-	yamlBody := []byte(fmt.Sprintf(`
-apiVersion: %s
-kind: %s
-metadata:
-  name: %s
-spec:
-  replicas: 1`, apiVersion, kind, name))
-	result, err := rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
-		Name(name).
-		Param("fieldManager", "apply_test").
-		Body(yamlBody).
-		DoRaw(context.TODO())
-	if err != nil {
-		t.Fatalf("failed to create custom resource with apply: %v:\n%v", err, string(result))
-	}
-	verifyReplicas(t, result, 1)
-
-	// Patch object to change the number of replicas
-	result, err = rest.Patch(types.MergePatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
-		Name(name).
-		Body([]byte(`{"spec":{"replicas": 5}}`)).
-		DoRaw(context.TODO())
-	if err != nil {
-		t.Fatalf("failed to update number of replicas with merge patch: %v:\n%v", err, string(result))
-	}
-	verifyReplicas(t, result, 5)
-
-	// Re-apply, we should get conflicts now, since the number of replicas was changed.
-	result, err = rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
-		Name(name).
-		Param("fieldManager", "apply_test").
-		Body(yamlBody).
-		DoRaw(context.TODO())
-	if err == nil {
-		t.Fatalf("Expecting to get conflicts when applying object after updating replicas, got no error: %s", result)
-	}
-	status, ok := err.(*apierrors.StatusError)
-	if !ok {
-		t.Fatalf("Expecting to get conflicts as API error")
-	}
-	if len(status.Status().Details.Causes) != 1 {
-		t.Fatalf("Expecting to get one conflict when applying object after updating replicas, got: %v", status.Status().Details.Causes)
-	}
-
-	// Re-apply with force, should work fine.
-	result, err = rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
-		Name(name).
-		Param("force", "true").
-		Param("fieldManager", "apply_test").
-		Body(yamlBody).
-		DoRaw(context.TODO())
-	if err != nil {
-		t.Fatalf("failed to apply object with force after updating replicas: %v:\n%v", err, string(result))
-	}
-	verifyReplicas(t, result, 1)
-
-	// Try to set managed fields using a subresource and verify that it has no effect
-	existingManagedFields, err := getManagedFields(result)
-	if err != nil {
-		t.Fatalf("failed to get managedFields from response: %v", err)
-	}
-	updateBytes := []byte(`{
-		"metadata": {
-			"managedFields": [{
-				"manager":"testing",
-				"operation":"Update",
-				"apiVersion":"v1",
-				"fieldsType":"FieldsV1",
-				"fieldsV1":{
-					"f:spec":{
-						"f:containers":{
-							"k:{\"name\":\"testing\"}":{
-								".":{},
-								"f:image":{},
-								"f:name":{}
-							}
-						}
-					}
-				}
-			}]
-		}
-	}`)
-	result, err = rest.Patch(types.MergePatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
-		SubResource("status").
-		Name(name).
-		Param("fieldManager", "subresource_test").
-		Body(updateBytes).
-		DoRaw(context.TODO())
-	if err != nil {
-		t.Fatalf("Error updating subresource: %v ", err)
-	}
-	newManagedFields, err := getManagedFields(result)
-	if err != nil {
-		t.Fatalf("failed to get managedFields from response: %v", err)
-	}
-	if !reflect.DeepEqual(existingManagedFields, newManagedFields) {
-		t.Fatalf("Expected managed fields to not have changed when trying manually settting them via subresoures.\n\nExpected: %#v\n\nGot: %#v", existingManagedFields, newManagedFields)
-	}
-
-	// However, it is possible to modify managed fields using the main resource
-	result, err = rest.Patch(types.MergePatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
-		Name(name).
-		Param("fieldManager", "subresource_test").
-		Body([]byte(`{"metadata":{"managedFields":[{}]}}`)).
-		DoRaw(context.TODO())
-	if err != nil {
-		t.Fatalf("Error updating managed fields of the main resource: %v ", err)
-	}
-	newManagedFields, err = getManagedFields(result)
-	if err != nil {
-		t.Fatalf("failed to get managedFields from response: %v", err)
-	}
-
-	if len(newManagedFields) != 0 {
-		t.Fatalf("Expected managed fields to have been reset, but got: %v", newManagedFields)
-	}
-}
 
 // TestApplyCRDStructuralSchema tests that when a CRD has a structural schema in its validation field,
 // it will be used to construct the CR schema used by apply.
@@ -217,9 +59,9 @@ func TestApplyCRDStructuralSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
+	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1.ClusterScoped)
 
-	var c apiextensionsv1beta1.CustomResourceValidation
+	var c apiextensionsv1.CustomResourceValidation
 	err = json.Unmarshal([]byte(`{
 		"openAPIV3Schema": {
 			"type": "object",
@@ -274,17 +116,17 @@ func TestApplyCRDStructuralSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	noxuDefinition.Spec.Validation = &c
-	falseBool := false
-	noxuDefinition.Spec.PreserveUnknownFields = &falseBool
+	for i := range noxuDefinition.Spec.Versions {
+		noxuDefinition.Spec.Versions[i].Schema = &c
+	}
 
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	kind := noxuDefinition.Spec.Names.Kind
-	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Version
+	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
 	name := "mytest"
 
 	rest := apiExtensionClient.Discovery().RESTClient()
@@ -303,7 +145,7 @@ spec:
     containerPort: 80
     protocol: TCP`, apiVersion, kind, name))
 	result, err := rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test").
 		Body(yamlBody).
@@ -318,7 +160,7 @@ spec:
 
 	// Patch object to add another finalizer to the finalizers list
 	result, err = rest.Patch(types.MergePatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Body([]byte(`{"metadata":{"finalizers":["test-finalizer","another-one"]}}`)).
 		DoRaw(context.TODO())
@@ -331,7 +173,7 @@ spec:
 
 	// Re-apply the same config, should work fine, since finalizers should have the list-type extension 'set'.
 	result, err = rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test").
 		SetHeader("Accept", "application/json").
@@ -346,7 +188,7 @@ spec:
 
 	// Patch object to change the number of replicas
 	result, err = rest.Patch(types.MergePatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Body([]byte(`{"spec":{"replicas": 5}}`)).
 		DoRaw(context.TODO())
@@ -357,7 +199,7 @@ spec:
 
 	// Re-apply, we should get conflicts now, since the number of replicas was changed.
 	result, err = rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test").
 		Body(yamlBody).
@@ -375,7 +217,7 @@ spec:
 
 	// Re-apply with force, should work fine.
 	result, err = rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("force", "true").
 		Param("fieldManager", "apply_test").
@@ -388,7 +230,7 @@ spec:
 
 	// New applier tries to edit an existing list item, we should get conflicts.
 	result, err = rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test_2").
 		Body([]byte(fmt.Sprintf(`
@@ -415,7 +257,7 @@ spec:
 
 	// New applier tries to add a new list item, should work fine.
 	result, err = rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test_2").
 		Body([]byte(fmt.Sprintf(`
@@ -459,7 +301,7 @@ spec:
 		"protocol": "TCP"
 	}`, apiVersion, kind, "should-not-exist"))
 	_, err = rest.Put().
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name("should-not-exist").
 		Param("fieldManager", "apply_test").
 		Body(notExistingYAMLBody).
