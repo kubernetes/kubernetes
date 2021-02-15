@@ -12,6 +12,8 @@ go_library(
         "mount_linux.go",
         "mount_unsupported.go",
         "mount_windows.go",
+        "resizefs_linux.go",
+        "resizefs_unsupported.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/mount-utils",
     importpath = "k8s.io/mount-utils",

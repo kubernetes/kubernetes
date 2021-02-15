@@ -36,7 +36,6 @@ filegroup(
         "//pkg/util/pod:all-srcs",
         "//pkg/util/procfs:all-srcs",
         "//pkg/util/removeall:all-srcs",
-        "//pkg/util/resizefs:all-srcs",
         "//pkg/util/rlimit:all-srcs",
         "//pkg/util/selinux:all-srcs",
         "//pkg/util/slice:all-srcs",
