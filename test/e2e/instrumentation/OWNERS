@@ -1,11 +1,11 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- fabxc
 - sig-instrumentation-approvers
 - x13n
 - kawych
 emeritus_approvers:
+- fabxc
 - piosz
 - fgrzadkowski
 reviewers:
