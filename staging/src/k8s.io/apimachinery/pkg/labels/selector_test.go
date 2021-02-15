@@ -904,7 +904,7 @@ func TestValidatedSelectorFromSet(t *testing.T) {
 			t.Errorf("ValidatedSelectorFromSet %#v returned unexpected error (-want,+got):\n%s", tc.name, diff)
 		}
 		if err == nil {
-			if diff := cmp.Diff(tc.expectedSelector, selector, cmp.AllowUnexported(Requirement{})); diff != "" {
+			if diff := cmp.Diff(tc.expectedSelector, selector); diff != "" {
 				t.Errorf("ValidatedSelectorFromSet %#v returned unexpected selector (-want,+got):\n%s", tc.name, diff)
 			}
 		}
@@ -926,5 +926,77 @@ func BenchmarkRequirementString(b *testing.B) {
 		if r.String() != "environment notin (dev)" {
 			b.Errorf("Unexpected Requirement string")
 		}
+	}
+}
+
+func TestRequirementEqual(t *testing.T) {
+	tests := []struct {
+		name string
+		x, y *Requirement
+		want bool
+	}{
+		{
+			name: "same requirements should be equal",
+			x: &Requirement{
+				key:       "key",
+				operator:  selection.Equals,
+				strValues: []string{"foo", "bar"},
+			},
+			y: &Requirement{
+				key:       "key",
+				operator:  selection.Equals,
+				strValues: []string{"foo", "bar"},
+			},
+			want: true,
+		},
+		{
+			name: "requirements with different keys should not be equal",
+			x: &Requirement{
+				key:       "key1",
+				operator:  selection.Equals,
+				strValues: []string{"foo", "bar"},
+			},
+			y: &Requirement{
+				key:       "key2",
+				operator:  selection.Equals,
+				strValues: []string{"foo", "bar"},
+			},
+			want: false,
+		},
+		{
+			name: "requirements with different operators should not be equal",
+			x: &Requirement{
+				key:       "key",
+				operator:  selection.Equals,
+				strValues: []string{"foo", "bar"},
+			},
+			y: &Requirement{
+				key:       "key",
+				operator:  selection.In,
+				strValues: []string{"foo", "bar"},
+			},
+			want: false,
+		},
+		{
+			name: "requirements with different values should not be equal",
+			x: &Requirement{
+				key:       "key",
+				operator:  selection.Equals,
+				strValues: []string{"foo", "bar"},
+			},
+			y: &Requirement{
+				key:       "key",
+				operator:  selection.Equals,
+				strValues: []string{"foobar"},
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := cmp.Equal(tt.x, tt.y); got != tt.want {
+				t.Errorf("cmp.Equal() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -274,6 +275,17 @@ func (r *Requirement) Values() sets.String {
 		ret.Insert(r.strValues[i])
 	}
 	return ret
+}
+
+// Equal checks the equality of requirement.
+func (r Requirement) Equal(x Requirement) bool {
+	if r.key != x.key {
+		return false
+	}
+	if r.operator != x.operator {
+		return false
+	}
+	return cmp.Equal(r.strValues, x.strValues)
 }
 
 // Empty returns true if the internalSelector doesn't restrict selection space
