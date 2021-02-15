@@ -19,6 +19,7 @@ package resource
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 	yaml "gopkg.in/yaml.v2"
@@ -73,12 +74,37 @@ func hasGVKExtension(extensions []*openapi_v2.NamedAny, gvk schema.GroupVersionK
 type DryRunVerifier struct {
 	finder        CRDFinder
 	openAPIGetter discovery.OpenAPISchemaInterface
+	oapiLock      sync.RWMutex
+	oapi          *openapi_v2.Document
+}
+
+func (v *DryRunVerifier) openAPISchema() (*openapi_v2.Document, error) {
+	if schema := func() *openapi_v2.Document {
+		v.oapiLock.RLock()
+		defer v.oapiLock.RUnlock()
+		return v.oapi
+	}(); schema != nil {
+		return schema, nil
+	}
+
+	v.oapiLock.Lock()
+	defer v.oapiLock.Unlock()
+	if v.oapi != nil {
+		return v.oapi, nil
+	}
+
+	oapi, err := v.openAPIGetter.OpenAPISchema()
+	if err != nil {
+		return nil, err
+	}
+	v.oapi = oapi
+	return v.oapi, nil
 }
 
 // HasSupport verifies if the given gvk supports DryRun. An error is
 // returned if it doesn't.
 func (v *DryRunVerifier) HasSupport(gvk schema.GroupVersionKind) error {
-	oapi, err := v.openAPIGetter.OpenAPISchema()
+	oapi, err := v.openAPISchema()
 	if err != nil {
 		return fmt.Errorf("failed to download openapi: %v", err)
 	}

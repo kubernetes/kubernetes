@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -153,4 +154,59 @@ func TestDryRunVerifierNoOpenAPI(t *testing.T) {
 	if err == nil {
 		t.Fatalf("MyCRD doesn't support dry-run, yet no error found")
 	}
+}
+
+func TestHasSupportCachesOpenAPI(t *testing.T) {
+	t.Parallel()
+
+	podDryRunSupportingOpenAPI := &openapi_v2.Document{Paths: &openapi_v2.Paths{
+		Path: []*openapi_v2.NamedPathItem{{Value: &openapi_v2.PathItem{
+			Patch: &openapi_v2.Operation{
+				Parameters: []*openapi_v2.ParametersItem{{Oneof: &openapi_v2.ParametersItem_Parameter{
+					Parameter: &openapi_v2.Parameter{Oneof: &openapi_v2.Parameter_NonBodyParameter{NonBodyParameter: &openapi_v2.NonBodyParameter{Oneof: &openapi_v2.NonBodyParameter_QueryParameterSubSchema{
+						QueryParameterSubSchema: &openapi_v2.QueryParameterSubSchema{Name: "dryRun"},
+					}}}},
+				}}},
+				VendorExtension: []*openapi_v2.NamedAny{{
+					Name:  "x-kubernetes-group-version-kind",
+					Value: &openapi_v2.Any{Yaml: `{"kind":"Pod","version":"v1"}`},
+				}},
+			},
+		}}},
+	}}
+	testCases := []struct {
+		name         string
+		cachedSchema *openapi_v2.Document
+		fetchErr     error
+	}{
+		{
+			name: "No cache, schema is fetched",
+		},
+		{
+			name:         "Cached schema is used",
+			cachedSchema: podDryRunSupportingOpenAPI,
+			fetchErr:     errors.New("Thou shall use the cache!"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			verifier := &DryRunVerifier{
+				openAPIGetter: &fakeOpenAPIGetter{podDryRunSupportingOpenAPI, tc.fetchErr},
+				oapi:          tc.cachedSchema,
+			}
+			if err := verifier.HasSupport(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+type fakeOpenAPIGetter struct {
+	schema *openapi_v2.Document
+	err    error
+}
+
+func (f *fakeOpenAPIGetter) OpenAPISchema() (*openapi_v2.Document, error) {
+	return f.schema, f.err
 }
