@@ -70,6 +70,12 @@ func (strategy) AllowCreateOnUpdate() bool {
 func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newSecret := obj.(*api.Secret)
 	oldSecret := old.(*api.Secret)
+
+	// this is weird, but consistent with what the validatedUpdate function used to do.
+	if len(newSecret.Type) == 0 {
+		newSecret.Type = oldSecret.Type
+	}
+
 	dropDisabledFields(newSecret, oldSecret)
 }
 
