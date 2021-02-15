@@ -22,7 +22,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
@@ -48,6 +50,13 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 		testInjectedIP := svc.Spec.ClusterIP
 		testSearchPath := "default.svc.cluster.local"
 
+		// Create Windows runtime class.
+		windowsRuntimeClassName := "dns-" + string(uuid.NewUUID())
+		windowsRuntimeClass := e2enode.NewWindowsRuntimeClass(windowsRuntimeClassName, framework.TestContext.ContainerRuntime)
+		_, err = f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), windowsRuntimeClass, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create Windows RuntimeClass resource")
+		defer f.ClientSet.NodeV1().RuntimeClasses().Delete(context.TODO(), windowsRuntimeClassName, metav1.DeleteOptions{})
+
 		ginkgo.By("Creating a windows pod with dnsPolicy=None and customized dnsConfig...")
 		testPod := e2epod.NewAgnhostPod(f.Namespace.Name, "e2e-dns-utils", nil, nil, nil)
 		testPod.Spec.DNSPolicy = v1.DNSNone
@@ -55,9 +64,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 			Nameservers: []string{testInjectedIP, "1.1.1.1"},
 			Searches:    []string{testSearchPath},
 		}
-		testPod.Spec.NodeSelector = map[string]string{
-			"kubernetes.io/os": "windows",
-		}
+		testPod.Spec.RuntimeClassName = &windowsRuntimeClassName
 		testPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 

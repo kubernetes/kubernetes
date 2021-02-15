@@ -18,6 +18,7 @@ package node
 
 import (
 	"fmt"
+	nodev1 "k8s.io/api/node/v1"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,5 +53,26 @@ func NewRuntimeClassPod(runtimeClassName string) *v1.Pod {
 			RestartPolicy:                v1.RestartPolicyNever,
 			AutomountServiceAccountToken: utilpointer.BoolPtr(false),
 		},
+	}
+}
+
+
+// NewWindowsRuntimeClass is a helper to generate a Windows RuntimeClass resource with
+// the given name & handler.
+func NewWindowsRuntimeClass(name, handler string) *nodev1.RuntimeClass {
+	scheduling := &nodev1.Scheduling{
+		NodeSelector: map[string]string{
+			"kubernetes.io/os": "windows",
+		},
+		Tolerations: []v1.Toleration {
+			{Effect: v1.TaintEffectNoSchedule, Key: "os", Operator: v1.TolerationOpEqual, Value: "windows"},
+		},
+	}
+	return &nodev1.RuntimeClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Handler: handler,
+		Scheduling: scheduling,
 	}
 }

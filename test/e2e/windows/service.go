@@ -17,9 +17,12 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -54,13 +57,16 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		nodePort := int(svc.Spec.Ports[0].NodePort)
-
+		// Create Windows runtime class.
+		windowsRuntimeClassName := "services-" + string(uuid.NewUUID())
+		windowsRuntimeClass := e2enode.NewWindowsRuntimeClass(windowsRuntimeClassName, framework.TestContext.ContainerRuntime)
+		_, err = f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), windowsRuntimeClass, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create Windows RuntimeClass resource")
+		defer f.ClientSet.NodeV1().RuntimeClasses().Delete(context.TODO(), windowsRuntimeClassName, metav1.DeleteOptions{})
 		ginkgo.By("creating Pod to be part of service " + serviceName)
 		// tweak the Jig to use windows...
 		windowsNodeSelectorTweak := func(rc *v1.ReplicationController) {
-			rc.Spec.Template.Spec.NodeSelector = map[string]string{
-				"kubernetes.io/os": "windows",
-			}
+			rc.Spec.Template.Spec.RuntimeClassName = &windowsRuntimeClassName
 		}
 		_, err = jig.Run(windowsNodeSelectorTweak)
 		framework.ExpectNoError(err)

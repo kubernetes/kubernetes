@@ -17,12 +17,14 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -90,9 +92,14 @@ func doReadOnlyTest(f *framework.Framework, source v1.VolumeSource, volumePath s
 		podName  = "pod-" + string(uuid.NewUUID())
 		pod      = testPodWithROVolume(podName, source, volumePath)
 	)
-	pod.Spec.NodeSelector = map[string]string{
-		"kubernetes.io/os": "windows",
-	}
+	// Create Windows runtime class.
+	windowsRuntimeClassName := "ro-" + string(uuid.NewUUID())
+	windowsRuntimeClass := e2enode.NewWindowsRuntimeClass(windowsRuntimeClassName, framework.TestContext.ContainerRuntime)
+	_, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), windowsRuntimeClass, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "failed to create Windows RuntimeClass resource")
+	defer f.ClientSet.NodeV1().RuntimeClasses().Delete(context.TODO(), windowsRuntimeClassName, metav1.DeleteOptions{})
+
+	pod.Spec.RuntimeClassName = &windowsRuntimeClassName
 
 	pod = f.PodClient().CreateSync(pod)
 	ginkgo.By("verifying that pod has the correct nodeSelector")
@@ -112,9 +119,14 @@ func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, vol
 		pod             = testPodWithROVolume(podName, source, volumePath)
 		rwcontainerName = containerName + "-rw"
 	)
-	pod.Spec.NodeSelector = map[string]string{
-		"kubernetes.io/os": "windows",
-	}
+	// Create Windows runtime class.
+	windowsRuntimeClassName := "wro-" + string(uuid.NewUUID())
+	windowsRuntimeClass := e2enode.NewWindowsRuntimeClass(windowsRuntimeClassName, framework.TestContext.ContainerRuntime)
+	_, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), windowsRuntimeClass, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "failed to create Windows RuntimeClass resource")
+	defer f.ClientSet.NodeV1().RuntimeClasses().Delete(context.TODO(), windowsRuntimeClassName, metav1.DeleteOptions{})
+
+	pod.Spec.RuntimeClassName = &windowsRuntimeClassName
 
 	rwcontainer := v1.Container{
 		Name:  containerName + "-rw",

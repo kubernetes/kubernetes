@@ -18,6 +18,8 @@ package windows
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -57,6 +59,14 @@ var _ = SIGDescribe("Device Plugin", func() {
 		labels := map[string]string{
 			daemonsetNameLabel: dsName,
 		}
+
+		// Create Windows runtime class.
+		windowsRuntimeClassName := "device-plugin-" + string(uuid.NewUUID())
+		windowsRuntimeClass := e2enode.NewWindowsRuntimeClass(windowsRuntimeClassName, framework.TestContext.ContainerRuntime)
+		_, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), windowsRuntimeClass, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create Windows RuntimeClass resource")
+		defer f.ClientSet.NodeV1().RuntimeClasses().Delete(context.TODO(), windowsRuntimeClassName, metav1.DeleteOptions{})
+
 		ds := &appsv1.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      dsName,
@@ -108,16 +118,14 @@ var _ = SIGDescribe("Device Plugin", func() {
 								},
 							},
 						},
-						NodeSelector: map[string]string{
-							"kubernetes.io/os": "windows",
-						},
+						RuntimeClassName: &windowsRuntimeClassName,
 					},
 				},
 			},
 		}
 
 		sysNs := "kube-system"
-		_, err := cs.AppsV1().DaemonSets(sysNs).Create(context.TODO(), ds, metav1.CreateOptions{})
+		_, err = cs.AppsV1().DaemonSets(sysNs).Create(context.TODO(), ds, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("creating Windows testing Pod")

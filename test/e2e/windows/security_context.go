@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -34,18 +35,25 @@ const runAsUserNameContainerName = "run-as-username-container"
 var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 	f := framework.NewDefaultFramework("windows-run-as-username")
 
+	// Create Windows runtime class.
+	windowsRuntimeClassName := "scc-" + string(uuid.NewUUID())
+	windowsRuntimeClass := e2enode.NewWindowsRuntimeClass(windowsRuntimeClassName, framework.TestContext.ContainerRuntime)
+	_, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), windowsRuntimeClass, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "failed to create Windows RuntimeClass resource")
+	defer f.ClientSet.NodeV1().RuntimeClasses().Delete(context.TODO(), windowsRuntimeClassName, metav1.DeleteOptions{})
+
 	ginkgo.It("should be able create pods and run containers with a given username", func() {
 		ginkgo.By("Creating 2 pods: 1 with the default user, and one with a custom one.")
-		podDefault := runAsUserNamePod(nil)
+		podDefault := runAsUserNamePod(nil, &windowsRuntimeClassName)
 		f.TestContainerOutput("check default user", podDefault, 0, []string{"ContainerUser"})
 
-		podUserName := runAsUserNamePod(toPtr("ContainerAdministrator"))
+		podUserName := runAsUserNamePod(toPtr("ContainerAdministrator"), &windowsRuntimeClassName)
 		f.TestContainerOutput("check set user", podUserName, 0, []string{"ContainerAdministrator"})
 	})
 
 	ginkgo.It("should not be able to create pods with unknown usernames", func() {
 		ginkgo.By("Creating a pod with an invalid username")
-		podInvalid := f.PodClient().Create(runAsUserNamePod(toPtr("FooLish")))
+		podInvalid := f.PodClient().Create(runAsUserNamePod(toPtr("FooLish"), &windowsRuntimeClassName))
 
 		framework.Logf("Waiting for pod %s to enter the error state.", podInvalid.Name)
 		framework.ExpectNoError(e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, podInvalid.Name, "", f.Namespace.Name))
@@ -60,7 +68,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 	ginkgo.It("should override SecurityContext username if set", func() {
 		ginkgo.By("Creating a pod with 2 containers with different username configurations.")
 
-		pod := runAsUserNamePod(toPtr("ContainerAdministrator"))
+		pod := runAsUserNamePod(toPtr("ContainerAdministrator"), &windowsRuntimeClassName)
 		pod.Spec.Containers[0].SecurityContext.WindowsOptions.RunAsUserName = toPtr("ContainerUser")
 		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
 			Name:    "run-as-username-new-container",
@@ -96,14 +104,14 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 	})
 })
 
-func runAsUserNamePod(username *string) *v1.Pod {
+func runAsUserNamePod(username, runtimeClassName *string) *v1.Pod {
 	podName := "run-as-username-" + string(uuid.NewUUID())
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
-			NodeSelector: map[string]string{"kubernetes.io/os": "windows"},
+			RuntimeClassName: runtimeClassName,
 			Containers: []v1.Container{
 				{
 					Name:    runAsUserNameContainerName,

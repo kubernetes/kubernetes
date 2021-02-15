@@ -19,6 +19,7 @@ package windows
 import (
 	"context"
 	"fmt"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"sort"
 	"sync"
 	"time"
@@ -97,8 +98,15 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 		stopCh     = make(chan struct{})
 	)
 
+	// Create Windows runtime class.
+	windowsRuntimeClassName := "density-" + string(uuid.NewUUID())
+	windowsRuntimeClass := e2enode.NewWindowsRuntimeClass(windowsRuntimeClassName, framework.TestContext.ContainerRuntime)
+	_, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), windowsRuntimeClass, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "failed to create Windows RuntimeClass resource")
+	defer f.ClientSet.NodeV1().RuntimeClasses().Delete(context.TODO(), windowsRuntimeClassName, metav1.DeleteOptions{})
+
 	// create test pod data structure
-	pods := newDensityTestPods(testArg.podsNr, false, imageutils.GetPauseImageName(), podType)
+	pods := newDensityTestPods(testArg.podsNr, false, imageutils.GetPauseImageName(), podType, windowsRuntimeClassName)
 
 	// the controller watches the change of pod status
 	controller := newInformerWatchPod(f, mutex, watchTimes, podType)
@@ -213,7 +221,7 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 }
 
 // newDensityTestPods creates a list of pods (specification) for test.
-func newDensityTestPods(numPods int, volume bool, imageName, podType string) []*v1.Pod {
+func newDensityTestPods(numPods int, volume bool, imageName, podType, runtimeClassName string) []*v1.Pod {
 	var pods []*v1.Pod
 
 	for i := 0; i < numPods; i++ {
@@ -235,9 +243,7 @@ func newDensityTestPods(numPods int, volume bool, imageName, podType string) []*
 						Name:  podName,
 					},
 				},
-				NodeSelector: map[string]string{
-					"kubernetes.io/os": "windows",
-				},
+				RuntimeClassName: &runtimeClassName,
 			},
 		}
 

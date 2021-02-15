@@ -18,6 +18,7 @@ package windows
 
 import (
 	"context"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,10 +41,17 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 	ginkgo.Context("Container limits", func() {
 		ginkgo.It("should not be exceeded after waiting 2 minutes", func() {
 			ginkgo.By("Creating one pod with limit set to '0.5'")
-			podsDecimal := newCPUBurnPods(1, powershellImage, "0.5", "1Gi")
+			// Create Windows runtime class.
+			windowsRuntimeClassName := "limits-" + string(uuid.NewUUID())
+			windowsRuntimeClass := e2enode.NewWindowsRuntimeClass(windowsRuntimeClassName, framework.TestContext.ContainerRuntime)
+			_, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), windowsRuntimeClass, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "failed to create Windows RuntimeClass resource")
+			defer f.ClientSet.NodeV1().RuntimeClasses().Delete(context.TODO(), windowsRuntimeClassName, metav1.DeleteOptions{})
+
+			podsDecimal := newCPUBurnPods(1, powershellImage, "0.5", "1Gi", windowsRuntimeClassName)
 			f.PodClient().CreateBatch(podsDecimal)
 			ginkgo.By("Creating one pod with limit set to '500m'")
-			podsMilli := newCPUBurnPods(1, powershellImage, "500m", "1Gi")
+			podsMilli := newCPUBurnPods(1, powershellImage, "500m", "1Gi", windowsRuntimeClassName)
 			f.PodClient().CreateBatch(podsMilli)
 			ginkgo.By("Waiting 2 minutes")
 			time.Sleep(2 * time.Minute)
@@ -92,7 +100,7 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 })
 
 // newCPUBurnPods creates a list of pods (specification) with a workload that will consume all available CPU resources up to container limit
-func newCPUBurnPods(numPods int, image imageutils.Config, cpuLimit string, memoryLimit string) []*v1.Pod {
+func newCPUBurnPods(numPods int, image imageutils.Config, cpuLimit string, memoryLimit string, runtimeClassName string) []*v1.Pod {
 	var pods []*v1.Pod
 
 	memLimitQuantity, err := resource.ParseQuantity(memoryLimit)
@@ -131,9 +139,7 @@ func newCPUBurnPods(numPods int, image imageutils.Config, cpuLimit string, memor
 						},
 					},
 				},
-				NodeSelector: map[string]string{
-					"kubernetes.io/os": "windows",
-				},
+				RuntimeClassName: &runtimeClassName,
 			},
 		}
 

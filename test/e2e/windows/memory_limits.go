@@ -19,6 +19,7 @@ package windows
 import (
 	"context"
 	"fmt"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"strconv"
 	"time"
 
@@ -107,11 +108,18 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 	memPerPod := memValue / int64(allocatablePods)
 	ginkgo.By(fmt.Sprintf("Deploying %d pods with mem limit %v, then one additional pod", allocatablePods, memPerPod))
 
+	// Create Windows runtime class.
+	windowsRuntimeClassName := "limits-" + string(uuid.NewUUID())
+	windowsRuntimeClass := e2enode.NewWindowsRuntimeClass(windowsRuntimeClassName, framework.TestContext.ContainerRuntime)
+	_, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), windowsRuntimeClass, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "failed to create Windows RuntimeClass resource")
+	defer f.ClientSet.NodeV1().RuntimeClasses().Delete(context.TODO(), windowsRuntimeClassName, metav1.DeleteOptions{})
+
 	// these should all work
-	pods := newMemLimitTestPods(allocatablePods, imageutils.GetPauseImageName(), podType, strconv.FormatInt(memPerPod, 10))
+	pods := newMemLimitTestPods(allocatablePods, imageutils.GetPauseImageName(), podType, strconv.FormatInt(memPerPod, 10), windowsRuntimeClassName)
 	f.PodClient().CreateBatch(pods)
 
-	failurePods := newMemLimitTestPods(1, imageutils.GetPauseImageName(), podType, strconv.FormatInt(memPerPod, 10))
+	failurePods := newMemLimitTestPods(1, imageutils.GetPauseImageName(), podType, strconv.FormatInt(memPerPod, 10), windowsRuntimeClassName)
 	f.PodClient().Create(failurePods[0])
 
 	gomega.Eventually(func() bool {
@@ -129,7 +137,7 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 }
 
 // newMemLimitTestPods creates a list of pods (specification) for test.
-func newMemLimitTestPods(numPods int, imageName, podType string, memoryLimit string) []*v1.Pod {
+func newMemLimitTestPods(numPods int, imageName, podType string, memoryLimit string, runtimeClassName string) []*v1.Pod {
 	var pods []*v1.Pod
 
 	memLimitQuantity, err := resource.ParseQuantity(memoryLimit)
@@ -159,9 +167,7 @@ func newMemLimitTestPods(numPods int, imageName, podType string, memoryLimit str
 						},
 					},
 				},
-				NodeSelector: map[string]string{
-					"kubernetes.io/os": "windows",
-				},
+				RuntimeClassName: &runtimeClassName,
 			},
 		}
 
