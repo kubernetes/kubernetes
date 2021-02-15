@@ -1,6 +1,6 @@
 module k8s.io/kubernetes/hack/tools
 
-go 1.15
+go 1.16
 
 require (
 	github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
