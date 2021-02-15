@@ -3991,33 +3991,41 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// Allow only additions to tolerations updates.
 	allErrs = append(allErrs, validateOnlyAddedTolerations(newPod.Spec.Tolerations, oldPod.Spec.Tolerations, specPath.Child("tolerations"))...)
 
-	// handle updateable fields by munging those fields prior to deep equal comparison.
-	mungedPod := *newPod
-	// munge spec.containers[*].image
-	var newContainers []core.Container
-	for ix, container := range mungedPod.Spec.Containers {
-		container.Image = oldPod.Spec.Containers[ix].Image
-		newContainers = append(newContainers, container)
-	}
-	mungedPod.Spec.Containers = newContainers
-	// munge spec.initContainers[*].image
-	var newInitContainers []core.Container
-	for ix, container := range mungedPod.Spec.InitContainers {
-		container.Image = oldPod.Spec.InitContainers[ix].Image
-		newInitContainers = append(newInitContainers, container)
-	}
-	mungedPod.Spec.InitContainers = newInitContainers
-	// munge spec.activeDeadlineSeconds
-	mungedPod.Spec.ActiveDeadlineSeconds = nil
-	if oldPod.Spec.ActiveDeadlineSeconds != nil {
-		activeDeadlineSeconds := *oldPod.Spec.ActiveDeadlineSeconds
-		mungedPod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+	// the last thing to check is pod spec equality.  If the pod specs are equal, then we can simply return the errors we have
+	// so far and save the cost of a deep copy.
+	if apiequality.Semantic.DeepEqual(newPod.Spec, oldPod.Spec) {
+		return allErrs
 	}
 
-	if !apiequality.Semantic.DeepEqual(mungedPod.Spec, oldPod.Spec) {
+	// handle updateable fields by munging those fields prior to deep equal comparison.
+	mungedPodSpec := *newPod.Spec.DeepCopy()
+	// munge spec.containers[*].image
+	var newContainers []core.Container
+	for ix, container := range mungedPodSpec.Containers {
+		container.Image = oldPod.Spec.Containers[ix].Image // +k8s:verify-mutation:reason=clone
+		newContainers = append(newContainers, container)
+	}
+	mungedPodSpec.Containers = newContainers
+	// munge spec.initContainers[*].image
+	var newInitContainers []core.Container
+	for ix, container := range mungedPodSpec.InitContainers {
+		container.Image = oldPod.Spec.InitContainers[ix].Image // +k8s:verify-mutation:reason=clone
+		newInitContainers = append(newInitContainers, container)
+	}
+	mungedPodSpec.InitContainers = newInitContainers
+	// munge spec.activeDeadlineSeconds
+	mungedPodSpec.ActiveDeadlineSeconds = nil
+	if oldPod.Spec.ActiveDeadlineSeconds != nil {
+		activeDeadlineSeconds := *oldPod.Spec.ActiveDeadlineSeconds
+		mungedPodSpec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+	}
+	// tolerations are checked before the deep copy, so munge those too
+	mungedPodSpec.Tolerations = oldPod.Spec.Tolerations // +k8s:verify-mutation:reason=clone
+
+	if !apiequality.Semantic.DeepEqual(mungedPodSpec, oldPod.Spec) {
 		// This diff isn't perfect, but it's a helluva lot better an "I'm not going to tell you what the difference is".
 		//TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
-		specDiff := diff.ObjectDiff(mungedPod.Spec, oldPod.Spec)
+		specDiff := diff.ObjectDiff(mungedPodSpec, oldPod.Spec)
 		allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("pod updates may not change fields other than `spec.containers[*].image`, `spec.initContainers[*].image`, `spec.activeDeadlineSeconds` or `spec.tolerations` (only additions to existing tolerations)\n%v", specDiff)))
 	}
 
