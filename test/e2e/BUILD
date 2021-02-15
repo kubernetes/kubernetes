@@ -51,7 +51,6 @@ go_library(
     srcs = [
         "e2e.go",
         "examples.go",
-        "gke_local_ssd.go",
         "gke_node_pools.go",
         "suites.go",
         "viperconfig.go",
@@ -64,7 +63,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
