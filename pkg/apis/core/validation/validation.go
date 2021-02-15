@@ -4944,10 +4944,6 @@ func ValidateSecret(secret *core.Secret) field.ErrorList {
 func ValidateSecretUpdate(newSecret, oldSecret *core.Secret) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newSecret.ObjectMeta, &oldSecret.ObjectMeta, field.NewPath("metadata"))
 
-	if len(newSecret.Type) == 0 {
-		newSecret.Type = oldSecret.Type
-	}
-
 	allErrs = append(allErrs, ValidateImmutableField(newSecret.Type, oldSecret.Type, field.NewPath("type"))...)
 
 	allErrs = append(allErrs, ValidateSecret(newSecret)...)
