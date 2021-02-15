@@ -109,6 +109,15 @@ func makeValidServiceCustom(tweaks ...func(svc *api.Service)) *api.Service {
 	return svc
 }
 
+func makeServiceWithClusterIp(clusterIP string, clusterIPs []string) *api.Service {
+	return &api.Service{
+		Spec: api.ServiceSpec{
+			ClusterIP:  clusterIP,
+			ClusterIPs: clusterIPs,
+		},
+	}
+}
+
 // TODO: This should be done on types that are not part of our API
 func TestBeforeUpdate(t *testing.T) {
 	testCases := []struct {
@@ -457,275 +466,115 @@ func TestNormalizeClusterIPs(t *testing.T) {
 		expectedClusterIP  string
 		expectedClusterIPs []string
 	}{
-
 		{
-			name:       "new - only clusterip used",
-			oldService: nil,
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: nil,
-				},
-			},
+			name:               "new - only clusterip used",
+			oldService:         nil,
+			newService:         makeServiceWithClusterIp("10.0.0.10", nil),
 			expectedClusterIP:  "10.0.0.10",
 			expectedClusterIPs: []string{"10.0.0.10"},
 		},
-
 		{
-			name:       "new - only clusterips used",
-			oldService: nil,
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
+			name:               "new - only clusterips used",
+			oldService:         nil,
+			newService:         makeServiceWithClusterIp("", []string{"10.0.0.10"}),
 			expectedClusterIP:  "", // this is a validation issue, and validation will catch it
 			expectedClusterIPs: []string{"10.0.0.10"},
 		},
-
 		{
-			name:       "new - both used",
-			oldService: nil,
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
+			name:               "new - both used",
+			oldService:         nil,
+			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
 			expectedClusterIP:  "10.0.0.10",
 			expectedClusterIPs: []string{"10.0.0.10"},
 		},
-
 		{
-			name: "update - no change",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
+			name:               "update - no change",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
 			expectedClusterIP:  "10.0.0.10",
 			expectedClusterIPs: []string{"10.0.0.10"},
 		},
-
 		{
-			name: "update - malformed change",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.11",
-					ClusterIPs: []string{"10.0.0.11"},
-				},
-			},
+			name:               "update - malformed change",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("10.0.0.11", []string{"10.0.0.11"}),
 			expectedClusterIP:  "10.0.0.11",
 			expectedClusterIPs: []string{"10.0.0.11"},
 		},
-
 		{
-			name: "update - malformed change on secondary ip",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10", "2000::1"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.11",
-					ClusterIPs: []string{"10.0.0.11", "3000::1"},
-				},
-			},
+			name:               "update - malformed change on secondary ip",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
+			newService:         makeServiceWithClusterIp("10.0.0.11", []string{"10.0.0.11", "3000::1"}),
 			expectedClusterIP:  "10.0.0.11",
 			expectedClusterIPs: []string{"10.0.0.11", "3000::1"},
 		},
-
 		{
-			name: "update - upgrade",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10", "2000::1"},
-				},
-			},
+			name:               "update - upgrade",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
 			expectedClusterIP:  "10.0.0.10",
 			expectedClusterIPs: []string{"10.0.0.10", "2000::1"},
 		},
 		{
-			name: "update - downgrade",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10", "2000::1"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
+			name:               "update - downgrade",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
+			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
 			expectedClusterIP:  "10.0.0.10",
 			expectedClusterIPs: []string{"10.0.0.10"},
 		},
-
 		{
-			name: "update - user cleared cluster IP",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
+			name:               "update - user cleared cluster IP",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("", []string{"10.0.0.10"}),
 			expectedClusterIP:  "",
 			expectedClusterIPs: nil,
 		},
-
 		{
-			name: "update - user cleared clusterIPs", // *MUST* REMAIN FOR OLD CLIENTS
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: nil,
-				},
-			},
+			name:               "update - user cleared clusterIPs", // *MUST* REMAIN FOR OLD CLIENTS
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("10.0.0.10", nil),
 			expectedClusterIP:  "10.0.0.10",
 			expectedClusterIPs: []string{"10.0.0.10"},
 		},
-
 		{
-			name: "update - user cleared both",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "",
-					ClusterIPs: nil,
-				},
-			},
+			name:               "update - user cleared both",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("", nil),
 			expectedClusterIP:  "",
 			expectedClusterIPs: nil,
 		},
-
 		{
-			name: "update - user cleared ClusterIP but changed clusterIPs",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "",
-					ClusterIPs: []string{"10.0.0.11"},
-				},
-			},
+			name:               "update - user cleared ClusterIP but changed clusterIPs",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("", []string{"10.0.0.11"}),
 			expectedClusterIP:  "", /* validation catches this */
 			expectedClusterIPs: []string{"10.0.0.11"},
 		},
-
 		{
-			name: "update - user cleared ClusterIPs but changed ClusterIP",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10", "2000::1"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.11",
-					ClusterIPs: nil,
-				},
-			},
+			name:               "update - user cleared ClusterIPs but changed ClusterIP",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
+			newService:         makeServiceWithClusterIp("10.0.0.11", nil),
 			expectedClusterIP:  "10.0.0.11",
 			expectedClusterIPs: nil,
 		},
-
 		{
-			name: "update - user changed from None to ClusterIP",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "None",
-					ClusterIPs: []string{"None"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"None"},
-				},
-			},
+			name:               "update - user changed from None to ClusterIP",
+			oldService:         makeServiceWithClusterIp("None", []string{"None"}),
+			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"None"}),
 			expectedClusterIP:  "10.0.0.10",
 			expectedClusterIPs: []string{"10.0.0.10"},
 		},
-
 		{
-			name: "update - user changed from ClusterIP to None",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "None",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
+			name:               "update - user changed from ClusterIP to None",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("None", []string{"10.0.0.10"}),
 			expectedClusterIP:  "None",
 			expectedClusterIPs: []string{"None"},
 		},
-
 		{
-			name: "update - user changed from ClusterIP to None and changed ClusterIPs in a dual stack (new client making a mistake)",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10", "2000::1"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "None",
-					ClusterIPs: []string{"10.0.0.11", "2000::1"},
-				},
-			},
+			name:               "update - user changed from ClusterIP to None and changed ClusterIPs in a dual stack (new client making a mistake)",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
+			newService:         makeServiceWithClusterIp("None", []string{"10.0.0.11", "2000::1"}),
 			expectedClusterIP:  "None",
 			expectedClusterIPs: []string{"10.0.0.11", "2000::1"},
 		},
