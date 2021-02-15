@@ -635,6 +635,11 @@ func KubeDescribe(text string, body func()) bool {
 	return ginkgo.Describe("[k8s.io] "+text, body)
 }
 
+// SIGDescribe is a wrapper function for ginkgo describe. Adds SIG namespacing.
+func SIGDescribe(sig, text string, body func()) bool {
+	return ginkgo.Describe("[sig-"+sig+"] "+text, body)
+}
+
 // ConformanceIt is wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
 func ConformanceIt(text string, body interface{}, timeout ...float64) bool {
 	return ginkgo.It(text+" [Conformance]", body, timeout...)
