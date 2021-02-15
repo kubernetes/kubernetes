@@ -3100,10 +3100,11 @@ func validateOnlyAddedTolerations(newTolerations []core.Toleration, oldToleratio
 	allErrs := field.ErrorList{}
 	for _, old := range oldTolerations {
 		found := false
-		old.TolerationSeconds = nil
-		for _, new := range newTolerations {
-			new.TolerationSeconds = nil
-			if reflect.DeepEqual(old, new) {
+		oldTolerationClone := old.DeepCopy()
+		for _, newToleration := range newTolerations {
+			// assign to our clone before doing a deep equal so we can allow tolerationseconds to change.
+			oldTolerationClone.TolerationSeconds = newToleration.TolerationSeconds // +k8s:verify-mutation:reason=clone
+			if reflect.DeepEqual(*oldTolerationClone, newToleration) {
 				found = true
 				break
 			}
@@ -3987,6 +3988,9 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, field.Invalid(specPath.Child("activeDeadlineSeconds"), newPod.Spec.ActiveDeadlineSeconds, "must not update from a positive integer to nil value"))
 	}
 
+	// Allow only additions to tolerations updates.
+	allErrs = append(allErrs, validateOnlyAddedTolerations(newPod.Spec.Tolerations, oldPod.Spec.Tolerations, specPath.Child("tolerations"))...)
+
 	// handle updateable fields by munging those fields prior to deep equal comparison.
 	mungedPod := *newPod
 	// munge spec.containers[*].image
@@ -4009,10 +4013,6 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		activeDeadlineSeconds := *oldPod.Spec.ActiveDeadlineSeconds
 		mungedPod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
 	}
-
-	// Allow only additions to tolerations updates.
-	mungedPod.Spec.Tolerations = oldPod.Spec.Tolerations
-	allErrs = append(allErrs, validateOnlyAddedTolerations(newPod.Spec.Tolerations, oldPod.Spec.Tolerations, specPath.Child("tolerations"))...)
 
 	if !apiequality.Semantic.DeepEqual(mungedPod.Spec, oldPod.Spec) {
 		// This diff isn't perfect, but it's a helluva lot better an "I'm not going to tell you what the difference is".
