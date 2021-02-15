@@ -182,6 +182,11 @@ var _ = SIGDescribe("KubeProxy", func() {
 			kubeProxyE2eImage))
 		fr.PodClient().CreateSync(serverPodSpec)
 
+		// The host exec pod should be ready before we start the test, as it is time sensitive
+		// (if the host exec pod takes a long time to be ready, that could cause spurious timeouts)
+		if readyErr := e2epod.WaitForPodsReady(fr.ClientSet, fr.Namespace.Name, hostExecPod.Name, 0); readyErr != nil {
+			framework.Failf("error waiting for host-exec pod %s to be ready: %v", hostExecPod.Name, readyErr)
+		}
 		// The server should be listening before spawning the client pod
 		if readyErr := e2epod.WaitForPodsReady(fr.ClientSet, fr.Namespace.Name, serverPodSpec.Name, 0); readyErr != nil {
 			framework.Failf("error waiting for server pod %s to be ready: %v", serverPodSpec.Name, readyErr)
@@ -193,6 +198,11 @@ var _ = SIGDescribe("KubeProxy", func() {
 			clientNodeInfo.nodeIP,
 			kubeProxyE2eImage))
 		fr.PodClient().CreateSync(clientPodSpec)
+
+		// The client should be ready before entering the time-sensitive portion of the test
+		if readyErr := e2epod.WaitForPodsReady(fr.ClientSet, fr.Namespace.Name, clientPodSpec.Name, 0); readyErr != nil {
+			framework.Failf("error waiting for client pod %s to be ready: %v", clientPodSpec.Name, readyErr)
+		}
 
 		ginkgo.By("Checking conntrack entries for the timeout")
 		// These must be synchronized from the default values set in
