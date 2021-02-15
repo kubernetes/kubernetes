@@ -1958,13 +1958,11 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume) field.E
 }
 
 // ValidatePersistentVolumeStatusUpdate tests to see if the status update is legal for an end user to make.
-// newPv is updated with fields that cannot be changed.
 func ValidatePersistentVolumeStatusUpdate(newPv, oldPv *core.PersistentVolume) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPv.ObjectMeta, &oldPv.ObjectMeta, field.NewPath("metadata"))
 	if len(newPv.ResourceVersion) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("resourceVersion"), ""))
 	}
-	newPv.Spec = oldPv.Spec
 	return allErrs
 }
 
@@ -2110,7 +2108,6 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 	for r, qty := range newPvc.Status.Capacity {
 		allErrs = append(allErrs, validateBasicResource(qty, capPath.Key(string(r)))...)
 	}
-	newPvc.Spec = oldPvc.Spec
 	return allErrs
 }
 
@@ -4052,8 +4049,7 @@ func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerS
 	return allErrs
 }
 
-// ValidatePodStatusUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
-// that cannot be changed.
+// ValidatePodStatusUpdate tests to see if the update is legal for an end user to make.
 func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
@@ -4083,9 +4079,6 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 			allErrs = append(allErrs, newIPErrs...)
 		}
 	}
-
-	// For status update we ignore changes to pod spec.
-	newPod.Spec = oldPod.Spec
 
 	return allErrs
 }
@@ -5564,7 +5557,6 @@ func ValidateResourceQuantityValue(resource string, value resource.Quantity, fld
 }
 
 // ValidateResourceQuotaUpdate tests to see if the update is legal for an end user to make.
-// newResourceQuota is updated with fields that cannot be changed.
 func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *core.ResourceQuota, opts ResourceQuotaValidationOptions) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newResourceQuota.ObjectMeta, &oldResourceQuota.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateResourceQuotaSpec(&newResourceQuota.Spec, opts, field.NewPath("spec"))...)
@@ -5583,12 +5575,10 @@ func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *core.Resour
 		allErrs = append(allErrs, field.Invalid(fldPath, newResourceQuota.Spec.Scopes, fieldImmutableErrorMsg))
 	}
 
-	newResourceQuota.Status = oldResourceQuota.Status
 	return allErrs
 }
 
 // ValidateResourceQuotaStatusUpdate tests to see if the status update is legal for an end user to make.
-// newResourceQuota is updated with fields that cannot be changed.
 func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *core.ResourceQuota) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newResourceQuota.ObjectMeta, &oldResourceQuota.ObjectMeta, field.NewPath("metadata"))
 	if len(newResourceQuota.ResourceVersion) == 0 {
@@ -5606,7 +5596,6 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *core.
 		allErrs = append(allErrs, ValidateResourceQuotaResourceName(string(k), resPath)...)
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 	}
-	newResourceQuota.Spec = oldResourceQuota.Spec
 	return allErrs
 }
 
@@ -5639,19 +5628,14 @@ func validateKubeFinalizerName(stringValue string, fldPath *field.Path) field.Er
 }
 
 // ValidateNamespaceUpdate tests to make sure a namespace update can be applied.
-// newNamespace is updated with fields that cannot be changed
 func ValidateNamespaceUpdate(newNamespace *core.Namespace, oldNamespace *core.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta, field.NewPath("metadata"))
-	newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
-	newNamespace.Status = oldNamespace.Status
 	return allErrs
 }
 
-// ValidateNamespaceStatusUpdate tests to see if the update is legal for an end user to make. newNamespace is updated with fields
-// that cannot be changed.
+// ValidateNamespaceStatusUpdate tests to see if the update is legal for an end user to make.
 func ValidateNamespaceStatusUpdate(newNamespace, oldNamespace *core.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta, field.NewPath("metadata"))
-	newNamespace.Spec = oldNamespace.Spec
 	if newNamespace.DeletionTimestamp.IsZero() {
 		if newNamespace.Status.Phase != core.NamespaceActive {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("status", "Phase"), newNamespace.Status.Phase, "may only be 'Active' if `deletionTimestamp` is empty"))
@@ -5665,7 +5649,6 @@ func ValidateNamespaceStatusUpdate(newNamespace, oldNamespace *core.Namespace) f
 }
 
 // ValidateNamespaceFinalizeUpdate tests to see if the update is legal for an end user to make.
-// newNamespace is updated with fields that cannot be changed.
 func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *core.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta, field.NewPath("metadata"))
 
@@ -5674,7 +5657,6 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *core.Namespace)
 		idxPath := fldPath.Index(i)
 		allErrs = append(allErrs, validateFinalizerName(string(newNamespace.Spec.Finalizers[i]), idxPath)...)
 	}
-	newNamespace.Status = oldNamespace.Status
 	return allErrs
 }
 
