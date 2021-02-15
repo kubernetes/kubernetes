@@ -1,0 +1,17 @@
+pkg/kubelet/dockershim/
+pkg/kubelet/dockershim/cm
+pkg/kubelet/dockershim/libdocker
+pkg/kubelet/dockershim/libdocker/testing
+pkg/kubelet/dockershim/metrics
+pkg/kubelet/dockershim/network
+pkg/kubelet/dockershim/network/cni
+pkg/kubelet/dockershim/network/cni/testing
+pkg/kubelet/dockershim/network/hairpin
+pkg/kubelet/dockershim/network/hostport
+pkg/kubelet/dockershim/network/kubenet
+pkg/kubelet/dockershim/network/metrics
+pkg/kubelet/dockershim/network/testing
+pkg/kubelet/dockershim/remote
+pkg/kubelet/server/metrics
+pkg/kubelet/server/stats
+pkg/kubelet/server/stats/testing
