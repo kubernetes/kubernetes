@@ -32,9 +32,10 @@ import (
 	"testing"
 	"time"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -798,28 +799,35 @@ func TestMetadataClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fooCRD := &apiextensionsv1beta1.CustomResourceDefinition{
+	fooCRD := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foos.cr.bar.com",
 		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "cr.bar.com",
-			Version: "v1",
-			Scope:   apiextensionsv1beta1.NamespaceScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "cr.bar.com",
+			Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural: "foos",
 				Kind:   "Foo",
 			},
-			Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-				Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema:  fixtures.AllowAllSchema(),
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					},
+				},
 			},
 		},
 	}
-	fooCRD, err = fixtures.CreateNewCustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
+	fooCRD, err = fixtures.CreateNewV1CustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
-	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Version, Resource: "foos"}
+	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Versions[0].Name, Resource: "foos"}
 
 	testcases := []struct {
 		name string
@@ -1119,26 +1127,33 @@ func TestAPICRDProtobuf(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fooCRD := &apiextensionsv1beta1.CustomResourceDefinition{
+	fooCRD := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foos.cr.bar.com",
 		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "cr.bar.com",
-			Version: "v1",
-			Scope:   apiextensionsv1beta1.NamespaceScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "cr.bar.com",
+			Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural: "foos",
 				Kind:   "Foo",
 			},
-			Subresources: &apiextensionsv1beta1.CustomResourceSubresources{Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{}},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:         "v1",
+					Served:       true,
+					Storage:      true,
+					Schema:       fixtures.AllowAllSchema(),
+					Subresources: &apiextensionsv1.CustomResourceSubresources{Status: &apiextensionsv1.CustomResourceSubresourceStatus{}},
+				},
+			},
 		},
 	}
-	fooCRD, err = fixtures.CreateNewCustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
+	fooCRD, err = fixtures.CreateNewV1CustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
-	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Version, Resource: "foos"}
+	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Versions[0].Name, Resource: "foos"}
 	crclient := dynamicClient.Resource(crdGVR).Namespace(testNamespace)
 
 	testcases := []struct {
@@ -1331,25 +1346,32 @@ func TestTransform(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fooCRD := &apiextensionsv1beta1.CustomResourceDefinition{
+	fooCRD := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foos.cr.bar.com",
 		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "cr.bar.com",
-			Version: "v1",
-			Scope:   apiextensionsv1beta1.NamespaceScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "cr.bar.com",
+			Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural: "foos",
 				Kind:   "Foo",
 			},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema:  fixtures.AllowAllSchema(),
+				},
+			},
 		},
 	}
-	fooCRD, err = fixtures.CreateNewCustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
+	fooCRD, err = fixtures.CreateNewV1CustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
-	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Version, Resource: "foos"}
+	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Versions[0].Name, Resource: "foos"}
 	crclient := dynamicClient.Resource(crdGVR).Namespace(testNamespace)
 
 	testcases := []struct {
