@@ -27,7 +27,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = framework.KubeDescribe("GKE node pools [Feature:GKENodePool]", func() {
+var _ = framework.SIGDescribe("cloud-provider", "GKE node pools [Feature:GKENodePool]", func() {
 
 	f := framework.NewDefaultFramework("node-pools")
 

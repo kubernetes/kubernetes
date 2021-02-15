@@ -49,7 +49,7 @@ func nodeNames(nodes []v1.Node) []string {
 	return result
 }
 
-var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
+var _ = framework.SIGDescribe("cloud-provider", "Recreate [Feature:Recreate]", func() {
 	f := framework.NewDefaultFramework("recreate")
 	var originalNodes []v1.Node
 	var originalPodNames []string
