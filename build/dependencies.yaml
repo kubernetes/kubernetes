@@ -112,7 +112,7 @@ dependencies:
       match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.15.8-1
+    version: v1.15.8-legacy-1
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: test/images/sample-apiserver/Dockerfile
