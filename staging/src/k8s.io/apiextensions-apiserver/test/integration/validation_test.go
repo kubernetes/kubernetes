@@ -94,9 +94,6 @@ func newNoxuValidationCRDs() []*apiextensionsv1.CustomResourceDefinition {
 	validationSchema := &apiextensionsv1.JSONSchemaProps{
 		Type:     "object",
 		Required: []string{"alpha", "beta"},
-		AdditionalProperties: &apiextensionsv1.JSONSchemaPropsOrBool{
-			Allows: true,
-		},
 		Properties: map[string]apiextensionsv1.JSONSchemaProps{
 			"alpha": {
 				Description: "Alpha is an alphanumeric string with underscores",
@@ -120,19 +117,6 @@ func newNoxuValidationCRDs() []*apiextensionsv1.CustomResourceDefinition {
 					},
 					{
 						Raw: []byte(`"baz"`),
-					},
-				},
-			},
-			"delta": {
-				Description: "Delta is a string with a maximum length of 5 or a number with a minimum value of 0",
-				AnyOf: []apiextensionsv1.JSONSchemaProps{
-					{
-						Type:      "string",
-						MaxLength: int64Ptr(5),
-					},
-					{
-						Type:    "number",
-						Minimum: float64Ptr(0),
 					},
 				},
 			},
@@ -532,18 +516,6 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 				expectedErrors: []string{`gamma: Unsupported value: "qux": supported values: "foo", "bar", "baz"`},
 			},
 			{
-				name: "bad delta",
-				instanceFn: func() *unstructured.Unstructured {
-					instance := newNoxuValidationInstance(ns, "foo")
-					instance.Object["delta"] = "foobarbaz"
-					return instance
-				},
-				expectedErrors: []string{
-					"must validate at least one schema (anyOf)",
-					"delta in body should be at most 5 chars long",
-				},
-			},
-			{
 				name: "absent alpha and beta",
 				instanceFn: func() *unstructured.Unstructured {
 					instance := newNoxuValidationInstance(ns, "foo")
@@ -605,7 +577,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 			}
 
 			// set stricter schema
-			validationSchema.OpenAPIV3Schema.Required = []string{"alpha", "beta", "epsilon"}
+			validationSchema.OpenAPIV3Schema.Required = []string{"alpha", "beta", "gamma"}
 
 			noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 			if err != nil {
@@ -614,6 +586,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 			ns := "not-the-default"
 			noxuResourceClient := newNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, v.Name)
 			instanceToCreate := newNoxuValidationInstance(ns, "foo")
+			unstructured.RemoveNestedField(instanceToCreate.Object, "gamma")
 			instanceToCreate.Object["apiVersion"] = fmt.Sprintf("%s/%s", noxuDefinition.Spec.Group, v.Name)
 
 			// CR is rejected
@@ -674,18 +647,20 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			validationSchema.OpenAPIV3Schema.AdditionalProperties.Allows = false
-
-			_, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
-			if err == nil {
-				t.Fatalf("unexpected non-error: additionalProperties cannot be set to false")
-			}
+			// v1 doesn't allow additional properties at all. this isn't necessary in v1.
+			//validationSchema.OpenAPIV3Schema.AdditionalProperties.Allows = false
+			//_, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+			//if err == nil {
+			//	t.Fatalf("unexpected non-error: additionalProperties cannot be set to false")
+			//}
 
 			validationSchema.OpenAPIV3Schema.Properties["zeta"] = apiextensionsv1.JSONSchemaProps{
 				Type:        "array",
 				UniqueItems: true,
 			}
-			validationSchema.OpenAPIV3Schema.AdditionalProperties.Allows = true
+
+			// v1 doesn't allow additional properties at all. this isn't necessary in v1.
+			//validationSchema.OpenAPIV3Schema.AdditionalProperties.Allows = true
 
 			_, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 			if err == nil {
@@ -696,6 +671,9 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 			validationSchema.OpenAPIV3Schema.Properties["zeta"] = apiextensionsv1.JSONSchemaProps{
 				Type:        "array",
 				UniqueItems: false,
+				Items: &apiextensionsv1.JSONSchemaPropsOrArray{
+					Schema: &apiextensionsv1.JSONSchemaProps{Type: "object"},
+				},
 			}
 
 			_, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
