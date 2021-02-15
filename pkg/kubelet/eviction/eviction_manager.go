@@ -430,7 +430,7 @@ func (m *managerImpl) reclaimNodeLevelResources(signalToReclaim evictionapi.Sign
 		debugLogObservations("observations after resource reclaim", observations)
 
 		// determine the set of thresholds met independent of grace period
-		thresholds := thresholdsMet(m.config.Thresholds, observations, false)
+		thresholds := thresholdsMet(m.config.Thresholds, observations, true)
 		debugLogThresholdsWithObservation("thresholds after resource reclaim - ignoring grace period", thresholds, observations)
 
 		if len(thresholds) == 0 {
