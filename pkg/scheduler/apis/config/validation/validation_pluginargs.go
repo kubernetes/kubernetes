@@ -199,7 +199,7 @@ func ValidateRequestedToCapacityRatioArgs(args config.RequestedToCapacityRatioAr
 	var path *field.Path
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateFunctionShape(args.Shape, path.Child("shape"))...)
-	allErrs = append(allErrs, validateResources(args.Resources, path.Child("resources"), 1, 100)...)
+	allErrs = append(allErrs, validateResources(args.Resources, path.Child("resources"), 0, 100)...)
 	return allErrs.ToAggregate()
 }
 
