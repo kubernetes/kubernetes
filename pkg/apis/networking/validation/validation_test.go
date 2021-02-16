@@ -44,6 +44,14 @@ func makeValidNetworkPolicy() *networking.NetworkPolicy {
 	}
 }
 
+func makeNetworkPolicyCustom(tweaks ...func(networkPolicy *networking.NetworkPolicy)) *networking.NetworkPolicy {
+	networkPolicy := makeValidNetworkPolicy()
+	for _, fn := range tweaks {
+		fn(networkPolicy)
+	}
+	return networkPolicy
+}
+
 func TestValidateNetworkPolicy(t *testing.T) {
 	protocolTCP := api.ProtocolTCP
 	protocolUDP := api.ProtocolUDP
@@ -51,14 +59,24 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	protocolSCTP := api.ProtocolSCTP
 	endPort := int32(32768)
 	// Tweaks used below.
-	setIngressEmptyIngressRule := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{}
+	// setIngressEmptyIngressRule := func(networkPolicy *networking.NetworkPolicy) {
+	// 	networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{}
+	// }
+	setIngressEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{networking.NetworkPolicyIngressRule{}}
 	}
+
 	setIngressEmptyFrom := func(networkPolicy *networking.NetworkPolicy) {
 		networkPolicy.Spec.Ingress[0].From = []networking.NetworkPolicyPeer{}
 	}
+
+	setIngressFromEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From = []networking.NetworkPolicyPeer{networking.NetworkPolicyPeer{}}
+	}
+
 	setIngressEmptyPorts := func(networkPolicy *networking.NetworkPolicy) {
 		networkPolicy.Spec.Ingress[0].Ports = []networking.NetworkPolicyPort{}
+
 	}
 
 	setIngressPorts := func(networkPolicy *networking.NetworkPolicy) {
@@ -87,10 +105,10 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	setIngressPortsHigher := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Ingress[0].Ports =  []networking.NetworkPolicyPort{
+		networkPolicy.Spec.Ingress[0].Ports = []networking.NetworkPolicyPort{
 			{
 				Protocol: &protocolTCP,
-				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 65535},
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32768},
 				EndPort:  &endPort,
 			},
 		}
@@ -107,7 +125,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 			MatchLabels: map[string]string{"e": "f"},
 		}
 	}
-	
+
 	setIngressFromNamespaceSelector := func(networkPolicy *networking.NetworkPolicy) {
 		networkPolicy.Spec.Ingress[0].From[0].NamespaceSelector = &metav1.LabelSelector{
 			MatchLabels: map[string]string{"c": "d"},
@@ -120,16 +138,42 @@ func TestValidateNetworkPolicy(t *testing.T) {
 			Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
 		}
 	}
-	
-	setEgressEmptyTo := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Egress[0].To = []networking.NetworkPolicyPeer{}
+
+	setIngressFromIPBlockIPV6 := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From[0].IPBlock = &networking.IPBlock{
+			CIDR:   "fd00:192:168::/64",
+			Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
+		}
+	}
+
+	// setEgressEmptyEgressRule := func(networkPolicy *networking.NetworkPolicy) {
+	// 	networkPolicy.Spec.Egress = []networking.NetworkPolicyEgressRule{}
+	// }
+
+	setEgressEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress = []networking.NetworkPolicyEgressRule{networking.NetworkPolicyEgressRule{}}
+	}
+
+	// setEgressEmptyTo := func(networkPolicy *networking.NetworkPolicy) {
+	// 	networkPolicy.Spec.Egress[0].To = []networking.NetworkPolicyPeer{}
+	// }
+
+	setEgressToEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].To = []networking.NetworkPolicyPeer{networking.NetworkPolicyPeer{}}
 	}
 
 	setEgressToNamespaceSelector := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Egress[0].To[0].NamespaceSelector =&metav1.LabelSelector{
+		networkPolicy.Spec.Egress[0].To[0].NamespaceSelector = &metav1.LabelSelector{
 			MatchLabels: map[string]string{"c": "d"},
 		}
 	}
+
+	setEgressToPodSelector := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].To[0].PodSelector = &metav1.LabelSelector{
+			MatchLabels: map[string]string{"c": "d"},
+		}
+	}
+
 	setEgressPorts := func(networkPolicy *networking.NetworkPolicy) {
 		networkPolicy.Spec.Egress[0].Ports = []networking.NetworkPolicyPort{
 			{
@@ -156,7 +200,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	setEgressPortsUDPandHigh := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Egress[0].Ports =  []networking.NetworkPolicyPort{
+		networkPolicy.Spec.Egress[0].Ports = []networking.NetworkPolicyPort{
 			{
 				Protocol: nil,
 				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32000},
@@ -170,7 +214,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	setEgressPortsBothHigh := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Egress[0].Ports =  []networking.NetworkPolicyPort{
+		networkPolicy.Spec.Egress[0].Ports = []networking.NetworkPolicyPort{
 			{
 				Protocol: nil,
 				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 30000},
@@ -183,7 +227,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 			},
 		}
 	}
-	
+
 	setEgressToIPBlock := func(networkPolicy *networking.NetworkPolicy) {
 		networkPolicy.Spec.Egress[0].To[0].IPBlock = &networking.IPBlock{
 			CIDR:   "192.168.0.0/16",
@@ -199,1016 +243,286 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		networkPolicy.Spec.PolicyTypes = []networking.PolicyType{networking.PolicyTypeEgress}
 	}
 
-	successCases := []networking.NetworkPolicy{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From:  []networking.NetworkPolicyPeer{},
-						Ports: []networking.NetworkPolicyPort{},
-					},
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: nil,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
-							},
-							{
-								Protocol: &protocolTCP,
-								Port:     nil,
-							},
-							{
-								Protocol: &protocolTCP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 443},
-							},
-							{
-								Protocol: &protocolUDP,
-								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
-							},
-							{
-								Protocol: &protocolSCTP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 7777},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								PodSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-								PodSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"e": "f"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-							},
-						},
-					},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "192.168.0.0/16",
-									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "192.168.0.0/16",
-									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "192.168.0.0/16",
-									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
-								},
-							},
-						},
-					},
-				},
-				PolicyTypes: []networking.PolicyType{networking.PolicyTypeEgress},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "192.168.0.0/16",
-									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
-								},
-							},
-						},
-					},
-				},
-				PolicyTypes: []networking.PolicyType{networking.PolicyTypeIngress, networking.PolicyTypeEgress},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: nil,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
-							},
-							{
-								Protocol: &protocolTCP,
-								Port:     nil,
-							},
-							{
-								Protocol: &protocolTCP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 443},
-							},
-							{
-								Protocol: &protocolUDP,
-								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
-							},
-							{
-								Protocol: &protocolSCTP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 7777},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-							},
-						},
-					},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "fd00:192:168::/48",
-									Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "fd00:192:168::/48",
-									Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "fd00:192:168::/48",
-									Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
-								},
-							},
-						},
-					},
-				},
-				PolicyTypes: []networking.PolicyType{networking.PolicyTypeEgress},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "fd00:192:168::/48",
-									Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
-								},
-							},
-						},
-					},
-				},
-				PolicyTypes: []networking.PolicyType{networking.PolicyTypeIngress, networking.PolicyTypeEgress},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: nil,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32000},
-								EndPort:  &endPort,
-							},
-							{
-								Protocol: &protocolUDP,
-								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-							},
-						},
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: nil,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 30000},
-								EndPort:  &endPort,
-							},
-							{
-								Protocol: nil,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32000},
-								EndPort:  &endPort,
-							},
-						},
-					},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								PodSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"e": "f"},
-								},
-							},
-						},
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: &protocolTCP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32768},
-								EndPort:  &endPort,
-							},
-						},
-					},
-				},
-			},
-		},
+	successCases := []*networking.NetworkPolicy{
+		makeNetworkPolicyCustom(setIngressEmptyFirstElement),
+		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressEmptyFrom, setIngressEmptyPorts),
+		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressPorts),
+		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromPodSelector),
+		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromNamespaceSelector),
+		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromNamespaceSelector, setAlternativeIngressFromPodSelector),
+		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlock),
+		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlock),
+		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, setPolicyTypesEgress),
+		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, setPolicyTypesIngressEgress),
+		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressPorts),
+		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlock),
+		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlock),
+		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, setPolicyTypesEgress),
+		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, setPolicyTypesIngressEgress),
+		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressPortsUDPandHigh),
+		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setEgressPortsBothHigh, setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setAlternativeIngressFromPodSelector, setIngressPortsHigher),
 	}
 
 	// Success cases are expected to pass validation.
 
 	for k, v := range successCases {
-		if errs := ValidateNetworkPolicy(&v); len(errs) != 0 {
+		if errs := ValidateNetworkPolicy(v); len(errs) != 0 {
 			t.Errorf("Expected success for %d, got %v", k, errs)
 		}
 	}
 
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
-	errorCases := map[string]networking.NetworkPolicy{
-		"namespaceSelector and ipBlock": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-								IPBlock: &networking.IPBlock{
-									CIDR:   "192.168.0.0/16",
-									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
-								},
-							},
-						},
-					},
-				},
+
+	// Error specific tweaks
+	setMissingFromToType := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{
+			{
+				From: []networking.NetworkPolicyPeer{{}},
 			},
-		},
-		"podSelector and ipBlock": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								PodSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-								IPBlock: &networking.IPBlock{
-									CIDR:   "192.168.0.0/16",
-									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
-								},
-							},
-						},
-					},
-				},
+		}
+		networkPolicy.Spec.Egress = []networking.NetworkPolicyEgressRule{
+			{
+				To: []networking.NetworkPolicyPeer{{}},
 			},
-		},
-		"missing from and to type": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{{}},
-					},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{{}},
-					},
-				},
+		}
+	}
+
+	setInvalidSpecPodselector := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec = networking.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: invalidSelector,
 			},
-		},
-		"invalid spec.podSelector": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: invalidSelector,
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-							},
-						},
-					},
-				},
+		}
+	}
+
+	setInvalidIngressPortProtocol := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].Ports = []networking.NetworkPolicyPort{
+			{
+				Protocol: &protocolICMP,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
 			},
-		},
-		"invalid ingress.ports.protocol": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: &protocolICMP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
-							},
-						},
-					},
-				},
+		}
+	}
+
+	setInvalidIngressPortsPort := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].Ports = []networking.NetworkPolicyPort{
+			{
+				Protocol: &protocolTCP,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 123456789},
 			},
-		},
-		"invalid ingress.ports.port (int)": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: &protocolTCP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 123456789},
-							},
-						},
-					},
-				},
+		}
+	}
+
+	setInvalidIngressPortsPortStr := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].Ports = []networking.NetworkPolicyPort{
+			{
+				Protocol: &protocolTCP,
+				Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "!@#$"},
 			},
-		},
-		"invalid ingress.ports.port (str)": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: &protocolTCP,
-								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "!@#$"},
-							},
-						},
-					},
-				},
+		}
+	}
+
+	setInvalidIngressFromPodSelector := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From[0].PodSelector = &metav1.LabelSelector{
+			MatchLabels: invalidSelector,
+		}
+	}
+
+	setInvalidEgressToPodSelector := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].To[0].PodSelector = &metav1.LabelSelector{
+			MatchLabels: invalidSelector,
+		}
+	}
+
+	setInvalidEgressPortProtocol := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].Ports = []networking.NetworkPolicyPort{
+			{
+				Protocol: &protocolICMP,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
 			},
-		},
-		"invalid ingress.from.podSelector": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								PodSelector: &metav1.LabelSelector{
-									MatchLabels: invalidSelector,
-								},
-							},
-						},
-					},
-				},
+		}
+	}
+
+	setInvalidEgressPortsPort := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].Ports = []networking.NetworkPolicyPort{
+			{
+				Protocol: &protocolTCP,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 123456789},
 			},
-		},
-		"invalid egress.to.podSelector": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								PodSelector: &metav1.LabelSelector{
-									MatchLabels: invalidSelector,
-								},
-							},
-						},
-					},
-				},
+		}
+	}
+
+	setInvalidEgressPortsPortStr := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].Ports = []networking.NetworkPolicyPort{
+			{
+				Protocol: &protocolTCP,
+				Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "!@#$"},
 			},
-		},
-		"invalid egress.ports.protocol": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: &protocolICMP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
-							},
-						},
-					},
-				},
+		}
+	}
+
+	setInvalidIngressFromNameSpaceSelector := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From[0].NamespaceSelector = &metav1.LabelSelector{
+			MatchLabels: invalidSelector,
+		}
+	}
+
+	unsetCIDR := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = ""
+	}
+
+	setInvalidCIDRFormat := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = "192.168.5.6"
+	}
+
+	setInvalidIPV6Format := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = "fd00:192:168::"
+	}
+
+	setEmptyExcept := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From[0].IPBlock.Except = []string{"", " "}
+	}
+
+	setExceptOutRange := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From[0].IPBlock = &networking.IPBlock{
+			CIDR:   "192.168.8.0/24",
+			Except: []string{"192.168.9.1/24"},
+		}
+	}
+	setExceptNotStrictlyRange := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From[0].IPBlock = &networking.IPBlock{
+			CIDR:   "192.168.0.0/24",
+			Except: []string{"192.168.0.0/24"},
+		}
+	}
+
+	setExceptIPV6OutRange := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress[0].From[0].IPBlock = &networking.IPBlock{
+			CIDR:   "fd00:192:168:1::/64",
+			Except: []string{"fd00:192:168:2::/64"},
+		}
+	}
+
+	setInvalidPolicyTypes := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.PolicyTypes = []networking.PolicyType{"foo", "bar"}
+	}
+
+	setTooManyPolicyTypes := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.PolicyTypes = []networking.PolicyType{"foo", "bar", "baz"}
+	}
+
+	setEgressMultiplePortsOneInvalid := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].Ports = []networking.NetworkPolicyPort{
+			{
+				Protocol: &protocolUDP,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 35000},
+				EndPort:  &endPort,
 			},
-		},
-		"invalid egress.ports.port (int)": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: &protocolTCP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 123456789},
-							},
-						},
-					},
-				},
+			{
+				Protocol: nil,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32000},
+				EndPort:  &endPort,
 			},
-		},
-		"invalid egress.ports.port (str)": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: &protocolTCP,
-								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "!@#$"},
-							},
-						},
-					},
-				},
+		}
+	}
+
+	setEndPortNamed := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].Ports = []networking.NetworkPolicyPort{
+			{
+				Protocol: &protocolUDP,
+				Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
+				EndPort:  &endPort,
 			},
-		},
-		"invalid ingress.from.namespaceSelector": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: invalidSelector,
-								},
-							},
-						},
-					},
-				},
+			{
+				Protocol: nil,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32000},
+				EndPort:  &endPort,
 			},
-		},
-		"missing cidr field": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									Except: []string{"192.168.8.0/24", "192.168.9.0/24"},
-								},
-							},
-						},
-					},
-				},
+		}
+	}
+
+	setEndPortWithoutPort := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].Ports = []networking.NetworkPolicyPort{
+			{
+				Protocol: &protocolTCP,
+				EndPort:  &endPort,
 			},
-		},
-		"invalid cidr format": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "192.168.5.6",
-									Except: []string{"192.168.1.0/24", "192.168.2.0/24"},
-								},
-							},
-						},
-					},
-				},
+		}
+	}
+
+	setPortGreaterEndPort := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].Ports = []networking.NetworkPolicyPort{
+			{
+				Protocol: &protocolSCTP,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 33000},
+				EndPort:  &endPort,
 			},
-		},
-		"invalid ipv6 cidr format": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "fd00:192:168::",
-									Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
-								},
-							},
-						},
-					},
-				},
+		}
+	}
+
+	setMultipleInvalidPortRanges := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].Ports = []networking.NetworkPolicyPort{
+			{
+				Protocol: &protocolUDP,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 35000},
+				EndPort:  &endPort,
 			},
-		},
-		"except field is an empty string": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "192.168.8.0/24",
-									Except: []string{"", " "},
-								},
-							},
-						},
-					},
-				},
+			{
+				Protocol: &protocolTCP,
+				EndPort:  &endPort,
 			},
-		},
-		"except IP is outside of CIDR range": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "192.168.8.0/24",
-									Except: []string{"192.168.9.1/24"},
-								},
-							},
-						},
-					},
-				},
+			{
+				Protocol: &protocolTCP,
+				Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "https"},
+				EndPort:  &endPort,
 			},
-		},
-		"except IP is not strictly within CIDR range": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "192.168.0.0/24",
-									Except: []string{"192.168.0.0/24"},
-								},
-							},
-						},
-					},
-				},
+		}
+	}
+
+	setInvalidEndPortRanges := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].Ports = []networking.NetworkPolicyPort{
+			{
+				Protocol: nil,
+				Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 30000},
+				EndPort:  utilpointer.Int32Ptr(65537),
 			},
-		},
-		"except IPv6 is outside of CIDR range": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Ingress: []networking.NetworkPolicyIngressRule{
-					{
-						From: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "fd00:192:168:1::/64",
-									Except: []string{"fd00:192:168:2::/64"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		"invalid policyTypes": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "192.168.0.0/16",
-									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
-								},
-							},
-						},
-					},
-				},
-				PolicyTypes: []networking.PolicyType{"foo", "bar"},
-			},
-		},
-		"too many policyTypes": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								IPBlock: &networking.IPBlock{
-									CIDR:   "192.168.0.0/16",
-									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
-								},
-							},
-						},
-					},
-				},
-				PolicyTypes: []networking.PolicyType{"foo", "bar", "baz"},
-			},
-		},
-		"multiple ports defined, one port range is invalid": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-							},
-						},
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: &protocolUDP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 35000},
-								EndPort:  &endPort,
-							},
-							{
-								Protocol: nil,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32000},
-								EndPort:  &endPort,
-							},
-						},
-					},
-				},
-			},
-		},
-		"endPort defined with named/string port": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-							},
-						},
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: &protocolUDP,
-								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
-								EndPort:  &endPort,
-							},
-							{
-								Protocol: nil,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 32000},
-								EndPort:  &endPort,
-							},
-						},
-					},
-				},
-			},
-		},
-		"endPort defined without port defined": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-							},
-						},
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: &protocolTCP,
-								EndPort:  &endPort,
-							},
-						},
-					},
-				},
-			},
-		},
-		"port is greater than endPort": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-							},
-						},
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: &protocolSCTP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 33000},
-								EndPort:  &endPort,
-							},
-						},
-					},
-				},
-			},
-		},
-		"multiple invalid port ranges defined": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-							},
-						},
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: &protocolUDP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 35000},
-								EndPort:  &endPort,
-							},
-							{
-								Protocol: &protocolTCP,
-								EndPort:  &endPort,
-							},
-							{
-								Protocol: &protocolTCP,
-								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "https"},
-								EndPort:  &endPort,
-							},
-						},
-					},
-				},
-			},
-		},
-		"invalid endport range defined": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-			Spec: networking.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-				Egress: []networking.NetworkPolicyEgressRule{
-					{
-						To: []networking.NetworkPolicyPeer{
-							{
-								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"c": "d"},
-								},
-							},
-						},
-						Ports: []networking.NetworkPolicyPort{
-							{
-								Protocol: nil,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 30000},
-								EndPort:  utilpointer.Int32Ptr(65537),
-							},
-						},
-					},
-				},
-			},
-		},
+		}
+	}
+
+	errorCases := map[string]*networking.NetworkPolicy{
+		"namespaceSelector and ipBlock":                     makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromNamespaceSelector, setIngressFromIPBlock),
+		"podSelector and ipBlock":                           makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToPodSelector, setEgressToIPBlock),
+		"missing from and to type":                          makeNetworkPolicyCustom(setIngressEmptyFirstElement, setEgressEmptyFirstElement, setMissingFromToType),
+		"invalid spec.podSelector":                          makeNetworkPolicyCustom(setInvalidSpecPodselector, setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromNamespaceSelector),
+		"invalid ingress.ports.protocol":                    makeNetworkPolicyCustom(setIngressEmptyFirstElement, setInvalidIngressPortProtocol),
+		"invalid ingress.ports.port (int)":                  makeNetworkPolicyCustom(setIngressEmptyFirstElement, setInvalidIngressPortsPort),
+		"invalid ingress.ports.port (str)":                  makeNetworkPolicyCustom(setIngressEmptyFirstElement, setInvalidIngressPortsPortStr),
+		"invalid ingress.from.podSelector":                  makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setInvalidIngressFromPodSelector),
+		"invalid egress.to.podSelector":                     makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setInvalidEgressToPodSelector),
+		"invalid egress.ports.protocol":                     makeNetworkPolicyCustom(setEgressEmptyFirstElement, setInvalidEgressPortProtocol),
+		"invalid egress.ports.port (int)":                   makeNetworkPolicyCustom(setEgressEmptyFirstElement, setInvalidEgressPortsPort),
+		"invalid egress.ports.port (str)":                   makeNetworkPolicyCustom(setEgressEmptyFirstElement, setInvalidEgressPortsPortStr),
+		"invalid ingress.from.namespaceSelector":            makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setInvalidIngressFromNameSpaceSelector),
+		"missing cidr field":                                makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlock, unsetCIDR),
+		"invalid cidr format":                               makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlock, setInvalidCIDRFormat),
+		"invalid ipv6 cidr format":                          makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlockIPV6, setInvalidIPV6Format),
+		"except field is an empty string":                   makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlock, setEmptyExcept),
+		"except IP is outside of CIDR range":                makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlock, setExceptOutRange),
+		"except IP is not strictly within CIDR range":       makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlock, setExceptNotStrictlyRange),
+		"except IPv6 is outside of CIDR range":              makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlockIPV6, setExceptIPV6OutRange),
+		"invalid policyTypes":                               makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, setInvalidPolicyTypes),
+		"too many policyTypes":                              makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, setTooManyPolicyTypes),
+		"multiple ports defined, one port range is invalid": makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setEgressMultiplePortsOneInvalid),
+		"endPort defined with named/string port":            makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setEndPortNamed),
+		"endPort defined without port defined":              makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setEndPortWithoutPort),
+		"port is greater than endPort":                      makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setPortGreaterEndPort),
+		"multiple invalid port ranges defined":              makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setMultipleInvalidPortRanges),
+		"invalid endport range defined":                     makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setInvalidEndPortRanges),
 	}
 
 	// Error cases are not expected to pass validation.
 	for testName, networkPolicy := range errorCases {
-		if errs := ValidateNetworkPolicy(&networkPolicy); len(errs) == 0 {
+		if errs := ValidateNetworkPolicy(networkPolicy); len(errs) == 0 {
 			t.Errorf("Expected failure for test: %s", testName)
 		}
 	}
