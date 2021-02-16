@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
@@ -134,15 +135,13 @@ func newProxyServer(
 	}
 
 	// nodeIP is ONLY used by iptables and IPVS mode to filter LoadBalancer source ranges
+	// use it as fall-back to detect the primary IP family
 	nodeIP := detectNodeIP(client, hostname, config.BindAddress)
-	protocol := utiliptables.ProtocolIPv4
-	if utilsnet.IsIPv6(nodeIP) {
-		klog.V(0).Infof("kube-proxy node IP is an IPv6 address (%s), assume IPv6 operation", nodeIP.String())
-		protocol = utiliptables.ProtocolIPv6
-	} else {
-		klog.V(0).Infof("kube-proxy node IP is an IPv4 address (%s), assume IPv4 operation", nodeIP.String())
-	}
+	klog.V(0).Infof("kube-proxy node IP is (%s)", nodeIP.String())
 
+	// get the primary IP family of the cluster
+	protocol := getPrimaryClusterIPFamily(client, nodeIP)
+	klog.V(0).Infof("kube-proxy primary IP family is (%s), assume %s operations only in single-stack", protocol, protocol)
 	iptInterface = utiliptables.New(execer, protocol)
 	maybeDualStack := utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack)
 	var ipt [2]utiliptables.Interface
@@ -579,4 +578,41 @@ func tryIPTablesProxy(kcompat iptables.KernelCompatTester) string {
 	// Fallback.
 	klog.V(1).Infof("Can't use iptables proxy, using userspace proxier")
 	return proxyModeUserspace
+}
+
+// getPrimaryClusterIPFamily obtains the primary IP family of the cluster
+// using the Cluster IP address of the kubernetes service created in the default namespace
+// This unequivocally identifies the primary IP family because the default service is single-stack
+// If it is dual-stacked in the future, ClusterIP will keep representing the primary family.
+// If it can't get the kubernetes.default service, falls-back to the NodeIP to get the primary IP family
+func getPrimaryClusterIPFamily(c clientset.Interface, nodeIP net.IP) utiliptables.Protocol {
+	backoff := wait.Backoff{
+		Steps:    6,
+		Duration: 1 * time.Second,
+		Factor:   2.0,
+		Jitter:   0.2,
+	}
+	var clusterIP string
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		// Get the ClusterIP of the kubernetes service created in the default namespace
+		svc, err := c.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		clusterIP = svc.Spec.ClusterIP
+		return true, nil
+	})
+	if err != nil {
+		klog.Warningf("kube-proxy could not obtain the kubernetes.default service IP Family, "+
+			"falling back to the NodeIP %s: %v", nodeIP.String(), err)
+		if utilsnet.IsIPv6(nodeIP) {
+			return utiliptables.ProtocolIPv6
+		}
+		return utiliptables.ProtocolIPv4
+	}
+
+	if utilsnet.IsIPv6String(clusterIP) {
+		return utiliptables.ProtocolIPv6
+	}
+	return utiliptables.ProtocolIPv4
 }

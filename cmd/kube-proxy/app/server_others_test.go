@@ -26,9 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
@@ -668,5 +666,67 @@ func resolveDualStackLocalDetectors(t *testing.T) func(localDetector proxyutilip
 			}
 			return [2]proxyutiliptables.LocalTrafficDetector{localDetector, otherLocalDetector}
 		}
+	}
+}
+
+func Test_getPrimaryClusterIPFamily(t *testing.T) {
+	tests := []struct {
+		name   string
+		svc    *v1.Service
+		nodeIP net.IP
+		want   utiliptables.Protocol
+	}{
+		// {
+		// Disabled because the backoff mechanism fails to get the Services takes ~ 30s
+		// --- PASS: Test_getPrimaryClusterIPFamily/no_service,_default_nodeIP (34.09s)
+		//	name:   "no service, default nodeIP",
+		//	svc:    &v1.Service{},
+		//	nodeIP: net.ParseIP("127.0.0.1"),
+		//	want:   utiliptables.ProtocolIPv4,
+		// },
+		// {
+		// Disabled because the backoff mechanism fails to get the Services takes ~ 30s
+		// --- PASS: Test_getPrimaryClusterIPFamily/no_service,_nodeIP_IPv6 (32.41s)
+		// name:   "no service, nodeIP IPv6",
+		// svc:    &v1.Service{},
+		// nodeIP: net.ParseIP("2001:db2::2"),
+		// want:   utiliptables.ProtocolIPv6,
+		// },
+		{
+			name: "default service IPv4, default nodeIP",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kubernetes",
+					Namespace: "default",
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIP: "192.168.1.1",
+				},
+			},
+			nodeIP: net.ParseIP("127.0.0.1"),
+			want:   utiliptables.ProtocolIPv4,
+		},
+		{
+			name: "default service IPv6, default nodeIP",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kubernetes",
+					Namespace: "default",
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIP: "2001:db2::21",
+				},
+			},
+			nodeIP: net.ParseIP("127.0.0.1"),
+			want:   utiliptables.ProtocolIPv6,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset(tt.svc)
+			if got := getPrimaryClusterIPFamily(client, tt.nodeIP); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getPrimaryClusterIPFamily() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
