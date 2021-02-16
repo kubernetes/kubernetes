@@ -147,7 +147,13 @@ func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 // GetNodeIP returns an IP (as with GetNodeHostIP) for the node with the provided name.
 // If required, it will wait for the node to be created.
 func GetNodeIP(client clientset.Interface, name string) net.IP {
-	var nodeIP net.IP
+	return GetNodeIPs(client, name)[0]
+}
+
+// GetNodeIPs returns node IP or IPs (as with GetNodeHostIPs), for the node with the provided name.
+// If required, it will wait for the node to be created.
+func GetNodeIPs(client clientset.Interface, name string) []net.IP {
+	nodeIPs := []net.IP{}
 	backoff := wait.Backoff{
 		Steps:    6,
 		Duration: 1 * time.Second,
@@ -161,7 +167,7 @@ func GetNodeIP(client clientset.Interface, name string) net.IP {
 			klog.Errorf("Failed to retrieve node info: %v", err)
 			return false, nil
 		}
-		nodeIP, err = GetNodeHostIP(node)
+		nodeIPs, err = GetNodeHostIPs(node)
 		if err != nil {
 			klog.Errorf("Failed to retrieve node IP: %v", err)
 			return false, err
@@ -169,9 +175,9 @@ func GetNodeIP(client clientset.Interface, name string) net.IP {
 		return true, nil
 	})
 	if err == nil {
-		klog.Infof("Successfully retrieved node IP: %v", nodeIP)
+		klog.Infof("Successfully retrieved node IPs: %v", nodeIPs)
 	}
-	return nodeIP
+	return nodeIPs
 }
 
 // GetZoneKey is a helper function that builds a string identifier that is unique per failure-zone;
