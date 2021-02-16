@@ -50,10 +50,19 @@ var storageOperationMetric = metrics.NewHistogramVec(
 	[]string{"volume_plugin", "operation_name", "status"},
 )
 
+var storageOperationErrorMetric = metrics.NewCounterVec(
+	&metrics.CounterOpts{
+		Name:           "storage_operation_errors_total",
+		Help:           "Storage operation errors (Deprecated since 1.21.0)",
+		StabilityLevel: metrics.ALPHA,
+	},
+	[]string{"volume_plugin", "operation_name"},
+)
+
 var storageOperationStatusMetric = metrics.NewCounterVec(
 	&metrics.CounterOpts{
 		Name:           "storage_operation_status_count",
-		Help:           "Storage operation return statuses count",
+		Help:           "Storage operation return statuses count (Deprecated since 1.21.0)",
 		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"volume_plugin", "operation_name", "status"},
@@ -77,6 +86,7 @@ func registerMetrics() {
 	// legacyregistry is the internal k8s wrapper around the prometheus
 	// global registry, used specifically for metric stability enforcement
 	legacyregistry.MustRegister(storageOperationMetric)
+	legacyregistry.MustRegister(storageOperationErrorMetric)
 	legacyregistry.MustRegister(storageOperationStatusMetric)
 	legacyregistry.MustRegister(storageOperationEndToEndLatencyMetric)
 }
@@ -92,6 +102,7 @@ func OperationCompleteHook(plugin, operationName string) func(*error) {
 			// TODO: Establish well-known error codes to be able to distinguish
 			// user configuration errors from system errors.
 			status = statusFailUnknown
+			storageOperationErrorMetric.WithLabelValues(plugin, operationName).Inc()
 		}
 		storageOperationMetric.WithLabelValues(plugin, operationName, status).Observe(timeTaken)
 		storageOperationStatusMetric.WithLabelValues(plugin, operationName, status).Inc()
