@@ -113,7 +113,7 @@ var (
 	promoterE2eRegistry     = registry.PromoterE2eRegistry
 	buildImageRegistry      = registry.BuildImageRegistry
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
-	gcEtcdRegistry          = registry.GcRegistry
+	gcEtcdRegistry          = registry.GcEtcdRegistry
 	gcRegistry              = registry.GcRegistry
 	sigStorageRegistry      = registry.SigStorageRegistry
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
