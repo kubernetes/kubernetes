@@ -33,6 +33,5 @@ reviewers:
 - therc
 - pweil-
 - lukaszo
-- jianhuiz
 labels:
 - sig/apps

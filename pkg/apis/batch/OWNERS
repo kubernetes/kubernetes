@@ -16,6 +16,5 @@ reviewers:
 - errordeveloper
 - mml
 - mbohlool
-- jianhuiz
 labels:
 - sig/apps

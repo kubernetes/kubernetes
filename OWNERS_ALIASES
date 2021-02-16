@@ -36,7 +36,6 @@ aliases:
     - dims
     - enj
     - erictune
-    - jianhuiz
     - lavalamp
     - liggitt
     - mikedanese
@@ -59,7 +58,6 @@ aliases:
     - dims
     - enj
     - errordeveloper
-    - jianhuiz
     - lavalamp
     - liggitt
     - mikedanese
@@ -97,7 +95,6 @@ aliases:
     - tallclair
   sig-auth-policy-reviewers:
     - deads2k
-    - jianhuiz
     - liggitt
     - mbohlool
     - tallclair
