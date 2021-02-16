@@ -1083,7 +1083,12 @@ metadata:
 	ginkgo.Describe("Kubectl cluster-info dump", func() {
 		ginkgo.It("should check if cluster-info dump succeeds", func() {
 			ginkgo.By("running cluster-info dump")
-			framework.RunKubectlOrDie(ns, "cluster-info", "dump")
+
+			// Should return in a timely fashion (or we should mark the test slow)
+			timer := time.NewTimer(300 * time.Second)
+			defer timer.Stop()
+
+			framework.NewKubectlCommand(ns, "cluster-info", "dump").WithTimeout(timer.C).ExecOrDie(ns)
 		})
 	})
 
