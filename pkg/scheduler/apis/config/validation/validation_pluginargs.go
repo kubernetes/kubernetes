@@ -199,7 +199,7 @@ func ValidateRequestedToCapacityRatioArgs(args config.RequestedToCapacityRatioAr
 	var path *field.Path
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateFunctionShape(args.Shape, path.Child("shape"))...)
-	allErrs = append(allErrs, validateResourcesNoMax(args.Resources, path.Child("resources"))...)
+	allErrs = append(allErrs, validateResources(args.Resources, path.Child("resources"), 1, 100)...)
 	return allErrs.ToAggregate()
 }
 
@@ -240,35 +240,23 @@ func validateFunctionShape(shape []config.UtilizationShapePoint, path *field.Pat
 	return allErrs
 }
 
-// TODO potentially replace with validateResources
-func validateResourcesNoMax(resources []config.ResourceSpec, p *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	for i, r := range resources {
-		if r.Weight < 1 {
-			allErrs = append(allErrs, field.Invalid(p.Index(i).Child("weight"), r.Weight,
-				fmt.Sprintf("resource weight of %s not in valid range [1, inf)", r.Name)))
-		}
-	}
-	return allErrs
-}
-
 // ValidateNodeResourcesLeastAllocatedArgs validates that NodeResourcesLeastAllocatedArgs are correct.
 func ValidateNodeResourcesLeastAllocatedArgs(args *config.NodeResourcesLeastAllocatedArgs) error {
 	var path *field.Path
-	return validateResources(args.Resources, path.Child("resources")).ToAggregate()
+	return validateResources(args.Resources, path.Child("resources"), 0, 100).ToAggregate()
 }
 
 // ValidateNodeResourcesMostAllocatedArgs validates that NodeResourcesMostAllocatedArgs are correct.
 func ValidateNodeResourcesMostAllocatedArgs(args *config.NodeResourcesMostAllocatedArgs) error {
 	var path *field.Path
-	return validateResources(args.Resources, path.Child("resources")).ToAggregate()
+	return validateResources(args.Resources, path.Child("resources"), 0, 100).ToAggregate()
 }
 
-func validateResources(resources []config.ResourceSpec, p *field.Path) field.ErrorList {
+func validateResources(resources []config.ResourceSpec, p *field.Path, minWeight, maxWeight int64) field.ErrorList {
 	var allErrs field.ErrorList
 	for i, resource := range resources {
-		if resource.Weight <= 0 || resource.Weight > 100 {
-			msg := fmt.Sprintf("resource weight of %v not in valid range (0, 100]", resource.Name)
+		if resource.Weight <= minWeight || resource.Weight > maxWeight {
+			msg := fmt.Sprintf("resource weight of %v not in valid range (%v, %v]", resource.Name, minWeight, maxWeight)
 			allErrs = append(allErrs, field.Invalid(p.Index(i).Child("weight"), resource.Weight, msg))
 		}
 	}
@@ -298,3 +286,4 @@ func ValidateNodeAffinityArgs(args *config.NodeAffinityArgs) error {
 	}
 	return errors.Flatten(errors.NewAggregate(errs))
 }
+
