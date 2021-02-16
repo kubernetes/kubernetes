@@ -117,7 +117,6 @@ var _ = SIGDescribe("HostPort", func() {
 		cmdPod2 := []string{"/bin/sh", "-c", fmt.Sprintf("curl -g --connect-timeout %v http://%s/hostname", timeout, net.JoinHostPort(hostIP, strconv.Itoa(int(port))))}
 		cmdPod3 := []string{"/bin/sh", "-c", fmt.Sprintf("nc -vuz -w %v %s %d", timeout, hostIP, port)}
 		// try 5 times to connect to the exposed ports
-		success := false
 		for i := 0; i < 5; i++ {
 			// check pod1
 			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d", hostExecPod.Name, localhost, port))
@@ -145,11 +144,9 @@ var _ = SIGDescribe("HostPort", func() {
 				framework.Logf("Can not connect from %s to pod(pod2) to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port)
 				continue
 			}
-			success = true
+			return
 		}
-		if !success {
-			framework.Failf("Failed to connect to exposed host ports")
-		}
+		framework.Failf("Failed to connect to exposed host ports")
 	})
 })
 
@@ -190,9 +187,11 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 			NodeName: nodeName,
 		},
 	}
-	_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), hostPortPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	if _, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), hostPortPod, metav1.CreateOptions{}); err != nil {
+		framework.Failf("error creating pod %s, err:%v", podName, err)
+	}
 
-	err = e2epod.WaitForPodNotPending(f.ClientSet, ns, podName)
-	framework.ExpectNoError(err)
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, ns, framework.PodStartTimeout); err != nil {
+		framework.Failf("wait for pod %s timeout, err:%v", podName, err)
+	}
 }
