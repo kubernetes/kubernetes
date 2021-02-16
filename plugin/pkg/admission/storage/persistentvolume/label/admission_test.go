@@ -174,9 +174,9 @@ func Test_PVLAdmission(t *testing.T) {
 			name:    "AWS EBS PV labeled correctly",
 			handler: newPersistentVolumeLabel(),
 			pvlabeler: mockVolumeLabels(map[string]string{
-				"a":                           "1",
-				"b":                           "2",
-				v1.LabelFailureDomainBetaZone: "1__2__3",
+				"a":                  "1",
+				"b":                  "2",
+				v1.LabelTopologyZone: "1__2__3",
 			}),
 			preAdmissionPV: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{Name: "awsebs", Namespace: "myns"},
@@ -193,9 +193,9 @@ func Test_PVLAdmission(t *testing.T) {
 					Name:      "awsebs",
 					Namespace: "myns",
 					Labels: map[string]string{
-						"a":                           "1",
-						"b":                           "2",
-						v1.LabelFailureDomainBetaZone: "1__2__3",
+						"a":                  "1",
+						"b":                  "2",
+						v1.LabelTopologyZone: "1__2__3",
 					},
 				},
 				Spec: api.PersistentVolumeSpec{
@@ -220,7 +220,7 @@ func Test_PVLAdmission(t *testing.T) {
 											Values:   []string{"2"},
 										},
 										{
-											Key:      v1.LabelFailureDomainBetaZone,
+											Key:      v1.LabelTopologyZone,
 											Operator: api.NodeSelectorOpIn,
 											Values:   []string{"1", "2", "3"},
 										},
@@ -373,15 +373,15 @@ func Test_PVLAdmission(t *testing.T) {
 			name:    "existing labels from user are changed",
 			handler: newPersistentVolumeLabel(),
 			pvlabeler: mockVolumeLabels(map[string]string{
-				v1.LabelFailureDomainBetaZone:   "domain1",
-				v1.LabelFailureDomainBetaRegion: "region1",
+				v1.LabelTopologyZone:   "domain1",
+				v1.LabelTopologyRegion: "region1",
 			}),
 			preAdmissionPV: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "awsebs", Namespace: "myns",
 					Labels: map[string]string{
-						v1.LabelFailureDomainBetaZone:   "existingDomain",
-						v1.LabelFailureDomainBetaRegion: "existingRegion",
+						v1.LabelTopologyZone:   "existingDomain",
+						v1.LabelTopologyRegion: "existingRegion",
 					},
 				},
 				Spec: api.PersistentVolumeSpec{
@@ -397,8 +397,8 @@ func Test_PVLAdmission(t *testing.T) {
 					Name:      "awsebs",
 					Namespace: "myns",
 					Labels: map[string]string{
-						v1.LabelFailureDomainBetaZone:   "domain1",
-						v1.LabelFailureDomainBetaRegion: "region1",
+						v1.LabelTopologyZone:   "domain1",
+						v1.LabelTopologyRegion: "region1",
 					},
 				},
 				Spec: api.PersistentVolumeSpec{
@@ -413,12 +413,12 @@ func Test_PVLAdmission(t *testing.T) {
 								{
 									MatchExpressions: []api.NodeSelectorRequirement{
 										{
-											Key:      v1.LabelFailureDomainBetaRegion,
+											Key:      v1.LabelTopologyRegion,
 											Operator: api.NodeSelectorOpIn,
 											Values:   []string{"region1"},
 										},
 										{
-											Key:      v1.LabelFailureDomainBetaZone,
+											Key:      v1.LabelTopologyZone,
 											Operator: api.NodeSelectorOpIn,
 											Values:   []string{"domain1"},
 										},
@@ -630,9 +630,9 @@ func Test_PVLAdmission(t *testing.T) {
 			name:    "AWS EBS PV overrides user applied labels",
 			handler: newPersistentVolumeLabel(),
 			pvlabeler: mockVolumeLabels(map[string]string{
-				"a":                           "1",
-				"b":                           "2",
-				v1.LabelFailureDomainBetaZone: "1__2__3",
+				"a":                  "1",
+				"b":                  "2",
+				v1.LabelTopologyZone: "1__2__3",
 			}),
 			preAdmissionPV: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
@@ -655,9 +655,9 @@ func Test_PVLAdmission(t *testing.T) {
 					Name:      "awsebs",
 					Namespace: "myns",
 					Labels: map[string]string{
-						"a":                           "1",
-						"b":                           "2",
-						v1.LabelFailureDomainBetaZone: "1__2__3",
+						"a":                  "1",
+						"b":                  "2",
+						v1.LabelTopologyZone: "1__2__3",
 					},
 				},
 				Spec: api.PersistentVolumeSpec{
@@ -682,7 +682,7 @@ func Test_PVLAdmission(t *testing.T) {
 											Values:   []string{"2"},
 										},
 										{
-											Key:      v1.LabelFailureDomainBetaZone,
+											Key:      v1.LabelTopologyZone,
 											Operator: api.NodeSelectorOpIn,
 											Values:   []string{"1", "2", "3"},
 										},

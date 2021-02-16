@@ -170,13 +170,23 @@ func TestTopologyTranslation(t *testing.T) {
 		},
 		// EBS test cases: test mostly topology key, i.e., don't repeat testing done with GCE
 		{
-			name:                 "AWS EBS with zone labels",
+			name:                 "AWS EBS with beta zone labels",
 			pv:                   makeAWSEBSPV(kubernetesBetaTopologyLabels, nil /*topology*/),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.AWSEBSTopologyKey, "us-east-1a"),
 		},
 		{
-			name:                 "AWS EBS with zone labels and topology",
+			name:                 "AWS EBS with beta zone labels and topology",
 			pv:                   makeAWSEBSPV(kubernetesBetaTopologyLabels, makeTopology(v1.LabelFailureDomainBetaZone, "us-east-2a")),
+			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.AWSEBSTopologyKey, "us-east-2a"),
+		},
+		{
+			name:                 "AWS EBS with GA zone labels",
+			pv:                   makeAWSEBSPV(kubernetesGATopologyLabels, nil /*topology*/),
+			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.AWSEBSTopologyKey, "us-east-1a"),
+		},
+		{
+			name:                 "AWS EBS with GA zone labels and topology",
+			pv:                   makeAWSEBSPV(kubernetesGATopologyLabels, makeTopology(v1.LabelTopologyZone, "us-east-2a")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.AWSEBSTopologyKey, "us-east-2a"),
 		},
 		// Cinder test cases: test mosty topology key, i.e., don't repeat testing done with GCE

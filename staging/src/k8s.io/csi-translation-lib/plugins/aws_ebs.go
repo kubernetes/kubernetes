@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -174,6 +175,11 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateCSIPVToInTree(pv *v1.Persis
 		ebsSource.Partition = int32(partValue)
 	}
 
+	// translate CSI topology to In-tree topology for rollback compatibility
+	if err := translateTopologyFromCSIToInTree(pv, AWSEBSTopologyKey, awsRegionTopologyHandler); err != nil {
+		return nil, fmt.Errorf("failed to translate topology. PV:%+v. Error:%v", *pv, err)
+	}
+
 	pv.Spec.CSI = nil
 	pv.Spec.AWSElasticBlockStore = ebsSource
 	return pv, nil
@@ -252,4 +258,91 @@ func KubernetesVolumeIDToEBSVolumeID(kubernetesID string) (string, error) {
 	}
 
 	return awsID, nil
+}
+
+// This code is copied over from gce_pd as is. However, we're passing our own getRegionFromZones implementation.
+// It might be worth moving this to a common place and pass that function as a parameter.
+func awsRegionTopologyHandler(pv *v1.PersistentVolume) error {
+
+	// Make sure the necessary fields exist
+	if pv == nil || pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil ||
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms == nil || len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
+		return nil
+	}
+
+	zoneLabel, regionLabel := getTopologyLabel(pv)
+
+	// process each term
+	for index, nodeSelectorTerm := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
+		// In the first loop, see if regionLabel already exist
+		regionExist := false
+		var zoneVals []string
+		for _, nsRequirement := range nodeSelectorTerm.MatchExpressions {
+			if nsRequirement.Key == regionLabel {
+				regionExist = true
+				break
+			} else if nsRequirement.Key == zoneLabel {
+				zoneVals = append(zoneVals, nsRequirement.Values...)
+			}
+		}
+		if regionExist {
+			// Regionlabel already exist in this term, skip it
+			continue
+		}
+		// If no regionLabel found, generate region label from the zoneLabel we collect from this term
+		regionVal, err := getAwsRegionFromZones(zoneVals)
+		if err != nil {
+			return err
+		}
+		// Add the regionVal to this term
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[index].MatchExpressions =
+			append(pv.Spec.NodeAffinity.Required.NodeSelectorTerms[index].MatchExpressions, v1.NodeSelectorRequirement{
+				Key:      regionLabel,
+				Operator: v1.NodeSelectorOpIn,
+				Values:   []string{regionVal},
+			})
+
+	}
+
+	// Add region label
+	regionVals := getTopologyValues(pv, regionLabel)
+	if len(regionVals) == 1 {
+		// We should only have exactly 1 region value
+		if pv.Labels == nil {
+			pv.Labels = make(map[string]string)
+		}
+		_, regionOK := pv.Labels[regionLabel]
+		if !regionOK {
+			pv.Labels[regionLabel] = regionVals[0]
+		}
+	}
+
+	return nil
+}
+
+func getAwsRegionFromZones(zones []string) (string, error) {
+	regions := sets.String{}
+	if len(zones) < 1 {
+		return "", fmt.Errorf("no zones specified")
+	}
+
+	// AWS zones can be in four forms:
+	// us-west-2a, us-gov-east-1a, us-west-2-lax-1a (local zone) and us-east-1-wl1-bos-wlz-1 (wavelength).
+	for _, zone := range zones {
+		splitZone := strings.Split(zone, "-")
+		if (len(splitZone) == 3 || len(splitZone) == 4) && len(splitZone[len(splitZone)-1]) == 2 {
+			// this would break if we ever have a location with more than 9 regions, ie us-west-10.
+			splitZone[len(splitZone)-1] = splitZone[len(splitZone)-1][:1]
+			regions.Insert(strings.Join(splitZone, "-"))
+		} else if len(splitZone) == 5 || len(splitZone) == 7 {
+			// local zone or wavelength
+			regions.Insert(strings.Join(splitZone[:3], "-"))
+		} else {
+			return "", fmt.Errorf("Unexpected zone format: %v is not a valid AWS zone", zone)
+		}
+	}
+	if regions.Len() != 1 {
+		return "", fmt.Errorf("multiple or no regions gotten from zones, got: %v", regions)
+	}
+	return regions.UnsortedList()[0], nil
 }
