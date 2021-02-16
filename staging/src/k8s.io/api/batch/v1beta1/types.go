@@ -156,6 +156,7 @@ const (
 type CronJobStatus struct {
 	// A list of pointers to currently running jobs.
 	// +optional
+	// +listType=atomic
 	Active []v1.ObjectReference `json:"active,omitempty" protobuf:"bytes,1,rep,name=active"`
 
 	// Information when was the last time the job was successfully scheduled.
