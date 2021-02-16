@@ -102,15 +102,15 @@ _DEBIAN_IPTABLES_DIGEST = {
 # Use skopeo to find these values: https://github.com/containers/skopeo
 #
 # Example
-# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/go-runner:buster-v2.2.2
-# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/go-runner:buster-v2.2.2
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/go-runner:buster-v2.3.1
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/go-runner:buster-v2.3.1
 _GO_RUNNER_DIGEST = {
-    "manifest": "sha256:384e84aa715aed583798a77b92b78747f786f238a3bf9a43419d80029ecb3cf8",
-    "amd64": "sha256:38f0621075389afe17c29f60715123469b5ee9aa18a34532eca3613e945486cb",
-    "arm": "sha256:2e70823f577cb81a22f5974d276171568bd71dd0407b0bd46f4c66d8fc46a3b7",
-    "arm64": "sha256:c69c669947d5b60ce4e64069b24c9021799f8354521a7d0cbff68adc96db8726",
-    "ppc64le": "sha256:1a794556fafbc240a3ea5c8a0b42b63c6a3f4ef157b5120c6c10e934b70a6d63",
-    "s390x": "sha256:ff594a58928755e3fdb1c8e25d453515adfce01b6c9035f9ffc01015c886f82d",
+    "manifest": "sha256:cd45714e4824eeff6f107d9e3b4f79be9ee0cf5071dc46caf755d3f324a36089",
+    "amd64": "sha256:309379049147b749d2bc63cd8bb2d6c46a68f45fd7fc5fd391d221b42e2c7196",
+    "arm": "sha256:81ad4220d42a19e5e11ccb4b385b404ab287d6417f9b51077ea15df5196d6e75",
+    "arm64": "sha256:93ccd74b2a434e21cd150cf89b10c6fc5e0bf66691ee5c8f22bf1241d168c445",
+    "ppc64le": "sha256:4a7f8dce0f4505e43790fb660b67f4cebad91fae1835c79d0132ba6ecf480701",
+    "s390x": "sha256:e6fa60bd53c8f3706c4d1cd6cd6bc3e95d01b4a924daab004fca9bf403b03e41",
 }
 
 def _digest(d, arch):
@@ -127,7 +127,7 @@ def image_dependencies():
             digest = _digest(_GO_RUNNER_DIGEST, arch),
             registry = "k8s.gcr.io/build-image",
             repository = "go-runner",
-            tag = "buster-v2.2.2",  # ignored, but kept here for documentation
+            tag = "buster-v2.3.1",  # ignored, but kept here for documentation
         )
 
         container_pull(
