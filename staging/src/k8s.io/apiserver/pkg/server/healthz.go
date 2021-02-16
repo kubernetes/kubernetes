@@ -53,11 +53,14 @@ func (s *GenericAPIServer) addHealthChecks(livezGracePeriod time.Duration, check
 		return fmt.Errorf("unable to add because the healthz endpoint has already been created")
 	}
 	s.healthzChecks = append(s.healthzChecks, checks...)
-	return s.addLivezChecks(livezGracePeriod, checks...)
+	if err := s.AddLivezChecks(livezGracePeriod, checks...); err != nil {
+		return err
+	}
+	return s.AddReadyzChecks(checks...)
 }
 
-// addReadyzChecks allows you to add a HealthCheck to readyz.
-func (s *GenericAPIServer) addReadyzChecks(checks ...healthz.HealthChecker) error {
+// AddReadyzChecks allows you to add a HealthCheck to readyz.
+func (s *GenericAPIServer) AddReadyzChecks(checks ...healthz.HealthChecker) error {
 	s.readyzLock.Lock()
 	defer s.readyzLock.Unlock()
 	if s.readyzChecksInstalled {
@@ -67,9 +70,8 @@ func (s *GenericAPIServer) addReadyzChecks(checks ...healthz.HealthChecker) erro
 	return nil
 }
 
-// addLivezChecks allows you to add a HealthCheck to livez. It will also automatically add a check to readyz,
-// since we want to avoid being ready when we are not live.
-func (s *GenericAPIServer) addLivezChecks(delay time.Duration, checks ...healthz.HealthChecker) error {
+// AddLivezChecks allows you to add a HealthCheck to livez.
+func (s *GenericAPIServer) AddLivezChecks(delay time.Duration, checks ...healthz.HealthChecker) error {
 	s.livezLock.Lock()
 	defer s.livezLock.Unlock()
 	if s.livezChecksInstalled {
@@ -78,14 +80,14 @@ func (s *GenericAPIServer) addLivezChecks(delay time.Duration, checks ...healthz
 	for _, check := range checks {
 		s.livezChecks = append(s.livezChecks, delayedHealthCheck(check, s.livezClock, delay))
 	}
-	return s.addReadyzChecks(checks...)
+	return nil
 }
 
 // addReadyzShutdownCheck is a convenience function for adding a readyz shutdown check, so
 // that we can register that the api-server is no longer ready while we attempt to gracefully
 // shutdown.
 func (s *GenericAPIServer) addReadyzShutdownCheck(stopCh <-chan struct{}) error {
-	return s.addReadyzChecks(shutdownCheck{stopCh})
+	return s.AddReadyzChecks(shutdownCheck{stopCh})
 }
 
 // installHealthz creates the healthz endpoint for this server
