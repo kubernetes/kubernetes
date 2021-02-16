@@ -423,7 +423,6 @@ type PersistentVolumeClaimList struct {
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
 	// Contains the types of access modes required
-	// +optional
 	AccessModes []PersistentVolumeAccessMode
 	// A label query over volumes to consider for binding. This selector is
 	// ignored when VolumeName is set
