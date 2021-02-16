@@ -133,6 +133,7 @@ func newProxyServer(
 		return nil, err
 	}
 
+	// nodeIP is ONLY used by iptables and IPVS mode to filter LoadBalancer source ranges
 	nodeIP := detectNodeIP(client, hostname, config.BindAddress)
 	protocol := utiliptables.ProtocolIPv4
 	if utilsnet.IsIPv6(nodeIP) {
