@@ -399,6 +399,10 @@ type KubeletConfiguration struct {
 	// 3. NUMAs nodes IDs that do not exist under the machine.
 	// 4. memory types except for memory and hugepages-<size>
 	ReservedMemory []MemoryReservation
+	// EnableProfiling enables /debug/pprof handler.
+	EnableProfilingHandler bool
+	// EnableDebugFlagsHandler enables/debug/flags/v handler.
+	EnableDebugFlagsHandler bool
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

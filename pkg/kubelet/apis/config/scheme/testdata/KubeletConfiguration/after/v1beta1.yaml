@@ -23,7 +23,9 @@ cpuCFSQuotaPeriod: 100ms
 cpuManagerPolicy: none
 cpuManagerReconcilePeriod: 10s
 enableControllerAttachDetach: true
+enableDebugFlagsHandler: true
 enableDebuggingHandlers: true
+enableProfilingHandler: true
 enableServer: true
 enableSystemLogHandler: true
 enforceNodeAllocatable:

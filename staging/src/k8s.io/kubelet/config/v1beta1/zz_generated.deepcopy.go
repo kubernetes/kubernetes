@@ -311,6 +311,16 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.EnableProfilingHandler != nil {
+		in, out := &in.EnableProfilingHandler, &out.EnableProfilingHandler
+		*out = new(bool)
+		**out = **in
+	}
+	if in.EnableDebugFlagsHandler != nil {
+		in, out := &in.EnableDebugFlagsHandler, &out.EnableDebugFlagsHandler
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
