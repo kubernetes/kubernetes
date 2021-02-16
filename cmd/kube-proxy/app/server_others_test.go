@@ -217,34 +217,34 @@ func Test_getDetectLocalMode(t *testing.T) {
 	}
 }
 
-func Test_detectNodeIP(t *testing.T) {
+func Test_detectNodeIPs(t *testing.T) {
 	cases := []struct {
 		name        string
 		nodeInfo    *v1.Node
 		hostname    string
 		bindAddress string
-		expectedIP  net.IP
+		expectedIPs [2]net.IP
 	}{
 		{
 			name:        "Bind address IPv4 unicast address and no Node object",
 			nodeInfo:    makeNodeWithAddresses("", "", ""),
 			hostname:    "fakeHost",
 			bindAddress: "10.0.0.1",
-			expectedIP:  net.ParseIP("10.0.0.1"),
+			expectedIPs: [2]net.IP{net.ParseIP("10.0.0.1"), net.ParseIP("::1")},
 		},
 		{
 			name:        "Bind address IPv6 unicast address and no Node object",
 			nodeInfo:    makeNodeWithAddresses("", "", ""),
 			hostname:    "fakeHost",
 			bindAddress: "fd00:4321::2",
-			expectedIP:  net.ParseIP("fd00:4321::2"),
+			expectedIPs: [2]net.IP{net.ParseIP("fd00:4321::2"), net.ParseIP("127.0.0.1")},
 		},
 		{
 			name:        "No Valid IP found",
 			nodeInfo:    makeNodeWithAddresses("", "", ""),
 			hostname:    "fakeHost",
 			bindAddress: "",
-			expectedIP:  net.ParseIP("127.0.0.1"),
+			expectedIPs: [2]net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
 		},
 		// Disabled because the GetNodeIP method has a backoff retry mechanism
 		// and the test takes more than 30 seconds
@@ -254,70 +254,84 @@ func Test_detectNodeIP(t *testing.T) {
 		//	nodeInfo:    makeNodeWithAddresses("", "", ""),
 		//	hostname:    "fakeHost",
 		//	bindAddress: "0.0.0.0",
-		//	expectedIP:  net.ParseIP("127.0.0.1"),
+		//	expectedIPs:  net.ParseIP("127.0.0.1"),
 		// },
 		{
 			name:        "Bind address 0.0.0.0 and node with IPv4 InternalIP set",
 			nodeInfo:    makeNodeWithAddresses("fakeHost", "192.168.1.1", "90.90.90.90"),
 			hostname:    "fakeHost",
 			bindAddress: "0.0.0.0",
-			expectedIP:  net.ParseIP("192.168.1.1"),
+			expectedIPs: [2]net.IP{net.ParseIP("192.168.1.1"), net.ParseIP("::1")},
 		},
 		{
 			name:        "Bind address :: and node with IPv4 InternalIP set",
 			nodeInfo:    makeNodeWithAddresses("fakeHost", "192.168.1.1", "90.90.90.90"),
 			hostname:    "fakeHost",
 			bindAddress: "::",
-			expectedIP:  net.ParseIP("192.168.1.1"),
+			expectedIPs: [2]net.IP{net.ParseIP("192.168.1.1"), net.ParseIP("::1")},
 		},
 		{
 			name:        "Bind address 0.0.0.0 and node with IPv6 InternalIP set",
 			nodeInfo:    makeNodeWithAddresses("fakeHost", "fd00:1234::1", "2001:db8::2"),
 			hostname:    "fakeHost",
 			bindAddress: "0.0.0.0",
-			expectedIP:  net.ParseIP("fd00:1234::1"),
+			expectedIPs: [2]net.IP{net.ParseIP("fd00:1234::1"), net.ParseIP("127.0.0.1")},
 		},
 		{
 			name:        "Bind address :: and node with IPv6 InternalIP set",
 			nodeInfo:    makeNodeWithAddresses("fakeHost", "fd00:1234::1", "2001:db8::2"),
 			hostname:    "fakeHost",
 			bindAddress: "::",
-			expectedIP:  net.ParseIP("fd00:1234::1"),
+			expectedIPs: [2]net.IP{net.ParseIP("fd00:1234::1"), net.ParseIP("127.0.0.1")},
 		},
 		{
 			name:        "Bind address 0.0.0.0 and node with only IPv4 ExternalIP set",
 			nodeInfo:    makeNodeWithAddresses("fakeHost", "", "90.90.90.90"),
 			hostname:    "fakeHost",
 			bindAddress: "0.0.0.0",
-			expectedIP:  net.ParseIP("90.90.90.90"),
+			expectedIPs: [2]net.IP{net.ParseIP("90.90.90.90"), net.ParseIP("::1")},
 		},
 		{
 			name:        "Bind address :: and node with only IPv4 ExternalIP set",
 			nodeInfo:    makeNodeWithAddresses("fakeHost", "", "90.90.90.90"),
 			hostname:    "fakeHost",
 			bindAddress: "::",
-			expectedIP:  net.ParseIP("90.90.90.90"),
+			expectedIPs: [2]net.IP{net.ParseIP("90.90.90.90"), net.ParseIP("::1")},
 		},
 		{
 			name:        "Bind address 0.0.0.0 and node with only IPv6 ExternalIP set",
 			nodeInfo:    makeNodeWithAddresses("fakeHost", "", "2001:db8::2"),
 			hostname:    "fakeHost",
 			bindAddress: "0.0.0.0",
-			expectedIP:  net.ParseIP("2001:db8::2"),
+			expectedIPs: [2]net.IP{net.ParseIP("2001:db8::2"), net.ParseIP("127.0.0.1")},
 		},
 		{
 			name:        "Bind address :: and node with only IPv6 ExternalIP set",
 			nodeInfo:    makeNodeWithAddresses("fakeHost", "", "2001:db8::2"),
 			hostname:    "fakeHost",
 			bindAddress: "::",
-			expectedIP:  net.ParseIP("2001:db8::2"),
+			expectedIPs: [2]net.IP{net.ParseIP("2001:db8::2"), net.ParseIP("127.0.0.1")},
+		},
+		{
+			name:        "Bind address 0.0.0.0 and node with dual-stack addresses IPv6 first",
+			nodeInfo:    makeNodeWithAddresses("fakeHost", "2001:db8::2", "192.168.1.1"),
+			hostname:    "fakeHost",
+			bindAddress: "0.0.0.0",
+			expectedIPs: [2]net.IP{net.ParseIP("2001:db8::2"), net.ParseIP("192.168.1.1")},
+		},
+		{
+			name:        "Bind address 0.0.0.0 and node with dual-stack addresses IPv4 first",
+			nodeInfo:    makeNodeWithAddresses("fakeHost", "192.168.1.1", "2001:db8::2"),
+			hostname:    "fakeHost",
+			bindAddress: "0.0.0.0",
+			expectedIPs: [2]net.IP{net.ParseIP("192.168.1.1"), net.ParseIP("2001:db8::2")},
 		},
 	}
 	for _, c := range cases {
 		client := clientsetfake.NewSimpleClientset(c.nodeInfo)
-		ip := detectNodeIP(client, c.hostname, c.bindAddress)
-		if !ip.Equal(c.expectedIP) {
-			t.Errorf("Case[%s] Expected IP %q got %q", c.name, c.expectedIP, ip)
+		ips := detectNodeIPs(client, c.hostname, c.bindAddress)
+		if !reflect.DeepEqual(ips, c.expectedIPs) {
+			t.Errorf("Case[%s] Expected IP %q got %q", c.name, c.expectedIPs, ips)
 		}
 	}
 }

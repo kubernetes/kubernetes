@@ -135,9 +135,14 @@ func newProxyServer(
 	}
 
 	// nodeIP is ONLY used by iptables and IPVS mode to filter LoadBalancer source ranges
-	// use it as fall-back to detect the primary IP family
-	nodeIP := detectNodeIP(client, hostname, config.BindAddress)
-	klog.V(0).Infof("kube-proxy node IP is (%s)", nodeIP.String())
+	// the first nodeIP returned is uses as fall-back to detect the primary IP family of kube-proxy
+	nodeIPs := detectNodeIPs(client, hostname, config.BindAddress)
+	nodeIP := nodeIPs[0]
+	klog.V(0).Infof("kube-proxy primary node IP is (%s)", nodeIP)
+	// kube-proxy expect nodeIPs always ordered as IPv4, IPv6
+	if utilsnet.IsIPv6(nodeIP) {
+		nodeIPs[0], nodeIPs[1] = nodeIPs[1], nodeIPs[0]
+	}
 
 	// get the primary IP family of the cluster
 	protocol := getPrimaryClusterIPFamily(client, nodeIP)
@@ -226,7 +231,7 @@ func newProxyServer(
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors,
 				hostname,
-				nodeIPTuple(config.BindAddress),
+				nodeIPs,
 				recorder,
 				healthzServer,
 				config.NodePortAddresses,
@@ -258,8 +263,6 @@ func newProxyServer(
 		klog.V(0).Info("Using ipvs Proxier.")
 		if maybeDualStack {
 			klog.V(0).Info("creating dualStackProxier for ipvs.")
-
-			nodeIPs := nodeIPTuple(config.BindAddress)
 
 			proxier, err = ipvs.NewDualStackProxier(
 				ipt,
@@ -393,21 +396,44 @@ func waitForPodCIDR(client clientset.Interface, nodeName string) (*v1.Node, erro
 	return nil, fmt.Errorf("event object not of type node")
 }
 
-// detectNodeIP returns the nodeIP used by the proxier
-// The order of precedence is:
-// 1. config.bindAddress if bindAddress is not 0.0.0.0 or ::
-// 2. the primary IP from the Node object, if set
-// 3. if no IP is found it defaults to 127.0.0.1 and IPv4
-func detectNodeIP(client clientset.Interface, hostname, bindAddress string) net.IP {
-	nodeIP := net.ParseIP(bindAddress)
-	if nodeIP.IsUnspecified() {
-		nodeIP = utilnode.GetNodeIP(client, hostname)
+// detectNodeIPs returns always two node IPs of each IP family to be used by the proxier
+// The first IP returned is the primary NodeIP
+// The IPs are always defaulted to the loopback addresses of each respective IP family
+// The order of precedence for the primary NodeIP is:
+// 1. config.bindAddress as primary if bindAddress is not 0.0.0.0 or ::
+// 2. the IP from the Node object, if set
+// 3. if no IP is found it defaults to 127.0.0.1
+func detectNodeIPs(client clientset.Interface, hostname, bindAddress string) [2]net.IP {
+	// return the NodeIPs complementing the passed primary IP with the secondary IP family
+	nodeIPs := func(primaryIP net.IP) [2]net.IP {
+		var nodeIPs [2]net.IP
+		nodeIPs[0] = primaryIP
+		if utilsnet.IsIPv6(primaryIP) {
+			nodeIPs[1] = net.ParseIP("127.0.0.1")
+		} else {
+			nodeIPs[1] = net.ParseIP("::1")
+		}
+		return nodeIPs
 	}
-	if nodeIP == nil {
-		klog.V(0).Infof("can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
-		nodeIP = net.ParseIP("127.0.0.1")
+	// bindAddress represent the primary NodeIP for kube-proxy if is not an unspecified address
+	bindIP := net.ParseIP(bindAddress)
+	if bindIP != nil && !bindIP.IsUnspecified() {
+		return nodeIPs(bindIP)
 	}
-	return nodeIP
+	// use kubernetes Node IPs if bind address is an unspecified address
+	var apiNodeIPs []net.IP
+	if bindIP.IsUnspecified() {
+		apiNodeIPs = utilnode.GetNodeIPs(client, hostname)
+	}
+	switch len(apiNodeIPs) {
+	case 1:
+		return nodeIPs(apiNodeIPs[0])
+	case 2:
+		return [2]net.IP{apiNodeIPs[0], apiNodeIPs[1]}
+	default:
+		klog.V(0).Infof("can't determine this node's IPs, assuming 127.0.0.1 as main IP; if this is incorrect, please set the --bind-address flag")
+		return nodeIPs(net.ParseIP("127.0.0.1"))
+	}
 }
 
 func getDetectLocalMode(config *proxyconfigapi.KubeProxyConfiguration) (proxyconfigapi.LocalMode, error) {
@@ -524,22 +550,6 @@ func cidrTuple(cidrList string) [2]string {
 	}
 
 	return cidrs
-}
-
-// nodeIPTuple takes an addresses and return a tuple (ipv4,ipv6)
-// The returned tuple is guaranteed to have the order (ipv4,ipv6). The address NOT of the passed address
-// will have "any" address (0.0.0.0 or ::) inserted.
-func nodeIPTuple(bindAddress string) [2]net.IP {
-	nodes := [2]net.IP{net.IPv4zero, net.IPv6zero}
-
-	adr := net.ParseIP(bindAddress)
-	if utilsnet.IsIPv6(adr) {
-		nodes[1] = adr
-	} else {
-		nodes[0] = adr
-	}
-
-	return nodes
 }
 
 func getProxyMode(proxyMode string, canUseIPVS bool, kcompat iptables.KernelCompatTester) string {
