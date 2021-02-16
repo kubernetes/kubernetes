@@ -51,6 +51,9 @@ type Interface interface {
 	FlushChain(table Table, chain Chain) error
 	// DeleteChain deletes the specified chain.  If the chain did not exist, return error.
 	DeleteChain(table Table, chain Chain) error
+	// ChainExists tests whether the specified chain exists, returning an error if it
+	// does not, or if it is unable to check.
+	ChainExists(table Table, chain Chain) (bool, error)
 	// EnsureRule checks if the specified rule is present and, if not, creates it.  If the rule existed, return true.
 	EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error)
 	// DeleteRule checks if the specified rule is present and, if so, deletes it.
@@ -570,7 +573,7 @@ func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), i
 
 		// Poll until stopCh is closed or iptables is flushed
 		err := utilwait.PollUntil(interval, func() (bool, error) {
-			if exists, err := runner.chainExists(tables[0], canary); exists {
+			if exists, err := runner.ChainExists(tables[0], canary); exists {
 				return false, nil
 			} else if isResourceError(err) {
 				klog.Warningf("Could not check for iptables canary %s/%s: %v", string(tables[0]), string(canary), err)
@@ -582,7 +585,7 @@ func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), i
 			// so we don't start reloading too soon.
 			err := utilwait.PollImmediate(iptablesFlushPollTime, iptablesFlushTimeout, func() (bool, error) {
 				for i := 1; i < len(tables); i++ {
-					if exists, err := runner.chainExists(tables[i], canary); exists || isResourceError(err) {
+					if exists, err := runner.ChainExists(tables[i], canary); exists || isResourceError(err) {
 						return false, nil
 					}
 				}
@@ -607,15 +610,14 @@ func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), i
 	}
 }
 
-// chainExists is used internally by Monitor; none of the public Interface methods can be
-// used to distinguish "chain exists" from "chain does not exist" with no side effects
-func (runner *runner) chainExists(table Table, chain Chain) (bool, error) {
+// ChainExists is part of Interface
+func (runner *runner) ChainExists(table Table, chain Chain) (bool, error) {
 	fullArgs := makeFullArgs(table, chain)
 
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
-	trace := utiltrace.New("iptables Monitor CANARY check")
+	trace := utiltrace.New("iptables ChainExists")
 	defer trace.LogIfLong(2 * time.Second)
 
 	_, err := runner.run(opListChain, fullArgs)

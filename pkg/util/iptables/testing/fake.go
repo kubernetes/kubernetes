@@ -93,6 +93,11 @@ func (*FakeIPTables) DeleteChain(table iptables.Table, chain iptables.Chain) err
 	return nil
 }
 
+// ChainExists is part of iptables.Interface
+func (*FakeIPTables) ChainExists(table iptables.Table, chain iptables.Chain) (bool, error) {
+	return true, nil
+}
+
 // EnsureRule is part of iptables.Interface
 func (*FakeIPTables) EnsureRule(position iptables.RulePosition, table iptables.Table, chain iptables.Chain, args ...string) (bool, error) {
 	return true, nil
