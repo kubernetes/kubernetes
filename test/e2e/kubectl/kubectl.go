@@ -1088,7 +1088,8 @@ metadata:
 			timer := time.NewTimer(300 * time.Second)
 			defer timer.Stop()
 
-			framework.NewKubectlCommand(ns, "cluster-info", "dump").WithTimeout(timer.C).ExecOrDie(namespace)
+			err := framework.NewKubectlCommand(ns, "cluster-info", "dump").WithTimeout(timer.C).Run(os.Stdout, os.Stderr)
+			framework.ExpectNoError(err)
 		})
 	})
 

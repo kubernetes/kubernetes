@@ -626,8 +626,21 @@ func (b KubectlBuilder) Exec() (string, error) {
 // ExecWithFullOutput runs the kubectl executable, and returns the stdout and stderr.
 func (b KubectlBuilder) ExecWithFullOutput() (string, string, error) {
 	var stdout, stderr bytes.Buffer
+
+	err := b.Run(&stdout, &stderr)
+	if err != nil {
+		return stdout.String(), stderr.String(), err
+	}
+	Logf("stderr: %q", stderr.String())
+	Logf("stdout: %q", stdout.String())
+	return stdout.String(), stderr.String(), nil
+}
+
+// Run runs the kubectl executable, but uses the specified Stdout/Stderr destinations.
+func (b KubectlBuilder) Run(stdout io.Writer, stderr io.Writer) error {
 	cmd := b.cmd
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
 	if err := cmd.Start(); err != nil {
@@ -645,18 +658,16 @@ func (b KubectlBuilder) ExecWithFullOutput() (string, string, error) {
 				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
 				Logf("rc: %d", rc)
 			}
-			return stdout.String(), stderr.String(), uexec.CodeExitError{
+			return uexec.CodeExitError{
 				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err),
 				Code: rc,
 			}
 		}
 	case <-b.timeout:
 		b.cmd.Process.Kill()
-		return "", "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v", cmd, cmd.Stdout, cmd.Stderr)
+		return fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v", cmd, cmd.Stdout, cmd.Stderr)
 	}
-	Logf("stderr: %q", stderr.String())
-	Logf("stdout: %q", stdout.String())
-	return stdout.String(), stderr.String(), nil
+	return nil
 }
 
 // RunKubectlOrDie is a convenience wrapper over kubectlBuilder
