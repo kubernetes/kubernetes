@@ -18,9 +18,9 @@ package helper
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -76,8 +76,8 @@ func TestDefaultNormalizeScore(t *testing.T) {
 			}
 
 			DefaultNormalizeScore(framework.MaxNodeScore, test.reverse, scores)
-			if !reflect.DeepEqual(scores, expectedScores) {
-				t.Errorf("expected %v, got %v", expectedScores, scores)
+			if diff := cmp.Diff(expectedScores, scores); diff != "" {
+				t.Errorf("Unexpected scores (-want, +got):\n%s", diff)
 			}
 		})
 	}
