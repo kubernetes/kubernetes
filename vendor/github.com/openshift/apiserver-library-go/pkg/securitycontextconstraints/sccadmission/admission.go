@@ -105,8 +105,8 @@ func (c *constraint) Admit(ctx context.Context, a admission.Attributes, _ admiss
 	}
 
 	// we didn't validate against any security context constraint provider, reject the pod and give the errors for each attempt
-	klog.V(4).Infof("unable to validate pod %s (generate: %s) against any security context constraint: %v", pod.Name, pod.GenerateName, validationErrs)
-	return admission.NewForbidden(a, fmt.Errorf("unable to validate against any security context constraint: %v", validationErrs))
+	klog.V(4).Infof("unable to validate pod %s (generate: %s) against any security context constraint: %v", pod.Name, pod.GenerateName, validationErrs.ToAggregate())
+	return admission.NewForbidden(a, fmt.Errorf("unable to validate against any security context constraint: %v", validationErrs.ToAggregate()))
 }
 
 func (c *constraint) Validate(ctx context.Context, a admission.Attributes, _ admission.ObjectInterfaces) error {
@@ -217,6 +217,14 @@ loop:
 	for i, provider = range providers {
 		if !allowedForUserOrSA(provider) {
 			denied = append(denied, provider.GetSCCName())
+			// this will cause every security context constraint attempted, in order, to the failure
+			validationErrs = append(validationErrs,
+				field.Forbidden(
+					field.NewPath(fmt.Sprintf("provider %q", provider.GetSCCName())),
+					"not usable by user or serviceaccount",
+				),
+			)
+
 			continue
 		}
 

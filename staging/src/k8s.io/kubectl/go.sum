@@ -483,7 +483,7 @@ github.com/opencontainers/runtime-spec v1.0.2/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/
 github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
 github.com/opencontainers/selinux v1.6.0/go.mod h1:VVGKuOLlE7v4PJyT6h7mNWvq1rzqiriPsEqVhc+svHE=
 github.com/openshift/api v0.0.0-20201214114959-164a2fb63b5f/go.mod h1:aqU5Cq+kqKKPbDMqxo9FojgDeSpNJI7iuskjXjtojDg=
-github.com/openshift/apiserver-library-go v0.0.0-20201214145556-6f1013f42f98/go.mod h1:bMWTKd7ZOYGyx1hVLipuA9LrIJw62V7Se99cZ/Volj8=
+github.com/openshift/apiserver-library-go v0.0.0-20210216185127-6e5216cd541f/go.mod h1:bMWTKd7ZOYGyx1hVLipuA9LrIJw62V7Se99cZ/Volj8=
 github.com/openshift/build-machinery-go v0.0.0-20200917070002-f171684f77ab/go.mod h1:b1BuldmJlbA/xYtdZvKi+7j5YGB44qJUJDZ9zwiNCfE=
 github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49/go.mod h1:9/jG4I6sh+5QublJpZZ4Zs/P4/QCXMsQQ/K/058bSB8=
 github.com/openshift/ginkgo v4.5.0-origin.1+incompatible h1:AGewrYJW8aXFkkf86sSoiO9L/a/QYKZvODVCaB/wk4o=
