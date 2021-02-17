@@ -51,6 +51,7 @@ import (
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 
 	"k8s.io/klog/v2"
 )
@@ -1412,7 +1413,7 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *v1.PersistentVolu
 
 	opComplete := util.OperationCompleteHook(pluginName, "volume_delete")
 	err = deleter.Delete()
-	opComplete(&err)
+	opComplete(volumetypes.CompleteFuncParam{Err: &err})
 	if err != nil {
 		// Deleter failed
 		return pluginName, false, err
@@ -1558,7 +1559,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 
 	opComplete := util.OperationCompleteHook(plugin.GetPluginName(), "volume_provision")
 	volume, err = provisioner.Provision(selectedNode, allowedTopologies)
-	opComplete(&err)
+	opComplete(volumetypes.CompleteFuncParam{Err: &err})
 	if err != nil {
 		// Other places of failure have nothing to do with VolumeScheduling,
 		// so just let controller retry in the next sync. We'll only call func

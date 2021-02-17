@@ -473,6 +473,7 @@ type Spec struct {
 	PersistentVolume                *v1.PersistentVolume
 	ReadOnly                        bool
 	InlineVolumeSpecForCSIMigration bool
+	Migrated                        bool
 }
 
 // Name returns the name of either Volume or PersistentVolume, one of which must not be nil.

@@ -31,6 +31,7 @@ go_library(
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/recyclerclient:go_default_library",
         "//pkg/volume/util/subpath:go_default_library",
+        "//pkg/volume/util/types:go_default_library",
         "//staging/src/k8s.io/api/authentication/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
