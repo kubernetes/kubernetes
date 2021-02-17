@@ -129,6 +129,10 @@ KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
 # Audit policy
 AUDIT_POLICY_FILE=${AUDIT_POLICY_FILE:-""}
 
+# The timeout setting When waiting node ready with 'kubectl get nodes'
+NODE_READY_TIMEOUT_SECOND=${NODE_READY_TIMEOUT_SECOND:-150}
+NODE_READY_INTERVAL_SECOND=${NODE_READY_INTERVAL_SECOND:-2}
+
 # sanity check for OpenStack provider
 if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     if [ "${CLOUD_CONFIG}" == "" ]; then
@@ -692,9 +696,7 @@ function wait_node_ready(){
   # check the nodes information after kubelet daemon start
   local nodes_stats="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' get nodes"
   local node_name=$HOSTNAME_OVERRIDE
-  local system_node_wait_time=150
-  local interval_time=2
-  kube::util::wait_for_success "$system_node_wait_time" "$interval_time" "$nodes_stats | grep $node_name"
+  kube::util::wait_for_success "$NODE_READY_TIMEOUT_SECOND" "$NODE_READY_INTERVAL_SECOND" "$nodes_stats | grep $node_name"
   if [ $? == "1" ]; then
     echo "time out on waiting for getting node info: $node_name"
     exit 1
