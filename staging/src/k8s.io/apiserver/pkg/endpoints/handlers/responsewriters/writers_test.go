@@ -366,6 +366,45 @@ func TestSerializeObject(t *testing.T) {
 	}
 }
 
+func benchmarkSerializeObject(b *testing.B, size int) {
+	largePayload := bytes.Repeat([]byte("0123456789abcdef"), size/16+1)
+	req := &http.Request{
+		Header: http.Header{
+			"Accept-Encoding": []string{"gzip"},
+		},
+		URL: &url.URL{Path: "/path"},
+	}
+	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.APIResponseCompression, true)()
+
+	encoder := &fakeEncoder{
+		buf: largePayload,
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		recorder := httptest.NewRecorder()
+		SerializeObject("application/json", encoder, recorder, req, http.StatusOK, nil /* object */)
+		result := recorder.Result()
+		if result.StatusCode != http.StatusOK {
+			b.Fatalf("incorrect status code: got %v;  want: %v", result.StatusCode, http.StatusOK)
+		}
+	}
+}
+
+func BenchmarkSerializeObject10KB(b *testing.B) {
+	benchmarkSerializeObject(b, 10*1024)
+}
+
+func BenchmarkSerializeObject10MB(b *testing.B) {
+	benchmarkSerializeObject(b, 10*1024*1024)
+}
+func BenchmarkSerializeObject100MB(b *testing.B) {
+	benchmarkSerializeObject(b, 100*1024*1024)
+}
+func BenchmarkSerializeObject1GB(b *testing.B) {
+	benchmarkSerializeObject(b, 1024*1024*1024)
+}
+
 type fakeResponseRecorder struct {
 	*httptest.ResponseRecorder
 	fe                 *fakeEncoder
