@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"path"
@@ -192,6 +193,31 @@ type crdInfo struct {
 	storageVersionUpdate *storageVersionUpdate
 }
 
+func (i *crdInfo) waitForStorageVersionUpdate(ctx context.Context) error {
+	// StorageVersionAPI feature gate is disabled
+	if i.storageVersionUpdate == nil {
+		return nil
+	}
+
+	// NOTE: currently the graceful CRD deletion waits 1s for in-flight requests
+	// to register themselves to the wait group. Ideally the storage version update should
+	// not cause the requests to miss the 1s window; otherwise the requests may
+	// fail ungracefully (e.g. it may happen if the CRD was deleted immediately after the
+	// first CR request establishes the underlying storage).
+	select {
+	case <-i.storageVersionUpdate.processedCh:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("aborted waiting for CRD storage version update: %v", ctx.Err())
+	// Unblock the requests if the storage version update takes a long time, otherwise
+	// CR requests may stack up and overwhelm the API server.
+	// TODO(roycaihw): benchmark the storage version update latency to adjust the timeout.
+	case <-time.After(i.storageVersionUpdate.timeout.Sub(time.Now())):
+		return fmt.Errorf("timeout waiting for CRD storage version update")
+	}
+	return nil
+}
+
 // storageVersionUpdate holds information about a storage version update,
 // indicating whether the update gets processed, or timed-out.
 type storageVersionUpdate struct {
@@ -204,9 +230,6 @@ type storageVersionUpdate struct {
 	// write requests even if the storage version update hasn't been
 	// processed.
 	timeout time.Time
-	// timeoutLogOnce allows the API server to log once when the timeout is
-	// hit.
-	timeoutLogOnce sync.Once
 }
 
 // crdStorageMap goes from customresourcedefinition to its storage
@@ -359,15 +382,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	terminating := apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating)
 
-	var crdInfo *crdInfo
-	if r.storageVersionManager != nil &&
-		(requestInfo.Verb == "create" ||
-			requestInfo.Verb == "update" ||
-			requestInfo.Verb == "patch") {
-		crdInfo, err = r.getOrCreateServingInfoForWrite(crd.UID, crd.Name)
-	} else {
-		crdInfo, err = r.getOrCreateServingInfoFor(crd.UID, crd.Name)
-	}
+	crdInfo, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
 	if apierrors.IsNotFound(err) {
 		r.delegate.ServeHTTP(w, req)
 		return
@@ -448,6 +463,11 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 		forceWatch := true
 		return handlers.ListResource(storage, storage, requestScope, forceWatch, r.minRequestTimeout)
 	case "create":
+		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
+			err := apierrors.NewServiceUnavailable(err.Error())
+			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+			return nil
+		}
 		if terminating {
 			err := apierrors.NewMethodNotSupported(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Verb)
 			err.ErrStatus.Message = fmt.Sprintf("%v not allowed while custom resource definition is terminating", requestInfo.Verb)
@@ -456,13 +476,33 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 		}
 		return handlers.CreateResource(storage, requestScope, r.admission)
 	case "update":
+		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
+			err := apierrors.NewServiceUnavailable(err.Error())
+			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+			return nil
+		}
 		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
+		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
+			err := apierrors.NewServiceUnavailable(err.Error())
+			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+			return nil
+		}
 		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
 	case "delete":
+		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
+			err := apierrors.NewServiceUnavailable(err.Error())
+			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+			return nil
+		}
 		allowsOptions := true
 		return handlers.DeleteResource(storage, allowsOptions, requestScope, r.admission)
 	case "deletecollection":
+		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
+			err := apierrors.NewServiceUnavailable(err.Error())
+			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+			return nil
+		}
 		checkBody := true
 		return handlers.DeleteCollection(storage, checkBody, requestScope, r.admission)
 	default:
@@ -482,8 +522,18 @@ func (r *crdHandler) serveStatus(w http.ResponseWriter, req *http.Request, reque
 	case "get":
 		return handlers.GetResource(storage, nil, requestScope)
 	case "update":
+		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
+			err := apierrors.NewServiceUnavailable(err.Error())
+			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+			return nil
+		}
 		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
+		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
+			err := apierrors.NewServiceUnavailable(err.Error())
+			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+			return nil
+		}
 		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
 	default:
 		responsewriters.ErrorNegotiated(
@@ -502,8 +552,18 @@ func (r *crdHandler) serveScale(w http.ResponseWriter, req *http.Request, reques
 	case "get":
 		return handlers.GetResource(storage, nil, requestScope)
 	case "update":
+		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
+			err := apierrors.NewServiceUnavailable(err.Error())
+			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+			return nil
+		}
 		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
+		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
+			err := apierrors.NewServiceUnavailable(err.Error())
+			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+			return nil
+		}
 		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
 	default:
 		responsewriters.ErrorNegotiated(
@@ -681,42 +741,6 @@ func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions
 		return nil, err
 	}
 	return info.storages[info.storageVersion].CustomResource, nil
-}
-
-// getOrCreateServingInfoForWrite is getOrCreateServingInfoFor, but blocks CR
-// write requests until the storage version update is processed, or
-// timed-out.
-// If the storage version update is processed, unblock and allow the write request.
-// If the storage version update timed-out, unblock and allow the write request.
-func (r *crdHandler) getOrCreateServingInfoForWrite(uid types.UID, name string) (ret *crdInfo, err error) {
-	ret, err = r.getOrCreateServingInfoFor(uid, name)
-
-	// Surface non-nil error early.
-	if err != nil ||
-		// Return early if the StorageVersionAPI feature gate is disabled.
-		r.storageVersionManager == nil ||
-		ret.storageVersionUpdate == nil ||
-		ret.storageVersionUpdate.processedCh == nil {
-		return ret, err
-	}
-
-	// NOTE: currently the graceful CRD deletion waits 1s for in-flight requests
-	// to register themselves to the wait group. Ideally the storage version update should
-	// not cause the requests to miss the 1s window; otherwise the requests may
-	// fail ungracefully (e.g. it may happen if the CRD was deleted immediately after the
-	// first CR request establishes the underlying storage).
-	select {
-	case <-ret.storageVersionUpdate.processedCh:
-	// Unblock the requests if the storage version update takes a long time, otherwise
-	// CR requests may stack up and overwhelm the API server.
-	// TODO(roycaihw): benchmark the storage version update latency to adjust the timeout.
-	case <-time.After(ret.storageVersionUpdate.timeout.Sub(time.Now())):
-		ret.storageVersionUpdate.timeoutLogOnce.Do(func() {
-			klog.V(4).Infof("timeout waiting for CRD storage version update, group: %v, resource: %v; unblocking write requests",
-				ret.spec.Group, ret.spec.Names.Plural)
-		})
-	}
-	return ret, nil
 }
 
 // getOrCreateServingInfoFor gets the CRD serving info for the given CRD UID if the key exists in the storage map.
