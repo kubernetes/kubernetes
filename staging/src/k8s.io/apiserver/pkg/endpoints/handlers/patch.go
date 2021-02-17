@@ -662,7 +662,7 @@ func patchToUpdateOptions(po *metav1.PatchOptions) *metav1.UpdateOptions {
 	return uo
 }
 
-// patchToCreateOptions creates an CreateOptions with the same field values as the provided PatchOptions.
+// patchToCreateOptions creates a CreateOptions with the same field values as the provided PatchOptions.
 func patchToCreateOptions(po *metav1.PatchOptions) *metav1.CreateOptions {
 	if po == nil {
 		return nil

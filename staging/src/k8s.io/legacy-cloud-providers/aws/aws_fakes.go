@@ -32,7 +32,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// FakeAWSServices is an fake AWS session used for testing
+// FakeAWSServices is a fake AWS session used for testing
 type FakeAWSServices struct {
 	region                      string
 	instances                   []*ec2.Instance

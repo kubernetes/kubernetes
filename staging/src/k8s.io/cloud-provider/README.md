@@ -26,7 +26,7 @@ later synced here.
 
 ## Things you should NOT do
 
- 1. Add an cloud provider specific code to this repo.
+ 1. Add a cloud provider specific code to this repo.
  2. Directly modify anything under vendor/k8s.io/cloud-provider in this repo. Those are driven from `k8s.io/kubernetes/staging/src/k8s.io/cloud-provider`.
  3. Make interface changes without first discussing them with
     sig-cloudprovider.

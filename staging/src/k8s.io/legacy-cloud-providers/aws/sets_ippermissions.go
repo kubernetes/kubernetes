@@ -29,7 +29,7 @@ import (
 // IPPermissionSet maps IP strings of strings to EC2 IpPermissions
 type IPPermissionSet map[string]*ec2.IpPermission
 
-// IPPermissionPredicate is an predicate to test whether IPPermission matches some condition.
+// IPPermissionPredicate is a predicate to test whether IPPermission matches some condition.
 type IPPermissionPredicate interface {
 	// Test checks whether specified IPPermission matches condition.
 	Test(perm *ec2.IpPermission) bool

@@ -364,7 +364,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 // returned if the secure port cannot be listened on.
 // The returned channel is closed when the (asynchronous) termination is finished.
 func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan struct{}, error) {
-	// Use an stop channel to allow graceful shutdown without dropping audit events
+	// Use a stop channel to allow graceful shutdown without dropping audit events
 	// after http server shutdown.
 	auditStopCh := make(chan struct{})
 

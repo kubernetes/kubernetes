@@ -39,7 +39,7 @@ const (
 	extensionGVK = "x-kubernetes-group-version-kind"
 )
 
-// ToValidOperationID makes an string a valid op ID (e.g. removing punctuations and whitespaces and make it camel case)
+// ToValidOperationID makes a string a valid op ID (e.g. removing punctuations and whitespaces and make it camel case)
 func ToValidOperationID(s string, capitalizeFirstLetter bool) string {
 	var buffer bytes.Buffer
 	capitalize := capitalizeFirstLetter

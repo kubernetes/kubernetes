@@ -530,7 +530,7 @@ func (f *FakeBasicVolumePlugin) SupportsMountOption() bool {
 
 var _ VolumePlugin = &FakeBasicVolumePlugin{}
 
-// FakeDeviceMountableVolumePlugin implements an device mountable plugin based on FakeBasicVolumePlugin.
+// FakeDeviceMountableVolumePlugin implements a device mountable plugin based on FakeBasicVolumePlugin.
 type FakeDeviceMountableVolumePlugin struct {
 	FakeBasicVolumePlugin
 }

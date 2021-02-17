@@ -1390,7 +1390,7 @@ metadata:
 		podName := "logs-generator"
 		containerName := "logs-generator"
 		ginkgo.BeforeEach(func() {
-			ginkgo.By("creating an pod")
+			ginkgo.By("creating a pod")
 			// Agnhost image generates logs for a total of 100 lines over 20s.
 			framework.RunKubectlOrDie(ns, "run", podName, "--image="+agnhostImage, "--restart=Never", "--", "logs-generator", "--log-lines-total", "100", "--run-duration", "20s")
 		})

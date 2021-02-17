@@ -435,7 +435,7 @@ func resourceClientForVersion(crd *apiextensionsv1.CustomResourceDefinition, dyn
 	return dynamicClientSet.Resource(gvr)
 }
 
-// isWatchCachePrimed returns true if the watch is primed for an specified version of CRD watch
+// isWatchCachePrimed returns true if the watch is primed for a specified version of CRD watch
 func isWatchCachePrimed(crd *apiextensionsv1.CustomResourceDefinition, dynamicClientSet dynamic.Interface) (bool, error) {
 	ns := ""
 	if crd.Spec.Scope != apiextensionsv1.ClusterScoped {

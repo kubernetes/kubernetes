@@ -47,7 +47,7 @@ type DBusCon struct {
 	SystemBus dBusConnector
 }
 
-// InhibitLock is a lock obtained after creating an systemd inhibitor by calling InhibitShutdown().
+// InhibitLock is a lock obtained after creating a systemd inhibitor by calling InhibitShutdown().
 type InhibitLock uint32
 
 // CurrentInhibitDelay returns the current delay inhibitor timeout value as configured in logind.conf(5).
@@ -69,7 +69,7 @@ func (bus *DBusCon) CurrentInhibitDelay() (time.Duration, error) {
 	return duration, nil
 }
 
-// InhibitShutdown creates an systemd inhibitor by calling logind's Inhibt() and returns the inhibitor lock
+// InhibitShutdown creates a systemd inhibitor by calling logind's Inhibt() and returns the inhibitor lock
 // see https://www.freedesktop.org/wiki/Software/systemd/inhibit/ for more details.
 func (bus *DBusCon) InhibitShutdown() (InhibitLock, error) {
 	obj := bus.SystemBus.Object(logindService, logindObject)

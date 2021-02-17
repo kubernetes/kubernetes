@@ -2966,7 +2966,7 @@ func TestEnsurePublicIPExists(t *testing.T) {
 			},
 		},
 		{
-			desc:                    "ensurePublicIPExists shall report an conflict error if the DNS label is conflicted",
+			desc:                    "ensurePublicIPExists shall report a conflict error if the DNS label is conflicted",
 			inputDNSLabel:           "test",
 			foundDNSLabelAnnotation: true,
 			existingPIPs: []network.PublicIPAddress{{

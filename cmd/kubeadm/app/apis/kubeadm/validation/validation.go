@@ -54,7 +54,7 @@ func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 	return allErrs
 }
 
-// ValidateClusterConfiguration validates an ClusterConfiguration object and collects all encountered errors
+// ValidateClusterConfiguration validates a ClusterConfiguration object and collects all encountered errors
 func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNetworking(c, field.NewPath("networking"))...)

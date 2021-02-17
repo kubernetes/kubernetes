@@ -18,7 +18,7 @@ limitations under the License.
 // are cloud provider dependent. It uses the API to listen to new events on resources.
 
 // This file should be written by each cloud provider.
-// For an minimal working example, please refer to k8s.io/cloud-provider/sample/basic_main.go
+// For a minimal working example, please refer to k8s.io/cloud-provider/sample/basic_main.go
 // For an advanced example, please refer to k8s.io/cloud-provider/sample/advanced_main.go
 // For more details, please refer to k8s.io/kubernetes/cmd/cloud-controller-manager/main.go
 // The current file demonstrate how other cloud provider should leverage CCM and it uses fake parameters. Please modify for your own use.
@@ -50,7 +50,7 @@ import (
 )
 
 const (
-	// cloudProviderName shows an sample of using hard coded parameter, please edit the value for your case.
+	// cloudProviderName shows a sample of using hard coded parameter, please edit the value for your case.
 	cloudProviderName = "SampleCloudProviderName"
 )
 
@@ -102,8 +102,8 @@ func main() {
 	// e.g. remove the cloud-node-lifecycle controller which current cloud provider does not need.
 	//delete(controllerInitializers, "cloud-node-lifecycle")
 
-	// Here is an example to add an controller(NodeIpamController) which will be used by cloud provider
-	// generate nodeIPAMConfig. Here is an sample code. Please pass the right parameter in your code.
+	// Here is an example to add a controller(NodeIpamController) which will be used by cloud provider
+	// generate nodeIPAMConfig. Here is a sample code. Please pass the right parameter in your code.
 	// If you do not need additional controller, please ignore.
 	nodeIPAMConfig := nodeipamconfig.NodeIPAMControllerConfiguration{
 		ServiceCIDR:          "sample",
@@ -119,7 +119,7 @@ func main() {
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
 	// normalize func and add the go flag set by hand.
-	// Here is an sample
+	// Here is a sample
 	pflag.CommandLine.SetNormalizeFunc(flag.WordSepNormalizeFunc)
 	// utilflag.InitFlags()
 	logs.InitLogs()

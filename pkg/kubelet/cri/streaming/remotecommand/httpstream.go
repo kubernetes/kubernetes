@@ -200,7 +200,7 @@ type protocolHandler interface {
 }
 
 // v4ProtocolHandler implements the V4 protocol version for streaming command execution. It only differs
-// in from v3 in the error stream format using an json-marshaled metav1.Status which carries
+// in from v3 in the error stream format using a json-marshaled metav1.Status which carries
 // the process' exit code.
 type v4ProtocolHandler struct{}
 

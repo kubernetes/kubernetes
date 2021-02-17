@@ -415,7 +415,7 @@ func (s *Scheme) Convert(in, out interface{}, context interface{}) error {
 	return s.converter.Convert(in, out, meta)
 }
 
-// ConvertFieldLabel alters the given field label and value for an kind field selector from
+// ConvertFieldLabel alters the given field label and value for a kind field selector from
 // versioned representation to an unversioned one or returns an error.
 func (s *Scheme) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
 	conversionFunc, ok := s.fieldLabelConversionFuncs[gvk]

@@ -378,7 +378,7 @@ run_non_native_resource_tests() {
   kube::test::get_object_assert foos/test-list '{{.someField}}' 'field1'
   kube::test::get_object_assert bars/test-list '{{.someField}}' 'field1'
 
-  # Test that re-apply an list doesn't change anything
+  # Test that re-apply a list doesn't change anything
   kubectl "${kube_flags[@]}" apply -f hack/testdata/CRD/multi-crd-list.yaml
 
   # Test that the field has the same value after re-apply

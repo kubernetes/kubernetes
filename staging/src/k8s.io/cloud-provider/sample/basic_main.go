@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // This file should be written by each cloud provider.
-// For an minimal working example, please refer to k8s.io/cloud-provider/sample/basic_main.go
+// For a minimal working example, please refer to k8s.io/cloud-provider/sample/basic_main.go
 // For an advanced example, please refer to k8s.io/cloud-provider/sample/advanced_main.go
 // For more details, please refer to k8s.io/kubernetes/cmd/cloud-controller-manager/main.go
 
@@ -44,7 +44,7 @@ import (
 const (
 	// The variables below are samples, please edit the value for your case.
 
-	// sampleCloudProviderName shows an sample of using hard coded parameter for CloudProviderName
+	// sampleCloudProviderName shows a sample of using hard coded parameter for CloudProviderName
 	sampleCloudProviderName = "SampleCloudProviderName"
 )
 
@@ -91,7 +91,7 @@ func main() {
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
 	// normalize func and add the go flag set by hand.
-	// Here is an sample
+	// Here is a sample
 	pflag.CommandLine.SetNormalizeFunc(flag.WordSepNormalizeFunc)
 	// utilflag.InitFlags()
 	logs.InitLogs()

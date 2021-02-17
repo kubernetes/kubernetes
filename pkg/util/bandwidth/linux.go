@@ -41,7 +41,7 @@ var (
 
 // tcShaper provides an implementation of the Shaper interface on Linux using the 'tc' tool.
 // In general, using this requires that the caller posses the NET_CAP_ADMIN capability, though if you
-// do this within an container, it only requires the NS_CAPABLE capability for manipulations to that
+// do this within a container, it only requires the NS_CAPABLE capability for manipulations to that
 // container's network namespace.
 // Uses the hierarchical token bucket queuing discipline (htb), this requires Linux 2.4.20 or newer
 // or a custom kernel with that queuing discipline backported.

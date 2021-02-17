@@ -270,7 +270,7 @@ const (
 	PodAntiAffinityWithRequiredPreferredReq
 )
 
-// PodAffinityExists creates an PodAffinity with the operator "Exists"
+// PodAffinityExists creates a PodAffinity with the operator "Exists"
 // and injects into the inner pod.
 func (p *PodWrapper) PodAffinityExists(labelKey, topologyKey string, kind PodAffinityKind) *PodWrapper {
 	if kind == NilPodAffinity {
@@ -309,7 +309,7 @@ func (p *PodWrapper) PodAffinityExists(labelKey, topologyKey string, kind PodAff
 	return p
 }
 
-// PodAntiAffinityExists creates an PodAntiAffinity with the operator "Exists"
+// PodAntiAffinityExists creates a PodAntiAffinity with the operator "Exists"
 // and injects into the inner pod.
 func (p *PodWrapper) PodAntiAffinityExists(labelKey, topologyKey string, kind PodAffinityKind) *PodWrapper {
 	if kind == NilPodAffinity {

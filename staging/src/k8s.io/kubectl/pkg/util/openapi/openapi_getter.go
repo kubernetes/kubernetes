@@ -34,7 +34,7 @@ type synchronizedOpenAPIGetter struct {
 
 var _ Getter = &synchronizedOpenAPIGetter{}
 
-// Getter is an interface for fetching openapi specs and parsing them into an Resources struct
+// Getter is an interface for fetching openapi specs and parsing them into a Resources struct
 type Getter interface {
 	// OpenAPIData returns the parsed OpenAPIData
 	Get() (Resources, error)

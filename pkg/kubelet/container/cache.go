@@ -131,7 +131,7 @@ func (c *cache) get(id types.UID) *data {
 		// container runtime. A cache miss indicates that there are no states
 		// regarding the pod last time we queried the container runtime.
 		// What this *really* means is that there are no visible pod/containers
-		// associated with this pod. Simply return an default (mostly empty)
+		// associated with this pod. Simply return a default (mostly empty)
 		// PodStatus to reflect this.
 		return makeDefaultData(id)
 	}

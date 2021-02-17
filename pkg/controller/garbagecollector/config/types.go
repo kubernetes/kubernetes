@@ -16,7 +16,7 @@ limitations under the License.
 
 package config
 
-// GroupResource describes an group resource.
+// GroupResource describes a group resource.
 type GroupResource struct {
 	// group is the group portion of the GroupResource.
 	Group string

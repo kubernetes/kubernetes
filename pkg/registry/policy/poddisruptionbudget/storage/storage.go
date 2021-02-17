@@ -64,7 +64,7 @@ func (r *REST) ShortNames() []string {
 	return []string{"pdb"}
 }
 
-// StatusREST implements the REST endpoint for changing the status of an podDisruptionBudget.
+// StatusREST implements the REST endpoint for changing the status of a podDisruptionBudget.
 type StatusREST struct {
 	store *genericregistry.Store
 }

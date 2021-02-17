@@ -182,7 +182,7 @@ func (plugin *cephfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 	return volume.NewSpecFromVolume(cephfsVolume), nil
 }
 
-// CephFS volumes represent a bare host file or directory mount of an CephFS export.
+// CephFS volumes represent a bare host file or directory mount of a CephFS export.
 type cephfs struct {
 	volName    string
 	podUID     types.UID
@@ -454,5 +454,5 @@ func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (stri
 		}
 		return "", "", nil
 	}
-	return "", "", fmt.Errorf("Spec does not reference an CephFS volume type")
+	return "", "", fmt.Errorf("Spec does not reference a CephFS volume type")
 }

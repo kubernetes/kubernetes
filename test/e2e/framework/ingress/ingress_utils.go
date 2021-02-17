@@ -209,7 +209,7 @@ func PollURL(route, host string, timeout time.Duration, interval time.Duration, 
 	return nil
 }
 
-// CreateIngressComformanceTests generates an slice of sequential test cases:
+// CreateIngressComformanceTests generates a slice of sequential test cases:
 // a simple http ingress, ingress with HTTPS, ingress HTTPS with a modified hostname,
 // ingress https with a modified URLMap
 func CreateIngressComformanceTests(jig *TestJig, ns string, annotations map[string]string) []ConformanceTests {

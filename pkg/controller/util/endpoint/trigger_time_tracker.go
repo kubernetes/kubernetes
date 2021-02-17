@@ -57,7 +57,7 @@ type ServiceKey struct {
 	Namespace, Name string
 }
 
-// ServiceState represents a state of an Service object that is known to this util.
+// ServiceState represents a state of a Service object that is known to this util.
 type ServiceState struct {
 	// lastServiceTriggerTime is a service trigger time observed most recently.
 	lastServiceTriggerTime time.Time

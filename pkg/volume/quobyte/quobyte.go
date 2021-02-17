@@ -200,7 +200,7 @@ func (plugin *quobytePlugin) newUnmounterInternal(volName string, podUID types.U
 	}, nil
 }
 
-// Quobyte volumes represent a bare host directory mount of an quobyte export.
+// Quobyte volumes represent a bare host directory mount of a quobyte export.
 type quobyte struct {
 	volName string
 	pod     *v1.Pod

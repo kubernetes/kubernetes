@@ -550,7 +550,7 @@ func startsWaitingForDependentsOrphaned(oldObj interface{}, newAccessor metav1.O
 	return deletionStartsWithFinalizer(oldObj, newAccessor, metav1.FinalizerOrphanDependents)
 }
 
-// if an blocking ownerReference points to an object gets removed, or gets set to
+// if a blocking ownerReference points to an object gets removed, or gets set to
 // "BlockOwnerDeletion=false", add the object to the attemptToDelete queue.
 func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(removed []metav1.OwnerReference, changed []ownerRefPair) {
 	for _, ref := range removed {

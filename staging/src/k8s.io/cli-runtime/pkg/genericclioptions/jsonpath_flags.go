@@ -56,7 +56,7 @@ func (f *JSONPathPrintFlags) AllowedFormats() []string {
 	return formats
 }
 
-// ToPrinter receives an templateFormat and returns a printer capable of
+// ToPrinter receives a templateFormat and returns a printer capable of
 // handling --template format printing.
 // Returns false if the specified templateFormat does not match a template format.
 func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (printers.ResourcePrinter, error) {

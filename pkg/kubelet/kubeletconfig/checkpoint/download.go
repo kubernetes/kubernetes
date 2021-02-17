@@ -120,7 +120,7 @@ func DecodeRemoteConfigSource(data []byte) (RemoteConfigSource, error) {
 		return nil, fmt.Errorf("failed to decode, error: %v", err)
 	}
 
-	// for now we assume we are trying to load an kubeletconfigv1beta1.SerializedNodeConfigSource,
+	// for now we assume we are trying to load a kubeletconfigv1beta1.SerializedNodeConfigSource,
 	// this may need to be extended if e.g. a new version of the api is born
 	cs, ok := obj.(*kubeletconfiginternal.SerializedNodeConfigSource)
 	if !ok {

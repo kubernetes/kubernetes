@@ -44,7 +44,7 @@ func (validatingWebhookConfigurationStrategy) NamespaceScoped() bool {
 	return false
 }
 
-// PrepareForCreate clears the status of an validatingWebhookConfiguration before creation.
+// PrepareForCreate clears the status of a validatingWebhookConfiguration before creation.
 func (validatingWebhookConfigurationStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	ic := obj.(*admissionregistration.ValidatingWebhookConfiguration)
 	ic.Generation = 1

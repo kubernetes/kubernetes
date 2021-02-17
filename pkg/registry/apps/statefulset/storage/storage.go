@@ -96,7 +96,7 @@ func (r *REST) Categories() []string {
 	return []string{"all"}
 }
 
-// StatusREST implements the REST endpoint for changing the status of an statefulSet
+// StatusREST implements the REST endpoint for changing the status of a statefulSet
 type StatusREST struct {
 	store *genericregistry.Store
 }

@@ -198,7 +198,7 @@ func TestInvalidPodFiltered(t *testing.T) {
 func TestNewPodAddedSnapshotAndUpdates(t *testing.T) {
 	channel, ch, config := createPodConfigTester(PodConfigNotificationSnapshotAndUpdates)
 
-	// see an set
+	// see a set
 	podUpdate := CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "new"))
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.SET, TestSource, CreateValidPod("foo", "new")))
@@ -216,7 +216,7 @@ func TestNewPodAddedSnapshotAndUpdates(t *testing.T) {
 func TestNewPodAddedSnapshot(t *testing.T) {
 	channel, ch, config := createPodConfigTester(PodConfigNotificationSnapshot)
 
-	// see an set
+	// see a set
 	podUpdate := CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "new"))
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.SET, TestSource, CreateValidPod("foo", "new")))
@@ -242,7 +242,7 @@ func TestNewPodAddedUpdatedRemoved(t *testing.T) {
 	// should ignore ADDs that are identical
 	expectNoPodUpdate(t, ch)
 
-	// an kubetypes.ADD should be converted to kubetypes.UPDATE
+	// a kubetypes.ADD should be converted to kubetypes.UPDATE
 	pod := CreateValidPod("foo", "new")
 	pod.Spec.Containers = []v1.Container{{Name: "bar", Image: "test", ImagePullPolicy: v1.PullIfNotPresent, TerminationMessagePolicy: v1.TerminationMessageReadFile}}
 	podUpdate = CreatePodUpdate(kubetypes.ADD, TestSource, pod)
@@ -284,7 +284,7 @@ func TestNewPodAddedUpdatedSet(t *testing.T) {
 	// should ignore ADDs that are identical
 	expectNoPodUpdate(t, ch)
 
-	// should be converted to an kubetypes.ADD, kubetypes.REMOVE, and kubetypes.UPDATE
+	// should be converted to a kubetypes.ADD, kubetypes.REMOVE, and kubetypes.UPDATE
 	pod := CreateValidPod("foo2", "new")
 	pod.Spec.Containers = []v1.Container{{Name: "bar", Image: "test", ImagePullPolicy: v1.PullIfNotPresent, TerminationMessagePolicy: v1.TerminationMessageReadFile}}
 	podUpdate = CreatePodUpdate(kubetypes.SET, TestSource, pod, CreateValidPod("foo3", "new"), CreateValidPod("foo4", "new"))

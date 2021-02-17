@@ -440,7 +440,7 @@ func getcanonicalVolumePath(ctx context.Context, dc *vclib.Datacenter, volumePat
 		if !vclib.IsValidUUID(dsFolder) {
 			dummyDiskVolPath := "[" + datastore + "] " + dsFolder + "/" + DummyDiskName
 			// Querying a non-existent dummy disk on the datastore folder.
-			// It would fail and return an folder ID in the error message.
+			// It would fail and return a folder ID in the error message.
 			_, err := dc.GetVirtualDiskPage83Data(ctx, dummyDiskVolPath)
 			canonicalVolumePath, err = getPathFromFileNotFound(err)
 			if err != nil {

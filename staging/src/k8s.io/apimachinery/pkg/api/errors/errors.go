@@ -95,7 +95,7 @@ func (u *UnexpectedObjectError) Error() string {
 	return fmt.Sprintf("unexpected object: %v", u.Object)
 }
 
-// FromObject generates an StatusError from an metav1.Status, if that is the type of obj; otherwise,
+// FromObject generates a StatusError from a metav1.Status, if that is the type of obj; otherwise,
 // returns an UnexpecteObjectError.
 func FromObject(obj runtime.Object) error {
 	switch t := obj.(type) {

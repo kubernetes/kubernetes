@@ -1035,7 +1035,7 @@ func isGCEError(err error, reason string) bool {
 	return false
 }
 
-// verifyDisksAttachedToNode takes in an slice of disks that should be attached to an instance, and the
+// verifyDisksAttachedToNode takes in a slice of disks that should be attached to an instance, and the
 // slice of disks actually attached to it. It returns a map verifying if the disks are actually attached.
 func verifyDisksAttachedToNode(disksToVerify []string, disksActuallyAttached []*compute.AttachedDisk) map[string]bool {
 	verifiedDisks := make(map[string]bool)

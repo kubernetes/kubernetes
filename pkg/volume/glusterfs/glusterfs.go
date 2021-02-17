@@ -231,7 +231,7 @@ func (plugin *glusterfsPlugin) ConstructVolumeSpec(volumeName, mountPath string)
 	return nil, fmt.Errorf("impossible to reconstruct glusterfs volume spec from volume mountpath")
 }
 
-// Glusterfs volumes represent a bare host file or directory mount of an Glusterfs export.
+// Glusterfs volumes represent a bare host file or directory mount of a Glusterfs export.
 type glusterfs struct {
 	volName string
 	pod     *v1.Pod

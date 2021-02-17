@@ -465,7 +465,7 @@ func TestIntegerMaxUnavailableWithScaling(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 3, 5, map[string]metav1.Time{})
 }
 
-// Verify that an percentage MaxUnavailable will recompute allowed disruptions when the scale of
+// Verify that a percentage MaxUnavailable will recompute allowed disruptions when the scale of
 // the selected pod's controller is modified.
 func TestPercentageMaxUnavailableWithScaling(t *testing.T) {
 	dc, ps := newFakeDisruptionController()

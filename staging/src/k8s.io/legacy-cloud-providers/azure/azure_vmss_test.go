@@ -1280,7 +1280,7 @@ func TestListScaleSets(t *testing.T) {
 			expectedVMSSNames: []string{"vmss-0", "vmss-1"},
 		},
 		{
-			description:   "listScaleSets should report the error if vmss client returns an retry.Error",
+			description:   "listScaleSets should report the error if vmss client returns a retry.Error",
 			vmssClientErr: &retry.Error{RawError: fmt.Errorf("error")},
 			expectedErr:   fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: error"),
 		},

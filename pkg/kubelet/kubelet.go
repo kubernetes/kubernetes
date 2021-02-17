@@ -1460,7 +1460,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 //
 // The workflow is:
 // * If the pod is being created, record pod worker start latency
-// * Call generateAPIPodStatus to prepare an v1.PodStatus for the pod
+// * Call generateAPIPodStatus to prepare a v1.PodStatus for the pod
 // * If the pod is being seen as running for the first time, record pod
 //   start latency
 // * Update the status of the pod in the status manager

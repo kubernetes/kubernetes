@@ -97,7 +97,7 @@ func UseOrCreateObject(t ObjectTyper, c ObjectCreater, gvk schema.GroupVersionKi
 	return c.New(gvk)
 }
 
-// NoopEncoder converts an Decoder to a Serializer or Codec for code that expects them but only uses decoding.
+// NoopEncoder converts a Decoder to a Serializer or Codec for code that expects them but only uses decoding.
 type NoopEncoder struct {
 	Decoder
 }

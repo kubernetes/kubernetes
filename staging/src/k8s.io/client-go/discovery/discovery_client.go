@@ -199,7 +199,7 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 	}
 	err = d.restClient.Get().AbsPath(url.String()).Do(context.TODO()).Into(resources)
 	if err != nil {
-		// ignore 403 or 404 error to be compatible with an v1.0 server.
+		// ignore 403 or 404 error to be compatible with a v1.0 server.
 		if groupVersion == "v1" && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
 			return resources, nil
 		}

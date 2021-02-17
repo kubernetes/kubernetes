@@ -116,7 +116,7 @@ var (
 		kubectl config set-credentials cluster-admin --exec-env=var-to-remove-`)
 )
 
-// NewCmdConfigSetAuthInfo returns an Command option instance for 'config set-credentials' sub command
+// NewCmdConfigSetAuthInfo returns a Command option instance for 'config set-credentials' sub command
 func NewCmdConfigSetAuthInfo(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &createAuthInfoOptions{configAccess: configAccess}
 	return newCmdConfigSetAuthInfo(out, options)

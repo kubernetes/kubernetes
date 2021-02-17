@@ -321,7 +321,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 		}
 		l, err := r.ReadBytes(eol[0])
 		if err != nil {
-			if err != io.EOF { // This is an real error
+			if err != io.EOF { // This is a real error
 				return fmt.Errorf("failed to read log file %q: %v", path, err)
 			}
 			if opts.follow {

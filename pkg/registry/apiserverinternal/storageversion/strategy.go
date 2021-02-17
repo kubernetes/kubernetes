@@ -42,7 +42,7 @@ func (storageVersionStrategy) NamespaceScoped() bool {
 	return false
 }
 
-// PrepareForCreate clears the status of an StorageVersion before creation.
+// PrepareForCreate clears the status of a StorageVersion before creation.
 func (storageVersionStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	sv := obj.(*apiserverinternal.StorageVersion)
 	sv.Status = apiserverinternal.StorageVersionStatus{}

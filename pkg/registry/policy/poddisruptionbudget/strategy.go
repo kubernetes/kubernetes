@@ -42,7 +42,7 @@ func (podDisruptionBudgetStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// PrepareForCreate clears the status of an PodDisruptionBudget before creation.
+// PrepareForCreate clears the status of a PodDisruptionBudget before creation.
 func (podDisruptionBudgetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	podDisruptionBudget := obj.(*policy.PodDisruptionBudget)
 	// create cannot set status

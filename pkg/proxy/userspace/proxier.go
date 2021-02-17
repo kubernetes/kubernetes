@@ -1242,7 +1242,7 @@ func (proxier *Proxier) iptablesHostNodePortArgs(nodePort int, protocol v1.Proto
 	return args
 }
 
-// Build a slice of iptables args for an from-non-local public-port rule.
+// Build a slice of iptables args for a from-non-local public-port rule.
 func (proxier *Proxier) iptablesNonLocalNodePortArgs(nodePort int, protocol v1.Protocol, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
 	args := iptablesCommonPortalArgs(nil, false, false, proxyPort, protocol, service)
 	args = append(args, "-m", "state", "--state", "NEW", "-j", "ACCEPT")

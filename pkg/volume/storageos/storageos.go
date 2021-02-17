@@ -292,7 +292,7 @@ type storageosManager interface {
 	DeviceDir(mounter *storageosMounter) string
 }
 
-// storageos volumes represent a bare host directory mount of an StorageOS export.
+// storageos volumes represent a bare host directory mount of a StorageOS export.
 type storageos struct {
 	podUID       types.UID
 	podNamespace string

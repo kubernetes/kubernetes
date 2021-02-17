@@ -128,7 +128,7 @@ func CheckDiffErr(err error) {
 }
 
 // checkErr formats a given error as a string and calls the passed handleErr
-// func with that string and an kubectl exit code.
+// func with that string and a kubectl exit code.
 func checkErr(err error, handleErr func(string, int)) {
 	// unwrap aggregates of 1
 	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) == 1 {

@@ -116,7 +116,7 @@ func NewRoundTripperWithConfig(cfg RoundTripperConfig) *SpdyRoundTripper {
 	}
 }
 
-// RoundTripperConfig is a set of options for an SpdyRoundTripper.
+// RoundTripperConfig is a set of options for a SpdyRoundTripper.
 type RoundTripperConfig struct {
 	// TLS configuration used by the round tripper.
 	TLS *tls.Config

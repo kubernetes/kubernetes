@@ -445,7 +445,7 @@ func checkAndUpdatePod(existing, ref *v1.Pod) (needUpdate, needReconcile, needGr
 	existing.Status = ref.Status
 	updateAnnotations(existing, ref)
 
-	// 2. this is an graceful delete
+	// 2. this is a graceful delete
 	if ref.DeletionTimestamp != nil {
 		needGracefulDelete = true
 	} else {

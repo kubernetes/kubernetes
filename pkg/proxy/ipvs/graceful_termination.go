@@ -52,7 +52,7 @@ type graceTerminateRSList struct {
 	list map[string]*listItem
 }
 
-// add push an new element to the rsList
+// add push a new element to the rsList
 func (q *graceTerminateRSList) add(rs *listItem) bool {
 	q.lock.Lock()
 	defer q.lock.Unlock()

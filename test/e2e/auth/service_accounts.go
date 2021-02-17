@@ -262,8 +262,8 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	                following scenarios here.
 	   1. Create Pod, Pod Spec has AutomountServiceAccountToken set to nil
 	      a) Service Account with default value,
-	      b) Service Account is an configured AutomountServiceAccountToken set to true,
-	      c) Service Account is an configured AutomountServiceAccountToken set to false
+	      b) Service Account is a configured AutomountServiceAccountToken set to true,
+	      c) Service Account is a configured AutomountServiceAccountToken set to false
 	   2. Create Pod, Pod Spec has AutomountServiceAccountToken set to true
 	      a) Service Account with default value,
 	      b) Service Account is configured with AutomountServiceAccountToken set to true,

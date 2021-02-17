@@ -25,12 +25,12 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 )
 
-// statusError is an object that can be converted into an metav1.Status
+// statusError is an object that can be converted into a metav1.Status
 type statusError interface {
 	Status() metav1.Status
 }
 
-// ErrorToAPIStatus converts an error to an metav1.Status object.
+// ErrorToAPIStatus converts an error to a metav1.Status object.
 func ErrorToAPIStatus(err error) *metav1.Status {
 	switch t := err.(type) {
 	case statusError:
@@ -68,7 +68,7 @@ func ErrorToAPIStatus(err error) *metav1.Status {
 		// by REST storage - these typically indicate programmer
 		// error by not using pkg/api/errors, or unexpected failure
 		// cases.
-		runtime.HandleError(fmt.Errorf("apiserver received an error that is not an metav1.Status: %#+v: %v", err, err))
+		runtime.HandleError(fmt.Errorf("apiserver received an error that is not a metav1.Status: %#+v: %v", err, err))
 		return &metav1.Status{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Status",

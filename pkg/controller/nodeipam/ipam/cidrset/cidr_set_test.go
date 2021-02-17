@@ -376,7 +376,7 @@ func TestDoubleOccupyRelease(t *testing.T) {
 			operation:   "occupy",
 			numOccupied: 5,
 		},
-		// Release an coccupied element: -1
+		// Release a coccupied element: -1
 		{
 			cidrStr:     "10.42.9.0/24",
 			operation:   "release",

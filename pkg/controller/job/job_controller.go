@@ -246,7 +246,7 @@ func (jm *Controller) updatePod(old, cur interface{}) {
 	if curPod.DeletionTimestamp != nil {
 		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
-		// for modification of the deletion timestamp and expect an job to create more pods asap, not wait
+		// for modification of the deletion timestamp and expect a job to create more pods asap, not wait
 		// until the kubelet actually deletes the pod.
 		jm.deletePod(curPod)
 		return

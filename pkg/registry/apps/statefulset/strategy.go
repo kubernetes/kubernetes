@@ -64,7 +64,7 @@ func (statefulSetStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// PrepareForCreate clears the status of an StatefulSet before creation.
+// PrepareForCreate clears the status of a StatefulSet before creation.
 func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	statefulSet := obj.(*apps.StatefulSet)
 	// create cannot set status

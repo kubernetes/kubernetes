@@ -730,7 +730,7 @@ func (p *PodStateVerification) filter(c clientset.Interface, namespace *v1.Names
 	}
 
 	ns := namespace.Name
-	pl, err := filterLabels(p.Selectors, c, ns) // Build an v1.PodList to operate against.
+	pl, err := filterLabels(p.Selectors, c, ns) // Build a v1.PodList to operate against.
 	Logf("Selector matched %v pods for %v", len(pl.Items), p.Selectors)
 	if len(pl.Items) == 0 || err != nil {
 		return pl.Items, err

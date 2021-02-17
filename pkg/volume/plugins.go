@@ -572,14 +572,14 @@ type VolumeConfig struct {
 	ProvisioningEnabled bool
 }
 
-// NewSpecFromVolume creates an Spec from an v1.Volume
+// NewSpecFromVolume creates a Spec from a v1.Volume
 func NewSpecFromVolume(vs *v1.Volume) *Spec {
 	return &Spec{
 		Volume: vs,
 	}
 }
 
-// NewSpecFromPersistentVolume creates an Spec from an v1.PersistentVolume
+// NewSpecFromPersistentVolume creates a Spec from a v1.PersistentVolume
 func NewSpecFromPersistentVolume(pv *v1.PersistentVolume, readOnly bool) *Spec {
 	return &Spec{
 		PersistentVolume: pv,

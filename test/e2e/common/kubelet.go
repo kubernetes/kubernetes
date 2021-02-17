@@ -102,9 +102,9 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		/*
 			Release: v1.13
 			Testname: Kubelet, failed pod, terminated reason
-			Description: Create a Pod with terminated state. Pod MUST have only one container. Container MUST be in terminated state and MUST have an terminated reason.
+			Description: Create a Pod with terminated state. Pod MUST have only one container. Container MUST be in terminated state and MUST have a terminated reason.
 		*/
-		framework.ConformanceIt("should have an terminated reason [NodeConformance]", func() {
+		framework.ConformanceIt("should have a terminated reason [NodeConformance]", func() {
 			gomega.Eventually(func() error {
 				podData, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 				if err != nil {

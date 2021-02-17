@@ -172,7 +172,7 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			expectedSkippableErrs: 1,
 		},
 		{
-			name: "the user should not be able to upgrade to an release candidate version if they haven't opted into that",
+			name: "the user should not be able to upgrade to a release candidate version if they haven't opted into that",
 			vg: &fakeVersionGetter{
 				clusterVersion: constants.MinimumControlPlaneVersion.WithPatch(3).String(),
 				kubeletVersion: constants.MinimumKubeletVersion.WithPatch(3).String(),

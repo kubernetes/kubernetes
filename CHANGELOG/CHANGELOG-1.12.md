@@ -2003,7 +2003,7 @@ filename | sha256 hash
 * Fixed a bug that was blocking extensible error handling when serializing API responses error out. Previously, serialization failures always resulted in the status code of the original response being returned. Now, the following behavior occurs: ([#67041](https://github.com/kubernetes/kubernetes/pull/67041), [@tristanburgess](https://github.com/tristanburgess))
     * If the serialization type is application/vnd.kubernetes.protobuf, and protobuf marshaling is not implemented for the requested API resource type, a '406 Not Acceptable is returned'.
     * If the serialization type is 'application/json':
-    * If serialization fails, and the original status code was an failure (e.g. 4xx or 5xx), the original status code will be returned.
+    * If serialization fails, and the original status code was a failure (e.g. 4xx or 5xx), the original status code will be returned.
     * If serialization fails, and the original status code was not a failure (e.g. 2xx), the status code of the serialization failure will be returned. By default, this is '500 Internal Server Error', because JSON serialization is our default, and not supposed to be implemented on a type-by-type basis.
 * Add a feature to the scheduler to score fewer than all nodes in every scheduling cycle. This can improve performance of the scheduler in large clusters. ([#66733](https://github.com/kubernetes/kubernetes/pull/66733), [@bsalamat](https://github.com/bsalamat))
 * kube-controller-manager can now start the quota controller when discovery results can only be partially determined. ([#67433](https://github.com/kubernetes/kubernetes/pull/67433), [@deads2k](https://github.com/deads2k))
@@ -2306,7 +2306,7 @@ filename | sha256 hash
 * Change Azure ARM Rate limiting error message. ([#65292](https://github.com/kubernetes/kubernetes/pull/65292), [@wgliang](https://github.com/wgliang))
 * AWS now checks for validity of ecryption key when creating encrypted volumes. Dynamic provisioning of encrypted volume may get slower due to these checks. ([#65223](https://github.com/kubernetes/kubernetes/pull/65223), [@jsafrane](https://github.com/jsafrane))
 * Report accurate status for kubernetes-master and -worker charms. ([#65187](https://github.com/kubernetes/kubernetes/pull/65187), [@kwmonroe](https://github.com/kwmonroe))
-* Fixed issue 63608, which is that under rare circumstances the ResourceQuota admission controller could lose track of an request in progress and time out after waiting 10 seconds for a decision to be made. ([#64598](https://github.com/kubernetes/kubernetes/pull/64598), [@MikeSpreitzer](https://github.com/MikeSpreitzer))
+* Fixed issue 63608, which is that under rare circumstances the ResourceQuota admission controller could lose track of a request in progress and time out after waiting 10 seconds for a decision to be made. ([#64598](https://github.com/kubernetes/kubernetes/pull/64598), [@MikeSpreitzer](https://github.com/MikeSpreitzer))
 * In the vSphere cloud provider the `Global.vm-uuid` configuration option is not deprecated anymore, it can be used to overwrite the VMUUID on the controller-manager ([#65152](https://github.com/kubernetes/kubernetes/pull/65152), [@alvaroaleman](https://github.com/alvaroaleman))
 * fluentd-gcp grace termination period increased to 60s. ([#65084](https://github.com/kubernetes/kubernetes/pull/65084), [@x13n](https://github.com/x13n))
 * Pass cluster_location argument to Heapster ([#65176](https://github.com/kubernetes/kubernetes/pull/65176), [@kawych](https://github.com/kawych))

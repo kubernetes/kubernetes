@@ -755,7 +755,7 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 		// we have zero or multple items, so coerce all items into a list.
 		// we don't want an *unstructured.Unstructured list yet, as we
 		// may be dealing with non-unstructured objects. Compose all items
-		// into an corev1.List, and then decode using an unstructured scheme.
+		// into a corev1.List, and then decode using an unstructured scheme.
 		list := corev1.List{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "List",

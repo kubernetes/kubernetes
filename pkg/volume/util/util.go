@@ -718,7 +718,7 @@ func IsAttachableVolume(volumeSpec *volume.Spec, volumePluginMgr *volume.VolumeP
 	return false
 }
 
-// IsDeviceMountableVolume checks if the given volumeSpec is an device mountable volume or not
+// IsDeviceMountableVolume checks if the given volumeSpec is a device mountable volume or not
 func IsDeviceMountableVolume(volumeSpec *volume.Spec, volumePluginMgr *volume.VolumePluginMgr) bool {
 	deviceMountableVolumePlugin, _ := volumePluginMgr.FindDeviceMountablePluginBySpec(volumeSpec)
 	if deviceMountableVolumePlugin != nil {

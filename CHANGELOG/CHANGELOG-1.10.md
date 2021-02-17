@@ -742,7 +742,7 @@ filename | sha256 hash
 * Fixed cleanup of CSI metadata files. ([#65323](https://github.com/kubernetes/kubernetes/pull/65323), [@jsafrane](https://github.com/jsafrane))
 * Fix an issue with dropped audit logs, when truncating and batch backends enabled at the same time. ([#65823](https://github.com/kubernetes/kubernetes/pull/65823), [@loburm](https://github.com/loburm))
 * fixes a validation error that could prevent updates to StatefulSet objects containing non-normalized resource requests ([#66165](https://github.com/kubernetes/kubernetes/pull/66165), [@liggitt](https://github.com/liggitt))
-* Fixed issue 63608, which is that under rare circumstances the ResourceQuota admission controller could lose track of an request in progress and time out after waiting 10 seconds for a decision to be made. ([#64598](https://github.com/kubernetes/kubernetes/pull/64598), [@MikeSpreitzer](https://github.com/MikeSpreitzer))
+* Fixed issue 63608, which is that under rare circumstances the ResourceQuota admission controller could lose track of a request in progress and time out after waiting 10 seconds for a decision to be made. ([#64598](https://github.com/kubernetes/kubernetes/pull/64598), [@MikeSpreitzer](https://github.com/MikeSpreitzer))
 * Make kubelet ReadLogs backward compatible. ([#63268](https://github.com/kubernetes/kubernetes/pull/63268), [@Random-Liu](https://github.com/Random-Liu))
 * set EnableHTTPSTrafficOnly in azure storage account creation ([#64957](https://github.com/kubernetes/kubernetes/pull/64957), [@andyzhangx](https://github.com/andyzhangx))
 * Rework Kubelet set `/etc/hosts` behavior to fix conformance testability ([#61613](https://github.com/kubernetes/kubernetes/pull/61613), [@dims](https://github.com/dims))

@@ -61,7 +61,7 @@ type AESConfiguration struct {
 	Keys []Key
 }
 
-// SecretboxConfiguration contains the API configuration for an Secretbox transformer.
+// SecretboxConfiguration contains the API configuration for a Secretbox transformer.
 type SecretboxConfiguration struct {
 	// keys is a list of keys to be used for creating the Secretbox transformer.
 	// Each key has to be 32 bytes long.

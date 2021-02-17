@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// statusError is an object that can be converted into an metav1.Status
+// statusError is an object that can be converted into a metav1.Status
 type statusError interface {
 	Status() metav1.Status
 }

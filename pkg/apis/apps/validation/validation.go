@@ -230,7 +230,7 @@ func ValidateControllerRevision(revision *apps.ControllerRevision) field.ErrorLi
 	return errs
 }
 
-// ValidateControllerRevisionUpdate collects errors pertaining to the mutation of an ControllerRevision Object. If the
+// ValidateControllerRevisionUpdate collects errors pertaining to the mutation of a ControllerRevision Object. If the
 // returned ErrorList is empty the update operation is valid. Any mutation to the ControllerRevision's Data or Revision
 // is considered to be invalid.
 func ValidateControllerRevisionUpdate(newHistory, oldHistory *apps.ControllerRevision) field.ErrorList {

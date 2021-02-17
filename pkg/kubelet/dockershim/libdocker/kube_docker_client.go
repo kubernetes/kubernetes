@@ -75,7 +75,7 @@ const (
 	defaultImagePullingProgressReportInterval = 10 * time.Second
 )
 
-// newKubeDockerClient creates an kubeDockerClient from an existing docker client. If requestTimeout is 0,
+// newKubeDockerClient creates a kubeDockerClient from an existing docker client. If requestTimeout is 0,
 // defaultTimeout will be applied.
 func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout, imagePullProgressDeadline time.Duration) Interface {
 	if requestTimeout == 0 {

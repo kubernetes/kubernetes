@@ -467,7 +467,7 @@ func (w ConditionalWait) isConditionMet(event watch.Event) (bool, error) {
 		return false, nil
 	}
 	if event.Type == watch.Deleted {
-		// this will chain back out, result in another get and an return false back up the chain
+		// this will chain back out, result in another get and a return false back up the chain
 		return false, nil
 	}
 	obj := event.Object.(*unstructured.Unstructured)

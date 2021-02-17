@@ -881,7 +881,7 @@ func newRemountRequiredError(
 
 // fsResizeRequiredError is an error returned when PodExistsInVolume() found
 // volume/pod attached/mounted but fsResizeRequired was true, indicating the
-// given volume receives an resize request after attached/mounted.
+// given volume receives a resize request after attached/mounted.
 type fsResizeRequiredError struct {
 	volumeName v1.UniqueVolumeName
 	podName    volumetypes.UniquePodName

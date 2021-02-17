@@ -684,7 +684,7 @@ func (s *ProxyServer) Run() error {
 				}
 				// errReadOnlySysFS is caused by a known docker issue (https://github.com/docker/docker/issues/24000),
 				// the only remediation we know is to restart the docker daemon.
-				// Here we'll send an node event with specific reason and message, the
+				// Here we'll send a node event with specific reason and message, the
 				// administrator should decide whether and how to handle this issue,
 				// whether to drain the node and restart docker.  Occurs in other container runtimes
 				// as well.

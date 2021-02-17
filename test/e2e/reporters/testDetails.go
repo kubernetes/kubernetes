@@ -30,7 +30,7 @@ import (
 
 // DetailsReporter is a ginkgo reporter which dumps information regarding the tests which is difficult to get
 // via an AST app. This allows us to leverage the existing ginkgo logic to walk the tests and such while then following
-// up with an custom app which leverages AST to generate conformance documentation.
+// up with a custom app which leverages AST to generate conformance documentation.
 type DetailsReporter struct {
 	Writer io.Writer
 }

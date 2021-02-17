@@ -160,7 +160,7 @@ func NewOperationExecutor(
 	}
 }
 
-// MarkVolumeOpts is an struct to pass arguments to MountVolume functions
+// MarkVolumeOpts is a struct to pass arguments to MountVolume functions
 type MarkVolumeOpts struct {
 	PodName             volumetypes.UniquePodName
 	PodUID              types.UID

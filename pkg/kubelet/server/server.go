@@ -652,7 +652,7 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 	}
 }
 
-// encodePods creates an v1.PodList object from pods and returns the encoded
+// encodePods creates a v1.PodList object from pods and returns the encoded
 // PodList.
 func encodePods(pods []*v1.Pod) (data []byte, err error) {
 	podList := new(v1.PodList)

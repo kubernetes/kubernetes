@@ -48,7 +48,7 @@ func (f *CustomColumnsPrintFlags) AllowedFormats() []string {
 	return formats
 }
 
-// ToPrinter receives an templateFormat and returns a printer capable of
+// ToPrinter receives a templateFormat and returns a printer capable of
 // handling custom-column printing.
 // Returns false if the specified templateFormat does not match a supported format.
 // Supported format types can be found in pkg/printers/printers.go

@@ -43,7 +43,7 @@ func init() {
 
 // scaleClient is an implementation of ScalesGetter
 // which makes use of a RESTMapper and a generic REST
-// client to support an discoverable resource.
+// client to support a discoverable resource.
 // It behaves somewhat similarly to the dynamic ClientPool,
 // but is more specifically scoped to Scale.
 type scaleClient struct {

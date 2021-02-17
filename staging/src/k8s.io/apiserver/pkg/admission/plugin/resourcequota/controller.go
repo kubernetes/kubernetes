@@ -302,7 +302,7 @@ func (e *quotaEvaluator) checkQuotas(quotas []corev1.ResourceQuota, admissionAtt
 	// this retry logic has the same bug that its possible to be checking against quota in a state that never actually exists where
 	// you've added a new documented, then updated an old one, your resource matches both and you're only checking one
 	// updates for these quota names failed.  Get the current quotas in the namespace, compare by name, check to see if the
-	// resource versions have changed.  If not, we're going to fall through an fail everything.  If they all have, then we can try again
+	// resource versions have changed.  If not, we're going to fall through a fail everything.  If they all have, then we can try again
 	newQuotas, err := e.quotaAccessor.GetQuotas(quotas[0].Namespace)
 	if err != nil {
 		// this means that updates failed.  Anything with a default deny error has failed and we need to let them know

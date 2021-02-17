@@ -38,7 +38,7 @@ type Prober interface {
 
 type tcpProber struct{}
 
-// Probe returns a ProbeRunner capable of running an TCP check.
+// Probe returns a ProbeRunner capable of running a TCP check.
 func (pr tcpProber) Probe(host string, port int, timeout time.Duration) (probe.Result, string, error) {
 	return DoTCPProbe(net.JoinHostPort(host, strconv.Itoa(port)), timeout)
 }

@@ -153,7 +153,7 @@ func TestCacheSetAndGet(t *testing.T) {
 func TestCacheGetPodDoesNotExist(t *testing.T) {
 	cache := NewCache()
 	podID, status := getTestPodIDAndStatus(0)
-	// If the pod does not exist in cache, cache should return an status
+	// If the pod does not exist in cache, cache should return a status
 	// object with id filled.
 	actualStatus, actualErr := cache.Get(podID)
 	assert.Equal(t, status, actualStatus)

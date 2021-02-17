@@ -989,7 +989,7 @@ func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource s
 
 	m.mutex.Unlock()
 	devs := devices.UnsortedList()
-	klog.V(4).Infof("Issuing an PreStartContainer call for container, %s, of pod %s", contName, string(podUID))
+	klog.V(4).Infof("Issuing a PreStartContainer call for container, %s, of pod %s", contName, string(podUID))
 	_, err := eI.e.preStartContainer(devs)
 	if err != nil {
 		return fmt.Errorf("device plugin PreStartContainer rpc failed with err: %v", err)

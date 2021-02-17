@@ -1207,7 +1207,7 @@ var _ = SIGDescribe("Services", func() {
 
 	/*
 		Testname: Service, update NodePort, same port different protocol
-		Description: Create a service to accept TCP requests. By default, created service MUST be of type ClusterIP and an ClusterIP MUST be assigned to the service.
+		Description: Create a service to accept TCP requests. By default, created service MUST be of type ClusterIP and a ClusterIP MUST be assigned to the service.
 		When service type is updated to NodePort supporting TCP protocol, it MUST be reachable on nodeIP over allocated NodePort to serve TCP requests.
 		When this NodePort service is updated to use two protocols i.e. TCP and UDP for same assigned service port 80, service update MUST be successful by allocating two NodePorts to the service and
 		service MUST be able to serve both TCP and UDP requests over same service port 80.
