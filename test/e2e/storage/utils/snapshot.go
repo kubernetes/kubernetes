@@ -100,12 +100,21 @@ func GetSnapshotContentFromSnapshot(dc dynamic.Interface, snapshot *unstructured
 
 }
 
+// DeleteSnapshotWithoutWaiting deletes a VolumeSnapshot and return directly without waiting
+func DeleteSnapshotWithoutWaiting(dc dynamic.Interface, ns string, snapshotName string) error {
+	ginkgo.By("deleting the snapshot")
+	err := dc.Resource(SnapshotGVR).Namespace(ns).Delete(context.TODO(), snapshotName, metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
 // DeleteAndWaitSnapshot deletes a VolumeSnapshot and waits for it to be deleted or until timeout occurs, whichever comes first
 func DeleteAndWaitSnapshot(dc dynamic.Interface, ns string, snapshotName string, poll, timeout time.Duration) error {
 	var err error
-	ginkgo.By("deleting the snapshot")
-	err = dc.Resource(SnapshotGVR).Namespace(ns).Delete(context.TODO(), snapshotName, metav1.DeleteOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
+	err = DeleteSnapshotWithoutWaiting(dc, ns, snapshotName)
+	if err != nil {
 		return err
 	}
 

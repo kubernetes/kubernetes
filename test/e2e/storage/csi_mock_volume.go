@@ -1303,7 +1303,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					framework.Logf("PVC not found. Continuing to test VolumeSnapshotContent finalizer")
 				}
 				if claim != nil && claim.DeletionTimestamp == nil {
-					framework.Failf("Expected deletion timestamp to be set on PVC %s", claim.Name)
+					framework.Failf("Expected deletion timestamp to be set on PVC: %v", claim)
 				}
 
 				ginkgo.By(fmt.Sprintf("Get VolumeSnapshotContent bound to VolumeSnapshot %s", snapshot.GetName()))
