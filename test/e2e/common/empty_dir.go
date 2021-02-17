@@ -282,7 +282,8 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		}
 
 		ginkgo.By("Creating Pod")
-		pod = f.PodClient().CreateSync(pod)
+		f.PodClient().Create(pod)
+		e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 
 		ginkgo.By("Reading file content from the nginx-container")
 		result := f.ExecShellInContainer(pod.Name, busyBoxMainContainerName, fmt.Sprintf("cat %s", busyBoxMainVolumeFilePath))
