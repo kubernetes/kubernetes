@@ -570,11 +570,22 @@ func (g *gcePDCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig
 }
 
 func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+	testns := f.Namespace.Name
+	cfg := &storageframework.PerTestConfig{
+		Driver:    g,
+		Prefix:    "gcepd",
+		Framework: f,
+	}
+
+	if framework.ProviderIs("gke") {
+		framework.Logf("The csi gce-pd driver is automatically installed in GKE. Skipping driver installation.")
+		return cfg, func() {}
+	}
+
 	ginkgo.By("deploying csi gce-pd driver")
 	// Create secondary namespace which will be used for creating driver
 	driverNamespace := utils.CreateDriverNamespace(f)
-	ns2 := driverNamespace.Name
-	ns1 := f.Namespace.Name
+	driverns := driverNamespace.Name
 
 	cancelLogging := utils.StartPodLogs(f, driverNamespace)
 	// It would be safer to rename the gcePD driver, but that
@@ -589,7 +600,7 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.
 	// 	DriverContainerName:      "gce-driver",
 	// 	ProvisionerContainerName: "csi-external-provisioner",
 	// }
-	createGCESecrets(f.ClientSet, ns2)
+	createGCESecrets(f.ClientSet, driverns)
 
 	manifests := []string{
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
@@ -611,17 +622,17 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
 	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
 	cleanupFunc := func() {
-		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", ns1))
-		// Delete the primary namespace but its okay to fail here because this namespace will
+		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", testns))
+		// Delete the primary namespace but it's okay to fail here because this namespace will
 		// also be deleted by framework.Aftereach hook
-		tryFunc(func() { f.DeleteNamespace(ns1) })
+		tryFunc(func() { f.DeleteNamespace(testns) })
 
-		ginkgo.By("uninstalling csi mock driver")
+		ginkgo.By("uninstalling csi gce-pd driver")
 		tryFunc(cleanup)
 		tryFunc(cancelLogging)
 
-		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", ns2))
-		tryFunc(func() { f.DeleteNamespace(ns2) })
+		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", driverns))
+		tryFunc(func() { f.DeleteNamespace(driverns) })
 		// cleanup function has already ran and hence we don't need to run it again.
 		// We do this as very last action because in-case defer(or AfterEach) races
 		// with AfterSuite and test routine gets killed then this block still
