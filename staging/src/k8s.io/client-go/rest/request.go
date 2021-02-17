@@ -516,7 +516,7 @@ func (r Request) finalURLTemplate() url.URL {
 	groupIndex := 0
 	index := 0
 	trimmedBasePath := ""
-	if url != nil && r.c.base != nil && strings.Contains(url.Path, r.c.base.Path) {
+	if r.c.base != nil && strings.Contains(url.Path, r.c.base.Path) {
 		p := strings.TrimPrefix(url.Path, r.c.base.Path)
 		if !strings.HasPrefix(p, "/") {
 			p = "/" + p
