@@ -357,7 +357,7 @@ func WaitForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namesp
 	return WaitTimeoutForPodNoLongerRunningInNamespace(c, podName, namespace, defaultPodDeletionTimeout)
 }
 
-// WaitTimeoutForPodReadyInNamespace waits the given timeout diration for the
+// WaitTimeoutForPodReadyInNamespace waits the given timeout duration for the
 // specified pod to be ready and running.
 func WaitTimeoutForPodReadyInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return wait.PollImmediate(poll, timeout, podRunningAndReady(c, podName, namespace))

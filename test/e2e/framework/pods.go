@@ -96,12 +96,12 @@ func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 	return p
 }
 
-// CreateSync creates a new pod according to the framework specifications, and wait for it to start.
+// CreateSync creates a new pod according to the framework specifications, and wait for it to start and be running and ready.
 func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
 	namespace := c.f.Namespace.Name
 	p := c.Create(pod)
-	ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(c.f.ClientSet, p.Name, namespace))
-	// Get the newest pod after it becomes running, some status may change after pod created, such as pod ip.
+	ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(c.f.ClientSet, p.Name, namespace, PodStartTimeout))
+	// Get the newest pod after it becomes running and ready, some status may change after pod created, such as pod ip.
 	p, err := c.Get(context.TODO(), p.Name, metav1.GetOptions{})
 	ExpectNoError(err)
 	return p
