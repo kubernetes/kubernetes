@@ -159,7 +159,7 @@ func TestCompatibility_v1_PodSecurityContext(t *testing.T) {
 	}
 
 	validator := func(obj runtime.Object) field.ErrorList {
-		opts := podutil.GetValidationOptionsFromPodSpec(&(obj.(*api.Pod).Spec), nil)
+		opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&(obj.(*api.Pod).Spec), nil, &(obj.(*api.Pod).ObjectMeta), nil)
 		return validation.ValidatePodSpec(&(obj.(*api.Pod).Spec), &(obj.(*api.Pod).ObjectMeta), field.NewPath("spec"), opts)
 	}
 

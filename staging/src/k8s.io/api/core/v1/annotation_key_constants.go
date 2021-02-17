@@ -128,4 +128,14 @@ const (
 	// This annotation is used by the Attach Detach Controller to determine whether to use the in-tree or
 	// CSI Backend for a volume plugin on a specific node.
 	MigratedPluginsAnnotationKey = "storage.alpha.kubernetes.io/migrated-plugins"
+
+	// PodDeletionCost can be used to set to an int32 that represent the cost of deleting
+	// a pod compared to other pods belonging to the same ReplicaSet. Pods with lower
+	// deletion cost are preferred to be deleted before pods with higher deletion cost.
+	// Note that this is honored on a best-effort basis, and so it does not offer guarantees on
+	// pod deletion order.
+	// The implicit deletion cost for pods that don't set the annotation is 0, negative values are permitted.
+	//
+	// This annotation is alpha-level and is only honored when PodDeletionCost feature is enabled.
+	PodDeletionCost = "controller.kubernetes.io/pod-deletion-cost"
 )
