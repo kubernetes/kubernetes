@@ -154,15 +154,7 @@ func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.Persisten
 			RestartPolicy: v1.RestartPolicyOnFailure,
 		},
 	}
-	var volumeMounts = make([]v1.VolumeMount, len(pvclaims))
-	var volumes = make([]v1.Volume, len(pvclaims))
-	for index, pvclaim := range pvclaims {
-		volumename := fmt.Sprintf("volume%v", index+1)
-		volumeMounts[index] = v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}
-		volumes[index] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
-	}
-	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
-	podSpec.Spec.Volumes = volumes
+	setVolumes(&podSpec.Spec, pvclaims, nil /*inline volume sources*/, false /*PVCs readonly*/)
 	if nodeSelector != nil {
 		podSpec.Spec.NodeSelector = nodeSelector
 	}
@@ -223,33 +215,42 @@ func MakePodSpec(podConfig *Config) *v1.PodSpec {
 		podSpec.SecurityContext.FSGroupChangePolicy = podConfig.PodFSGroupChangePolicy
 	}
 
+	setVolumes(podSpec, podConfig.PVCs, podConfig.InlineVolumeSources, podConfig.PVCsReadOnly)
+	SetNodeSelection(podSpec, podConfig.NodeSelection)
+	return podSpec
+}
+
+func setVolumes(podSpec *v1.PodSpec, pvcs []*v1.PersistentVolumeClaim, inlineVolumeSources []*v1.VolumeSource, pvcsReadOnly bool) {
 	var volumeMounts = make([]v1.VolumeMount, 0)
 	var volumeDevices = make([]v1.VolumeDevice, 0)
-	var volumes = make([]v1.Volume, len(podConfig.PVCs)+len(podConfig.InlineVolumeSources))
+	var volumes = make([]v1.Volume, len(pvcs)+len(inlineVolumeSources))
 	volumeIndex := 0
-	for _, pvclaim := range podConfig.PVCs {
+	for _, pvclaim := range pvcs {
 		volumename := fmt.Sprintf("volume%v", volumeIndex+1)
 		if pvclaim.Spec.VolumeMode != nil && *pvclaim.Spec.VolumeMode == v1.PersistentVolumeBlock {
 			volumeDevices = append(volumeDevices, v1.VolumeDevice{Name: volumename, DevicePath: "/mnt/" + volumename})
 		} else {
 			volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename})
 		}
-
-		volumes[volumeIndex] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: podConfig.PVCsReadOnly}}}
+		volumes[volumeIndex] = v1.Volume{
+			Name: volumename,
+			VolumeSource: v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvclaim.Name,
+					ReadOnly:  pvcsReadOnly,
+				},
+			},
+		}
 		volumeIndex++
 	}
-	for _, src := range podConfig.InlineVolumeSources {
+	for _, src := range inlineVolumeSources {
 		volumename := fmt.Sprintf("volume%v", volumeIndex+1)
 		// In-line volumes can be only filesystem, not block.
 		volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename})
 		volumes[volumeIndex] = v1.Volume{Name: volumename, VolumeSource: *src}
 		volumeIndex++
 	}
-
 	podSpec.Containers[0].VolumeMounts = volumeMounts
 	podSpec.Containers[0].VolumeDevices = volumeDevices
 	podSpec.Volumes = volumes
-
-	SetNodeSelection(podSpec, podConfig.NodeSelection)
-	return podSpec
 }
