@@ -58,10 +58,8 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	protocolICMP := api.Protocol("ICMP")
 	protocolSCTP := api.ProtocolSCTP
 	endPort := int32(32768)
+
 	// Tweaks used below.
-	// setIngressEmptyIngressRule := func(networkPolicy *networking.NetworkPolicy) {
-	// 	networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{}
-	// }
 	setIngressEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
 		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{networking.NetworkPolicyIngressRule{}}
 	}
@@ -141,22 +139,14 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	setIngressFromIPBlockIPV6 := func(networkPolicy *networking.NetworkPolicy) {
 		networkPolicy.Spec.Ingress[0].From[0].IPBlock = &networking.IPBlock{
-			CIDR:   "fd00:192:168::/64",
+			CIDR:   "fd00:192:168::/48",
 			Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
 		}
 	}
 
-	// setEgressEmptyEgressRule := func(networkPolicy *networking.NetworkPolicy) {
-	// 	networkPolicy.Spec.Egress = []networking.NetworkPolicyEgressRule{}
-	// }
-
 	setEgressEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
 		networkPolicy.Spec.Egress = []networking.NetworkPolicyEgressRule{networking.NetworkPolicyEgressRule{}}
 	}
-
-	// setEgressEmptyTo := func(networkPolicy *networking.NetworkPolicy) {
-	// 	networkPolicy.Spec.Egress[0].To = []networking.NetworkPolicyPeer{}
-	// }
 
 	setEgressToEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
 		networkPolicy.Spec.Egress[0].To = []networking.NetworkPolicyPeer{networking.NetworkPolicyPeer{}}
@@ -171,6 +161,20 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	setEgressToPodSelector := func(networkPolicy *networking.NetworkPolicy) {
 		networkPolicy.Spec.Egress[0].To[0].PodSelector = &metav1.LabelSelector{
 			MatchLabels: map[string]string{"c": "d"},
+		}
+	}
+
+	setEgressToIPBlock := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].To[0].IPBlock = &networking.IPBlock{
+			CIDR:   "192.168.0.0/16",
+			Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+		}
+	}
+
+	setEgressToIPBlockIPV6 := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Egress[0].To[0].IPBlock = &networking.IPBlock{
+			CIDR:   "fd00:192:168::/48",
+			Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
 		}
 	}
 
@@ -228,19 +232,12 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		}
 	}
 
-	setEgressToIPBlock := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Egress[0].To[0].IPBlock = &networking.IPBlock{
-			CIDR:   "192.168.0.0/16",
-			Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
-		}
+	setPolicyTypesEgress := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.PolicyTypes = []networking.PolicyType{networking.PolicyTypeEgress}
 	}
 
 	setPolicyTypesIngressEgress := func(networkPolicy *networking.NetworkPolicy) {
 		networkPolicy.Spec.PolicyTypes = []networking.PolicyType{networking.PolicyTypeIngress, networking.PolicyTypeEgress}
-	}
-
-	setPolicyTypesEgress := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.PolicyTypes = []networking.PolicyType{networking.PolicyTypeEgress}
 	}
 
 	successCases := []*networking.NetworkPolicy{
@@ -255,10 +252,10 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, setPolicyTypesEgress),
 		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, setPolicyTypesIngressEgress),
 		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressPorts),
-		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlock),
-		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlock),
-		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, setPolicyTypesEgress),
-		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, setPolicyTypesIngressEgress),
+		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlockIPV6),
+		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlockIPV6),
+		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlockIPV6, setPolicyTypesEgress),
+		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlockIPV6, setPolicyTypesIngressEgress),
 		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressPortsUDPandHigh),
 		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setEgressPortsBothHigh, setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setAlternativeIngressFromPodSelector, setIngressPortsHigher),
 	}
