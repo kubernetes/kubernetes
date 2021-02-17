@@ -211,12 +211,7 @@ func SetDefaults_VolumeBindingArgs(obj *v1beta2.VolumeBindingArgs) {
 func SetDefaults_PodTopologySpreadArgs(obj *v1beta2.PodTopologySpreadArgs) {
 	if feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
 		if obj.DefaultingType == "" {
-			// TODO(#94008): Always default to System in v1beta2.
-			if len(obj.DefaultConstraints) != 0 {
-				obj.DefaultingType = v1beta2.ListDefaulting
-			} else {
-				obj.DefaultingType = v1beta2.SystemDefaulting
-			}
+			obj.DefaultingType = v1beta2.SystemDefaulting
 		}
 		return
 	}
