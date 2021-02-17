@@ -227,7 +227,7 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 		if err != nil {
 			return nil, fmt.Errorf("failed to get region from zones: %v", err)
 		}
-		volID = fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, region, pv.Spec.GCEPersistentDisk.PDName)
+		volID = fmt.Sprintf(volIDRegionalFmt, UnspecifiedValue, region, pv.Spec.GCEPersistentDisk.PDName)
 	} else {
 		// Unspecified
 		volID = fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, UnspecifiedValue, pv.Spec.GCEPersistentDisk.PDName)
