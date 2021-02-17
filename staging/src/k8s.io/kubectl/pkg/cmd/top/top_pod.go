@@ -183,9 +183,9 @@ func (o TopPodOptions) RunTopPod() error {
 	if len(metrics.Items) == 0 {
 		// If the API server query is successful but all the pods are newly created,
 		// the metrics are probably not ready yet, so we return the error here in the first place.
-		e := verifyEmptyMetrics(o, selector)
-		if e != nil {
-			return e
+		err := verifyEmptyMetrics(o, selector)
+		if err != nil {
+			return err
 		}
 
 		// if we had no errors, be sure we output something.
@@ -194,9 +194,6 @@ func (o TopPodOptions) RunTopPod() error {
 		} else {
 			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
 		}
-	}
-	if err != nil {
-		return err
 	}
 
 	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy)
