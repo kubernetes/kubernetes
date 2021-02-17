@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -1326,5 +1327,55 @@ func TestDropEphemeralContainers(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+func TestValidatePodDeletionCostOption(t *testing.T) {
+	testCases := []struct {
+		name                            string
+		oldPodMeta                      *metav1.ObjectMeta
+		featureEnabled                  bool
+		wantAllowInvalidPodDeletionCost bool
+	}{
+		{
+			name:                            "CreateFeatureEnabled",
+			featureEnabled:                  true,
+			wantAllowInvalidPodDeletionCost: false,
+		},
+		{
+			name:                            "CreateFeatureDisabled",
+			featureEnabled:                  false,
+			wantAllowInvalidPodDeletionCost: true,
+		},
+		{
+			name:                            "UpdateFeatureDisabled",
+			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{core.PodDeletionCost: "100"}},
+			featureEnabled:                  false,
+			wantAllowInvalidPodDeletionCost: true,
+		},
+		{
+			name:                            "UpdateFeatureEnabledValidOldValue",
+			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{core.PodDeletionCost: "100"}},
+			featureEnabled:                  true,
+			wantAllowInvalidPodDeletionCost: false,
+		},
+		{
+			name:                            "UpdateFeatureEnabledValidOldValue",
+			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{core.PodDeletionCost: "invalid-value"}},
+			featureEnabled:                  true,
+			wantAllowInvalidPodDeletionCost: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDeletionCost, tc.featureEnabled)()
+			// The new pod doesn't impact the outcome.
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, nil, nil, tc.oldPodMeta)
+			if tc.wantAllowInvalidPodDeletionCost != gotOptions.AllowInvalidPodDeletionCost {
+				t.Errorf("unexpected diff, want: %v, got: %v", tc.wantAllowInvalidPodDeletionCost, gotOptions.AllowInvalidPodDeletionCost)
+			}
+
+		})
 	}
 }

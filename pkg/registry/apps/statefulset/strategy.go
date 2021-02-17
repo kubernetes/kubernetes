@@ -96,7 +96,8 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 // Validate validates a new StatefulSet.
 func (statefulSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	statefulSet := obj.(*apps.StatefulSet)
-	return validation.ValidateStatefulSet(statefulSet)
+	opts := pod.GetValidationOptionsFromPodTemplate(&statefulSet.Spec.Template, nil)
+	return validation.ValidateStatefulSet(statefulSet, opts)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -112,7 +113,9 @@ func (statefulSetStrategy) AllowCreateOnUpdate() bool {
 func (statefulSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newStatefulSet := obj.(*apps.StatefulSet)
 	oldStatefulSet := old.(*apps.StatefulSet)
-	validationErrorList := validation.ValidateStatefulSet(newStatefulSet)
+
+	opts := pod.GetValidationOptionsFromPodTemplate(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
+	validationErrorList := validation.ValidateStatefulSet(newStatefulSet, opts)
 	updateErrorList := validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet)
 	return append(validationErrorList, updateErrorList...)
 }

@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -45,8 +46,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 
 	"github.com/stretchr/testify/assert"
@@ -435,7 +439,7 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 	now := metav1.Now()
 	then := metav1.Time{Time: now.AddDate(0, -1, 0)}
 	zeroTime := metav1.Time{}
-	pod := func(podName, nodeName string, phase v1.PodPhase, ready bool, restarts int32, readySince metav1.Time, created metav1.Time) *v1.Pod {
+	pod := func(podName, nodeName string, phase v1.PodPhase, ready bool, restarts int32, readySince metav1.Time, created metav1.Time, annotations map[string]string) *v1.Pod {
 		var conditions []v1.PodCondition
 		var containerStatuses []v1.ContainerStatus
 		if ready {
@@ -446,6 +450,7 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				CreationTimestamp: created,
 				Name:              podName,
+				Annotations:       annotations,
 			},
 			Spec: v1.PodSpec{NodeName: nodeName},
 			Status: v1.PodStatus{
@@ -456,15 +461,17 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 		}
 	}
 	var (
-		unscheduledPod                      = pod("unscheduled", "", v1.PodPending, false, 0, zeroTime, zeroTime)
-		scheduledPendingPod                 = pod("pending", "node", v1.PodPending, false, 0, zeroTime, zeroTime)
-		unknownPhasePod                     = pod("unknown-phase", "node", v1.PodUnknown, false, 0, zeroTime, zeroTime)
-		runningNotReadyPod                  = pod("not-ready", "node", v1.PodRunning, false, 0, zeroTime, zeroTime)
-		runningReadyNoLastTransitionTimePod = pod("ready-no-last-transition-time", "node", v1.PodRunning, true, 0, zeroTime, zeroTime)
-		runningReadyNow                     = pod("ready-now", "node", v1.PodRunning, true, 0, now, now)
-		runningReadyThen                    = pod("ready-then", "node", v1.PodRunning, true, 0, then, then)
-		runningReadyNowHighRestarts         = pod("ready-high-restarts", "node", v1.PodRunning, true, 9001, now, now)
-		runningReadyNowCreatedThen          = pod("ready-now-created-then", "node", v1.PodRunning, true, 0, now, then)
+		unscheduledPod                      = pod("unscheduled", "", v1.PodPending, false, 0, zeroTime, zeroTime, nil)
+		scheduledPendingPod                 = pod("pending", "node", v1.PodPending, false, 0, zeroTime, zeroTime, nil)
+		unknownPhasePod                     = pod("unknown-phase", "node", v1.PodUnknown, false, 0, zeroTime, zeroTime, nil)
+		runningNotReadyPod                  = pod("not-ready", "node", v1.PodRunning, false, 0, zeroTime, zeroTime, nil)
+		runningReadyNoLastTransitionTimePod = pod("ready-no-last-transition-time", "node", v1.PodRunning, true, 0, zeroTime, zeroTime, nil)
+		runningReadyNow                     = pod("ready-now", "node", v1.PodRunning, true, 0, now, now, nil)
+		runningReadyThen                    = pod("ready-then", "node", v1.PodRunning, true, 0, then, then, nil)
+		runningReadyNowHighRestarts         = pod("ready-high-restarts", "node", v1.PodRunning, true, 9001, now, now, nil)
+		runningReadyNowCreatedThen          = pod("ready-now-created-then", "node", v1.PodRunning, true, 0, now, then, nil)
+		lowPodDeletionCost                  = pod("low-deletion-cost", "node", v1.PodRunning, true, 0, now, then, map[string]string{core.PodDeletionCost: "10"})
+		highPodDeletionCost                 = pod("high-deletion-cost", "node", v1.PodRunning, true, 0, now, then, map[string]string{core.PodDeletionCost: "100"})
 	)
 	equalityTests := []*v1.Pod{
 		unscheduledPod,
@@ -491,33 +498,40 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 		rank int
 	}
 	inequalityTests := []struct {
-		lesser, greater podWithRank
+		lesser, greater        podWithRank
+		disablePodDeletioncost bool
 	}{
-		{podWithRank{unscheduledPod, 1}, podWithRank{scheduledPendingPod, 2}},
-		{podWithRank{unscheduledPod, 2}, podWithRank{scheduledPendingPod, 1}},
-		{podWithRank{scheduledPendingPod, 1}, podWithRank{unknownPhasePod, 2}},
-		{podWithRank{unknownPhasePod, 1}, podWithRank{runningNotReadyPod, 2}},
-		{podWithRank{runningNotReadyPod, 1}, podWithRank{runningReadyNoLastTransitionTimePod, 1}},
-		{podWithRank{runningReadyNoLastTransitionTimePod, 1}, podWithRank{runningReadyNow, 1}},
-		{podWithRank{runningReadyNow, 2}, podWithRank{runningReadyNoLastTransitionTimePod, 1}},
-		{podWithRank{runningReadyNow, 1}, podWithRank{runningReadyThen, 1}},
-		{podWithRank{runningReadyNow, 2}, podWithRank{runningReadyThen, 1}},
-		{podWithRank{runningReadyNowHighRestarts, 1}, podWithRank{runningReadyNow, 1}},
-		{podWithRank{runningReadyNow, 2}, podWithRank{runningReadyNowHighRestarts, 1}},
-		{podWithRank{runningReadyNow, 1}, podWithRank{runningReadyNowCreatedThen, 1}},
-		{podWithRank{runningReadyNowCreatedThen, 2}, podWithRank{runningReadyNow, 1}},
+		{lesser: podWithRank{unscheduledPod, 1}, greater: podWithRank{scheduledPendingPod, 2}},
+		{lesser: podWithRank{unscheduledPod, 2}, greater: podWithRank{scheduledPendingPod, 1}},
+		{lesser: podWithRank{scheduledPendingPod, 1}, greater: podWithRank{unknownPhasePod, 2}},
+		{lesser: podWithRank{unknownPhasePod, 1}, greater: podWithRank{runningNotReadyPod, 2}},
+		{lesser: podWithRank{runningNotReadyPod, 1}, greater: podWithRank{runningReadyNoLastTransitionTimePod, 1}},
+		{lesser: podWithRank{runningReadyNoLastTransitionTimePod, 1}, greater: podWithRank{runningReadyNow, 1}},
+		{lesser: podWithRank{runningReadyNow, 2}, greater: podWithRank{runningReadyNoLastTransitionTimePod, 1}},
+		{lesser: podWithRank{runningReadyNow, 1}, greater: podWithRank{runningReadyThen, 1}},
+		{lesser: podWithRank{runningReadyNow, 2}, greater: podWithRank{runningReadyThen, 1}},
+		{lesser: podWithRank{runningReadyNowHighRestarts, 1}, greater: podWithRank{runningReadyNow, 1}},
+		{lesser: podWithRank{runningReadyNow, 2}, greater: podWithRank{runningReadyNowHighRestarts, 1}},
+		{lesser: podWithRank{runningReadyNow, 1}, greater: podWithRank{runningReadyNowCreatedThen, 1}},
+		{lesser: podWithRank{runningReadyNowCreatedThen, 2}, greater: podWithRank{runningReadyNow, 1}},
+		{lesser: podWithRank{lowPodDeletionCost, 2}, greater: podWithRank{highPodDeletionCost, 1}},
+		{lesser: podWithRank{highPodDeletionCost, 2}, greater: podWithRank{lowPodDeletionCost, 1}, disablePodDeletioncost: true},
 	}
-	for _, test := range inequalityTests {
-		podsWithRanks := ActivePodsWithRanks{
-			Pods: []*v1.Pod{test.lesser.pod, test.greater.pod},
-			Rank: []int{test.lesser.rank, test.greater.rank},
-		}
-		if !podsWithRanks.Less(0, 1) {
-			t.Errorf("expected pod %q with rank %v to be less than %q with rank %v", podsWithRanks.Pods[0].Name, podsWithRanks.Rank[0], podsWithRanks.Pods[1].Name, podsWithRanks.Rank[1])
-		}
-		if podsWithRanks.Less(1, 0) {
-			t.Errorf("expected pod %q with rank %v not to be less than %v with rank %v", podsWithRanks.Pods[1].Name, podsWithRanks.Rank[1], podsWithRanks.Pods[0].Name, podsWithRanks.Rank[0])
-		}
+	for i, test := range inequalityTests {
+		t.Run(fmt.Sprintf("test%d", i), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDeletionCost, !test.disablePodDeletioncost)()
+
+			podsWithRanks := ActivePodsWithRanks{
+				Pods: []*v1.Pod{test.lesser.pod, test.greater.pod},
+				Rank: []int{test.lesser.rank, test.greater.rank},
+			}
+			if !podsWithRanks.Less(0, 1) {
+				t.Errorf("expected pod %q with rank %v to be less than %q with rank %v", podsWithRanks.Pods[0].Name, podsWithRanks.Rank[0], podsWithRanks.Pods[1].Name, podsWithRanks.Rank[1])
+			}
+			if podsWithRanks.Less(1, 0) {
+				t.Errorf("expected pod %q with rank %v not to be less than %v with rank %v", podsWithRanks.Pods[1].Name, podsWithRanks.Rank[1], podsWithRanks.Pods[0].Name, podsWithRanks.Rank[0])
+			}
+		})
 	}
 }
 

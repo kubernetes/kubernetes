@@ -131,7 +131,7 @@ func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList
 	return allErrs
 }
 
-func ValidatePodSpecificAnnotations(annotations map[string]string, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+func ValidatePodSpecificAnnotations(annotations map[string]string, spec *core.PodSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if value, isMirror := annotations[core.MirrorPodAnnotationKey]; isMirror {
@@ -142,6 +142,12 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *core.Po
 
 	if annotations[core.TolerationsAnnotationKey] != "" {
 		allErrs = append(allErrs, ValidateTolerationsInPodAnnotations(annotations, fldPath)...)
+	}
+
+	if !opts.AllowInvalidPodDeletionCost {
+		if _, err := helper.GetDeletionCostFromPodAnnotations(annotations); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Key(core.PodDeletionCost), annotations[core.PodDeletionCost], "must be a 32bit integer"))
+		}
 	}
 
 	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
@@ -167,7 +173,7 @@ func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath 
 	return allErrs
 }
 
-func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *core.Pod, fldPath *field.Path) field.ErrorList {
+func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *core.Pod, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	newAnnotations := newPod.Annotations
 	oldAnnotations := oldPod.Annotations
@@ -194,7 +200,7 @@ func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *core.Pod, fldPath *fie
 			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not add mirror pod annotation"))
 		}
 	}
-	allErrs = append(allErrs, ValidatePodSpecificAnnotations(newAnnotations, &newPod.Spec, fldPath)...)
+	allErrs = append(allErrs, ValidatePodSpecificAnnotations(newAnnotations, &newPod.Spec, fldPath, opts)...)
 	return allErrs
 }
 
@@ -3185,6 +3191,8 @@ type PodValidationOptions struct {
 	AllowMultipleHugePageResources bool
 	// Allow pod spec to use hugepages in downward API
 	AllowDownwardAPIHugePages bool
+	// Allow invalid pod-deletion-cost annotation value for backward compatibility.
+	AllowInvalidPodDeletionCost bool
 }
 
 // ValidatePodSingleHugePageResources checks if there are multiple huge
@@ -3209,7 +3217,7 @@ func ValidatePodSingleHugePageResources(pod *core.Pod, specPath *field.Path) fie
 func validatePodMetadataAndSpec(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, fldPath)
-	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, fldPath.Child("annotations"))...)
+	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, fldPath.Child("annotations"), opts)...)
 	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, field.NewPath("spec"), opts)...)
 
 	// we do additional validation only pertinent for pods and not pod templates
@@ -3928,7 +3936,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
 	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
-	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"))...)
+	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"), opts)...)
 	specPath := field.NewPath("spec")
 
 	if !opts.AllowMultipleHugePageResources {
@@ -4035,10 +4043,10 @@ func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerS
 
 // ValidatePodStatusUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
 // that cannot be changed.
-func ValidatePodStatusUpdate(newPod, oldPod *core.Pod) field.ErrorList {
+func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
-	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"))...)
+	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"), opts)...)
 	allErrs = append(allErrs, validatePodConditions(newPod.Status.Conditions, fldPath.Child("conditions"))...)
 
 	fldPath = field.NewPath("status")
@@ -4573,7 +4581,7 @@ func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, fldPath *field.Path, op
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(spec.Annotations, fldPath.Child("annotations"))...)
-	allErrs = append(allErrs, ValidatePodSpecificAnnotations(spec.Annotations, &spec.Spec, fldPath.Child("annotations"))...)
+	allErrs = append(allErrs, ValidatePodSpecificAnnotations(spec.Annotations, &spec.Spec, fldPath.Child("annotations"), opts)...)
 	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec, nil, fldPath.Child("spec"), opts)...)
 	allErrs = append(allErrs, validateSeccompAnnotationsAndFields(spec.ObjectMeta, &spec.Spec, fldPath.Child("spec"))...)
 
