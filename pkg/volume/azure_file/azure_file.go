@@ -55,8 +55,9 @@ var _ volume.PersistentVolumePlugin = &azureFilePlugin{}
 var _ volume.ExpandableVolumePlugin = &azureFilePlugin{}
 
 const (
-	azureFilePluginName    = "kubernetes.io/azure-file"
-	defaultSecretNamespace = "default"
+	azureFilePluginName     = "kubernetes.io/azure-file"
+	defaultSecretNamespace  = "default"
+	minimumPremiumShareSize = 100 // GB
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
