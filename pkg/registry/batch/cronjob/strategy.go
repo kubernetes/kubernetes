@@ -20,7 +20,6 @@ import (
 	"context"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -42,7 +41,7 @@ type cronJobStrategy struct {
 // Strategy is the default logic that applies when creating and updating CronJob objects.
 var Strategy = cronJobStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns OrphanDependents for batch/v1beta1 and batch/v2alpha1 for backwards compatibility,
+// DefaultGarbageCollectionPolicy returns OrphanDependents for batch/v1beta1 for backwards compatibility,
 // and DeleteDependents for all other versions.
 func (cronJobStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
 	var groupVersion schema.GroupVersion
@@ -50,7 +49,7 @@ func (cronJobStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.
 		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 	}
 	switch groupVersion {
-	case batchv1beta1.SchemeGroupVersion, batchv2alpha1.SchemeGroupVersion:
+	case batchv1beta1.SchemeGroupVersion:
 		// for back compatibility
 		return rest.OrphanDependents
 	default:

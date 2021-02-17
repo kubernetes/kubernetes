@@ -80,7 +80,6 @@ autoscaling/v2beta1 \
 autoscaling/v2beta2 \
 batch/v1 \
 batch/v1beta1 \
-batch/v2alpha1 \
 certificates.k8s.io/v1 \
 certificates.k8s.io/v1beta1 \
 coordination.k8s.io/v1beta1 \
