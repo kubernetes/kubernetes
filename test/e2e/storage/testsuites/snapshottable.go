@@ -269,8 +269,17 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 				framework.ExpectNoError(err)
 
 				ginkgo.By("should delete the VolumeSnapshotContent according to its deletion policy")
-				err = storageutils.DeleteAndWaitSnapshot(dc, vs.GetNamespace(), vs.GetName(), framework.Poll, f.Timeouts.SnapshotDelete)
+
+				// Delete both Snapshot and PVC at the same time because different storage systems
+				// have different ordering of deletion. Some may require delete PVC first before
+				// Snapshot deletion and some are opposite.
+				err = storageutils.DeleteSnapshotWithoutWaiting(dc, vs.GetNamespace(), vs.GetName())
 				framework.ExpectNoError(err)
+				err = cs.CoreV1().PersistentVolumeClaims(restoredPVC.Namespace).Delete(context.TODO(), restoredPVC.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+
+				// Wait for the Snapshot to be actually deleted from API server
+				err = storageutils.WaitForNamespacedGVRDeletion(dc, storageutils.SnapshotGVR, vs.GetNamespace(), vs.GetNamespace(), framework.Poll, f.Timeouts.SnapshotDelete)
 
 				switch pattern.SnapshotDeletionPolicy {
 				case storageframework.DeleteSnapshot:
