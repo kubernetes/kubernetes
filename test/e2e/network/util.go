@@ -18,6 +18,7 @@ package network
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"regexp"
@@ -28,6 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -103,6 +107,34 @@ func CheckSCTPModuleLoadedOnNodes(f *framework.Framework, nodes *v1.NodeList) bo
 		framework.Logf("the sctp module is not loaded on node: %v", node.Name)
 	}
 	return false
+}
+
+// WatchEvent will watch  for events starting from the eventsList resourceVersion for
+// the given timeout. Watch event return when an event with the expected eventType and
+// eventReason is found or if the timeout has been reached. Test will fail if the
+// timeout is reached.
+func WatchEvent(f *framework.Framework, eventType, eventReason, namespace, resourceVersion string, timeout time.Duration) {
+
+	framework.Logf("Waiting for %s event", eventReason)
+	w := &cache.ListWatch{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return f.ClientSet.CoreV1().Events(namespace).Watch(context.TODO(), options)
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err := watchtools.Until(ctx, resourceVersion, w, func(event watch.Event) (bool, error) {
+		if event, ok := event.Object.(*v1.Event); ok {
+			if event.Type == eventType && event.Reason == eventReason {
+				framework.Logf("Found %s event", eventReason)
+				return true, nil
+			}
+			return false, nil
+		}
+		return false, nil
+	})
+	framework.ExpectNoError(err, "failed to see %v event")
 }
 
 // execSourceIPTest executes curl to access "/clientip" endpoint on target address

@@ -1115,6 +1115,10 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		// save the health check node port because it disappears when ESIPP is turned off.
 		healthCheckNodePort := int(svc.Spec.HealthCheckNodePort)
 
+		// track which events have already been seen
+		eventsList, err := f.ClientSet.CoreV1().Events(namespace).List(context.TODO(), metav1.ListOptions{})
+		framework.ExpectNoError(err)
+
 		ginkgo.By("turning ESIPP off")
 		svc, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
@@ -1192,6 +1196,9 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 			}
 		}
 
+		// Look for EnsuredLoadBalancer event to signal that service changes have been processed by the service controller
+		// EnsuredLoadBalancer event will occur regardless of cloudprovider
+		WatchEvent(f, v1.EventTypeNormal, "EnsuredLoadBalancer", namespace, eventsList.ResourceVersion, loadBalancerCreateTimeout)
 		// Poll till kube-proxy re-adds the MASQUERADE rule on the node.
 		ginkgo.By(fmt.Sprintf("checking source ip is NOT preserved through loadbalancer %v", ingressIP))
 		var clientIP string
@@ -1208,6 +1215,9 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		if pollErr != nil {
 			framework.Failf("Source IP WAS preserved even after ESIPP turned off. Got %v, expected a ten-dot cluster ip.", clientIP)
 		}
+		// track which events have already been seen
+		eventsList, err = f.ClientSet.CoreV1().Events(namespace).List(context.TODO(), metav1.ListOptions{})
+		framework.ExpectNoError(err)
 
 		// TODO: We need to attempt to create another service with the previously
 		// allocated healthcheck nodePort. If the health check nodePort has been
@@ -1222,6 +1232,9 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 			svc.Spec.HealthCheckNodePort = int32(healthCheckNodePort)
 		})
 		framework.ExpectNoError(err)
+		// Look for EnsuredLoadBalancer event to signal that service changes have been processed by the service controller
+		// EnsuredLoadBalancer event will occur regardless of cloudprovider
+		WatchEvent(f, v1.EventTypeNormal, "EnsuredLoadBalancer", namespace, eventsList.ResourceVersion, loadBalancerCreateTimeout)
 		pollErr = wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			clientIP, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
 			if err != nil {
