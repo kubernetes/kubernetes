@@ -69,7 +69,7 @@ spec:
       serviceAccountName: fluentd-es
       containers:
       - name: fluentd-es
-        image: quay.io/fluentd_elasticsearch/fluentd:v3.0.5
+        image: quay.io/fluentd_elasticsearch/fluentd:v3.2.0
         env:
         - name: FLUENTD_ARGS
           value: --no-supervisor -q
