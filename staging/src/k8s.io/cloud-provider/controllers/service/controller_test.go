@@ -1382,7 +1382,7 @@ func Test_getNodeConditionPredicate(t *testing.T) {
 		{want: true, input: &v1.Node{Spec: v1.NodeSpec{Unschedulable: true}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}},
 
 		{want: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}}},
-		{want: false, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeRoleExcludeBalancer: ""}}}},
+		{want: false, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelNodeExcludeBalancers: ""}}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1498,7 +1498,7 @@ func Test_shouldSyncNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node",
 					Labels: map[string]string{
-						labelNodeRoleExcludeBalancer: "",
+						v1.LabelNodeExcludeBalancers: "",
 					},
 				},
 			},

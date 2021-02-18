@@ -58,4 +58,11 @@ const (
 	// controllers and kube-proxy to check if the Endpoint objects should be replicated when
 	// using Headless Services
 	IsHeadlessService = "service.kubernetes.io/headless"
+
+	// LabelNodeExcludeBalancers specifies that the node should not be considered as a target
+	// for external load-balancers which use nodes as a second hop (e.g. many cloud LBs which only
+	// understand nodes). For services that use externalTrafficPolicy=Local, this may mean that
+	// any backends on excluded nodes are not reachable by those external load-balancers.
+	// Implementations of this exclusion may vary based on provider.
+	LabelNodeExcludeBalancers = "node.kubernetes.io/exclude-from-external-load-balancers"
 )
