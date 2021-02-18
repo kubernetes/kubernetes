@@ -944,6 +944,13 @@ function construct-windows-kubeproxy-flags {
   # so we actually log to the file
   flags+=" --logtostderr=false"
 
+  # Enabling Windows DSR mode unlocks newer network features and reduces
+  # port usage for services.
+  # https://techcommunity.microsoft.com/t5/networking-blog/direct-server-return-dsr-in-a-nutshell/ba-p/693710
+  if [[ "${WINDOWS_ENABLE_DSR:-}" == "true" ]]; then
+    flags+=" --feature-gates=WinDSR=true --enable-dsr=true "
+  fi
+
   # Configure flags with explicit empty string values. We can't escape
   # double-quotes, because they still break sc.exe after expansion in the
   # binPath parameter, and single-quotes get parsed as characters instead
