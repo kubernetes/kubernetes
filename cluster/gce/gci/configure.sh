@@ -762,6 +762,22 @@ function install-kube-binary-config {
   rm -f "${KUBE_HOME}/${server_binary_tar}.sha512"
 }
 
+# retry-forever retries a command forever with a delay between retries.
+#
+# $1:     Delay between retries, in seconds.
+# $2..$N: Command to retry.
+#
+# e.g.: `retry-forever 30 do something` retries `do something` every 30s.
+function retry-forever {
+  local -r delay=$1
+  shift 1
+
+  until "$@"; do
+    echo "== $@ failed, retrying after ${delay}s =="
+    sleep ${delay}
+  done
+}
+
 ######### Main Function ##########
 echo "Start to install kubernetes files"
 # if install fails, message-of-the-day (motd) will warn at login shell
@@ -793,14 +809,14 @@ if [[ "$(is-master)" == "true" ]]; then
 fi
 
 # download and source kube-env
-download-kube-env
+retry-forever 30 download-kube-env
 source "${KUBE_HOME}/kube-env"
 
-download-kubelet-config "${KUBE_HOME}/kubelet-config.yaml"
+retry-forever 10 download-kubelet-config "${KUBE_HOME}/kubelet-config.yaml"
 
 # master certs
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
-  download-kube-master-certs
+  retry-forever 10 download-kube-master-certs
 fi
 
 # ensure chosen container runtime is present
@@ -810,4 +826,3 @@ ensure-container-runtime
 install-kube-binary-config
 
 echo "Done for installing kubernetes files"
-
