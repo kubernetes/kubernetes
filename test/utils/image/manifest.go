@@ -252,7 +252,7 @@ func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs[PrometheusToSd] = Config{gcRegistry, "prometheus-to-sd", "v0.5.0"}
 	configs[Redis] = Config{promoterE2eRegistry, "redis", "5.0.5-alpine"}
 	configs[RegressionIssue74839] = Config{promoterE2eRegistry, "regression-issue-74839", "1.2"}
-	configs[ResourceConsumer] = Config{e2eRegistry, "resource-consumer", "1.5"}
+	configs[ResourceConsumer] = Config{promoterE2eRegistry, "resource-consumer", "1.9"}
 	configs[SdDummyExporter] = Config{gcRegistry, "sd-dummy-exporter", "v0.2.0"}
 	configs[VolumeNFSServer] = Config{promoterE2eRegistry, "volume/nfs", "1.2"}
 	configs[VolumeISCSIServer] = Config{promoterE2eRegistry, "volume/iscsi", "2.2"}
