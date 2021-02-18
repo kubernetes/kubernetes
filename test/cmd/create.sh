@@ -85,7 +85,7 @@ run_kubectl_create_error_tests() {
   rm "${ERROR_FILE}"
 
   # Posting a pod to namespaces should fail.  Also tests --raw forcing the post location
-  grep -q "cannot be handled as a Namespace: converting (v1.Pod)" <<< "$( kubectl convert -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -o json | kubectl create "${kube_flags[@]}" --raw /api/v1/namespaces -f - --v=8 2>&1 )"
+  grep -q 'the object provided is unrecognized (must be of type Namespace)' <<< "$( kubectl create "${kube_flags[@]}" --raw /api/v1/namespaces -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml --v=8 2>&1 )"
 
   grep -q "raw and --edit are mutually exclusive" <<< "$( kubectl create "${kube_flags[@]}" --raw /api/v1/namespaces -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml --edit 2>&1 )"
 
