@@ -1524,7 +1524,7 @@ _Nothing has changed._
 - k8s.io/kube-openapi: bf4fb3b → 61e04a5
 
 ### Removed
-- github.com/docker/libnetwork: [c8a5fca](https://github.com/docker/libnetwork/tree/c8a5fca)
+- github.com/moby/libnetwork: [c8a5fca](https://github.com/moby/libnetwork/tree/c8a5fca)
 
 
 

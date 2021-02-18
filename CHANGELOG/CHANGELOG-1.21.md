@@ -206,7 +206,7 @@ filename | sha512 hash
 - sigs.k8s.io/apiserver-network-proxy/konnectivity-client: v0.0.14 → v0.0.15
 
 ### Removed
-- github.com/docker/spdystream: [449fdfc](https://github.com/docker/spdystream/tree/449fdfc)
+- github.com/moby/spdystream: [449fdfc](https://github.com/moby/spdystream/tree/449fdfc)
 
 
 
