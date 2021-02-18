@@ -123,6 +123,14 @@ func (f *fakeIPTables) DeleteChain(tableName utiliptables.Table, chainName utili
 	return nil
 }
 
+func (f *fakeIPTables) ChainExists(tableName utiliptables.Table, chainName utiliptables.Chain) (bool, error) {
+	_, _, err := f.getChain(tableName, chainName)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // Returns index of rule in array; < 0 if rule is not found
 func findRule(chain *fakeChain, rule string) int {
 	for i, candidate := range chain.rules {
