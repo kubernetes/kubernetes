@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsbatchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -134,6 +137,51 @@ func (c *FakeCronJobs) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 func (c *FakeCronJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *batchv1.CronJob, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(cronjobsResource, c.ns, name, pt, data, subresources...), &batchv1.CronJob{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*batchv1.CronJob), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied cronJob.
+func (c *FakeCronJobs) Apply(ctx context.Context, cronJob *applyconfigurationsbatchv1.CronJobApplyConfiguration, opts v1.ApplyOptions) (result *batchv1.CronJob, err error) {
+	if cronJob == nil {
+		return nil, fmt.Errorf("cronJob provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(cronJob)
+	if err != nil {
+		return nil, err
+	}
+	name := cronJob.Name
+	if name == nil {
+		return nil, fmt.Errorf("cronJob.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(cronjobsResource, c.ns, *name, types.ApplyPatchType, data), &batchv1.CronJob{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*batchv1.CronJob), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeCronJobs) ApplyStatus(ctx context.Context, cronJob *applyconfigurationsbatchv1.CronJobApplyConfiguration, opts v1.ApplyOptions) (result *batchv1.CronJob, err error) {
+	if cronJob == nil {
+		return nil, fmt.Errorf("cronJob provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(cronJob)
+	if err != nil {
+		return nil, err
+	}
+	name := cronJob.Name
+	if name == nil {
+		return nil, fmt.Errorf("cronJob.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(cronjobsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &batchv1.CronJob{})
 
 	if obj == nil {
 		return nil, err
