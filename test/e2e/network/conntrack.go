@@ -331,12 +331,7 @@ var _ = SIGDescribe("Conntrack", func() {
 				},
 			},
 		}
-		_, err := fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(context.TODO(), serverPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-
-		err = e2epod.WaitForPodsRunningReady(fr.ClientSet, fr.Namespace.Name, 1, 0, framework.PodReadyBeforeTimeout, map[string]string{})
-		framework.ExpectNoError(err)
-
+		fr.PodClient().CreateSync(serverPod)
 		ginkgo.By("Server pod created on node " + serverNodeInfo.name)
 
 		svc := &v1.Service{
@@ -353,7 +348,7 @@ var _ = SIGDescribe("Conntrack", func() {
 				},
 			},
 		}
-		_, err = fr.ClientSet.CoreV1().Services(fr.Namespace.Name).Create(context.TODO(), svc, metav1.CreateOptions{})
+		_, err := fr.ClientSet.CoreV1().Services(fr.Namespace.Name).Create(context.TODO(), svc, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Server service created")
@@ -376,9 +371,8 @@ var _ = SIGDescribe("Conntrack", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
-		_, err = fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
 
+		fr.PodClient().CreateSync(pod)
 		ginkgo.By("Client pod created")
 
 		// The client will open connections against the server
@@ -397,9 +391,10 @@ var _ = SIGDescribe("Conntrack", func() {
 		logs, err := e2epod.GetPodLogs(cs, ns, "boom-server", "boom-server")
 		framework.ExpectNoError(err)
 		if !strings.Contains(string(logs), "connection established") {
+			framework.Logf("boom-server pod logs: %s", logs)
 			framework.Failf("Boom server pod did not sent any bad packet to the client")
 		}
 		framework.Logf("boom-server pod logs: %s", logs)
-		framework.Logf("boom-server did not receive any RST packet")
+		framework.Logf("boom-server OK: did not receive any RST packet")
 	})
 })
