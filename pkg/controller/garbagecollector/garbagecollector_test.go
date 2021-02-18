@@ -2735,6 +2735,11 @@ func (t *trackingWorkqueue) Add(item interface{}) {
 	t.queue(item)
 	t.limiter.Add(item)
 }
+func (t *trackingWorkqueue) AddAll(items ...interface{}) {
+	for _, item := range items {
+		t.Add(item)
+	}
+}
 func (t *trackingWorkqueue) AddAfter(item interface{}, duration time.Duration) {
 	t.Add(item)
 }

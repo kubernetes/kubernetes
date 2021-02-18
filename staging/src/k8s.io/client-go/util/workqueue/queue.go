@@ -25,6 +25,7 @@ import (
 
 type Interface interface {
 	Add(item interface{})
+	AddAll(items ...interface{})
 	Len() int
 	Get() (item interface{}, shutdown bool)
 	Done(item interface{})
@@ -117,19 +118,51 @@ func (q *Type) Add(item interface{}) {
 	if q.shuttingDown {
 		return
 	}
-	if q.dirty.has(item) {
+
+	if q.addInternal(item) {
+		q.cond.Signal()
+	}
+}
+
+// Like Add but insert multiple items in an atomic batch.
+func (q *Type) AddAll(items ...interface{}) {
+	if len(items) == 0 {
+		// Early out to avoid even touching the lock.
 		return
+	}
+
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+	if q.shuttingDown {
+		return
+	}
+
+	doSignal := false
+	for _, item := range items {
+		if q.addInternal(item) {
+			doSignal = true
+		}
+	}
+	if doSignal {
+		q.cond.Signal()
+	}
+}
+
+// Internal implementation used by Add and AddAll. Must be called with the cond.L lock held already.
+func (q *Type) addInternal(item interface{}) bool {
+	if q.dirty.has(item) {
+		return false
 	}
 
 	q.metrics.add(item)
 
 	q.dirty.insert(item)
 	if q.processing.has(item) {
-		return
+		return false
 	}
 
 	q.queue = append(q.queue, item)
-	q.cond.Signal()
+	return true
 }
 
 // Len returns the current queue length, for informational purposes only. You

@@ -159,3 +159,52 @@ func TestReinsert(t *testing.T) {
 		t.Errorf("Expected queue to be empty. Has %v items", a)
 	}
 }
+
+func TestAddAll(t *testing.T) {
+	q := workqueue.New()
+
+	// Start consumers
+	seen := sync.Map{}
+	const consumers = 10
+	consumerWG := sync.WaitGroup{}
+	consumerWG.Add(consumers)
+	for i := 0; i < consumers; i++ {
+		go func() {
+			defer consumerWG.Done()
+			for {
+				item, quit := q.Get()
+				if quit {
+					return
+				}
+				_, loaded := seen.LoadOrStore(item, true)
+				if loaded {
+					t.Errorf("Consumer saw item %v again", item)
+				}
+				q.Done(item)
+			}
+		}()
+	}
+
+	// Start producers
+	const producers = 50
+	producerWG := sync.WaitGroup{}
+	producerWG.Add(producers)
+	for i := 0; i < producers*2; i += 2 {
+		go func(i int) {
+			defer producerWG.Done()
+			q.AddAll(i, i, i+1)
+		}(i)
+	}
+
+	producerWG.Wait()
+	q.ShutDown()
+	consumerWG.Wait()
+
+	// Confirm every number was seen.
+	for i := 0; i < producers*2; i++ {
+		_, ok := seen.Load(i)
+		if !ok {
+			t.Errorf("Consumer did not see item %v", i)
+		}
+	}
+}
