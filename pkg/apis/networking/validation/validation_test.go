@@ -61,7 +61,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	// Tweaks used below.
 	setIngressEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{networking.NetworkPolicyIngressRule{}}
+		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{{}}
 	}
 
 	setIngressEmptyFrom := func(networkPolicy *networking.NetworkPolicy) {
@@ -69,7 +69,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	setIngressFromEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Ingress[0].From = []networking.NetworkPolicyPeer{networking.NetworkPolicyPeer{}}
+		networkPolicy.Spec.Ingress[0].From = []networking.NetworkPolicyPeer{{}}
 	}
 
 	setIngressEmptyPorts := func(networkPolicy *networking.NetworkPolicy) {
@@ -145,11 +145,11 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	setEgressEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Egress = []networking.NetworkPolicyEgressRule{networking.NetworkPolicyEgressRule{}}
+		networkPolicy.Spec.Egress = []networking.NetworkPolicyEgressRule{{}}
 	}
 
 	setEgressToEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Egress[0].To = []networking.NetworkPolicyPeer{networking.NetworkPolicyPeer{}}
+		networkPolicy.Spec.Egress[0].To = []networking.NetworkPolicyPeer{{}}
 	}
 
 	setEgressToNamespaceSelector := func(networkPolicy *networking.NetworkPolicy) {
