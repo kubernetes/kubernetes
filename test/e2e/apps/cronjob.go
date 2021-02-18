@@ -64,8 +64,12 @@ var _ = SIGDescribe("CronJob", func() {
 		e2eskipper.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResourceBeta, f.Namespace.Name)
 	})
 
-	// multiple jobs running at once
-	ginkgo.It("should schedule multiple jobs concurrently", func() {
+	/*
+	   Release: v1.21
+	   Testname: CronJob AllowConcurrent
+	   Description: CronJob MUST support AllowConcurrent policy, allowing to run multiple jobs at the same time.
+	*/
+	framework.ConformanceIt("should schedule multiple jobs concurrently", func() {
 		ginkgo.By("Creating a cronjob")
 		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batchv1.AllowConcurrent,
 			sleepCommand, nil, nil)
@@ -87,8 +91,12 @@ var _ = SIGDescribe("CronJob", func() {
 		framework.ExpectNoError(err, "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
-	// suspended should not schedule jobs
-	ginkgo.It("should not schedule jobs when suspended [Slow]", func() {
+	/*
+	   Release: v1.21
+	   Testname: CronJob Suspend
+	   Description: CronJob MUST support suspension, which suppresses creation of new jobs.
+	*/
+	framework.ConformanceIt("should not schedule jobs when suspended [Slow]", func() {
 		ginkgo.By("Creating a suspended cronjob")
 		cronJob := newTestCronJob("suspended", "*/1 * * * ?", batchv1.AllowConcurrent,
 			sleepCommand, nil, nil)
@@ -111,8 +119,12 @@ var _ = SIGDescribe("CronJob", func() {
 		framework.ExpectNoError(err, "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
-	// only single active job is allowed for ForbidConcurrent
-	ginkgo.It("should not schedule new jobs when ForbidConcurrent [Slow]", func() {
+	/*
+	   Release: v1.21
+	   Testname: CronJob FrobidConcurrent
+	   Description: CronJob MUST support ForbidConcurrent policy, allowing to run single, previous job at the time.
+	*/
+	framework.ConformanceIt("should not schedule new jobs when ForbidConcurrent [Slow]", func() {
 		ginkgo.By("Creating a ForbidConcurrent cronjob")
 		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batchv1.ForbidConcurrent,
 			sleepCommand, nil, nil)
@@ -143,8 +155,12 @@ var _ = SIGDescribe("CronJob", func() {
 		framework.ExpectNoError(err, "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
-	// only single active job is allowed for ReplaceConcurrent
-	ginkgo.It("should replace jobs when ReplaceConcurrent", func() {
+	/*
+	   Release: v1.21
+	   Testname: CronJob ReplaceConcurrent
+	   Description: CronJob MUST support ReplaceConcurrent policy, allowing to run single, newer job at the time.
+	*/
+	framework.ConformanceIt("should replace jobs when ReplaceConcurrent", func() {
 		ginkgo.By("Creating a ReplaceConcurrent cronjob")
 		cronJob := newTestCronJob("replace", "*/1 * * * ?", batchv1.ReplaceConcurrent,
 			sleepCommand, nil, nil)
@@ -285,7 +301,14 @@ var _ = SIGDescribe("CronJob", func() {
 		ensureHistoryLimits(f.ClientSet, f.Namespace.Name, cronJob)
 	})
 
-	ginkgo.It("should support CronJob API operations", func() {
+	/*
+	   Release: v1.21
+	   Testname: CronJob API Operations
+	   Description:
+	   CronJob MUST support create, get, list, watch, update, patch, delete, and deletecollection.
+	   CronJob/status MUST support get, update and patch.
+	*/
+	framework.ConformanceIt("should support CronJob API operations", func() {
 		ginkgo.By("Creating a cronjob")
 		successLimit := int32(1)
 		failedLimit := int32(0)
