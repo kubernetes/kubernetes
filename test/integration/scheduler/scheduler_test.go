@@ -107,6 +107,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "VolumeBinding"},
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
@@ -202,6 +203,7 @@ kind: Policy
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "VolumeBinding"},
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},

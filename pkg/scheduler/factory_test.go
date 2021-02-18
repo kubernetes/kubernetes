@@ -155,6 +155,7 @@ func TestCreateFromConfig(t *testing.T) {
 					Enabled: []schedulerapi.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
+						{Name: "NodeAffinity"},
 						{Name: "VolumeBinding"},
 						{Name: "PodTopologySpread"},
 						{Name: "InterPodAffinity"},
