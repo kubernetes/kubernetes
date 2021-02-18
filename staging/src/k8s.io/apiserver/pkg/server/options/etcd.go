@@ -35,6 +35,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
+	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/klog/v2"
 )
 
@@ -196,7 +197,19 @@ func (s *EtcdOptions) ApplyTo(c *server.Config) error {
 	if err := s.addEtcdHealthEndpoint(c); err != nil {
 		return err
 	}
-	c.RESTOptionsGetter = &SimpleRestOptionsFactory{Options: *s}
+	transformerOverrides := make(map[schema.GroupResource]value.Transformer)
+	if len(s.EncryptionProviderConfigFilepath) > 0 {
+		var err error
+		transformerOverrides, err = encryptionconfig.GetTransformerOverrides(s.EncryptionProviderConfigFilepath)
+		if err != nil {
+			return err
+		}
+	}
+
+	c.RESTOptionsGetter = &SimpleRestOptionsFactory{
+		Options:              *s,
+		TransformerOverrides: transformerOverrides,
+	}
 	return nil
 }
 
@@ -229,7 +242,8 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 }
 
 type SimpleRestOptionsFactory struct {
-	Options EtcdOptions
+	Options              EtcdOptions
+	TransformerOverrides map[schema.GroupResource]value.Transformer
 }
 
 func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
@@ -240,6 +254,11 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 		DeleteCollectionWorkers: f.Options.DeleteCollectionWorkers,
 		ResourcePrefix:          resource.Group + "/" + resource.Resource,
 		CountMetricPollPeriod:   f.Options.StorageConfig.CountMetricPollPeriod,
+	}
+	if f.TransformerOverrides != nil {
+		if transformer, ok := f.TransformerOverrides[resource]; ok {
+			ret.StorageConfig.Transformer = transformer
+		}
 	}
 	if f.Options.EnableWatchCache {
 		sizes, err := ParseWatchCacheSizes(f.Options.WatchCacheSizes)
