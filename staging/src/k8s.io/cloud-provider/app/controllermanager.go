@@ -78,7 +78,6 @@ the cloud specific control loops shipped with Kubernetes.`,
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
-				//os.Exit(1)
 			}
 
 			completedConfig := c.Complete()
@@ -88,7 +87,6 @@ the cloud specific control loops shipped with Kubernetes.`,
 			if err := Run(completedConfig, cloud, controllerInitializers, stopCh); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
-				//os.Exit(1)
 			}
 			return nil
 		},

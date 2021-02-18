@@ -55,7 +55,7 @@ func startNodeIpamControllerWrapper(completedConfig *cloudcontrollerconfig.Compl
 	nodeIPAMControllerOptions.AddFlags(fs)
 	errors := nodeIPAMControllerOptions.Validate()
 	if len(errors) > 0 {
-		klog.Fatal("NodeIPAM controller values are not properly.")
+		klog.Fatal("NodeIPAM controller values are not properly set.")
 	}
 	var nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration
 	nodeIPAMControllerOptions.ApplyTo(&nodeIPAMConfig)
