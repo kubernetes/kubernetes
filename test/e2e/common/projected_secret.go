@@ -32,7 +32,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
+var _ = SIGStorageDescribe("Projected secret", func() {
 	f := framework.NewDefaultFramework("projected")
 
 	/*

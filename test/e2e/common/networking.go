@@ -24,7 +24,7 @@ import (
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 )
 
-var _ = ginkgo.Describe("[sig-network] Networking", func() {
+var _ = SIGNetworkDescribe("Networking", func() {
 	f := framework.NewDefaultFramework("pod-network-test")
 
 	ginkgo.Describe("Granular Checks: Pods", func() {

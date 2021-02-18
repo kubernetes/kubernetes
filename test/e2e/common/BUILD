@@ -17,6 +17,7 @@ go_library(
         "downwardapi_volume.go",
         "empty_dir.go",
         "expansion.go",
+        "framework.go",
         "host_path.go",
         "init_container.go",
         "kubelet.go",

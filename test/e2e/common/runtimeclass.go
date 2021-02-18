@@ -39,7 +39,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
+var _ = SIGNodeDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 
 	ginkgo.It("should reject a Pod requesting a non-existent RuntimeClass [NodeFeature:RuntimeHandler]", func() {

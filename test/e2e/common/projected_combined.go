@@ -29,7 +29,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = ginkgo.Describe("[sig-storage] Projected combined", func() {
+var _ = SIGStorageDescribe("Projected combined", func() {
 	f := framework.NewDefaultFramework("projected")
 
 	// Test multiple projections

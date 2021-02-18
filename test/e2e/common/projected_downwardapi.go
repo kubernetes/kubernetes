@@ -32,7 +32,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
+var _ = SIGStorageDescribe("Projected downwardAPI", func() {
 	f := framework.NewDefaultFramework("projected")
 
 	// How long to wait for a log pod to be displayed
