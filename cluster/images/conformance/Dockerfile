@@ -15,8 +15,12 @@
 ARG BASEIMAGE
 
 FROM gcr.io/k8s-staging-build-image/debian-base:v2.1.3 as base
+RUN mkdir /tmp/results \
+ && chown 65532 /tmp/results # Distroless nonroot UID
 
 FROM ${BASEIMAGE}
+
+COPY --from=base /tmp/results /tmp
 
 # This is a dependency for `kubectl diff` tests
 COPY --from=base /usr/bin/diff /usr/local/bin/
