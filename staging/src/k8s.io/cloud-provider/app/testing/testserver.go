@@ -63,7 +63,7 @@ type Logger interface {
 // 		 enough time to remove temporary files.
 func StartTestServer(t Logger, customFlags []string) (result TestServer, err error) {
 	stopCh := make(chan struct{})
-	configDoneCh := make(chan string)
+	configDoneCh := make(chan struct{})
 	var capturedConfig config.CompletedConfig
 	tearDown := func() {
 		close(stopCh)
@@ -90,7 +90,6 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	cloudInitializer := func(config *config.CompletedConfig) cloudprovider.Interface {
 		capturedConfig = *config
 		// send signal to indicate the capturedConfig has been properly set
-		configDoneCh <- ""
 		close(configDoneCh)
 		cloudConfig := config.ComponentConfig.KubeCloudShared.CloudProvider
 		cloud, err := cloudprovider.InitCloudProvider(cloudConfig.Name, cloudConfig.CloudConfigFile)
