@@ -89,6 +89,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 
 	cloudInitializer := func(config *config.CompletedConfig) cloudprovider.Interface {
 		capturedConfig = *config
+		// send signal to indicate the capturedConfig has been properly set
 		configDoneCh <- ""
 		close(configDoneCh)
 		cloudConfig := config.ComponentConfig.KubeCloudShared.CloudProvider
