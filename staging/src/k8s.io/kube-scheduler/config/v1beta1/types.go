@@ -44,56 +44,57 @@ const (
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// Parallelism defines the amount of parallelism in algorithms for scheduling a Pods. Must be greater than 0. Defaults to 16
+	// The amount of parallelism in algorithms for scheduling Pods.
+	// Must be greater than 0. Defaults to 16.
 	Parallelism *int32 `json:"parallelism,omitempty"`
 
-	// LeaderElection defines the configuration of leader election client.
+	// The configuration of leader election client.
 	LeaderElection componentbaseconfigv1alpha1.LeaderElectionConfiguration `json:"leaderElection"`
 
-	// ClientConnection specifies the kubeconfig file and client connection
-	// settings for the proxy server to use when communicating with the apiserver.
+	// This specifies the kubeconfig file and client connection settings for the scheduler
+	// when communicating with the API server.
 	ClientConnection componentbaseconfigv1alpha1.ClientConnectionConfiguration `json:"clientConnection"`
-	// HealthzBindAddress is the IP address and port for the health check server to serve on,
-	// defaulting to 0.0.0.0:10251
+	// The IP address and port for the health check server to serve on,
+	// defaulting to "0.0.0.0:10251".
 	HealthzBindAddress *string `json:"healthzBindAddress,omitempty"`
-	// MetricsBindAddress is the IP address and port for the metrics server to
-	// serve on, defaulting to 0.0.0.0:10251.
+	// The IP address and port for the metrics server to serve on,
+	// defaulting to "0.0.0.0:10251".
 	MetricsBindAddress *string `json:"metricsBindAddress,omitempty"`
 
-	// DebuggingConfiguration holds configuration for Debugging related features
-	// TODO: We might wanna make this a substruct like Debugging componentbaseconfigv1alpha1.DebuggingConfiguration
+	// The configuration for debugging related features.
 	componentbaseconfigv1alpha1.DebuggingConfiguration `json:",inline"`
 
-	// PercentageOfNodesToScore is the percentage of all nodes that once found feasible
-	// for running a pod, the scheduler stops its search for more feasible nodes in
-	// the cluster. This helps improve scheduler's performance. Scheduler always tries to find
-	// at least "minFeasibleNodesToFind" feasible nodes no matter what the value of this flag is.
-	// Example: if the cluster size is 500 nodes and the value of this flag is 30,
-	// then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
+	// The percentage of all nodes that once found feasible for running a Pod.
+	// The scheduler stops its search for more feasible nodes in the cluster.
+	// This helps improve the scheduler's performance. The scheduler always tries to find
+	// at least "minFeasibleNodesToFind" feasible nodes no matter what the value of
+	// this field is.
+	//
+	// Example: if the cluster size is 500 nodes and the value of this field is 30,
+	// then the scheduler stops finding further feasible nodes once it finds 150 feasible ones.
 	// When the value is 0, default percentage (5%--50% based on the size of the cluster) of the
 	// nodes will be scored.
 	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
 
-	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
-	// If specified, it must be greater than 0. If this value is null, the default value (1s)
-	// will be used.
+	// The initial backoff for unschedulable Pods. If specified, it must be greater than 0.
+	// If this value is null, the default value ("1s") will be used.
 	PodInitialBackoffSeconds *int64 `json:"podInitialBackoffSeconds,omitempty"`
 
-	// PodMaxBackoffSeconds is the max backoff for unschedulable pods.
-	// If specified, it must be greater than podInitialBackoffSeconds. If this value is null,
-	// the default value (10s) will be used.
+	// The max backoff for unschedulable Pods. If specified, it must be greater than
+	// the `podInitialBackoffSeconds` value. If this value is null, the default value
+	// ("10s") is used.
 	PodMaxBackoffSeconds *int64 `json:"podMaxBackoffSeconds,omitempty"`
 
-	// Profiles are scheduling profiles that kube-scheduler supports. Pods can
+	// The scheduling profiles that kube-scheduler supports. Pods can
 	// choose to be scheduled under a particular profile by setting its associated
-	// scheduler name. Pods that don't specify any scheduler name are scheduled
+	// `schedulerName`. Pods that don't specify any scheduler name are scheduled
 	// with the "default-scheduler" profile, if present here.
 	// +listType=map
 	// +listMapKey=schedulerName
 	Profiles []KubeSchedulerProfile `json:"profiles,omitempty"`
 
-	// Extenders are the list of scheduler extenders, each holding the values of how to communicate
-	// with the extender. These extenders are shared by all scheduler profiles.
+	// The list of scheduler Extenders, each holding the values of how to communicate
+	// with the Extender. These Extenders are shared by all scheduler profiles.
 	// +listType=set
 	Extenders []Extender `json:"extenders,omitempty"`
 }
@@ -128,100 +129,108 @@ func (c *KubeSchedulerConfiguration) EncodeNestedObjects(e runtime.Encoder) erro
 
 // KubeSchedulerProfile is a scheduling profile.
 type KubeSchedulerProfile struct {
-	// SchedulerName is the name of the scheduler associated to this profile.
-	// If SchedulerName matches with the pod's "spec.schedulerName", then the pod
+	// The name of the scheduler associated with this profile.
+	// If `schedulerName` matches with a Pod's `spec.schedulerName`, the Pod
 	// is scheduled with this profile.
 	SchedulerName *string `json:"schedulerName,omitempty"`
 
-	// Plugins specify the set of plugins that should be enabled or disabled.
-	// Enabled plugins are the ones that should be enabled in addition to the
-	// default plugins. Disabled plugins are any of the default plugins that
+	// The set of Plugins that should be enabled or disabled.
+	// Enabled Plugins are the ones that should be enabled in addition to the
+	// default Plugins. Disabled Plugins are any of the default Plugins that
 	// should be disabled.
-	// When no enabled or disabled plugin is specified for an extension point,
-	// default plugins for that extension point will be used if there is any.
-	// If a QueueSort plugin is specified, the same QueueSort Plugin and
+	// When no enabled or disabled Plugin is specified for an extension point,
+	// default Plugins for that extension point will be used if there is any.
+	// If a "QueueSort" plugin is specified, the same "QueueSort" Plugin and
 	// PluginConfig must be specified for all profiles.
 	Plugins *Plugins `json:"plugins,omitempty"`
 
-	// PluginConfig is an optional set of custom plugin arguments for each plugin.
-	// Omitting config args for a plugin is equivalent to using the default config
-	// for that plugin.
+	// An optional set of custom plugin arguments for each Plugin.
+	// Omitting config args for a Plugin is equivalent to using the default config
+	// for that Plugin.
 	// +listType=map
 	// +listMapKey=name
 	PluginConfig []PluginConfig `json:"pluginConfig,omitempty"`
 }
 
-// Plugins include multiple extension points. When specified, the list of plugins for
+// Plugins include multiple extension points. When specified, the list of Plugins for
 // a particular extension point are the only ones enabled. If an extension point is
-// omitted from the config, then the default set of plugins is used for that extension point.
-// Enabled plugins are called in the order specified here, after default plugins. If they need to
-// be invoked before default plugins, default plugins must be disabled and re-enabled here in desired order.
+// omitted from the config, then the default set of plugins are used for that extension point.
+// Enabled Plugins are called in the order specified here, after default Plugins. If they need to
+// be invoked before default Plugins, default Plugins must be disabled and re-enabled here
+// in a desired order.
 type Plugins struct {
-	// QueueSort is a list of plugins that should be invoked when sorting pods in the scheduling queue.
+	// A list of Plugins that should be invoked when sorting Pods in the scheduling queue.
 	QueueSort *PluginSet `json:"queueSort,omitempty"`
 
-	// PreFilter is a list of plugins that should be invoked at "PreFilter" extension point of the scheduling framework.
+	// A list of Plugins that should be invoked at "PreFilter"
+	// extension point of the scheduling framework.
 	PreFilter *PluginSet `json:"preFilter,omitempty"`
 
-	// Filter is a list of plugins that should be invoked when filtering out nodes that cannot run the Pod.
+	// A list of Plugins that should be invoked when filtering out nodes that cannot run a Pod.
 	Filter *PluginSet `json:"filter,omitempty"`
 
-	// PostFilter is a list of plugins that are invoked after filtering phase, no matter whether filtering succeeds or not.
+	// A list of Plugins that are invoked after the "Filter" phase, no matter whether
+	// filtering succeeds or not.
 	PostFilter *PluginSet `json:"postFilter,omitempty"`
 
-	// PreScore is a list of plugins that are invoked before scoring.
+	// A list of Plugins that are invoked before the "Score" phase.
 	PreScore *PluginSet `json:"preScore,omitempty"`
 
-	// Score is a list of plugins that should be invoked when ranking nodes that have passed the filtering phase.
+	// A list of Plugins that should be invoked when ranking nodes that
+	// have passed the "Filter" phase.
 	Score *PluginSet `json:"score,omitempty"`
 
-	// Reserve is a list of plugins invoked when reserving/unreserving resources
-	// after a node is assigned to run the pod.
+	// A list of Plugins invoked when reserving/unreserving resources after a node
+	// is assigned to run a Pod.
 	Reserve *PluginSet `json:"reserve,omitempty"`
 
-	// Permit is a list of plugins that control binding of a Pod. These plugins can prevent or delay binding of a Pod.
+	// A list of Plugins that control the binding of a Pod. These Plugins can
+	// prevent or delay binding of a Pod.
 	Permit *PluginSet `json:"permit,omitempty"`
 
-	// PreBind is a list of plugins that should be invoked before a pod is bound.
+	// A list of Plugins that should be invoked before a Pod is bound.
 	PreBind *PluginSet `json:"preBind,omitempty"`
 
-	// Bind is a list of plugins that should be invoked at "Bind" extension point of the scheduling framework.
-	// The scheduler call these plugins in order. Scheduler skips the rest of these plugins as soon as one returns success.
+	// A list of Plugins that should be invoked at "Bind" extension point of
+	// the scheduling framework.
+	// The scheduler executes these Plugins in order until the first Plugin that
+	// returns success.
 	Bind *PluginSet `json:"bind,omitempty"`
 
-	// PostBind is a list of plugins that should be invoked after a pod is successfully bound.
+	// A list of Plugins that should be invoked after a Pod is successfully bound.
 	PostBind *PluginSet `json:"postBind,omitempty"`
 }
 
-// PluginSet specifies enabled and disabled plugins for an extension point.
+// PluginSet specifies enabled and disabled Plugins for an extension point.
 // If an array is empty, missing, or nil, default plugins at that extension point will be used.
 type PluginSet struct {
-	// Enabled specifies plugins that should be enabled in addition to default plugins.
-	// These are called after default plugins and in the same order specified here.
+	// The Plugins that should be enabled in addition to default Plugins.
+	// These are called after default Plugins and in the same order specified here.
 	// +listType=atomic
 	Enabled []Plugin `json:"enabled,omitempty"`
-	// Disabled specifies default plugins that should be disabled.
-	// When all default plugins need to be disabled, an array containing only one "*" should be provided.
+	// The default Plugins that should be disabled.
+	// In particular, an array with a single `*` element means to disable all Plugins.
 	// +listType=map
 	// +listMapKey=name
 	Disabled []Plugin `json:"disabled,omitempty"`
 }
 
-// Plugin specifies a plugin name and its weight when applicable. Weight is used only for Score plugins.
+// Plugin specifies a Plugin name and its weight when applicable.
 type Plugin struct {
-	// Name defines the name of plugin
+	// The name of the Plugin.
 	Name string `json:"name"`
-	// Weight defines the weight of plugin, only used for Score plugins.
+	// The weight of the Plugin, only used for "Score" plugins.
 	Weight *int32 `json:"weight,omitempty"`
 }
 
-// PluginConfig specifies arguments that should be passed to a plugin at the time of initialization.
-// A plugin that is invoked at multiple extension points is initialized once. Args can have arbitrary structure.
-// It is up to the plugin to process these Args.
+// PluginConfig specifies arguments that should be passed to a Plugin at the time of initialization.
+// A Plugin that is invoked at multiple extension points is initialized once. Args can have arbitrary structure.
+// It is up to the Plugin to process these args.
 type PluginConfig struct {
-	// Name defines the name of plugin being configured
+	// The name of Plugin being configured.
 	Name string `json:"name"`
-	// Args defines the arguments passed to the plugins at the time of initialization. Args can have arbitrary structure.
+	// The arguments passed to the Plugin at the time of initialization.
+	// The `args` can have arbitrary structure.
 	Args runtime.RawExtension `json:"args,omitempty"`
 }
 
@@ -266,44 +275,49 @@ func (c *PluginConfig) encodeNestedObjects(e runtime.Encoder) error {
 // Extender holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
 // it is assumed that the extender chose not to provide that extension.
 type Extender struct {
-	// URLPrefix at which the extender is available
+	// The URL prefix at which the extender is available.
 	URLPrefix string `json:"urlPrefix"`
-	// Verb for the filter call, empty if not supported. This verb is appended to the URLPrefix when issuing the filter call to extender.
+	// The verb for the `filter` call, empty if not supported. This verb is appended to the
+	// `urlPrefix` when issuing the `filter` call to the Extender.
 	FilterVerb string `json:"filterVerb,omitempty"`
-	// Verb for the preempt call, empty if not supported. This verb is appended to the URLPrefix when issuing the preempt call to extender.
+	// The verb for the `preempt` call, empty if not supported. This verb is appended to the
+	// `urlPrefix` when issuing the `preempt` call to the Extender.
 	PreemptVerb string `json:"preemptVerb,omitempty"`
-	// Verb for the prioritize call, empty if not supported. This verb is appended to the URLPrefix when issuing the prioritize call to extender.
+	// The verb for the `prioritize` call, empty if not supported. This verb is appended to
+	// the `urlPrefix` when issuing the `prioritize` call to the Extender.
 	PrioritizeVerb string `json:"prioritizeVerb,omitempty"`
-	// The numeric multiplier for the node scores that the prioritize call generates.
+	// The numeric multiplier for the node scores that the `prioritize` call generates.
 	// The weight should be a positive integer
 	Weight int64 `json:"weight,omitempty"`
-	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
-	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
-	// can implement this function.
+	// The verb for the `bind` call, empty if not supported. This verb is appended to the
+	// `urlPrefix` when issuing the `bind` call to the Extender.
+	// If this method is implemented by the Extender, it is the Extender's responsibility
+	// to bind the Pod to the API server. Only one Extender can implement this function.
 	BindVerb string `json:"bindVerb,omitempty"`
-	// EnableHTTPS specifies whether https should be used to communicate with the extender
+	// This flag specifies whether HTTPS should be used to communicate with the Extender.
 	EnableHTTPS bool `json:"enableHTTPS,omitempty"`
-	// TLSConfig specifies the transport layer security config
+	// This specifies the transport layer security (TLS) configuration.
 	TLSConfig *v1.ExtenderTLSConfig `json:"tlsConfig,omitempty"`
-	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
-	// timeout is ignored, k8s/other extenders priorities are used to select the node.
+	// This specifies the timeout duration for a call to the Extender. Filter timeout fails
+	// the scheduling of a Pod. Prioritize timeout is ignored, k8s/other extenders priorities
+	// are used to select a node.
 	HTTPTimeout metav1.Duration `json:"httpTimeout,omitempty"`
-	// NodeCacheCapable specifies that the extender is capable of caching node information,
+	// This flag indicates that the Extender is capable of caching node information,
 	// so the scheduler should only send minimal information about the eligible nodes
-	// assuming that the extender already cached full details of all nodes in the cluster
+	// assuming that the extender already cached full details of all nodes in the cluster.
 	NodeCacheCapable bool `json:"nodeCacheCapable,omitempty"`
-	// ManagedResources is a list of extended resources that are managed by
-	// this extender.
-	// - A pod will be sent to the extender on the Filter, Prioritize and Bind
-	//   (if the extender is the binder) phases iff the pod requests at least
+	// A list of extended resources that are managed by this Extender.
+	//
+	// - A Pod will be sent to the Extender on the "Filter", "Prioritize" and "Bind"
+	//   (if the extender is the binder) phases if the Pod requests at least
 	//   one of the extended resources in this list. If empty or unspecified,
-	//   all pods will be sent to this extender.
+	//   all Pods are sent to this Extender.
 	// - If IgnoredByScheduler is set to true for a resource, kube-scheduler
 	//   will skip checking the resource in predicates.
 	// +optional
 	// +listType=atomic
 	ManagedResources []v1.ExtenderManagedResource `json:"managedResources,omitempty"`
-	// Ignorable specifies if the extender is ignorable, i.e. scheduling should not
-	// fail when the extender returns an error or is not reachable.
+	// This specifies if the Extender is ignorable, i.e. scheduling should not
+	// fail when the Extender returns an error or is not reachable.
 	Ignorable bool `json:"ignorable,omitempty"`
 }
