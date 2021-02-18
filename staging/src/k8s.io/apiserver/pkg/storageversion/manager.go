@@ -140,7 +140,7 @@ func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.C
 		if len(gr.Group) == 0 {
 			gr.Group = "core"
 		}
-		if err := UpdateStorageVersionFor(context.TODO(), sc, serverID, gr, r.EncodingVersion, dv, nil); err != nil {
+		if err := UpdateStorageVersionFor(context.TODO(), sc, serverID, gr, r.EncodingVersion, dv, nil, false); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to update storage version for %v: %v", r.GroupResource, err))
 			s.recordStatusFailure(&r, err)
 			hasFailure = true

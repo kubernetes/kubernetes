@@ -129,11 +129,11 @@ func setStatusCondition(conditions *[]v1alpha1.StorageVersionCondition, newCondi
 // calulation is finished, and before the client sends the create/update request.
 // It allows the caller to customizes the storage version object, e.g. setting
 // an owner reference.
-func UpdateStorageVersionFor(ctx context.Context, c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string, postProcessFunc processStorageVersionFunc) error {
+func UpdateStorageVersionFor(ctx context.Context, c Client, apiserverID string, gr schema.GroupResource, encodingVersion string, decodableVersions []string, postProcessFunc processStorageVersionFunc, alwaysRetry bool) error {
 	retries := 3
 	var retry int
 	var err error
-	for retry < retries {
+	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -152,6 +152,9 @@ func UpdateStorageVersionFor(ctx context.Context, c Client, apiserverID string, 
 			klog.Errorf("retry %d, failed to update storage version for %v: %v", retry, gr, err)
 			retry++
 			time.Sleep(1 * time.Second)
+		}
+		if !alwaysRetry && retry >= retries {
+			break
 		}
 	}
 	return err

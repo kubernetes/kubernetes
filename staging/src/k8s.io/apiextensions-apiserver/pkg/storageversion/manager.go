@@ -269,5 +269,6 @@ func (m *manager) updateCRDStorageVersion(ctx context.Context, crd *apiextension
 		gr,
 		encodingVersion,
 		decodableVersions,
-		appendOwnerRefFunc)
+		appendOwnerRefFunc,
+		true)
 }
