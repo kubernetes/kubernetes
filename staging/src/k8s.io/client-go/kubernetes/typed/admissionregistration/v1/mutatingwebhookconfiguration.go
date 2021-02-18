@@ -20,12 +20,15 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	admissionregistrationv1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -46,6 +49,7 @@ type MutatingWebhookConfigurationInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.MutatingWebhookConfigurationList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.MutatingWebhookConfiguration, err error)
+	Apply(ctx context.Context, mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfigurationApplyConfiguration, opts metav1.ApplyOptions) (result *v1.MutatingWebhookConfiguration, err error)
 	MutatingWebhookConfigurationExpansion
 }
 
@@ -161,6 +165,31 @@ func (c *mutatingWebhookConfigurations) Patch(ctx context.Context, name string, 
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied mutatingWebhookConfiguration.
+func (c *mutatingWebhookConfigurations) Apply(ctx context.Context, mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfigurationApplyConfiguration, opts metav1.ApplyOptions) (result *v1.MutatingWebhookConfiguration, err error) {
+	if mutatingWebhookConfiguration == nil {
+		return nil, fmt.Errorf("mutatingWebhookConfiguration provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(mutatingWebhookConfiguration)
+	if err != nil {
+		return nil, err
+	}
+	name := mutatingWebhookConfiguration.Name
+	if name == nil {
+		return nil, fmt.Errorf("mutatingWebhookConfiguration.Name must be provided to Apply")
+	}
+	result = &v1.MutatingWebhookConfiguration{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("mutatingwebhookconfigurations").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

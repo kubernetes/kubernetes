@@ -20,12 +20,15 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	certificatesv1 "k8s.io/client-go/applyconfigurations/certificates/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -47,6 +50,8 @@ type CertificateSigningRequestInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.CertificateSigningRequestList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CertificateSigningRequest, err error)
+	Apply(ctx context.Context, certificateSigningRequest *certificatesv1.CertificateSigningRequestApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CertificateSigningRequest, err error)
+	ApplyStatus(ctx context.Context, certificateSigningRequest *certificatesv1.CertificateSigningRequestApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CertificateSigningRequest, err error)
 	UpdateApproval(ctx context.Context, certificateSigningRequestName string, certificateSigningRequest *v1.CertificateSigningRequest, opts metav1.UpdateOptions) (*v1.CertificateSigningRequest, error)
 
 	CertificateSigningRequestExpansion
@@ -179,6 +184,60 @@ func (c *certificateSigningRequests) Patch(ctx context.Context, name string, pt 
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied certificateSigningRequest.
+func (c *certificateSigningRequests) Apply(ctx context.Context, certificateSigningRequest *certificatesv1.CertificateSigningRequestApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CertificateSigningRequest, err error) {
+	if certificateSigningRequest == nil {
+		return nil, fmt.Errorf("certificateSigningRequest provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(certificateSigningRequest)
+	if err != nil {
+		return nil, err
+	}
+	name := certificateSigningRequest.Name
+	if name == nil {
+		return nil, fmt.Errorf("certificateSigningRequest.Name must be provided to Apply")
+	}
+	result = &v1.CertificateSigningRequest{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("certificatesigningrequests").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *certificateSigningRequests) ApplyStatus(ctx context.Context, certificateSigningRequest *certificatesv1.CertificateSigningRequestApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CertificateSigningRequest, err error) {
+	if certificateSigningRequest == nil {
+		return nil, fmt.Errorf("certificateSigningRequest provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(certificateSigningRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	name := certificateSigningRequest.Name
+	if name == nil {
+		return nil, fmt.Errorf("certificateSigningRequest.Name must be provided to Apply")
+	}
+
+	result = &v1.CertificateSigningRequest{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("certificatesigningrequests").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
