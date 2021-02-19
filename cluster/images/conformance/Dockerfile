@@ -28,10 +28,9 @@ COPY --from=base /usr/bin/diff /usr/local/bin/
 COPY ginkgo /usr/local/bin/
 COPY e2e.test /usr/local/bin/
 COPY kubectl /usr/local/bin/
-COPY gorunner /run_e2e.sh
+COPY gorunner /usr/local/bin/
 COPY gorunner /gorunner
 COPY cluster /kubernetes/cluster
-WORKDIR /usr/local/bin
 
 ENV E2E_FOCUS="\[Conformance\]"
 ENV E2E_SKIP=""
@@ -41,4 +40,4 @@ ENV E2E_VERBOSITY="4"
 ENV RESULTS_DIR="/tmp/results"
 ENV KUBECONFIG=""
 
-CMD [ "/gorunner" ]
+ENTRYPOINT [ "/gorunner" ]
