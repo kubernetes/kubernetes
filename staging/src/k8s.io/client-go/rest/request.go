@@ -242,7 +242,7 @@ func (r *Request) SubResource(subresources ...string) *Request {
 	}
 	subresource := path.Join(subresources...)
 	if len(r.subresource) != 0 {
-		r.err = fmt.Errorf("subresource already set to %q, cannot change to %q", r.resource, subresource)
+		r.err = fmt.Errorf("subresource already set to %q, cannot change to %q", r.subresource, subresource)
 		return r
 	}
 	for _, s := range subresources {
