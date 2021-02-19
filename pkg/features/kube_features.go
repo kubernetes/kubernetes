@@ -201,7 +201,8 @@ const (
 	CRIContainerLogRotation featuregate.Feature = "CRIContainerLogRotation"
 
 	// owner: @krmayankk
-	// beta: v1.14
+	// beta:  v1.14
+	// ga:    v1.21
 	//
 	// Enables control over the primary group ID of containers' init processes.
 	RunAsGroup featuregate.Feature = "RunAsGroup"
@@ -705,7 +706,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationvSphere:                            {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires vSphere CSI driver)
 	CSIMigrationvSphereComplete:                    {Default: false, PreRelease: featuregate.Beta}, // remove in 1.22
 	InTreePluginvSphereUnregister:                  {Default: false, PreRelease: featuregate.Alpha},
-	RunAsGroup:                                     {Default: true, PreRelease: featuregate.Beta},
 	CSIMigrationOpenStack:                          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires OpenStack Cinder CSI driver)
 	InTreePluginOpenStackUnregister:                {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpath:                                  {Default: true, PreRelease: featuregate.GA},
@@ -759,6 +759,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceLBNodePortControl:                       {Default: false, PreRelease: featuregate.Alpha},
 	MixedProtocolLBService:                         {Default: false, PreRelease: featuregate.Alpha},
 	PreferNominatedNode:                            {Default: false, PreRelease: featuregate.Alpha},
+	RunAsGroup:                                     {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
