@@ -67,7 +67,10 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 
 // Apply applies parameters into global configuration of metrics.
 func (o *Options) Apply() {
-	if o != nil && len(o.ShowHiddenMetricsForVersion) > 0 {
+	if o == nil {
+		return
+	}
+	if len(o.ShowHiddenMetricsForVersion) > 0 {
 		SetShowHidden()
 	}
 	// set disabled metrics
