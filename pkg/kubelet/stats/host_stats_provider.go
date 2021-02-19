@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-// PodEtcHostsPathFunc is a function to fetch a etc hosts path by pod uid.
-type PodEtcHostsPathFunc func(podUID types.UID) string
+// PodEtcHostsPathFunc is a function to fetch a etc hosts path by pod uid and whether etc host path is supported by the runtime
+type PodEtcHostsPathFunc func(podUID types.UID) (string, bool)
 
 // metricsProviderByPath maps a path to its metrics provider
 type metricsProviderByPath map[string]volume.MetricsProvider
@@ -79,7 +79,13 @@ func (h hostStatsProvider) getPodContainerLogStats(podNamespace, podName string,
 
 // getPodEtcHostsStats gets status for pod etc hosts usage
 func (h hostStatsProvider) getPodEtcHostsStats(podUID types.UID, rootFsInfo *cadvisorapiv2.FsInfo) (*statsapi.FsStats, error) {
-	metrics := h.podEtcHostsMetrics(podUID)
+	// Runtimes may not support etc hosts file (Windows with docker)
+	podEtcHostsPath, isEtcHostsSupported := h.podEtcHostsPathFunc(podUID)
+	if !isEtcHostsSupported {
+		return nil, nil
+	}
+
+	metrics := volume.NewMetricsDu(podEtcHostsPath)
 	hostMetrics, err := metrics.GetMetrics()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get stats %v", err)
@@ -101,11 +107,6 @@ func (h hostStatsProvider) podLogMetrics(podNamespace, podName string, podUID ty
 func (h hostStatsProvider) podContainerLogMetrics(podNamespace, podName string, podUID types.UID, containerName string) (metricsProviderByPath, error) {
 	podContainerLogsDirectoryPath := kuberuntime.BuildContainerLogsDirectory(podNamespace, podName, podUID, containerName)
 	return h.fileMetricsByDir(podContainerLogsDirectoryPath)
-}
-
-func (h hostStatsProvider) podEtcHostsMetrics(podUID types.UID) volume.MetricsProvider {
-	podEtcHostsPath := h.podEtcHostsPathFunc(podUID)
-	return volume.NewMetricsDu(podEtcHostsPath)
 }
 
 // fileMetricsByDir returns metrics by path for each file under specified directory
