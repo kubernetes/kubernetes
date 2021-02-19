@@ -106,7 +106,7 @@ ginkgo:
 	echo "$$GINKGO_HELP_INFO"
 else
 ginkgo:
-	hack/make-rules/build.sh vendor/github.com/onsi/ginkgo/ginkgo
+	hack/make-rules/build.sh github.com/onsi/ginkgo/ginkgo
 endif
 
 define VERIFY_HELP_INFO

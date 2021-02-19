@@ -219,7 +219,7 @@ $(PRERELEASE_LIFECYCLE_FILES): $(PRERELEASE_LIFECYCLE_GEN)
 # it, and make is happy.
 $(PRERELEASE_LIFECYCLE_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/prerelease-lifecycle-gen)
 	KUBE_BUILD_PLATFORMS="" \
-	    hack/make-rules/build.sh vendor/k8s.io/code-generator/cmd/prerelease-lifecycle-gen
+	    hack/make-rules/build.sh k8s.io/code-generator/cmd/prerelease-lifecycle-gen
 	touch $@
 
 
@@ -314,7 +314,7 @@ $(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
 # it, and make is happy.
 $(DEEPCOPY_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/deepcopy-gen)
 	KUBE_BUILD_PLATFORMS="" \
-	    hack/make-rules/build.sh vendor/k8s.io/code-generator/cmd/deepcopy-gen
+	    hack/make-rules/build.sh k8s.io/code-generator/cmd/deepcopy-gen
 	touch $@
 
 
@@ -415,7 +415,7 @@ $(DEFAULTER_FILES): $(DEFAULTER_GEN)
 # it, and make is happy.
 $(DEFAULTER_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/defaulter-gen)
 	KUBE_BUILD_PLATFORMS="" \
-	    hack/make-rules/build.sh vendor/k8s.io/code-generator/cmd/defaulter-gen
+	    hack/make-rules/build.sh k8s.io/code-generator/cmd/defaulter-gen
 	touch $@
 
 
@@ -529,7 +529,7 @@ $(CONVERSION_FILES): $(CONVERSION_GEN)
 # and make is happy.
 $(CONVERSION_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/conversion-gen)
 	KUBE_BUILD_PLATFORMS="" \
-	    hack/make-rules/build.sh vendor/k8s.io/code-generator/cmd/conversion-gen
+	    hack/make-rules/build.sh k8s.io/code-generator/cmd/conversion-gen
 	touch $@
 
 
@@ -656,5 +656,5 @@ gen_openapi: $(OPENAPI_GEN) $(KUBE_OPENAPI_OUTFILE) $(AGGREGATOR_OPENAPI_OUTFILE
 # it, and make is happy.
 $(OPENAPI_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/kube-openapi/cmd/openapi-gen)
 	KUBE_BUILD_PLATFORMS="" \
-	    hack/make-rules/build.sh vendor/k8s.io/kube-openapi/cmd/openapi-gen
+	    hack/make-rules/build.sh k8s.io/kube-openapi/cmd/openapi-gen
 	touch $@
