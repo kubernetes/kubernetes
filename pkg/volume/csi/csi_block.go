@@ -256,9 +256,6 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 
 // SetUpDevice ensures the device is attached returns path where the device is located.
 func (m *csiBlockMapper) SetUpDevice() (string, error) {
-	if !m.plugin.blockEnabled {
-		return "", errors.New("CSIBlockVolume feature not enabled")
-	}
 	klog.V(4).Infof(log("blockMapper.SetUpDevice called"))
 
 	// Get csiSource from spec
@@ -319,9 +316,6 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 }
 
 func (m *csiBlockMapper) MapPodDevice() (string, error) {
-	if !m.plugin.blockEnabled {
-		return "", errors.New("CSIBlockVolume feature not enabled")
-	}
 	klog.V(4).Infof(log("blockMapper.MapPodDevice called"))
 
 	// Get csiSource from spec
@@ -422,10 +416,6 @@ func (m *csiBlockMapper) unstageVolumeForBlock(ctx context.Context, csi csiClien
 
 // TearDownDevice removes traces of the SetUpDevice.
 func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error {
-	if !m.plugin.blockEnabled {
-		return errors.New("CSIBlockVolume feature not enabled")
-	}
-
 	ctx, cancel := createCSIOperationContext(m.spec, csiTimeout)
 	defer cancel()
 
@@ -489,9 +479,6 @@ func (m *csiBlockMapper) cleanupOrphanDeviceFiles() error {
 
 // UnmapPodDevice unmaps the block device path.
 func (m *csiBlockMapper) UnmapPodDevice() error {
-	if !m.plugin.blockEnabled {
-		return errors.New("CSIBlockVolume feature not enabled")
-	}
 	publishPath := m.getPublishPath()
 
 	csiClient, err := m.csiClientGetter.Get()
