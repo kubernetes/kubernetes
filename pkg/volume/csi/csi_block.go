@@ -357,7 +357,7 @@ func (m *csiBlockMapper) MapPodDevice() (string, error) {
 		accessMode = m.spec.PersistentVolume.Spec.AccessModes[0]
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := createCSIOperationContext(m.spec, csiTimeout)
 	defer cancel()
 
 	csiClient, err := m.csiClientGetter.Get()
@@ -426,7 +426,7 @@ func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error 
 		return errors.New("CSIBlockVolume feature not enabled")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := createCSIOperationContext(m.spec, csiTimeout)
 	defer cancel()
 
 	csiClient, err := m.csiClientGetter.Get()
@@ -499,7 +499,7 @@ func (m *csiBlockMapper) UnmapPodDevice() error {
 		return errors.New(log("blockMapper.UnmapPodDevice failed to get CSI client: %v", err))
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	ctx, cancel := createCSIOperationContext(m.spec, csiTimeout)
 	defer cancel()
 
 	// Call NodeUnpublishVolume.

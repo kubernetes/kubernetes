@@ -257,7 +257,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 	csi := c.csiClient
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.watchTimeout)
+	ctx, cancel := createCSIOperationContext(spec, c.watchTimeout)
 	defer cancel()
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
 	stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
@@ -516,7 +516,8 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	}
 	csi := c.csiClient
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.watchTimeout)
+	// could not get whether this is migrated because there is no spec
+	ctx, cancel := createCSIOperationContext(nil, csiTimeout)
 	defer cancel()
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
 	stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
