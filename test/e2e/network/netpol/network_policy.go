@@ -343,6 +343,23 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 			ValidateOrFail(k8s, model, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
+		ginkgo.It("should enforce policy based on any PodSelectors [Feature:NetworkPolicy]", func() {
+			nsX, _, _, model, k8s := getK8SModel(f)
+
+			peers := []map[string]string{{"pod": "b"}, {"pod": "c"}}
+			policy := GetAllowIngressByAnyPod("allow-ns-x-pod-b-c", map[string]string{"pod": "a"}, peers)
+			CreatePolicy(k8s, policy, nsX)
+
+			reachability := NewReachability(model.AllPods(), true)
+			reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
+
+			// Connect Pods b and c to pod a from namespace nsX
+			reachability.Expect(NewPodString(nsX, "b"), NewPodString(nsX, "a"), true)
+			reachability.Expect(NewPodString(nsX, "c"), NewPodString(nsX, "a"), true)
+
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+		})
+
 		ginkgo.It("should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func() {
 			nsX, nsY, _, model, k8s := getK8SModel(f)
 			allowedNamespaces := &metav1.LabelSelector{
