@@ -19,7 +19,6 @@ package kuberuntime
 import (
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"sort"
 	"testing"
 	"time"
@@ -1373,6 +1372,41 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 	}
 }
 
+func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+	fakeRuntime.ErrorOnSandboxCreate = true
+
+	containers := []v1.Container{
+		{
+			Name:            "foo1",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: containers,
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+
+	// GetPodStatus and the following SyncPod will not return errors in the
+	// case where the pod has been deleted. We are not adding any pods into
+	// the fakePodProvider so they are 'deleted'.
+	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	result := m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	// This will return an error if the pod has _not_ been deleted.
+	assert.NoError(t, result.Error())
+}
+
 func makeBasePodAndStatusWithInitAndEphemeralContainers() (*v1.Pod, *kubecontainer.PodStatus) {
 	pod, status := makeBasePodAndStatus()
 	pod.Spec.InitContainers = []v1.Container{
@@ -1399,27 +1433,4 @@ func makeBasePodAndStatusWithInitAndEphemeralContainers() (*v1.Pod, *kubecontain
 		Hash: kubecontainer.HashContainer((*v1.Container)(&pod.Spec.EphemeralContainers[0].EphemeralContainerCommon)),
 	})
 	return pod, status
-}
-
-func TestSandboxCreationErrorRegex(t *testing.T) {
-	reTests := []struct {
-		testString string
-		match      bool
-		regex      *regexp.Regexp
-	}{
-		{
-			testString: `Multus: [e2e-deployment-7897/webserver-9569696c8-gs6c8]: error setting the networks status, pod was already deleted: SetNetworkStatus: failed to query the pod webserver-9569696c8-gs6c8 in out of cluster comm: pods "webserver-9569696c8-gs6c8" not found`,
-			match:      true,
-			regex:      ignoreSandboxCreateErrorRegex[0],
-		},
-		{
-			testString: `this will not match`,
-			match:      false,
-			regex:      ignoreSandboxCreateErrorRegex[0],
-		},
-	}
-
-	for _, test := range reTests {
-		assert.Equal(t, test.match, test.regex.MatchString(test.testString))
-	}
 }

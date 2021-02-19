@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"regexp"
 	goruntime "runtime"
 	"time"
 
@@ -73,10 +72,6 @@ const (
 var (
 	// ErrVersionNotSupported is returned when the api version of runtime interface is not supported
 	ErrVersionNotSupported = errors.New("runtime api version is not supported")
-	// ignore error regexex for sandbox creation
-	ignoreSandboxCreateErrorRegex = []*regexp.Regexp{
-		regexp.MustCompile(`pods\s\"\S+.\"\snot found`),
-	}
 )
 
 // podStateProvider can determine if a pod is deleted ir terminated
@@ -143,7 +138,7 @@ type kubeGenericRuntimeManager struct {
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
 
-	// PodState
+	// PodState provider instance
 	podStateProvider podStateProvider
 }
 
@@ -246,7 +241,6 @@ func NewKubeGenericRuntimeManager(
 		}
 	}
 	kubeRuntimeManager.keyring = credentialprovider.NewDockerKeyring()
-	kubeRuntimeManager.podStateProvider = podStateProvider
 
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
@@ -257,6 +251,7 @@ func NewKubeGenericRuntimeManager(
 		imagePullBurst)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(httpClient, kubeRuntimeManager, kubeRuntimeManager)
 	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager)
+	kubeRuntimeManager.podStateProvider = podStateProvider
 
 	kubeRuntimeManager.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {
@@ -760,17 +755,19 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		result.AddSyncResult(createSandboxResult)
 		podSandboxID, msg, err = m.createPodSandbox(pod, podContainerChanges.Attempt)
 		if err != nil {
+			// createPodSandbox can return an error from CNI, CSI,
+			// or CRI if the Pod has been deleted while the POD is
+			// being created. If the pod has been deleted then it's
+			// not a real error.
+			if m.podStateProvider.IsPodDeleted(pod.UID) {
+				klog.V(4).Infof("Pod %q was deleted and sandbox failed to be created: %v", format.Pod(pod), pod.UID)
+				return
+			}
 			createSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
 			klog.Errorf("createPodSandbox for pod %q failed: %v", format.Pod(pod), err)
 			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 			if referr != nil {
 				klog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), referr)
-			}
-			isDeleted := m.podStateProvider.IsPodDeleted(pod.UID)
-			for _, re := range ignoreSandboxCreateErrorRegex {
-				if isDeleted && re.MatchString(err.Error()) {
-					return
-				}
 			}
 			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed to create pod sandbox: %v", err)
 			return
