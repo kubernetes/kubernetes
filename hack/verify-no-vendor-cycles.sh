@@ -25,7 +25,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-export GO111MODULE=auto
+export GO111MODULE=on
 
 staging_repos=()
 kube::util::read-array staging_repos < <(kube::util::list_staging_repos)
