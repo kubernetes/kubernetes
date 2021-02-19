@@ -222,7 +222,7 @@ const (
 	RunAsGroup featuregate.Feature = "RunAsGroup"
 
 	// owner: @saad-ali
-	// ga
+	// ga: 	  v1.10
 	//
 	// Allow mounting a subpath of a volume in a container
 	// Do not remove this feature gate even though it's GA
@@ -299,7 +299,7 @@ const (
 
 	// owner: @janosi
 	// alpha: v1.12
-	// beta:  v1.18
+	// beta:  v1.19
 	// GA:    v1.20
 	//
 	// Enables SCTP as new protocol for Service ports, NetworkPolicy, and ContainerPort in Pod/Containers definition
