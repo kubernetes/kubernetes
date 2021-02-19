@@ -152,17 +152,47 @@ __kubectl_parse_get()
     fi
 }
 
+# Same as __kubectl_get_resources (with s) but allows completion for only one resource name.
 __kubectl_get_resource()
 {
     if [[ ${#nouns[@]} -eq 0 ]]; then
-      local kubectl_out
-      if kubectl_out=$(__kubectl_debug_out "kubectl api-resources $(__kubectl_override_flags) -o name --cached --request-timeout=5s --verbs=get"); then
-          COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
-          return 0
-      fi
-      return 1
+      __kubectl_get_resource_helper "" "$cur"
+      return # the return status is that of the last command executed in the function body
     fi
     __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
+}
+
+# Same as __kubectl_get_resource (without s) but allows completion for multiple, comma-separated resource names.
+__kubectl_get_resources()
+{
+    local SEPARATOR=','
+    if [[ ${#nouns[@]} -eq 0 ]]; then
+      local kubectl_out HEAD TAIL
+      HEAD=""
+      TAIL="$cur"
+      # if SEPARATOR is contained in $cur, e.g. "pod,sec"
+      if [[ "$cur" = *${SEPARATOR}* ]] ; then
+        # set HEAD to "pod,"
+        HEAD="${cur%${SEPARATOR}*}${SEPARATOR}"
+        # set TAIL to "sec"
+        TAIL="${cur##*${SEPARATOR}}"
+      fi
+      __kubectl_get_resource_helper "$HEAD" "$TAIL"
+      return # the return status is that of the last command executed in the function body
+    fi
+    __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
+}
+
+__kubectl_get_resource_helper()
+{
+    local kubectl_out HEAD TAIL
+    HEAD="$1"
+    TAIL="$2"
+    if kubectl_out=$(__kubectl_debug_out "kubectl api-resources $(__kubectl_override_flags) -o name --cached --request-timeout=5s --verbs=get"); then
+        COMPREPLY=( $( compgen -P "$HEAD" -W "${kubectl_out[*]}" -- "$TAIL" ) )
+        return 0
+    fi
+    return 1
 }
 
 __kubectl_get_resource_namespace()
@@ -251,7 +281,11 @@ __kubectl_cp()
 
 __kubectl_custom_func() {
     case ${last_command} in
-        kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_edit | kubectl_patch |\
+        kubectl_get)
+            __kubectl_get_resources
+            return
+            ;;
+        kubectl_describe | kubectl_delete | kubectl_label | kubectl_edit | kubectl_patch |\
         kubectl_annotate | kubectl_expose | kubectl_scale | kubectl_autoscale | kubectl_taint | kubectl_rollout_* |\
         kubectl_apply_edit-last-applied | kubectl_apply_view-last-applied)
             __kubectl_get_resource
