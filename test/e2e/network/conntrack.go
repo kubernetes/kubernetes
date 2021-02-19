@@ -160,9 +160,7 @@ var _ = SIGDescribe("Conntrack", func() {
 		serverPod1.Spec.NodeName = serverNodeInfo.name
 		fr.PodClient().CreateSync(serverPod1)
 
-		// Waiting for service to expose endpoint.
-		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
-		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
 
 		// Note that the fact that Endpoints object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
@@ -188,9 +186,7 @@ var _ = SIGDescribe("Conntrack", func() {
 		framework.Logf("Cleaning up %s pod", podBackend1)
 		fr.PodClient().DeleteSync(podBackend1, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 
-		// Waiting for service to expose endpoint.
-		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
-		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
 
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
@@ -237,9 +233,7 @@ var _ = SIGDescribe("Conntrack", func() {
 		serverPod1.Spec.NodeName = serverNodeInfo.name
 		fr.PodClient().CreateSync(serverPod1)
 
-		// Waiting for service to expose endpoint.
-		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
-		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
 
 		// Note that the fact that Endpoints object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
@@ -265,9 +259,7 @@ var _ = SIGDescribe("Conntrack", func() {
 		framework.Logf("Cleaning up %s pod", podBackend1)
 		fr.PodClient().DeleteSync(podBackend1, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 
-		// Waiting for service to expose endpoint.
-		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
-		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
 
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
