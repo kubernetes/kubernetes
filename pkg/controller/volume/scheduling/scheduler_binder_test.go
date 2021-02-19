@@ -77,6 +77,11 @@ var (
 	boundMigrationPVC     = makeTestPVC("pvc-migration-bound", "1G", "", pvcBound, "pv-migration-bound", "1", &waitClass)
 	provMigrationPVCBound = makeTestPVC("pvc-migration-provisioned", "1Gi", "", pvcBound, "pv-migration-bound", "1", &waitClassWithProvisioner)
 
+	// PVCs and PV for GenericEphemeralVolume
+	conflictingGenericPVC = makeGenericEphemeralPVC("test-volume", false /* not owned*/)
+	correctGenericPVC     = makeGenericEphemeralPVC("test-volume", true /* owned */)
+	pvBoundGeneric        = makeTestPV("pv-bound", "node1", "1G", "1", correctGenericPVC, waitClass)
+
 	// PVs for manual binding
 	pvNode1a                   = makeTestPV("pv-node1a", "node1", "5G", "1", nil, waitClass)
 	pvNode1b                   = makeTestPV("pv-node1b", "node1", "10G", "1", nil, waitClass)
@@ -583,6 +588,22 @@ const (
 	pvcSelectedNode
 )
 
+func makeGenericEphemeralPVC(volumeName string, owned bool) *v1.PersistentVolumeClaim {
+	pod := makePodWithGenericEphemeral()
+	pvc := makeTestPVC(pod.Name+"-"+volumeName, "1G", "", pvcBound, "pv-bound", "1", &immediateClass)
+	if owned {
+		controller := true
+		pvc.OwnerReferences = []metav1.OwnerReference{
+			{
+				Name:       pod.Name,
+				UID:        pod.UID,
+				Controller: &controller,
+			},
+		}
+	}
+	return pvc
+}
+
 func makeTestPVC(name, size, node string, pvcBoundState int, pvName, resourceVersion string, className *string) *v1.PersistentVolumeClaim {
 	fs := v1.PersistentVolumeFilesystem
 	pvc := &v1.PersistentVolumeClaim{
@@ -784,6 +805,19 @@ func makePodWithoutPVC() *v1.Pod {
 	return pod
 }
 
+func makePodWithGenericEphemeral(volumeNames ...string) *v1.Pod {
+	pod := makePod(nil)
+	for _, volumeName := range volumeNames {
+		pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+			Name: volumeName,
+			VolumeSource: v1.VolumeSource{
+				Ephemeral: &v1.EphemeralVolumeSource{},
+			},
+		})
+	}
+	return pod
+}
+
 func makeBinding(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) *BindingInfo {
 	return &BindingInfo{pvc: pvc.DeepCopy(), pv: pv.DeepCopy()}
 }
@@ -856,6 +890,9 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		cachePVCs []*v1.PersistentVolumeClaim
 		// If nil, makePod with podPVCs
 		pod *v1.Pod
+
+		// GenericEphemeralVolume feature enabled?
+		ephemeral bool
 
 		// Expected podBindingCache fields
 		expectedBindings []*BindingInfo
@@ -953,6 +990,31 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			podPVCs:    []*v1.PersistentVolumeClaim{immediateUnboundPVC, unboundPVC},
 			shouldFail: true,
 		},
+		"generic-ephemeral,no-pvc": {
+			pod:        makePodWithGenericEphemeral("no-such-pvc"),
+			ephemeral:  true,
+			shouldFail: true,
+		},
+		"generic-ephemeral,with-pvc": {
+			pod:       makePodWithGenericEphemeral("test-volume"),
+			cachePVCs: []*v1.PersistentVolumeClaim{correctGenericPVC},
+			pvs:       []*v1.PersistentVolume{pvBoundGeneric},
+			ephemeral: true,
+		},
+		"generic-ephemeral,wrong-pvc": {
+			pod:        makePodWithGenericEphemeral("test-volume"),
+			cachePVCs:  []*v1.PersistentVolumeClaim{conflictingGenericPVC},
+			pvs:        []*v1.PersistentVolume{pvBoundGeneric},
+			ephemeral:  true,
+			shouldFail: true,
+		},
+		"generic-ephemeral,disabled": {
+			pod:        makePodWithGenericEphemeral("test-volume"),
+			cachePVCs:  []*v1.PersistentVolumeClaim{correctGenericPVC},
+			pvs:        []*v1.PersistentVolume{pvBoundGeneric},
+			ephemeral:  false,
+			shouldFail: true,
+		},
 	}
 
 	testNode := &v1.Node{
@@ -965,6 +1027,8 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType, csiStorageCapacity bool, csiDriver *storagev1.CSIDriver) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, scenario.ephemeral)()
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
