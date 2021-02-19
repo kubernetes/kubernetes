@@ -1372,6 +1372,41 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 	}
 }
 
+func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+	fakeRuntime.ErrorOnSandboxCreate = true
+
+	containers := []v1.Container{
+		{
+			Name:            "foo1",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: containers,
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+
+	// GetPodStatus and the following SyncPod will not return errors in the
+	// case where the pod has been deleted. We are not adding any pods into
+	// the fakePodProvider so they are 'deleted'.
+	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	result := m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	// This will return an error if the pod has _not_ been deleted.
+	assert.NoError(t, result.Error())
+}
+
 func makeBasePodAndStatusWithInitAndEphemeralContainers() (*v1.Pod, *kubecontainer.PodStatus) {
 	pod, status := makeBasePodAndStatus()
 	pod.Spec.InitContainers = []v1.Container{

@@ -101,7 +101,9 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		return nil, err
 	}
 
-	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, newFakePodStateProvider(), kubeRuntimeManager)
+	podStateProvider := newFakePodStateProvider()
+	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager)
+	kubeRuntimeManager.podStateProvider = podStateProvider
 	kubeRuntimeManager.runtimeName = typedVersion.RuntimeName
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
