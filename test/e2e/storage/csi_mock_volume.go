@@ -1301,8 +1301,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 						framework.ExpectNoError(err, "Failed to get claim: %v", err)
 					}
 					framework.Logf("PVC not found. Continuing to test VolumeSnapshotContent finalizer")
-				}
-				if claim != nil && claim.DeletionTimestamp == nil {
+				} else if claim.DeletionTimestamp == nil {
 					framework.Failf("Expected deletion timestamp to be set on PVC: %v", claim)
 				}
 
