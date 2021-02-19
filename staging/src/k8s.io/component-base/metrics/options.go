@@ -61,17 +61,18 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		"disabled-metrics",
 		o.DisabledMetrics,
 		"This flag provides an escape hatch for misbehaving metrics. "+
-			"You must provide the fully qualified metric name in order to disable it.")
+			"You must provide the fully qualified metric name in order to disable it. "+
+			"Disclaimer: disabling metrics is higher in precedence than showing hidden metrics.")
 }
 
 // Apply applies parameters into global configuration of metrics.
 func (o *Options) Apply() {
 	if o != nil && len(o.ShowHiddenMetricsForVersion) > 0 {
 		SetShowHidden()
-		// set disabled metrics
-		for _, metricName := range o.DisabledMetrics {
-			SetDisabledMetric(metricName)
-		}
+	}
+	// set disabled metrics
+	for _, metricName := range o.DisabledMetrics {
+		SetDisabledMetric(metricName)
 	}
 }
 

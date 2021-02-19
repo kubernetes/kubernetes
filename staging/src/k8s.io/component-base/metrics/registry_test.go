@@ -517,7 +517,9 @@ func TestRegistryReset(t *testing.T) {
 }
 
 func TestDisabledMetrics(t *testing.T) {
-	SetDisabledMetric("should_be_disabled")
+	o := NewOptions()
+	o.DisabledMetrics = []string{"should_be_disabled"}
+	o.Apply()
 	currentVersion := apimachineryversion.Info{
 		Major:      "1",
 		Minor:      "17",
