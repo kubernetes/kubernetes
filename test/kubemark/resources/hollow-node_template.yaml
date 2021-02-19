@@ -105,10 +105,11 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        command:
-        - /bin/sh
-        - -c
-        - /node-problem-detector --system-log-monitors=/config/kernel.monitor --apiserver-override="https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig" --alsologtostderr 1>>/var/log/npd-$(NODE_NAME).log 2>&1
+        command: [
+          '/bin/sh',
+          '-c',
+          'sleep $(shuf -i 1-300 -n 1) && /node-problem-detector --system-log-monitors=/config/kernel.monitor --apiserver-override="https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig" --alsologtostderr 1>>/var/log/npd-$(NODE_NAME).log 2>&1'
+        ]
         volumeMounts:
         - name: kubeconfig-volume
           mountPath: /kubeconfig
