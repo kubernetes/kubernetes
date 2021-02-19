@@ -338,7 +338,7 @@ func getPatchedJSON(patchType types.PatchType, originalJS, patchJS []byte, gvk s
 		// get a typed object for this GVK if we need to apply a strategic merge patch
 		obj, err := creater.New(gvk)
 		if err != nil {
-			return nil, fmt.Errorf("cannot apply strategic merge patch for %s locally, try --type merge", gvk.String())
+			return nil, fmt.Errorf("strategic merge patch is not supported for %s locally, try --type merge", gvk.String())
 		}
 		return strategicpatch.StrategicMergePatch(originalJS, patchJS, obj)
 
