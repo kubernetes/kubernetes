@@ -441,6 +441,9 @@ func TestSyncPodsDeletesWhenSourcesAreReadyPerQOS(t *testing.T) {
 	// assert that unwanted pods were killed
 	fakeRuntime.AssertKilledPods([]string{"12345678"})
 
+	// simulate Runtime.KillPod
+	fakeRuntime.PodList = nil
+
 	kubelet.HandlePodCleanups()
 	kubelet.HandlePodCleanups()
 	kubelet.HandlePodCleanups()
@@ -495,6 +498,39 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 
 	// Sources are ready. Remove unwanted pods.
 	fakeRuntime.AssertKilledPods([]string{"12345678"})
+}
+
+func TestKillPodFollwedByIsPodPendingTermination(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	defer testKubelet.kubelet.podKiller.Close()
+	go testKubelet.kubelet.podKiller.PerformPodKillingWork()
+
+	pod := &kubecontainer.Pod{
+		ID:        "12345678",
+		Name:      "foo",
+		Namespace: "new",
+		Containers: []*kubecontainer.Container{
+			{Name: "bar"},
+		},
+	}
+
+	fakeRuntime := testKubelet.fakeRuntime
+	fakeContainerManager := testKubelet.fakeContainerManager
+	fakeContainerManager.PodContainerManager.AddPodFromCgroups(pod) // add pod to mock cgroup
+	fakeRuntime.PodList = []*containertest.FakePod{
+		{Pod: pod},
+	}
+
+	kl := testKubelet.kubelet
+	kl.podKiller.KillPod(&kubecontainer.PodPair{
+		APIPod:     nil,
+		RunningPod: pod,
+	})
+
+	if !(kl.podKiller.IsPodPendingTerminationByUID(pod.ID) || fakeRuntime.AssertKilledPods([]string{"12345678"}) == nil) {
+		t.Fatal("Race condition: When KillPod is complete, the pod should be pending termination or be killed")
+	}
 }
 
 type testNodeLister struct {
