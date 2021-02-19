@@ -1330,11 +1330,10 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 func TestNodesWherePreemptionMightHelp(t *testing.T) {
 	// Prepare 4 nodes names.
 	nodeNames := []string{"node1", "node2", "node3", "node4"}
-
 	tests := []struct {
 		name          string
 		nodesStatuses framework.NodeToStatusMap
-		expected      map[string]bool // set of expected node names. Value is ignored.
+		expected      sets.String // set of expected node names.
 	}{
 		{
 			name: "No node should be attempted",
@@ -1344,7 +1343,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, tainttoleration.ErrReasonNotMatch),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodelabel.ErrReasonPresenceViolated),
 			},
-			expected: map[string]bool{},
+			expected: sets.NewString(),
 		},
 		{
 			name: "ErrReasonAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
@@ -1353,7 +1352,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable),
 			},
-			expected: map[string]bool{"node1": true, "node4": true},
+			expected: sets.NewString("node1", "node4"),
 		},
 		{
 			name: "pod with both pod affinity and anti-affinity should be tried",
@@ -1361,7 +1360,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAffinityNotMatch),
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 			},
-			expected: map[string]bool{"node1": true, "node3": true, "node4": true},
+			expected: sets.NewString("node1", "node3", "node4"),
 		},
 		{
 			name: "ErrReasonAffinityRulesNotMatch should not be tried as it indicates that the pod is unschedulable due to inter-pod affinity, but ErrReasonAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
@@ -1369,7 +1368,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, interpodaffinity.ErrReasonAffinityRulesNotMatch),
 				"node2": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAffinityNotMatch),
 			},
-			expected: map[string]bool{"node2": true, "node3": true, "node4": true},
+			expected: sets.NewString("node2", "node3", "node4"),
 		},
 		{
 			name: "Mix of failed predicates works fine",
@@ -1377,14 +1376,14 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumerestrictions.ErrReasonDiskConflict),
 				"node2": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Insufficient %v", v1.ResourceMemory)),
 			},
-			expected: map[string]bool{"node2": true, "node3": true, "node4": true},
+			expected: sets.NewString("node2", "node3", "node4"),
 		},
 		{
 			name: "Node condition errors should be considered unresolvable",
 			nodesStatuses: framework.NodeToStatusMap{
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnknownCondition),
 			},
-			expected: map[string]bool{"node2": true, "node3": true, "node4": true},
+			expected: sets.NewString("node2", "node3", "node4"),
 		},
 		{
 			name: "ErrVolume... errors should not be tried as it indicates that the pod is unschedulable due to no matching volumes for pod on node",
@@ -1393,7 +1392,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumescheduling.ErrReasonNodeConflict)),
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumescheduling.ErrReasonBindConflict)),
 			},
-			expected: map[string]bool{"node4": true},
+			expected: sets.NewString("node4"),
 		},
 		{
 			name: "ErrReasonConstraintsNotMatch should be tried as it indicates that the pod is unschedulable due to topology spread constraints",
@@ -1402,7 +1401,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"node3": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
 			},
-			expected: map[string]bool{"node1": true, "node3": true, "node4": true},
+			expected: sets.NewString("node1", "node3", "node4"),
 		},
 		{
 			name: "UnschedulableAndUnresolvable status should be skipped but Unschedulable should be tried",
@@ -1411,7 +1410,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node3": framework.NewStatus(framework.Unschedulable, ""),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
 			},
-			expected: map[string]bool{"node1": true, "node3": true},
+			expected: sets.NewString("node1", "node3"),
 		},
 		{
 			name: "ErrReasonNodeLabelNotMatch should not be tried as it indicates that the pod is unschedulable due to node doesn't have the required label",
@@ -1420,7 +1419,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node3": framework.NewStatus(framework.Unschedulable, ""),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
 			},
-			expected: map[string]bool{"node1": true, "node3": true},
+			expected: sets.NewString("node1", "node3"),
 		},
 	}
 
