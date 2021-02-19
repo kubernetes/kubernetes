@@ -215,8 +215,9 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 				podConfig := e2epod.Config{
 					NS:            l.ns.Name,
 					PVCs:          []*v1.PersistentVolumeClaim{l.Pvc},
-					SeLinuxLabel:  e2epv.SELinuxLabel,
+					SeLinuxLabel:  e2evolume.GetLinuxLabel(),
 					NodeSelection: l.config.ClientNodeSelection,
+					ImageID:       e2evolume.GetDefaultTestImageID(),
 				}
 				pod, err := e2epod.MakeSecPod(&podConfig)
 				framework.ExpectNoError(err, "Failed to create pod")
@@ -250,7 +251,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 
 	case testpatterns.DynamicPV:
 		if pattern.VolMode == v1.PersistentVolumeBlock && !isBlockSupported {
-			ginkgo.It("should fail in binding dynamic provisioned PV to PVC [Slow]", func() {
+			ginkgo.It("should fail in binding dynamic provisioned PV to PVC [Slow][LinuxOnly]", func() {
 				manualInit()
 				defer cleanup()
 
@@ -300,7 +301,8 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 		podConfig := e2epod.Config{
 			NS:           l.ns.Name,
 			PVCs:         []*v1.PersistentVolumeClaim{l.Pvc},
-			SeLinuxLabel: e2epv.SELinuxLabel,
+			SeLinuxLabel: e2evolume.GetLinuxLabel(),
+			ImageID:      e2evolume.GetDefaultTestImageID(),
 		}
 		pod, err := e2epod.MakeSecPod(&podConfig)
 		framework.ExpectNoError(err)
@@ -342,7 +344,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 		framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
 	})
 
-	ginkgo.It("should not mount / map unused volumes in a pod", func() {
+	ginkgo.It("should not mount / map unused volumes in a pod [LinuxOnly]", func() {
 		if pattern.VolMode == v1.PersistentVolumeBlock {
 			skipTestIfBlockNotSupported(driver)
 		}
@@ -356,7 +358,8 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 		podConfig := e2epod.Config{
 			NS:           l.ns.Name,
 			PVCs:         []*v1.PersistentVolumeClaim{l.Pvc},
-			SeLinuxLabel: e2epv.SELinuxLabel,
+			SeLinuxLabel: e2evolume.GetLinuxLabel(),
+			ImageID:      e2evolume.GetDefaultTestImageID(),
 		}
 		pod, err := e2epod.MakeSecPod(&podConfig)
 		framework.ExpectNoError(err)

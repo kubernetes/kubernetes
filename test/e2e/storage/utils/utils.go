@@ -67,41 +67,45 @@ const (
 )
 
 // PodExec runs f.ExecCommandInContainerWithFullOutput to execute a shell cmd in target pod
-func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, error) {
-	stdout, _, err := f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
-	return stdout, err
+func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, string, error) {
+	if framework.NodeOSDistroIs("windows") {
+		return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "powershell", "/c", shExec)
+	}
+	return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
+
 }
 
 // VerifyExecInPodSucceed verifies shell cmd in target pod succeed
 func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) {
-	_, err := PodExec(f, pod, shExec)
+	stdout, stderr, err := PodExec(f, pod, shExec)
 	if err != nil {
+
 		if exiterr, ok := err.(uexec.CodeExitError); ok {
 			exitCode := exiterr.ExitStatus()
 			framework.ExpectNoError(err,
-				"%q should succeed, but failed with exit code %d and error message %q",
-				shExec, exitCode, exiterr)
+				"%q should succeed, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, exiterr, stdout, stderr)
 		} else {
 			framework.ExpectNoError(err,
-				"%q should succeed, but failed with error message %q",
-				shExec, err)
+				"%q should succeed, but failed with error message %q\nstdout: %s\nstderr: %s",
+				shExec, err, stdout, stderr)
 		}
 	}
 }
 
 // VerifyExecInPodFail verifies shell cmd in target pod fail with certain exit code
 func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, shExec string, exitCode int) {
-	_, err := PodExec(f, pod, shExec)
+	stdout, stderr, err := PodExec(f, pod, shExec)
 	if err != nil {
 		if exiterr, ok := err.(clientexec.ExitError); ok {
 			actualExitCode := exiterr.ExitStatus()
 			framework.ExpectEqual(actualExitCode, exitCode,
-				"%q should fail with exit code %d, but failed with exit code %d and error message %q",
-				shExec, exitCode, actualExitCode, exiterr)
+				"%q should fail with exit code %d, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, actualExitCode, exiterr, stdout, stderr)
 		} else {
 			framework.ExpectNoError(err,
-				"%q should fail with exit code %d, but failed with error message %q",
-				shExec, exitCode, err)
+				"%q should fail with exit code %d, but failed with error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, err, stdout, stderr)
 		}
 	}
 	framework.ExpectError(err, "%q should fail with exit code %d, but exit without error", shExec, exitCode)
@@ -635,11 +639,17 @@ func CheckReadWriteToPath(f *framework.Framework, pod *v1.Pod, volMode v1.Persis
 		// text -> file1 (write to file)
 		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path))
 		// grep file1 (read from file and check contents)
-		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("grep 'Hello world.' %s/file1.txt", path))
-
+		VerifyExecInPodSucceed(f, pod, readFile("Hello word.", path))
 		// Check that writing to directory as block volume fails
 		VerifyExecInPodFail(f, pod, fmt.Sprintf("dd if=/dev/urandom of=%s bs=64 count=1", path), 1)
 	}
+}
+
+func readFile(content, path string) string {
+	if framework.NodeOSDistroIs("windows") {
+		return fmt.Sprintf("Select-String '%s' %s/file1.txt", content, path)
+	}
+	return fmt.Sprintf("grep 'Hello world.' %s/file1.txt", path)
 }
 
 // genBinDataFromSeed generate binData with random seed
@@ -748,7 +758,7 @@ func CreateDriverNamespace(f *framework.Framework) *v1.Namespace {
 	return namespace
 }
 
-// WaitForGVRDeletion waits until an object has been deleted
+// WaitForGVRDeletion waits until a non-namespaced object has been deleted
 func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, objectName string, poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
 
@@ -758,7 +768,7 @@ func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ob
 			framework.Logf("%s %v is not found and has been deleted", gvr.Resource, objectName)
 			return true
 		} else if err != nil {
-			framework.Logf("Get $s %v returned an error: %v", objectName, err.Error())
+			framework.Logf("Get %s returned an error: %v", objectName, err.Error())
 		} else {
 			framework.Logf("%s %v has been found and is not deleted", gvr.Resource, objectName)
 		}
@@ -769,6 +779,29 @@ func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ob
 	}
 
 	return fmt.Errorf("%s %s is not deleted within %v", gvr.Resource, objectName, timeout)
+}
+
+// WaitForNamespacedGVRDeletion waits until a namespaced object has been deleted
+func WaitForNamespacedGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ns, objectName string, poll, timeout time.Duration) error {
+	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
+
+	if successful := WaitUntil(poll, timeout, func() bool {
+		_, err := c.Resource(gvr).Namespace(ns).Get(context.TODO(), objectName, metav1.GetOptions{})
+		if err != nil && apierrors.IsNotFound(err) {
+			framework.Logf("%s %s is not found in namespace %s and has been deleted", gvr.Resource, objectName, ns)
+			return true
+		} else if err != nil {
+			framework.Logf("Get %s in namespace %s returned an error: %v", objectName, ns, err.Error())
+		} else {
+			framework.Logf("%s %s has been found in namespace %s and is not deleted", gvr.Resource, objectName, ns)
+		}
+
+		return false
+	}); successful {
+		return nil
+	}
+
+	return fmt.Errorf("%s %s in namespace %s is not deleted within %v", gvr.Resource, objectName, ns, timeout)
 }
 
 // WaitUntil runs checkDone until a timeout is reached

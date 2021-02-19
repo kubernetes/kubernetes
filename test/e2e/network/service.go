@@ -3587,11 +3587,7 @@ func createPausePodDeployment(cs clientset.Interface, name, ns string, replicas 
 	labels := map[string]string{"deployment": "agnhost-pause"}
 	pauseDeployment := e2edeployment.NewDeployment(name, int32(replicas), labels, "", "", appsv1.RollingUpdateDeploymentStrategyType)
 
-	pauseDeployment.Spec.Template.Spec.Containers[0] = v1.Container{
-		Name:  "agnhost-pause",
-		Image: imageutils.GetE2EImage(imageutils.Agnhost),
-		Args:  []string{"pause"},
-	}
+	pauseDeployment.Spec.Template.Spec.Containers[0] = e2epod.NewAgnhostContainer("agnhost-pause", nil, nil, "pause")
 	pauseDeployment.Spec.Template.Spec.Affinity = &v1.Affinity{
 		PodAntiAffinity: &v1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
@@ -3612,25 +3608,12 @@ func createPausePodDeployment(cs clientset.Interface, name, ns string, replicas 
 // createPodOrFail creates a pod with the specified containerPorts.
 func createPodOrFail(c clientset.Interface, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort) {
 	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: labels,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "pause",
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"pause"},
-					Ports: containerPorts,
-					// Add a dummy environment variable to work around a docker issue.
-					// https://github.com/docker/docker/issues/14203
-					Env: []v1.EnvVar{{Name: "FOO", Value: " "}},
-				},
-			},
-		},
-	}
+	pod := e2epod.NewAgnhostPod(ns, name, nil, nil, containerPorts)
+	pod.ObjectMeta.Labels = labels
+	// Add a dummy environment variable to work around a docker issue.
+	// https://github.com/docker/docker/issues/14203
+	pod.Spec.Containers[0].Env = []v1.EnvVar{{Name: "FOO", Value: " "}}
+
 	_, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create pod %s in namespace %s", name, ns)
 }
