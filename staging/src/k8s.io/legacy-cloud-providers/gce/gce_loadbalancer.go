@@ -208,15 +208,23 @@ func (g *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 		return err
 	}
 
-	klog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v): deleting loadbalancer", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region)
+	klog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v): deleting loadbalancer with scheme %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, scheme)
 
 	switch scheme {
 	case cloud.SchemeInternal:
 		err = g.ensureInternalLoadBalancerDeleted(clusterName, clusterID, svc)
+		klog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v): done deleting internal loadbalancer resources. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, err)
+		// attempt deletion of external resources, in case a transition event was missed by the controller.
+		err2 := g.ensureExternalLoadBalancerDeleted(clusterName, clusterID, svc)
+		klog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v): done deleting external loadbalancer resources. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, err2)
+
 	default:
 		err = g.ensureExternalLoadBalancerDeleted(clusterName, clusterID, svc)
+		klog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v): done deleting external loadbalancer resources. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, err)
+		// attempt deletion of internal resources, in case a transition event was missed by the controller.
+		err2 := g.ensureInternalLoadBalancerDeleted(clusterName, clusterID, svc)
+		klog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v): done deleting internal loadbalancer resources. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, err2)
 	}
-	klog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v): done deleting loadbalancer. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, err)
 	return err
 }
 
