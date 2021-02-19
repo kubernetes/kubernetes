@@ -68,11 +68,11 @@ $(META_DIR)/$(GO_PKGDEPS_FILE): FORCE
 	    echo "DBG: calculating Go dependencies";  \
 	fi
 	hack/run-in-gopath.sh go install ./hack/make-rules/helpers/go2make
-	hack/run-in-gopath.sh go2make                       \
-	    k8s.io/kubernetes/...                           \
-	    --prune  k8s.io/kubernetes/staging              \
-	    --prune  k8s.io/kubernetes/vendor               \
-	    k8s.io/kubernetes/vendor/k8s.io/...             \
+	hack/run-in-gopath.sh go2make                                                                  \
+	    k8s.io/kubernetes/{build,cmd,pkg,plugin,test}/...                                          \
+	    $(shell ls staging/src/k8s.io | xargs printf -- "k8s.io/kubernetes/vendor/k8s.io/%s/... ") \
+	    k8s.io/kubernetes/vendor/k8s.io/gengo/...                                                  \
+	    k8s.io/kubernetes/vendor/k8s.io/kube-openapi/...                                           \
 	    > $@.tmp
 	if ! cmp -s $@.tmp $@; then                         \
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then            \
