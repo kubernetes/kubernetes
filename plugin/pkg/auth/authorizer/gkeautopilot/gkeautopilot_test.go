@@ -230,6 +230,91 @@ func TestAuthorize(t *testing.T) {
 				reason:   fmt.Sprintf(authReasonDeniedVerbManagedNamespace, "ns2", "verb3"),
 			},
 		},
+		"VerbDeniedForNamespace_ResourceIgnored_NoOpinion": {
+			input{
+				prepConfig: func(c *config) {
+					c.ManagedNamespaces = []ManagedNamespace{
+						{
+							Name:        "ns2",
+							DeniedVerbs: []string{"verb1", "verb2", "verb3"},
+							IgnoredResources: []ResourceSubresource{
+								{
+									Resource: "roles",
+								},
+							},
+						},
+					}
+				},
+
+				prepRequest: func() {
+					request.verb = "verb3"
+					request.namespace = "ns2"
+					request.resource = "roles"
+				},
+			},
+			expected{
+				decision: authorizer.DecisionNoOpinion,
+				reason:   authReasonNoOpinion,
+			},
+		},
+		"VerbDeniedForNamespace_ResourceSubresourceIgnored_NoOpinion": {
+			input{
+				prepConfig: func(c *config) {
+					c.ManagedNamespaces = []ManagedNamespace{
+						{
+							Name:        "ns2",
+							DeniedVerbs: []string{"verb1", "verb2", "verb3"},
+							IgnoredResources: []ResourceSubresource{
+								{
+									Resource: "roles",
+									Subresource: "subres",
+								},
+							},
+						},
+					}
+				},
+
+				prepRequest: func() {
+					request.verb = "verb3"
+					request.namespace = "ns2"
+					request.resource = "roles"
+					request.subresource = "subres"
+				},
+			},
+			expected{
+				decision: authorizer.DecisionNoOpinion,
+				reason:   authReasonNoOpinion,
+			},
+		},
+		"VerbDeniedForNamespace_ResourceSubresourceIgnored_SubresourceNotMatch_IsDenied": {
+			input{
+				prepConfig: func(c *config) {
+					c.ManagedNamespaces = []ManagedNamespace{
+						{
+							Name:        "ns2",
+							DeniedVerbs: []string{"verb1", "verb2", "verb3"},
+							IgnoredResources: []ResourceSubresource{
+								{
+									Resource: "roles",
+									Subresource: "subres1",
+								},
+							},
+						},
+					}
+				},
+
+				prepRequest: func() {
+					request.verb = "verb3"
+					request.namespace = "ns2"
+					request.resource = "roles"
+					request.subresource = "subres2"
+				},
+			},
+			expected{
+				decision: authorizer.DecisionDeny,
+				reason:   fmt.Sprintf(authReasonDeniedVerbManagedNamespace, "ns2", "verb3"),
+			},
+		},
 		"ResourceDeniedForNamespaceAndSubresourceNonEmpty_IsDenied": {
 			input{
 				prepConfig: func(c *config) {
@@ -238,7 +323,7 @@ func TestAuthorize(t *testing.T) {
 							Name: "ns2",
 							DeniedResources: []ResourceSubresource{
 								{
-									Resource: "pod",
+									Resource: "pods",
 								},
 							},
 						},
@@ -246,14 +331,14 @@ func TestAuthorize(t *testing.T) {
 				},
 
 				prepRequest: func() {
-					request.resource = "pod"
+					request.resource = "pods"
 					request.subresource = "create"
 					request.namespace = "ns2"
 				},
 			},
 			expected{
 				decision: authorizer.DecisionDeny,
-				reason:   fmt.Sprintf(authReasonDeniedResourceManagedNamespace, "ns2", "pod"),
+				reason:   fmt.Sprintf(authReasonDeniedResourceManagedNamespace, "ns2", "pods"),
 			},
 		},
 		"ClusterScopedVerbDenied_IsDenied": {
@@ -285,7 +370,7 @@ func TestAuthorize(t *testing.T) {
 							Name: "",
 							DeniedResources: []ResourceSubresource{
 								{
-									Resource:    "node",
+									Resource:    "nodes",
 									Subresource: "proxy",
 								},
 							},
@@ -294,14 +379,14 @@ func TestAuthorize(t *testing.T) {
 				},
 
 				prepRequest: func() {
-					request.resource = "node"
+					request.resource = "nodes"
 					request.subresource = "proxy"
 					request.namespace = ""
 				},
 			},
 			expected{
 				decision: authorizer.DecisionDeny,
-				reason:   fmt.Sprintf(authReasonDeniedClusterScopedResource, "node/proxy"),
+				reason:   fmt.Sprintf(authReasonDeniedClusterScopedResource, "nodes/proxy"),
 			},
 		},
 		"ClusterScopedSubresourceNotDenied_NoOpinion": {
@@ -312,7 +397,7 @@ func TestAuthorize(t *testing.T) {
 							Name: "",
 							DeniedResources: []ResourceSubresource{
 								{
-									Resource:    "node",
+									Resource:    "nodes",
 									Subresource: "proxy",
 								},
 							},
@@ -321,7 +406,7 @@ func TestAuthorize(t *testing.T) {
 				},
 
 				prepRequest: func() {
-					request.resource = "node"
+					request.resource = "nodes"
 					request.subresource = "subres"
 					request.namespace = ""
 				},
@@ -339,7 +424,7 @@ func TestAuthorize(t *testing.T) {
 							Name: "ns2",
 							DeniedResources: []ResourceSubresource{
 								{
-									Resource: "pod",
+									Resource: "pods",
 								},
 							},
 						},
@@ -347,14 +432,14 @@ func TestAuthorize(t *testing.T) {
 				},
 
 				prepRequest: func() {
-					request.resource = "pod"
+					request.resource = "pods"
 					request.subresource = ""
 					request.namespace = "ns2"
 				},
 			},
 			expected{
 				decision: authorizer.DecisionDeny,
-				reason:   fmt.Sprintf(authReasonDeniedResourceManagedNamespace, "ns2", "pod"),
+				reason:   fmt.Sprintf(authReasonDeniedResourceManagedNamespace, "ns2", "pods"),
 			},
 		},
 		"SubresourceDeniedForNamespace_IsDenied": {
@@ -365,7 +450,7 @@ func TestAuthorize(t *testing.T) {
 							Name: "ns2",
 							DeniedResources: []ResourceSubresource{
 								{
-									Resource:    "pod",
+									Resource:    "pods",
 									Subresource: "exec",
 								},
 							},
@@ -374,14 +459,14 @@ func TestAuthorize(t *testing.T) {
 				},
 
 				prepRequest: func() {
-					request.resource = "pod"
+					request.resource = "pods"
 					request.subresource = "exec"
 					request.namespace = "ns2"
 				},
 			},
 			expected{
 				decision: authorizer.DecisionDeny,
-				reason:   fmt.Sprintf(authReasonDeniedSubresourceManagedNamespace, "ns2", "pod/exec"),
+				reason:   fmt.Sprintf(authReasonDeniedSubresourceManagedNamespace, "ns2", "pods/exec"),
 			},
 		},
 		"VerbAndSubresourceNotDeniedForNamespace_NoOpinion": {
@@ -392,7 +477,7 @@ func TestAuthorize(t *testing.T) {
 							Name: "ns2",
 							DeniedResources: []ResourceSubresource{
 								{
-									Resource:    "pod",
+									Resource:    "pods",
 									Subresource: "exec",
 								},
 							},
@@ -402,7 +487,7 @@ func TestAuthorize(t *testing.T) {
 
 				prepRequest: func() {
 					request.verb = "verb4"
-					request.resource = "pod"
+					request.resource = "pods"
 					request.subresource = "log"
 					request.namespace = "ns2"
 				},

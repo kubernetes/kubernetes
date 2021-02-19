@@ -36,7 +36,7 @@ func newConfigErr(msg string) *configValidationError {
 // errors that might be returned for when validating
 var (
 	errManagedNamespaceEmptyVerbs          = newConfigErr("managedNamespace.deniedVerbs.[*] cannot be empty")
-	errManagedNamespaceEmptyResource       = newConfigErr("managedNamespace.deniedResources.[*].resource cannot be empty")
+	errManagedNamespaceEmptyResource       = newConfigErr("managedNamespace.[denied/ignored]Resources.[*].resource cannot be empty")
 	errManagedResourceEmptyResource        = newConfigErr("managedResource.resource cannot be empty")
 	errManagedResourceEmptyName            = newConfigErr("managedResource.name cannot be empty")
 	errManagedResourceEmptySubresourceName = newConfigErr("managedResource.subresources.[*].name cannot be empty")
@@ -52,6 +52,10 @@ type Identities struct {
 type ManagedNamespace struct {
 	// Name of the namespace
 	Name string
+	// A request will be ignored (e.g. no managed namespace level denial) if its
+	// namespace matches Name and its resource/subresource is in IgnoredResources
+	// set
+	IgnoredResources []ResourceSubresource
 	// A request will be denied if its namespace matches Name and its verb is in
 	// DeniedVerbs set
 	DeniedVerbs []string
@@ -129,11 +133,12 @@ func (t *treeNode) addPath(path []string, allowedVerbs sets.String) {
 	t.children[path[0]].addPath(path[1:], allowedVerbs)
 }
 
-// namespaceDeniedSets is used by configHelper and specifies the denied verbs
+// namespaceConfigSets is used by configHelper and specifies the denied verbs
 // and subresources as sets, for fast lookup
-type namespaceDeniedSets struct {
-	deniedVerbs               sets.String
-	deniedResourceSubresource sets.String
+type namespaceConfigSets struct {
+	ignoredResourceSubresource sets.String
+	deniedVerbs                sets.String
+	deniedResourceSubresource  sets.String
 }
 
 // configHelper is used by the authz client to pre-calculate a few
@@ -141,7 +146,7 @@ type namespaceDeniedSets struct {
 type configHelper struct {
 	ignoredUsersSet      sets.String
 	ignoredGroupsSet     sets.String
-	managedNamespacesMap map[string]namespaceDeniedSets
+	managedNamespacesMap map[string]namespaceConfigSets
 
 	// every path from the root of the tree to a leaf, traverses a resource
 	// path in the following order: [APIGroup, Namespace, Resource, Name,
@@ -175,6 +180,12 @@ type configHelper struct {
 func (c *config) validate() error {
 	// check for invalid empty fields in managed namespaces
 	for _, mns := range c.ManagedNamespaces {
+		for _, resSubres := range mns.IgnoredResources {
+			if resSubres.Resource == "" {
+				return errManagedNamespaceEmptyResource
+			}
+		}
+
 		for _, v := range mns.DeniedVerbs {
 			if v == "" {
 				return errManagedNamespaceEmptyVerbs
@@ -214,16 +225,22 @@ func (c *config) validate() error {
 // config lists
 func buildConfigHelper(c *config) *configHelper {
 	// nsMap is a map from a namespace to a set of verbs
-	nsMap := map[string]namespaceDeniedSets{}
+	nsMap := map[string]namespaceConfigSets{}
 	for _, mns := range c.ManagedNamespaces {
-		resSubList := []string{}
-		for _, rs := range mns.DeniedResources {
-			resSubList = append(resSubList, resSubToString(rs.Resource, rs.Subresource))
+		ignoredResSubList := []string{}
+		for _, rs := range mns.IgnoredResources {
+			ignoredResSubList = append(ignoredResSubList, resSubToString(rs.Resource, rs.Subresource))
 		}
 
-		nsMap[mns.Name] = namespaceDeniedSets{
-			deniedVerbs:               sets.NewString(mns.DeniedVerbs...),
-			deniedResourceSubresource: sets.NewString(resSubList...),
+		deniedResSubList := []string{}
+		for _, rs := range mns.DeniedResources {
+			deniedResSubList = append(deniedResSubList, resSubToString(rs.Resource, rs.Subresource))
+		}
+
+		nsMap[mns.Name] = namespaceConfigSets{
+			ignoredResourceSubresource: sets.NewString(ignoredResSubList...),
+			deniedVerbs:                sets.NewString(mns.DeniedVerbs...),
+			deniedResourceSubresource:  sets.NewString(deniedResSubList...),
 		}
 	}
 

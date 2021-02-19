@@ -203,6 +203,17 @@ func (a *Authorizer) isRequestForNamespaceDenied(request authorizer.Attributes) 
 	reqNamespace := request.GetNamespace()
 
 	if ds, ok := a.configHelper.managedNamespacesMap[reqNamespace]; ok {
+		reqResource := request.GetResource()
+		reqResSubres := resSubToString(reqResource, request.GetSubresource())
+
+		if ds.ignoredResourceSubresource.Has(resSubToString(reqResource, "")) {
+			return false, authReasonNoOpinion
+		}
+
+		if ds.ignoredResourceSubresource.Has(reqResSubres) {
+			return false, authReasonNoOpinion
+		}
+
 		reqVerb := request.GetVerb()
 		if ds.deniedVerbs.Has(reqVerb) {
 			reason := fmt.Sprintf(authReasonDeniedVerbManagedNamespace, reqNamespace, reqVerb)
@@ -213,7 +224,6 @@ func (a *Authorizer) isRequestForNamespaceDenied(request authorizer.Attributes) 
 			return true, reason
 		}
 
-		reqResource := request.GetResource()
 		if ds.deniedResourceSubresource.Has(resSubToString(reqResource, "")) {
 			reason := fmt.Sprintf(authReasonDeniedResourceManagedNamespace, reqNamespace, reqResource)
 			if reqNamespace == "" {
@@ -223,7 +233,6 @@ func (a *Authorizer) isRequestForNamespaceDenied(request authorizer.Attributes) 
 			return true, reason
 		}
 
-		reqResSubres := resSubToString(request.GetResource(), request.GetSubresource())
 		if ds.deniedResourceSubresource.Has(reqResSubres) {
 			reason := fmt.Sprintf(authReasonDeniedSubresourceManagedNamespace, reqNamespace, reqResSubres)
 			if reqNamespace == "" {
