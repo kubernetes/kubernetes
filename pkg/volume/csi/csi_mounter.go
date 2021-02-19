@@ -285,7 +285,13 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 	kletHost, ok := c.plugin.host.(volume.KubeletVolumeHost)
 	if ok {
-		kletHost.WaitForCacheSync()
+		synced, err := kletHost.CSIDriversSynced()
+		if err != nil {
+			return nil, err
+		}
+		if !synced {
+			return nil, errors.New("CSIDrivers has not been synced yet")
+		}
 	}
 
 	if c.plugin.csiDriverLister == nil {

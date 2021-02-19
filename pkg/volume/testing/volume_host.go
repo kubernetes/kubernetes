@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
@@ -366,13 +365,13 @@ func (f *fakeKubeletVolumeHost) CSIDriverLister() storagelistersv1.CSIDriverList
 	return f.csiDriverLister
 }
 
-func (f *fakeKubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
+func (f *fakeKubeletVolumeHost) CSIDriversSynced() (bool, error) {
 	// not needed for testing
-	return nil
+	return true, nil
 }
 
-func (f *fakeKubeletVolumeHost) WaitForCacheSync() error {
-	return nil
+func (f *fakeKubeletVolumeHost) WaitForCacheSync() {
+	return
 }
 
 func (f *fakeKubeletVolumeHost) GetHostUtil() hostutil.HostUtils {

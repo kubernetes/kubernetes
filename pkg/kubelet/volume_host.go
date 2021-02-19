@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"runtime"
@@ -169,24 +170,29 @@ func (kvh *kubeletVolumeHost) CSIDriverLister() storagelisters.CSIDriverLister {
 	return kvh.csiDriverLister
 }
 
-func (kvh *kubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
-	return kvh.csiDriversSynced
+func (kvh *kubeletVolumeHost) CSIDriversSynced() (bool, error) {
+	if kvh.csiDriversSynced == nil {
+		return false, errors.New("csiDriversSynced not found, kubelet running in standalone mode, should not create pods that use csi volume")
+	}
+
+	return kvh.csiDriversSynced(), nil
 }
 
 // WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
-func (kvh *kubeletVolumeHost) WaitForCacheSync() error {
+func (kvh *kubeletVolumeHost) WaitForCacheSync() {
 	if kvh.csiDriversSynced == nil {
-		klog.Error("csiDriversSynced not found on KubeletVolumeHost")
-		return fmt.Errorf("csiDriversSynced not found on KubeletVolumeHost")
+		klog.Warningf("csiDriversSynced not found, kubelet running in standalone mode, should not create pods that use csi volume")
+		return
 	}
 
 	synced := []cache.InformerSynced{kvh.csiDriversSynced}
 	if !cache.WaitForCacheSync(wait.NeverStop, synced...) {
-		klog.Warning("failed to wait for cache sync for CSIDriverLister")
-		return fmt.Errorf("failed to wait for cache sync for CSIDriverLister")
+		klog.Warningf("failed to wait for cache sync for CSIDriverLister")
+		return
 	}
 
-	return nil
+	klog.InfoS("CSIDrivers has been synced")
+	return
 }
 
 func (kvh *kubeletVolumeHost) NewWrapperMounter(

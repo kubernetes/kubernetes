@@ -37,7 +37,6 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
@@ -340,9 +339,9 @@ type KubeletVolumeHost interface {
 	// CSIDriverLister returns the informer lister for the CSIDriver API Object
 	CSIDriverLister() storagelistersv1.CSIDriverLister
 	// CSIDriverSynced returns the informer synced for the CSIDriver API Object
-	CSIDriversSynced() cache.InformerSynced
+	CSIDriversSynced() (bool, error)
 	// WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
-	WaitForCacheSync() error
+	WaitForCacheSync()
 	// Returns hostutil.HostUtils
 	GetHostUtil() hostutil.HostUtils
 }

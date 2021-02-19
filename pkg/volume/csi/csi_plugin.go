@@ -210,6 +210,9 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			if p.serviceAccountTokenGetter == nil {
 				klog.Error(log("ServiceAccountTokenGetter not found on KubeletVolumeHost"))
 			}
+
+			go kletHost.WaitForCacheSync()
+
 			// We don't run the volumeAttachmentLister in the kubelet context
 			p.volumeAttachmentLister = nil
 		}
@@ -784,8 +787,12 @@ func (p *csiPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapP
 func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 	kletHost, ok := p.host.(volume.KubeletVolumeHost)
 	if ok {
-		if err := kletHost.WaitForCacheSync(); err != nil {
+		synced, err := kletHost.CSIDriversSynced()
+		if err != nil {
 			return false, err
+		}
+		if !synced {
+			return false, errors.New("CSIDrivers has not been synced yet")
 		}
 	}
 
@@ -825,8 +832,12 @@ func (p *csiPlugin) supportsVolumeLifecycleMode(driver string, volumeMode storag
 	if p.csiDriverLister != nil {
 		kletHost, ok := p.host.(volume.KubeletVolumeHost)
 		if ok {
-			if err := kletHost.WaitForCacheSync(); err != nil {
+			synced, err := kletHost.CSIDriversSynced()
+			if err != nil {
 				return err
+			}
+			if !synced {
+				return errors.New("CSIDrivers has not been synced yet")
 			}
 		}
 
@@ -898,8 +909,12 @@ func (p *csiPlugin) getFSGroupPolicy(driver string) (storage.FSGroupPolicy, erro
 	if p.csiDriverLister != nil {
 		kletHost, ok := p.host.(volume.KubeletVolumeHost)
 		if ok {
-			if err := kletHost.WaitForCacheSync(); err != nil {
+			synced, err := kletHost.CSIDriversSynced()
+			if err != nil {
 				return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, err
+			}
+			if !synced {
+				return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, errors.New("CSIDrivers has not been synced yet")
 			}
 		}
 
