@@ -255,22 +255,22 @@ func TopologyKeyExist(key string, vna *v1.VolumeNodeAffinity) bool {
 	return false
 }
 
-type regionTopologyHandler func(pv *v1.PersistentVolume) error
+type regionParserFn func([]string) (string, error)
 
 // translateTopologyFromCSIToInTree translate a CSI topology to
 // Kubernetes topology and add topology labels to it. Note that this function
 // will only work for plugin with a single topologyKey that translates to
-// Kubernetes zone(and region if regionTopologyHandler is passed in).
+// Kubernetes zone(and region if regionParser is passed in).
 // If a plugin has more than one topologyKey, it will need to be processed
 // separately by the plugin.
-// regionTopologyHandler is a function to add region topology NodeAffinity
-// and labels for the given PV. It assumes the Zone NodeAffinity already exists
-// If regionTopologyHandler is nil, no region NodeAffinity will be added
-//
+// If regionParser is nil, no region NodeAffinity will be added. If not nil,
+// it'll be passed to regionTopologyHandler, which will add region topology NodeAffinity
+// and labels for the given PV. It assumes the Zone NodeAffinity already exists.
+// In short this function will,
 // 1. Replace all CSI topology to Kubernetes Zone topology label
-// 2. Process and generate region topology if a regionTopologyHandler is passed
+// 2. Process and generate region topology if a regionParser is passed
 // 3. Add Kubernetes Topology labels(zone) if they do not exist
-func translateTopologyFromCSIToInTree(pv *v1.PersistentVolume, csiTopologyKey string, regionTopologyHandler regionTopologyHandler) error {
+func translateTopologyFromCSIToInTree(pv *v1.PersistentVolume, csiTopologyKey string, regionParser regionParserFn) error {
 
 	zoneLabel, _ := getTopologyLabel(pv)
 
@@ -280,10 +280,10 @@ func translateTopologyFromCSIToInTree(pv *v1.PersistentVolume, csiTopologyKey st
 		return fmt.Errorf("Failed to replace CSI topology to Kubernetes topology, error: %v", err)
 	}
 
-	// 2. Take care of region topology if a regionTopologyHandler is passed
-	if regionTopologyHandler != nil {
+	// 2. Take care of region topology if a regionParser is passed
+	if regionParser != nil {
 		// let's make less strict on this one. Even if there is an error in the region processing, just ignore it
-		err = regionTopologyHandler(pv)
+		err = regionTopologyHandler(pv, regionParser)
 		if err != nil {
 			return fmt.Errorf("Failed to handle region topology. error: %v", err)
 		}
@@ -332,4 +332,66 @@ func translateAllowedTopologies(terms []v1.TopologySelectorTerm, key string) ([]
 		newTopologies = append(newTopologies, newTerm)
 	}
 	return newTopologies, nil
+}
+
+// regionTopologyHandler will process the PV and add region
+// kubernetes topology label to its NodeAffinity and labels
+// It assumes the Zone NodeAffinity already exists
+// Each provider is responsible for providing their own regionParser
+func regionTopologyHandler(pv *v1.PersistentVolume, regionParser regionParserFn) error {
+
+	// Make sure the necessary fields exist
+	if pv == nil || pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil ||
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms == nil || len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
+		return nil
+	}
+
+	zoneLabel, regionLabel := getTopologyLabel(pv)
+
+	// process each term
+	for index, nodeSelectorTerm := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
+		// In the first loop, see if regionLabel already exist
+		regionExist := false
+		var zoneVals []string
+		for _, nsRequirement := range nodeSelectorTerm.MatchExpressions {
+			if nsRequirement.Key == regionLabel {
+				regionExist = true
+				break
+			} else if nsRequirement.Key == zoneLabel {
+				zoneVals = append(zoneVals, nsRequirement.Values...)
+			}
+		}
+		if regionExist {
+			// Regionlabel already exist in this term, skip it
+			continue
+		}
+		// If no regionLabel found, generate region label from the zoneLabel we collect from this term
+		regionVal, err := regionParser(zoneVals)
+		if err != nil {
+			return err
+		}
+		// Add the regionVal to this term
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[index].MatchExpressions =
+			append(pv.Spec.NodeAffinity.Required.NodeSelectorTerms[index].MatchExpressions, v1.NodeSelectorRequirement{
+				Key:      regionLabel,
+				Operator: v1.NodeSelectorOpIn,
+				Values:   []string{regionVal},
+			})
+
+	}
+
+	// Add region label
+	regionVals := getTopologyValues(pv, regionLabel)
+	if len(regionVals) == 1 {
+		// We should only have exactly 1 region value
+		if pv.Labels == nil {
+			pv.Labels = make(map[string]string)
+		}
+		_, regionOK := pv.Labels[regionLabel]
+		if !regionOK {
+			pv.Labels[regionLabel] = regionVals[0]
+		}
+	}
+
+	return nil
 }

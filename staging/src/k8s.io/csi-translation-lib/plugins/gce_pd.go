@@ -227,7 +227,7 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 		volID = fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, zones[0], pv.Spec.GCEPersistentDisk.PDName)
 	} else if len(zones) > 1 {
 		// Regional
-		region, err := getRegionFromZones(zones)
+		region, err := gceGetRegionFromZones(zones)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get region from zones: %v", err)
 		}
@@ -292,7 +292,7 @@ func (g *gcePersistentDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.Persisten
 	}
 
 	// translate CSI topology to In-tree topology for rollback compatibility
-	if err := translateTopologyFromCSIToInTree(pv, GCEPDTopologyKey, gceRegionTopologyHandler); err != nil {
+	if err := translateTopologyFromCSIToInTree(pv, GCEPDTopologyKey, gceGetRegionFromZones); err != nil {
 		return nil, fmt.Errorf("failed to translate topology. PV:%+v. Error:%v", *pv, err)
 	}
 
@@ -356,7 +356,7 @@ func (g *gcePersistentDiskCSITranslator) RepairVolumeHandle(volumeHandle, nodeID
 	case "regions":
 		region := ""
 		if tok[volIDZoneValue] == UnspecifiedValue {
-			region, err = getRegionFromZones([]string{nodeTok[volIDZoneValue]})
+			region, err = gceGetRegionFromZones([]string{nodeTok[volIDZoneValue]})
 			if err != nil {
 				return "", fmt.Errorf("failed to get region from zone %s: %v", nodeTok[volIDZoneValue], err)
 			}
@@ -377,70 +377,9 @@ func pdNameFromVolumeID(id string) (string, error) {
 	return splitID[volIDDiskNameValue], nil
 }
 
-// gceRegionTopologyHandler will process the PV and add region
-// kubernetes topology label to its NodeAffinity and labels
-// It assumes the Zone NodeAffinity already exists
-func gceRegionTopologyHandler(pv *v1.PersistentVolume) error {
-
-	// Make sure the necessary fields exist
-	if pv == nil || pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil ||
-		pv.Spec.NodeAffinity.Required.NodeSelectorTerms == nil || len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
-		return nil
-	}
-
-	zoneLabel, regionLabel := getTopologyLabel(pv)
-
-	// process each term
-	for index, nodeSelectorTerm := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
-		// In the first loop, see if regionLabel already exist
-		regionExist := false
-		var zoneVals []string
-		for _, nsRequirement := range nodeSelectorTerm.MatchExpressions {
-			if nsRequirement.Key == regionLabel {
-				regionExist = true
-				break
-			} else if nsRequirement.Key == zoneLabel {
-				zoneVals = append(zoneVals, nsRequirement.Values...)
-			}
-		}
-		if regionExist {
-			// Regionlabel already exist in this term, skip it
-			continue
-		}
-		// If no regionLabel found, generate region label from the zoneLabel we collect from this term
-		regionVal, err := getRegionFromZones(zoneVals)
-		if err != nil {
-			return err
-		}
-		// Add the regionVal to this term
-		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[index].MatchExpressions =
-			append(pv.Spec.NodeAffinity.Required.NodeSelectorTerms[index].MatchExpressions, v1.NodeSelectorRequirement{
-				Key:      regionLabel,
-				Operator: v1.NodeSelectorOpIn,
-				Values:   []string{regionVal},
-			})
-
-	}
-
-	// Add region label
-	regionVals := getTopologyValues(pv, regionLabel)
-	if len(regionVals) == 1 {
-		// We should only have exactly 1 region value
-		if pv.Labels == nil {
-			pv.Labels = make(map[string]string)
-		}
-		_, regionOK := pv.Labels[regionLabel]
-		if !regionOK {
-			pv.Labels[regionLabel] = regionVals[0]
-		}
-	}
-
-	return nil
-}
-
 // TODO: Replace this with the imported one from GCE PD CSI Driver when
 // the driver removes all k8s/k8s dependencies
-func getRegionFromZones(zones []string) (string, error) {
+func gceGetRegionFromZones(zones []string) (string, error) {
 	regions := sets.String{}
 	if len(zones) < 1 {
 		return "", fmt.Errorf("no zones specified")

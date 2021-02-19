@@ -176,7 +176,7 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateCSIPVToInTree(pv *v1.Persis
 	}
 
 	// translate CSI topology to In-tree topology for rollback compatibility
-	if err := translateTopologyFromCSIToInTree(pv, AWSEBSTopologyKey, awsRegionTopologyHandler); err != nil {
+	if err := translateTopologyFromCSIToInTree(pv, AWSEBSTopologyKey, getAwsRegionFromZones); err != nil {
 		return nil, fmt.Errorf("failed to translate topology. PV:%+v. Error:%v", *pv, err)
 	}
 
@@ -258,66 +258,6 @@ func KubernetesVolumeIDToEBSVolumeID(kubernetesID string) (string, error) {
 	}
 
 	return awsID, nil
-}
-
-// This code is copied over from gce_pd as is. However, we're passing our own getRegionFromZones implementation.
-// It might be worth moving this to a common place and pass that function as a parameter.
-func awsRegionTopologyHandler(pv *v1.PersistentVolume) error {
-
-	// Make sure the necessary fields exist
-	if pv == nil || pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil ||
-		pv.Spec.NodeAffinity.Required.NodeSelectorTerms == nil || len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
-		return nil
-	}
-
-	zoneLabel, regionLabel := getTopologyLabel(pv)
-
-	// process each term
-	for index, nodeSelectorTerm := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
-		// In the first loop, see if regionLabel already exist
-		regionExist := false
-		var zoneVals []string
-		for _, nsRequirement := range nodeSelectorTerm.MatchExpressions {
-			if nsRequirement.Key == regionLabel {
-				regionExist = true
-				break
-			} else if nsRequirement.Key == zoneLabel {
-				zoneVals = append(zoneVals, nsRequirement.Values...)
-			}
-		}
-		if regionExist {
-			// Regionlabel already exist in this term, skip it
-			continue
-		}
-		// If no regionLabel found, generate region label from the zoneLabel we collect from this term
-		regionVal, err := getAwsRegionFromZones(zoneVals)
-		if err != nil {
-			return err
-		}
-		// Add the regionVal to this term
-		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[index].MatchExpressions =
-			append(pv.Spec.NodeAffinity.Required.NodeSelectorTerms[index].MatchExpressions, v1.NodeSelectorRequirement{
-				Key:      regionLabel,
-				Operator: v1.NodeSelectorOpIn,
-				Values:   []string{regionVal},
-			})
-
-	}
-
-	// Add region label
-	regionVals := getTopologyValues(pv, regionLabel)
-	if len(regionVals) == 1 {
-		// We should only have exactly 1 region value
-		if pv.Labels == nil {
-			pv.Labels = make(map[string]string)
-		}
-		_, regionOK := pv.Labels[regionLabel]
-		if !regionOK {
-			pv.Labels[regionLabel] = regionVals[0]
-		}
-	}
-
-	return nil
 }
 
 func getAwsRegionFromZones(zones []string) (string, error) {
