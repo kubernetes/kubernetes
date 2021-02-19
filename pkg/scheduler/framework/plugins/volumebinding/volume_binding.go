@@ -23,7 +23,8 @@ import (
 	"sync"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -59,6 +60,27 @@ type stateData struct {
 
 func (d *stateData) Clone() framework.StateData {
 	return d
+}
+
+// Equal checks equality of two stateData objects. This is useful for
+// testing with cmp.Equal.
+func (d *stateData) Equal(x *stateData) bool {
+	if d.skip != x.skip {
+		return false
+	}
+	if d.allBound != x.allBound {
+		return false
+	}
+	if !cmp.Equal(d.boundClaims, x.boundClaims) {
+		return false
+	}
+	if !cmp.Equal(d.claimsToBind, x.claimsToBind) {
+		return false
+	}
+	if !cmp.Equal(d.podVolumesByNode, x.podVolumesByNode) {
+		return false
+	}
+	return true
 }
 
 // VolumeBinding is a plugin that binds pod volumes in scheduling.

@@ -18,10 +18,10 @@ package volumebinding
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
@@ -296,8 +296,8 @@ func TestVolumeBinding(t *testing.T) {
 
 			t.Logf("Verify: call PreFilter and check status")
 			gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
-			if !reflect.DeepEqual(gotPreFilterStatus, item.wantPreFilterStatus) {
-				t.Errorf("filter prefilter status does not match: %v, want: %v", gotPreFilterStatus, item.wantPreFilterStatus)
+			if diff := cmp.Diff(item.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 			if !gotPreFilterStatus.IsSuccess() {
 				// scheduler framework will skip Filter if PreFilter fails
@@ -309,14 +309,14 @@ func TestVolumeBinding(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(stateData, item.wantStateAfterPreFilter) {
-				t.Errorf("state got after prefilter does not match: %v, want: %v", stateData, item.wantStateAfterPreFilter)
+			if diff := cmp.Diff(item.wantStateAfterPreFilter, stateData); diff != "" {
+				t.Errorf("Unexpected state data (-want, +got):\n%s", diff)
 			}
 
 			t.Logf("Verify: call Filter and check status")
 			gotStatus := p.Filter(ctx, state, item.pod, nodeInfo)
-			if !reflect.DeepEqual(gotStatus, item.wantFilterStatus) {
-				t.Errorf("filter status does not match: %v, want: %v", gotStatus, item.wantFilterStatus)
+			if diff := cmp.Diff(item.wantFilterStatus, gotStatus); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}

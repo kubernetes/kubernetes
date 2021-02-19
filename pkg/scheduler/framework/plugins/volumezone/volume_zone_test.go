@@ -18,10 +18,10 @@ package volumezone
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -215,8 +215,8 @@ func TestSingleZone(t *testing.T) {
 				nil,
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -337,8 +337,8 @@ func TestMultiZone(t *testing.T) {
 				nil,
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -446,8 +446,14 @@ func TestWithBinding(t *testing.T) {
 				scLister,
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if test.wantStatus.Code() == framework.Error {
+				if diff := cmp.Diff(test.wantStatus.Reasons(), gotStatus.Reasons()); diff != "" {
+					t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+				}
+			} else {
+				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+					t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+				}
 			}
 		})
 	}
