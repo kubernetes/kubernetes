@@ -124,6 +124,7 @@ release_filegroup(
     name = "client-targets",
     conditioned_srcs = for_platforms(for_client = [
         "//cmd/kubectl",
+        "//cmd/kubectl-convert",
     ]),
 )
 
