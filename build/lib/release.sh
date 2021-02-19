@@ -218,12 +218,6 @@ function kube::release::package_node_tarballs() {
 function kube::release::build_server_images() {
   # Clean out any old images
   rm -rf "${RELEASE_IMAGES}"
-
-  export DOCKER_CLI_EXPERIMENTAL=enabled
-  docker run --rm --privileged multiarch/qemu-user-static:5.2.0-2 --reset -p yes
-  docker buildx rm kube-server-image-builder || true
-  docker buildx create --use --name=kube-server-image-builder
-
   local platform
   for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
     local platform_tag
@@ -245,8 +239,6 @@ function kube::release::build_server_images() {
 
     kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
   done
-
-  docker buildx rm kube-server-image-builder
 }
 
 # Package up all of the server binaries
@@ -415,7 +407,7 @@ function kube::release::create_docker_images_for_server() {
 
         kube::log::status "Deleting docker image ${docker_image_tag}"
         "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
-      )
+      ) &
     done
 
     if [[ "${KUBE_BUILD_CONFORMANCE}" =~ [yY] ]]; then
