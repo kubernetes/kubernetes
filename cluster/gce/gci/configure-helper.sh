@@ -1627,6 +1627,7 @@ function prepare-log-file {
 
 # Prepares parameters for kube-proxy manifest.
 # $1 source path of kube-proxy manifest.
+# Assumptions: HOST_PLATFORM and HOST_ARCH are specified by calling detect_host_info.
 function prepare-kube-proxy-manifest-variables {
   local -r src_file=$1;
 
@@ -1676,6 +1677,8 @@ function prepare-kube-proxy-manifest-variables {
   sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-proxy_docker_tag'\]}}@${kube_proxy_docker_tag}@g" "${src_file}"
+  # TODO(#99245): Use multi-arch image and get rid of this.
+  sed -i -e "s@{{pillar\['host_arch'\]}}@${HOST_ARCH}@g" "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
   sed -i -e "s@{{kube_cache_mutation_detector_env_name}}@${kube_cache_mutation_detector_env_name}@g" "${src_file}"
@@ -2985,9 +2988,46 @@ EOF
   systemctl restart containerd
 }
 
+# This function detects the platform/arch of the machine where the script runs,
+# and sets the HOST_PLATFORM and HOST_ARCH environment variables accordingly.
+# Callers can specify HOST_PLATFORM_OVERRIDE and HOST_ARCH_OVERRIDE to skip the detection.
+# This function is adapted from the detect_client_info function in cluster/get-kube-binaries.sh
+# and kube::util::host_os, kube::util::host_arch functions in hack/lib/util.sh
+# This function should be synced with detect_host_info in ./configure.sh
+function detect_host_info() {
+  HOST_PLATFORM=${HOST_PLATFORM_OVERRIDE:-"$(uname -s)"}
+  case "${HOST_PLATFORM}" in
+    Linux|linux)
+      HOST_PLATFORM="linux"
+      ;;
+    *)
+      echo "Unknown, unsupported platform: ${HOST_PLATFORM}." >&2
+      echo "Supported platform(s): linux." >&2
+      echo "Bailing out." >&2
+      exit 2
+  esac
+
+  HOST_ARCH=${HOST_ARCH_OVERRIDE:-"$(uname -m)"}
+  case "${HOST_ARCH}" in
+    x86_64*|i?86_64*|amd64*)
+      HOST_ARCH="amd64"
+      ;;
+    aHOST_arch64*|aarch64*|arm64*)
+      HOST_ARCH="arm64"
+      ;;
+    *)
+      echo "Unknown, unsupported architecture (${HOST_ARCH})." >&2
+      echo "Supported architecture(s): amd64 and arm64." >&2
+      echo "Bailing out." >&2
+      exit 2
+      ;;
+  esac
+}
+
 ########### Main Function ###########
 function main() {
   echo "Start to configure instance for kubernetes"
+  detect_host_info
 
   readonly UUID_MNT_PREFIX="/mnt/disks/by-uuid/google-local-ssds"
   readonly UUID_BLOCK_PREFIX="/dev/disk/by-uuid/google-local-ssds"

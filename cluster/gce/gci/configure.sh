@@ -271,6 +271,7 @@ function install-cni-binaries {
 }
 
 # Install crictl binary.
+# Assumptions: HOST_PLATFORM and HOST_ARCH are specified by calling detect_host_info.
 function install-crictl {
   if [[ -n "${CRICTL_VERSION:-}" ]]; then
     local -r crictl_version="${CRICTL_VERSION}"
@@ -279,7 +280,7 @@ function install-crictl {
     local -r crictl_version="${DEFAULT_CRICTL_VERSION}"
     local -r crictl_hash="${DEFAULT_CRICTL_HASH}"
   fi
-  local -r crictl="crictl-${crictl_version}-linux-amd64.tar.gz"
+  local -r crictl="crictl-${crictl_version}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz"
 
   # Create crictl config file.
   cat > /etc/crictl.yaml <<EOF
@@ -439,10 +440,10 @@ function install-docker {
   release=$(lsb_release -cs)
 
   # Add the Docker apt-repository
-  curl -fsSL "https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg" \
+  curl -fsSL "https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID")/gpg" \
     | apt-key add -
   add-apt-repository \
-    "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
+    "deb [arch=${HOST_ARCH}] https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID") \
     $release stable"
 
   # Install Docker
@@ -456,11 +457,6 @@ function install-containerd-ubuntu {
   # bailout if we are not on ubuntu
   if [[ -z "$(command -v lsb_release)" || $(lsb_release -si) != "Ubuntu" ]]; then
     echo "Unable to automatically install containerd in non-ubuntu image. Bailing out..."
-    exit 2
-  fi
-
-  if [[ $(dpkg --print-architecture) != "amd64" ]]; then
-    echo "Unable to automatically install containerd in non-amd64 image. Bailing out..."
     exit 2
   fi
 
@@ -480,10 +476,10 @@ function install-containerd-ubuntu {
   release=$(lsb_release -cs)
 
   # Add the Docker apt-repository (as we install containerd from there)
-  curl -fsSL "https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg" \
+  curl -fsSL "https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID")/gpg" \
     | apt-key add -
   add-apt-repository \
-    "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
+    "deb [arch=${HOST_ARCH}] https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID") \
     $release stable"
 
   # Install containerd from Docker repo
@@ -494,13 +490,23 @@ function install-containerd-ubuntu {
   # Override to latest versions of containerd and runc
   systemctl stop containerd
   if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" ]]; then
+    # TODO(https://github.com/containerd/containerd/issues/2901): Remove this check once containerd has arm64 release.
+    if [[ $(dpkg --print-architecture) != "amd64" ]]; then
+      echo "Unable to automatically install containerd in non-amd64 image. Bailing out..."
+      exit 2
+    fi
     # containerd versions have slightly different url(s), so try both
-    ( curl -fsSL "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}-linux-amd64.tar.gz" || \
-      curl -fsSL "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}.linux-amd64.tar.gz" ) \
+    ( curl -fsSL "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" || \
+      curl -fsSL "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}.${HOST_PLATFORM}-${HOST_ARCH}.tar.gz" ) \
     | tar --overwrite -xzv -C /usr/
   fi
   if [[ -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
-    curl -fsSL "https://github.com/opencontainers/runc/releases/download/${UBUNTU_INSTALL_RUNC_VERSION}/runc.amd64" --output /usr/sbin/runc && chmod 755 /usr/sbin/runc
+    # TODO: Remove this check once runc has arm64 release.
+    if [[ $(dpkg --print-architecture) != "amd64" ]]; then
+      echo "Unable to automatically install runc in non-amd64. Bailing out..."
+      exit 2
+    fi
+    curl -fsSL "https://github.com/opencontainers/runc/releases/download/${UBUNTU_INSTALL_RUNC_VERSION}/runc.${HOST_ARCH}" --output /usr/sbin/runc && chmod 755 /usr/sbin/runc
   fi
   sudo systemctl start containerd
 }
@@ -623,8 +629,47 @@ function install-kube-binary-config {
   rm -f "${KUBE_HOME}/${server_binary_tar}.sha512"
 }
 
+
+# This function detects the platform/arch of the machine where the script runs,
+# and sets the HOST_PLATFORM and HOST_ARCH environment variables accordingly.
+# Callers can specify HOST_PLATFORM_OVERRIDE and HOST_ARCH_OVERRIDE to skip the detection.
+# This function is adapted from the detect_client_info function in cluster/get-kube-binaries.sh
+# and kube::util::host_os, kube::util::host_arch functions in hack/lib/util.sh
+# This function should be synced with detect_host_info in ./configure-helper.sh
+function detect_host_info() {
+  HOST_PLATFORM=${HOST_PLATFORM_OVERRIDE:-"$(uname -s)"}
+  case "${HOST_PLATFORM}" in
+    Linux|linux)
+      HOST_PLATFORM="linux"
+      ;;
+    *)
+      echo "Unknown, unsupported platform: ${HOST_PLATFORM}." >&2
+      echo "Supported platform(s): linux." >&2
+      echo "Bailing out." >&2
+      exit 2
+  esac
+
+  HOST_ARCH=${HOST_ARCH_OVERRIDE:-"$(uname -m)"}
+  case "${HOST_ARCH}" in
+    x86_64*|i?86_64*|amd64*)
+      HOST_ARCH="amd64"
+      ;;
+    aHOST_arch64*|aarch64*|arm64*)
+      HOST_ARCH="arm64"
+      ;;
+    *)
+      echo "Unknown, unsupported architecture (${HOST_ARCH})." >&2
+      echo "Supported architecture(s): amd64 and arm64." >&2
+      echo "Bailing out." >&2
+      exit 2
+      ;;
+  esac
+}
+
 ######### Main Function ##########
 echo "Start to install kubernetes files"
+detect_host_info
+
 # if install fails, message-of-the-day (motd) will warn at login shell
 set-broken-motd
 
