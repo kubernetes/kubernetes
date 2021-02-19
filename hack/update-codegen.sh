@@ -27,10 +27,10 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 go install k8s.io/kubernetes/pkg/generated/openapi/cmd/models-schema
-go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/client-gen
-go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/lister-gen
-go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/informer-gen
-go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/applyconfiguration-gen
+go install k8s.io/code-generator/cmd/client-gen
+go install k8s.io/code-generator/cmd/lister-gen
+go install k8s.io/code-generator/cmd/informer-gen
+go install k8s.io/code-generator/cmd/applyconfiguration-gen
 
 modelsschema=$(kube::util::find-binary "models-schema")
 clientgen=$(kube::util::find-binary "client-gen")

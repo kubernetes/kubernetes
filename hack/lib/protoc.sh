@@ -27,7 +27,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # $1: Full path to the directory where the api.proto file is
 function kube::protoc::generate_proto() {
   kube::golang::setup_env
-  go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
+  go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 
   kube::protoc::check_protoc
 
