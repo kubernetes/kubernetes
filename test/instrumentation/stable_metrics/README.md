@@ -7,7 +7,7 @@ require review by sig-instrumentation.
 To update the list, run
 
 ```console
-./update-stable-metrics.sh
+./hack/update-generated-stable-metrics.sh
 ```
 
 Add the changed file to your PR, then send for review.

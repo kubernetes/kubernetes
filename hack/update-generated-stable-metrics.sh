@@ -23,7 +23,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-source "${KUBE_ROOT}/test/instrumentation/stability-utils.sh"
+source "${KUBE_ROOT}/test/instrumentation/stable_metrics/stability-utils.sh"
 
 kube::update::stablemetrics
 

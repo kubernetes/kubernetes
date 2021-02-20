@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
@@ -41,6 +41,7 @@ find_files_to_check() {
         -o -wholename './_gopath' \
         -o -wholename './release' \
         -o -wholename './target' \
+        -o -wholename './.git' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/vendor/*' \
         -o -wholename '*/hack/*' \
@@ -58,11 +59,11 @@ reset=$(tput sgr0)
 kube::validate::stablemetrics() {
   stability_check_setup
   temp_file=$(mktemp)
-  doValidate=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go" | sort | xargs -L 200 go run "test/instrumentation/main.go" "test/instrumentation/decode_metric.go" "test/instrumentation/find_stable_metric.go" "test/instrumentation/error.go" "test/instrumentation/metric.go" -- 1>"${temp_file}")
+  doValidate=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go" | sort | xargs -L 200 go run "test/instrumentation/stable_metrics/main.go" "test/instrumentation/stable_metrics/decode_metric.go" "test/instrumentation/stable_metrics/find_stable_metric.go" "test/instrumentation/stable_metrics/error.go" "test/instrumentation/stable_metrics/metric.go" -- 1>"${temp_file}")
 
   if $doValidate; then
-    echo -e "${green}Diffing test/instrumentation/testdata/stable-metrics-list.yaml\n${reset}"
-    if diff -u "$KUBE_ROOT/test/instrumentation/testdata/stable-metrics-list.yaml" "$temp_file"; then
+    echo -e "${green}Diffing test/instrumentation/stable_metrics/testdata/stable-metrics-list.yaml\n${reset}"
+    if diff -u "$KUBE_ROOT/test/instrumentation/stable_metrics/testdata/stable-metrics-list.yaml" "$temp_file"; then
       echo -e "${green}\nPASS metrics stability verification ${reset}"
       return 0
     fi
@@ -76,13 +77,13 @@ kube::validate::stablemetrics() {
 kube::update::stablemetrics() {
   stability_check_setup
   temp_file=$(mktemp)
-  doCheckStability=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go" | sort | xargs -L 200 go run "test/instrumentation/main.go" "test/instrumentation/decode_metric.go" "test/instrumentation/find_stable_metric.go" "test/instrumentation/error.go" "test/instrumentation/metric.go" -- 1>"${temp_file}")
+  doCheckStability=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go" | sort | xargs -L 200 go run "test/instrumentation/stable_metrics/main.go" "test/instrumentation/stable_metrics/decode_metric.go" "test/instrumentation/stable_metrics/find_stable_metric.go" "test/instrumentation/stable_metrics/error.go" "test/instrumentation/stable_metrics/metric.go" -- 1>"${temp_file}")
 
   if ! $doCheckStability; then
     echo "${red}!!! updating golden list of metrics has failed! ${reset}" >&2
     exit 1
   fi
-  mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/testdata/stable-metrics-list.yaml"
+  mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/stable_metrics/testdata/stable-metrics-list.yaml"
   echo "${green}Updated golden list of stable metrics.${reset}"
 }
 
