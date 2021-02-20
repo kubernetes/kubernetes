@@ -359,6 +359,76 @@ func TestPriorityQueue_Delete(t *testing.T) {
 	}
 }
 
+func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
+	tests := []struct {
+		name string
+		// Init pods in activeQ and unschedulableQ respectively.
+		podsInActiveQ, podsInUnschedulableQ int
+	}{
+		{
+			name:                 "1k-pods",
+			podsInActiveQ:        200,
+			podsInUnschedulableQ: 800,
+		},
+		{
+			name:                 "5k-pods",
+			podsInActiveQ:        1000,
+			podsInUnschedulableQ: 4000,
+		},
+	}
+
+	podTemplates := []v1.Pod{highPriorityPod, highPriNominatedPod, medPriorityPod, unschedulablePod}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			c := clock.NewFakeClock(time.Now())
+			q := NewPriorityQueue(newDefaultQueueSort(), WithClock(c))
+
+			// Init pods in activeQ.
+			for i := 0; i < tt.podsInActiveQ; i++ {
+				p := podTemplates[i%len(podTemplates)].DeepCopy()
+				p.Name, p.UID = fmt.Sprintf("%v-%v", p.Name, i), types.UID(fmt.Sprintf("%v-%v", p.UID, i))
+				q.Add(p)
+			}
+			// Init pods in unschedulableQ.
+			for i := 0; i < tt.podsInUnschedulableQ; i++ {
+				p := podTemplates[i%len(podTemplates)].DeepCopy()
+				p.Name, p.UID = fmt.Sprintf("%v-%v", p.Name, i+tt.podsInActiveQ), types.UID(fmt.Sprintf("%v-%v", p.UID, i+tt.podsInActiveQ))
+				podInfo := q.newQueuedPodInfo(p)
+				podInfo.Attempts = 1
+				q.AddUnschedulableIfNotPresent(podInfo, q.SchedulingCycle())
+			}
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				// Iterate 10 times, each time we step 2 seconds forward, and run flushBackoffQCompleted()
+				// every 5 iterations (10 seconds).
+				for j := 1; j <= 10; j++ {
+					// Moves clock by 2 seconds.
+					c.Step(time.Second * 2)
+					q.MoveAllToActiveOrBackoffQueue("test")
+
+					// Pop half of the pods in activeQ and re-add them.
+					// This simulates how Pods gets moved between queues when failing the scheduling.
+					l := q.activeQ.Len()
+					for k := 0; k < l/2; k++ {
+						podInfo, err := q.Pop()
+						if err != nil {
+							b.Fatalf("Cannot pod pods from activeQ: %v", err)
+						}
+						q.AddUnschedulableIfNotPresent(podInfo, q.SchedulingCycle())
+					}
+
+					// Trigger flushBackoffQCompleted() every 10 seconds.
+					if j%5 == 0 {
+						q.flushBackoffQCompleted()
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	c := clock.NewFakeClock(time.Now())
 	q := NewPriorityQueue(newDefaultQueueSort(), WithClock(c))
