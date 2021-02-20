@@ -360,6 +360,100 @@ func TestPriorityQueue_Delete(t *testing.T) {
 	}
 }
 
+func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
+	tests := []struct {
+		name      string
+		moveEvent string
+	}{
+		{
+			name:      "baseline",
+			moveEvent: UnschedulableTimeout,
+		},
+		{
+			name:      "worst",
+			moveEvent: NodeAdd,
+		},
+		{
+			name: "random",
+			// leave "moveEvent" unspecified
+		},
+	}
+
+	podTemplates := []*v1.Pod{
+		highPriorityPodInfo.Pod, highPriNominatedPodInfo.Pod,
+		medPriorityPodInfo.Pod, unschedulablePodInfo.Pod,
+	}
+	events := []string{NodeAdd, NodeTaintChange, NodeAllocatableChange, NodeConditionChange, NodeLabelChange, PodAdd,
+		PvcAdd, PvcUpdate, PvAdd, PvUpdate, StorageClassAdd, CSINodeAdd, CSINodeUpdate}
+	pluginNum := 20
+	var plugins []string
+	// Mimic that we have 20 plugins loaded in runtime.
+	for i := 0; i < pluginNum; i++ {
+		plugins = append(plugins, fmt.Sprintf("fake-plugin-%v", i))
+	}
+
+	for _, tt := range tests {
+		for _, podsInUnschedulableQ := range []int{1000, 5000} {
+			b.Run(fmt.Sprintf("%v-%v", tt.name, podsInUnschedulableQ), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					b.StopTimer()
+					c := clock.NewFakeClock(time.Now())
+
+					m := make(map[framework.ClusterEvent]sets.String)
+					// - All plugins registered for events[0], which is NodeAdd.
+					// - 1/2 of plugins registered for events[1]
+					// - 1/3 of plugins registered for events[2]
+					// - ...
+					for j := 0; j < len(events); j++ {
+						m[clusterEventReg[events[j]]] = sets.NewString()
+						for k := 0; k < len(plugins); k++ {
+							if (k+1)%(j+1) == 0 {
+								m[clusterEventReg[events[j]]].Insert(plugins[k])
+							}
+						}
+					}
+
+					q := NewPriorityQueue(newDefaultQueueSort(), WithClock(c), WithClusterEventMap(m))
+
+					// Init pods in unschedulableQ.
+					for j := 0; j < podsInUnschedulableQ; j++ {
+						p := podTemplates[j%len(podTemplates)].DeepCopy()
+						p.Name, p.UID = fmt.Sprintf("%v-%v", p.Name, j), types.UID(fmt.Sprintf("%v-%v", p.UID, j))
+						var podInfo *framework.QueuedPodInfo
+						// The ultimate goal of composing each PodInfo is to cover the path that intersects
+						// (unschedulable) plugin names with the plugins that register the moveEvent,
+						// here the rational is:
+						// - in baseline case, don't inject unschedulable plugin names, so podMatchesEvent()
+						//   never gets executed.
+						// - in worst case, make both ends (of the intersection) a big number,i.e.,
+						//   M intersected with N instead of M with 1 (or 1 with N)
+						// - in random case, each pod failed by a random plugin, and also the moveEvent
+						//   is randomized.
+						if tt.name == "baseline" {
+							podInfo = q.newQueuedPodInfo(p)
+						} else if tt.name == "worst" {
+							// Each pod failed by all plugins.
+							podInfo = q.newQueuedPodInfo(p, plugins...)
+						} else {
+							// Random case.
+							podInfo = q.newQueuedPodInfo(p, plugins[j%len(plugins)])
+						}
+						q.AddUnschedulableIfNotPresent(podInfo, q.SchedulingCycle())
+					}
+
+					b.StartTimer()
+					if tt.moveEvent != "" {
+						q.MoveAllToActiveOrBackoffQueue(tt.moveEvent)
+					} else {
+						// Random case.
+						q.MoveAllToActiveOrBackoffQueue(events[i%len(events)])
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	c := clock.NewFakeClock(time.Now())
 	m := map[framework.ClusterEvent]sets.String{
