@@ -456,9 +456,11 @@ func TestPackSubsets(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result := RepackSubsets(tc.given)
-		if !reflect.DeepEqual(result, SortSubsets(tc.expect)) {
-			t.Errorf("case %q: expected %s, got %s", tc.name, spew.Sprintf("%#v", SortSubsets(tc.expect)), spew.Sprintf("%#v", result))
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			result := RepackSubsets(tc.given)
+			if !reflect.DeepEqual(result, SortSubsets(tc.expect)) {
+				t.Errorf("expected %s, got %s", spew.Sprintf("%#v", SortSubsets(tc.expect)), spew.Sprintf("%#v", result))
+			}
+		})
 	}
 }

@@ -188,36 +188,38 @@ func TestFindPort(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		port, err := FindPort(&v1.Pod{Spec: v1.PodSpec{Containers: tc.containers}},
-			&v1.ServicePort{Protocol: "TCP", TargetPort: tc.port})
-		if err != nil && tc.pass {
-			t.Errorf("unexpected error for %s: %v", tc.name, err)
-		}
-		if err == nil && !tc.pass {
-			t.Errorf("unexpected non-error for %s: %d", tc.name, port)
-		}
-		if port != tc.expected {
-			t.Errorf("wrong result for %s: expected %d, got %d", tc.name, tc.expected, port)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			port, err := FindPort(&v1.Pod{Spec: v1.PodSpec{Containers: tc.containers}},
+				&v1.ServicePort{Protocol: "TCP", TargetPort: tc.port})
+			if err != nil && tc.pass {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if err == nil && !tc.pass {
+				t.Errorf("unexpected non-error: %d", port)
+			}
+			if port != tc.expected {
+				t.Errorf("expected %d, got %d", tc.expected, port)
+			}
+		})
 	}
 }
 
 func TestVisitContainers(t *testing.T) {
 	testCases := []struct {
-		desc                       string
+		name                       string
 		spec                       *v1.PodSpec
 		wantContainers             []string
 		mask                       ContainerType
 		ephemeralContainersEnabled bool
 	}{
 		{
-			desc:           "empty podspec",
+			name:           "empty podspec",
 			spec:           &v1.PodSpec{},
 			wantContainers: []string{},
 			mask:           AllContainers,
 		},
 		{
-			desc: "regular containers",
+			name: "regular containers",
 			spec: &v1.PodSpec{
 				Containers: []v1.Container{
 					{Name: "c1"},
@@ -236,7 +238,7 @@ func TestVisitContainers(t *testing.T) {
 			mask:           Containers,
 		},
 		{
-			desc: "init containers",
+			name: "init containers",
 			spec: &v1.PodSpec{
 				Containers: []v1.Container{
 					{Name: "c1"},
@@ -255,7 +257,7 @@ func TestVisitContainers(t *testing.T) {
 			mask:           InitContainers,
 		},
 		{
-			desc: "ephemeral containers",
+			name: "ephemeral containers",
 			spec: &v1.PodSpec{
 				Containers: []v1.Container{
 					{Name: "c1"},
@@ -274,7 +276,7 @@ func TestVisitContainers(t *testing.T) {
 			mask:           EphemeralContainers,
 		},
 		{
-			desc: "all container types",
+			name: "all container types",
 			spec: &v1.PodSpec{
 				Containers: []v1.Container{
 					{Name: "c1"},
@@ -293,7 +295,7 @@ func TestVisitContainers(t *testing.T) {
 			mask:           AllContainers,
 		},
 		{
-			desc: "all feature enabled container types with ephemeral containers disabled",
+			name: "all feature enabled container types with ephemeral containers disabled",
 			spec: &v1.PodSpec{
 				Containers: []v1.Container{
 					{Name: "c1"},
@@ -312,7 +314,7 @@ func TestVisitContainers(t *testing.T) {
 			mask:           AllFeatureEnabledContainers(),
 		},
 		{
-			desc: "all feature enabled container types with ephemeral containers enabled",
+			name: "all feature enabled container types with ephemeral containers enabled",
 			spec: &v1.PodSpec{
 				Containers: []v1.Container{
 					{Name: "c1"},
@@ -332,7 +334,7 @@ func TestVisitContainers(t *testing.T) {
 			ephemeralContainersEnabled: true,
 		},
 		{
-			desc: "dropping fields",
+			name: "dropping fields",
 			spec: &v1.PodSpec{
 				Containers: []v1.Container{
 					{Name: "c1"},
@@ -353,7 +355,7 @@ func TestVisitContainers(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.desc, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			if tc.ephemeralContainersEnabled {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, tc.ephemeralContainersEnabled)()
 				tc.mask = AllFeatureEnabledContainers()
@@ -756,12 +758,14 @@ func TestGetContainerStatus(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		resultStatus, exists := GetContainerStatus(test.status, test.name)
-		assert.Equal(t, test.expected.status, resultStatus, "GetContainerStatus: "+test.desc)
-		assert.Equal(t, test.expected.exists, exists, "GetContainerStatus: "+test.desc)
+		t.Run(test.desc, func(t *testing.T) {
+			resultStatus, exists := GetContainerStatus(test.status, test.name)
+			assert.Equal(t, test.expected.status, resultStatus)
+			assert.Equal(t, test.expected.exists, exists)
 
-		resultStatus = GetExistingContainerStatus(test.status, test.name)
-		assert.Equal(t, test.expected.status, resultStatus, "GetExistingContainerStatus: "+test.desc)
+			resultStatus = GetExistingContainerStatus(test.status, test.name)
+			assert.Equal(t, test.expected.status, resultStatus)
+		})
 	}
 }
 
@@ -825,8 +829,9 @@ func TestUpdatePodCondition(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		resultStatus := UpdatePodCondition(test.status, &test.conditions)
-
-		assert.Equal(t, test.expected, resultStatus, test.desc)
+		t.Run(test.desc, func(t *testing.T) {
+			resultStatus := UpdatePodCondition(test.status, &test.conditions)
+			assert.Equal(t, test.expected, resultStatus)
+		})
 	}
 }
