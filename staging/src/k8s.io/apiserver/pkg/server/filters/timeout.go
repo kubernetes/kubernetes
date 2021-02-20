@@ -105,6 +105,7 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			resultCh <- err
 		}()
 		t.handler.ServeHTTP(tw, r)
+		tw.done()
 	}()
 	select {
 	case err := <-resultCh:
@@ -139,6 +140,7 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type timeoutWriter interface {
 	http.ResponseWriter
 	timeout(*apierrors.StatusError)
+	done()
 }
 
 func newTimeoutWriter(w http.ResponseWriter) timeoutWriter {
@@ -169,6 +171,14 @@ type baseTimeoutWriter struct {
 	wroteHeader bool
 	// if this timeout writer has been hijacked
 	hijacked bool
+	// if inner handler has been served
+	served bool
+}
+
+func (tw *baseTimeoutWriter) done() {
+	tw.mu.Lock()
+	tw.served = true
+	tw.mu.Unlock()
 }
 
 func (tw *baseTimeoutWriter) Header() http.Header {
@@ -233,25 +243,31 @@ func (tw *baseTimeoutWriter) timeout(err *apierrors.StatusError) {
 	// handler
 	if !tw.wroteHeader && !tw.hijacked {
 		tw.w.WriteHeader(http.StatusGatewayTimeout)
-		enc := json.NewEncoder(tw.w)
-		enc.Encode(&err.ErrStatus)
-	} else {
-		// The timeout writer has been used by the inner handler. There is
-		// no way to timeout the HTTP request at the point. We have to shutdown
-		// the connection for HTTP1 or reset stream for HTTP2.
-		//
-		// Note from the golang's docs:
-		// If ServeHTTP panics, the server (the caller of ServeHTTP) assumes
-		// that the effect of the panic was isolated to the active request.
-		// It recovers the panic, logs a stack trace to the server error log,
-		// and either closes the network connection or sends an HTTP/2
-		// RST_STREAM, depending on the HTTP protocol. To abort a handler so
-		// the client sees an interrupted response but the server doesn't log
-		// an error, panic with the value ErrAbortHandler.
-		//
-		// We are throwing http.ErrAbortHandler deliberately so that a client is notified and to suppress a not helpful stacktrace in the logs
-		panic(http.ErrAbortHandler)
+		if err := json.NewEncoder(tw.w).Encode(&err.ErrStatus); err != nil {
+			utilruntime.HandleError(err)
+		}
+		return
 	}
+	// Due to the uncertainty of the lock, the serve that the inner handler
+	// has completed by the time the execution reaches this point can be exited normally.
+	if tw.served {
+		return
+	}
+	// The timeout writer has been used by the inner handler. There is
+	// no way to timeout the HTTP request at the point. We have to shutdown
+	// the connection for HTTP1 or reset stream for HTTP2.
+	//
+	// Note from the golang's docs:
+	// If ServeHTTP panics, the server (the caller of ServeHTTP) assumes
+	// that the effect of the panic was isolated to the active request.
+	// It recovers the panic, logs a stack trace to the server error log,
+	// and either closes the network connection or sends an HTTP/2
+	// RST_STREAM, depending on the HTTP protocol. To abort a handler so
+	// the client sees an interrupted response but the server doesn't log
+	// an error, panic with the value ErrAbortHandler.
+	//
+	// We are throwing http.ErrAbortHandler deliberately so that a client is notified and to suppress a not helpful stacktrace in the logs
+	panic(http.ErrAbortHandler)
 }
 
 func (tw *baseTimeoutWriter) closeNotify() <-chan bool {
