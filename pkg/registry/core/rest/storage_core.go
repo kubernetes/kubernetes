@@ -35,7 +35,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
+	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -110,13 +110,9 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		NegotiatedSerializer:         legacyscheme.Codecs,
 	}
 
-	var podDisruptionClient policyclient.PodDisruptionBudgetsGetter
-	if policyGroupVersion := (schema.GroupVersion{Group: "policy", Version: "v1beta1"}); legacyscheme.Scheme.IsVersionRegistered(policyGroupVersion) {
-		var err error
-		podDisruptionClient, err = policyclient.NewForConfig(c.LoopbackClientConfig)
-		if err != nil {
-			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-		}
+	podDisruptionClient, err := policyclient.NewForConfig(c.LoopbackClientConfig)
+	if err != nil {
+		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 	restStorage := LegacyRESTStorage{}
 

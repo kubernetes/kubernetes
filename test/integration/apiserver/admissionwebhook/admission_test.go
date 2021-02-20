@@ -119,9 +119,9 @@ var (
 		gvr("", "v1", "pods/exec"):        {"create": testPodConnectSubresource},
 		gvr("", "v1", "pods/portforward"): {"create": testPodConnectSubresource},
 
-		gvr("", "v1", "bindings"):      {"create": testPodBindingEviction},
-		gvr("", "v1", "pods/binding"):  {"create": testPodBindingEviction},
-		gvr("", "v1", "pods/eviction"): {"create": testPodBindingEviction},
+		gvr("", "v1", "bindings"):             {"create": testPodBindingEviction},
+		gvr("", "v1", "pods/binding"):         {"create": testPodBindingEviction},
+		gvr("", "v1", "pods/eviction"):        {"create": testPodBindingEviction},
 
 		gvr("", "v1", "nodes/proxy"):    {"*": testSubresourceProxy},
 		gvr("", "v1", "pods/proxy"):     {"*": testSubresourceProxy},

@@ -29,7 +29,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
+	policy "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	policylisters "k8s.io/client-go/listers/policy/v1beta1"
+	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -799,7 +799,7 @@ func filterPodsWithPDBViolation(podInfos []*framework.PodInfo, pdbs []*policy.Po
 
 func getPDBLister(informerFactory informers.SharedInformerFactory) policylisters.PodDisruptionBudgetLister {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
-		return informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister()
+		return informerFactory.Policy().V1().PodDisruptionBudgets().Lister()
 	}
 	return nil
 }

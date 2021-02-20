@@ -805,7 +805,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WindowsEndpointSliceProxying:                   {Default: true, PreRelease: featuregate.Beta},
 	StartupProbe:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
-	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
+	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	CronJobControllerV2:                            {Default: true, PreRelease: featuregate.Beta},
 	DaemonSetUpdateSurge:                           {Default: false, PreRelease: featuregate.Alpha},
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},

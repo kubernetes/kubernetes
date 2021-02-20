@@ -33,8 +33,12 @@ type PodDisruptionBudgetSpec struct {
 
 	// Label query over pods whose evictions are managed by the disruption
 	// budget.
+	// A null selector selects no pods.
+	// An empty selector ({}) also selects no pods, which differs from standard behavior of selecting all pods.
+	// In policy/v1, an empty selector will select all pods in the namespace.
+	// +patchStrategy=replace
 	// +optional
-	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty" patchStrategy:"replace" protobuf:"bytes,2,opt,name=selector"`
 
 	// An eviction is allowed if at most "maxUnavailable" pods selected by
 	// "selector" are unavailable after the eviction, i.e. even in absence of
@@ -118,7 +122,9 @@ const (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.5
-// +k8s:prerelease-lifecycle-gen:deprecated=1.22
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:removed=1.25
+// +k8s:prerelease-lifecycle-gen:replacement=policy,v1,PodDisruptionBudget
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudget struct {
@@ -136,7 +142,9 @@ type PodDisruptionBudget struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.5
-// +k8s:prerelease-lifecycle-gen:deprecated=1.22
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:removed=1.25
+// +k8s:prerelease-lifecycle-gen:replacement=policy,v1,PodDisruptionBudgetList
 
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 type PodDisruptionBudgetList struct {

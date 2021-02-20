@@ -265,6 +265,14 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/policy/v1
+		gvr("policy", "v1", "poddisruptionbudgets"): {
+			Stub:             `{"metadata": {"name": "pdbv1"}, "spec": {"selector": {"matchLabels": {"anokkey": "anokvalue"}}}}`,
+			ExpectedEtcdPath: "/registry/poddisruptionbudgets/" + namespace + "/pdbv1",
+			ExpectedGVK:      gvkP("policy", "v1beta1", "PodDisruptionBudget"),
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/policy/v1beta1
 		gvr("policy", "v1beta1", "poddisruptionbudgets"): {
 			Stub:             `{"metadata": {"name": "pdb1"}, "spec": {"selector": {"matchLabels": {"anokkey": "anokvalue"}}}}`,

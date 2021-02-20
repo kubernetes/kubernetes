@@ -20,6 +20,7 @@ import (
 	"math/rand"
 	"testing"
 
+	policyv1 "k8s.io/api/policy/v1"
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	admissionregv1 "k8s.io/api/admissionregistration/v1"
@@ -110,6 +111,7 @@ var groups = []runtime.SchemeBuilder{
 	nodev1.SchemeBuilder,
 	nodev1alpha1.SchemeBuilder,
 	nodev1beta1.SchemeBuilder,
+	policyv1.SchemeBuilder,
 	policyv1beta1.SchemeBuilder,
 	rbacv1alpha1.SchemeBuilder,
 	rbacv1beta1.SchemeBuilder,

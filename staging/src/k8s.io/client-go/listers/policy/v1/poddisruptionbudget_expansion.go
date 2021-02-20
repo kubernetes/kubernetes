@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+
+package v1
 
 import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
+	policy "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
@@ -36,7 +37,7 @@ type PodDisruptionBudgetListerExpansion interface {
 // PodDisruptionBudgetNamespaceLister.
 type PodDisruptionBudgetNamespaceListerExpansion interface{}
 
-// GetPodPodDisruptionBudgets returns a list of PodDisruptionBudgets matching a pod.  Returns an error only if no matching PodDisruptionBudgets are found.
+// GetPodPodDisruptionBudgets returns a list of PodDisruptionBudgets matching a pod.
 func (s *podDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *v1.Pod) ([]*policy.PodDisruptionBudget, error) {
 	var selector labels.Selector
 
@@ -51,12 +52,11 @@ func (s *podDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *v1.Pod) ([]*
 		selector, err = metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
 		if err != nil {
 			klog.Warningf("invalid selector: %v", err)
-			// TODO(mml): add an event to the PDB
 			continue
 		}
 
-		// If a PDB with a nil or empty selector creeps in, it should match nothing, not everything.
-		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+		// Unlike the v1beta version, here we let an empty selector match everything.
+		if !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
 		pdbList = append(pdbList, pdb)
