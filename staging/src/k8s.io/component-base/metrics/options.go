@@ -28,6 +28,7 @@ import (
 // Options has all parameters needed for exposing metrics from components
 type Options struct {
 	ShowHiddenMetricsForVersion string
+	DisabledMetrics             []string
 }
 
 // NewOptions returns default metrics options
@@ -56,12 +57,25 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 			"The format is <major>.<minor>, e.g.: '1.16'. "+
 			"The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, "+
 			"rather than being surprised when they are permanently removed in the release after that.")
+	fs.StringSliceVar(&o.DisabledMetrics,
+		"disabled-metrics",
+		o.DisabledMetrics,
+		"This flag provides an escape hatch for misbehaving metrics. "+
+			"You must provide the fully qualified metric name in order to disable it. "+
+			"Disclaimer: disabling metrics is higher in precedence than showing hidden metrics.")
 }
 
 // Apply applies parameters into global configuration of metrics.
 func (o *Options) Apply() {
-	if o != nil && len(o.ShowHiddenMetricsForVersion) > 0 {
+	if o == nil {
+		return
+	}
+	if len(o.ShowHiddenMetricsForVersion) > 0 {
 		SetShowHidden()
+	}
+	// set disabled metrics
+	for _, metricName := range o.DisabledMetrics {
+		SetDisabledMetric(metricName)
 	}
 }
 

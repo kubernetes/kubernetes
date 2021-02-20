@@ -515,3 +515,41 @@ func TestRegistryReset(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDisabledMetrics(t *testing.T) {
+	o := NewOptions()
+	o.DisabledMetrics = []string{"should_be_disabled"}
+	o.Apply()
+	currentVersion := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "17",
+		GitVersion: "v1.17.1-alpha-1.12345",
+	}
+	registry := newKubeRegistry(currentVersion)
+	disabledMetric := NewCounterVec(&CounterOpts{
+		Name: "should_be_disabled",
+		Help: "this metric should be disabled",
+	}, []string{"label"})
+	// gauges cannot be reset
+	enabledMetric := NewGauge(&GaugeOpts{
+		Name: "should_be_enabled",
+		Help: "this metric should not be disabled",
+	})
+
+	registry.MustRegister(disabledMetric)
+	registry.MustRegister(enabledMetric)
+	disabledMetric.WithLabelValues("one").Inc()
+	disabledMetric.WithLabelValues("two").Inc()
+	disabledMetric.WithLabelValues("two").Inc()
+	enabledMetric.Inc()
+
+	enabledMetricOutput := `
+        # HELP should_be_enabled [ALPHA] this metric should not be disabled
+        # TYPE should_be_enabled gauge
+        should_be_enabled 1
+`
+
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(enabledMetricOutput), "should_be_disabled", "should_be_enabled"); err != nil {
+		t.Fatal(err)
+	}
+}
