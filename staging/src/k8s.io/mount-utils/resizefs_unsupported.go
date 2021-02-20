@@ -20,16 +20,18 @@ package mount
 
 import (
 	"fmt"
+
+	utilexec "k8s.io/utils/exec"
 )
 
 // ResizeFs Provides support for resizing file systems
 type ResizeFs struct {
-	mounter *SafeFormatAndMount
+	exec utilexec.Interface
 }
 
 // NewResizeFs returns new instance of resizer
-func NewResizeFs(mounter *SafeFormatAndMount) *ResizeFs {
-	return &ResizeFs{mounter: mounter}
+func NewResizeFs(exec utilexec.Interface) *ResizeFs {
+	return &ResizeFs{exec: exec}
 }
 
 // Resize perform resize of file system

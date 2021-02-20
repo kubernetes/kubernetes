@@ -264,11 +264,6 @@ func MergeResizeConditionOnPVC(
 
 // GenericResizeFS : call generic filesystem resizer for plugins that don't have any special filesystem resize requirements
 func GenericResizeFS(host volume.VolumeHost, pluginName, devicePath, deviceMountPath string) (bool, error) {
-	mounter := host.GetMounter(pluginName)
-	diskFormatter := &mount.SafeFormatAndMount{
-		Interface: mounter,
-		Exec:      host.GetExec(pluginName),
-	}
-	resizer := mount.NewResizeFs(diskFormatter)
+	resizer := mount.NewResizeFs(host.GetExec(pluginName))
 	return resizer.Resize(devicePath, deviceMountPath)
 }
