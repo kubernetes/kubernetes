@@ -64,6 +64,8 @@ func (f *lastAppliedManager) Apply(liveObj, newObj runtime.Object, managed Manag
 	if manager != "kubectl" {
 		return newLiveObj, newManaged, newErr
 	}
+	removeLastAppliedManagers(newManaged)
+	removeLastAppliedManagers(managed)
 
 	// Check if we have conflicts
 	if newErr == nil {
@@ -73,7 +75,7 @@ func (f *lastAppliedManager) Apply(liveObj, newObj runtime.Object, managed Manag
 	if !ok {
 		return newLiveObj, newManaged, newErr
 	}
-	conflictSet := conflictsToSet(conflicts)
+	conflictSet := conflicts.ToSet()
 
 	// Check if conflicts are allowed due to client-side apply,
 	// and if so, then force apply
@@ -152,15 +154,6 @@ func (f *lastAppliedManager) allowedConflictsFromLastApplied(liveObj runtime.Obj
 	return lastAppliedObjFieldSet, nil
 }
 
-// TODO: replace with merge.Conflicts.ToSet()
-func conflictsToSet(conflicts merge.Conflicts) *fieldpath.Set {
-	conflictSet := fieldpath.NewSet()
-	for _, conflict := range []merge.Conflict(conflicts) {
-		conflictSet.Insert(conflict.Path)
-	}
-	return conflictSet
-}
-
 func conflictsDifference(conflicts merge.Conflicts, s *fieldpath.Set) merge.Conflicts {
 	newConflicts := []merge.Conflict{}
 	for _, conflict := range []merge.Conflict(conflicts) {
@@ -169,4 +162,15 @@ func conflictsDifference(conflicts merge.Conflicts, s *fieldpath.Set) merge.Conf
 		}
 	}
 	return newConflicts
+}
+
+func removeLastAppliedManagers(managed Managed) {
+	if managed == nil {
+		return
+	}
+	for manager, fields := range managed.Fields() {
+		if manager != "kubectl" && fields.Set().Has(fieldpath.MakePathOrDie("metadata", "annotations", corev1.LastAppliedConfigAnnotation)) {
+			delete(managed.Fields(), manager)
+		}
+	}
 }

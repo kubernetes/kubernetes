@@ -867,6 +867,49 @@ metadata:
 				}
 			}
 		})
+
+		ginkgo.It("should upgrade to server-side apply and remove owned fields", func() {
+			ginkgo.By("create ConfigMap with client-side apply")
+			configMap := `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+data:
+  key: value
+  legacy: unused
+`
+			framework.RunKubectlOrDieInput(ns, configMap, "apply", "-f", "-")
+
+			ginkgo.By("apply ConfigMap with server-side apply")
+			framework.RunKubectlOrDieInput(ns, configMap, "apply", "--server-side", "-f", "-")
+			output := framework.RunKubectlOrDie(ns, "get", "configmap", "test", "-o", "yaml")
+			if !strings.Contains(output, "key: value") {
+				framework.Failf("Expected 'key: value' to be in ConfigMap, but got output:\n%s\n", output)
+			}
+			if !strings.Contains(output, "legacy: unused") {
+				framework.Failf("Expected 'legacy: unused' to be in ConfigMap, but got output:\n%s\n", output)
+			}
+
+			ginkgo.By("apply ConfigMap with server-side apply with removed field")
+			configMap = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+data:
+  key: value
+`
+			framework.RunKubectlOrDieInput(ns, configMap, "apply", "--server-side", "-f", "-")
+
+			output = framework.RunKubectlOrDie(ns, "get", "configmap", "test", "-o", "yaml")
+			if strings.Contains(output, "legacy: unused") {
+				framework.Failf("Expected 'legacy: unused' to be removed from ConfigMap, but got output:\n%s\n", output)
+			}
+			if !strings.Contains(output, "key: value") {
+				framework.Failf("Expected 'key: value' to be in ConfigMap, but got output:\n%s\n", output)
+			}
+		})
 	})
 
 	ginkgo.Describe("Kubectl diff", func() {

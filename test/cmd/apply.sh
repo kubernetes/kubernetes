@@ -469,6 +469,38 @@ __EOF__
   # clean-up
   kubectl "${kube_flags[@]:?}" delete customresourcedefinition resources.mygroup.example.com
 
+  kubectl "${kube_flags[@]:?}" apply -f - << __EOF__
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+data:
+  key: value
+  legacy: unused
+__EOF__
+  grep -q "legacy: unused" <<< "$(kubectl get configmap test -o yaml "${kube_flags[@]:?}")" || exit 1
+  kubectl "${kube_flags[@]:?}" apply --server-side -f - << __EOF__
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+data:
+  key: value
+  legacy: unused
+__EOF__
+  grep -q "legacy: unused" <<< "$(kubectl get configmap test -o yaml "${kube_flags[@]:?}")" || exit 1
+  kubectl "${kube_flags[@]:?}" apply --server-side -f - << __EOF__
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+data:
+  key: value
+__EOF__
+  ! grep -q "legacy: unused" <<< "$(kubectl get configmap test -o yaml "${kube_flags[@]:?}")" || exit 1
+  # Clean up ConfigMap.
+  kubectl "${kube_flags[@]:?}" delete configmap test
+
   set +o nounset
   set +o errexit
 }

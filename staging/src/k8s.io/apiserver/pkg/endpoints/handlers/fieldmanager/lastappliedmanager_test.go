@@ -281,6 +281,50 @@ spec:
 `),
 		},
 		{
+			fieldManager: "kubectl",
+			original: []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-c
+        image: my-image
+`),
+			applied: []byte(`
+# test allowed deletion with no conflicts
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels: {} # removed app label
+spec:
+  # removed replicas
+  selector:
+    matchLabels: {} # removed app label
+  template:
+    metadata:
+      labels: {} # removed app label
+    spec:
+      containers:
+      - name: my-c
+        image: my-image
+`),
+		},
+		{
 			fieldManager: "not_kubectl",
 			lastApplied: []byte(`
 # expect conflicts because field manager is NOT kubectl
@@ -946,6 +990,14 @@ func testConflicts(t *testing.T, f TestFieldManager, tests []testArgs) {
 				if err != nil {
 					t.Errorf("expected no error but got %v", err)
 				}
+
+				if m := f.ManagedFields(); true {
+					for _, entry := range m {
+						if entry.Manager == "test_client_side_apply" {
+							t.Errorf("expect exclusive ownership of managed fields, but got last-applied manager: %v", entry.String())
+						}
+					}
+				}
 			} else {
 				if err == nil || !apierrors.IsConflict(err) {
 					t.Errorf("expected to get conflicts but got %v", err)
@@ -968,7 +1020,6 @@ func testConflicts(t *testing.T, f TestFieldManager, tests []testArgs) {
 				if err != nil {
 					t.Errorf("unexpected error during force ownership apply: %v", err)
 				}
-
 			}
 
 			// Eventually resource should contain applied changes
