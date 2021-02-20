@@ -35,7 +35,6 @@ import (
 
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	fs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	"k8s.io/klog/v2"
 )
 
@@ -72,26 +71,13 @@ func NewHandler(cgroupManager cgroups.Manager, rootFs string, pid int, includedM
 // Get cgroup and networking stats of the specified container
 func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	var cgroupStats *cgroups.Stats
-	readCgroupStats := true
-	if cgroups.IsCgroup2UnifiedMode() {
-		// On cgroup v2 there are no stats at the root cgroup
-		// so check whether it is the root cgroup
-		if h.cgroupManager.Path("") == fs2.UnifiedMountpoint {
-			readCgroupStats = false
-		}
-	}
-	var err error
-	if readCgroupStats {
-		cgroupStats, err = h.cgroupManager.GetStats()
-		if err != nil {
-			return nil, err
-		}
-	}
+	cgroupStats, _ = h.cgroupManager.GetStats()
 	libcontainerStats := &libcontainer.Stats{
 		CgroupStats: cgroupStats,
 	}
 	stats := newContainerStats(libcontainerStats, h.includedMetrics)
 
+	var err error
 	if h.includedMetrics.Has(container.ProcessSchedulerMetrics) {
 		pids, err := h.cgroupManager.GetAllPids()
 		if err != nil {
@@ -834,7 +820,12 @@ func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Memory.MaxUsage = s.MemoryStats.Usage.MaxUsage
 	ret.Memory.Failcnt = s.MemoryStats.Usage.Failcnt
 
-	if s.MemoryStats.UseHierarchy {
+	if cgroups.IsCgroup2UnifiedMode() {
+		ret.Memory.Cache = s.MemoryStats.Stats["file"]
+		ret.Memory.RSS = s.MemoryStats.Stats["anon"]
+		ret.Memory.Swap = s.MemoryStats.SwapUsage.Usage
+		ret.Memory.MappedFile = s.MemoryStats.Stats["file_mapped"]
+	} else if s.MemoryStats.UseHierarchy {
 		ret.Memory.Cache = s.MemoryStats.Stats["total_cache"]
 		ret.Memory.RSS = s.MemoryStats.Stats["total_rss"]
 		ret.Memory.Swap = s.MemoryStats.Stats["total_swap"]
