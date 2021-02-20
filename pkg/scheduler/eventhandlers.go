@@ -60,7 +60,7 @@ func (sched *Scheduler) onPvcUpdate(old, new interface{}) {
 func (sched *Scheduler) onStorageClassAdd(obj interface{}) {
 	sc, ok := obj.(*storagev1.StorageClass)
 	if !ok {
-		klog.ErrorS(nil, "cannot convert to *storagev1.StorageClass", "obj", obj)
+		klog.ErrorS(nil, "Cannot convert to *storagev1.StorageClass", "obj", obj)
 		return
 	}
 
@@ -90,32 +90,32 @@ func (sched *Scheduler) onServiceDelete(obj interface{}) {
 func (sched *Scheduler) addNodeToCache(obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if !ok {
-		klog.ErrorS(nil, "cannot convert to *v1.Node", "obj", obj)
+		klog.ErrorS(nil, "Cannot convert to *v1.Node", "obj", obj)
 		return
 	}
 
 	if err := sched.SchedulerCache.AddNode(node); err != nil {
-		klog.ErrorS(err, "scheduler cache AddNode failed")
+		klog.ErrorS(err, "Scheduler cache AddNode failed")
 	}
 
-	klog.V(3).InfoS("add event for node", "node", klog.KObj(node))
+	klog.V(3).InfoS("Add event for node", "node", klog.KObj(node))
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.NodeAdd)
 }
 
 func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 	oldNode, ok := oldObj.(*v1.Node)
 	if !ok {
-		klog.ErrorS(nil, "cannot convert oldObj to *v1.Node", "oldObj", oldObj)
+		klog.ErrorS(nil, "Cannot convert oldObj to *v1.Node", "oldObj", oldObj)
 		return
 	}
 	newNode, ok := newObj.(*v1.Node)
 	if !ok {
-		klog.ErrorS(nil, "cannot convert newObj to *v1.Node", "newObj", newObj)
+		klog.ErrorS(nil, "Cannot convert newObj to *v1.Node", "newObj", newObj)
 		return
 	}
 
 	if err := sched.SchedulerCache.UpdateNode(oldNode, newNode); err != nil {
-		klog.ErrorS(err, "scheduler cache UpdateNode failed")
+		klog.ErrorS(err, "Scheduler cache UpdateNode failed")
 	}
 
 	// Only requeue unschedulable pods if the node became more schedulable.
@@ -133,21 +133,21 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 		var ok bool
 		node, ok = t.Obj.(*v1.Node)
 		if !ok {
-			klog.ErrorS(nil, "cannot convert to *v1.Node", "obj", t.Obj)
+			klog.ErrorS(nil, "Cannot convert to *v1.Node", "obj", t.Obj)
 			return
 		}
 	default:
-		klog.ErrorS(nil, "cannot convert to *v1.Node", "type", t)
+		klog.ErrorS(nil, "Cannot convert to *v1.Node", "obj", t)
 		return
 	}
-	klog.V(3).InfoS("delete event for node", "node", klog.KObj(node))
+	klog.V(3).InfoS("Delete event for node", "node", klog.KObj(node))
 	// NOTE: Updates must be written to scheduler cache before invalidating
 	// equivalence cache, because we could snapshot equivalence cache after the
 	// invalidation and then snapshot the cache itself. If the cache is
 	// snapshotted before updates are written, we would update equivalence
 	// cache with stale information which is based on snapshot of old cache.
 	if err := sched.SchedulerCache.RemoveNode(node); err != nil {
-		klog.ErrorS(err, "scheduler cache RemoveNode failed")
+		klog.ErrorS(err, "Scheduler cache RemoveNode failed")
 	}
 }
 
@@ -206,7 +206,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
 		// which specify a scheduler name that matches one of the profiles.
-		klog.ErrorS(err, "unable to get profile", "pod", klog.KObj(pod))
+		klog.ErrorS(err, "Unable to get profile", "pod", klog.KObj(pod))
 		return
 	}
 	fwk.RejectWaitingPod(pod.UID)
@@ -215,13 +215,13 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 func (sched *Scheduler) addPodToCache(obj interface{}) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
-		klog.ErrorS(nil, "cannot convert to *v1.Pod", "obj", obj)
+		klog.ErrorS(nil, "Cannot convert to *v1.Pod", "obj", obj)
 		return
 	}
 	klog.V(3).InfoS("Add event for scheduled pod", "pod", klog.KObj(pod))
 
 	if err := sched.SchedulerCache.AddPod(pod); err != nil {
-		klog.ErrorS(err, "scheduler cache AddPod failed", "pod", klog.KObj(pod))
+		klog.ErrorS(err, "Scheduler cache AddPod failed", "pod", klog.KObj(pod))
 	}
 
 	sched.SchedulingQueue.AssignedPodAdded(pod)
@@ -230,12 +230,12 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 	oldPod, ok := oldObj.(*v1.Pod)
 	if !ok {
-		klog.ErrorS(nil, "cannot convert oldObj to *v1.Pod", "oldObj", oldObj)
+		klog.ErrorS(nil, "Cannot convert oldObj to *v1.Pod", "oldObj", oldObj)
 		return
 	}
 	newPod, ok := newObj.(*v1.Pod)
 	if !ok {
-		klog.ErrorS(nil, "cannot convert newObj to *v1.Pod", "newObj", newObj)
+		klog.ErrorS(nil, "Cannot convert newObj to *v1.Pod", "newObj", newObj)
 		return
 	}
 
@@ -254,7 +254,7 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 	// snapshotted before updates are written, we would update equivalence
 	// cache with stale information which is based on snapshot of old cache.
 	if err := sched.SchedulerCache.UpdatePod(oldPod, newPod); err != nil {
-		klog.ErrorS(err, "scheduler cache UpdatePod failed", "oldPod", klog.KObj(oldPod), "newPod", klog.KObj(newPod))
+		klog.ErrorS(err, "Scheduler cache UpdatePod failed", "oldPod", klog.KObj(oldPod), "newPod", klog.KObj(newPod))
 	}
 
 	sched.SchedulingQueue.AssignedPodUpdated(newPod)
@@ -269,11 +269,11 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 		var ok bool
 		pod, ok = t.Obj.(*v1.Pod)
 		if !ok {
-			klog.ErrorS(nil, "cannot convert to *v1.Pod", "obj", t.Obj)
+			klog.ErrorS(nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
 			return
 		}
 	default:
-		klog.ErrorS(nil, "cannot convert to *v1.Pod", "type", t)
+		klog.ErrorS(nil, "Cannot convert to *v1.Pod", "obj", t)
 		return
 	}
 	klog.V(3).InfoS("Delete event for scheduled pod", "pod", klog.KObj(pod))
@@ -283,7 +283,7 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 	// snapshotted before updates are written, we would update equivalence
 	// cache with stale information which is based on snapshot of old cache.
 	if err := sched.SchedulerCache.RemovePod(pod); err != nil {
-		klog.ErrorS(err, "scheduler cache RemovePod failed", "pod", klog.KObj(pod))
+		klog.ErrorS(err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
 	}
 
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.AssignedPodDelete)
@@ -349,7 +349,7 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 	if !reflect.DeepEqual(assumedPodCopy, podCopy) {
 		return false
 	}
-	klog.V(3).InfoS("skipping pod update", "pod", klog.KObj(pod))
+	klog.V(3).InfoS("Pod update ignored because changes won't affect scheduling", "pod", klog.KObj(pod))
 	return true
 }
 
