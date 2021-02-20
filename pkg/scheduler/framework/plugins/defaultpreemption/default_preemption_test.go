@@ -1666,9 +1666,9 @@ func TestPreempt(t *testing.T) {
 				pdbLister: getPDBLister(informerFactory),
 				args:      *getDefaultDefaultPreemptionArgs(),
 			}
-			node, err := pl.preempt(context.Background(), state, test.pod, make(framework.NodeToStatusMap))
-			if err != nil {
-				t.Errorf("unexpected error in preemption: %v", err)
+			node, status := pl.preempt(context.Background(), state, test.pod, make(framework.NodeToStatusMap))
+			if !status.IsSuccess() {
+				t.Errorf("unexpected error in preemption: %v", status.AsError())
 			}
 			if len(node) != 0 && node != test.expectedNode {
 				t.Errorf("expected node: %v, got: %v", test.expectedNode, node)
@@ -1703,9 +1703,9 @@ func TestPreempt(t *testing.T) {
 			}
 
 			// Call preempt again and make sure it doesn't preempt any more pods.
-			node, err = pl.preempt(context.Background(), state, test.pod, make(framework.NodeToStatusMap))
-			if err != nil {
-				t.Errorf("unexpected error in preemption: %v", err)
+			node, status = pl.preempt(context.Background(), state, test.pod, make(framework.NodeToStatusMap))
+			if !status.IsSuccess() {
+				t.Errorf("unexpected error in preemption: %v", status.AsError())
 			}
 			if len(node) != 0 && len(deletedPodNames) > 0 {
 				t.Errorf("didn't expect any more preemption. Node %v is selected for preemption.", node)
