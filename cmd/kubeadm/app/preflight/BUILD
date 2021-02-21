@@ -25,6 +25,7 @@ go_library(
         "//cmd/kubeadm/app/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
         "//vendor/github.com/PuerkitoBio/purell:go_default_library",
