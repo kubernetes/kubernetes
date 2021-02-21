@@ -48,9 +48,9 @@ func NewManager(config *configs.Cgroup, dirPath string, rootless bool) (cgroups.
 }
 
 func (m *manager) getControllers() error {
-	if m.controllers != nil {
-		return nil
-	}
+	//if m.controllers != nil {
+	//	return nil
+	//}
 
 	file := filepath.Join(m.dirPath, "cgroup.controllers")
 	data, err := ioutil.ReadFile(file)
