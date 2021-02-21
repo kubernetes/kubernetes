@@ -133,6 +133,7 @@ go_test(
         "mirror_pod_test.go",
         "node_container_manager_test.go",
         "node_perf_test.go",
+        "node_shutdown_linux_test.go",
         "pids_test.go",
         "pod_hostnamefqdn_test.go",
         "pods_container_manager_test.go",
