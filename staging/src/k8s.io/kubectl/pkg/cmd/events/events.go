@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -46,8 +47,11 @@ var (
 )
 
 type EventsOptions struct {
-	Namespace string
-	Watch     bool
+	AllNamespaces bool
+	Namespace     string
+	Watch         bool
+
+	builder *resource.Builder
 
 	genericclioptions.IOStreams
 }
@@ -81,21 +85,46 @@ func NewCmdEvents(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 func (o *EventsOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing the requested events, watch for more events.")
+	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 }
 
 func (o *EventsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	// TODO
+	var err error
+	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	o.builder = f.NewBuilder()
 
 	return nil
 }
 
 func (o EventsOptions) Validate() error {
-	// TODO
-
+	// Nothing to do here.
 	return nil
 }
 
 // Run retrieves events
 func (o EventsOptions) Run() error {
+	r := o.builder.
+		Unstructured().
+		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
+		ResourceTypes("events").
+		SelectAllParam(true).
+		Flatten().
+		Do()
+
+	if err := r.Err(); err != nil {
+		return err
+	}
+
+	r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			fmt.Printf("visit err: %#v\n", err)
+		}
+		fmt.Printf("visit: %#v\n", info.Object)
+		return nil
+	})
 	return nil
 }
