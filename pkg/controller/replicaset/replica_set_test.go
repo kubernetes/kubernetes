@@ -1125,7 +1125,11 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 	manager.deleteRS(rs)
 	manager.syncReplicaSet(GetKey(rs, t))
 
-	if _, exists, err = manager.expectations.GetExpectations(rsKey); exists {
+	_, exists, err = manager.expectations.GetExpectations(rsKey)
+	if err != nil {
+		t.Errorf("Failed to get controllee expectations: %v", err)
+	}
+	if exists {
 		t.Errorf("Found expectations, expected none since the ReplicaSet has been deleted.")
 	}
 

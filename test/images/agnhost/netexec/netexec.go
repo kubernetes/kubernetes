@@ -321,15 +321,12 @@ func dialHandler(w http.ResponseWriter, r *http.Request) {
 	var dialer func(string, net.Addr) (string, error)
 	switch strings.ToLower(protocol) {
 	case "", "http":
-		protocol = "http"
 		dialer = dialHTTP
 		addr, err = net.ResolveTCPAddr("tcp", hostPort)
 	case "udp":
-		protocol = "udp"
 		dialer = dialUDP
 		addr, err = net.ResolveUDPAddr("udp", hostPort)
 	case "sctp":
-		protocol = "sctp"
 		dialer = dialSCTP
 		addr, err = sctp.ResolveSCTPAddr("sctp", hostPort)
 	default:

@@ -102,7 +102,6 @@ func (m *azureDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 			klog.Errorf("azureDisk - Unmount directory %s failed with %v", dir, err)
 			return err
 		}
-		mountPoint = true
 	}
 
 	if runtime.GOOS != "windows" {

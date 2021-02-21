@@ -70,8 +70,8 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet,
 
 	ipv4 := api.IPv4Protocol
 	ipv6 := api.IPv6Protocol
-	var primaryIPFamily *api.IPFamily = nil
-	var secondaryFamily *api.IPFamily = nil
+	var primaryIPFamily *api.IPFamily
+	var secondaryFamily *api.IPFamily
 	if netutil.IsIPv6CIDR(&serviceCIDR) {
 		primaryIPFamily = &ipv6
 		if hasSecondary {
