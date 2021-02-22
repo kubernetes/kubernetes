@@ -13,4 +13,5 @@ require (
 	gotest.tools/gotestsum v0.3.5
 	honnef.co/go/tools v0.0.1-2020.1.6
 	k8s.io/repo-infra v0.1.3
+	sigs.k8s.io/zeitgeist v0.1.1-0.20210222132743-e06e27751b7f
 )
