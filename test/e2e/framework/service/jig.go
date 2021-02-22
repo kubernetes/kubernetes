@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -44,7 +43,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
@@ -819,14 +817,10 @@ func testReachabilityOverServiceName(serviceName string, sp v1.ServicePort, exec
 
 func testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod *v1.Pod) error {
 	// If .spec.clusterIP is set to "" or "None" for service, ClusterIP is not created, so reachability can not be tested over clusterIP:servicePort
-	isClusterIPV46, err := regexp.MatchString(e2enetwork.RegexIPv4+"||"+e2enetwork.RegexIPv6, clusterIP)
-	if err != nil {
+	if net.ParseIP(clusterIP) == nil {
 		return fmt.Errorf("unable to parse ClusterIP: %s", clusterIP)
 	}
-	if isClusterIPV46 {
-		return testEndpointReachability(clusterIP, sp.Port, sp.Protocol, execPod)
-	}
-	return nil
+	return testEndpointReachability(clusterIP, sp.Port, sp.Protocol, execPod)
 }
 
 func testReachabilityOverExternalIP(externalIP string, sp v1.ServicePort, execPod *v1.Pod) error {
