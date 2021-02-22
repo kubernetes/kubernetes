@@ -36,6 +36,7 @@ type RegistryList struct {
 	PromoterE2eRegistry     string `yaml:"promoterE2eRegistry"`
 	BuildImageRegistry      string `yaml:"buildImageRegistry"`
 	InvalidRegistry         string `yaml:"invalidRegistry"`
+	GcHttpdRegistry         string `yaml:"gcHttpdRegistry"`
 	GcEtcdRegistry          string `yaml:"gcEtcdRegistry"`
 	GcRegistry              string `yaml:"gcRegistry"`
 	SigStorageRegistry      string `yaml:"sigStorageRegistry"`
@@ -76,6 +77,7 @@ func initReg() RegistryList {
 		BuildImageRegistry:      "k8s.gcr.io/build-image",
 		InvalidRegistry:         "invalid.com/invalid",
 		GcEtcdRegistry:          "k8s.gcr.io",
+		GcHttpdRegistry:         "k8s.gcr.io/e2e-test-images",
 		GcRegistry:              "k8s.gcr.io",
 		SigStorageRegistry:      "k8s.gcr.io/sig-storage",
 		GcrReleaseRegistry:      "gcr.io/gke-release",
@@ -114,6 +116,7 @@ var (
 	buildImageRegistry      = registry.BuildImageRegistry
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
 	gcEtcdRegistry          = registry.GcEtcdRegistry
+	gcHttpdRegistry         = registry.GcHttpdRegistry
 	gcRegistry              = registry.GcRegistry
 	sigStorageRegistry      = registry.SigStorageRegistry
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
@@ -230,8 +233,8 @@ func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs[EchoServer] = Config{promoterE2eRegistry, "echoserver", "2.3"}
 	configs[Etcd] = Config{gcEtcdRegistry, "etcd", "3.4.13-0"}
 	configs[GlusterDynamicProvisioner] = Config{promoterE2eRegistry, "glusterdynamic-provisioner", "v1.0"}
-	configs[Httpd] = Config{promoterE2eRegistry, "httpd", "2.4.38-alpine"}
-	configs[HttpdNew] = Config{promoterE2eRegistry, "httpd", "2.4.39-alpine"}
+	configs[Httpd] = Config{gcHttpdRegistry, "httpd", "2.4.38-alpine"}
+	configs[HttpdNew] = Config{gcHttpdRegistry, "httpd", "2.4.39-alpine"}
 	configs[InvalidRegistryImage] = Config{invalidRegistry, "alpine", "3.1"}
 	configs[IpcUtils] = Config{promoterE2eRegistry, "ipc-utils", "1.2"}
 	configs[JessieDnsutils] = Config{promoterE2eRegistry, "jessie-dnsutils", "1.4"}
