@@ -143,8 +143,8 @@ type SchedulerAlgorithmSource struct {
 	Provider *string
 }
 
-// SchedulerPolicySource configures a means to obtain a scheduler Policy. One
-// source field must be specified, and source fields are mutually exclusive.
+// SchedulerPolicySource configures a means to obtain a scheduler Policy.
+// Source fields are mutually exclusive.
 type SchedulerPolicySource struct {
 	// File is a file policy source.
 	File *SchedulerPolicyFileSource
