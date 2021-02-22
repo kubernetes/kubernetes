@@ -890,6 +890,10 @@ func makeLocalPVConfig(config *localTestConfig, volume *localTestVolume) e2epv.P
 	if !found {
 		framework.Failf("Node does not have required label %q", nodeKey)
 	}
+	framework.Logf("nodeValue for local PV is %q", nodeValue)
+	if len(nodeValue) == 0 {
+		nodeValue = config.node0.Name
+	}
 
 	pvConfig := e2epv.PersistentVolumeConfig{
 		PVSource: v1.PersistentVolumeSource{
