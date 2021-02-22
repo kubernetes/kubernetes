@@ -213,6 +213,8 @@ filegroup(
         "//vendor/github.com/jonboulle/clockwork:all-srcs",
         "//vendor/github.com/json-iterator/go:all-srcs",
         "//vendor/github.com/karrick/godirwalk:all-srcs",
+        "//vendor/github.com/klauspost/compress/flate:all-srcs",
+        "//vendor/github.com/klauspost/compress/gzip:all-srcs",
         "//vendor/github.com/konsorten/go-windows-terminal-sequences:all-srcs",
         "//vendor/github.com/libopenstorage/openstorage/api:all-srcs",
         "//vendor/github.com/libopenstorage/openstorage/pkg/parser:all-srcs",
