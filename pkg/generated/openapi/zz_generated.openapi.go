@@ -20425,6 +20425,22 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 						},
 					},
 					"setHostnameAsFQDN": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-field-version": []interface{}{
+									map[string]interface{}{
+										"prerelease":  "alpha",
+										"minVersion":  "v1.19",
+										"featureGate": "SetHostnameAsFQDN",
+									},
+									map[string]interface{}{
+										"prerelease":  "beta",
+										"minVersion":  "v1.20",
+										"featureGate": "SetHostnameAsFQDN",
+									},
+								},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "If true the pod's hostname will be configured as the pod's FQDN, rather than the leaf name (the default). In Linux containers, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname). In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN. If a pod does not have FQDN, this has no effect. Default to false.",
 							Type:        []string{"boolean"},
@@ -24355,6 +24371,17 @@ func schema_k8sio_api_discovery_v1alpha1_Endpoint(ref common.ReferenceCallback) 
 						},
 					},
 					"nodeName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-field-version": []interface{}{
+									map[string]interface{}{
+										"prerelease":  "alpha",
+										"minVersion":  "v1.20",
+										"featureGate": "EndpointSliceNodeName",
+									},
+								},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "nodeName represents the name of the Node hosting this endpoint. This can be used to determine endpoints local to a Node. This field can be enabled with the EndpointSliceNodeName feature gate.",
 							Type:        []string{"string"},
@@ -24643,6 +24670,17 @@ func schema_k8sio_api_discovery_v1beta1_Endpoint(ref common.ReferenceCallback) c
 						},
 					},
 					"nodeName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-field-version": []interface{}{
+									map[string]interface{}{
+										"prerelease":  "alpha",
+										"minVersion":  "v1.20",
+										"featureGate": "EndpointSliceNodeName",
+									},
+								},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "nodeName represents the name of the Node hosting this endpoint. This can be used to determine endpoints local to a Node. This field can be enabled with the EndpointSliceNodeName feature gate.",
 							Type:        []string{"string"},
