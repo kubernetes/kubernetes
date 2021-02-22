@@ -190,13 +190,6 @@ func WithRunAllFilters(runAllFilters bool) Option {
 	}
 }
 
-// withMetricsRecorder is only used in tests.
-func withMetricsRecorder(recorder *metricsRecorder) Option {
-	return func(o *frameworkOptions) {
-		o.metricsRecorder = recorder
-	}
-}
-
 // WithPodNominator sets podNominator for the scheduling frameworkImpl.
 func WithPodNominator(nominator framework.PodNominator) Option {
 	return func(o *frameworkOptions) {
