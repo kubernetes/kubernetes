@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ktypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/metrics/testutil"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -398,14 +399,15 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 				podInfo.Attempts = 1
 				q.AddUnschedulableIfNotPresent(podInfo, q.SchedulingCycle())
 			}
-			b.ResetTimer()
 
+			// We cannot use wait.Until() as it wraps a RealClock.
+			go wait.BackoffUntil(q.flushBackoffQCompleted, wait.NewJitteredBackoffManager(1.0*time.Second, 0.0, c), true, q.stop)
+
+			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				// Iterate 10 times, each time we step 2 seconds forward, and run flushBackoffQCompleted()
-				// every 5 iterations (10 seconds).
-				for j := 1; j <= 10; j++ {
-					// Moves clock by 2 seconds.
-					c.Step(time.Second * 2)
+				// Iterate 10 times, each time we step 1 second forward.
+				for j := 0; j < 10; j++ {
+					c.Step(time.Second)
 					q.MoveAllToActiveOrBackoffQueue("test")
 
 					// Pop half of the pods in activeQ and re-add them.
@@ -417,11 +419,6 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 							b.Fatalf("Cannot pod pods from activeQ: %v", err)
 						}
 						q.AddUnschedulableIfNotPresent(podInfo, q.SchedulingCycle())
-					}
-
-					// Trigger flushBackoffQCompleted() every 10 seconds.
-					if j%5 == 0 {
-						q.flushBackoffQCompleted()
 					}
 				}
 			}
