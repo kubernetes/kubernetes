@@ -450,29 +450,49 @@ func (g openAPITypeWriter) generateStructExtensions(t *types.Type) error {
 		}
 	}
 
+	fieldVersions, errors := parseFieldVersions(t.CommentLines)
+	if len(errors) > 0 {
+		for _, e := range errors {
+			klog.Errorf("[%s]: %s\n", t.String(), e)
+		}
+	}
+
 	// TODO(seans3): Validate struct extensions here.
-	g.emitExtensions(extensions, unions)
+	g.emitExtensions(extensions, unions, fieldVersions)
 	return nil
 }
 
 func (g openAPITypeWriter) generateMemberExtensions(m *types.Member, parent *types.Type) error {
 	extensions, parseErrors := parseExtensions(m.CommentLines)
-	validationErrors := validateMemberExtensions(extensions, m)
-	errors := append(parseErrors, validationErrors...)
+	extensionValidationErrors := validateMemberExtensions(extensions, m)
+	extensionErrors := append(parseErrors, extensionValidationErrors...)
 	// Initially, we will only log member extension errors.
-	if len(errors) > 0 {
+	if len(extensionErrors) > 0 {
 		errorPrefix := fmt.Sprintf("[%s] %s:", parent.String(), m.String())
-		for _, e := range errors {
+		for _, e := range extensionErrors {
 			klog.V(2).Infof("%s %s\n", errorPrefix, e)
 		}
 	}
-	g.emitExtensions(extensions, nil)
+	g.emitExtensions(extensions, nil, nil)
+
+	fieldVersions, parseErrors := parseFieldVersions(m.CommentLines)
+	fieldVersionValidationErrors := validateFieldVersions(fieldVersions)
+	fvErrors := append(parseErrors, fieldVersionValidationErrors...)
+	// Initially, we will only log member extension errors.
+	if len(fvErrors) > 0 {
+		errorPrefix := fmt.Sprintf("[%s] %s:", parent.String(), m.String())
+		for _, e := range fvErrors {
+			klog.V(2).Infof("%s %s\n", errorPrefix, e)
+		}
+	}
+	g.emitExtensions(nil, nil, fieldVersions)
+
 	return nil
 }
 
-func (g openAPITypeWriter) emitExtensions(extensions []extension, unions []union) {
+func (g openAPITypeWriter) emitExtensions(extensions []extension, unions []union, fieldVersions []fieldVersion) {
 	// If any extensions exist, then emit code to create them.
-	if len(extensions) == 0 && len(unions) == 0 {
+	if len(extensions) == 0 && len(unions) == 0 && len(fieldVersions) == 0 {
 		return
 	}
 	g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
@@ -492,6 +512,13 @@ func (g openAPITypeWriter) emitExtensions(extensions []extension, unions []union
 		g.Do("\"x-kubernetes-unions\": []interface{}{\n", nil)
 		for _, u := range unions {
 			u.emit(g)
+		}
+		g.Do("},\n", nil)
+	}
+	if len(fieldVersions) > 0 {
+		g.Do("\"$.$\": []interface{}{\n", fieldVersionExtension)
+		for _, fv := range fieldVersions {
+			fv.emit(g)
 		}
 		g.Do("},\n", nil)
 	}
