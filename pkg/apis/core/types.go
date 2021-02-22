@@ -2767,6 +2767,8 @@ type PodSpec struct {
 	// In Linux containers, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname).
 	// In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN.
 	// If a pod does not have FQDN, this has no effect.
+	// +k8s:openapi-gen:prerelease=alpha,minVersion=v1.19,featureGate=SetHostnameAsFQDN
+	// +k8s:openapi-gen:prerelease=beta,minVersion=v1.20,featureGate=SetHostnameAsFQDN
 	// +optional
 	SetHostnameAsFQDN *bool
 	// If specified, the pod's scheduling constraints
