@@ -31,6 +31,9 @@ import (
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/authorization/restrictusers"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/authorization/restrictusers/usercache"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/scheduler/nodeenv"
+
+	// magnet to get authorizer package in hack/update-vendor.sh
+	_ "github.com/openshift/library-go/pkg/authorization/hardcodedauthorizer"
 )
 
 func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, kubeInformers clientgoinformers.SharedInformerFactory, pluginInitializers *[]admission.PluginInitializer) error {
