@@ -127,7 +127,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		}
 	})
 
-	framework.KubeDescribe("Pods", func() {
+	ginkgo.Describe("Pods", func() {
 		ginkgo.Context("should return to running and ready state after network partition is healed", func() {
 			ginkgo.BeforeEach(func() {
 				e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
@@ -237,7 +237,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		})
 	})
 
-	framework.KubeDescribe("[ReplicationController]", func() {
+	ginkgo.Describe("[ReplicationController]", func() {
 		ginkgo.It("should recreate pods scheduled on the unreachable node "+
 			"AND allow scheduling of pods on a node after it rejoins the cluster", func() {
 			e2eskipper.SkipUnlessSSHKeyPresent()
@@ -355,7 +355,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		})
 	})
 
-	framework.KubeDescribe("[StatefulSet]", func() {
+	ginkgo.Describe("[StatefulSet]", func() {
 		psName := "ss"
 		labels := map[string]string{
 			"foo": "bar",
@@ -430,7 +430,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		})
 	})
 
-	framework.KubeDescribe("[Job]", func() {
+	ginkgo.Describe("[Job]", func() {
 		ginkgo.It("should create new pods when node is partitioned", func() {
 			e2eskipper.SkipUnlessSSHKeyPresent()
 
@@ -477,7 +477,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		})
 	})
 
-	framework.KubeDescribe("Pods", func() {
+	ginkgo.Describe("Pods", func() {
 		ginkgo.Context("should be evicted from unready Node", func() {
 			ginkgo.BeforeEach(func() {
 				e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
