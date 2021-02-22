@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package clientbuilder
 
 import (
 	"context"
@@ -25,6 +25,8 @@ import (
 
 	"golang.org/x/oauth2"
 	v1authenticationapi "k8s.io/api/authentication/v1"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -33,7 +35,6 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
-	"k8s.io/controller-manager/pkg/clientbuilder"
 	"k8s.io/klog/v2"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -73,7 +74,8 @@ type DynamicControllerClientBuilder struct {
 	clock clock.Clock
 }
 
-func NewDynamicClientBuilder(clientConfig *restclient.Config, coreClient v1core.CoreV1Interface, ns string) clientbuilder.ControllerClientBuilder {
+// NewDynamicClientBuilder returns client builder which uses TokenRequest feature and refresh service account token periodically
+func NewDynamicClientBuilder(clientConfig *restclient.Config, coreClient v1core.CoreV1Interface, ns string) ControllerClientBuilder {
 	builder := &DynamicControllerClientBuilder{
 		ClientConfig:        clientConfig,
 		CoreClient:          coreClient,
@@ -87,7 +89,7 @@ func NewDynamicClientBuilder(clientConfig *restclient.Config, coreClient v1core.
 }
 
 // this function only for test purpose, don't call it
-func NewTestDynamicClientBuilder(clientConfig *restclient.Config, coreClient v1core.CoreV1Interface, ns string, expirationSeconds int64, leewayPercent int) clientbuilder.ControllerClientBuilder {
+func NewTestDynamicClientBuilder(clientConfig *restclient.Config, coreClient v1core.CoreV1Interface, ns string, expirationSeconds int64, leewayPercent int) ControllerClientBuilder {
 	builder := &DynamicControllerClientBuilder{
 		ClientConfig:        clientConfig,
 		CoreClient:          coreClient,
@@ -216,4 +218,30 @@ func constructClient(saNamespace, saName string, config *restclient.Config) rest
 	ret := *restclient.AnonymousClientConfig(config)
 	restclient.AddUserAgent(&ret, username)
 	return ret
+}
+
+func getOrCreateServiceAccount(coreClient v1core.CoreV1Interface, namespace, name string) (*v1.ServiceAccount, error) {
+	sa, err := coreClient.ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err == nil {
+		return sa, nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	// Create the namespace if we can't verify it exists.
+	// Tolerate errors, since we don't know whether this component has namespace creation permissions.
+	if _, err := coreClient.Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+		if _, err = coreClient.Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+			klog.Warningf("create non-exist namespace %s failed:%v", namespace, err)
+		}
+	}
+
+	// Create the service account
+	sa, err = coreClient.ServiceAccounts(namespace).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name}}, metav1.CreateOptions{})
+	if apierrors.IsAlreadyExists(err) {
+		// If we're racing to init and someone else already created it, re-fetch
+		return coreClient.ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	}
+	return sa, err
 }
