@@ -357,7 +357,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 					gotError = err
 				},
 				NextPod: func() *framework.QueuedPodInfo {
-					return &framework.QueuedPodInfo{Pod: item.sendPod}
+					return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(item.sendPod)}
 				},
 				Profiles: profile.Map{
 					testSchedulerName: fwk,
@@ -838,7 +838,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		SchedulerCache: scache,
 		Algorithm:      algo,
 		NextPod: func() *framework.QueuedPodInfo {
-			return &framework.QueuedPodInfo{Pod: clientcache.Pop(queuedPodStore).(*v1.Pod)}
+			return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(clientcache.Pop(queuedPodStore).(*v1.Pod))}
 		},
 		Error: func(p *framework.QueuedPodInfo, err error) {
 			errChan <- err

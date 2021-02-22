@@ -352,7 +352,7 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 		}
 
 		// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
-		podInfo.Pod = cachedPod.DeepCopy()
+		podInfo.PodInfo = framework.NewPodInfo(cachedPod.DeepCopy())
 		if err := podQueue.AddUnschedulableIfNotPresent(podInfo, podQueue.SchedulingCycle()); err != nil {
 			klog.ErrorS(err, "Error occurred")
 		}

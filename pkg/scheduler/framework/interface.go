@@ -604,13 +604,13 @@ type PreemptHandle interface {
 type PodNominator interface {
 	// AddNominatedPod adds the given pod to the nominated pod map or
 	// updates it if it already exists.
-	AddNominatedPod(pod *v1.Pod, nodeName string)
+	AddNominatedPod(pod *PodInfo, nodeName string)
 	// DeleteNominatedPodIfExists deletes nominatedPod from internal cache. It's a no-op if it doesn't exist.
 	DeleteNominatedPodIfExists(pod *v1.Pod)
 	// UpdateNominatedPod updates the <oldPod> with <newPod>.
-	UpdateNominatedPod(oldPod, newPod *v1.Pod)
+	UpdateNominatedPod(oldPod *v1.Pod, newPodInfo *PodInfo)
 	// NominatedPodsForNode returns nominatedPods on the given node.
-	NominatedPodsForNode(nodeName string) []*v1.Pod
+	NominatedPodsForNode(nodeName string) []*PodInfo
 }
 
 // PluginsRunner abstracts operations to run some plugins.
