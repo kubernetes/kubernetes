@@ -17,7 +17,6 @@ limitations under the License.
 package responsewriters
 
 import (
-	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -27,6 +26,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/klauspost/compress/gzip"
 
 	"k8s.io/apiserver/pkg/features"
 
@@ -144,8 +145,8 @@ var gzipPool = &sync.Pool{
 }
 
 const (
-	// defaultGzipContentEncodingLevel is set to 4 which uses less CPU than the default level
-	defaultGzipContentEncodingLevel = 4
+	// defaultGzipContentEncodingLevel is set to 1 which uses less CPU than the default level
+	defaultGzipContentEncodingLevel = 1
 	// defaultGzipThresholdBytes is compared to the size of the first write from the stream
 	// (usually the entire object), and if the size is smaller no gzipping will be performed
 	// if the client requests it.
