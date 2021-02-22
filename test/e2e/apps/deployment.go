@@ -66,6 +66,8 @@ const (
 	pollLongTimeout = 5 * time.Minute
 	dRetryPeriod    = 2 * time.Second
 	dRetryTimeout   = 5 * time.Minute
+
+	dContextTimeout = 2 * time.Minute
 )
 
 var (
@@ -216,7 +218,7 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "failed to create Deployment %v in namespace %v", testDeploymentName, testNamespaceName)
 
 		ginkgo.By("waiting for Deployment to be created")
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), dContextTimeout)
 		defer cancel()
 		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
@@ -234,7 +236,7 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "failed to see %v event", watch.Added)
 
 		ginkgo.By("waiting for all Replicas to be Ready")
-		ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
+		ctx, cancel = context.WithTimeout(context.Background(), dContextTimeout)
 		defer cancel()
 		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			if deployment, ok := event.Object.(*appsv1.Deployment); ok {
@@ -273,7 +275,7 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "failed to Marshal Deployment JSON patch")
 		_, err = f.ClientSet.AppsV1().Deployments(testNamespaceName).Patch(context.TODO(), testDeploymentName, types.StrategicMergePatchType, []byte(deploymentPatch), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch Deployment")
-		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel = context.WithTimeout(context.Background(), dContextTimeout)
 		defer cancel()
 		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
@@ -294,7 +296,7 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "failed to see %v event", watch.Modified)
 
 		ginkgo.By("waiting for Replicas to scale")
-		ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
+		ctx, cancel = context.WithTimeout(context.Background(), dContextTimeout)
 		defer cancel()
 		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			if deployment, ok := event.Object.(*appsv1.Deployment); ok {
@@ -341,7 +343,7 @@ var _ = SIGDescribe("Deployment", func() {
 		// currently this hasn't been able to hit the endpoint replaceAppsV1NamespacedDeploymentStatus
 		_, err = dc.Resource(deploymentResource).Namespace(testNamespaceName).Update(context.TODO(), &testDeploymentUpdateUnstructured, metav1.UpdateOptions{}) //, "status")
 		framework.ExpectNoError(err, "failed to update the DeploymentStatus")
-		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel = context.WithTimeout(context.Background(), dContextTimeout)
 		defer cancel()
 		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
@@ -371,7 +373,7 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectEqual(deploymentGet.Spec.Template.Spec.Containers[0].Image, testDeploymentUpdateImage, "failed to update image")
 		framework.ExpectEqual(deploymentGet.ObjectMeta.Labels["test-deployment"], "updated", "failed to update labels")
 
-		ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
+		ctx, cancel = context.WithTimeout(context.Background(), dContextTimeout)
 		defer cancel()
 		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			if deployment, ok := event.Object.(*appsv1.Deployment); ok {
@@ -398,7 +400,7 @@ var _ = SIGDescribe("Deployment", func() {
 		})
 		framework.ExpectNoError(err, "failed to Marshal Deployment JSON patch")
 		dc.Resource(deploymentResource).Namespace(testNamespaceName).Patch(context.TODO(), testDeploymentName, types.StrategicMergePatchType, []byte(deploymentStatusPatch), metav1.PatchOptions{}, "status")
-		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel = context.WithTimeout(context.Background(), dContextTimeout)
 		defer cancel()
 		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
@@ -423,7 +425,7 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "failed to convert the unstructured response to a Deployment")
 		framework.ExpectEqual(deploymentGet.Spec.Template.Spec.Containers[0].Image, testDeploymentUpdateImage, "failed to update image")
 		framework.ExpectEqual(deploymentGet.ObjectMeta.Labels["test-deployment"], "updated", "failed to update labels")
-		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel = context.WithTimeout(context.Background(), dContextTimeout)
 		defer cancel()
 		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			if deployment, ok := event.Object.(*appsv1.Deployment); ok {
@@ -444,7 +446,7 @@ var _ = SIGDescribe("Deployment", func() {
 		err = f.ClientSet.AppsV1().Deployments(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &zero}, metav1.ListOptions{LabelSelector: testDeploymentLabelsFlat})
 		framework.ExpectNoError(err, "failed to delete Deployment via collection")
 
-		ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
+		ctx, cancel = context.WithTimeout(context.Background(), dContextTimeout)
 		defer cancel()
 		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
