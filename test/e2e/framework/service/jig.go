@@ -1026,24 +1026,8 @@ func (j *TestJig) CheckServiceReachability(svc *v1.Service, pod *v1.Pod) error {
 	}
 }
 
-// CreateServicePods creates a replication controller with the label same as service. Service listens to HTTP.
+// CreateServicePods creates a replication controller with the label same as service. Service listens to TCP and UDP.
 func (j *TestJig) CreateServicePods(replica int) error {
-	config := testutils.RCConfig{
-		Client:       j.Client,
-		Name:         j.Name,
-		Image:        framework.ServeHostnameImage,
-		Command:      []string{"/agnhost", "serve-hostname"},
-		Namespace:    j.Namespace,
-		Labels:       j.Labels,
-		PollInterval: 3 * time.Second,
-		Timeout:      framework.PodReadyBeforeTimeout,
-		Replicas:     replica,
-	}
-	return e2erc.RunRC(config)
-}
-
-// CreateTCPUDPServicePods creates a replication controller with the label same as service. Service listens to TCP and UDP.
-func (j *TestJig) CreateTCPUDPServicePods(replica int) error {
 	config := testutils.RCConfig{
 		Client:       j.Client,
 		Name:         j.Name,

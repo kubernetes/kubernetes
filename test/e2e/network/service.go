@@ -1228,7 +1228,7 @@ var _ = SIGDescribe("Services", func() {
 		})
 		framework.ExpectNoError(err)
 
-		err = jig.CreateTCPUDPServicePods(2)
+		err = jig.CreateServicePods(2)
 		framework.ExpectNoError(err)
 		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
 		err = jig.CheckServiceReachability(nodePortService, execPod)
