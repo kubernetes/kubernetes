@@ -101,6 +101,7 @@ func TestController_DiscoveryError(t *testing.T) {
 		"GarbageCollectorController":       startGarbageCollectorController,
 		"EndpointSliceController":          startEndpointSliceController,
 		"EndpointSliceMirroringController": startEndpointSliceMirroringController,
+		"PodDisruptionBudgetController":    startDisruptionController,
 	}
 
 	tcs := map[string]struct {
