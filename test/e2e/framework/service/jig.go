@@ -48,6 +48,7 @@ import (
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	utilsnet "k8s.io/utils/net"
 )
 
 // NodePortRange should match whatever the default/configured range is
@@ -830,7 +831,7 @@ func testReachabilityOverExternalIP(externalIP string, sp v1.ServicePort, execPo
 func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod, clusterIP string) error {
 	internalAddrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
 	externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
-	isClusterIPV4 := net.ParseIP(clusterIP).To4() != nil
+	isClusterIPV4 := utilsnet.IsIPv4String(clusterIP)
 
 	for _, internalAddr := range internalAddrs {
 		// If the node's internal address points to localhost, then we are not
@@ -839,10 +840,8 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 			framework.Logf("skipping testEndpointReachability() for internal adddress %s", internalAddr)
 			continue
 		}
-		isNodeInternalIPV4 := net.ParseIP(internalAddr).To4() != nil
-		// Check service reachability on the node internalIP which is same family
-		// as clusterIP
-		if isClusterIPV4 != isNodeInternalIPV4 {
+		// Check service reachability on the node internalIP which is same family as clusterIP
+		if isClusterIPV4 != utilsnet.IsIPv4String(internalAddr) {
 			framework.Logf("skipping testEndpointReachability() for internal adddress %s as it does not match clusterIP (%s) family", internalAddr, clusterIP)
 			continue
 		}
@@ -853,8 +852,7 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 		}
 	}
 	for _, externalAddr := range externalAddrs {
-		isNodeExternalIPV4 := net.ParseIP(externalAddr).To4() != nil
-		if isClusterIPV4 != isNodeExternalIPV4 {
+		if isClusterIPV4 != utilsnet.IsIPv4String(externalAddr) {
 			framework.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
 			continue
 		}
