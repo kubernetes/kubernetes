@@ -275,6 +275,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 		wantModes                     []storage.VolumeLifecycleMode
 		wantTokenRequests             []storage.TokenRequest
 		wantRequiresRepublish         *bool
+		wantGeneration                int64
 	}{
 		{
 			name:                      "capacity feature enabled, before: none, update: enabled",
@@ -321,6 +322,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			update:                        driverWithServiceAccountTokenGCP,
 			wantTokenRequests:             []storage.TokenRequest{{Audience: gcp}},
 			wantRequiresRepublish:         &enabled,
+			wantGeneration:                1,
 		},
 		{
 			name:                  "service account token feature disabled, before: none, update: audience=gcp",
@@ -335,6 +337,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			update:                driverWithServiceAccountTokenGCP,
 			wantTokenRequests:     []storage.TokenRequest{{Audience: gcp}},
 			wantRequiresRepublish: &enabled,
+			wantGeneration:        1,
 		},
 	}
 
@@ -346,6 +349,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 
 			csiDriver := test.update.DeepCopy()
 			Strategy.PrepareForUpdate(ctx, csiDriver, test.old)
+			require.Equal(t, test.wantGeneration, csiDriver.GetGeneration())
 			require.Equal(t, test.wantCapacity, csiDriver.Spec.StorageCapacity)
 			require.Equal(t, test.wantModes, csiDriver.Spec.VolumeLifecycleModes)
 			require.Equal(t, test.wantTokenRequests, csiDriver.Spec.TokenRequests)

@@ -656,6 +656,7 @@ const (
 
 	// owner: @zshihang
 	// alpha: v1.20
+	// beta: v1.21
 	//
 	// Enable kubelet to pass pod's service account token to NodePublishVolume
 	// call of CSI driver which is mounting volumes for that pod.
@@ -801,7 +802,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	BalanceAttachedNodeVolumes:                     {Default: false, PreRelease: featuregate.Alpha},
 	CSIInlineVolume:                                {Default: true, PreRelease: featuregate.Beta},
 	CSIStorageCapacity:                             {Default: true, PreRelease: featuregate.Beta},
-	CSIServiceAccountToken:                         {Default: false, PreRelease: featuregate.Alpha},
+	CSIServiceAccountToken:                         {Default: true, PreRelease: featuregate.Beta},
 	GenericEphemeralVolume:                         {Default: true, PreRelease: featuregate.Beta},
 	CSIVolumeFSGroupPolicy:                         {Default: true, PreRelease: featuregate.Beta},
 	RuntimeClass:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23

@@ -19,6 +19,7 @@ package csidriver
 import (
 	"context"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -64,10 +65,7 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csiDriver := obj.(*storage.CSIDriver)
 
-	errs := validation.ValidateCSIDriver(csiDriver)
-	errs = append(errs, validation.ValidateCSIDriver(csiDriver)...)
-
-	return errs
+	return validation.ValidateCSIDriver(csiDriver)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -82,31 +80,33 @@ func (csiDriverStrategy) AllowCreateOnUpdate() bool {
 // existing object does not already have that field set. This allows the field to remain when
 // downgrading to a version that has the feature disabled.
 func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	if old.(*storage.CSIDriver).Spec.StorageCapacity == nil &&
+	newCSIDriver := obj.(*storage.CSIDriver)
+	oldCSIDriver := old.(*storage.CSIDriver)
+
+	if oldCSIDriver.Spec.StorageCapacity == nil &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
-		newCSIDriver := obj.(*storage.CSIDriver)
 		newCSIDriver.Spec.StorageCapacity = nil
 	}
-	if old.(*storage.CSIDriver).Spec.VolumeLifecycleModes == nil &&
+	if oldCSIDriver.Spec.VolumeLifecycleModes == nil &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		newCSIDriver := obj.(*storage.CSIDriver)
 		newCSIDriver.Spec.VolumeLifecycleModes = nil
 	}
-	if old.(*storage.CSIDriver).Spec.FSGroupPolicy == nil &&
+	if oldCSIDriver.Spec.FSGroupPolicy == nil &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
-		newCSIDriver := obj.(*storage.CSIDriver)
 		newCSIDriver.Spec.FSGroupPolicy = nil
 	}
-	if old.(*storage.CSIDriver).Spec.TokenRequests == nil &&
+	if oldCSIDriver.Spec.TokenRequests == nil &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
-		csiDriver := obj.(*storage.CSIDriver)
-		csiDriver.Spec.TokenRequests = nil
+		newCSIDriver.Spec.TokenRequests = nil
+	}
+	if oldCSIDriver.Spec.RequiresRepublish == nil &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
+		newCSIDriver.Spec.RequiresRepublish = nil
 	}
 
-	if old.(*storage.CSIDriver).Spec.RequiresRepublish == nil &&
-		!utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
-		csiDriver := obj.(*storage.CSIDriver)
-		csiDriver.Spec.RequiresRepublish = nil
+	// Any changes to the mutable fields increment the generation number.
+	if !apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.TokenRequests, newCSIDriver.Spec.TokenRequests) || !apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.RequiresRepublish, newCSIDriver.Spec.RequiresRepublish) {
+		newCSIDriver.Generation = oldCSIDriver.Generation + 1
 	}
 }
 

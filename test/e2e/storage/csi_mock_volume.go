@@ -1368,7 +1368,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 	})
 
-	ginkgo.Context("CSIServiceAccountToken [Feature:CSIServiceAccountToken]", func() {
+	ginkgo.Context("CSIServiceAccountToken", func() {
 		var (
 			err error
 		)
