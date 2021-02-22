@@ -382,29 +382,30 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 
 	for _, tt := range tests {
 		b.Run(tt.name, func(b *testing.B) {
-			c := clock.NewFakeClock(time.Now())
-			q := NewPriorityQueue(newDefaultQueueSort(), WithClock(c))
-
-			// Init pods in activeQ.
-			for i := 0; i < tt.podsInActiveQ; i++ {
-				p := podTemplates[i%len(podTemplates)].DeepCopy()
-				p.Name, p.UID = fmt.Sprintf("%v-%v", p.Name, i), types.UID(fmt.Sprintf("%v-%v", p.UID, i))
-				q.Add(p)
-			}
-			// Init pods in unschedulableQ.
-			for i := 0; i < tt.podsInUnschedulableQ; i++ {
-				p := podTemplates[i%len(podTemplates)].DeepCopy()
-				p.Name, p.UID = fmt.Sprintf("%v-%v", p.Name, i+tt.podsInActiveQ), types.UID(fmt.Sprintf("%v-%v", p.UID, i+tt.podsInActiveQ))
-				podInfo := q.newQueuedPodInfo(p)
-				podInfo.Attempts = 1
-				q.AddUnschedulableIfNotPresent(podInfo, q.SchedulingCycle())
-			}
-
-			// We cannot use wait.Until() as it wraps a RealClock.
-			go wait.BackoffUntil(q.flushBackoffQCompleted, wait.NewJitteredBackoffManager(1.0*time.Second, 0.0, c), true, q.stop)
-
-			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+				c := clock.NewFakeClock(time.Now())
+				q := NewPriorityQueue(newDefaultQueueSort(), WithClock(c))
+
+				// Init pods in activeQ.
+				for i := 0; i < tt.podsInActiveQ; i++ {
+					p := podTemplates[i%len(podTemplates)].DeepCopy()
+					p.Name, p.UID = fmt.Sprintf("%v-%v", p.Name, i), types.UID(fmt.Sprintf("%v-%v", p.UID, i))
+					q.Add(p)
+				}
+				// Init pods in unschedulableQ.
+				for i := 0; i < tt.podsInUnschedulableQ; i++ {
+					p := podTemplates[i%len(podTemplates)].DeepCopy()
+					p.Name, p.UID = fmt.Sprintf("%v-%v", p.Name, i+tt.podsInActiveQ), types.UID(fmt.Sprintf("%v-%v", p.UID, i+tt.podsInActiveQ))
+					podInfo := q.newQueuedPodInfo(p)
+					podInfo.Attempts = 1
+					q.AddUnschedulableIfNotPresent(podInfo, q.SchedulingCycle())
+				}
+
+				// We cannot use wait.Until() as it wraps a RealClock.
+				go wait.BackoffUntil(q.flushBackoffQCompleted, wait.NewJitteredBackoffManager(1.0*time.Second, 0.0, c), true, q.stop)
+
+				b.StartTimer()
 				// Iterate 10 times, each time we step 1 second forward.
 				for j := 0; j < 10; j++ {
 					c.Step(time.Second)
