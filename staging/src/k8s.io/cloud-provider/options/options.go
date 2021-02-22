@@ -194,12 +194,10 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 		ClientConfig: c.Kubeconfig,
 	}
 	if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
-		c.ClientBuilder = clientbuilder.SAControllerClientBuilder{
-			ClientConfig:         restclient.AnonymousClientConfig(c.Kubeconfig),
-			CoreClient:           c.Client.CoreV1(),
-			AuthenticationClient: c.Client.AuthenticationV1(),
-			Namespace:            metav1.NamespaceSystem,
-		}
+		c.ClientBuilder = clientbuilder.NewDynamicClientBuilder(
+			restclient.AnonymousClientConfig(c.Kubeconfig),
+			c.Client.CoreV1(),
+			metav1.NamespaceSystem)
 	} else {
 		c.ClientBuilder = rootClientBuilder
 	}
