@@ -59,7 +59,7 @@ func waitForPods(f *framework.Framework, podCount int, timeout time.Duration) (r
 	return runningPods
 }
 
-var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeature:ContainerRuntimeRestart]", func() {
+var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeature:ContainerRuntimeRestart]", func() {
 	const (
 		// Saturate the node. It's not necessary that all these pods enter
 		// Running/Ready, because we don't know the number of cores in the

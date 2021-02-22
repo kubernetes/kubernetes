@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2enode
+package gcp
 
 import (
 	"bytes"
@@ -320,7 +320,7 @@ func checkDockerStorageDriver() error {
 	return fmt.Errorf("failed to find storage driver")
 }
 
-var _ = framework.KubeDescribe("GKE system requirements [NodeConformance][Feature:GKEEnv][NodeFeature:GKEEnv]", func() {
+var _ = SIGDescribe("GKE system requirements [NodeConformance][Feature:GKEEnv][NodeFeature:GKEEnv]", func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.RunIfSystemSpecNameIs("gke")
 	})
@@ -436,4 +436,14 @@ func getKernelVersion() (*semver.Version, error) {
 		return nil, fmt.Errorf("failed to convert %q to semantic version: %s", v, err)
 	}
 	return &kernelVersion, nil
+}
+
+// runCommand runs the cmd and returns the combined stdout and stderr, or an
+// error if the command failed.
+func runCommand(cmd ...string) (string, error) {
+	output, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to run %q: %s (%s)", strings.Join(cmd, " "), err, output)
+	}
+	return string(output), nil
 }

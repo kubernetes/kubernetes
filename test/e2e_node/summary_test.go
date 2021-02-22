@@ -38,7 +38,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
+var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("summary-test")
 	ginkgo.Context("when querying /stats/summary", func() {
 		ginkgo.AfterEach(func() {

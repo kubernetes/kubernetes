@@ -63,7 +63,7 @@ var (
 )
 
 // Serial because the test restarts Kubelet
-var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
+var _ = SIGDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
 	testDevicePlugin(f, "/var/lib/kubelet/plugins_registry")
 })

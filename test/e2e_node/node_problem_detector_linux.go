@@ -42,7 +42,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector] [Serial]", func() {
+var _ = SIGDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector] [Serial]", func() {
 	const (
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second
@@ -68,7 +68,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 	})
 
 	// Test system log monitor. We may add other tests if we have more problem daemons in the future.
-	framework.KubeDescribe("SystemLogMonitor", func() {
+	ginkgo.Describe("SystemLogMonitor", func() {
 		const (
 			// Use test condition to avoid changing the real node condition in use.
 			// TODO(random-liu): Now node condition could be arbitrary string, consider whether we need to

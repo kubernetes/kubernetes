@@ -66,7 +66,7 @@ const (
 
 // InodeEviction tests that the node responds to node disk pressure by evicting only responsible pods.
 // Node disk pressure is induced by consuming all inodes on the node.
-var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
+var _ = SIGDescribe("InodeEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("inode-eviction-test")
 	expectedNodeCondition := v1.NodeDiskPressure
 	expectedStarvedResource := resourceInodes
@@ -102,7 +102,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive][NodeF
 
 // ImageGCNoEviction tests that the node does not evict pods when inodes are consumed by images
 // Disk pressure is induced by pulling large images
-var _ = framework.KubeDescribe("ImageGCNoEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
+var _ = SIGDescribe("ImageGCNoEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("image-gc-eviction-test")
 	pressureTimeout := 10 * time.Minute
 	expectedNodeCondition := v1.NodeDiskPressure
@@ -132,7 +132,7 @@ var _ = framework.KubeDescribe("ImageGCNoEviction [Slow] [Serial] [Disruptive][N
 
 // MemoryAllocatableEviction tests that the node responds to node memory pressure by evicting only responsible pods.
 // Node memory pressure is only encountered because we reserve the majority of the node's capacity via kube-reserved.
-var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
+var _ = SIGDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("memory-allocatable-eviction-test")
 	expectedNodeCondition := v1.NodeMemoryPressure
 	expectedStarvedResource := v1.ResourceMemory
@@ -165,7 +165,7 @@ var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disru
 
 // LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
 // Disk pressure is induced by running pods which consume disk space.
-var _ = framework.KubeDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
+var _ = SIGDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
 	pressureTimeout := 10 * time.Minute
 	expectedNodeCondition := v1.NodeDiskPressure
@@ -194,7 +194,7 @@ var _ = framework.KubeDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive
 // LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
 // Disk pressure is induced by running pods which consume disk space, which exceed the soft eviction threshold.
 // Note: This test's purpose is to test Soft Evictions.  Local storage was chosen since it is the least costly to run.
-var _ = framework.KubeDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
+var _ = SIGDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
 	pressureTimeout := 10 * time.Minute
 	expectedNodeCondition := v1.NodeDiskPressure
@@ -230,7 +230,7 @@ var _ = framework.KubeDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disrup
 })
 
 // LocalStorageCapacityIsolationEviction tests that container and volume local storage limits are enforced through evictions
-var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolation][NodeFeature:Eviction]", func() {
+var _ = SIGDescribe("LocalStorageCapacityIsolationEviction [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolation][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
 	evictionTestTimeout := 10 * time.Minute
 	ginkgo.Context(fmt.Sprintf(testContextFmt, "evictions due to pod local storage violations"), func() {
@@ -282,7 +282,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 // PriorityMemoryEvictionOrdering tests that the node responds to node memory pressure by evicting pods.
 // This test tests that the guaranteed pod is never evicted, and that the lower-priority pod is evicted before
 // the higher priority pod.
-var _ = framework.KubeDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
+var _ = SIGDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("priority-memory-eviction-ordering-test")
 	expectedNodeCondition := v1.NodeMemoryPressure
 	expectedStarvedResource := v1.ResourceMemory
@@ -339,7 +339,7 @@ var _ = framework.KubeDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [
 // PriorityLocalStorageEvictionOrdering tests that the node responds to node disk pressure by evicting pods.
 // This test tests that the guaranteed pod is never evicted, and that the lower-priority pod is evicted before
 // the higher priority pod.
-var _ = framework.KubeDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
+var _ = SIGDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("priority-disk-eviction-ordering-test")
 	expectedNodeCondition := v1.NodeDiskPressure
 	expectedStarvedResource := v1.ResourceEphemeralStorage
@@ -395,7 +395,7 @@ var _ = framework.KubeDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Ser
 })
 
 // PriorityPidEvictionOrdering tests that the node emits pid pressure in response to a fork bomb, and evicts pods by priority
-var _ = framework.KubeDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
+var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("pidpressure-eviction-test")
 	pressureTimeout := 2 * time.Minute
 	expectedNodeCondition := v1.NodePIDPressure

@@ -35,7 +35,7 @@ const (
 	logContainerName = "logger"
 )
 
-var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
+var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
 	var podClient *framework.PodClient
 
