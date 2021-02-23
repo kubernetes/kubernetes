@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package storage
 
 import (
 	"context"
@@ -33,7 +33,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var _ = SIGStorageDescribe("ConfigMap", func() {
+var _ = SIGDescribe("ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
 	/*

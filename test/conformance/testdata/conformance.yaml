@@ -485,7 +485,7 @@
     Container will execute curl command to reach the service port within specified
     max retry limit and MUST result in reporting unique hostnames.
   release: v1.9, v1.18
-  file: test/e2e/common/networking.go
+  file: test/e2e/common/network/networking.go
 - testname: Networking, intra pod udp
   codename: '[k8s.io] [sig-network] Networking Granular Checks: Pods should function
     for intra-pod communication: udp [NodeConformance] [Conformance]'
@@ -497,7 +497,7 @@
     Container will execute curl command to reach the service port within specified
     max retry limit and MUST result in reporting unique hostnames.
   release: v1.9, v1.18
-  file: test/e2e/common/networking.go
+  file: test/e2e/common/network/networking.go
 - testname: Networking, intra pod http, from node
   codename: '[k8s.io] [sig-network] Networking Granular Checks: Pods should function
     for node-pod communication: http [LinuxOnly] [NodeConformance] [Conformance]'
@@ -511,7 +511,7 @@
     hostnames. This test is marked LinuxOnly since HostNetwork is not supported on
     other platforms like Windows.
   release: v1.9
-  file: test/e2e/common/networking.go
+  file: test/e2e/common/network/networking.go
 - testname: Networking, intra pod http, from node
   codename: '[k8s.io] [sig-network] Networking Granular Checks: Pods should function
     for node-pod communication: udp [LinuxOnly] [NodeConformance] [Conformance]'
@@ -525,28 +525,28 @@
     hostnames. This test is marked LinuxOnly since HostNetwork is not supported on
     other platforms like Windows.
   release: v1.9
-  file: test/e2e/common/networking.go
+  file: test/e2e/common/network/networking.go
 - testname: ConfigMap, from environment field
   codename: '[k8s.io] [sig-node] ConfigMap should be consumable via environment variable
     [NodeConformance] [Conformance]'
   description: Create a Pod with an environment variable value set using a value from
     ConfigMap. A ConfigMap value MUST be accessible in the container environment.
   release: v1.9
-  file: test/e2e/common/configmap.go
+  file: test/e2e/common/node/configmap.go
 - testname: ConfigMap, from environment variables
   codename: '[k8s.io] [sig-node] ConfigMap should be consumable via the environment
     [NodeConformance] [Conformance]'
   description: Create a Pod with a environment source from ConfigMap. All ConfigMap
     values MUST be available as environment variables in the container.
   release: v1.9
-  file: test/e2e/common/configmap.go
+  file: test/e2e/common/node/configmap.go
 - testname: ConfigMap, with empty-key
   codename: '[k8s.io] [sig-node] ConfigMap should fail to create ConfigMap with empty
     key [Conformance]'
   description: Attempt to create a ConfigMap with an empty key. The creation MUST
     fail.
   release: v1.14
-  file: test/e2e/common/configmap.go
+  file: test/e2e/common/node/configmap.go
 - testname: ConfigMap lifecycle
   codename: '[k8s.io] [sig-node] ConfigMap should run through a ConfigMap lifecycle
     [Conformance]'
@@ -555,21 +555,21 @@
     selector it MUST find the ConfigMap by it's static label and updated value. The
     ConfigMap must be deleted by Collection.
   release: v1.19
-  file: test/e2e/common/configmap.go
+  file: test/e2e/common/node/configmap.go
 - testname: DownwardAPI, environment for CPU and memory limits and requests
   codename: '[k8s.io] [sig-node] Downward API should provide container''s limits.cpu/memory
     and requests.cpu/memory as env vars [NodeConformance] [Conformance]'
   description: Downward API MUST expose CPU request and Memory request set through
     environment variables at runtime in the container.
   release: v1.9
-  file: test/e2e/common/downward_api.go
+  file: test/e2e/common/downwardapi.go
 - testname: DownwardAPI, environment for default CPU and memory limits and requests
   codename: '[k8s.io] [sig-node] Downward API should provide default limits.cpu/memory
     from node allocatable [NodeConformance] [Conformance]'
   description: Downward API MUST expose CPU request and Memory limits set through
     environment variables at runtime in the container.
   release: v1.9
-  file: test/e2e/common/downward_api.go
+  file: test/e2e/common/downwardapi.go
 - testname: DownwardAPI, environment for host ip
   codename: '[k8s.io] [sig-node] Downward API should provide host IP as an env var
     [NodeConformance] [Conformance]'
@@ -577,14 +577,14 @@
     Specify host IP as environment variable in the Pod Spec are visible at runtime
     in the container.
   release: v1.9
-  file: test/e2e/common/downward_api.go
+  file: test/e2e/common/downwardapi.go
 - testname: DownwardAPI, environment for Pod UID
   codename: '[k8s.io] [sig-node] Downward API should provide pod UID as env vars [NodeConformance]
     [Conformance]'
   description: Downward API MUST expose Pod UID set through environment variables
     at runtime in the container.
   release: v1.9
-  file: test/e2e/common/downward_api.go
+  file: test/e2e/common/downwardapi.go
 - testname: DownwardAPI, environment for name, namespace and ip
   codename: '[k8s.io] [sig-node] Downward API should provide pod name, namespace and
     IP address as env vars [NodeConformance] [Conformance]'
@@ -592,7 +592,7 @@
     Specify Pod Name, namespace and IP as environment variable in the Pod Spec are
     visible at runtime in the container.
   release: v1.9
-  file: test/e2e/common/downward_api.go
+  file: test/e2e/common/downwardapi.go
 - testname: Pod events, verify event from Scheduler and Kubelet
   codename: '[k8s.io] [sig-node] Events should be sent by kubelets and the scheduler
     about pods scheduling and running  [Conformance]'
@@ -624,7 +624,7 @@
     be found when listed. The set of Pod Templates is deleted and MUST NOT show up
     when listed by its label selector.
   release: v1.19
-  file: test/e2e/common/podtemplates.go
+  file: test/e2e/common/node/podtemplates.go
 - testname: PodTemplate lifecycle
   codename: '[k8s.io] [sig-node] PodTemplates should run the lifecycle of PodTemplates
     [Conformance]'
@@ -633,7 +633,7 @@
     selector it MUST find the PodTemplate by it's static label and updated value.
     The PodTemplate must be deleted.
   release: v1.19
-  file: test/e2e/common/podtemplates.go
+  file: test/e2e/common/node/podtemplates.go
 - testname: Pods, QOS
   codename: '[k8s.io] [sig-node] Pods Extended [k8s.io] Pods Set QOS Class should
     be set on Pods with matching resource requests and limits for memory and cpu [Conformance]'
@@ -660,7 +660,7 @@
     document. The runtimeclasses resource must support create, get, list, watch, update,
     patch, delete, and deletecollection.'
   release: v1.20
-  file: test/e2e/common/runtimeclass.go
+  file: test/e2e/common/node/runtimeclass.go
 - testname: Security Context, test RunAsGroup at container level
   codename: '[k8s.io] [sig-node] Security Context should support container.SecurityContext.RunAsUser
     And container.SecurityContext.RunAsGroup [LinuxOnly] [Conformance]'
@@ -687,7 +687,7 @@
     to custom path in the Pod. ConfigMap's text data and binary data MUST be verified
     by reading the content from the mounted files in the Pod.
   release: v1.12
-  file: test/e2e/common/configmap_volume.go
+  file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, create, update and delete
   codename: '[k8s.io] [sig-storage] ConfigMap optional updates should be reflected
     in volume [NodeConformance] [Conformance]'
@@ -697,7 +697,7 @@
     the content from the mounted file in the Pod. Also when the item(file) is deleted
     from the map that MUST result in a error reading that item(file).
   release: v1.9
-  file: test/e2e/common/configmap_volume.go
+  file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, without mapping
   codename: '[k8s.io] [sig-storage] ConfigMap should be consumable from pods in volume
     [NodeConformance] [Conformance]'
@@ -707,7 +707,7 @@
     content of the file MUST be readable and verified and file modes MUST default
     to 0x644.
   release: v1.9
-  file: test/e2e/common/configmap_volume.go
+  file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, without mapping, non-root user
   codename: '[k8s.io] [sig-storage] ConfigMap should be consumable from pods in volume
     as non-root [NodeConformance] [Conformance]'
@@ -717,7 +717,7 @@
     created Pod using the volume mount. The file on the volume MUST have file mode
     set to default value of 0x644.
   release: v1.9
-  file: test/e2e/common/configmap_volume.go
+  file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, without mapping, volume mode set
   codename: '[k8s.io] [sig-storage] ConfigMap should be consumable from pods in volume
     with defaultMode set [LinuxOnly] [NodeConformance] [Conformance]'
@@ -729,7 +729,7 @@
     This test is marked LinuxOnly since Windows does not support setting specific
     file permissions.
   release: v1.9
-  file: test/e2e/common/configmap_volume.go
+  file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, with mapping
   codename: '[k8s.io] [sig-storage] ConfigMap should be consumable from pods in volume
     with mappings [NodeConformance] [Conformance]'
@@ -739,7 +739,7 @@
     created Pod using the volume mount. The data content of the file MUST be readable
     and verified and file modes MUST default to 0x644.
   release: v1.9
-  file: test/e2e/common/configmap_volume.go
+  file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, with mapping, volume mode set
   codename: '[k8s.io] [sig-storage] ConfigMap should be consumable from pods in volume
     with mappings and Item mode set [LinuxOnly] [NodeConformance] [Conformance]'
@@ -751,7 +751,7 @@
     MUST be set to the custom value of '0x400' This test is marked LinuxOnly since
     Windows does not support setting specific file permissions.
   release: v1.9
-  file: test/e2e/common/configmap_volume.go
+  file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, with mapping, non-root user
   codename: '[k8s.io] [sig-storage] ConfigMap should be consumable from pods in volume
     with mappings as non-root [NodeConformance] [Conformance]'
@@ -761,7 +761,7 @@
     MUST be accessible to read from the newly created Pod using the volume mount.
     The file on the volume MUST have file mode set to default value of 0x644.
   release: v1.9
-  file: test/e2e/common/configmap_volume.go
+  file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, multiple volume maps
   codename: '[k8s.io] [sig-storage] ConfigMap should be consumable in multiple volumes
     in the same pod [NodeConformance] [Conformance]'
@@ -769,7 +769,7 @@
     created Pod using the volume mount that is mapped to multiple paths in the Pod.
     The content MUST be accessible from all the mapped volume mounts.
   release: v1.9
-  file: test/e2e/common/configmap_volume.go
+  file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, immutability
   codename: '[k8s.io] [sig-storage] ConfigMap should be immutable if `immutable` field
     is set [Conformance]'
@@ -779,7 +779,7 @@
     MUST fail. Try to update the ConfigMap`s metadata (labels), the update must succeed.
     Try to delete the ConfigMap, the deletion must succeed.
   release: v1.21
-  file: test/e2e/common/configmap_volume.go
+  file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, update
   codename: '[k8s.io] [sig-storage] ConfigMap updates should be reflected in volume
     [NodeConformance] [Conformance]'
@@ -788,7 +788,7 @@
     the ConfigMap is updated the change to the config map MUST be verified by reading
     the content from the mounted file in the Pod.
   release: v1.9
-  file: test/e2e/common/configmap_volume.go
+  file: test/e2e/common/storage/configmap_volume.go
 - testname: DownwardAPI volume, CPU limits
   codename: '[k8s.io] [sig-storage] Downward API volume should provide container''s
     cpu limit [NodeConformance] [Conformance]'
@@ -796,7 +796,7 @@
     contains a item for the CPU limits. The container runtime MUST be able to access
     CPU limits from the specified path on the mounted volume.
   release: v1.9
-  file: test/e2e/common/downwardapi_volume.go
+  file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, CPU request
   codename: '[k8s.io] [sig-storage] Downward API volume should provide container''s
     cpu request [NodeConformance] [Conformance]'
@@ -804,7 +804,7 @@
     contains a item for the CPU request. The container runtime MUST be able to access
     CPU request from the specified path on the mounted volume.
   release: v1.9
-  file: test/e2e/common/downwardapi_volume.go
+  file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, memory limits
   codename: '[k8s.io] [sig-storage] Downward API volume should provide container''s
     memory limit [NodeConformance] [Conformance]'
@@ -812,7 +812,7 @@
     contains a item for the memory limits. The container runtime MUST be able to access
     memory limits from the specified path on the mounted volume.
   release: v1.9
-  file: test/e2e/common/downwardapi_volume.go
+  file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, memory request
   codename: '[k8s.io] [sig-storage] Downward API volume should provide container''s
     memory request [NodeConformance] [Conformance]'
@@ -820,7 +820,7 @@
     contains a item for the memory request. The container runtime MUST be able to
     access memory request from the specified path on the mounted volume.
   release: v1.9
-  file: test/e2e/common/downwardapi_volume.go
+  file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, CPU limit, default node allocatable
   codename: '[k8s.io] [sig-storage] Downward API volume should provide node allocatable
     (cpu) as default cpu limit if the limit is not set [NodeConformance] [Conformance]'
@@ -829,7 +829,7 @@
     The container runtime MUST be able to access CPU limits from the specified path
     on the mounted volume and the value MUST be default node allocatable.
   release: v1.9
-  file: test/e2e/common/downwardapi_volume.go
+  file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, memory limit, default node allocatable
   codename: '[k8s.io] [sig-storage] Downward API volume should provide node allocatable
     (memory) as default memory limit if the limit is not set [NodeConformance] [Conformance]'
@@ -838,7 +838,7 @@
     container. The container runtime MUST be able to access memory limits from the
     specified path on the mounted volume and the value MUST be default node allocatable.
   release: v1.9
-  file: test/e2e/common/downwardapi_volume.go
+  file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, pod name
   codename: '[k8s.io] [sig-storage] Downward API volume should provide podname only
     [NodeConformance] [Conformance]'
@@ -846,7 +846,7 @@
     contains a item for the Pod name. The container runtime MUST be able to access
     Pod name from the specified path on the mounted volume.
   release: v1.9
-  file: test/e2e/common/downwardapi_volume.go
+  file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, volume mode 0400
   codename: '[k8s.io] [sig-storage] Downward API volume should set DefaultMode on
     files [LinuxOnly] [NodeConformance] [Conformance]'
@@ -856,7 +856,7 @@
     path on the mounted volume. This test is marked LinuxOnly since Windows does not
     support setting specific file permissions.
   release: v1.9
-  file: test/e2e/common/downwardapi_volume.go
+  file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, file mode 0400
   codename: '[k8s.io] [sig-storage] Downward API volume should set mode on item file
     [LinuxOnly] [NodeConformance] [Conformance]'
@@ -866,7 +866,7 @@
     volume. This test is marked LinuxOnly since Windows does not support setting specific
     file permissions.
   release: v1.9
-  file: test/e2e/common/downwardapi_volume.go
+  file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, update annotations
   codename: '[k8s.io] [sig-storage] Downward API volume should update annotations
     on modification [NodeConformance] [Conformance]'
@@ -876,7 +876,7 @@
     volume. Update the annotations by adding a new annotation to the running Pod.
     The new annotation MUST be available from the mounted volume.
   release: v1.9
-  file: test/e2e/common/downwardapi_volume.go
+  file: test/e2e/common/storage/downwardapi_volume.go
 - testname: DownwardAPI volume, update label
   codename: '[k8s.io] [sig-storage] Downward API volume should update labels on modification
     [NodeConformance] [Conformance]'
@@ -886,7 +886,7 @@
     the labels by adding a new label to the running Pod. The new label MUST be available
     from the mounted volume.
   release: v1.9
-  file: test/e2e/common/downwardapi_volume.go
+  file: test/e2e/common/storage/downwardapi_volume.go
 - testname: EmptyDir, Shared volumes between containers
   codename: '[k8s.io] [sig-storage] EmptyDir volumes pod should support shared volumes
     between containers [Conformance]'
@@ -895,7 +895,7 @@
     mounted to the pod. The main container shoud wait until the sub container drops
     a file, and main container acess the shared data.
   release: v1.15
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0644
   codename: '[k8s.io] [sig-storage] EmptyDir volumes should support (non-root,0644,default)
     [LinuxOnly] [NodeConformance] [Conformance]'
@@ -905,7 +905,7 @@
     MUST be readable. This test is marked LinuxOnly since Windows does not support
     setting specific file permissions, or running as UID / GID.
   release: v1.9
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0644, non-root user
   codename: '[k8s.io] [sig-storage] EmptyDir volumes should support (non-root,0644,tmpfs)
     [LinuxOnly] [NodeConformance] [Conformance]'
@@ -916,7 +916,7 @@
     since Windows does not support setting specific file permissions, or running as
     UID / GID, or the medium = 'Memory'.
   release: v1.9
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0666
   codename: '[k8s.io] [sig-storage] EmptyDir volumes should support (non-root,0666,default)
     [LinuxOnly] [NodeConformance] [Conformance]'
@@ -926,7 +926,7 @@
     MUST be readable. This test is marked LinuxOnly since Windows does not support
     setting specific file permissions, or running as UID / GID.
   release: v1.9
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0666,, non-root user
   codename: '[k8s.io] [sig-storage] EmptyDir volumes should support (non-root,0666,tmpfs)
     [LinuxOnly] [NodeConformance] [Conformance]'
@@ -937,7 +937,7 @@
     since Windows does not support setting specific file permissions, or running as
     UID / GID, or the medium = 'Memory'.
   release: v1.9
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0777
   codename: '[k8s.io] [sig-storage] EmptyDir volumes should support (non-root,0777,default)
     [LinuxOnly] [NodeConformance] [Conformance]'
@@ -947,7 +947,7 @@
     MUST be readable. This test is marked LinuxOnly since Windows does not support
     setting specific file permissions, or running as UID / GID.
   release: v1.9
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0777, non-root user
   codename: '[k8s.io] [sig-storage] EmptyDir volumes should support (non-root,0777,tmpfs)
     [LinuxOnly] [NodeConformance] [Conformance]'
@@ -958,7 +958,7 @@
     since Windows does not support setting specific file permissions, or running as
     UID / GID, or the medium = 'Memory'.
   release: v1.9
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0644
   codename: '[k8s.io] [sig-storage] EmptyDir volumes should support (root,0644,default)
     [LinuxOnly] [NodeConformance] [Conformance]'
@@ -967,7 +967,7 @@
     MUST be readable. This test is marked LinuxOnly since Windows does not support
     setting specific file permissions, or running as UID / GID.
   release: v1.9
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0644
   codename: '[k8s.io] [sig-storage] EmptyDir volumes should support (root,0644,tmpfs)
     [LinuxOnly] [NodeConformance] [Conformance]'
@@ -977,7 +977,7 @@
     Windows does not support setting specific file permissions, or running as UID
     / GID, or the medium = 'Memory'.
   release: v1.9
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0666
   codename: '[k8s.io] [sig-storage] EmptyDir volumes should support (root,0666,default)
     [LinuxOnly] [NodeConformance] [Conformance]'
@@ -986,7 +986,7 @@
     MUST be readable. This test is marked LinuxOnly since Windows does not support
     setting specific file permissions, or running as UID / GID.
   release: v1.9
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0666
   codename: '[k8s.io] [sig-storage] EmptyDir volumes should support (root,0666,tmpfs)
     [LinuxOnly] [NodeConformance] [Conformance]'
@@ -996,7 +996,7 @@
     Windows does not support setting specific file permissions, or running as UID
     / GID, or the medium = 'Memory'.
   release: v1.9
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0777
   codename: '[k8s.io] [sig-storage] EmptyDir volumes should support (root,0777,default)
     [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1005,7 +1005,7 @@
     MUST be readable. This test is marked LinuxOnly since Windows does not support
     setting specific file permissions, or running as UID / GID.
   release: v1.9
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode 0777
   codename: '[k8s.io] [sig-storage] EmptyDir volumes should support (root,0777,tmpfs)
     [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1015,7 +1015,7 @@
     since Windows does not support setting specific file permissions, or running as
     UID / GID, or the medium = 'Memory'.
   release: v1.9
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode default
   codename: '[k8s.io] [sig-storage] EmptyDir volumes volume on default medium should
     have the correct mode [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1023,7 +1023,7 @@
     set as -rwxrwxrwx and mount type set to tmpfs. This test is marked LinuxOnly since
     Windows does not support setting specific file permissions.
   release: v1.9
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium memory, volume mode default
   codename: '[k8s.io] [sig-storage] EmptyDir volumes volume on tmpfs should have the
     correct mode [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1032,7 +1032,7 @@
     is marked LinuxOnly since Windows does not support setting specific file permissions,
     or the medium = 'Memory'.
   release: v1.9
-  file: test/e2e/common/empty_dir.go
+  file: test/e2e/common/storage/empty_dir.go
 - testname: Projected Volume, multiple projections
   codename: '[k8s.io] [sig-storage] Projected combined should project all components
     that make up the projection API [Projection][NodeConformance] [Conformance]'
@@ -1041,7 +1041,7 @@
     Pod MUST be able to read the secrets, configMap values and the cpu and memory
     limits as well as cpu and memory requests from the mounted DownwardAPIVolumeFiles.
   release: v1.9
-  file: test/e2e/common/projected_combined.go
+  file: test/e2e/common/storage/projected_combined.go
 - testname: Projected Volume, ConfigMap, create, update and delete
   codename: '[k8s.io] [sig-storage] Projected configMap optional updates should be
     reflected in volume [NodeConformance] [Conformance]'
@@ -1053,7 +1053,7 @@
     be able to read the updated configMap value. Delete the configMap in the delete
     container. Pod MUST fail to read the configMap from the delete container.
   release: v1.9
-  file: test/e2e/common/projected_configmap.go
+  file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, volume mode default
   codename: '[k8s.io] [sig-storage] Projected configMap should be consumable from
     pods in volume [NodeConformance] [Conformance]'
@@ -1061,7 +1061,7 @@
     a configMap with default permission mode. Pod MUST be able to read the content
     of the ConfigMap successfully and the mode on the volume MUST be -rw-r--r--.
   release: v1.9
-  file: test/e2e/common/projected_configmap.go
+  file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, non-root user
   codename: '[k8s.io] [sig-storage] Projected configMap should be consumable from
     pods in volume as non-root [NodeConformance] [Conformance]'
@@ -1069,7 +1069,7 @@
     a configMap as non-root user with uid 1000. Pod MUST be able to read the content
     of the ConfigMap successfully and the mode on the volume MUST be -rw-r--r--.
   release: v1.9
-  file: test/e2e/common/projected_configmap.go
+  file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, volume mode 0400
   codename: '[k8s.io] [sig-storage] Projected configMap should be consumable from
     pods in volume with defaultMode set [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1079,7 +1079,7 @@
     test is marked LinuxOnly since Windows does not support setting specific file
     permissions.
   release: v1.9
-  file: test/e2e/common/projected_configmap.go
+  file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, mapped
   codename: '[k8s.io] [sig-storage] Projected configMap should be consumable from
     pods in volume with mappings [NodeConformance] [Conformance]'
@@ -1088,7 +1088,7 @@
     path. Pod MUST be able to read the content of the ConfigMap from the custom location
     successfully and the mode on the volume MUST be -rw-r--r--.
   release: v1.9
-  file: test/e2e/common/projected_configmap.go
+  file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, mapped, volume mode 0400
   codename: '[k8s.io] [sig-storage] Projected configMap should be consumable from
     pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1099,7 +1099,7 @@
     test is marked LinuxOnly since Windows does not support setting specific file
     permissions.
   release: v1.9
-  file: test/e2e/common/projected_configmap.go
+  file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, mapped, non-root user
   codename: '[k8s.io] [sig-storage] Projected configMap should be consumable from
     pods in volume with mappings as non-root [NodeConformance] [Conformance]'
@@ -1108,7 +1108,7 @@
     custom path. Pod MUST be able to read the content of the ConfigMap from the custom
     location successfully and the mode on the volume MUST be -r--r--r--.
   release: v1.9
-  file: test/e2e/common/projected_configmap.go
+  file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, multiple volume paths
   codename: '[k8s.io] [sig-storage] Projected configMap should be consumable in multiple
     volumes in the same pod [NodeConformance] [Conformance]'
@@ -1117,7 +1117,7 @@
     be able to read the content of the configMap successfully from the two volume
     mounts.
   release: v1.9
-  file: test/e2e/common/projected_configmap.go
+  file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, ConfigMap, update
   codename: '[k8s.io] [sig-storage] Projected configMap updates should be reflected
     in volume [NodeConformance] [Conformance]'
@@ -1126,7 +1126,7 @@
     create the configMap with value-1. Pod MUST be able to update the value in the
     confgiMap to value-2.
   release: v1.9
-  file: test/e2e/common/projected_configmap.go
+  file: test/e2e/common/storage/projected_configmap.go
 - testname: Projected Volume, DownwardAPI, CPU limits
   codename: '[k8s.io] [sig-storage] Projected downwardAPI should provide container''s
     cpu limit [NodeConformance] [Conformance]'
@@ -1134,7 +1134,7 @@
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the cpu limits from the mounted DownwardAPIVolumeFiles.
   release: v1.9
-  file: test/e2e/common/projected_downwardapi.go
+  file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, CPU request
   codename: '[k8s.io] [sig-storage] Projected downwardAPI should provide container''s
     cpu request [NodeConformance] [Conformance]'
@@ -1142,7 +1142,7 @@
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the cpu request from the mounted DownwardAPIVolumeFiles.
   release: v1.9
-  file: test/e2e/common/projected_downwardapi.go
+  file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, memory limits
   codename: '[k8s.io] [sig-storage] Projected downwardAPI should provide container''s
     memory limit [NodeConformance] [Conformance]'
@@ -1150,7 +1150,7 @@
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the memory limits from the mounted DownwardAPIVolumeFiles.
   release: v1.9
-  file: test/e2e/common/projected_downwardapi.go
+  file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, memory request
   codename: '[k8s.io] [sig-storage] Projected downwardAPI should provide container''s
     memory request [NodeConformance] [Conformance]'
@@ -1158,7 +1158,7 @@
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the memory request from the mounted DownwardAPIVolumeFiles.
   release: v1.9
-  file: test/e2e/common/projected_downwardapi.go
+  file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, CPU limit, node allocatable
   codename: '[k8s.io] [sig-storage] Projected downwardAPI should provide node allocatable
     (cpu) as default cpu limit if the limit is not set [NodeConformance] [Conformance]'
@@ -1167,7 +1167,7 @@
     resources for requests and limits are NOT specified for the container. Pod MUST
     be able to read the default cpu limits from the mounted DownwardAPIVolumeFiles.
   release: v1.9
-  file: test/e2e/common/projected_downwardapi.go
+  file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, memory limit, node allocatable
   codename: '[k8s.io] [sig-storage] Projected downwardAPI should provide node allocatable
     (memory) as default memory limit if the limit is not set [NodeConformance] [Conformance]'
@@ -1176,7 +1176,7 @@
     resources for requests and limits are NOT specified for the container. Pod MUST
     be able to read the default memory limits from the mounted DownwardAPIVolumeFiles.
   release: v1.9
-  file: test/e2e/common/projected_downwardapi.go
+  file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, pod name
   codename: '[k8s.io] [sig-storage] Projected downwardAPI should provide podname only
     [NodeConformance] [Conformance]'
@@ -1184,7 +1184,7 @@
     pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able
     to read the pod name from the mounted DownwardAPIVolumeFiles.
   release: v1.9
-  file: test/e2e/common/projected_downwardapi.go
+  file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, volume mode 0400
   codename: '[k8s.io] [sig-storage] Projected downwardAPI should set DefaultMode on
     files [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1195,7 +1195,7 @@
     test is marked LinuxOnly since Windows does not support setting specific file
     permissions.
   release: v1.9
-  file: test/e2e/common/projected_downwardapi.go
+  file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, volume mode 0400
   codename: '[k8s.io] [sig-storage] Projected downwardAPI should set mode on item
     file [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1206,7 +1206,7 @@
     test is marked LinuxOnly since Windows does not support setting specific file
     permissions.
   release: v1.9
-  file: test/e2e/common/projected_downwardapi.go
+  file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, update annotation
   codename: '[k8s.io] [sig-storage] Projected downwardAPI should update annotations
     on modification [NodeConformance] [Conformance]'
@@ -1216,7 +1216,7 @@
     Annotations are then updated. Pod MUST be able to read the updated values for
     the Annotations.
   release: v1.9
-  file: test/e2e/common/projected_downwardapi.go
+  file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, DownwardAPI, update labels
   codename: '[k8s.io] [sig-storage] Projected downwardAPI should update labels on
     modification [NodeConformance] [Conformance]'
@@ -1225,7 +1225,7 @@
     MUST be able to read the labels from the mounted DownwardAPIVolumeFiles. Labels
     are then updated. Pod MUST be able to read the updated values for the Labels.
   release: v1.9
-  file: test/e2e/common/projected_downwardapi.go
+  file: test/e2e/common/storage/projected_downwardapi.go
 - testname: Projected Volume, Secrets, create, update delete
   codename: '[k8s.io] [sig-storage] Projected secret optional updates should be reflected
     in volume [NodeConformance] [Conformance]'
@@ -1237,7 +1237,7 @@
     the updated secret value. Delete the secret in the delete container. Pod MUST
     fail to read the secret from the delete container.
   release: v1.9
-  file: test/e2e/common/projected_secret.go
+  file: test/e2e/common/storage/projected_secret.go
 - testname: Projected Volume, Secrets, volume mode default
   codename: '[k8s.io] [sig-storage] Projected secret should be consumable from pods
     in volume [NodeConformance] [Conformance]'
@@ -1245,7 +1245,7 @@
     secret with a specified key with default permission mode. Pod MUST be able to
     read the content of the key successfully and the mode MUST be -rw-r--r-- by default.
   release: v1.9
-  file: test/e2e/common/projected_secret.go
+  file: test/e2e/common/storage/projected_secret.go
 - testname: Project Volume, Secrets, non-root, custom fsGroup
   codename: '[k8s.io] [sig-storage] Projected secret should be consumable from pods
     in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeConformance]
@@ -1257,7 +1257,7 @@
     marked LinuxOnly since Windows does not support setting specific file permissions,
     or running as UID / GID.
   release: v1.9
-  file: test/e2e/common/projected_secret.go
+  file: test/e2e/common/storage/projected_secret.go
 - testname: Projected Volume, Secrets, volume mode 0400
   codename: '[k8s.io] [sig-storage] Projected secret should be consumable from pods
     in volume with defaultMode set [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1267,7 +1267,7 @@
     -r--------. This test is marked LinuxOnly since Windows does not support setting
     specific file permissions.
   release: v1.9
-  file: test/e2e/common/projected_secret.go
+  file: test/e2e/common/storage/projected_secret.go
 - testname: Projected Volume, Secrets, mapped
   codename: '[k8s.io] [sig-storage] Projected secret should be consumable from pods
     in volume with mappings [NodeConformance] [Conformance]'
@@ -1276,7 +1276,7 @@
     to a custom path. Pod MUST be able to read the content of the key successfully
     and the mode MUST be -r--------on the mapped volume.
   release: v1.9
-  file: test/e2e/common/projected_secret.go
+  file: test/e2e/common/storage/projected_secret.go
 - testname: Projected Volume, Secrets, mapped, volume mode 0400
   codename: '[k8s.io] [sig-storage] Projected secret should be consumable from pods
     in volume with mappings and Item Mode set [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1286,7 +1286,7 @@
     and the mode MUST be -r-------- on the mapped volume. This test is marked LinuxOnly
     since Windows does not support setting specific file permissions.
   release: v1.9
-  file: test/e2e/common/projected_secret.go
+  file: test/e2e/common/storage/projected_secret.go
 - testname: Projected Volume, Secrets, mapped, multiple paths
   codename: '[k8s.io] [sig-storage] Projected secret should be consumable in multiple
     volumes in a pod [NodeConformance] [Conformance]'
@@ -1295,7 +1295,7 @@
     Pod MUST be able to read the content of the key successfully from the two volume
     mounts and the mode MUST be -r-------- on the mapped volumes.
   release: v1.9
-  file: test/e2e/common/projected_secret.go
+  file: test/e2e/common/storage/projected_secret.go
 - testname: Secrets Volume, create, update and delete
   codename: '[k8s.io] [sig-storage] Secrets optional updates should be reflected in
     volume [NodeConformance] [Conformance]'
@@ -1307,7 +1307,7 @@
     be able to read the updated secret value. Delete the secret in the delete container.
     Pod MUST fail to read the secret from the delete container.
   release: v1.9
-  file: test/e2e/common/secrets_volume.go
+  file: test/e2e/common/storage/secrets_volume.go
 - testname: Secrets Volume, volume mode default, secret with same name in different
     namespace
   codename: '[k8s.io] [sig-storage] Secrets should be able to mount in a volume regardless
@@ -1319,7 +1319,7 @@
     are associated with namespace where pod is created. The file mode of the secret
     MUST be -rw-r--r-- by default.
   release: v1.12
-  file: test/e2e/common/secrets_volume.go
+  file: test/e2e/common/storage/secrets_volume.go
 - testname: Secrets Volume, default
   codename: '[k8s.io] [sig-storage] Secrets should be consumable from pods in volume
     [NodeConformance] [Conformance]'
@@ -1328,7 +1328,7 @@
     from the container runtime and the file mode of the secret MUST be -rw-r--r--
     by default.
   release: v1.9
-  file: test/e2e/common/secrets_volume.go
+  file: test/e2e/common/storage/secrets_volume.go
 - testname: Secrets Volume, volume mode 0440, fsGroup 1001 and uid 1000
   codename: '[k8s.io] [sig-storage] Secrets should be consumable from pods in volume
     as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1339,7 +1339,7 @@
     default. This test is marked LinuxOnly since Windows does not support setting
     specific file permissions, or running as UID / GID.
   release: v1.9
-  file: test/e2e/common/secrets_volume.go
+  file: test/e2e/common/storage/secrets_volume.go
 - testname: Secrets Volume, volume mode 0400
   codename: '[k8s.io] [sig-storage] Secrets should be consumable from pods in volume
     with defaultMode set [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1349,7 +1349,7 @@
     MUST be -r-------- by default. This test is marked LinuxOnly since Windows does
     not support setting specific file permissions.
   release: v1.9
-  file: test/e2e/common/secrets_volume.go
+  file: test/e2e/common/storage/secrets_volume.go
 - testname: Secrets Volume, mapping
   codename: '[k8s.io] [sig-storage] Secrets should be consumable from pods in volume
     with mappings [NodeConformance] [Conformance]'
@@ -1358,7 +1358,7 @@
     the mounted volume from the specified custom path. The file mode of the secret
     MUST be -rw-r--r-- by default.
   release: v1.9
-  file: test/e2e/common/secrets_volume.go
+  file: test/e2e/common/storage/secrets_volume.go
 - testname: Secrets Volume, mapping, volume mode 0400
   codename: '[k8s.io] [sig-storage] Secrets should be consumable from pods in volume
     with mappings and Item Mode set [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1368,7 +1368,7 @@
     The file mode of the secret MUST be -r--r--r--. This test is marked LinuxOnly
     since Windows does not support setting specific file permissions.
   release: v1.9
-  file: test/e2e/common/secrets_volume.go
+  file: test/e2e/common/storage/secrets_volume.go
 - testname: Secrets Volume, mapping multiple volume paths
   codename: '[k8s.io] [sig-storage] Secrets should be consumable in multiple volumes
     in a pod [NodeConformance] [Conformance]'
@@ -1376,7 +1376,7 @@
     into the container in to two different custom paths. Pod MUST be able to read
     the secret from the both the mounted volumes from the two specified custom paths.
   release: v1.9
-  file: test/e2e/common/secrets_volume.go
+  file: test/e2e/common/storage/secrets_volume.go
 - testname: Secrets Volume, immutability
   codename: '[k8s.io] [sig-storage] Secrets should be immutable if `immutable` field
     is set [Conformance]'
@@ -1386,7 +1386,7 @@
     fail. Try to update the secret`s metadata (labels), the update must succeed. Try
     to delete the secret, the deletion must succeed.
   release: v1.21
-  file: test/e2e/common/secrets_volume.go
+  file: test/e2e/common/storage/secrets_volume.go
 - testname: Admission webhook, list mutating webhooks
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing
     mutating webhooks should work [Conformance]'

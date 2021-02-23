@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package storage
 
 import (
 	"fmt"
@@ -33,7 +33,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGStorageDescribe("Downward API volume", func() {
+var _ = SIGDescribe("Downward API volume", func() {
 	// How long to wait for a log pod to be displayed
 	const podLogTimeout = 3 * time.Minute
 	f := framework.NewDefaultFramework("downward-api")

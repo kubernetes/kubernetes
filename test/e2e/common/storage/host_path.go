@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package storage
 
 import (
 	"fmt"
@@ -31,7 +31,7 @@ import (
 
 //TODO : Consolidate this code with the code for emptyDir.
 //This will require some smart.
-var _ = SIGStorageDescribe("HostPath", func() {
+var _ = SIGDescribe("HostPath", func() {
 	f := framework.NewDefaultFramework("hostpath")
 
 	ginkgo.BeforeEach(func() {

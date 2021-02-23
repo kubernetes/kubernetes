@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package network
 
 import (
 	"github.com/onsi/ginkgo"
@@ -24,7 +24,7 @@ import (
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 )
 
-var _ = SIGNetworkDescribe("Networking", func() {
+var _ = SIGDescribe("Networking", func() {
 	f := framework.NewDefaultFramework("pod-network-test")
 
 	ginkgo.Describe("Granular Checks: Pods", func() {
