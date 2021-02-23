@@ -156,7 +156,7 @@ func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
 	klog.V(4).InfoS("Processing PVC", "PVC", klog.KRef(pvcNamespace, pvcName))
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).InfoS("Finished processing PVC", "PVC", klog.KRef(pvcNamespace, pvcName), fmt.Sprintf("(%v)", time.Since(startTime)))
+		klog.V(4).InfoS("Finished processing PVC", "PVC", klog.KRef(pvcNamespace, pvcName), "duration", time.Since(startTime))
 	}()
 
 	pvc, err := c.pvcLister.PersistentVolumeClaims(pvcNamespace).Get(pvcName)
@@ -178,7 +178,7 @@ func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
 		if !isUsed {
 			return c.removeFinalizer(pvc)
 		}
-		klog.V(2).InfoS("Keeping PVC", "PVC", klog.KRef(pvcNamespace, pvcName), " because it is still being used")
+		klog.V(2).InfoS("Keeping PVC because it is being used", "PVC", klog.KObj(pvc))
 	}
 
 	if protectionutil.NeedToAddFinalizer(pvc, volumeutil.PVCProtectionFinalizer) {
@@ -238,7 +238,7 @@ func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
 }
 
 func (c *Controller) askInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
-	klog.V(4).InfoS("Looking for Pods using PVC", "PVC", klog.KObj(pvc), "in the Informer's cache")
+	klog.V(4).InfoS("Looking for Pods using PVC in the Informer's cache", "PVC", klog.KObj(pvc))
 
 	// The indexer is used to find pods which might use the PVC.
 	objs, err := c.podIndexer.ByIndex(common.PodPVCIndex, fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name))
@@ -270,12 +270,12 @@ func (c *Controller) askInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 		return true, nil
 	}
 
-	klog.V(4).InfoS("No Pod using PVC", "PVC", klog.KObj(pvc), "was found in the Informer's cache")
+	klog.V(4).InfoS("No Pod using PVC was found in the Informer's cache", "PVC", klog.KObj(pvc))
 	return false, nil
 }
 
 func (c *Controller) askAPIServer(pvc *v1.PersistentVolumeClaim) (bool, error) {
-	klog.V(4).InfoS("Looking for Pods using PVC", "PVC", klog.KObj(pvc), "with a live list")
+	klog.V(4).InfoS("Looking for Pods using PVC with a live list", "PVC", klog.KObj(pvc))
 
 	podsList, err := c.client.CoreV1().Pods(pvc.Namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -300,7 +300,7 @@ func (c *Controller) podUsesPVC(pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool
 		for _, volume := range pod.Spec.Volumes {
 			if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvc.Name ||
 				c.genericEphemeralVolumeFeatureEnabled && !podIsShutDown(pod) && volume.Ephemeral != nil && pod.Name+"-"+volume.Name == pvc.Name && metav1.IsControlledBy(pvc, pod) {
-				klog.V(2).InfoS("Pod", "pod", klog.KObj(pod), "uses PVC", "PVC", klog.KObj(pvc))
+				klog.V(2).InfoS("Pod uses PVC", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
 				return true
 			}
 		}
@@ -406,7 +406,7 @@ func (c *Controller) enqueuePVCs(pod *v1.Pod, deleted bool) {
 		return
 	}
 
-	klog.V(4).InfoS("Enqueuing PVCs for Pod", "pod", klog.KObj(pod), "(UID=", pod.UID, ")")
+	klog.V(4).InfoS("Enqueuing PVCs for Pod", "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	// Enqueue all PVCs that the pod uses
 	for _, volume := range pod.Spec.Volumes {
