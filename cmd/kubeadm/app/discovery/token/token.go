@@ -75,7 +75,7 @@ func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Dis
 	insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint, kubeadmapiv1beta2.DefaultClusterName)
 	clusterName := insecureBootstrapConfig.Contexts[insecureBootstrapConfig.CurrentContext].Cluster
 
-	klog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q", endpoint)
+	klog.V(1).InfoS("[discovery] Created cluster-info discovery client, requesting info from endpoint", "endpoint", endpoint)
 	insecureClusterInfo, err := getClusterInfo(client, insecureBootstrapConfig, token, interval, duration)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Dis
 
 	// If no TLS root CA pinning was specified, we're done
 	if pubKeyPins.Empty() {
-		klog.V(1).Infof("[discovery] Cluster info signature and contents are valid and no TLS pinning was specified, will use API Server %q", endpoint)
+		klog.V(1).InfoS("[discovery] Cluster info signature and contents are valid and no TLS pinning was specified, will use API Server ", "endpoint", endpoint)
 		return insecureConfig, nil
 	}
 
@@ -113,7 +113,7 @@ func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Dis
 	// Now that we know the cluster CA, connect back a second time validating with that CA
 	secureBootstrapConfig := buildSecureBootstrapKubeConfig(endpoint, clusterCABytes, clusterName)
 
-	klog.V(1).Infof("[discovery] Requesting info from %q again to validate TLS against the pinned public key", endpoint)
+	klog.V(1).InfoS("[discovery] Requesting info from %q again to validate TLS against the pinned public key", "endpoint", endpoint)
 	secureClusterInfo, err := getClusterInfo(client, secureBootstrapConfig, token, interval, duration)
 	if err != nil {
 		return nil, err
@@ -130,7 +130,7 @@ func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Dis
 		return nil, errors.Wrapf(err, "couldn't parse the kubeconfig file in the %s ConfigMap", bootstrapapi.ConfigMapClusterInfo)
 	}
 
-	klog.V(1).Infof("[discovery] Cluster info signature and contents are valid and TLS certificate validates against pinned roots, will use API Server %q", endpoint)
+	klog.V(1).InfoS("[discovery] Cluster info signature and contents are valid and TLS certificate validates against pinned roots, will use API Server", "endpoint", endpoint)
 
 	return secureKubeconfig, nil
 }
@@ -212,13 +212,13 @@ func getClusterInfo(client clientset.Interface, kubeconfig *clientcmdapi.Config,
 	wait.JitterUntil(func() {
 		cm, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		if err != nil {
-			klog.V(1).Infof("[discovery] Failed to request cluster-info, will try again: %v", err)
+			klog.V(1).InfoS("[discovery] Failed to request cluster-info, will try again", "err", err)
 			return
 		}
 		// Even if the ConfigMap is available the JWS signature is patched-in a bit later.
 		// Make sure we retry util then.
 		if _, ok := cm.Data[bootstrapapi.JWSSignatureKeyPrefix+token.ID]; !ok {
-			klog.V(1).Infof("[discovery] The cluster-info ConfigMap does not yet contain a JWS signature for token ID %q, will try again", token.ID)
+			klog.V(1).InfoS("[discovery] The cluster-info ConfigMap does not yet contain a JWS signature for token ID , will try again", "tokenId", token.ID)
 			err = errors.Errorf("could not find a JWS signature in the cluster-info ConfigMap for token ID %q", token.ID)
 			return
 		}
