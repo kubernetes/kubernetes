@@ -344,7 +344,7 @@ func TestGetNextScheduleTime(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-10 * time.Minute)}
 		// Current time is more than creation time, but less than T1.
 		now := T1.Add(-7 * time.Minute)
-		schedule := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule != nil {
 			t.Errorf("expected no start time, got:  %v", schedule)
 		}
@@ -355,7 +355,7 @@ func TestGetNextScheduleTime(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-10 * time.Minute)}
 		// Current time is after T1
 		now := T1.Add(2 * time.Second)
-		schedule := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected 1 start time, got nil")
 		} else if !schedule.Equal(T1) {
@@ -370,7 +370,7 @@ func TestGetNextScheduleTime(t *testing.T) {
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1}
 		// Current time is after T1
 		now := T1.Add(2 * time.Minute)
-		schedule := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule != nil {
 			t.Errorf("expected 0 start times, got: %v", schedule)
 		}
@@ -383,7 +383,7 @@ func TestGetNextScheduleTime(t *testing.T) {
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1}
 		// Current time is after T1 and after T2
 		now := T2.Add(5 * time.Minute)
-		schedule := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected 1 start times, got nil")
 		} else if !schedule.Equal(T2) {
@@ -396,7 +396,7 @@ func TestGetNextScheduleTime(t *testing.T) {
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		// Current time is after T1 and after T2
 		now := T2.Add(5 * time.Minute)
-		schedule := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected 1 start times, got nil")
 		} else if !schedule.Equal(T2) {
@@ -408,7 +408,7 @@ func TestGetNextScheduleTime(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		now := T2.Add(10 * 24 * time.Hour)
-		schedule := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected more than 0 missed times")
 		}
@@ -421,7 +421,7 @@ func TestGetNextScheduleTime(t *testing.T) {
 		// Deadline is short
 		deadline := int64(2 * 60 * 60)
 		cj.Spec.StartingDeadlineSeconds = &deadline
-		schedule := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected more than 0 missed times")
 		}
@@ -673,9 +673,9 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sched, err := cron.Parse(tt.args.schedule)
 			if err != nil {
-				t.Errorf("error setting up the test")
+				t.Errorf("error setting up the test, %s", err)
 			}
-			gotTime, gotNumberOfMisses := getMostRecentScheduleTime(*tt.args.earliestTime, tt.args.now, sched)
+			gotTime, gotNumberOfMisses, _ := getMostRecentScheduleTime(*tt.args.earliestTime, tt.args.now, sched)
 			if gotTime == nil && tt.expectedTime != nil {
 				t.Errorf("getMostRecentScheduleTime() got nil, want %v", tt.expectedTime)
 			}

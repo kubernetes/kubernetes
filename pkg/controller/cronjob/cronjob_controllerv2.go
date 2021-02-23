@@ -477,7 +477,14 @@ func (jm *ControllerV2) syncCronJob(
 		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "UnparseableSchedule", "unparseable schedule: %s : %s", cj.Spec.Schedule, err)
 		return cj, nil, nil
 	}
-	scheduledTime := getNextScheduleTime(*cj, now, sched, jm.recorder)
+	scheduledTime, err := getNextScheduleTime(*cj, now, sched, jm.recorder)
+	if err != nil {
+		// this is likely a user error in defining the spec value
+		// we should log the error and not reconcile this cronjob until an update to spec
+		klog.V(2).InfoS("invalid schedule", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "schedule", cj.Spec.Schedule, "err", err)
+		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "InvalidSchedule", "invalid schedule schedule: %s : %s", cj.Spec.Schedule, err)
+		return cj, nil, nil
+	}
 	if scheduledTime == nil {
 		// no unmet start time, return cj,.
 		// The only time this should happen is if queue is filled after restart.
