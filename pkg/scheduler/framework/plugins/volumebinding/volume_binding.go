@@ -254,13 +254,13 @@ func (pl *VolumeBinding) PreBind(ctx context.Context, cs *framework.CycleState, 
 	if !ok {
 		return framework.AsStatus(fmt.Errorf("no pod volumes found for node %q", nodeName))
 	}
-	klog.V(5).Infof("Trying to bind volumes for pod \"%v/%v\"", pod.Namespace, pod.Name)
+	klog.V(5).InfoS("Trying to bind volumes for pod", "pod", klog.KObj(pod))
 	err = pl.Binder.BindPodVolumes(pod, podVolumes)
 	if err != nil {
-		klog.V(1).Infof("Failed to bind volumes for pod \"%v/%v\": %v", pod.Namespace, pod.Name, err)
+		klog.V(1).InfoS("Failed to bind volumes for pod", "pod", klog.KObj(pod), "err", err)
 		return framework.AsStatus(err)
 	}
-	klog.V(5).Infof("Success binding volumes for pod \"%v/%v\"", pod.Namespace, pod.Name)
+	klog.V(5).InfoS("Success binding volumes for pod", "pod", klog.KObj(pod))
 	return nil
 }
 
