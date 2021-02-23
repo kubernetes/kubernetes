@@ -410,6 +410,7 @@ func TestPollImmediateError(t *testing.T) {
 
 func TestPollForever(t *testing.T) {
 	ch := make(chan struct{})
+	errc := make(chan error, 1)
 	done := make(chan struct{}, 1)
 	complete := make(chan struct{})
 	go func() {
@@ -424,7 +425,7 @@ func TestPollForever(t *testing.T) {
 		})
 
 		if err := PollInfinite(time.Microsecond, f); err != nil {
-			t.Fatalf("unexpected error %v", err)
+			errc <- fmt.Errorf("unexpected error %v", err)
 		}
 
 		close(ch)
@@ -439,7 +440,10 @@ func TestPollForever(t *testing.T) {
 		select {
 		case _, open := <-ch:
 			if !open {
-				t.Fatalf("did not expect channel to be closed")
+				if len(errc) != 0 {
+					t.Fatalf("did not expect channel to be closed, %v", <-errc)
+				}
+				t.Fatal("did not expect channel to be closed")
 			}
 		case <-time.After(ForeverTestTimeout):
 			t.Fatalf("channel did not return at least once within the poll interval")
@@ -455,9 +459,13 @@ func TestPollForever(t *testing.T) {
 				return
 			}
 		}
-		t.Fatalf("expected closed channel after two iterations")
+		t.Error("expected closed channel after two iterations")
 	}()
 	<-complete
+
+	if len(errc) != 0 {
+		t.Fatal(<-errc)
+	}
 }
 
 func TestWaitFor(t *testing.T) {
