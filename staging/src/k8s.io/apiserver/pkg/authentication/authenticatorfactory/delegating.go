@@ -42,7 +42,7 @@ type DelegatingAuthenticatorConfig struct {
 	Anonymous bool
 
 	// TokenAccessReviewClient is a client to do token review. It can be nil. Then every token is ignored.
-	TokenAccessReviewClient authenticationclient.TokenReviewInterface
+	TokenAccessReviewClient authenticationclient.AuthenticationV1Interface
 
 	// TokenAccessReviewTimeout specifies a time limit for requests made by the authorization webhook client.
 	TokenAccessReviewTimeout time.Duration
@@ -91,7 +91,10 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 		if c.WebhookRetryBackoff == nil {
 			return nil, nil, errors.New("retry backoff parameters for delegating authentication webhook has not been specified")
 		}
-		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient, c.APIAudiences, *c.WebhookRetryBackoff, c.TokenAccessReviewTimeout)
+		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient, c.APIAudiences, *c.WebhookRetryBackoff, c.TokenAccessReviewTimeout, webhooktoken.AuthenticatorMetrics{
+			RecordRequestTotal:   RecordRequestTotal,
+			RecordRequestLatency: RecordRequestLatency,
+		})
 		if err != nil {
 			return nil, nil, err
 		}
