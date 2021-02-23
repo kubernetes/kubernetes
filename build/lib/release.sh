@@ -364,8 +364,13 @@ function kube::release::create_docker_images_for_server() {
       local base_image=${wrappable##*,}
       local binary_file_path="${binary_dir}/${binary_name}"
       local docker_build_path="${binary_file_path}.dockerbuild"
-      local docker_file_path="${KUBE_ROOT}/build/server-image/Dockerfile"
       local docker_image_tag="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
+
+      local docker_file_path="${KUBE_ROOT}/build/server-image/Dockerfile"
+      # If this binary has its own Dockerfile use that else use the generic Dockerfile.
+      if [[ -f "${KUBE_ROOT}/build/server-image/${binary_name}/Dockerfile" ]]; then
+          docker_file_path="${KUBE_ROOT}/build/server-image/${binary_name}/Dockerfile"
+      fi
 
       kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
       (
