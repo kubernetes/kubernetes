@@ -93,13 +93,13 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 
 	client, err := getClientset(options.kubeconfigPath, false)
 	if err == nil {
-		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", options.kubeconfigPath)
+		klog.V(1).InfoS("[reset] Loaded client set from kubeconfig file", "file", options.kubeconfigPath)
 		cfg, err = configutil.FetchInitConfigurationFromCluster(client, out, "reset", false, false)
 		if err != nil {
-			klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
+			klog.Infos("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster", "err", err)
 		}
 	} else {
-		klog.V(1).Infof("[reset] Could not obtain a client set from the kubeconfig file: %s", options.kubeconfigPath)
+		klog.V(1).InfoS("[reset] Could not obtain a client set from the kubeconfig file:", options.kubeconfigPath)
 	}
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, ignorePreflightErrors(cfg))
@@ -117,10 +117,10 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 		if err != nil {
 			return nil, err
 		}
-		klog.V(1).Infof("[reset] Detected and using CRI socket: %s", criSocketPath)
+		klog.V(1).InfoS("[reset] Detected and using CRI socket", "criSocketPath", criSocketPath)
 	} else {
 		criSocketPath = options.criSocketPath
-		klog.V(1).Infof("[reset] Using specified CRI socket: %s", criSocketPath)
+		klog.V(1).InfoS("[reset] Using specified CRI socket", "criSocketPath", criSocketPath)
 	}
 
 	return &resetData{
@@ -215,9 +215,9 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 func cleanDirs(data *resetData) {
 	fmt.Printf("[reset] Deleting contents of stateful directories: %v\n", data.dirsToClean)
 	for _, dir := range data.dirsToClean {
-		klog.V(1).Infof("[reset] Deleting contents of %s", dir)
+		klog.V(1).InfoS("[reset] Deleting contents of", "dir", dir)
 		if err := phases.CleanDir(dir); err != nil {
-			klog.Warningf("[reset] Failed to delete contents of %q directory: %v", dir, err)
+			klog.InfoS("[reset] Failed to delete contents of directory", "directory", dir, "err", err)
 		}
 	}
 }
