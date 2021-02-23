@@ -119,7 +119,15 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		testRSAdoptMatchingAndReleaseNotMatching(f)
 	})
 
-	ginkgo.It("Replicaset should have a working scale subresource", func() {
+	/*
+		Release: v1.21
+		Testname: ReplicaSet, completes the scaling of a ReplicaSet subresource
+		Description: Create a ReplicaSet (RS) with a single Pod. The Pod MUST be verified
+		that it is running. The RS MUST get and verify the scale subresource count.
+		The RS MUST update and verify the scale subresource. The RS MUST patch and verify
+		a scale subresource.
+	*/
+	framework.ConformanceIt("Replicaset should have a working scale subresource", func() {
 		testRSScaleSubresources(f)
 	})
 })

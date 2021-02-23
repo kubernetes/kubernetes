@@ -2109,6 +2109,15 @@
     the Job MUST execute to completion.
   release: v1.16
   file: test/e2e/apps/job.go
+- testname: ReplicaSet, completes the scaling of a ReplicaSet subresource
+  codename: '[sig-apps] ReplicaSet Replicaset should have a working scale subresource
+    [Conformance]'
+  description: Create a ReplicaSet (RS) with a single Pod. The Pod MUST be verified
+    that it is running. The RS MUST get and verify the scale subresource count. The
+    RS MUST update and verify the scale subresource. The RS MUST patch and verify
+    a scale subresource.
+  release: v1.21
+  file: test/e2e/apps/replica_set.go
 - testname: Replica Set, adopt matching pods and release non matching pods
   codename: '[sig-apps] ReplicaSet should adopt matching pods on creation and release
     no longer matching pods [Conformance]'
