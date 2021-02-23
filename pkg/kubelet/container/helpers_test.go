@@ -393,6 +393,91 @@ func TestGetContainerSpec(t *testing.T) {
 	}
 }
 
+func TestShouldPodBeRestarted(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "test-01"},
+				{Name: "test-02"},
+			},
+		},
+	}
+	podStatus := []*PodStatus{
+		{
+			ID:        pod.UID,
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			ContainerStatuses: []*Status{
+				{
+					Name:     "test-01",
+					State:    ContainerStateExited,
+					ExitCode: 0,
+				},
+				{
+					Name:     "test-02",
+					State:    ContainerStateExited,
+					ExitCode: 1,
+				},
+			},
+		},
+		{
+			ID:        pod.UID,
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			ContainerStatuses: []*Status{
+				{
+					Name:     "test-01",
+					State:    ContainerStateExited,
+					ExitCode: 0,
+				},
+				{
+					Name:     "test-02",
+					State:    ContainerStateExited,
+					ExitCode: 0,
+				},
+			},
+		},
+	}
+	policies := []v1.RestartPolicy{
+		v1.RestartPolicyNever,
+		v1.RestartPolicyOnFailure,
+		v1.RestartPolicyAlways,
+	}
+
+	// test policies
+	expected := []bool{false, true, true, false, false, true}
+	for i, status := range podStatus {
+		for j, policy := range policies {
+			pod.Spec.RestartPolicy = policy
+			e := expected[i*len(policies)+j]
+			r := ShouldPodBeRestarted(pod, status)
+			if r != e {
+				t.Errorf("Restart for pod %q with restart policy %q expected %t, got %t",
+					pod.Name, policy, e, r)
+			}
+		}
+	}
+
+	// test deleted pod
+	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	for _, status := range podStatus {
+		for _, policy := range policies {
+			pod.Spec.RestartPolicy = policy
+			e := false
+			r := ShouldPodBeRestarted(pod, status)
+			if r != e {
+				t.Errorf("Restart for pod %q with restart policy %q expected %t, got %t",
+					pod.Name, policy, e, r)
+			}
+		}
+	}
+}
+
 func TestShouldContainerBeRestarted(t *testing.T) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

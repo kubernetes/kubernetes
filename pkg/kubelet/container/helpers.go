@@ -58,6 +58,16 @@ type RuntimeHelper interface {
 	GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64
 }
 
+// ShouldPodBeRestarted checks whether a pod needs to be restarted.
+func ShouldPodBeRestarted(pod *v1.Pod, podStatus *PodStatus) bool {
+	for _, container := range pod.Spec.Containers {
+		if ShouldContainerBeRestarted(&container, pod, podStatus) {
+			return true
+		}
+	}
+	return false
+}
+
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
 // TODO(yifan): Think about how to refactor this.
 func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus *PodStatus) bool {
