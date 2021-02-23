@@ -315,7 +315,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			createLocalPVCsPVs(config, []*localTestVolume{testVol}, immediateMode)
 			pod, err := createLocalPod(config, testVol, nil)
 			framework.ExpectError(err)
-			err = e2epod.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, f.Timeouts.PodStartShort)
+			err = e2epod.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 			framework.ExpectError(err)
 			cleanupLocalPVCsPVs(config, []*localTestVolume{testVol})
 		})
@@ -332,7 +332,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
-			err = e2epod.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, f.Timeouts.PodStartShort)
+			err = e2epod.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 			framework.ExpectError(err)
 
 			cleanupLocalVolumes(config, []*localTestVolume{testVol})
@@ -1035,7 +1035,7 @@ func createLocalPod(config *localTestConfig, volume *localTestVolume, fsGroup *i
 		SeLinuxLabel: selinuxLabel,
 		FsGroup:      fsGroup,
 	}
-	return e2epod.CreateSecPod(config.client, &podConfig, config.timeouts.PodStartShort)
+	return e2epod.CreateSecPod(config.client, &podConfig, config.timeouts.PodStart)
 }
 
 func createWriteCmd(testDir string, testFile string, writeTestFileContent string, volumeType localVolumeType) string {
