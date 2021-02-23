@@ -453,9 +453,10 @@ aliases:
     - jpbetz
     - sttts
 
-  # sig-apps-api-reviewers:
-  #   -
-  #   -
+  sig-apps-api-reviewers:
+    - janetkuo
+    - kow3ns
+    - soltysh
 
   sig-auth-api-reviewers:
     - enj
@@ -546,6 +547,7 @@ aliases:
     - derekwaynecarr  # Node
     - dims            # Architecture
     - ehashman        # Instrumentation
+    - janetkuo        # Apps
     - jdumars         # Architecture, Release
     - jsafrane        # Storage
     - kow3ns          # Apps
@@ -562,7 +564,7 @@ aliases:
     - justinsb        # Cluster Lifecycle
     - saad-ali        # Storage
     - seans3          # CLI
-    - soltysh         # CLI
+    - soltysh         # Apps, CLI
     - tallclair       # Auth
     - thockin         # Network
     - timothysc       # Cluster Lifecycle, Scheduling
