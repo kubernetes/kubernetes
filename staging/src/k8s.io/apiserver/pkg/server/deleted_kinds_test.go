@@ -221,11 +221,25 @@ func Test_resourceExpirationEvaluator_shouldServe(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if actual := tt.resourceExpirationEvaluator.shouldServe(tt.restStorage); actual != tt.expected {
+			gv := schema.GroupVersion{Group: "mygroup", Version: "myversion"}
+			convertor := &dummyConvertor{}
+			if actual := tt.resourceExpirationEvaluator.shouldServe(gv, convertor, tt.restStorage); actual != tt.expected {
 				t.Errorf("shouldServe() = %v, want %v", actual, tt.expected)
+			}
+			if !reflect.DeepEqual(convertor.called, gv) {
+				t.Errorf("expected converter to be called with %#v, got %#v", gv, convertor.called)
 			}
 		})
 	}
+}
+
+type dummyConvertor struct {
+	called runtime.GroupVersioner
+}
+
+func (d *dummyConvertor) ConvertToVersion(in runtime.Object, gv runtime.GroupVersioner) (runtime.Object, error) {
+	d.called = gv
+	return in, nil
 }
 
 func checkErr(t *testing.T, actual error, expected string) {
@@ -309,7 +323,8 @@ func Test_removeDeletedKinds(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.resourceExpirationEvaluator.RemoveDeletedKinds("group.name", tt.versionedResourcesStorageMap)
+			convertor := &dummyConvertor{}
+			tt.resourceExpirationEvaluator.RemoveDeletedKinds("group.name", convertor, tt.versionedResourcesStorageMap)
 			if !reflect.DeepEqual(tt.expectedStorage, tt.versionedResourcesStorageMap) {
 				t.Fatal(spew.Sdump(tt.versionedResourcesStorageMap))
 			}
