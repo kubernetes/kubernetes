@@ -17,6 +17,7 @@ approvers:
   - MrHohn
   - deads2k
   - enisoc
+  - enj
   - janetkuo
   - liggitt
   - mikedanese
@@ -32,7 +33,6 @@ approvers:
   - sttts
   - timothysc
 emeritus_approvers:
-  - enj
   - eparis
   - erictune
   - foxish
