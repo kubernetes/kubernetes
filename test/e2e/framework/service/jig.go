@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -44,12 +43,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	utilsnet "k8s.io/utils/net"
 )
 
 // NodePortRange should match whatever the default/configured range is
@@ -819,14 +818,10 @@ func testReachabilityOverServiceName(serviceName string, sp v1.ServicePort, exec
 
 func testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod *v1.Pod) error {
 	// If .spec.clusterIP is set to "" or "None" for service, ClusterIP is not created, so reachability can not be tested over clusterIP:servicePort
-	isClusterIPV46, err := regexp.MatchString(e2enetwork.RegexIPv4+"||"+e2enetwork.RegexIPv6, clusterIP)
-	if err != nil {
+	if net.ParseIP(clusterIP) == nil {
 		return fmt.Errorf("unable to parse ClusterIP: %s", clusterIP)
 	}
-	if isClusterIPV46 {
-		return testEndpointReachability(clusterIP, sp.Port, sp.Protocol, execPod)
-	}
-	return nil
+	return testEndpointReachability(clusterIP, sp.Port, sp.Protocol, execPod)
 }
 
 func testReachabilityOverExternalIP(externalIP string, sp v1.ServicePort, execPod *v1.Pod) error {
@@ -836,7 +831,7 @@ func testReachabilityOverExternalIP(externalIP string, sp v1.ServicePort, execPo
 func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod, clusterIP string) error {
 	internalAddrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
 	externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
-	isClusterIPV4 := net.ParseIP(clusterIP).To4() != nil
+	isClusterIPV4 := utilsnet.IsIPv4String(clusterIP)
 
 	for _, internalAddr := range internalAddrs {
 		// If the node's internal address points to localhost, then we are not
@@ -845,10 +840,8 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 			framework.Logf("skipping testEndpointReachability() for internal adddress %s", internalAddr)
 			continue
 		}
-		isNodeInternalIPV4 := net.ParseIP(internalAddr).To4() != nil
-		// Check service reachability on the node internalIP which is same family
-		// as clusterIP
-		if isClusterIPV4 != isNodeInternalIPV4 {
+		// Check service reachability on the node internalIP which is same family as clusterIP
+		if isClusterIPV4 != utilsnet.IsIPv4String(internalAddr) {
 			framework.Logf("skipping testEndpointReachability() for internal adddress %s as it does not match clusterIP (%s) family", internalAddr, clusterIP)
 			continue
 		}
@@ -859,8 +852,7 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 		}
 	}
 	for _, externalAddr := range externalAddrs {
-		isNodeExternalIPV4 := net.ParseIP(externalAddr).To4() != nil
-		if isClusterIPV4 != isNodeExternalIPV4 {
+		if isClusterIPV4 != utilsnet.IsIPv4String(externalAddr) {
 			framework.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
 			continue
 		}
@@ -890,19 +882,24 @@ func testEndpointReachability(endpoint string, port int32, protocol v1.Protocol,
 	cmd := ""
 	switch protocol {
 	case v1.ProtocolTCP:
-		cmd = fmt.Sprintf("nc -zv -t -w 2 %s %v", endpoint, port)
+		cmd = fmt.Sprintf("echo hostName | nc -v -t -w 2 %s %v", endpoint, port)
 	case v1.ProtocolUDP:
-		cmd = fmt.Sprintf("nc -zv -u -w 2 %s %v", endpoint, port)
+		cmd = fmt.Sprintf("echo hostName | nc -v -u -w 2 %s %v", endpoint, port)
 	default:
-		return fmt.Errorf("service reachablity check is not supported for %v", protocol)
+		return fmt.Errorf("service reachability check is not supported for %v", protocol)
 	}
 
 	err := wait.PollImmediate(1*time.Second, ServiceReachabilityShortPollTimeout, func() (bool, error) {
-		if _, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd); err != nil {
+		stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		if err != nil {
 			framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
 			return false, nil
 		}
-		return true, nil
+		trimmed := strings.TrimSpace(stdout)
+		if trimmed != "" {
+			return true, nil
+		}
+		return false, nil
 	})
 	if err != nil {
 		return fmt.Errorf("service is not reachable within %v timeout on endpoint %s over %s protocol", ServiceReachabilityShortPollTimeout, ep, protocol)
@@ -1021,24 +1018,8 @@ func (j *TestJig) CheckServiceReachability(svc *v1.Service, pod *v1.Pod) error {
 	}
 }
 
-// CreateServicePods creates a replication controller with the label same as service. Service listens to HTTP.
+// CreateServicePods creates a replication controller with the label same as service. Service listens to TCP and UDP.
 func (j *TestJig) CreateServicePods(replica int) error {
-	config := testutils.RCConfig{
-		Client:       j.Client,
-		Name:         j.Name,
-		Image:        framework.ServeHostnameImage,
-		Command:      []string{"/agnhost", "serve-hostname"},
-		Namespace:    j.Namespace,
-		Labels:       j.Labels,
-		PollInterval: 3 * time.Second,
-		Timeout:      framework.PodReadyBeforeTimeout,
-		Replicas:     replica,
-	}
-	return e2erc.RunRC(config)
-}
-
-// CreateTCPUDPServicePods creates a replication controller with the label same as service. Service listens to TCP and UDP.
-func (j *TestJig) CreateTCPUDPServicePods(replica int) error {
 	config := testutils.RCConfig{
 		Client:       j.Client,
 		Name:         j.Name,
