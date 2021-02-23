@@ -2036,6 +2036,15 @@
   description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
   release: v1.10
   file: test/e2e/apps/daemon_set.go
+- testname: Deployment, completes the scaling of a Deployment subresource
+  codename: '[sig-apps] Deployment Deployment should have a working scale subresource
+    [Conformance]'
+  description: Create a Deployment with a single Pod. The Pod MUST be verified that
+    it is running. The Deployment MUST get and verify the scale subresource count.
+    The Deployment MUST update and verify the scale subresource. The Deployment MUST
+    patch and verify a scale subresource.
+  release: v1.21
+  file: test/e2e/apps/deployment.go
 - testname: Deployment Recreate
   codename: '[sig-apps] Deployment RecreateDeployment should delete old pods and create
     new ones [Conformance]'

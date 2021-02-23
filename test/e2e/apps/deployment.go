@@ -133,7 +133,16 @@ var _ = SIGDescribe("Deployment", func() {
 	ginkgo.It("test Deployment ReplicaSet orphaning and adoption regarding controllerRef", func() {
 		testDeploymentsControllerRef(f)
 	})
-	ginkgo.It("Deployment should have a working scale subresource", func() {
+
+	/*
+	   Release: v1.21
+	   Testname: Deployment, completes the scaling of a Deployment subresource
+	   Description: Create a Deployment with a single Pod. The Pod MUST be verified
+	   that it is running. The Deployment MUST get and verify the scale subresource count.
+	   The Deployment MUST update and verify the scale subresource. The Deployment MUST patch and verify
+	   a scale subresource.
+	*/
+	framework.ConformanceIt("Deployment should have a working scale subresource", func() {
 		testDeploymentSubresources(f)
 	})
 	/*
