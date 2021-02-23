@@ -27,20 +27,24 @@ import (
 const EphemeralVolumeSubsystem = "ephemeral_volume_controller"
 
 var (
-	// EphemeralVolumeCreate tracks the number of
-	// PersistentVolumeClaims().Create calls for each failure
-	// reason
-	// (https://pkg.go.dev/k8s.io/apimachinery@v0.20.2/pkg/apis/meta/v1#StatusReason),
-	// with empty for successful calls.
-	EphemeralVolumeCreate = metrics.NewCounterVec(
+	// EphemeralVolumeCreateAttempts tracks the number of
+	// PersistentVolumeClaims().Create calls (both successful and unsuccessful)
+	EphemeralVolumeCreateAttempts = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      EphemeralVolumeSubsystem,
-			Name:           "create",
+			Name:           "create_total",
 			Help:           "Number of PersistenVolumeClaims creation requests",
 			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"reason"},
-	)
+		})
+	// EphemeralVolumeCreateFailures tracks the number of unsuccessful
+	// PersistentVolumeClaims().Create calls
+	EphemeralVolumeCreateFailures = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      EphemeralVolumeSubsystem,
+			Name:           "create_failures_total",
+			Help:           "Number of PersistenVolumeClaims creation requests",
+			StabilityLevel: metrics.ALPHA,
+		})
 )
 
 var registerMetrics sync.Once
@@ -48,6 +52,7 @@ var registerMetrics sync.Once
 // RegisterMetrics registers EphemeralVolume metrics.
 func RegisterMetrics() {
 	registerMetrics.Do(func() {
-		legacyregistry.MustRegister(EphemeralVolumeCreate)
+		legacyregistry.MustRegister(EphemeralVolumeCreateAttempts)
+		legacyregistry.MustRegister(EphemeralVolumeCreateFailures)
 	})
 }

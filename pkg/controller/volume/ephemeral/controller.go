@@ -25,7 +25,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -282,16 +281,10 @@ func (ec *ephemeralController) handleVolume(pod *v1.Pod, vol v1.Volume) error {
 		},
 		Spec: ephemeral.VolumeClaimTemplate.Spec,
 	}
+	ephemeralvolumemetrics.EphemeralVolumeCreateAttempts.Inc()
 	_, err = ec.kubeClient.CoreV1().PersistentVolumeClaims(pod.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
-	reason := ""
 	if err != nil {
-		reason = string(apierrors.ReasonForError(err))
-		if reason == "" {
-			reason = "Unknown"
-		}
-	}
-	ephemeralvolumemetrics.EphemeralVolumeCreate.WithLabelValues(reason).Inc()
-	if err != nil {
+		ephemeralvolumemetrics.EphemeralVolumeCreateFailures.Inc()
 		return fmt.Errorf("create PVC %s: %v", pvcName, err)
 	}
 	return nil

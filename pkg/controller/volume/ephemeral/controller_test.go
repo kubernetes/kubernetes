@@ -22,7 +22,7 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	// storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	// "k8s.io/apimachinery/pkg/types"
@@ -116,7 +116,7 @@ func TestSyncHandler(t *testing.T) {
 			name:            "create-conflict",
 			pods:            []*v1.Pod{testPodWithEphemeral},
 			podKey:          podKey(testPodWithEphemeral),
-			expectedMetrics: expectedMetrics{0, 1},
+			expectedMetrics: expectedMetrics{1, 1},
 			expectedError:   true,
 		},
 	}
@@ -139,7 +139,7 @@ func TestSyncHandler(t *testing.T) {
 			}
 
 			fakeKubeClient := createTestClient(objects...)
-			if tc.expectedMetrics.numConflicts > 0 {
+			if tc.expectedMetrics.numFailures > 0 {
 				fakeKubeClient.PrependReactor("create", "persistentvolumeclaims", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, nil, apierrors.NewConflict(action.GetResource().GroupResource(), "fake name", errors.New("fake conflict"))
 				})
@@ -245,22 +245,22 @@ func createTestClient(objects ...runtime.Object) *fake.Clientset {
 // Metrics helpers
 
 type expectedMetrics struct {
-	numCreated   int
-	numConflicts int
+	numCreated  int
+	numFailures int
 }
 
 func expectMetrics(t *testing.T, em expectedMetrics) {
 	t.Helper()
 
-	actualCreated, err := testutil.GetCounterMetricValue(ephemeralvolumemetrics.EphemeralVolumeCreate.WithLabelValues(""))
+	actualCreated, err := testutil.GetCounterMetricValue(ephemeralvolumemetrics.EphemeralVolumeCreateAttempts)
 	handleErr(t, err, "ephemeralVolumeCreate")
 	if actualCreated != float64(em.numCreated) {
 		t.Errorf("Expected PVCs to be created %d, got %v", em.numCreated, actualCreated)
 	}
-	actualConflicts, err := testutil.GetCounterMetricValue(ephemeralvolumemetrics.EphemeralVolumeCreate.WithLabelValues("Conflict"))
+	actualConflicts, err := testutil.GetCounterMetricValue(ephemeralvolumemetrics.EphemeralVolumeCreateFailures)
 	handleErr(t, err, "ephemeralVolumeCreate/Conflict")
-	if actualConflicts != float64(em.numConflicts) {
-		t.Errorf("Expected PVCs to have conflicts %d, got %v", em.numConflicts, actualConflicts)
+	if actualConflicts != float64(em.numFailures) {
+		t.Errorf("Expected PVCs to have conflicts %d, got %v", em.numFailures, actualConflicts)
 	}
 }
 
@@ -272,6 +272,6 @@ func handleErr(t *testing.T, err error, metricName string) {
 
 func setupMetrics() {
 	ephemeralvolumemetrics.RegisterMetrics()
-	ephemeralvolumemetrics.EphemeralVolumeCreate.Delete(map[string]string{"reason": ""})
-	ephemeralvolumemetrics.EphemeralVolumeCreate.Delete(map[string]string{"reason": "Conflict"})
+	ephemeralvolumemetrics.EphemeralVolumeCreateAttempts.Reset()
+	ephemeralvolumemetrics.EphemeralVolumeCreateFailures.Reset()
 }
