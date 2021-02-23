@@ -735,10 +735,17 @@ var _ = SIGDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var cs clientset.Interface
+	var family v1.IPFamily
+
 	serviceLBNames := []string{}
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
+		if framework.TestContext.ClusterIsIPv6() {
+			family = v1.IPv6Protocol
+		} else {
+			family = v1.IPv4Protocol
+		}
 	})
 
 	ginkgo.AfterEach(func() {
@@ -1159,6 +1166,48 @@ var _ = SIGDescribe("Services", func() {
 		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
 		err = jig.CheckServiceReachability(nodePortService, execPod)
 		framework.ExpectNoError(err)
+	})
+
+	ginkgo.It("should be able to use ExternalTrafficPolicy Local on a NodePort service", func() {
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 2)
+		framework.ExpectNoError(err)
+		if len(nodes.Items) < 2 {
+			e2eskipper.Skipf(
+				"Test requires >= 2 Ready nodes, but there are only %v nodes",
+				len(nodes.Items))
+		}
+		ipInternalNode1 := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
+		nameNode1 := nodes.Items[0].Name
+		ipInternalNode2 := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[1], v1.NodeInternalIP, family)
+
+		// Create a new NodePort service with ExternalTrafficPolicy Local
+
+		namespace := f.Namespace.Name
+		serviceName := "service-local-nodeport"
+		ginkgo.By("creating a service " + namespace + "/" + serviceName + " with type=NodePort and ExternalTrafficPolicy=Local")
+		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
+		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeNodePort
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: 80, TargetPort: intstr.FromInt(9376)}}
+		})
+		framework.ExpectNoError(err)
+		tcpNodePort := int(svc.Spec.Ports[0].NodePort)
+
+		// Add a backend pod to the service in one node
+		ginkgo.By("creating a backend pod for the service " + serviceName)
+		serverPod := e2epod.NewAgnhostPod(namespace, "pod-backend", nil, nil, []v1.ContainerPort{{ContainerPort: 9376}}, "serve-hostname")
+		serverPod.Labels = jig.Labels
+		serverPod.Spec.NodeName = nameNode1
+		f.PodClient().CreateSync(serverPod)
+
+		// Check that the NodePort works on the node where the pod has been scheduled
+		ginkgo.By("verifying service is up on the node with the pod")
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, namespace, []string{serverPod.Name}, ipInternalNode1[0], tcpNodePort))
+
+		// Check that the NodePort doesn't work on the node where the pod has been scheduled
+		ginkgo.By("verifying service is not reachable on the node without the pod")
+		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, namespace, ipInternalNode2[0], tcpNodePort))
 	})
 
 	/*

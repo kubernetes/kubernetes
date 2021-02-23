@@ -1030,11 +1030,14 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		readyEndpoints := make([]proxy.Endpoint, 0, len(allEndpoints))
+		hasLocalEndpoints := false
 		for _, endpoint := range allEndpoints {
 			if !endpoint.IsReady() {
 				continue
 			}
-
+			if endpoint.GetIsLocal() {
+				hasLocalEndpoints = true
+			}
 			readyEndpoints = append(readyEndpoints, endpoint)
 		}
 		hasEndpoints := len(readyEndpoints) > 0
@@ -1294,7 +1297,10 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 			}
 
-			if hasEndpoints {
+			// Only forward traffic if ExternalTrafficPolicy=Cluster and there are ANY endpoints
+			// or if ExternalTrafficPolicy=Local and there are LOCAL endpoints
+			if (hasEndpoints && !svcInfo.OnlyNodeLocalEndpoints()) ||
+				(hasLocalEndpoints && svcInfo.OnlyNodeLocalEndpoints()) {
 				args = append(args[:0],
 					"-A", string(kubeNodePortsChain),
 					"-m", "comment", "--comment", svcNameString,
