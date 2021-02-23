@@ -85,10 +85,10 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 	rotate := false
 	pemPath := filepath.Join(pkiPath, "kubelet-client-current.pem")
 	if _, err := os.Stat(pemPath); err == nil {
-		klog.V(1).Infof("[kubelet-finalize] Assuming that kubelet client certificate rotation is enabled: found %q", pemPath)
+		klog.V(1).InfoS("[kubelet-finalize] Assuming that kubelet client certificate rotation is enabled", "found path", pemPath)
 		rotate = true
 	} else {
-		klog.V(1).Infof("[kubelet-finalize] Assuming that kubelet client certificate rotation is disabled: %v", err)
+		klog.V(1).InfoS("[kubelet-finalize] Assuming that kubelet client certificate rotation is disabled", "err", err)
 	}
 
 	// Exit early if rotation is disabled.
@@ -129,7 +129,7 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 	}
 
 	// Restart the kubelet.
-	klog.V(1).Info("[kubelet-finalize] Restarting the kubelet to enable client certificate rotation")
+	klog.V(1).InfoS("[kubelet-finalize] Restarting the kubelet to enable client certificate rotation")
 	kubeletphase.TryRestartKubelet()
 
 	return nil
