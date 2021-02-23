@@ -2020,6 +2020,17 @@ type Probe struct {
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// +optional
 	FailureThreshold int32
+	// Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
+	// The grace period is the duration in seconds after the processes running in the pod are sent
+	// a termination signal and the time when the processes are forcibly halted with a kill signal.
+	// Set this value longer than the expected cleanup time for your process.
+	// If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
+	// value overrides the value provided by the pod spec.
+	// Value must be non-negative integer. The value zero indicates stop immediately via
+	// the kill signal (no opportunity to shut down).
+	// This is an alpha field and requires enabling ProbeTerminationGracePeriod feature gate.
+	// +optional
+	TerminationGracePeriodSeconds *int64
 }
 
 // PullPolicy describes a policy for if/when to pull a container image
@@ -2719,7 +2730,8 @@ type PodSpec struct {
 	// +optional
 	RestartPolicy RestartPolicy
 	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
-	// Value must be non-negative integer. The value zero indicates delete immediately.
+	// Value must be non-negative integer. The value zero indicates stop immediately via the kill
+	// signal (no opportunity to shut down).
 	// If this value is nil, the default grace period will be used instead.
 	// The grace period is the duration in seconds after the processes running in the pod are sent
 	// a termination signal and the time when the processes are forcibly halted with a kill signal.
