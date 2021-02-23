@@ -2268,6 +2268,13 @@
     and 3c the ServiceTokenVolume MUST not be auto mounted.
   release: v1.9
   file: test/e2e/auth/service_accounts.go
+- testname: RootCA ConfigMap test
+  codename: '[sig-auth] ServiceAccounts should guarantee kube-root-ca.crt exist in
+    any namespace [Conformance]'
+  description: Ensure every namespace exist a ConfigMap for root ca cert. 1. Created
+    automatically 2. Recreated if deleted 3. Reconciled if modified
+  release: v1.21
+  file: test/e2e/auth/service_accounts.go
 - testname: Service Account Tokens Must AutoMount
   codename: '[sig-auth] ServiceAccounts should mount an API token into pods  [Conformance]'
   description: Ensure that Service Account keys are mounted into the Container. Pod
