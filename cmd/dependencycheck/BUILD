@@ -8,7 +8,7 @@ go_library(
 )
 
 go_binary(
-    name = "vendorcycle",
+    name = "dependencycheck",
     embed = [":go_default_library"],
     visibility = ["//visibility:public"],
 )
