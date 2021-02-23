@@ -169,7 +169,7 @@ func GetNodeIP(client clientset.Interface, name string) net.IP {
 		return true, nil
 	})
 	if err == nil {
-		klog.Infof("Successfully retrieved node IP: %v", nodeIP)
+		klog.InfoS("Successfully retrieved node IP", "nodeIp", nodeIP)
 	}
 	return nodeIP
 }
@@ -284,7 +284,7 @@ func PatchNodeCIDRs(c clientset.Interface, node types.NodeName, cidrs []string) 
 	if err != nil {
 		return fmt.Errorf("failed to json.Marshal CIDR: %v", err)
 	}
-	klog.V(4).Infof("cidrs patch bytes are:%s", string(patchBytes))
+	klog.V(4).InfoS("cidrs patch bytes are", "bytes", string(patchBytes))
 	if _, err := c.CoreV1().Nodes().Patch(context.TODO(), string(node), types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 		return fmt.Errorf("failed to patch node CIDR: %v", err)
 	}
