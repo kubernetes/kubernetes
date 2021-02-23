@@ -631,7 +631,6 @@ const (
 	opFlushChain  operation = "-F"
 	opDeleteChain operation = "-X"
 	opListChain   operation = "-S"
-	opAppendRule  operation = "-A"
 	opCheckRule   operation = "-C"
 	opDeleteRule  operation = "-D"
 )
