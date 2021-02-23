@@ -6,7 +6,7 @@ load(
 load("//staging/src/k8s.io/component-base/version:def.bzl", "version_x_defs")
 
 go_binary(
-    name = "kubectl",
+    name = "kubectl-convert",
     embed = [":go_default_library"],
     pure = "on",
     visibility = ["//visibility:public"],
