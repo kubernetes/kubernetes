@@ -33,7 +33,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFeature:SystemNodeCriticalPod]", func() {
+var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFeature:SystemNodeCriticalPod]", func() {
 	f := framework.NewDefaultFramework("system-node-critical-pod-test")
 	// this test only manipulates pods in kube-system
 	f.SkipNamespaceCreation = true

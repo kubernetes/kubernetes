@@ -70,7 +70,7 @@ type nodeConfigTestCase struct {
 }
 
 // This test is marked [Disruptive] because the Kubelet restarts several times during this test.
-var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletConfig][Serial][Disruptive]", func() {
+var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletConfig][Serial][Disruptive]", func() {
 	f := framework.NewDefaultFramework("dynamic-kubelet-configuration-test")
 	var beforeNode *v1.Node
 	var beforeConfigMap *v1.ConfigMap

@@ -41,7 +41,7 @@ const (
 	rotationConsistentlyTimeout = 2 * time.Minute
 )
 
-var _ = framework.KubeDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() {
+var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("container-log-rotation-test")
 	ginkgo.Context("when a container generates a lot of log", func() {
 		ginkgo.BeforeEach(func() {

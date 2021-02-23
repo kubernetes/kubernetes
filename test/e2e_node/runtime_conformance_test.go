@@ -32,7 +32,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
+var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 	f := framework.NewDefaultFramework("runtime-conformance")
 
 	ginkgo.Describe("container runtime conformance blackbox test", func() {

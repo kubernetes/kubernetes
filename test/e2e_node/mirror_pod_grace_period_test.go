@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = framework.KubeDescribe("MirrorPodWithGracePeriod", func() {
+var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 	f := framework.NewDefaultFramework("mirror-pod-with-grace-period")
 	ginkgo.Context("when create a mirror pod ", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
