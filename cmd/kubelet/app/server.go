@@ -160,7 +160,8 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			cmds := cleanFlagSet.Args()
 			if len(cmds) > 0 {
 				cmd.Usage()
-				klog.Fatalf("unknown command: %s", cmds[0])
+				fmt.Printf("unknown command: %s\n", cmds[0])
+				return
 			}
 
 			// short-circuit on help
