@@ -77,7 +77,7 @@ func GetKubeConfigPath(file string) string {
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	rules.Precedence = append(rules.Precedence, kubeadmconstants.GetAdminKubeConfigPath())
 	file = rules.GetDefaultFilename()
-	klog.V(1).Infof("Using kubeconfig file: %s", file)
+	klog.V(1).InfoS("Using kubeconfig file", "file", file)
 	return file
 }
 
