@@ -442,7 +442,7 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 }
 
 func getDiskFormat(exec utilexec.Interface, disk string) (string, error) {
-	args := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
+	args := []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
 	klog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
 	dataOut, err := exec.Command("blkid", args...).CombinedOutput()
 	output := string(dataOut)

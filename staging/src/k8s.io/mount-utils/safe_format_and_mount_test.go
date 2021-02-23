@@ -77,14 +77,14 @@ func TestSafeFormatAndMount(t *testing.T) {
 			fstype:       "ext4",
 			mountOptions: []string{"ro"},
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=ext4\n", nil},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=ext4\n", nil},
 			},
 		},
 		{
 			description: "Test a normal mount of an already formatted device",
 			fstype:      "ext4",
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=ext4\n", nil},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=ext4\n", nil},
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
 			},
 		},
@@ -93,7 +93,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			fstype:       "ext4",
 			mountOptions: []string{"ro"},
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
 			},
 			expErrorType: UnformattedReadOnly,
 		},
@@ -101,7 +101,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			description: "Test a normal mount of unformatted device",
 			fstype:      "ext4",
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
 				{"mkfs.ext4", []string{"-F", "-m0", "/dev/foo"}, "", nil},
 			},
 		},
@@ -109,7 +109,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			description: "Test 'fsck' fails with exit status 4",
 			fstype:      "ext4",
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=ext4\n", nil},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=ext4\n", nil},
 				{"fsck", []string{"-a", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 4}},
 			},
 			expErrorType: HasFilesystemErrors,
@@ -118,7 +118,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			description: "Test 'fsck' fails with exit status 1 (errors found and corrected)",
 			fstype:      "ext4",
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=ext4\n", nil},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=ext4\n", nil},
 				{"fsck", []string{"-a", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 1}},
 			},
 		},
@@ -126,7 +126,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			description: "Test 'fsck' fails with exit status other than 1 and 4 (likely unformatted device)",
 			fstype:      "ext4",
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=ext4\n", nil},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=ext4\n", nil},
 				{"fsck", []string{"-a", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 8}},
 			},
 		},
@@ -135,7 +135,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			fstype:      "ext4",
 			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'")},
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nPTTYPE=dos\n", nil},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nPTTYPE=dos\n", nil},
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
 			},
 			expErrorType: FilesystemMismatch,
@@ -145,7 +145,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			fstype:      "ext4",
 			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'")},
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
 				{"mkfs.ext4", []string{"-F", "-m0", "/dev/foo"}, "", fmt.Errorf("formatting failed")},
 			},
 			expErrorType: FormatFailed,
@@ -155,7 +155,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			fstype:      "ext4",
 			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'")},
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
 				{"mkfs.ext4", []string{"-F", "-m0", "/dev/foo"}, "", nil},
 			},
 			expErrorType: UnknownMountError,
@@ -164,7 +164,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			description: "Test that 'blkid' is called and confirms unformatted disk, format passes, mount passes",
 			fstype:      "ext4",
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
 				{"mkfs.ext4", []string{"-F", "-m0", "/dev/foo"}, "", nil},
 			},
 		},
@@ -172,7 +172,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			description: "Test that 'blkid' is called and confirms unformatted disk, format passes, mount passes with ext3",
 			fstype:      "ext3",
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
 				{"mkfs.ext3", []string{"-F", "-m0", "/dev/foo"}, "", nil},
 			},
 		},
@@ -180,7 +180,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			description: "test that none ext4 fs does not get called with ext4 options.",
 			fstype:      "xfs",
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
 				{"mkfs.xfs", []string{"/dev/foo"}, "", nil},
 			},
 		},
@@ -188,7 +188,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			description: "Test that 'blkid' is called and reports ext4 partition",
 			fstype:      "ext4",
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=ext4\n", nil},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=ext4\n", nil},
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
 			},
 		},
@@ -197,7 +197,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			fstype:      "xfs",
 			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'"), nil},
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 4}},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 4}},
 				{"mkfs.xfs", []string{"/dev/foo"}, "", nil},
 			},
 			expErrorType: GetDiskFormatFailed,
@@ -208,7 +208,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			sensitiveMountOptions: []string{"mySecret"},
 			mountErrs:             []error{fmt.Errorf("unknown filesystem type '(null)'")},
 			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
+				{"blkid", []string{"-p", "-u", "filesystems", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
 				{"mkfs.ext4", []string{"-F", "-m0", "/dev/foo"}, "", fmt.Errorf("formatting failed")},
 			},
 			expErrorType: FormatFailed,
