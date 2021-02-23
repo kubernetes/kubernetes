@@ -361,7 +361,7 @@ function kube::release::create_docker_images_for_server() {
     for wrappable in $binaries; do
 
       local binary_name=${wrappable%%,*}
-      local base_image=${wrappable##*,}
+      local base_image_name=${wrappable##*,}
       local binary_file_path="${binary_dir}/${binary_name}"
       local docker_build_path="${binary_file_path}.dockerbuild"
       local docker_image_tag="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
@@ -384,7 +384,8 @@ function kube::release::create_docker_images_for_server() {
           --platform linux/"${arch}" \
           --load ${docker_build_opts:+"${docker_build_opts}"} \
           -t "${docker_image_tag}" \
-          --build-arg BASEIMAGE="${base_image}" \
+          --build-arg BASE_IMAGE_REGISTRY="${KUBE_BASE_IMAGE_REGISTRY}" \
+          --build-arg BASE_IMAGE_NAME="${base_image_name}" \
           --build-arg BINARY="${binary_name}" \
           "${docker_build_path}" >"${build_log}" 2>&1; then
             cat "${build_log}"

@@ -13,16 +13,17 @@
 # limitations under the License.
 
 # This file create the kube-apiserver image.
-ARG BASEIMAGE
+ARG BASE_IMAGE_REGISTRY
+ARG BASE_IMAGE_NAME
 # we use the hosts platform to apply the capabilities to avoid the need
 # to setup qemu for the builder.
-FROM --platform=linux/$BUILDARCH k8s.gcr.io/build-image/setcap:buster-v1.4.0
+FROM --platform=linux/$BUILDARCH ${BASE_IMAGE_REGISTRY}/setcap:buster-v1.4.0
 ARG BINARY
 COPY ${BINARY} /${BINARY}
 # We apply cap_net_bind_service so that kube-apiserver can be run as
 # non-root and still listen on port less than 1024
 RUN setcap cap_net_bind_service=+ep /${BINARY}
 
-FROM --platform=linux/$TARGETARCH ${BASEIMAGE}
+FROM --platform=linux/$TARGETARCH ${BASE_IMAGE_REGISTRY}/${BASE_IMAGE_NAME}
 ARG BINARY
 COPY --from=0 /${BINARY} /usr/local/bin/${BINARY}
