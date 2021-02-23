@@ -1,7 +1,7 @@
 // +build linux
 
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,28 +16,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resizefs
+package mount
 
 import (
 	"fmt"
 
 	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
+	utilexec "k8s.io/utils/exec"
 )
 
 // ResizeFs Provides support for resizing file systems
 type ResizeFs struct {
-	mounter *mount.SafeFormatAndMount
+	exec utilexec.Interface
 }
 
 // NewResizeFs returns new instance of resizer
-func NewResizeFs(mounter *mount.SafeFormatAndMount) *ResizeFs {
-	return &ResizeFs{mounter: mounter}
+func NewResizeFs(exec utilexec.Interface) *ResizeFs {
+	return &ResizeFs{exec: exec}
 }
 
 // Resize perform resize of file system
 func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string) (bool, error) {
-	format, err := resizefs.mounter.GetDiskFormat(devicePath)
+	format, err := getDiskFormat(resizefs.exec, devicePath)
 
 	if err != nil {
 		formatErr := fmt.Errorf("ResizeFS.Resize - error checking format for device %s: %v", devicePath, err)
@@ -61,7 +61,7 @@ func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string) (boo
 }
 
 func (resizefs *ResizeFs) extResize(devicePath string) (bool, error) {
-	output, err := resizefs.mounter.Exec.Command("resize2fs", devicePath).CombinedOutput()
+	output, err := resizefs.exec.Command("resize2fs", devicePath).CombinedOutput()
 	if err == nil {
 		klog.V(2).Infof("Device %s resized successfully", devicePath)
 		return true, nil
@@ -74,7 +74,7 @@ func (resizefs *ResizeFs) extResize(devicePath string) (bool, error) {
 
 func (resizefs *ResizeFs) xfsResize(deviceMountPath string) (bool, error) {
 	args := []string{"-d", deviceMountPath}
-	output, err := resizefs.mounter.Exec.Command("xfs_growfs", args...).CombinedOutput()
+	output, err := resizefs.exec.Command("xfs_growfs", args...).CombinedOutput()
 
 	if err == nil {
 		klog.V(2).Infof("Device %s resized successfully", deviceMountPath)

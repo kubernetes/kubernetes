@@ -1,7 +1,7 @@
 // +build !linux
 
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,22 +16,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resizefs
+package mount
 
 import (
 	"fmt"
 
-	"k8s.io/mount-utils"
+	utilexec "k8s.io/utils/exec"
 )
 
 // ResizeFs Provides support for resizing file systems
 type ResizeFs struct {
-	mounter *mount.SafeFormatAndMount
+	exec utilexec.Interface
 }
 
 // NewResizeFs returns new instance of resizer
-func NewResizeFs(mounter *mount.SafeFormatAndMount) *ResizeFs {
-	return &ResizeFs{mounter: mounter}
+func NewResizeFs(exec utilexec.Interface) *ResizeFs {
+	return &ResizeFs{exec: exec}
 }
 
 // Resize perform resize of file system

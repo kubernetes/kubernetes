@@ -21,8 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/mount-utils"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -31,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/util/resizefs"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/mount-utils"
 )
 
 var (
@@ -266,11 +264,6 @@ func MergeResizeConditionOnPVC(
 
 // GenericResizeFS : call generic filesystem resizer for plugins that don't have any special filesystem resize requirements
 func GenericResizeFS(host volume.VolumeHost, pluginName, devicePath, deviceMountPath string) (bool, error) {
-	mounter := host.GetMounter(pluginName)
-	diskFormatter := &mount.SafeFormatAndMount{
-		Interface: mounter,
-		Exec:      host.GetExec(pluginName),
-	}
-	resizer := resizefs.NewResizeFs(diskFormatter)
+	resizer := mount.NewResizeFs(host.GetExec(pluginName))
 	return resizer.Resize(devicePath, deviceMountPath)
 }

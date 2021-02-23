@@ -24,7 +24,6 @@ go_library(
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/securitycontext:go_default_library",
-        "//pkg/util/resizefs:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumepathhandler:go_default_library",
