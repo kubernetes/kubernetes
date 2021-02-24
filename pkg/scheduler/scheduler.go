@@ -89,10 +89,11 @@ type Scheduler struct {
 }
 
 type schedulerOptions struct {
-	schedulerAlgorithmSource schedulerapi.SchedulerAlgorithmSource
-	percentageOfNodesToScore int32
-	podInitialBackoffSeconds int64
-	podMaxBackoffSeconds     int64
+	schedulerAlgorithmSource   schedulerapi.SchedulerAlgorithmSource
+	percentageOfNodesToScore   int32
+	podMaxUnschedulableSeconds int64
+	podInitialBackoffSeconds   int64
+	podMaxBackoffSeconds       int64
 	// Contains out-of-tree plugins to be merged with the in-tree registry.
 	frameworkOutOfTreeRegistry frameworkruntime.Registry
 	profiles                   []schedulerapi.KubeSchedulerProfile
@@ -141,6 +142,13 @@ func WithFrameworkOutOfTreeRegistry(registry frameworkruntime.Registry) Option {
 	}
 }
 
+// WithPodMaxUnschedulableSeconds sets podMaxUnschedulableSeconds for Scheduler, the default value is 60
+func WithPodMaxUnschedulableSeconds(podMaxUnschedulableSeconds int64) Option {
+	return func(o *schedulerOptions) {
+		o.podMaxUnschedulableSeconds = podMaxUnschedulableSeconds
+	}
+}
+
 // WithPodInitialBackoffSeconds sets podInitialBackoffSeconds for Scheduler, the default value is 1
 func WithPodInitialBackoffSeconds(podInitialBackoffSeconds int64) Option {
 	return func(o *schedulerOptions) {
@@ -180,10 +188,12 @@ var defaultSchedulerOptions = schedulerOptions{
 	schedulerAlgorithmSource: schedulerapi.SchedulerAlgorithmSource{
 		Provider: defaultAlgorithmSourceProviderName(),
 	},
-	percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
-	podInitialBackoffSeconds: int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
-	podMaxBackoffSeconds:     int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
-	parallelism:              int32(parallelize.DefaultParallelism),
+
+	percentageOfNodesToScore:   schedulerapi.DefaultPercentageOfNodesToScore,
+	podMaxUnschedulableSeconds: int64(internalqueue.DefaultPodMaxUnschedulableDuration.Seconds()),
+	podInitialBackoffSeconds:   int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
+	podMaxBackoffSeconds:       int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
+	parallelism:                int32(parallelize.DefaultParallelism),
 }
 
 // New returns a Scheduler
@@ -213,20 +223,21 @@ func New(client clientset.Interface,
 	snapshot := internalcache.NewEmptySnapshot()
 
 	configurator := &Configurator{
-		client:                   client,
-		recorderFactory:          recorderFactory,
-		informerFactory:          informerFactory,
-		schedulerCache:           schedulerCache,
-		StopEverything:           stopEverything,
-		percentageOfNodesToScore: options.percentageOfNodesToScore,
-		podInitialBackoffSeconds: options.podInitialBackoffSeconds,
-		podMaxBackoffSeconds:     options.podMaxBackoffSeconds,
-		profiles:                 append([]schedulerapi.KubeSchedulerProfile(nil), options.profiles...),
-		registry:                 registry,
-		nodeInfoSnapshot:         snapshot,
-		extenders:                options.extenders,
-		frameworkCapturer:        options.frameworkCapturer,
-		parallellism:             options.parallelism,
+		client:                     client,
+		recorderFactory:            recorderFactory,
+		informerFactory:            informerFactory,
+		schedulerCache:             schedulerCache,
+		StopEverything:             stopEverything,
+		percentageOfNodesToScore:   options.percentageOfNodesToScore,
+		podMaxUnschedulableSeconds: options.podMaxUnschedulableSeconds,
+		podInitialBackoffSeconds:   options.podInitialBackoffSeconds,
+		podMaxBackoffSeconds:       options.podMaxBackoffSeconds,
+		profiles:                   append([]schedulerapi.KubeSchedulerProfile(nil), options.profiles...),
+		registry:                   registry,
+		nodeInfoSnapshot:           snapshot,
+		extenders:                  options.extenders,
+		frameworkCapturer:          options.frameworkCapturer,
+		parallellism:               options.parallelism,
 	}
 
 	metrics.Register()

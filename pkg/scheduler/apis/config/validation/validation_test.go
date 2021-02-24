@@ -28,6 +28,7 @@ import (
 )
 
 func TestValidateKubeSchedulerConfiguration(t *testing.T) {
+	podMaxUnschedulableSeconds := int64(60)
 	podInitialBackoffSeconds := int64(1)
 	podMaxBackoffSeconds := int64(1)
 	validConfig := &config.KubeSchedulerConfiguration{
@@ -57,9 +58,10 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			ResourceNamespace: "name",
 			ResourceName:      "name",
 		},
-		PodInitialBackoffSeconds: podInitialBackoffSeconds,
-		PodMaxBackoffSeconds:     podMaxBackoffSeconds,
-		PercentageOfNodesToScore: 35,
+		PodMaxUnschedulableSeconds: podMaxUnschedulableSeconds,
+		PodInitialBackoffSeconds:   podInitialBackoffSeconds,
+		PodMaxBackoffSeconds:       podMaxBackoffSeconds,
+		PercentageOfNodesToScore:   35,
 		Profiles: []config.KubeSchedulerProfile{
 			{
 				SchedulerName: "me",
@@ -148,6 +150,9 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		BindVerb:       "bar",
 	})
 
+	invalidPodMaxUnschedulableValue := validConfig.DeepCopy()
+	invalidPodMaxUnschedulableValue.PodMaxUnschedulableSeconds = int64(-1)
+
 	scenarios := map[string]struct {
 		expectedToFail bool
 		config         *config.KubeSchedulerConfiguration
@@ -215,6 +220,10 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		"extender-duplicate-bind": {
 			expectedToFail: true,
 			config:         extenderDuplicateBind,
+		},
+		"bad-pod-max-unschedulable-seconds": {
+			expectedToFail: true,
+			config:         invalidPodMaxUnschedulableValue,
 		},
 	}
 

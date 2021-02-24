@@ -74,6 +74,8 @@ type Configurator struct {
 	// percentageOfNodesToScore specifies percentage of all nodes to score in each scheduling cycle.
 	percentageOfNodesToScore int32
 
+	podMaxUnschedulableSeconds int64
+
 	podInitialBackoffSeconds int64
 
 	podMaxBackoffSeconds int64
@@ -156,6 +158,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	podQueue := internalqueue.NewSchedulingQueue(
 		lessFn,
 		c.informerFactory,
+		internalqueue.WithPodMaxUnschedulableDuration(time.Duration(c.podMaxUnschedulableSeconds)*time.Second),
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
 		internalqueue.WithPodNominator(nominator),

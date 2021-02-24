@@ -686,9 +686,14 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 func TestPriorityQueue_NewWithOptions(t *testing.T) {
 	q := NewTestQueue(context.Background(),
 		newDefaultQueueSort(),
+		WithPodMaxUnschedulableDuration(30*time.Second),
 		WithPodInitialBackoffDuration(2*time.Second),
 		WithPodMaxBackoffDuration(20*time.Second),
 	)
+
+	if q.podMaxUnschedulableDuration != 30*time.Second {
+		t.Errorf("Unexpected pod max unschedulable duration . Expected: %v, got: %v", 30*time.Second, q.podMaxUnschedulableDuration)
+	}
 
 	if q.podInitialBackoffDuration != 2*time.Second {
 		t.Errorf("Unexpected pod backoff initial duration. Expected: %v, got: %v", 2*time.Second, q.podInitialBackoffDuration)
@@ -1135,7 +1140,7 @@ func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
 
 	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&highPod, "fakePlugin"), q.SchedulingCycle())
 	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&midPod, "fakePlugin"), q.SchedulingCycle())
-	c.Step(unschedulableQTimeInterval + time.Second)
+	c.Step(q.podMaxUnschedulableDuration + time.Second)
 	q.flushUnschedulableQLeftover()
 
 	if p, err := q.Pop(); err != nil || p.Pod != &highPod {
@@ -1477,9 +1482,9 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 		t.Fatalf("Failed to pop a pod %v", err)
 	}
 	queue.AddUnschedulableIfNotPresent(pInfo, 1)
-	// Override clock to exceed the unschedulableQTimeInterval so that unschedulable pods
+	// Override clock to exceed the DefaultPodMaxUnschedulableDuration so that unschedulable pods
 	// will be moved to activeQ
-	c.SetTime(timestamp.Add(unschedulableQTimeInterval + 1))
+	c.SetTime(timestamp.Add(DefaultPodMaxUnschedulableDuration + 1))
 	queue.flushUnschedulableQLeftover()
 	pInfo, err = queue.Pop()
 	if err != nil {
@@ -1497,9 +1502,9 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 		t.Fatalf("Failed to pop a pod %v", err)
 	}
 	queue.AddUnschedulableIfNotPresent(pInfo, 1)
-	// Override clock to exceed the unschedulableQTimeInterval so that unschedulable pods
+	// Override clock to exceed the DefaultPodMaxUnschedulableDuration so that unschedulable pods
 	// will be moved to activeQ
-	c.SetTime(timestamp.Add(unschedulableQTimeInterval + 1))
+	c.SetTime(timestamp.Add(DefaultPodMaxUnschedulableDuration + 1))
 	queue.flushUnschedulableQLeftover()
 	newPod := pod.DeepCopy()
 	newPod.Generation = 1

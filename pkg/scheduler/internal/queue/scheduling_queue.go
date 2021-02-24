@@ -48,14 +48,12 @@ import (
 )
 
 const (
-	// If the pod stays in unschedulableQ longer than the unschedulableQTimeInterval,
+	// If the pod stays in unschedulableQ longer than the DefaultPodMaxUnschedulableDuration ,
 	// the pod will be moved from unschedulableQ to activeQ.
-	unschedulableQTimeInterval = 60 * time.Second
+	DefaultPodMaxUnschedulableDuration = 60 * time.Second
 
 	queueClosed = "scheduling queue is closed"
-)
 
-const (
 	// DefaultPodInitialBackoffDuration is the default value for the initial backoff duration
 	// for unschedulable pods. To change the default podInitialBackoffDurationSeconds used by the
 	// scheduler, update the ComponentConfig value in defaults.go
@@ -125,6 +123,9 @@ type PriorityQueue struct {
 	stop  chan struct{}
 	clock util.Clock
 
+	// podMaxUnschedulableDuration duration
+	podMaxUnschedulableDuration time.Duration
+
 	// pod initial backoff duration.
 	podInitialBackoffDuration time.Duration
 	// pod maximum backoff duration.
@@ -160,11 +161,12 @@ type PriorityQueue struct {
 }
 
 type priorityQueueOptions struct {
-	clock                     util.Clock
-	podInitialBackoffDuration time.Duration
-	podMaxBackoffDuration     time.Duration
-	podNominator              framework.PodNominator
-	clusterEventMap           map[framework.ClusterEvent]sets.String
+	clock                       util.Clock
+	podMaxUnschedulableDuration time.Duration
+	podInitialBackoffDuration   time.Duration
+	podMaxBackoffDuration       time.Duration
+	podNominator                framework.PodNominator
+	clusterEventMap             map[framework.ClusterEvent]sets.String
 }
 
 // Option configures a PriorityQueue
@@ -174,6 +176,13 @@ type Option func(*priorityQueueOptions)
 func WithClock(clock util.Clock) Option {
 	return func(o *priorityQueueOptions) {
 		o.clock = clock
+	}
+}
+
+// WithPodMaxUnschedulableDuration sets podMaxUnschedulableDuration for PriorityQueue.
+func WithPodMaxUnschedulableDuration(duration time.Duration) Option {
+	return func(o *priorityQueueOptions) {
+		o.podMaxUnschedulableDuration = duration
 	}
 }
 
@@ -206,9 +215,10 @@ func WithClusterEventMap(m map[framework.ClusterEvent]sets.String) Option {
 }
 
 var defaultPriorityQueueOptions = priorityQueueOptions{
-	clock:                     util.RealClock{},
-	podInitialBackoffDuration: DefaultPodInitialBackoffDuration,
-	podMaxBackoffDuration:     DefaultPodMaxBackoffDuration,
+	clock:                       util.RealClock{},
+	podMaxUnschedulableDuration: DefaultPodMaxUnschedulableDuration,
+	podInitialBackoffDuration:   DefaultPodInitialBackoffDuration,
+	podMaxBackoffDuration:       DefaultPodMaxBackoffDuration,
 }
 
 // Making sure that PriorityQueue implements SchedulingQueue.
@@ -246,15 +256,16 @@ func NewPriorityQueue(
 	}
 
 	pq := &PriorityQueue{
-		PodNominator:              options.podNominator,
-		clock:                     options.clock,
-		stop:                      make(chan struct{}),
-		podInitialBackoffDuration: options.podInitialBackoffDuration,
-		podMaxBackoffDuration:     options.podMaxBackoffDuration,
-		activeQ:                   heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
-		unschedulableQ:            newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
-		moveRequestCycle:          -1,
-		clusterEventMap:           options.clusterEventMap,
+		PodNominator:                options.podNominator,
+		clock:                       options.clock,
+		stop:                        make(chan struct{}),
+		podMaxUnschedulableDuration: options.podMaxUnschedulableDuration,
+		podInitialBackoffDuration:   options.podInitialBackoffDuration,
+		podMaxBackoffDuration:       options.podMaxBackoffDuration,
+		activeQ:                     heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
+		unschedulableQ:              newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
+		moveRequestCycle:            -1,
+		clusterEventMap:             options.clusterEventMap,
 	}
 	pq.cond.L = &pq.lock
 	pq.podBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
@@ -373,7 +384,7 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 	}
 }
 
-// flushUnschedulableQLeftover moves pod which stays in unschedulableQ longer than the unschedulableQTimeInterval
+// flushUnschedulableQLeftover moves pod which stays in unschedulableQ longer than the podMaxUnschedulableDuration
 // to activeQ.
 func (p *PriorityQueue) flushUnschedulableQLeftover() {
 	p.lock.Lock()
@@ -383,7 +394,7 @@ func (p *PriorityQueue) flushUnschedulableQLeftover() {
 	currentTime := p.clock.Now()
 	for _, pInfo := range p.unschedulableQ.podInfoMap {
 		lastScheduleTime := pInfo.Timestamp
-		if currentTime.Sub(lastScheduleTime) > unschedulableQTimeInterval {
+		if currentTime.Sub(lastScheduleTime) > p.podMaxUnschedulableDuration {
 			podsToMove = append(podsToMove, pInfo)
 		}
 	}

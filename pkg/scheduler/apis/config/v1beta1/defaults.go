@@ -138,14 +138,19 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 	// Use the default LeaderElectionConfiguration options
 	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
 
+	if obj.PodMaxUnschedulableSeconds == nil {
+		val := pointer.Int64Ptr(60)
+		obj.PodMaxUnschedulableSeconds = val
+	}
+
 	if obj.PodInitialBackoffSeconds == nil {
-		val := int64(1)
-		obj.PodInitialBackoffSeconds = &val
+		val := pointer.Int64Ptr(1)
+		obj.PodInitialBackoffSeconds = val
 	}
 
 	if obj.PodMaxBackoffSeconds == nil {
-		val := int64(10)
-		obj.PodMaxBackoffSeconds = &val
+		val := pointer.Int64Ptr(10)
+		obj.PodMaxBackoffSeconds = val
 	}
 
 	// Enable profiling by default in the scheduler

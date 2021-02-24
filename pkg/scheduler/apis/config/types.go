@@ -84,6 +84,11 @@ type KubeSchedulerConfiguration struct {
 	// nodes will be scored.
 	PercentageOfNodesToScore int32
 
+	// PodMaxUnschedulableSeconds is the max duration for pods in unschedulableQ
+	// If specified, it must be greater than 0. If this value is null,
+	// the default value (60s) will be used
+	PodMaxUnschedulableSeconds int64
+
 	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
 	// If specified, it must be greater than 0. If this value is null, the default value (1s)
 	// will be used.
