@@ -222,6 +222,17 @@ func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList 
 		if evictionReservation != nil {
 			value.Add(evictionReservation[k])
 		}
+		if k == v1.ResourceCPU {
+			for _, pod := range cm.systemCriticalPods {
+				for _, container := range pod.Spec.Containers {
+					if _, ok := container.Resources.Requests[v1.ResourceCPU]; !ok {
+						continue
+					}
+
+					value.Sub(container.Resources.Requests[v1.ResourceCPU])
+				}
+			}
+		}
 		if !value.IsZero() {
 			result[k] = *value
 		}

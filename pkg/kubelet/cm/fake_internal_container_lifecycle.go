@@ -35,7 +35,7 @@ func (f *fakeInternalContainerLifecycle) PreStartContainer(pod *v1.Pod, containe
 	return nil
 }
 
-func (f *fakeInternalContainerLifecycle) PreStopContainer(containerID string) error {
+func (f *fakeInternalContainerLifecycle) PreStopContainer(pod *v1.Pod, containerID string) error {
 	return nil
 }
 

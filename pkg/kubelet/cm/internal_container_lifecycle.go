@@ -17,6 +17,8 @@ limitations under the License.
 package cm
 
 import (
+	"strings"
+
 	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -26,10 +28,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
+const annotationSystemCriticalPod = "kubernetes.io/system-critical-pod"
+
 type InternalContainerLifecycle interface {
 	PreCreateContainer(pod *v1.Pod, container *v1.Container, containerConfig *runtimeapi.ContainerConfig) error
 	PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error
-	PreStopContainer(containerID string) error
+	PreStopContainer(pod *v1.Pod, containerID string) error
 	PostStopContainer(containerID string) error
 }
 
@@ -38,6 +42,9 @@ type internalContainerLifecycleImpl struct {
 	cpuManager      cpumanager.Manager
 	memoryManager   memorymanager.Manager
 	topologyManager topologymanager.Manager
+
+	// System critical pods
+	systemCriticalPods map[string]*v1.Pod
 }
 
 func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
@@ -58,10 +65,19 @@ func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, containe
 			return err
 		}
 	}
+
+	if v, ok := pod.Annotations[annotationSystemCriticalPod]; ok && strings.ToLower(v) == "true" {
+		i.systemCriticalPods[string(pod.UID)] = pod
+	}
+
 	return nil
 }
 
-func (i *internalContainerLifecycleImpl) PreStopContainer(containerID string) error {
+func (i *internalContainerLifecycleImpl) PreStopContainer(pod *v1.Pod, containerID string) error {
+	if v, ok := pod.Annotations[annotationSystemCriticalPod]; ok && strings.ToLower(v) == "true" {
+		delete(i.systemCriticalPods, string(pod.UID))
+	}
+
 	return nil
 }
 

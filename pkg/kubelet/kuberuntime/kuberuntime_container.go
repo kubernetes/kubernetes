@@ -624,7 +624,7 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 	m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeNormal, events.KillingContainer, message)
 
 	// Run internal pre-stop lifecycle hook
-	if err := m.internalLifecycle.PreStopContainer(containerID.ID); err != nil {
+	if err := m.internalLifecycle.PreStopContainer(pod, containerID.ID); err != nil {
 		return err
 	}
 
