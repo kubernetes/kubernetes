@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package node
 
 import (
 	"context"
@@ -31,9 +31,9 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 
 	"github.com/onsi/ginkgo"
 )
@@ -42,7 +42,7 @@ const (
 	serverStartTimeout = framework.PodStartTimeout + 3*time.Minute
 )
 
-var _ = framework.KubeDescribe("[Feature:Example]", func() {
+var _ = SIGDescribe("[Feature:Example]", func() {
 	f := framework.NewDefaultFramework("examples")
 
 	var c clientset.Interface
@@ -53,17 +53,17 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
-		err := auth.BindClusterRoleInNamespace(c.RbacV1(), "edit", f.Namespace.Name,
+		err := e2eauth.BindClusterRoleInNamespace(c.RbacV1(), "edit", f.Namespace.Name,
 			rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 		framework.ExpectNoError(err)
 
-		err = auth.WaitForAuthorizationUpdate(c.AuthorizationV1(),
+		err = e2eauth.WaitForAuthorizationUpdate(c.AuthorizationV1(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			f.Namespace.Name, "create", schema.GroupResource{Resource: "pods"}, true)
 		framework.ExpectNoError(err)
 	})
 
-	framework.KubeDescribe("Liveness", func() {
+	ginkgo.Describe("Liveness", func() {
 		ginkgo.It("liveness pods should be automatically restarted", func() {
 			test := "test/fixtures/doc-yaml/user-guide/liveness"
 			execYaml := readFile(test, "exec-liveness.yaml.in")
@@ -110,7 +110,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		})
 	})
 
-	framework.KubeDescribe("Secret", func() {
+	ginkgo.Describe("Secret", func() {
 		ginkgo.It("should create a pod that reads a secret", func() {
 			test := "test/fixtures/doc-yaml/user-guide/secrets"
 			secretYaml := readFile(test, "secret.yaml")
@@ -130,7 +130,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		})
 	})
 
-	framework.KubeDescribe("Downward API", func() {
+	ginkgo.Describe("Downward API", func() {
 		ginkgo.It("should create a pod that prints his name and namespace", func() {
 			test := "test/fixtures/doc-yaml/user-guide/downward-api"
 			podYaml := readFile(test, "dapi-pod.yaml.in")
@@ -152,7 +152,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 func readFile(test, file string) string {
 	from := filepath.Join(test, file)
-	data, err := testfiles.Read(from)
+	data, err := e2etestfiles.Read(from)
 	if err != nil {
 		framework.Fail(err.Error())
 	}
