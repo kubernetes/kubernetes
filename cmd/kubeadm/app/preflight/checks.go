@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -258,7 +259,11 @@ func (dac DirAvailableCheck) Check() (warnings, errorList []error) {
 	if err != nil {
 		return nil, []error{errors.Wrapf(err, "unable to check if %s is empty", dac.Path)}
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Printf("Error occures while closing file, Error: %v", err)
+		}
+	}()
 
 	_, err = f.Readdirnames(1)
 	if err != io.EOF {
@@ -340,7 +345,11 @@ func (fcc FileContentCheck) Check() (warnings, errorList []error) {
 	}
 
 	lr := io.LimitReader(f, int64(len(fcc.Content)))
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Printf("Error occures while closing file, Error: %v", err)
+		}
+	}()
 
 	buf := &bytes.Buffer{}
 	_, err = io.Copy(buf, lr)
@@ -657,7 +666,11 @@ func (swc SwapCheck) Check() (warnings, errorList []error) {
 		// /proc/swaps not available, thus no reasons to warn
 		return nil, nil
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Printf("Error occures while closing file, Error: %v", err)
+		}
+	}()
 	var buf []string
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
