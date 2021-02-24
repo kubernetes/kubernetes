@@ -63,6 +63,7 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 			imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, strings.ToLower(version.NonEmpty()), typedClientPath))
 		}
 	}
+	imports = append(imports, "k8s.io/klog/v2")
 	return
 }
 
@@ -143,6 +144,9 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 			return nil, fmt.Errorf("burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
 		}
 		configShallowCopy.RateLimiter = $.flowcontrolNewTokenBucketRateLimiter|raw$(configShallowCopy.QPS, configShallowCopy.Burst)
+	}
+    if c.Timeout == 0 {
+		klog.Warning("The provided config doesn't specify a timeout. The Timeout specifies a time limit for requests made by this client. Request without timeout can hang forever. Usually, it is a bad idea.")
 	}
 	var cs Clientset
 	var err error
