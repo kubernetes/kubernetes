@@ -1069,7 +1069,7 @@ func storeDaemonSetStatus(dsClient unversionedapps.DaemonSetInterface, ds *apps.
 	toUpdate := ds.DeepCopy()
 
 	var updateErr, getErr error
-	for i := 0; i < StatusUpdateRetries; i++ {
+	for i := 0; ; i++ {
 		if updateObservedGen {
 			toUpdate.Status.ObservedGeneration = ds.Generation
 		}
@@ -1085,6 +1085,10 @@ func storeDaemonSetStatus(dsClient unversionedapps.DaemonSetInterface, ds *apps.
 			return nil
 		}
 
+		// Stop retrying if we exceed statusUpdateRetries - the DaemonSet will be requeued with a rate limit.
+		if i >= StatusUpdateRetries {
+			break
+		}
 		// Update the set with the latest resource version for the next poll
 		if toUpdate, getErr = dsClient.Get(context.TODO(), ds.Name, metav1.GetOptions{}); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
