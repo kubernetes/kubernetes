@@ -169,10 +169,10 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	s.SetMemoryBlocks(podUID, container.Name, containerBlocks)
 
 	// update init containers memory blocks to reflect the fact that we re-used init containers memory
-	// it possible that the size of the init container memory block will have 0 value, when all memory
+	// it is possible that the size of the init container memory block will have 0 value, when all memory
 	// allocated for it was re-used
 	// we only do this so that the sum(memory_for_all_containers) == total amount of allocated memory to the pod, even
-	// though the fine state here doesn't accurately reflect what was (in reality) allocated to each container
+	// though the final state here doesn't accurately reflect what was (in reality) allocated to each container
 	// TODO: we should refactor our state structs to reflect the amount of the re-used memory
 	p.updateInitContainersMemoryBlocks(s, pod, container, containerBlocks)
 
@@ -225,13 +225,13 @@ func (p *staticPolicy) getPodReusableMemory(pod *v1.Pod, numaAffinity bitmask.Bi
 }
 
 // RemoveContainer call is idempotent
-func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
-	klog.InfoS("RemoveContainer", "podUID", podUID, "containerName", containerName)
+func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerName string) {
 	blocks := s.GetMemoryBlocks(podUID, containerName)
 	if blocks == nil {
-		return nil
+		return
 	}
 
+	klog.InfoS("RemoveContainer", "podUID", podUID, "containerName", containerName)
 	s.Delete(podUID, containerName)
 
 	// Mutate machine memory state to update free and reserved memory
@@ -275,8 +275,6 @@ func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerNa
 	}
 
 	s.SetMachineState(machineState)
-
-	return nil
 }
 
 func regenerateHints(pod *v1.Pod, ctn *v1.Container, ctnBlocks []state.Block, reqRsrc map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {

@@ -2031,15 +2031,7 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			err = p.RemoveContainer(s, "pod1", "container1")
-			if !reflect.DeepEqual(err, testCase.expectedError) {
-				t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
-			}
-
-			if err != nil {
-				return
-			}
-
+			p.RemoveContainer(s, "pod1", "container1")
 			assignments := s.GetMemoryAssignments()
 			if !areContainerMemoryAssignmentsEqual(t, assignments, testCase.expectedAssignments) {
 				t.Fatalf("Actual assignments %v are different from the expected %v", assignments, testCase.expectedAssignments)

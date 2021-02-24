@@ -49,8 +49,7 @@ func (p *none) Allocate(s state.State, pod *v1.Pod, container *v1.Container) err
 }
 
 // RemoveContainer call is idempotent
-func (p *none) RemoveContainer(s state.State, podUID string, containerName string) error {
-	return nil
+func (p *none) RemoveContainer(s state.State, podUID string, containerName string) {
 }
 
 // GetTopologyHints implements the topologymanager.HintProvider Interface
