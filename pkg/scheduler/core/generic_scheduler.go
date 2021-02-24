@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -397,6 +398,12 @@ func (g *genericScheduler) findNodesThatPassExtenders(pod *v1.Pod, feasibleNodes
 	return feasibleNodes, nil
 }
 
+type pluginScores struct {
+	Plugin           string
+	Score            int64
+	AverageNodeScore float64
+}
+
 // prioritizeNodes prioritizes the nodes by running the score plugins,
 // which return a score for each node from the call to RunScorePlugins().
 // The scores from each plugin are added together to make the score for that node, then
@@ -434,22 +441,17 @@ func (g *genericScheduler) prioritizeNodes(
 		return nil, scoreStatus.AsError()
 	}
 
-	if klog.V(10).Enabled() {
-		for plugin, nodeScoreList := range scoresMap {
-			for _, nodeScore := range nodeScoreList {
-				klog.InfoS("Plugin scored node for pod", "pod", klog.KObj(pod), "plugin", plugin, "node", nodeScore.Name, "score", nodeScore.Score)
-			}
-		}
-	}
-
 	// Summarize all scores.
 	result := make(framework.NodeScoreList, 0, len(nodes))
-
 	for i := range nodes {
 		result = append(result, framework.NodeScore{Name: nodes[i].Name, Score: 0})
 		for j := range scoresMap {
 			result[i].Score += scoresMap[j][i].Score
 		}
+	}
+
+	if klog.V(4).Enabled() {
+		logPluginScores(nodes, scoresMap, pod)
 	}
 
 	if len(g.extenders) != 0 && nodes != nil {
@@ -492,12 +494,60 @@ func (g *genericScheduler) prioritizeNodes(
 		}
 	}
 
-	if klog.V(10).Enabled() {
+	if klog.V(4).Enabled() {
 		for i := range result {
 			klog.InfoS("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", result[i].Name, "score", result[i].Score)
 		}
 	}
 	return result, nil
+}
+
+// logPluginScores adds summarized plugin score logging. The goal of this block is to show the highest scoring plugins on
+// each node, and the average score for those plugins across all nodes.
+func logPluginScores(nodes []*v1.Node, scoresMap framework.PluginToNodeScores, pod *v1.Pod) {
+	totalPluginScores := make(map[string]int64)
+	for j := range scoresMap {
+		for i := range nodes {
+			totalPluginScores[j] += scoresMap[j][i].Score
+		}
+	}
+	// Build a map of Nodes->PluginScores on that node
+	nodeToPluginScores := make(framework.PluginToNodeScores, len(nodes))
+	for _, node := range nodes {
+		nodeToPluginScores[node.Name] = make(framework.NodeScoreList, len(scoresMap))
+	}
+	// Convert the scoresMap (which contains Plugins->NodeScores) to the Nodes->PluginScores map
+	for plugin, nodeScoreList := range scoresMap {
+		for _, nodeScore := range nodeScoreList {
+			klog.V(10).InfoS("Plugin scored node for pod", "pod", klog.KObj(pod), "plugin", plugin, "node", nodeScore.Name, "score", nodeScore.Score)
+			nodeToPluginScores[nodeScore.Name] = append(nodeToPluginScores[nodeScore.Name], framework.NodeScore{Name: plugin, Score: nodeScore.Score})
+		}
+	}
+
+	for node, scores := range nodeToPluginScores {
+		// Get the top 3 scoring plugins for each node
+		sort.Slice(scores, func(i, j int) bool {
+			return scores[i].Score > scores[j].Score
+		})
+		var topScores []pluginScores
+		for _, score := range scores {
+			pluginScore := pluginScores{
+				Plugin:           score.Name,
+				Score:            score.Score,
+				AverageNodeScore: float64(totalPluginScores[score.Name]) / float64(len(nodes)),
+			}
+			topScores = append(topScores, pluginScore)
+			if len(topScores) == 3 {
+				break
+			}
+		}
+
+		klog.InfoS("Top 3 plugins for pod on node",
+			"pod", klog.KObj(pod),
+			"node", node,
+			"scores", topScores,
+		)
+	}
 }
 
 // NewGenericScheduler creates a genericScheduler object.
