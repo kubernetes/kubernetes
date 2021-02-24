@@ -24,6 +24,7 @@ import (
 	"io"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -337,12 +338,14 @@ func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]
 	reader, writer := io.Pipe()
 	wg := &sync.WaitGroup{}
 	wg.Add(len(requests))
+	closedWithError := int32(0)
 	for objRef, request := range requests {
 		go func(objRef corev1.ObjectReference, request rest.ResponseWrapper) {
 			defer wg.Done()
 			out := o.addPrefixIfNeeded(objRef, writer)
 			if err := o.ConsumeRequestFn(request, out); err != nil {
 				if !o.IgnoreLogErrors {
+					atomic.StoreInt32(&closedWithError, 1)
 					writer.CloseWithError(err)
 
 					// It's important to return here to propagate the error via the pipe
@@ -357,7 +360,9 @@ func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]
 
 	go func() {
 		wg.Wait()
-		writer.Close()
+		if atomic.LoadInt32(&closedWithError) == 0 {
+			writer.Close()
+		}
 	}()
 
 	_, err := io.Copy(o.Out, reader)
