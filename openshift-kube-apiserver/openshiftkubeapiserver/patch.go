@@ -1,23 +1,14 @@
 package openshiftkubeapiserver
 
 import (
+	"os"
 	"time"
-
-	"k8s.io/kubernetes/openshift-kube-apiserver/enablement"
-
-	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/quota/v1/generic"
-	genericapiserver "k8s.io/apiserver/pkg/server"
-	clientgoinformers "k8s.io/client-go/informers"
-	corev1informers "k8s.io/client-go/informers/core/v1"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/quota/v1/install"
 
 	"github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy"
 	"github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy/imagereferencemutators"
 	"github.com/openshift/apiserver-library-go/pkg/admission/quota/clusterresourcequota"
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sccadmission"
+	apiclientv1 "github.com/openshift/client-go/apiserver/clientset/versioned/typed/apiserver/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configv1informer "github.com/openshift/client-go/config/informers/externalversions"
 	quotaclient "github.com/openshift/client-go/quota/clientset/versioned"
@@ -30,11 +21,21 @@ import (
 	"github.com/openshift/library-go/pkg/apiserver/admission/admissionrestconfig"
 	"github.com/openshift/library-go/pkg/apiserver/apiserverconfig"
 	"github.com/openshift/library-go/pkg/quota/clusterquotamapping"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/quota/v1/generic"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	clientgoinformers "k8s.io/client-go/informers"
+	corev1informers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/authorization/restrictusers"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/authorization/restrictusers/usercache"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/autoscaling/managednode"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/autoscaling/managementcpusoverride"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/scheduler/nodeenv"
+	"k8s.io/kubernetes/openshift-kube-apiserver/enablement"
+	"k8s.io/kubernetes/openshift-kube-apiserver/filters/apirequestcount"
+	"k8s.io/kubernetes/pkg/quota/v1/install"
 
 	// magnet to get authorizer package in hack/update-vendor.sh
 	_ "github.com/openshift/library-go/pkg/authorization/hardcodedauthorizer"
@@ -82,7 +83,20 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 	// END ADMISSION
 
 	// HANDLER CHAIN (with oauth server and web console)
-	genericConfig.BuildHandlerChainFunc, err = BuildHandlerChain(enablement.OpenshiftConfig().ConsolePublicURL, enablement.OpenshiftConfig().AuthConfig.OAuthMetadataFile)
+	apiserverClient, err := apiclientv1.NewForConfig(makeJSONRESTConfig(genericConfig.LoopbackClientConfig))
+	if err != nil {
+		return err
+	}
+	apiRequestCountController := apirequestcount.NewController(apiserverClient.APIRequestCounts(), nodeFor())
+	genericConfig.AddPostStartHook("openshift.io-api-request-count-filter", func(context genericapiserver.PostStartHookContext) error {
+		go apiRequestCountController.Start(context.StopCh)
+		return nil
+	})
+	genericConfig.BuildHandlerChainFunc, err = BuildHandlerChain(
+		enablement.OpenshiftConfig().ConsolePublicURL,
+		enablement.OpenshiftConfig().AuthConfig.OAuthMetadataFile,
+		apiRequestCountController,
+	)
 	if err != nil {
 		return err
 	}
@@ -109,12 +123,25 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 	return nil
 }
 
+func makeJSONRESTConfig(config *rest.Config) *rest.Config {
+	c := rest.CopyConfig(config)
+	c.AcceptContentTypes = "application/json"
+	c.ContentType = "application/json"
+	return c
+}
+
+func nodeFor() string {
+	node := os.Getenv("HOST_IP")
+	if hostname, err := os.Hostname(); err != nil {
+		node = hostname
+	}
+	return node
+}
+
 // newInformers is only exposed for the build's integration testing until it can be fixed more appropriately.
 func newInformers(loopbackClientConfig *rest.Config) (*kubeAPIServerInformers, error) {
 	// ClusterResourceQuota is served using CRD resource any status update must use JSON
-	jsonLoopbackClientConfig := rest.CopyConfig(loopbackClientConfig)
-	jsonLoopbackClientConfig.ContentConfig.AcceptContentTypes = "application/json"
-	jsonLoopbackClientConfig.ContentConfig.ContentType = "application/json"
+	jsonLoopbackClientConfig := makeJSONRESTConfig(loopbackClientConfig)
 
 	quotaClient, err := quotaclient.NewForConfig(jsonLoopbackClientConfig)
 	if err != nil {
