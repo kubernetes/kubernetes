@@ -775,16 +775,14 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.evictionManager = evictionManager
 	klet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
-		// Safe, whitelisted sysctls can always be used as unsafe sysctls in the spec.
-		// Hence, we concatenate those two lists.
-		safeAndUnsafeSysctls := append(sysctlwhitelist.SafeSysctlWhitelist(), allowedUnsafeSysctls...)
-		sysctlsWhitelist, err := sysctl.NewWhitelist(safeAndUnsafeSysctls)
-		if err != nil {
-			return nil, err
-		}
-		klet.admitHandlers.AddPodAdmitHandler(sysctlsWhitelist)
+	// Safe, whitelisted sysctls can always be used as unsafe sysctls in the spec.
+	// Hence, we concatenate those two lists.
+	safeAndUnsafeSysctls := append(sysctlwhitelist.SafeSysctlWhitelist(), allowedUnsafeSysctls...)
+	sysctlsWhitelist, err := sysctl.NewWhitelist(safeAndUnsafeSysctls)
+	if err != nil {
+		return nil, err
 	}
+	klet.admitHandlers.AddPodAdmitHandler(sysctlsWhitelist)
 
 	// enable active deadline handler
 	activeDeadlineHandler, err := newActiveDeadlineHandler(klet.statusManager, kubeDeps.Recorder, klet.clock)
