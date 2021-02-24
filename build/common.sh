@@ -85,22 +85,35 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 # mapped to KUBE_RSYNC_PORT via docker networking.
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
+# These are the default versions (image tags) for their respective base images.
+readonly __default_debian_iptables_version=buster-v1.5.0
+readonly __default_go_runner_version=buster-v2.3.1
+
+# These are the base images for the Docker-wrapped binaries.
+readonly KUBE_GORUNNER_IMAGE="${KUBE_GORUNNER_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/go-runner:$__default_go_runner_version}"
+readonly KUBE_APISERVER_BASE_IMAGE="${KUBE_APISERVER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
+readonly KUBE_CONTROLLER_MANAGER_BASE_IMAGE="${KUBE_CONTROLLER_MANAGER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
+readonly KUBE_SCHEDULER_BASE_IMAGE="${KUBE_SCHEDULER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
+readonly KUBE_PROXY_BASE_IMAGE="${KUBE_PROXY_BASE_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/debian-iptables:$__default_debian_iptables_version}"
+
+# This is the image used in a multi-stage build to apply capabilities to Docker-wrapped binaries.
+readonly KUBE_BUILD_SETCAP_IMAGE="${KUBE_BUILD_SETCAP_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/setcap:buster-v1.4.0}"
+
 # Get the set of master binaries that run in Docker (on Linux)
-# Entry format is "<name-of-binary>,<base-image-name>:<base-image-version>".
+# Entry format is "<binary-name>,<base-image>".
 # Binaries are placed in /usr/local/bin inside the image.
-# When building these images the registry for the base images is considered to be ${KUBE_BASE_IMAGE_REGISTRY}.
+# `make` users can override any or all of the base images using the associated
+# environment variables.
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
-  local debian_iptables_version=buster-v1.5.0
-  local go_runner_version=buster-v2.3.1
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
   ### in build/BUILD. And kube::golang::server_image_targets
   local targets=(
-    "kube-apiserver,go-runner:${go_runner_version}"
-    "kube-controller-manager,go-runner:${go_runner_version}"
-    "kube-scheduler,go-runner:${go_runner_version}"
-    "kube-proxy,debian-iptables:${debian_iptables_version}"
+    "kube-apiserver,${KUBE_APISERVER_BASE_IMAGE}"
+    "kube-controller-manager,${KUBE_CONTROLLER_MANAGER_BASE_IMAGE}"
+    "kube-scheduler,${KUBE_SCHEDULER_BASE_IMAGE}"
+    "kube-proxy,${KUBE_PROXY_BASE_IMAGE}"
   )
 
   echo "${targets[@]}"
