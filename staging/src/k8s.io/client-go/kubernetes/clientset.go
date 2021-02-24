@@ -66,6 +66,7 @@ import (
 	storagev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klog/v2"
 )
 
 type Interface interface {
@@ -390,6 +391,9 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 			return nil, fmt.Errorf("burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
 		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
+	}
+	if c.Timeout == 0 {
+		klog.Warning("The provided config doesn't specify a timeout. The Timeout specifies a time limit for requests made by this client. Request without timeout can hang forever. Usually, it is a bad idea.")
 	}
 	var cs Clientset
 	var err error
