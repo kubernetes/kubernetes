@@ -19,6 +19,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -28,7 +29,11 @@ func copyFile(source, dest string) error {
 	if err != nil {
 		return fmt.Errorf("unable to open source file [%s]: %q", source, err)
 	}
-	defer sf.Close()
+	defer func() {
+		if err := sf.Close(); err != nil {
+			log.Printf("Error occurs while closing source file, Error: %v", err)
+		}
+	}()
 	fi, err := sf.Stat()
 	if err != nil {
 		return fmt.Errorf("unable to stat source file [%s]: %q", source, err)
@@ -42,7 +47,11 @@ func copyFile(source, dest string) error {
 	if err != nil {
 		return fmt.Errorf("unable to create destination file [%s]: %q", dest, err)
 	}
-	defer df.Close()
+	defer func() {
+		if err := df.Close(); err != nil {
+			log.Printf("Error occurs while closing destination file, Error: %v", err)
+		}
+	}()
 
 	_, err = io.Copy(df, sf)
 	if err != nil {
