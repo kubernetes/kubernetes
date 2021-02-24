@@ -28,7 +28,6 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -38,6 +37,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
@@ -367,9 +367,6 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, pr
 	klog.V(1).Infoln("[token] preparing selector for bootstrap token")
 	tokenSelector := fields.SelectorFromSet(
 		map[string]string{
-			// TODO: We hard-code "type" here until `field_constants.go` that is
-			// currently in `pkg/apis/core/` exists in the external API, i.e.
-			// k8s.io/api/v1. Should be v1.SecretTypeField
 			"type": string(bootstrapapi.SecretTypeBootstrapToken),
 		},
 	)

@@ -15,7 +15,6 @@ go_test(
     tags = ["integration"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/daemon:go_default_library",
         "//pkg/scheduler:go_default_library",

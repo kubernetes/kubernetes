@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "annotation_key_constants.go",
         "doc.go",
-        "field_constants.go",
         "json.go",
         "objectreference.go",
         "register.go",

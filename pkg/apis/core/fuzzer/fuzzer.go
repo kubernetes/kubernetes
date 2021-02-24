@@ -23,7 +23,7 @@ import (
 
 	fuzz "github.com/google/gofuzz"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -83,10 +83,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				s.Affinity = new(core.Affinity)
 			}
 			if s.SchedulerName == "" {
-				s.SchedulerName = core.DefaultSchedulerName
+				s.SchedulerName = v1.DefaultSchedulerName
 			}
 			if s.EnableServiceLinks == nil {
-				enableServiceLinks := corev1.DefaultEnableServiceLinks
+				enableServiceLinks := v1.DefaultEnableServiceLinks
 				s.EnableServiceLinks = &enableServiceLinks
 			}
 		},

@@ -24,7 +24,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -510,7 +509,7 @@ func TestNodeAffinity(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      api.ObjectNameField,
+												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -535,7 +534,7 @@ func TestNodeAffinity(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      api.ObjectNameField,
+												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -561,7 +560,7 @@ func TestNodeAffinity(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      api.ObjectNameField,
+												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -596,7 +595,7 @@ func TestNodeAffinity(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      api.ObjectNameField,
+												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -630,7 +629,7 @@ func TestNodeAffinity(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      api.ObjectNameField,
+												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -663,7 +662,7 @@ func TestNodeAffinity(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      api.ObjectNameField,
+												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -718,7 +717,7 @@ func TestNodeAffinity(t *testing.T) {
 					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 						NodeSelectorTerms: []v1.NodeSelectorTerm{{
 							MatchFields: []v1.NodeSelectorRequirement{{
-								Key:      api.ObjectNameField,
+								Key:      metav1.ObjectNameField,
 								Operator: v1.NodeSelectorOpIn,
 								Values:   []string{"node_2"},
 							}},
@@ -757,7 +756,7 @@ func TestNodeAffinity(t *testing.T) {
 					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 						NodeSelectorTerms: []v1.NodeSelectorTerm{{
 							MatchFields: []v1.NodeSelectorRequirement{{
-								Key:      api.ObjectNameField,
+								Key:      metav1.ObjectNameField,
 								Operator: v1.NodeSelectorOpIn,
 								Values:   []string{"node_2"},
 							}},
