@@ -638,6 +638,7 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 		args                   args
 		expectedTime           *time.Time
 		expectedNumberOfMisses int64
+		wantErr                bool
 	}{
 		{
 			name: "now before next schedule",
@@ -652,30 +653,50 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 			name: "now just after next schedule",
 			args: args{
 				earliestTime: topOfTheHour(),
-				now:          topOfTheHour().Add(time.Second * 61),
+				now:          topOfTheHour().Add(time.Minute * 61),
 				schedule:     "0 * * * *",
 			},
-			expectedTime:           justAfterTheHour(),
+			expectedTime:           deltaTimeAfterTopOfTheHour(time.Minute * 60),
 			expectedNumberOfMisses: 1,
 		},
 		{
 			name: "missed 5 schedules",
 			args: args{
 				earliestTime: deltaTimeAfterTopOfTheHour(time.Second * 10),
-				now:          *deltaTimeAfterTopOfTheHour(time.Minute * 5),
+				now:          *deltaTimeAfterTopOfTheHour(time.Minute * 301),
 				schedule:     "0 * * * *",
 			},
-			expectedTime:           deltaTimeAfterTopOfTheHour(time.Minute * 5),
+			expectedTime:           deltaTimeAfterTopOfTheHour(time.Minute * 300),
 			expectedNumberOfMisses: 5,
+		},
+		{
+			name: "rogue cronjob",
+			args: args{
+				earliestTime: deltaTimeAfterTopOfTheHour(time.Second * 10),
+				now:          *deltaTimeAfterTopOfTheHour(time.Hour * 1000000),
+				schedule:     "59 23 31 2 *",
+			},
+			expectedTime:           nil,
+			expectedNumberOfMisses: 0,
+			wantErr:                true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sched, err := cron.Parse(tt.args.schedule)
+			sched, err := cron.ParseStandard(tt.args.schedule)
 			if err != nil {
 				t.Errorf("error setting up the test, %s", err)
 			}
-			gotTime, gotNumberOfMisses, _ := getMostRecentScheduleTime(*tt.args.earliestTime, tt.args.now, sched)
+			gotTime, gotNumberOfMisses, err := getMostRecentScheduleTime(*tt.args.earliestTime, tt.args.now, sched)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("getMostRecentScheduleTime() got no error when expected one")
+				}
+				return
+			}
+			if !tt.wantErr && err != nil {
+				t.Error("getMostRecentScheduleTime() got error when none expected")
+			}
 			if gotTime == nil && tt.expectedTime != nil {
 				t.Errorf("getMostRecentScheduleTime() got nil, want %v", tt.expectedTime)
 			}
