@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controlplane
+package server
 
 import (
 	"reflect"
@@ -75,14 +75,14 @@ func Test_newResourceExpirationEvaluator(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual, actualErr := newResourceExpirationEvaluator(tt.currentVersion)
+			actual, actualErr := NewResourceExpirationEvaluator(tt.currentVersion)
 
 			checkErr(t, actualErr, tt.expectedErr)
 			if actualErr != nil {
 				return
 			}
 
-			if !reflect.DeepEqual(tt.expected, *actual) {
+			if !reflect.DeepEqual(tt.expected, *actual.(*resourceExpirationEvaluator)) {
 				t.Fatal(actual)
 			}
 		})
@@ -309,7 +309,7 @@ func Test_removeDeletedKinds(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.resourceExpirationEvaluator.removeDeletedKinds("group.name", tt.versionedResourcesStorageMap)
+			tt.resourceExpirationEvaluator.RemoveDeletedKinds("group.name", tt.versionedResourcesStorageMap)
 			if !reflect.DeepEqual(tt.expectedStorage, tt.versionedResourcesStorageMap) {
 				t.Fatal(spew.Sdump(tt.versionedResourcesStorageMap))
 			}
