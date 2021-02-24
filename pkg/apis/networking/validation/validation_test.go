@@ -255,22 +255,39 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	successCases := []*networking.NetworkPolicy{
+		// Success Test Number 1
 		makeNetworkPolicyCustom(setIngressEmptyFirstElement),
+		// Success Test Number 2
 		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressEmptyPorts),
+		// Success Test Number 3
 		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressPorts),
+		// Success Test Number 4
 		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromPodSelector("c", "d")),
+		// Success Test Number 5
 		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromNamespaceSelector),
+		// Success Test Number 6
 		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromNamespaceSelector, setIngressFromPodSelector("e", "f")),
+		// Success Test Number 7
 		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlock),
+		// Success Test Number 8
 		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlock),
+		// Success Test Number 9
 		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, setPolicyTypesEgress),
+		// Success Test Number 10
 		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, setPolicyTypesIngressEgress),
+		// Success Test Number 11
 		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressPorts),
+		// Success Test Number 12
 		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlockIPV6),
+		// Success Test Number 13
 		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromIPBlockIPV6),
+		// Success Test Number 14
 		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlockIPV6, setPolicyTypesEgress),
+		// Success Test Number 15
 		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlockIPV6, setPolicyTypesIngressEgress),
+		// Success Test Number 16
 		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressPortsUDPandHigh),
+		// Success Test Number 17
 		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setEgressPortsBothHigh, setIngressEmptyFirstElement, setIngressFromEmptyFirstElement, setIngressFromPodSelector("e", "f"), setIngressPortsHigher),
 	}
 
@@ -278,7 +295,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	for k, v := range successCases {
 		if errs := ValidateNetworkPolicy(v); len(errs) != 0 {
-			t.Errorf("Expected success for %d, got %v", k, errs)
+			t.Errorf("Expected success for the success validation test number %d, got %v", (k + 1), errs)
 		}
 	}
 
