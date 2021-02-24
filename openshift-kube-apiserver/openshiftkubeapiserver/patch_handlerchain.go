@@ -20,26 +20,31 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/util/flowcontrol"
+	patchfilters "k8s.io/kubernetes/openshift-kube-apiserver/filters"
+	"k8s.io/kubernetes/openshift-kube-apiserver/filters/deprecatedapirequest"
 )
 
 // TODO switch back to taking a kubeapiserver config.  For now make it obviously safe for 3.11
-func BuildHandlerChain(consolePublicURL string, oauthMetadataFile string) (func(apiHandler http.Handler, kc *genericapiserver.Config) http.Handler, error) {
+func BuildHandlerChain(consolePublicURL string, oauthMetadataFile string, genericConfig *genericapiserver.Config) (func(apiHandler http.Handler, kc *genericapiserver.Config) http.Handler, map[string]genericapiserver.PostStartHookFunc, error) {
 	// load the oauthmetadata when we can return an error
 	oAuthMetadata := []byte{}
 	if len(oauthMetadataFile) > 0 {
 		var err error
 		oAuthMetadata, err = loadOAuthMetadataFile(oauthMetadataFile)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-
+	deprecatedAPIRequestController := deprecatedapirequest.NewController(genericConfig.LoopbackClientConfig)
 	return func(apiHandler http.Handler, genericConfig *genericapiserver.Config) http.Handler {
 			// well-known comes after the normal handling chain. This shows where to connect for oauth information
 			handler := withOAuthInfo(apiHandler, oAuthMetadata)
 
 			// we rate limit watches after building the regular handler chain so we have the context information
 			handler = withWatchRateLimit(handler)
+
+			// after normal chain, so that user is in context
+			handler = patchfilters.WithDeprecatedApiRequestLogging(handler, deprecatedAPIRequestController)
 
 			// this is the normal kube handler chain
 			handler = genericapiserver.DefaultBuildHandlerChain(handler, genericConfig)
@@ -51,6 +56,9 @@ func BuildHandlerChain(consolePublicURL string, oauthMetadataFile string) (func(
 			handler = withConsoleRedirect(handler, consolePublicURL)
 
 			return handler
+		},
+		map[string]genericapiserver.PostStartHookFunc{
+			"openshift.io-deprecated-api-requests-filter": deprecatedapirequest.NewPostStartHookFunc(deprecatedAPIRequestController),
 		},
 		nil
 }

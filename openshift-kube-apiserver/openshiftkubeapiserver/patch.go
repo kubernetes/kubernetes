@@ -76,7 +76,8 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 	// END ADMISSION
 
 	// HANDLER CHAIN (with oauth server and web console)
-	genericConfig.BuildHandlerChainFunc, err = BuildHandlerChain(enablement.OpenshiftConfig().ConsolePublicURL, enablement.OpenshiftConfig().AuthConfig.OAuthMetadataFile)
+	var handlersPostStartHookFuncs map[string]genericapiserver.PostStartHookFunc
+	genericConfig.BuildHandlerChainFunc, handlersPostStartHookFuncs, err = BuildHandlerChain(enablement.OpenshiftConfig().ConsolePublicURL, enablement.OpenshiftConfig().AuthConfig.OAuthMetadataFile, genericConfig)
 	if err != nil {
 		return err
 	}
@@ -98,6 +99,9 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 		go oauthAPIServiceReachabilityCheck.checkForConnection(context)
 		return nil
 	})
+	for name, postStartHookFunc := range handlersPostStartHookFuncs {
+		genericConfig.AddPostStartHookOrDie(name, postStartHookFunc)
+	}
 	enablement.AppendPostStartHooksOrDie(genericConfig)
 
 	return nil
