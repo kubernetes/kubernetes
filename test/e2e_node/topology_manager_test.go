@@ -880,11 +880,6 @@ func runTopologyManagerTests(f *framework.Framework) {
 			// Run the tests
 			runTopologyManagerPolicySuiteTests(f)
 		}
-		// restore kubelet config
-		setOldKubeletConfig(f, oldCfg)
-
-		// Delete state file to allow repeated runs
-		deleteStateFile()
 	})
 
 	ginkgo.It("run Topology Manager node alignment test suite", func() {
@@ -922,12 +917,6 @@ func runTopologyManagerTests(f *framework.Framework) {
 
 			runTopologyManagerNodeAlignmentSuiteTests(f, sd, reservedSystemCPUs, policy, numaNodes, coreCount)
 		}
-
-		// restore kubelet config
-		setOldKubeletConfig(f, oldCfg)
-
-		// Delete state file to allow repeated runs
-		deleteStateFile()
 	})
 
 	ginkgo.It("run the Topology Manager pod scope alignment test suite", func() {
@@ -956,9 +945,11 @@ func runTopologyManagerTests(f *framework.Framework) {
 		reservedSystemCPUs := configureTopologyManagerInKubelet(f, oldCfg, policy, scope, configMap, numaNodes)
 
 		runTMScopeResourceAlignmentTestSuite(f, configMap, reservedSystemCPUs, policy, numaNodes, coreCount)
+	})
 
+	ginkgo.AfterEach(func() {
+		// restore kubelet config
 		setOldKubeletConfig(f, oldCfg)
-		deleteStateFile()
 	})
 }
 
@@ -969,5 +960,4 @@ var _ = SIGDescribe("Topology Manager [Serial] [Feature:TopologyManager][NodeFea
 	ginkgo.Context("With kubeconfig updated to static CPU Manager policy run the Topology Manager tests", func() {
 		runTopologyManagerTests(f)
 	})
-
 })
