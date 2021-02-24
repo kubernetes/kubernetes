@@ -6,6 +6,7 @@ go_library(
         "addon_update.go",
         "cluster_upgrade.go",
         "framework.go",
+        "gke_node_pools.go",
         "ha_master.go",
         "kubelet_security.go",
         "node_lease.go",
