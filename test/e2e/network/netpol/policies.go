@@ -322,6 +322,28 @@ func GetAllowIngressByNamespaceAndPort(name string, targetLabels map[string]stri
 	return policy
 }
 
+// GetAllowIngressByProtocol allows ingress for any ports on a specific protocol.
+func GetAllowIngressByProtocol(name string, targetLabels map[string]string, protocol *v1.Protocol) *networkingv1.NetworkPolicy {
+	policy := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: targetLabels,
+			},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{{
+				Ports: []networkingv1.NetworkPolicyPort{
+					{
+						Protocol: protocol,
+					},
+				},
+			}},
+		},
+	}
+	return policy
+}
+
 // GetAllowIngressByNamespaceOrPod allows ingress for pods with matching namespace OR pod labels
 func GetAllowIngressByNamespaceOrPod(name string, targetLabels map[string]string, peerNamespaceSelector *metav1.LabelSelector, peerPodSelector *metav1.LabelSelector) *networkingv1.NetworkPolicy {
 	policy := &networkingv1.NetworkPolicy{
