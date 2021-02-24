@@ -195,7 +195,7 @@ func getPodPreferredNodeAffinity(pod *v1.Pod) (*nodeaffinity.PreferredScheduling
 func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
 	c, err := cycleState.Read(preScoreStateKey)
 	if err != nil {
-		return nil, fmt.Errorf("reading %q from cycleState: %v", preScoreStateKey, err)
+		return nil, fmt.Errorf("reading %q from cycleState: %w", preScoreStateKey, err)
 	}
 
 	s, ok := c.(*preScoreState)

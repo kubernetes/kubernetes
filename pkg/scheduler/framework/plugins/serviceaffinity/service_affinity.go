@@ -108,14 +108,14 @@ func (pl *ServiceAffinity) createPreFilterState(pod *v1.Pod) (*preFilterState, e
 	// Store services which match the pod.
 	matchingPodServices, err := helper.GetPodServices(pl.serviceLister, pod)
 	if err != nil {
-		return nil, fmt.Errorf("listing pod services: %v", err.Error())
+		return nil, fmt.Errorf("listing pod services: %w", err)
 	}
 	selector := createSelectorFromLabels(pod.Labels)
 
 	// consider only the pods that belong to the same namespace
 	nodeInfos, err := pl.sharedLister.NodeInfos().List()
 	if err != nil {
-		return nil, fmt.Errorf("listing nodeInfos: %v", err.Error())
+		return nil, fmt.Errorf("listing nodeInfos: %w", err)
 	}
 	matchingPodList := filterPods(nodeInfos, selector, pod.Namespace)
 
@@ -194,7 +194,7 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
 		// preFilterState doesn't exist, likely PreFilter wasn't invoked.
-		return nil, fmt.Errorf("error reading %q from cycleState: %v", preFilterStateKey, err)
+		return nil, fmt.Errorf("error reading %q from cycleState: %w", preFilterStateKey, err)
 	}
 
 	if c == nil {
