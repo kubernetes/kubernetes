@@ -12,6 +12,7 @@ go_library(
         "flexvolume_mounted_volume_resize.go",
         "flexvolume_online_resize.go",
         "generic_persistent_volume-disruptive.go",
+        "gke_local_ssd.go",
         "host_path_type.go",
         "in_tree_volumes.go",
         "mounted_volume_resize.go",
