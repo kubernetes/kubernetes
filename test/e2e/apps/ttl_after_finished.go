@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package apps
 
 import (
 	"context"
@@ -40,7 +40,7 @@ const (
 	JobTimeout = 15 * time.Minute
 )
 
-var _ = framework.KubeDescribe("[Feature:TTLAfterFinished][NodeAlphaFeature:TTLAfterFinished]", func() {
+var _ = SIGDescribe("[Feature:TTLAfterFinished]", func() {
 	f := framework.NewDefaultFramework("ttlafterfinished")
 
 	ginkgo.It("job should be deleted once it finishes after TTL seconds", func() {
@@ -93,9 +93,9 @@ func testFinishedJob(f *framework.Framework) {
 	framework.Logf("Check Job's deletionTimestamp and compare with the time when the Job finished")
 	job, err = e2ejob.GetJob(c, ns, job.Name)
 	framework.ExpectNoError(err)
-	finishTime := FinishTime(job)
-	finishTimeUTC := finishTime.UTC()
-	framework.ExpectNotEqual(finishTime.IsZero(), true)
+	jobFinishTime := finishTime(job)
+	finishTimeUTC := jobFinishTime.UTC()
+	framework.ExpectNotEqual(jobFinishTime.IsZero(), true)
 
 	deleteAtUTC := job.ObjectMeta.DeletionTimestamp.UTC()
 	framework.ExpectNotEqual(deleteAtUTC, nil)
@@ -104,8 +104,8 @@ func testFinishedJob(f *framework.Framework) {
 	framework.ExpectEqual(deleteAtUTC.Before(expireAtUTC), false)
 }
 
-// FinishTime returns finish time of the specified job.
-func FinishTime(finishedJob *batchv1.Job) metav1.Time {
+// finishTime returns finish time of the specified job.
+func finishTime(finishedJob *batchv1.Job) metav1.Time {
 	var finishTime metav1.Time
 	for _, c := range finishedJob.Status.Conditions {
 		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == v1.ConditionTrue {
