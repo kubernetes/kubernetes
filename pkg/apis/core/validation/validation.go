@@ -3391,7 +3391,7 @@ func ValidateNodeSelectorRequirement(rq core.NodeSelectorRequirement, fldPath *f
 }
 
 var nodeFieldSelectorValidators = map[string]func(string, bool) []string{
-	core.ObjectNameField: ValidateNodeName,
+	metav1.ObjectNameField: ValidateNodeName,
 }
 
 // ValidateNodeFieldSelectorRequirement tests that the specified NodeSelectorRequirement fields has valid data

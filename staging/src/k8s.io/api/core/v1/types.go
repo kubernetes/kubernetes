@@ -6168,7 +6168,7 @@ type RangeAllocation struct {
 }
 
 const (
-	// "default-scheduler" is the name of default scheduler.
+	// DefaultSchedulerName defines the name of default scheduler.
 	DefaultSchedulerName = "default-scheduler"
 
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule

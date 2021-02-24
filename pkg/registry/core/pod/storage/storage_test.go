@@ -84,7 +84,7 @@ func validNewPod() *api.Pod {
 				},
 			},
 			SecurityContext:    &api.PodSecurityContext{},
-			SchedulerName:      api.DefaultSchedulerName,
+			SchedulerName:      v1.DefaultSchedulerName,
 			EnableServiceLinks: &enableServiceLinks,
 		},
 	}
@@ -886,7 +886,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 				},
 			},
 			SecurityContext: &api.PodSecurityContext{},
-			SchedulerName:   api.DefaultSchedulerName,
+			SchedulerName:   v1.DefaultSchedulerName,
 		},
 	}, nil, 1, false)
 	if err != nil {
@@ -917,7 +917,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 
 			TerminationGracePeriodSeconds: &grace,
 			SecurityContext:               &api.PodSecurityContext{},
-			SchedulerName:                 api.DefaultSchedulerName,
+			SchedulerName:                 v1.DefaultSchedulerName,
 			EnableServiceLinks:            &enableServiceLinks,
 		},
 	}
@@ -959,7 +959,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 				},
 			},
 			SecurityContext: &api.PodSecurityContext{},
-			SchedulerName:   api.DefaultSchedulerName,
+			SchedulerName:   v1.DefaultSchedulerName,
 		},
 	}
 	err := storage.Storage.Create(ctx, key, &podStart, nil, 0, false)
@@ -985,7 +985,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 					},
 				},
 				SecurityContext: &api.PodSecurityContext{},
-				SchedulerName:   api.DefaultSchedulerName,
+				SchedulerName:   v1.DefaultSchedulerName,
 			},
 			Status: api.PodStatus{
 				Phase:   api.PodRunning,
@@ -1010,7 +1010,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 					},
 				},
 				SecurityContext: &api.PodSecurityContext{},
-				SchedulerName:   api.DefaultSchedulerName,
+				SchedulerName:   v1.DefaultSchedulerName,
 			},
 			Status: api.PodStatus{
 				Phase:   api.PodRunning,

@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
-	apicore "k8s.io/kubernetes/pkg/apis/core"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
@@ -504,13 +503,13 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 			name:             "node is deleted during a scheduling cycle",
 			nodes:            []v1.Node{*nodeFoo, *nodeBar},
 			nodeNameToDelete: "foo",
-			injectErr:        apierrors.NewNotFound(apicore.Resource("node"), nodeFoo.Name),
+			injectErr:        apierrors.NewNotFound(v1.Resource("node"), nodeFoo.Name),
 			expectNodeNames:  sets.NewString("bar"),
 		},
 		{
 			name:            "node is not deleted but NodeNotFound is received incorrectly",
 			nodes:           []v1.Node{*nodeFoo, *nodeBar},
-			injectErr:       apierrors.NewNotFound(apicore.Resource("node"), nodeFoo.Name),
+			injectErr:       apierrors.NewNotFound(v1.Resource("node"), nodeFoo.Name),
 			expectNodeNames: sets.NewString("foo", "bar"),
 		},
 	}

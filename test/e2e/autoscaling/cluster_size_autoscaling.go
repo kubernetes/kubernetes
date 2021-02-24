@@ -43,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
@@ -1450,7 +1449,7 @@ func drainNode(f *framework.Framework, node *v1.Node) {
 	makeNodeUnschedulable(f.ClientSet, node)
 
 	ginkgo.By("Manually drain the single node")
-	podOpts := metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
+	podOpts := metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector("spec.nodeName", node.Name).String()}
 	pods, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), podOpts)
 	framework.ExpectNoError(err)
 	for _, pod := range pods.Items {

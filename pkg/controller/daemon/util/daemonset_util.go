@@ -25,7 +25,6 @@ import (
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
@@ -151,7 +150,7 @@ func SplitByAvailablePods(minReadySeconds int32, pods []*v1.Pod) ([]*v1.Pod, []*
 // Note that this function assumes that no NodeAffinity conflicts with the selected nodeName.
 func ReplaceDaemonSetPodNodeNameNodeAffinity(affinity *v1.Affinity, nodename string) *v1.Affinity {
 	nodeSelReq := v1.NodeSelectorRequirement{
-		Key:      api.ObjectNameField,
+		Key:      metav1.ObjectNameField,
 		Operator: v1.NodeSelectorOpIn,
 		Values:   []string{nodename},
 	}
@@ -220,11 +219,11 @@ func GetTargetNodeName(pod *v1.Pod) (string, error) {
 
 	for _, term := range terms {
 		for _, exp := range term.MatchFields {
-			if exp.Key == api.ObjectNameField &&
+			if exp.Key == metav1.ObjectNameField &&
 				exp.Operator == v1.NodeSelectorOpIn {
 				if len(exp.Values) != 1 {
 					return "", fmt.Errorf("the matchFields value of '%s' is not unique for pod %s/%s",
-						api.ObjectNameField, pod.Namespace, pod.Name)
+						metav1.ObjectNameField, pod.Namespace, pod.Name)
 				}
 
 				return exp.Values[0], nil

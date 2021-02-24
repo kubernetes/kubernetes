@@ -737,7 +737,7 @@ func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
 			}
 
 			field := nodeSelector.NodeSelectorTerms[0].MatchFields[0]
-			if field.Key == api.ObjectNameField {
+			if field.Key == metav1.ObjectNameField {
 				if field.Operator != v1.NodeSelectorOpIn {
 					t.Fatalf("the operation of hostname NodeAffinity is not %v", v1.NodeSelectorOpIn)
 				}
@@ -2699,7 +2699,7 @@ func TestDeleteUnscheduledPodForNotExistingNode(t *testing.T) {
 						{
 							MatchFields: []v1.NodeSelectorRequirement{
 								{
-									Key:      api.ObjectNameField,
+									Key:      metav1.ObjectNameField,
 									Operator: v1.NodeSelectorOpIn,
 									Values:   []string{"node-2"},
 								},

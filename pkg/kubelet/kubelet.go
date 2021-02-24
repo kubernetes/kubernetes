@@ -442,7 +442,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	if kubeDeps.KubeClient != nil {
 		kubeInformers := informers.NewSharedInformerFactoryWithOptions(kubeDeps.KubeClient, 0, informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			options.FieldSelector = fields.Set{api.ObjectNameField: string(nodeName)}.String()
+			options.FieldSelector = fields.Set{metav1.ObjectNameField: string(nodeName)}.String()
 		}))
 		nodeLister = kubeInformers.Core().V1().Nodes().Lister()
 		nodeHasSynced = func() bool {

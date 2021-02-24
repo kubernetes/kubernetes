@@ -35,7 +35,6 @@ go_test(
     srcs = ["node_affinity_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/framework/runtime:go_default_library",

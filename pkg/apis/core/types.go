@@ -5331,9 +5331,6 @@ type RangeAllocation struct {
 }
 
 const (
-	// DefaultSchedulerName defines the name of default scheduler.
-	DefaultSchedulerName = "default-scheduler"
-
 	// DefaultHardPodAffinitySymmetricWeight is the weight of implicit PreferredDuringScheduling affinity rule.
 	//
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
