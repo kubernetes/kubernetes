@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package gcp
 
 import (
 	"fmt"
@@ -27,7 +27,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = framework.KubeDescribe("GKE node pools [Feature:GKENodePool]", func() {
+var _ = SIGDescribe("GKE node pools [Feature:GKENodePool]", func() {
 
 	f := framework.NewDefaultFramework("node-pools")
 

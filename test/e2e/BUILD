@@ -51,7 +51,6 @@ go_library(
     srcs = [
         "e2e.go",
         "examples.go",
-        "gke_node_pools.go",
         "suites.go",
         "viperconfig.go",
     ],
@@ -83,7 +82,6 @@ go_library(
         "//test/e2e/framework/providers/kubemark:go_default_library",
         "//test/e2e/framework/providers/openstack:go_default_library",
         "//test/e2e/framework/providers/vsphere:go_default_library",
-        "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/reporters:go_default_library",
         "//test/utils:go_default_library",
