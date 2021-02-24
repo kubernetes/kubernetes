@@ -86,8 +86,9 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # Get the set of master binaries that run in Docker (on Linux)
-# Entry format is "<name-of-binary>,<base-image>".
+# Entry format is "<name-of-binary>,<base-image-name>:<base-image-version>".
 # Binaries are placed in /usr/local/bin inside the image.
+# When building these images the registry for the base images is considered to be ${KUBE_BASE_IMAGE_REGISTRY}.
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
@@ -96,10 +97,10 @@ kube::build::get_docker_wrapped_binaries() {
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
   ### in build/BUILD. And kube::golang::server_image_targets
   local targets=(
-    "kube-apiserver,${KUBE_BASE_IMAGE_REGISTRY}/go-runner:${go_runner_version}"
-    "kube-controller-manager,${KUBE_BASE_IMAGE_REGISTRY}/go-runner:${go_runner_version}"
-    "kube-scheduler,${KUBE_BASE_IMAGE_REGISTRY}/go-runner:${go_runner_version}"
-    "kube-proxy,${KUBE_BASE_IMAGE_REGISTRY}/debian-iptables:${debian_iptables_version}"
+    "kube-apiserver,go-runner:${go_runner_version}"
+    "kube-controller-manager,go-runner:${go_runner_version}"
+    "kube-scheduler,go-runner:${go_runner_version}"
+    "kube-proxy,debian-iptables:${debian_iptables_version}"
   )
 
   echo "${targets[@]}"
