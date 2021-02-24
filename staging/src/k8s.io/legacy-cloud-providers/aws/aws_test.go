@@ -1576,8 +1576,8 @@ func TestGetVolumeLabels(t *testing.T) {
 
 	assert.Nil(t, err, "Error creating Volume %v", err)
 	assert.Equal(t, map[string]string{
-		v1.LabelFailureDomainBetaZone:   "us-east-1a",
-		v1.LabelFailureDomainBetaRegion: "us-east-1"}, labels)
+		v1.LabelTopologyZone:   "us-east-1a",
+		v1.LabelTopologyRegion: "us-east-1"}, labels)
 	awsServices.ec2.(*MockedFakeEC2).AssertExpectations(t)
 }
 
@@ -1650,8 +1650,8 @@ func TestGetLabelsForVolume(t *testing.T) {
 				AvailabilityZone: aws.String("us-east-1a"),
 			}},
 			map[string]string{
-				v1.LabelFailureDomainBetaZone:   "us-east-1a",
-				v1.LabelFailureDomainBetaRegion: "us-east-1",
+				v1.LabelTopologyZone:   "us-east-1a",
+				v1.LabelTopologyRegion: "us-east-1",
 			},
 			nil,
 		},

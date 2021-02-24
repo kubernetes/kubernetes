@@ -108,16 +108,16 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 		name                      string
 		key                       string
 		expErr                    bool
-		regionTopologyHandler     regionTopologyHandler
+		regionParser              regionParserFn
 		pv                        *v1.PersistentVolume
 		expectedNodeSelectorTerms []v1.NodeSelectorTerm
 		expectedLabels            map[string]string
 	}{
 		{
-			name:                  "Remove CSI Topology Key and do not change existing GA Kubernetes topology",
-			key:                   GCEPDTopologyKey,
-			expErr:                false,
-			regionTopologyHandler: gceRegionTopologyHandler,
+			name:         "Remove CSI Topology Key and do not change existing GA Kubernetes topology",
+			key:          GCEPDTopologyKey,
+			expErr:       false,
+			regionParser: gceGetRegionFromZones,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -150,10 +150,10 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 			expectedLabels:            useast1aGALabels,
 		},
 		{
-			name:                  "Remove CSI Topology Key and do not change existing Beta Kubernetes topology",
-			key:                   GCEPDTopologyKey,
-			expErr:                false,
-			regionTopologyHandler: gceRegionTopologyHandler,
+			name:         "Remove CSI Topology Key and do not change existing Beta Kubernetes topology",
+			key:          GCEPDTopologyKey,
+			expErr:       false,
+			regionParser: gceGetRegionFromZones,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -186,10 +186,10 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 			expectedLabels:            uswest2bBetaLabels,
 		},
 		{
-			name:                  "Remove CSI Topology Key and add Kubernetes topology from NodeAffinity, ignore labels",
-			key:                   GCEPDTopologyKey,
-			expErr:                false,
-			regionTopologyHandler: gceRegionTopologyHandler,
+			name:         "Remove CSI Topology Key and add Kubernetes topology from NodeAffinity, ignore labels",
+			key:          GCEPDTopologyKey,
+			expErr:       false,
+			regionParser: gceGetRegionFromZones,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -223,10 +223,10 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 			},
 		},
 		{
-			name:                  "No CSI topology label exists and no change to the NodeAffinity",
-			key:                   GCEPDTopologyKey,
-			expErr:                false,
-			regionTopologyHandler: gceRegionTopologyHandler,
+			name:         "No CSI topology label exists and no change to the NodeAffinity",
+			key:          GCEPDTopologyKey,
+			expErr:       false,
+			regionParser: gceGetRegionFromZones,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -250,10 +250,10 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 			},
 		},
 		{
-			name:                  "Generate GA labels and kubernetes topology only from CSI topology",
-			key:                   GCEPDTopologyKey,
-			expErr:                false,
-			regionTopologyHandler: gceRegionTopologyHandler,
+			name:         "Generate GA labels and kubernetes topology only from CSI topology",
+			key:          GCEPDTopologyKey,
+			expErr:       false,
+			regionParser: gceGetRegionFromZones,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -280,10 +280,10 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 			expectedLabels:            useast1aGALabels,
 		},
 		{
-			name:                  "Generate Beta labels and kubernetes topology from Beta NodeAffinity",
-			key:                   GCEPDTopologyKey,
-			expErr:                false,
-			regionTopologyHandler: gceRegionTopologyHandler,
+			name:         "Generate Beta labels and kubernetes topology from Beta NodeAffinity",
+			key:          GCEPDTopologyKey,
+			expErr:       false,
+			regionParser: gceGetRegionFromZones,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -310,10 +310,9 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 			expectedLabels:            uswest2bBetaLabels,
 		},
 		{
-			name:                  "regionParser is missing and only zone labels get generated",
-			key:                   GCEPDTopologyKey,
-			expErr:                false,
-			regionTopologyHandler: nil,
+			name:   "regionParser is missing and only zone labels get generated",
+			key:    GCEPDTopologyKey,
+			expErr: false,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -352,10 +351,10 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 			},
 		},
 		{
-			name:                  "Replace multi-term CSI Topology Key and add Region Kubernetes topology for both",
-			key:                   GCEPDTopologyKey,
-			expErr:                false,
-			regionTopologyHandler: gceRegionTopologyHandler,
+			name:         "Replace multi-term CSI Topology Key and add Region Kubernetes topology for both",
+			key:          GCEPDTopologyKey,
+			expErr:       false,
+			regionParser: gceGetRegionFromZones,
 			pv: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gcepd", Namespace: "myns",
@@ -426,7 +425,7 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("Running test: %v", tc.name)
-		err := translateTopologyFromCSIToInTree(tc.pv, tc.key, tc.regionTopologyHandler)
+		err := translateTopologyFromCSIToInTree(tc.pv, tc.key, tc.regionParser)
 		if err != nil && !tc.expErr {
 			t.Errorf("Did not expect an error, got: %v", err)
 		}

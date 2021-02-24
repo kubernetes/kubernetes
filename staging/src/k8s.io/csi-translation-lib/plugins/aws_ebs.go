@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -174,6 +175,11 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateCSIPVToInTree(pv *v1.Persis
 		ebsSource.Partition = int32(partValue)
 	}
 
+	// translate CSI topology to In-tree topology for rollback compatibility
+	if err := translateTopologyFromCSIToInTree(pv, AWSEBSTopologyKey, getAwsRegionFromZones); err != nil {
+		return nil, fmt.Errorf("failed to translate topology. PV:%+v. Error:%v", *pv, err)
+	}
+
 	pv.Spec.CSI = nil
 	pv.Spec.AWSElasticBlockStore = ebsSource
 	return pv, nil
@@ -252,4 +258,31 @@ func KubernetesVolumeIDToEBSVolumeID(kubernetesID string) (string, error) {
 	}
 
 	return awsID, nil
+}
+
+func getAwsRegionFromZones(zones []string) (string, error) {
+	regions := sets.String{}
+	if len(zones) < 1 {
+		return "", fmt.Errorf("no zones specified")
+	}
+
+	// AWS zones can be in four forms:
+	// us-west-2a, us-gov-east-1a, us-west-2-lax-1a (local zone) and us-east-1-wl1-bos-wlz-1 (wavelength).
+	for _, zone := range zones {
+		splitZone := strings.Split(zone, "-")
+		if (len(splitZone) == 3 || len(splitZone) == 4) && len(splitZone[len(splitZone)-1]) == 2 {
+			// this would break if we ever have a location with more than 9 regions, ie us-west-10.
+			splitZone[len(splitZone)-1] = splitZone[len(splitZone)-1][:1]
+			regions.Insert(strings.Join(splitZone, "-"))
+		} else if len(splitZone) == 5 || len(splitZone) == 7 {
+			// local zone or wavelength
+			regions.Insert(strings.Join(splitZone[:3], "-"))
+		} else {
+			return "", fmt.Errorf("Unexpected zone format: %v is not a valid AWS zone", zone)
+		}
+	}
+	if regions.Len() != 1 {
+		return "", fmt.Errorf("multiple or no regions gotten from zones, got: %v", regions)
+	}
+	return regions.UnsortedList()[0], nil
 }

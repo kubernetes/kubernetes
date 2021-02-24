@@ -396,7 +396,7 @@ func TestGetCandidateZone(t *testing.T) {
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						v1.LabelFailureDomainBetaZone: testZone,
+						v1.LabelTopologyZone: testZone,
 					},
 				},
 			},

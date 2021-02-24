@@ -1683,7 +1683,7 @@ func InitAwsDriver() storageframework.TestDriver {
 				"ntfs",
 			),
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
-			TopologyKeys:         []string{v1.LabelFailureDomainBetaZone},
+			TopologyKeys:         []string{v1.LabelTopologyZone},
 			Capabilities: map[storageframework.Capability]bool{
 				storageframework.CapPersistence:         true,
 				storageframework.CapFsGroup:             true,
@@ -1775,7 +1775,7 @@ func (a *awsDriver) CreateVolume(config *storageframework.PerTestConfig, volType
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelFailureDomainBetaZone: zone,
+				v1.LabelTopologyZone: zone,
 			},
 		}
 	}
