@@ -632,6 +632,25 @@ func TestQuantityNeg(t *testing.T) {
 	}
 }
 
+func TestQuantityNegValue(t *testing.T) {
+	table := []struct {
+		input string
+		value int64
+	}{
+		{"-1Gi", -1 * 1024 * 1024 * 1024},
+		{"-50Gi", -50 * 1024 * 1024 * 1024},
+		{"-1.0Gi", -1 * 1024 * 1024 * 1024},
+		{"-50.0Gi", -50 * 1024 * 1024 * 1024},
+	}
+
+	for _, item := range table {
+		q := MustParse(item.input)
+		if q.Value() != item.value {
+			t.Errorf("value of %q: expected %v, got %v", item.input, item.value, q.Value())
+		}
+	}
+}
+
 func TestQuantityString(t *testing.T) {
 	table := []struct {
 		in        Quantity

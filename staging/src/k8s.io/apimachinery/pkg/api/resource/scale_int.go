@@ -58,7 +58,7 @@ func scaledValue(unscaled *big.Int, scale, newScale int) int64 {
 
 	// fast path when unscaled < max.Int64 and exp(10,dif) < max.Int64
 	const log10MaxInt64 = 19
-	if unscaled.Cmp(maxInt64) < 0 && dif < log10MaxInt64 {
+	if unscaled.CmpAbs(maxInt64) < 0 && dif < log10MaxInt64 {
 		divide := int64(math.Pow10(dif))
 		result := unscaled.Int64() / divide
 		mod := unscaled.Int64() % divide
