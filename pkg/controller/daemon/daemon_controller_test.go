@@ -3186,3 +3186,80 @@ func getQueuedKeys(queue workqueue.RateLimitingInterface) []string {
 	sort.Strings(keys)
 	return keys
 }
+
+func TestStoreDaemonSetStatus(t *testing.T) {
+	getError := fmt.Errorf("fake get error")
+	updateError := fmt.Errorf("fake update error")
+	tests := []struct {
+		name                 string
+		updateErrorNum       int
+		getErrorNum          int
+		expectedUpdateCalled int
+		expectedGetCalled    int
+		expectedError        error
+	}{
+		{
+			name:                 "succeed immediately",
+			updateErrorNum:       0,
+			getErrorNum:          0,
+			expectedUpdateCalled: 1,
+			expectedGetCalled:    0,
+			expectedError:        nil,
+		},
+		{
+			name:                 "succeed after one update failure",
+			updateErrorNum:       1,
+			getErrorNum:          0,
+			expectedUpdateCalled: 2,
+			expectedGetCalled:    1,
+			expectedError:        nil,
+		},
+		{
+			name:                 "fail after two update failures",
+			updateErrorNum:       2,
+			getErrorNum:          0,
+			expectedUpdateCalled: 2,
+			expectedGetCalled:    1,
+			expectedError:        updateError,
+		},
+		{
+			name:                 "fail after one update failure and one get failure",
+			updateErrorNum:       1,
+			getErrorNum:          1,
+			expectedUpdateCalled: 1,
+			expectedGetCalled:    1,
+			expectedError:        getError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ds := newDaemonSet("foo")
+			fakeClient := &fake.Clientset{}
+			getCalled := 0
+			fakeClient.AddReactor("get", "daemonsets", func(action core.Action) (bool, runtime.Object, error) {
+				getCalled += 1
+				if getCalled <= tt.getErrorNum {
+					return true, nil, getError
+				}
+				return true, ds, nil
+			})
+			updateCalled := 0
+			fakeClient.AddReactor("update", "daemonsets", func(action core.Action) (bool, runtime.Object, error) {
+				updateCalled += 1
+				if updateCalled <= tt.updateErrorNum {
+					return true, nil, updateError
+				}
+				return true, ds, nil
+			})
+			if err := storeDaemonSetStatus(fakeClient.AppsV1().DaemonSets("default"), ds, 2, 2, 2, 2, 2, 2, 2, true); err != tt.expectedError {
+				t.Errorf("storeDaemonSetStatus() got %v, expected %v", err, tt.expectedError)
+			}
+			if getCalled != tt.expectedGetCalled {
+				t.Errorf("Get() was called %v times, expected %v times", getCalled, tt.expectedGetCalled)
+			}
+			if updateCalled != tt.expectedUpdateCalled {
+				t.Errorf("UpdateStatus() was called %v times, expected %v times", updateCalled, tt.expectedUpdateCalled)
+			}
+		})
+	}
+}
