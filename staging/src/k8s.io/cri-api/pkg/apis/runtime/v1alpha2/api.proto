@@ -401,7 +401,7 @@ message RunPodSandboxRequest {
     // If the runtime handler is unknown, this request should be rejected.  An
     // empty string should select the default handler, equivalent to the
     // behavior before this feature was added.
-    // See https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
+    // See https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
     string runtime_handler = 2;
 }
 

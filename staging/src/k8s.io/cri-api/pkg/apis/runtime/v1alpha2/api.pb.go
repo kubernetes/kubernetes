@@ -1219,7 +1219,7 @@ type RunPodSandboxRequest struct {
 	// If the runtime handler is unknown, this request should be rejected.  An
 	// empty string should select the default handler, equivalent to the
 	// behavior before this feature was added.
-	// See https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
+	// See https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
 	RuntimeHandler       string   `protobuf:"bytes,2,opt,name=runtime_handler,json=runtimeHandler,proto3" json:"runtime_handler,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
