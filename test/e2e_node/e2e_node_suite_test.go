@@ -54,6 +54,9 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
+
+	// test sources
+	_ "k8s.io/kubernetes/test/e2e_node/gcp"
 )
 
 var (
