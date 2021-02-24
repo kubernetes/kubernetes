@@ -31,7 +31,7 @@ E2E_GO_RUNNER_BIN?=$(shell test -f $(LOCAL_OUTPUT_PATH)/go-runner && echo $(LOCA
 
 CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 
-BASEIMAGE=debian:stable-slim
+BASEIMAGE=k8s.gcr.io/build-image/debian-base:buster-v1.4.0
 TEMP_DIR:=$(shell mktemp -d -t conformanceXXXXXX)
 
 all: build

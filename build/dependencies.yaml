@@ -139,6 +139,8 @@ dependencies:
   - name: "k8s.gcr.io/debian-base: dependents"
     version: buster-v1.4.0
     refPaths:
+    - path: cluster/images/conformance/Makefile
+      match: BASEIMAGE\=k8s\.gcr\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: build/workspace.bzl
       match: tag =
     - path: cluster/images/etcd/Makefile
