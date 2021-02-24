@@ -42,7 +42,6 @@ var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
 var _ = SIGDescribe("KubeProxy", func() {
 	const (
-		testDaemonHTTPPort    = 11301
 		testDaemonTCPPort     = 11302
 		postFinTimeoutSeconds = 30
 	)

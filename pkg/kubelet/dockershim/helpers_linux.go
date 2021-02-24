@@ -154,3 +154,6 @@ func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
 	}
 	return fmt.Sprintf(dockerNetNSFmt, c.State.Pid), nil
 }
+
+// applyExperimentalCreateConfig applys experimental configures from sandbox annotations.
+}

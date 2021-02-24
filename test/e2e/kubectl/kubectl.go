@@ -101,7 +101,6 @@ const (
 	httpdDeployment1Filename  = "httpd-deployment1.yaml.in"
 	httpdDeployment2Filename  = "httpd-deployment2.yaml.in"
 	httpdDeployment3Filename  = "httpd-deployment3.yaml.in"
-	httpdRCFilename           = "httpd-rc.yaml.in"
 	metaPattern               = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
 )
 
@@ -114,9 +113,6 @@ var (
 
 var (
 	proxyRegexp = regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
-
-	cronJobGroupVersionResourceAlpha = schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}
-	cronJobGroupVersionResourceBeta  = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
 )
 
 var schemaFoo = []byte(`description: Foo CRD for Testing

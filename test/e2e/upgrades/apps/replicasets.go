@@ -34,8 +34,6 @@ import (
 )
 
 const (
-	interval = 10 * time.Second
-	timeout  = 5 * time.Minute
 	rsName   = "rs"
 	scaleNum = 2
 )

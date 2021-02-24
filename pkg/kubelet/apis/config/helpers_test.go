@@ -82,21 +82,12 @@ func allPrimitiveFieldPaths(t *testing.T, tp reflect.Type, path *field.Path) set
 //lint:file-ignore U1000 Ignore dummy types, used by tests.
 
 // dummy helper types
-type foo struct {
-	foo int
-}
-type bar struct {
-	str    string
-	strptr *string
 
-	ints      []int
+type bar struct {
+
 	stringMap map[string]string
 
-	foo    foo
 	fooptr *foo
-
-	bars   []foo
-	barMap map[string]foo
 }
 
 func TestAllPrimitiveFieldPaths(t *testing.T) {
@@ -104,9 +95,7 @@ func TestAllPrimitiveFieldPaths(t *testing.T) {
 		"str",
 		"strptr",
 		"ints[*]",
-		"stringMap[*]",
 		"foo.foo",
-		"fooptr.foo",
 		"bars[*].foo",
 		"barMap[*].foo",
 	)

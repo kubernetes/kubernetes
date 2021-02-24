@@ -504,8 +504,7 @@ func TestPodControllerLookup(t *testing.T) {
 	}
 }
 
-// byName sorts pods by their names.
-type byName []*v1.Pod
+// byName sorts pods by their names
 
 func (pods byName) Len() int           { return len(pods) }
 func (pods byName) Swap(i, j int)      { pods[i], pods[j] = pods[j], pods[i] }
