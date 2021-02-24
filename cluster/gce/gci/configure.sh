@@ -288,13 +288,8 @@ function install-node-problem-detector {
     local -r npd_version="${NODE_PROBLEM_DETECTOR_LATEST_VERSION}"
     local -r npd_hash="${NODE_PROBLEM_DETECTOR_LATEST_TAR_HASH}"
   else
-    if [[ -n "${NODE_PROBLEM_DETECTOR_VERSION:-}" ]]; then
-      local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
-      local -r npd_hash="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
-    else
-      local -r npd_version="${DEFAULT_NPD_VERSION}"
-      local -r npd_hash="${DEFAULT_NPD_HASH}"
-    fi
+    local -r npd_version="${DEFAULT_NPD_VERSION}"
+    local -r npd_hash="${DEFAULT_NPD_HASH}"
   fi
 
   local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
