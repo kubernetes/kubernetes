@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
+var _ = SIGNodeDescribe("Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
 
 	/*
