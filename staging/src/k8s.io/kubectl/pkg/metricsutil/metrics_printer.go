@@ -37,6 +37,7 @@ var (
 	NamespaceColumn = "NAMESPACE"
 	PodColumn       = "POD"
 	HostColumn      = "NODE"
+	IpColumn        = "IP"
 )
 
 type ResourceMetricsInfo struct {
@@ -203,6 +204,7 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 		}
 		if len(pods.Items) > 0 {
 			printValue(w, HostColumn)
+			printValue(w, IpColumn)
 		}
 		if printContainers {
 			printValue(w, PodColumn)
@@ -246,6 +248,7 @@ func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespac
 	}
 	if podExists {
 		printValue(out, pod.Spec.NodeName)
+		printValue(out, pod.Status.HostIP)
 	}
 	printMetricsLine(out, &ResourceMetricsInfo{
 		Name:      m.Name,

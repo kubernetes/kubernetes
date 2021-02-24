@@ -45,11 +45,11 @@ type TopPodOptions struct {
 	Namespace          string
 	Selector           string
 	SortBy             string
+	Output             string
 	AllNamespaces      bool
 	PrintContainers    bool
 	NoHeaders          bool
 	UseProtocolBuffers bool
-	NodeName           bool
 
 	PodClient       corev1client.PodsGetter
 	Printer         *metricsutil.TopCmdPrinter
@@ -83,8 +83,8 @@ var (
 		# Show metrics for the pods defined by label name=myLabel
 		kubectl top pod -l name=myLabel
 		
-		# Show NodeHame information alongside pod
-		kubectl top pod --node-name`))
+		# Show pod metrics with more information (such as node name)
+		kubectl top pod -o wide`))
 )
 
 func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions.IOStreams) *cobra.Command {
@@ -109,6 +109,7 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 	}
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort pods list using specified field. The field can be either 'cpu' or 'memory'.")
+	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "If present, print output with more information (such as node name)")
 	cmd.Flags().BoolVar(&o.PrintContainers, "containers", o.PrintContainers, "If present, print usage of containers within a pod.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers.")
@@ -210,8 +211,8 @@ func (o TopPodOptions) RunTopPod() error {
 		}
 	}
 
-	// check if user wants host information. Get pods from core client to merge with results
-	if o.NodeName == true {
+	// check if user wants wide data, if so get pods to join metrics together
+	if o.Output == "wide" {
 		pods, err = getPods(o, selector)
 	}
 
