@@ -218,7 +218,6 @@ func defaultFrameworkOptions() frameworkOptions {
 	}
 }
 
-// TODO(#91029): move this to frameworkImpl runtime package.
 var _ framework.PreemptHandle = &preemptHandle{}
 
 type preemptHandle struct {
