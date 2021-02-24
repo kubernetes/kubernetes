@@ -6,13 +6,15 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	patchfilters "k8s.io/kubernetes/openshift-kube-apiserver/filters"
+	"k8s.io/kubernetes/openshift-kube-apiserver/filters/apirequestcount"
 
 	authorizationv1 "github.com/openshift/api/authorization/v1"
 	"github.com/openshift/library-go/pkg/apiserver/httprequest"
 )
 
 // TODO switch back to taking a kubeapiserver config.  For now make it obviously safe for 3.11
-func BuildHandlerChain(consolePublicURL string, oauthMetadataFile string) (func(apiHandler http.Handler, kc *genericapiserver.Config) http.Handler, error) {
+func BuildHandlerChain(consolePublicURL string, oauthMetadataFile string, requestLogger apirequestcount.APIRequestLogger) (func(apiHandler http.Handler, kc *genericapiserver.Config) http.Handler, error) {
 	// load the oauthmetadata when we can return an error
 	oAuthMetadata := []byte{}
 	if len(oauthMetadataFile) > 0 {
@@ -27,6 +29,9 @@ func BuildHandlerChain(consolePublicURL string, oauthMetadataFile string) (func(
 			// well-known comes after the normal handling chain. This shows where to connect for oauth information
 			handler := withOAuthInfo(apiHandler, oAuthMetadata)
 
+			// after normal chain, so that user is in context
+			handler = patchfilters.WithAPIRequestCountLogging(handler, requestLogger)
+
 			// this is the normal kube handler chain
 			handler = genericapiserver.DefaultBuildHandlerChain(handler, genericConfig)
 
@@ -38,6 +43,7 @@ func BuildHandlerChain(consolePublicURL string, oauthMetadataFile string) (func(
 
 			return handler
 		},
+
 		nil
 }
 
