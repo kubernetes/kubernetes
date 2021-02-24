@@ -28,6 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 
@@ -59,13 +60,15 @@ func isSecretImmutable(object runtime.Object) bool {
 	return false
 }
 
-func newSecretCache(fakeClient clientset.Interface) *objectCache {
+func newSecretCache(fakeClient clientset.Interface, fakeClock clock.Clock, maxIdleTime time.Duration) *objectCache {
 	return &objectCache{
 		listObject:    listSecret(fakeClient),
 		watchObject:   watchSecret(fakeClient),
 		newObject:     func() runtime.Object { return &v1.Secret{} },
 		isImmutable:   isSecretImmutable,
 		groupResource: corev1.Resource("secret"),
+		clock:         fakeClock,
+		maxIdleTime:   maxIdleTime,
 		items:         make(map[objectKey]*objectCacheItem),
 	}
 }
@@ -85,7 +88,8 @@ func TestSecretCache(t *testing.T) {
 	fakeWatch := watch.NewFake()
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
-	store := newSecretCache(fakeClient)
+	fakeClock := clock.NewFakeClock(time.Now())
+	store := newSecretCache(fakeClient, fakeClock, time.Minute)
 
 	store.AddReference("ns", "name")
 	_, err := store.Get("ns", "name")
@@ -154,7 +158,8 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 	fakeWatch := watch.NewFake()
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
-	store := newSecretCache(fakeClient)
+	fakeClock := clock.NewFakeClock(time.Now())
+	store := newSecretCache(fakeClient, fakeClock, time.Minute)
 
 	store.AddReference("ns", "name")
 	// This should trigger List and Watch actions eventually.
@@ -259,7 +264,8 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 			fakeWatch := watch.NewFake()
 			fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
-			store := newSecretCache(fakeClient)
+			fakeClock := clock.NewFakeClock(time.Now())
+			store := newSecretCache(fakeClient, fakeClock, time.Minute)
 
 			key := objectKey{namespace: "ns", name: "name"}
 			itemExists := func() (bool, error) {
@@ -275,12 +281,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 
 				item.lock.Lock()
 				defer item.lock.Unlock()
-				select {
-				case <-item.stopCh:
-					return false
-				default:
-					return true
-				}
+				return !item.stopped
 			}
 
 			// AddReference should start reflector.
@@ -324,4 +325,83 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 			assert.Equal(t, tc.eventual == nil || !isSecretImmutable(tc.eventual), reflectorRunning())
 		})
 	}
+}
+
+func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "name",
+			Namespace:       "ns",
+			ResourceVersion: "200",
+		},
+	}
+
+	fakeClient := &fake.Clientset{}
+	listReactor := func(a core.Action) (bool, runtime.Object, error) {
+		result := &v1.SecretList{
+			ListMeta: metav1.ListMeta{
+				ResourceVersion: "200",
+			},
+			Items: []v1.Secret{*secret},
+		}
+
+		return true, result, nil
+	}
+
+	fakeClient.AddReactor("list", "secrets", listReactor)
+	fakeWatch := watch.NewFake()
+	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
+	fakeClock := clock.NewFakeClock(time.Now())
+	store := newSecretCache(fakeClient, fakeClock, time.Minute)
+
+	key := objectKey{namespace: "ns", name: "name"}
+	itemExists := func() (bool, error) {
+		store.lock.Lock()
+		defer store.lock.Unlock()
+		_, ok := store.items[key]
+		return ok, nil
+	}
+
+	reflectorRunning := func() bool {
+		store.lock.Lock()
+		defer store.lock.Unlock()
+		item := store.items[key]
+
+		item.lock.Lock()
+		defer item.lock.Unlock()
+		return !item.stopped
+	}
+
+	// AddReference should start reflector.
+	store.AddReference("ns", "name")
+	if err := wait.Poll(10*time.Millisecond, 10*time.Second, itemExists); err != nil {
+		t.Errorf("item wasn't added to cache")
+	}
+
+	obj, _ := store.Get("ns", "name")
+	assert.True(t, apiequality.Semantic.DeepEqual(secret, obj))
+
+	assert.True(t, reflectorRunning())
+
+	fakeClock.Step(90 * time.Second)
+	store.startRecycleIdleWatch()
+
+	// Reflector should already be stopped for maxIdleTime exceeded.
+	assert.False(t, reflectorRunning())
+
+	obj, _ = store.Get("ns", "name")
+	assert.True(t, apiequality.Semantic.DeepEqual(secret, obj))
+	// Reflector should reRun after get secret again.
+	assert.True(t, reflectorRunning())
+
+	fakeClock.Step(20 * time.Second)
+	_, _ = store.Get("ns", "name")
+	fakeClock.Step(20 * time.Second)
+	_, _ = store.Get("ns", "name")
+	fakeClock.Step(20 * time.Second)
+	_, _ = store.Get("ns", "name")
+	store.startRecycleIdleWatch()
+
+	// Reflector should be running when the get function is called periodically.
+	assert.True(t, reflectorRunning())
 }
