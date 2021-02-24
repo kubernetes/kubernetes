@@ -466,7 +466,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 				queue.Delete(testPod)
 			}
 
-			testPodInfo := &framework.QueuedPodInfo{Pod: testPod}
+			testPodInfo := &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(testPod)}
 			errFunc := MakeDefaultErrorFunc(client, podInformer.Lister(), queue, schedulerCache)
 			errFunc(testPodInfo, tt.injectErr)
 
@@ -537,7 +537,7 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 				}
 			}
 
-			testPodInfo := &framework.QueuedPodInfo{Pod: testPod}
+			testPodInfo := &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(testPod)}
 			errFunc := MakeDefaultErrorFunc(client, podInformer.Lister(), queue, schedulerCache)
 			errFunc(testPodInfo, tt.injectErr)
 
@@ -572,7 +572,7 @@ func TestDefaultErrorFunc_PodAlreadyBound(t *testing.T) {
 	// Add node to schedulerCache no matter it's deleted in API server or not.
 	schedulerCache.AddNode(&nodeFoo)
 
-	testPodInfo := &framework.QueuedPodInfo{Pod: testPod}
+	testPodInfo := &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(testPod)}
 	errFunc := MakeDefaultErrorFunc(client, podInformer.Lister(), queue, schedulerCache)
 	errFunc(testPodInfo, fmt.Errorf("binding rejected: timeout"))
 

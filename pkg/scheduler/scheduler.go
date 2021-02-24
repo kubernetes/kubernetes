@@ -325,7 +325,7 @@ func (sched *Scheduler) recordSchedulingFailure(fwk framework.Framework, podInfo
 	// and the time the scheduler receives a Pod Update for the nominated pod.
 	// Here we check for nil only for tests.
 	if sched.SchedulingQueue != nil {
-		sched.SchedulingQueue.AddNominatedPod(podInfo.Pod, nominatedNode)
+		sched.SchedulingQueue.AddNominatedPod(podInfo.PodInfo, nominatedNode)
 	}
 
 	pod := podInfo.Pod

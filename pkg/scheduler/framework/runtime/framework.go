@@ -657,18 +657,17 @@ func addNominatedPods(ctx context.Context, ph framework.PreemptHandle, pod *v1.P
 		// This may happen only in tests.
 		return false, state, nodeInfo, nil
 	}
-	nominatedPods := ph.NominatedPodsForNode(nodeInfo.Node().Name)
-	if len(nominatedPods) == 0 {
+	nominatedPodInfos := ph.NominatedPodsForNode(nodeInfo.Node().Name)
+	if len(nominatedPodInfos) == 0 {
 		return false, state, nodeInfo, nil
 	}
 	nodeInfoOut := nodeInfo.Clone()
 	stateOut := state.Clone()
 	podsAdded := false
-	for _, p := range nominatedPods {
-		if corev1.PodPriority(p) >= corev1.PodPriority(pod) && p.UID != pod.UID {
-			podInfoToAdd := framework.NewPodInfo(p)
-			nodeInfoOut.AddPodInfo(podInfoToAdd)
-			status := ph.RunPreFilterExtensionAddPod(ctx, stateOut, pod, podInfoToAdd, nodeInfoOut)
+	for _, pi := range nominatedPodInfos {
+		if corev1.PodPriority(pi.Pod) >= corev1.PodPriority(pod) && pi.Pod.UID != pod.UID {
+			nodeInfoOut.AddPodInfo(pi)
+			status := ph.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
 			if !status.IsSuccess() {
 				return false, state, nodeInfo, status.AsError()
 			}

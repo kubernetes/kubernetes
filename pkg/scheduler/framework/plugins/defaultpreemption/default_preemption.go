@@ -731,17 +731,17 @@ func PrepareCandidate(c Candidate, fh framework.Handle, cs kubernetes.Interface,
 // worth the complexity, especially because we generally expect to have a very
 // small number of nominated pods per node.
 func getLowerPriorityNominatedPods(pn framework.PodNominator, pod *v1.Pod, nodeName string) []*v1.Pod {
-	pods := pn.NominatedPodsForNode(nodeName)
+	podInfos := pn.NominatedPodsForNode(nodeName)
 
-	if len(pods) == 0 {
+	if len(podInfos) == 0 {
 		return nil
 	}
 
 	var lowerPriorityPods []*v1.Pod
 	podPriority := corev1helpers.PodPriority(pod)
-	for _, p := range pods {
-		if corev1helpers.PodPriority(p) < podPriority {
-			lowerPriorityPods = append(lowerPriorityPods, p)
+	for _, pi := range podInfos {
+		if corev1helpers.PodPriority(pi.Pod) < podPriority {
+			lowerPriorityPods = append(lowerPriorityPods, pi.Pod)
 		}
 	}
 	return lowerPriorityPods

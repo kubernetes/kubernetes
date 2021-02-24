@@ -1305,7 +1305,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 
 			podNominator := internalqueue.NewPodNominator()
 			if tt.nominatedPod != nil {
-				podNominator.AddNominatedPod(tt.nominatedPod, nodeName)
+				podNominator.AddNominatedPod(framework.NewPodInfo(tt.nominatedPod), nodeName)
 			}
 			f, err := newFrameworkWithQueueSortAndBind(registry, cfgPls, emptyArgs, WithPodNominator(podNominator))
 			if err != nil {
