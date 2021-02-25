@@ -661,6 +661,38 @@
     patch, delete, and deletecollection.'
   release: v1.20
   file: test/e2e/common/node/runtimeclass.go
+- testname: Secrets, pod environment field
+  codename: '[k8s.io] [sig-node] Secrets should be consumable from pods in env vars
+    [NodeConformance] [Conformance]'
+  description: Create a secret. Create a Pod with Container that declares a environment
+    variable which references the secret created to extract a key value from the secret.
+    Pod MUST have the environment variable that contains proper value for the key
+    to the secret.
+  release: v1.9
+  file: test/e2e/common/node/secrets.go
+- testname: Secrets, pod environment from source
+  codename: '[k8s.io] [sig-node] Secrets should be consumable via the environment
+    [NodeConformance] [Conformance]'
+  description: Create a secret. Create a Pod with Container that declares a environment
+    variable using 'EnvFrom' which references the secret created to extract a key
+    value from the secret. Pod MUST have the environment variable that contains proper
+    value for the key to the secret.
+  release: v1.9
+  file: test/e2e/common/node/secrets.go
+- testname: Secrets, with empty-key
+  codename: '[k8s.io] [sig-node] Secrets should fail to create secret due to empty
+    secret key [Conformance]'
+  description: Attempt to create a Secret with an empty key. The creation MUST fail.
+  release: v1.15
+  file: test/e2e/common/node/secrets.go
+- testname: Secret patching
+  codename: '[k8s.io] [sig-node] Secrets should patch a secret [Conformance]'
+  description: A Secret is created. Listing all Secrets MUST return an empty list.
+    Given the patching and fetching of the Secret, the fields MUST equal the new values.
+    The Secret is deleted by it's static Label. Secrets are listed finally, the list
+    MUST NOT include the originally created Secret.
+  release: v1.18
+  file: test/e2e/common/node/secrets.go
 - testname: Security Context, test RunAsGroup at container level
   codename: '[k8s.io] [sig-node] Security Context should support container.SecurityContext.RunAsUser
     And container.SecurityContext.RunAsGroup [LinuxOnly] [Conformance]'
@@ -1934,38 +1966,6 @@
     of 'Terminating' scoped ResourceQuota.
   release: v1.16
   file: test/e2e/apimachinery/resource_quota.go
-- testname: Secrets, pod environment field
-  codename: '[sig-api-machinery] Secrets should be consumable from pods in env vars
-    [NodeConformance] [Conformance]'
-  description: Create a secret. Create a Pod with Container that declares a environment
-    variable which references the secret created to extract a key value from the secret.
-    Pod MUST have the environment variable that contains proper value for the key
-    to the secret.
-  release: v1.9
-  file: test/e2e/common/secrets.go
-- testname: Secrets, pod environment from source
-  codename: '[sig-api-machinery] Secrets should be consumable via the environment
-    [NodeConformance] [Conformance]'
-  description: Create a secret. Create a Pod with Container that declares a environment
-    variable using 'EnvFrom' which references the secret created to extract a key
-    value from the secret. Pod MUST have the environment variable that contains proper
-    value for the key to the secret.
-  release: v1.9
-  file: test/e2e/common/secrets.go
-- testname: Secrets, with empty-key
-  codename: '[sig-api-machinery] Secrets should fail to create secret due to empty
-    secret key [Conformance]'
-  description: Attempt to create a Secret with an empty key. The creation MUST fail.
-  release: v1.15
-  file: test/e2e/common/secrets.go
-- testname: Secret patching
-  codename: '[sig-api-machinery] Secrets should patch a secret [Conformance]'
-  description: A Secret is created. Listing all Secrets MUST return an empty list.
-    Given the patching and fetching of the Secret, the fields MUST equal the new values.
-    The Secret is deleted by it's static Label. Secrets are listed finally, the list
-    MUST NOT include the originally created Secret.
-  release: v1.18
-  file: test/e2e/common/secrets.go
 - testname: API metadata HTTP return
   codename: '[sig-api-machinery] Servers with support for Table transformation should
     return a 406 for a backend which does not implement metadata [Conformance]'

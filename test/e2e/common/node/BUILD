@@ -7,6 +7,7 @@ go_library(
         "framework.go",
         "podtemplates.go",
         "runtimeclass.go",
+        "secrets.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/common/node",
     visibility = ["//visibility:public"],
