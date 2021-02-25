@@ -49,6 +49,12 @@ type CertificateSigningRequestSpec struct {
 	// `scope-hostname.io/name`.
 	// Distribution of trust for signers happens out of band.
 	// You can select on this field using `spec.signerName`.
+	// Kubernetes provides built-in signers that each have a well-known signerName:
+	// 1. kubernetes.io/kube-apiserver-client
+	// 2. kubernetes.io/kube-apiserver-client-kubelet
+	// 3. kubernetes.io/kubelet-serving
+	// 4. kubernetes.io/legacy-unknown
+	// Custom signerNames can also be specified and that those are external signers and as such the control plane signer will not issue certificates.
 	SignerName string
 
 	// usages specifies a set of usage contexts the key will be
