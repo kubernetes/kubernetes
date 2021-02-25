@@ -28,7 +28,6 @@ go_library(
         "security_context.go",
         "sysctl.go",
         "util.go",
-        "volumes.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/common",
     deps = [
@@ -69,7 +68,6 @@ go_library(
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/rc:go_default_library",
         "//test/e2e/framework/skipper:go_default_library",
-        "//test/e2e/framework/volume:go_default_library",
         "//test/e2e/framework/websocket:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
