@@ -24,7 +24,6 @@ go_library(
         "pods.go",
         "privileged.go",
         "runtime.go",
-        "secrets.go",
         "security_context.go",
         "sysctl.go",
         "util.go",
