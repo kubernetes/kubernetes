@@ -28,6 +28,7 @@ import (
 	"k8s.io/gengo/types"
 	"k8s.io/klog/v2"
 
+	applygenargs "k8s.io/code-generator/cmd/applyconfiguration-gen/args"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 )
 
@@ -59,7 +60,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	pkgTypes := packageTypesForInputDirs(context, arguments.InputDirs, arguments.OutputPackagePath)
-	refs := refGraphForReachableTypes(pkgTypes)
+	initialTypes := arguments.CustomArgs.(*applygenargs.CustomArgs).ExternalApplyConfigurations
+	refs := refGraphForReachableTypes(pkgTypes, initialTypes)
 
 	groupVersions := make(map[string]clientgentypes.GroupVersions)
 	groupGoNames := make(map[string]string)

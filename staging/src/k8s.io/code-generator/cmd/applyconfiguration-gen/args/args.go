@@ -20,20 +20,51 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/spf13/pflag"
 	"k8s.io/gengo/args"
+	"k8s.io/gengo/types"
 
 	codegenutil "k8s.io/code-generator/pkg/util"
 )
 
+// ClientGenArgs is a wrapper for arguments to applyconfiguration-gen.
+type CustomArgs struct {
+	// ExternalApplyConfigurations provides the locations of externally generated
+	// apply configuration types for types referenced by the go structs provided as input.
+	// Locations are provided as a comma separated list of <package>.<typeName>:<applyconfiguration-package>
+	// entries.
+	//
+	// E.g. if a type references appsv1.Deployment, the location of its apply configuration should
+	// be provided:
+	//   k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1
+	//
+	// meta/v1 types (TypeMeta and ObjectMeta) are always included and do not need to be passed in.
+	ExternalApplyConfigurations map[types.Name]string
+}
+
 // NewDefaults returns default arguments for the generator.
-func NewDefaults() *args.GeneratorArgs {
+func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	genericArgs := args.Default().WithoutDefaultFlagParsing()
+	customArgs := &CustomArgs{
+		ExternalApplyConfigurations: map[types.Name]string{
+			// Always include TypeMeta and ObjectMeta. They are sufficient for the vast majority of use cases.
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "TypeMeta"}:   "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ObjectMeta"}: "k8s.io/client-go/applyconfigurations/meta/v1",
+		},
+	}
+	genericArgs.CustomArgs = customArgs
 
 	if pkg := codegenutil.CurrentPackage(); len(pkg) != 0 {
 		genericArgs.OutputPackagePath = path.Join(pkg, "pkg/client/applyconfigurations")
 	}
 
-	return genericArgs
+	return genericArgs, customArgs
+}
+
+func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
+	pflag.Var(NewExternalApplyConfigurationValue(&ca.ExternalApplyConfigurations, nil), "external-applyconfigurations",
+		"list of comma separated external apply configurations locations in <type-package>.<type-name>:<applyconfiguration-package> form."+
+			"For example: k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1")
 }
 
 // Validate checks the given arguments.

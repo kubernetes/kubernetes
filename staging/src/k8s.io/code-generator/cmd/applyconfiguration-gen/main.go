@@ -32,9 +32,10 @@ import (
 
 func main() {
 	klog.InitFlags(nil)
-	genericArgs := generatorargs.NewDefaults()
+	genericArgs, customArgs := generatorargs.NewDefaults()
 	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), util.BoilerplatePath())
 	genericArgs.AddFlags(pflag.CommandLine)
+	customArgs.AddFlags(pflag.CommandLine, "k8s.io/kubernetes/pkg/apis") // TODO: move this input path out of client-gen
 	if err := flag.Set("logtostderr", "true"); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}

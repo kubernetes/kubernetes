@@ -28,8 +28,8 @@ type refGraph map[types.Name]string
 
 // refGraphForReachableTypes returns a refGraph that contains all reachable types from
 // the root clientgen types of the provided packages.
-func refGraphForReachableTypes(pkgTypes map[string]*types.Package) refGraph {
-	refs := refGraph{}
+func refGraphForReachableTypes(pkgTypes map[string]*types.Package, initialTypes map[types.Name]string) refGraph {
+	var refs refGraph = initialTypes
 
 	// Include only types that are reachable from the root clientgen types.
 	// We don't want to generate apply configurations for types that are not reachable from a root
