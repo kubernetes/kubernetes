@@ -835,7 +835,6 @@ spec:
 }
 
 func TestNonStructuralSchemaCondition(t *testing.T) {
-	t.Skip("non-structural schemas can no longer be created")
 	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -1603,12 +1602,12 @@ properties:
 			if err != nil {
 				t.Fatalf("failed decoding of: %v\n\n%s", err, manifest)
 			}
-			crd := obj.(*apiextensionsv1.CustomResourceDefinition)
+			crd := obj.(*apiextensionsv1beta1.CustomResourceDefinition)
 			crd.Spec.Group = fmt.Sprintf("tests-%d.apiextension.k8s.io", i)
 			crd.Name = fmt.Sprintf("foos.%s", crd.Spec.Group)
 
 			// create CRDs
-			crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
+			crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
 			if len(tst.expectedCreateErrors) > 0 && err == nil {
 				t.Fatalf("expected create errors, got none")
 			} else if len(tst.expectedCreateErrors) == 0 && err != nil {
