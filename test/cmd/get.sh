@@ -181,7 +181,7 @@ run_kubectl_get_tests() {
   kube::test::if_has_string "${output_message}" 'valid-pod' # pod details
   output_message=$(kubectl get pods/valid-pod -o name -w --request-timeout=1 "${kube_flags[@]}")
   kube::test::if_has_not_string "${output_message}" 'STATUS' # no headers
-  kube::test::if_has_string     "${output_message}" 'pod/valid-pod' # resource name
+  kube::test::if_has_string     "${output_message}" 'valid-pod' # -o name returns only resource name
   output_message=$(kubectl get pods/valid-pod -o yaml -w --request-timeout=1 "${kube_flags[@]}")
   kube::test::if_has_not_string "${output_message}" 'STATUS'          # no headers
   kube::test::if_has_string     "${output_message}" 'name: valid-pod' # yaml

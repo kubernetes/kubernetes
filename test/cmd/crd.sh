@@ -184,9 +184,9 @@ run_non_native_resource_tests() {
   # Test that we can create a new resource of type Kind
   kubectl "${kube_flags[@]}" create -f hack/testdata/CRD/resource.yaml "${kube_flags[@]}"
 
-  # Test that -o name returns kind.group/resourcename
+  # Test that -o name returns only resourcename
   output_message=$(kubectl "${kube_flags[@]}" get resource/myobj -o name)
-  kube::test::if_has_string "${output_message}" 'kind.mygroup.example.com/myobj'
+  kube::test::if_has_string "${output_message}" 'myobj'
 
   output_message=$(kubectl "${kube_flags[@]}" get resources/myobj -o name)
   kube::test::if_has_string "${output_message}" 'kind.mygroup.example.com/myobj'
