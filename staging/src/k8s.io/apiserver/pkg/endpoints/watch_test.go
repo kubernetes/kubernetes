@@ -103,8 +103,8 @@ func TestWatchWebsocket(t *testing.T) {
 
 	dest, _ := url.Parse(server.URL)
 	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
-	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
-	dest.RawQuery = ""
+	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simples"
+	dest.RawQuery = "watch=true"
 
 	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
 	if err != nil {
@@ -153,8 +153,8 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 
 	dest, _ := url.Parse(server.URL)
 	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
-	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
-	dest.RawQuery = ""
+	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simples"
+	dest.RawQuery = "watch=true"
 
 	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
 	if err != nil {
@@ -418,8 +418,8 @@ func TestWatchHTTPAccept(t *testing.T) {
 	client := http.Client{}
 
 	dest, _ := url.Parse(server.URL)
-	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
-	dest.RawQuery = ""
+	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simples"
+	dest.RawQuery = "watch=true"
 
 	request, err := http.NewRequest("GET", dest.String(), nil)
 	if err != nil {
@@ -449,8 +449,8 @@ func TestWatchParamParsing(t *testing.T) {
 
 	dest, _ := url.Parse(server.URL)
 
-	rootPath := "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
-	namespacedPath := "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/namespaces/other/simpleroots"
+	rootPath := "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simples"
+	namespacedPath := "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simpleroots"
 
 	table := []struct {
 		path            string
@@ -462,28 +462,28 @@ func TestWatchParamParsing(t *testing.T) {
 	}{
 		{
 			path:            rootPath,
-			rawQuery:        "resourceVersion=1234",
+			rawQuery:        "resourceVersion=1234&watch=true",
 			resourceVersion: "1234",
 			labelSelector:   "",
 			fieldSelector:   "",
 			namespace:       metav1.NamespaceAll,
 		}, {
 			path:            rootPath,
-			rawQuery:        "resourceVersion=314159&fieldSelector=Host%3D&labelSelector=name%3Dfoo",
+			rawQuery:        "resourceVersion=314159&fieldSelector=Host%3D&labelSelector=name%3Dfoo&watch=true",
 			resourceVersion: "314159",
 			labelSelector:   "name=foo",
 			fieldSelector:   "Host=",
 			namespace:       metav1.NamespaceAll,
 		}, {
 			path:            rootPath,
-			rawQuery:        "fieldSelector=id%3dfoo&resourceVersion=1492",
+			rawQuery:        "fieldSelector=id%3dfoo&resourceVersion=1492&watch=true",
 			resourceVersion: "1492",
 			labelSelector:   "",
 			fieldSelector:   "id=foo",
 			namespace:       metav1.NamespaceAll,
 		}, {
 			path:            rootPath,
-			rawQuery:        "",
+			rawQuery:        "watch=true",
 			resourceVersion: "",
 			labelSelector:   "",
 			fieldSelector:   "",
@@ -491,28 +491,28 @@ func TestWatchParamParsing(t *testing.T) {
 		},
 		{
 			path:            namespacedPath,
-			rawQuery:        "resourceVersion=1234",
+			rawQuery:        "resourceVersion=1234&watch=true",
 			resourceVersion: "1234",
 			labelSelector:   "",
 			fieldSelector:   "",
 			namespace:       "other",
 		}, {
 			path:            namespacedPath,
-			rawQuery:        "resourceVersion=314159&fieldSelector=Host%3D&labelSelector=name%3Dfoo",
+			rawQuery:        "resourceVersion=314159&fieldSelector=Host%3D&labelSelector=name%3Dfoo&watch=true",
 			resourceVersion: "314159",
 			labelSelector:   "name=foo",
 			fieldSelector:   "Host=",
 			namespace:       "other",
 		}, {
 			path:            namespacedPath,
-			rawQuery:        "fieldSelector=id%3dfoo&resourceVersion=1492",
+			rawQuery:        "fieldSelector=id%3dfoo&resourceVersion=1492&watch=true",
 			resourceVersion: "1492",
 			labelSelector:   "",
 			fieldSelector:   "id=foo",
 			namespace:       "other",
 		}, {
 			path:            namespacedPath,
-			rawQuery:        "",
+			rawQuery:        "watch=true",
 			resourceVersion: "",
 			labelSelector:   "",
 			fieldSelector:   "",
@@ -557,8 +557,8 @@ func TestWatchProtocolSelection(t *testing.T) {
 	client := http.Client{}
 
 	dest, _ := url.Parse(server.URL)
-	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
-	dest.RawQuery = ""
+	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simples"
+	dest.RawQuery = "watch=true"
 
 	table := []struct {
 		isWebsocket bool
