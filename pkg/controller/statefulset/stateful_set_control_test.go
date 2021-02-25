@@ -517,6 +517,7 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		history.SortControllerRevisions(revisions)
 		current, update, _, err := ssc.getStatefulSetRevisions(test.set, revisions)
 		if err != nil {
 			t.Fatalf("error getting statefulset revisions:%v", err)

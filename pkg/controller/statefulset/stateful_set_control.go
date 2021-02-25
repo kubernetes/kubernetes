@@ -200,11 +200,10 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 // This method expects that revisions is sorted when supplied.
 func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 	set *apps.StatefulSet,
-	revisions []*apps.ControllerRevision) (*apps.ControllerRevision, *apps.ControllerRevision, int32, error) {
+	sortedRevisions []*apps.ControllerRevision) (*apps.ControllerRevision, *apps.ControllerRevision, int32, error) {
 	var currentRevision, updateRevision *apps.ControllerRevision
 
-	revisionCount := len(revisions)
-	history.SortControllerRevisions(revisions)
+	revisionCount := len(sortedRevisions)
 
 	// Use a local copy of set.Status.CollisionCount to avoid modifying set.Status directly.
 	// This copy is returned so the value gets carried over to set.Status in updateStatefulSet.
@@ -214,18 +213,18 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 	}
 
 	// create a new revision from the current set
-	updateRevision, err := newRevision(set, nextRevision(revisions), &collisionCount)
+	updateRevision, err := newRevision(set, nextRevision(sortedRevisions), &collisionCount)
 	if err != nil {
 		return nil, nil, collisionCount, err
 	}
 
-	// find any equivalent revisions
-	equalRevisions := history.FindEqualRevisions(revisions, updateRevision)
+	// find any equivalent sortedRevisions
+	equalRevisions := history.FindEqualRevisions(sortedRevisions, updateRevision)
 	equalCount := len(equalRevisions)
 
-	if equalCount > 0 && history.EqualRevision(revisions[revisionCount-1], equalRevisions[equalCount-1]) {
+	if equalCount > 0 && history.EqualRevision(sortedRevisions[revisionCount-1], equalRevisions[equalCount-1]) {
 		// if the equivalent revision is immediately prior the update revision has not changed
-		updateRevision = revisions[revisionCount-1]
+		updateRevision = sortedRevisions[revisionCount-1]
 	} else if equalCount > 0 {
 		// if the equivalent revision is not immediately prior we will roll back by incrementing the
 		// Revision of the equivalent revision
@@ -244,9 +243,9 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 	}
 
 	// attempt to find the revision that corresponds to the current revision
-	for i := range revisions {
-		if revisions[i].Name == set.Status.CurrentRevision {
-			currentRevision = revisions[i]
+	for i := range sortedRevisions {
+		if sortedRevisions[i].Name == set.Status.CurrentRevision {
+			currentRevision = sortedRevisions[i]
 			break
 		}
 	}
