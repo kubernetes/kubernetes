@@ -765,7 +765,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		})
 	})
 
-	framework.KubeDescribe("GlusterDynamicProvisioner", func() {
+	ginkgo.Describe("GlusterDynamicProvisioner", func() {
 		ginkgo.It("should create and delete persistent volumes [fast]", func() {
 			e2eskipper.SkipIfProviderIs("gke")
 			ginkgo.By("creating a Gluster DP server Pod")

@@ -635,8 +635,8 @@
   release: v1.19
   file: test/e2e/common/node/podtemplates.go
 - testname: Pods, QOS
-  codename: '[k8s.io] [sig-node] Pods Extended [k8s.io] Pods Set QOS Class should
-    be set on Pods with matching resource requests and limits for memory and cpu [Conformance]'
+  codename: '[k8s.io] [sig-node] Pods Extended Pods Set QOS Class should be set on
+    Pods with matching resource requests and limits for memory and cpu [Conformance]'
   description: Create a Pod with CPU and Memory request and limits. Pod status MUST
     have QOSClass set to PodQOSGuaranteed.
   release: v1.9
@@ -2190,7 +2190,7 @@
   release: v1.20
   file: test/e2e/apps/rc.go
 - testname: StatefulSet, Burst Scaling
-  codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
+  codename: '[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic]
     Burst scaling should run to completion even with unhealthy pods [Slow] [Conformance]'
   description: StatefulSet MUST support the Parallel PodManagementPolicy for burst
     scaling. This test does not depend on a preexisting default StorageClass or a
@@ -2198,7 +2198,7 @@
   release: v1.9
   file: test/e2e/apps/statefulset.go
 - testname: StatefulSet, Scaling
-  codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
+  codename: '[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic]
     Scaling should happen in predictable order and halt if any stateful pod is unhealthy
     [Slow] [Conformance]'
   description: StatefulSet MUST create Pods in ascending order by ordinal index when
@@ -2208,7 +2208,7 @@
   release: v1.9
   file: test/e2e/apps/statefulset.go
 - testname: StatefulSet, Recreate Failed Pod
-  codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
+  codename: '[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic]
     Should recreate evicted statefulset [Conformance]'
   description: StatefulSet MUST delete and recreate Pods it owns that go into a Failed
     state, such as when they are rejected or evicted by a Node. This test does not
@@ -2216,7 +2216,7 @@
   release: v1.9
   file: test/e2e/apps/statefulset.go
 - testname: StatefulSet resource Replica scaling
-  codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
+  codename: '[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic]
     should have a working scale subresource [Conformance]'
   description: Create a StatefulSet resource. Newly created StatefulSet resource MUST
     have a scale of one. Bring the scale of the StatefulSet resource up to two. StatefulSet
@@ -2224,7 +2224,7 @@
   release: v1.16, v1.21
   file: test/e2e/apps/statefulset.go
 - testname: StatefulSet, Rolling Update with Partition
-  codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
+  codename: '[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic]
     should perform canary updates and phased rolling updates of template modifications
     [Conformance]'
   description: StatefulSet's RollingUpdate strategy MUST support the Partition parameter
@@ -2234,7 +2234,7 @@
   release: v1.9
   file: test/e2e/apps/statefulset.go
 - testname: StatefulSet, Rolling Update
-  codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
+  codename: '[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic]
     should perform rolling updates and roll backs of template modifications [Conformance]'
   description: StatefulSet MUST support the RollingUpdate strategy to automatically
     replace Pods one at a time when the Pod template changes. The StatefulSet's status
