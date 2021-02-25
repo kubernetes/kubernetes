@@ -4,7 +4,7 @@
 
 // +build darwin dragonfly freebsd netbsd openbsd
 
-package terminal
+package term
 
 import "golang.org/x/sys/unix"
 

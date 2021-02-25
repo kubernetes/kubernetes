@@ -94,12 +94,13 @@ require (
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vmware/govmomi v0.20.3
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
-	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
-	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
+	golang.org/x/exp v0.0.0-20210220032938-85be41e4509f // indirect
+	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
-	golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
-	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
-	golang.org/x/tools v0.0.0-20210106214847-113979e3529a
+	golang.org/x/sys v0.0.0-20210225134936-a50acf3fe073
+	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
+	golang.org/x/tools v0.1.0
 	gonum.org/v1/gonum v0.6.2
 	gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e // indirect
 	google.golang.org/api v0.20.0
@@ -149,7 +150,7 @@ replace (
 	cloud.google.com/go/firestore => cloud.google.com/go/firestore v1.1.0
 	cloud.google.com/go/pubsub => cloud.google.com/go/pubsub v1.2.0
 	cloud.google.com/go/storage => cloud.google.com/go/storage v1.6.0
-	dmitri.shuralyov.com/gpu/mtl => dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9
+	dmitri.shuralyov.com/gpu/mtl => dmitri.shuralyov.com/gpu/mtl v0.0.0-20201218220906-28db891af037
 	github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v43.0.0+incompatible
 	github.com/Azure/go-ansiterm => github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.2.0+incompatible
@@ -443,19 +444,20 @@ replace (
 	go.uber.org/atomic => go.uber.org/atomic v1.4.0
 	go.uber.org/multierr => go.uber.org/multierr v1.1.0
 	go.uber.org/zap => go.uber.org/zap v1.10.0
-	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
-	golang.org/x/exp => golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
+	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
+	golang.org/x/exp => golang.org/x/exp v0.0.0-20210220032938-85be41e4509f
 	golang.org/x/image => golang.org/x/image v0.0.0-20190802002840-cff245a6509b
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20200302205851-738671d3881b
-	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20190719004257-d2bd2a29d028
-	golang.org/x/mod => golang.org/x/mod v0.3.0
-	golang.org/x/net => golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20201217150744-e6ae53a27f4f
+	golang.org/x/mod => golang.org/x/mod v0.3.1-0.20200828183125-ce943fd02449
+	golang.org/x/net => golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20210225134936-a50acf3fe073
+	golang.org/x/term => golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
 	golang.org/x/text => golang.org/x/text v0.3.4
-	golang.org/x/time => golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
-	golang.org/x/tools => golang.org/x/tools v0.0.0-20210106214847-113979e3529a
+	golang.org/x/time => golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
+	golang.org/x/tools => golang.org/x/tools v0.1.0
 	golang.org/x/xerrors => golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	gonum.org/v1/gonum => gonum.org/v1/gonum v0.6.2
 	gonum.org/v1/netlib => gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e
