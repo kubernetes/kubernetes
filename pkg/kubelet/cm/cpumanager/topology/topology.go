@@ -253,7 +253,7 @@ func Discover(machineInfo *cadvisorapi.MachineInfo, numaNodeInfo NUMANodeInfo) (
 
 	return &CPUTopology{
 		NumCPUs:    machineInfo.NumCores,
-		NumSockets: len(machineInfo.Topology),
+		NumSockets: machineInfo.NumSockets,
 		NumCores:   numPhysicalCores,
 		CPUDetails: CPUDetails,
 	}, nil
