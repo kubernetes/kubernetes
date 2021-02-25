@@ -16,19 +16,19 @@ limitations under the License.
 
 package common
 
-import "k8s.io/kubernetes/test/e2e/framework"
+import "github.com/onsi/ginkgo"
 
 // SIGNetworkDescribe annotates the test with the SIG Network label.
 func SIGNetworkDescribe(text string, body func()) bool {
-	return framework.KubeDescribe("[sig-network] "+text, body)
+	return ginkgo.Describe("[sig-network] "+text, body)
 }
 
 // SIGNodeDescribe annotates the test with the SIG Node label.
 func SIGNodeDescribe(text string, body func()) bool {
-	return framework.KubeDescribe("[sig-node] "+text, body)
+	return ginkgo.Describe("[sig-node] "+text, body)
 }
 
 // SIGStorageDescribe annotates the test with the SIG Storage label.
 func SIGStorageDescribe(text string, body func()) bool {
-	return framework.KubeDescribe("[sig-storage] "+text, body)
+	return ginkgo.Describe("[sig-storage] "+text, body)
 }

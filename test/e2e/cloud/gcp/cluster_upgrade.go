@@ -322,13 +322,14 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	})
 })
 
+// TODO(#98326): Figure out the right SIG and use appropriate SIGDescribe.
 var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]", func() {
 	f := framework.NewDefaultFramework("stateful-upgrade")
 
 	// Create the frameworks here because we can only create them
 	// in a "Describe".
 	testFrameworks := createUpgradeFrameworks(statefulsetUpgradeTests)
-	framework.KubeDescribe("stateful upgrade", func() {
+	ginkgo.Describe("stateful upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 			framework.ExpectNoError(err)
