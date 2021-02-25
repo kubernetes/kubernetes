@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kustomize
+package resource
 
 import (
-	"bytes"
+	"github.com/davecgh/go-spew/spew"
+	"sigs.k8s.io/kustomize/api/filesys"
+	"sigs.k8s.io/kustomize/api/konfig"
 	"testing"
-
-	"sigs.k8s.io/kustomize/pkg/fs"
 )
 
 const (
@@ -79,7 +79,7 @@ metadata:
     note: This is a test annotation
   labels:
     app: nginx
-  name: foo-ns1-bar
+  name: ns1
 ---
 apiVersion: v1
 data:
@@ -91,7 +91,7 @@ metadata:
     note: This is a test annotation
   labels:
     app: nginx
-  name: foo-literalConfigMap-bar-8d2dkb8k24
+  name: foo-literalConfigMap-bar-g5f6t456f5
   namespace: ns1
 ---
 apiVersion: v1
@@ -104,7 +104,7 @@ metadata:
     note: This is a test annotation
   labels:
     app: nginx
-  name: foo-secret-bar-9btc7bt4kb
+  name: foo-secret-bar-82c2g5f8f6
   namespace: ns1
 type: Opaque
 ---
@@ -131,20 +131,29 @@ spec:
 `
 )
 
-func TestResources1(t *testing.T) {
-	fSys := fs.MakeFakeFS()
-	fSys.WriteFile("/kustomization.yaml", []byte(kustomizationContent1))
-	fSys.WriteFile("/deployment.yaml", []byte(deploymentContent))
-	fSys.WriteFile("/namespace.yaml", []byte(namespaceContent))
-	fSys.WriteFile("/jsonpatch.json", []byte(jsonpatchContent))
-
-	var out bytes.Buffer
-	err := RunKustomizeBuild(&out, fSys, "/")
-	if err != nil {
-		t.Fatalf("unexpected Resources error %v", err)
+func TestKustomizeVisitor(t *testing.T) {
+	fSys := filesys.MakeFsInMemory()
+	fSys.WriteFile(
+		konfig.DefaultKustomizationFileName(),
+		[]byte(kustomizationContent1))
+	fSys.WriteFile("deployment.yaml", []byte(deploymentContent))
+	fSys.WriteFile("namespace.yaml", []byte(namespaceContent))
+	fSys.WriteFile("jsonpatch.json", []byte(jsonpatchContent))
+	b := newDefaultBuilder()
+	kv := KustomizeVisitor{
+		mapper:  b.mapper,
+		dirPath: ".",
+		schema:  b.schema,
+		fSys:    fSys,
 	}
-
-	if out.String() != expectedContent {
-		t.Fatalf("expected:\n%s\nbut got:\n%s", expectedContent, out.String())
+	tv := &testVisitor{}
+	if err := kv.Visit(tv.Handle); err != nil {
+		t.Fatal(err)
+	}
+	if len(tv.Infos) != 4 {
+		t.Fatal(spew.Sdump(tv.Infos))
+	}
+	if string(kv.yml) != expectedContent {
+		t.Fatalf("expected:\n%s\nbut got:\n%s", expectedContent, string(kv.yml))
 	}
 }
