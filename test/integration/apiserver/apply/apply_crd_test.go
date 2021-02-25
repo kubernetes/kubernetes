@@ -20,10 +20,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
 	"reflect"
 	"testing"
+	"time"
+
+	"k8s.io/apimachinery/pkg/util/wait"
+
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+
+	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/pkg/transport"
+	"google.golang.org/grpc"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -394,12 +405,45 @@ func verifyNumPorts(t *testing.T, b []byte, n int) {
 	}
 }
 
+func findCRDCondition(crd *apiextensionsv1.CustomResourceDefinition, conditionType apiextensionsv1.CustomResourceDefinitionConditionType) *apiextensionsv1.CustomResourceDefinitionCondition {
+	for i := range crd.Status.Conditions {
+		if crd.Status.Conditions[i].Type == conditionType {
+			return &crd.Status.Conditions[i]
+		}
+	}
+
+	return nil
+}
+
 // TestApplyCRDUnhandledSchema tests that when a CRD has a schema that kube-openapi ToProtoModels cannot handle correctly,
 // apply falls back to non-schema behavior
 func TestApplyCRDUnhandledSchema(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	storageConfig := framework.SharedEtcd()
+	tlsInfo := transport.TLSInfo{
+		CertFile:      storageConfig.Transport.CertFile,
+		KeyFile:       storageConfig.Transport.KeyFile,
+		TrustedCAFile: storageConfig.Transport.TrustedCAFile,
+	}
+	tlsConfig, err := tlsInfo.ClientConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	etcdConfig := clientv3.Config{
+		Endpoints:   storageConfig.Transport.ServerList,
+		DialTimeout: 20 * time.Second,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: tlsConfig,
+	}
+	etcdclient, err := clientv3.New(etcdConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, storageConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -410,16 +454,37 @@ func TestApplyCRDUnhandledSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dynamicClient, err := dynamic.NewForConfig(config)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
+	// this has to be v1beta1, so we can have an item with validation that does not match.  v1 validation prevents this.
+
+	noxuBetaDefinition := &apiextensionsv1beta1.CustomResourceDefinition{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "CustomResourceDefinition",
+			APIVersion: "apiextensions.k8s.io/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group: "mygroup.example.com",
+			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{{
+				Name:    "v1beta1",
+				Served:  true,
+				Storage: true,
+			}},
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:     "noxus",
+				Singular:   "nonenglishnoxu",
+				Kind:       "WishIHadChosenNoxu",
+				ShortNames: []string{"foo", "bar", "abc", "def"},
+				ListKind:   "NoxuItemList",
+				Categories: []string{"all"},
+			},
+			Scope: apiextensionsv1beta1.ClusterScoped,
+		},
+	}
 
 	// This is a schema that kube-openapi ToProtoModels does not handle correctly.
 	// https://github.com/kubernetes/kubernetes/blob/38752f7f99869ed65fb44378360a517649dc2f83/vendor/k8s.io/kube-openapi/pkg/util/proto/document.go#L184
-	var c apiextensionsv1.CustomResourceValidation
+	var c apiextensionsv1beta1.CustomResourceValidation
 	err = json.Unmarshal([]byte(`{
 		"openAPIV3Schema": {
 			"properties": {
@@ -432,9 +497,38 @@ func TestApplyCRDUnhandledSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	noxuDefinition.Spec.Versions[0].Schema = &c
+	noxuBetaDefinition.Spec.Validation = &c
 
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	betaBytes, err := json.Marshal(noxuBetaDefinition)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(string(betaBytes))
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
+	key := path.Join("/", storageConfig.Prefix, "apiextensions.k8s.io", "customresourcedefinitions", noxuBetaDefinition.Name)
+	if _, err := etcdclient.Put(ctx, key, string(betaBytes)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	noxuDefinition, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), noxuBetaDefinition.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// wait until the CRD is established
+	err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+		localCrd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), noxuBetaDefinition.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		condition := findCRDCondition(localCrd, apiextensionsv1.Established)
+		if condition == nil {
+			return false, nil
+		}
+		if condition.Status == apiextensionsv1.ConditionTrue {
+			return true, nil
+		}
+		return false, nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
