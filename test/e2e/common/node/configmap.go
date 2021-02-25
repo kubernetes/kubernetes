@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"context"
@@ -31,7 +31,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGNodeDescribe("ConfigMap", func() {
+var _ = SIGDescribe("ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
 	/*
@@ -238,6 +238,21 @@ var _ = SIGNodeDescribe("ConfigMap", func() {
 	})
 })
 
+func newConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
+	return &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: f.Namespace.Name,
+			Name:      name,
+		},
+		Data: map[string]string{
+			"data-1": "value-1",
+			"data-2": "value-2",
+			"data-3": "value-3",
+		},
+	}
+}
+
+// TODO: Unify with newConfigMap
 func newEnvFromConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 	return &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

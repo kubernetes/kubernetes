@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"context"
@@ -38,7 +38,7 @@ const (
 	podTemplateRetryTimeout = 1 * time.Minute
 )
 
-var _ = SIGNodeDescribe("PodTemplates", func() {
+var _ = SIGDescribe("PodTemplates", func() {
 	f := framework.NewDefaultFramework("podtemplate")
 	/*
 	   Release: v1.19

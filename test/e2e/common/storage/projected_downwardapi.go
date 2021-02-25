@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package storage
 
 import (
 	"fmt"
@@ -32,7 +32,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGStorageDescribe("Projected downwardAPI", func() {
+var _ = SIGDescribe("Projected downwardAPI", func() {
 	f := framework.NewDefaultFramework("projected")
 
 	// How long to wait for a log pod to be displayed

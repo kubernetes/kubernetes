@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package storage
 
 import (
 	"context"
@@ -33,7 +33,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGStorageDescribe("Projected configMap", func() {
+var _ = SIGDescribe("Projected configMap", func() {
 	f := framework.NewDefaultFramework("projected")
 
 	/*

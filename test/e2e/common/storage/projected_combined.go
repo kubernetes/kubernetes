@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package storage
 
 import (
 	"context"
@@ -29,7 +29,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGStorageDescribe("Projected combined", func() {
+var _ = SIGDescribe("Projected combined", func() {
 	f := framework.NewDefaultFramework("projected")
 
 	// Test multiple projections

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package storage
 
 import (
 	"context"
@@ -42,7 +42,7 @@ var (
 	nonRootUID = int64(1001)
 )
 
-var _ = SIGStorageDescribe("EmptyDir volumes", func() {
+var _ = SIGDescribe("EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 
 	ginkgo.Context("when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup]", func() {
