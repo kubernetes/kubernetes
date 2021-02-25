@@ -29,9 +29,9 @@ func IsControlledBy(obj Object, owner Object) bool {
 	return ref.UID == owner.GetUID()
 }
 
-// GetControllerOf returns a pointer to a copy of the controllerRef if controllee has a controller
-func GetControllerOf(controllee Object) *OwnerReference {
-	ref := GetControllerOfNoCopy(controllee)
+// GetControllerOf returns a pointer to a copy of the controllerRef if controller has a controller
+func GetControllerOf(controller Object) *OwnerReference {
+	ref := GetControllerOfNoCopy(controller)
 	if ref == nil {
 		return nil
 	}
@@ -39,9 +39,9 @@ func GetControllerOf(controllee Object) *OwnerReference {
 	return &cp
 }
 
-// GetControllerOf returns a pointer to the controllerRef if controllee has a controller
-func GetControllerOfNoCopy(controllee Object) *OwnerReference {
-	refs := controllee.GetOwnerReferences()
+// GetControllerOf returns a pointer to the controllerRef if controller has a controller
+func GetControllerOfNoCopy(controller Object) *OwnerReference {
+	refs := controller.GetOwnerReferences()
 	for i := range refs {
 		if refs[i].Controller != nil && *refs[i].Controller {
 			return &refs[i]

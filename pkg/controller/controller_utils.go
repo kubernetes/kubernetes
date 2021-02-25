@@ -125,16 +125,16 @@ func StaticResyncPeriodFunc(resyncPeriod time.Duration) ResyncPeriodFunc {
 //	}
 //
 // Implementation:
-//	ControlleeExpectation = pair of atomic counters to track controllee's creation/deletion
-//	ControllerExpectationsStore = TTLStore + a ControlleeExpectation per controller
+//	ControllerExpectation = pair of atomic counters to track controller's creation/deletion
+//	ControllerExpectationsStore = TTLStore + a ControllerExpectation per controller
 //
 // * Once set expectations can only be lowered
 // * A controller isn't synced till its expectations are either fulfilled, or expire
-// * Controllers that don't set expectations will get woken up for every matching controllee
+// * Controllers that don't set expectations will get woken up for every matching controller
 
-// ExpKeyFunc to parse out the key from a ControlleeExpectation
+// ExpKeyFunc to parse out the key from a ControllerExpectation
 var ExpKeyFunc = func(obj interface{}) (string, error) {
-	if e, ok := obj.(*ControlleeExpectations); ok {
+	if e, ok := obj.(*ControllerExpectations); ok {
 		return e.key, nil
 	}
 	return "", fmt.Errorf("could not find key for obj %#v", obj)
@@ -145,7 +145,7 @@ var ExpKeyFunc = func(obj interface{}) (string, error) {
 // Warning: if using KeyFunc it is not safe to use a single ControllerExpectationsInterface with different
 // types of controllers, because the keys might conflict across types.
 type ControllerExpectationsInterface interface {
-	GetExpectations(controllerKey string) (*ControlleeExpectations, bool, error)
+	GetExpectations(controllerKey string) (*ControllerExpectations, bool, error)
 	SatisfiedExpectations(controllerKey string) bool
 	DeleteExpectations(controllerKey string)
 	SetExpectations(controllerKey string, add, del int) error
@@ -162,11 +162,11 @@ type ControllerExpectations struct {
 	cache.Store
 }
 
-// GetExpectations returns the ControlleeExpectations of the given controller.
-func (r *ControllerExpectations) GetExpectations(controllerKey string) (*ControlleeExpectations, bool, error) {
+// GetExpectations returns the ControllerExpectations of the given controller.
+func (r *ControllerExpectations) GetExpectations(controllerKey string) (*ControllerExpectations, bool, error) {
 	exp, exists, err := r.GetByKey(controllerKey)
 	if err == nil && exists {
-		return exp.(*ControlleeExpectations), true, nil
+		return exp.(*ControllerExpectations), true, nil
 	}
 	return nil, false, err
 }
@@ -181,7 +181,7 @@ func (r *ControllerExpectations) DeleteExpectations(controllerKey string) {
 }
 
 // SatisfiedExpectations returns true if the required adds/dels for the given controller have been observed.
-// Add/del counts are established by the controller at sync time, and updated as controllees are observed by the controller
+// Add/del counts are established by the controller at sync time, and updated as controllers are observed by the controller
 // manager.
 func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) bool {
 	if exp, exists, err := r.GetExpectations(controllerKey); exists {
@@ -200,9 +200,9 @@ func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) boo
 	} else {
 		// When a new controller is created, it doesn't have expectations.
 		// When it doesn't see expected watch events for > TTL, the expectations expire.
-		//	- In this case it wakes up, creates/deletes controllees, and sets expectations again.
-		// When it has satisfied expectations and no controllees need to be created/destroyed > TTL, the expectations expire.
-		//	- In this case it continues without setting expectations till it needs to create/delete controllees.
+		//	- In this case it wakes up, creates/deletes controllers, and sets expectations again.
+		// When it has satisfied expectations and no controllers need to be created/destroyed > TTL, the expectations expire.
+		//	- In this case it continues without setting expectations till it needs to create/delete controllers.
 		klog.V(4).Infof("Controller %v either never recorded expectations, or the ttl expired.", controllerKey)
 	}
 	// Trigger a sync if we either encountered and error (which shouldn't happen since we're
@@ -213,13 +213,13 @@ func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) boo
 // TODO: Extend ExpirationCache to support explicit expiration.
 // TODO: Make this possible to disable in tests.
 // TODO: Support injection of clock.
-func (exp *ControlleeExpectations) isExpired() bool {
+func (exp *ControllerExpectations) isExpired() bool {
 	return clock.RealClock{}.Since(exp.timestamp) > ExpectationsTimeout
 }
 
 // SetExpectations registers new expectations for the given controller. Forgets existing expectations.
 func (r *ControllerExpectations) SetExpectations(controllerKey string, add, del int) error {
-	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: clock.RealClock{}.Now()}
+	exp := &ControllerExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: clock.RealClock{}.Now()}
 	klog.V(4).Infof("Setting expectations %#v", exp)
 	return r.Add(exp)
 }
@@ -260,8 +260,8 @@ func (r *ControllerExpectations) DeletionObserved(controllerKey string) {
 	r.LowerExpectations(controllerKey, 0, 1)
 }
 
-// ControlleeExpectations track controllee creates/deletes.
-type ControlleeExpectations struct {
+// ControllerExpectations track controller creates/deletes.
+type ControllerExpectations struct {
 	// Important: Since these two int64 fields are using sync/atomic, they have to be at the top of the struct due to a bug on 32-bit platforms
 	// See: https://golang.org/pkg/sync/atomic/ for more information
 	add       int64
@@ -271,19 +271,19 @@ type ControlleeExpectations struct {
 }
 
 // Add increments the add and del counters.
-func (e *ControlleeExpectations) Add(add, del int64) {
+func (e *ControllerExpectations) Add(add, del int64) {
 	atomic.AddInt64(&e.add, add)
 	atomic.AddInt64(&e.del, del)
 }
 
 // Fulfilled returns true if this expectation has been fulfilled.
-func (e *ControlleeExpectations) Fulfilled() bool {
+func (e *ControllerExpectations) Fulfilled() bool {
 	// TODO: think about why this line being atomic doesn't matter
 	return atomic.LoadInt64(&e.add) <= 0 && atomic.LoadInt64(&e.del) <= 0
 }
 
-// GetExpectations returns the add and del expectations of the controllee.
-func (e *ControlleeExpectations) GetExpectations() (int64, int64) {
+// GetExpectations returns the add and del expectations of the controller.
+func (e *ControllerExpectations) GetExpectations() (int64, int64) {
 	return atomic.LoadInt64(&e.add), atomic.LoadInt64(&e.del)
 }
 
@@ -317,7 +317,7 @@ type UIDSet struct {
 type UIDTrackingControllerExpectations struct {
 	ControllerExpectationsInterface
 	// TODO: There is a much nicer way to do this that involves a single store,
-	// a lock per entry, and a ControlleeExpectationsInterface type.
+	// a lock per entry, and a ControllerExpectationsInterface type.
 	uidStoreLock sync.Mutex
 	// Store used for the UIDs associated with any expectation tracked via the
 	// ControllerExpectationsInterface.
