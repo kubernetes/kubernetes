@@ -130,6 +130,10 @@ var _ = SIGDescribe("ReplicaSet", func() {
 	framework.ConformanceIt("Replicaset should have a working scale subresource", func() {
 		testRSScaleSubresources(f)
 	})
+
+	ginkgo.It("ReplicaSet Replace and Patch tests", func() {
+		testRSLifeCycle(f)
+	})
 })
 
 // A basic test to check the deployment of an image using a ReplicaSet. The
@@ -419,4 +423,68 @@ func testRSScaleSubresources(f *framework.Framework) {
 	framework.ExpectNoError(err, "Failed to get replicaset resource: %v", err)
 	framework.ExpectEqual(*(rs.Spec.Replicas), int32(4), "replicaset should have 4 replicas")
 
+}
+
+// ReplicaSet Replace and Patch tests
+func testRSLifeCycle(f *framework.Framework) {
+	ns := f.Namespace.Name
+	c := f.ClientSet
+	zero := int64(0)
+
+	// Create webserver pods.
+	rsPodLabels := map[string]string{
+		"name": "sample-pod",
+		"pod":  WebserverImageName,
+	}
+
+	rsName := "test-rs"
+	replicas := int32(1)
+	rsPatchReplicas := int32(3)
+	rsPatchImage := imageutils.GetE2EImage(imageutils.Pause)
+
+	// Create a ReplicaSet
+	rs := newRS(rsName, replicas, rsPodLabels, WebserverImageName, WebserverImage, nil)
+	_, err := c.AppsV1().ReplicaSets(ns).Create(context.TODO(), rs, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+
+	// Verify that the required pods have come up.
+	err = e2epod.VerifyPodsRunning(c, ns, "sample-pod", false, replicas)
+	framework.ExpectNoError(err, "Failed to create pods: %s", err)
+
+	// Scale the ReplicaSet
+	ginkgo.By(fmt.Sprintf("Scaling up %q replicaset ", rsName))
+	_, err = e2ereplicaset.UpdateReplicaSetWithRetries(c, ns, rsName, func(update *appsv1.ReplicaSet) {
+		x := int32(2)
+		update.Spec.Replicas = &x
+	})
+	framework.ExpectNoError(err, "ReplicaSet fail to scale to %q replicasets")
+
+	// Patch the PeplicaSet
+	ginkgo.By("patching the ReplicaSet")
+	rsPatch, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"labels": map[string]string{"test-rs": "patched"},
+		},
+		"spec": map[string]interface{}{
+			"replicas": rsPatchReplicas,
+			"template": map[string]interface{}{
+				"spec": map[string]interface{}{
+					"TerminationGracePeriodSeconds": &zero,
+					"containers": [1]map[string]interface{}{{
+						"name":    rsName,
+						"image":   rsPatchImage,
+						"command": []string{"/bin/sleep", "100000"},
+					}},
+				},
+			},
+		},
+	})
+	framework.ExpectNoError(err, "failed to Marshal ReplicaSet JSON patch")
+	_, err = f.ClientSet.AppsV1().ReplicaSets(ns).Patch(context.TODO(), rsName, types.StrategicMergePatchType, []byte(rsPatch), metav1.PatchOptions{})
+	framework.ExpectNoError(err, "failed to patch ReplicaSet")
+
+	rs, err = c.AppsV1().ReplicaSets(ns).Get(context.TODO(), rsName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Failed to get replicaset resource: %v", err)
+	framework.ExpectEqual(*(rs.Spec.Replicas), rsPatchReplicas, "replicaset should have 3 replicas")
+	framework.ExpectEqual(rs.Spec.Template.Spec.Containers[0].Image, rsPatchImage, "replicaset not using rsPatchImage. Is using %v", rs.Spec.Template.Spec.Containers[0].Image)
 }
