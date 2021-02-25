@@ -148,6 +148,7 @@ type fakeJobControl struct {
 	Jobs          []batchv1.Job
 	DeleteJobName []string
 	Err           error
+	CreateErr     error
 	UpdateJobName []string
 	PatchJobName  []string
 	Patches       [][]byte
@@ -158,8 +159,8 @@ var _ jobControlInterface = &fakeJobControl{}
 func (f *fakeJobControl) CreateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
 	f.Lock()
 	defer f.Unlock()
-	if f.Err != nil {
-		return nil, f.Err
+	if f.CreateErr != nil {
+		return nil, f.CreateErr
 	}
 	job.SelfLink = fmt.Sprintf("/apis/batch/v1/namespaces/%s/jobs/%s", namespace, job.Name)
 	f.Jobs = append(f.Jobs, *job)

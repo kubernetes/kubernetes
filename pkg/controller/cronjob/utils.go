@@ -150,12 +150,11 @@ func getRecentUnmetScheduleTimes(cj batchv1beta1.CronJob, now time.Time) ([]time
 	return starts, nil
 }
 
-// getUnmetScheduleTimes gets the slice of all the missed times from the time a job
-// last was scheduled to up `now`.
-//
+// getNextScheduleTime gets the time of next schedule after last scheduled and before now
+//  it returns nil if no unmet schedule times.
 // If there are too many (>100) unstarted times, it will raise a warning and but still return
 // the list of missed times.
-func getUnmetScheduleTimes(cj batchv1beta1.CronJob, now time.Time, schedule cron.Schedule, recorder record.EventRecorder) []time.Time {
+func getNextScheduleTime(cj batchv1beta1.CronJob, now time.Time, schedule cron.Schedule, recorder record.EventRecorder) (*time.Time, error) {
 	starts := []time.Time{}
 
 	var earliestTime time.Time
@@ -179,19 +178,12 @@ func getUnmetScheduleTimes(cj batchv1beta1.CronJob, now time.Time, schedule cron
 		}
 	}
 	if earliestTime.After(now) {
-		return []time.Time{}
+		return nil, nil
 	}
 
-	// t := schedule.Next(earliestTime)
-	// t1 := schedule.Next(t)
-	// delta := t1 - t
-	// missed := now - earliestTime/delta
-	// last missed = earliestTime + delta * (missed - 1)
-	// TODO: @alpatel, convert the following for loop into above logic and add test cases
-	for t := schedule.Next(earliestTime); !t.After(now); t = schedule.Next(t) {
-		starts = append(starts, t)
-	}
-	if len(starts) > 100 {
+	t, numberOfMissedSchedules, err := getMostRecentScheduleTime(earliestTime, now, schedule)
+
+	if numberOfMissedSchedules > 100 {
 		// An object might miss several starts. For example, if
 		// controller gets wedged on friday at 5:01pm when everyone has
 		// gone home, and someone comes in on tuesday AM and discovers
@@ -212,7 +204,33 @@ func getUnmetScheduleTimes(cj batchv1beta1.CronJob, now time.Time, schedule cron
 		recorder.Eventf(&cj, corev1.EventTypeWarning, "TooManyMissedTimes", "too many missed start times: %d. Set or decrease .spec.startingDeadlineSeconds or check clock skew", len(starts))
 		klog.InfoS("too many missed times", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "missed times", len(starts))
 	}
-	return starts
+	return t, err
+}
+
+// getMostRecentScheduleTime returns the latest schedule time between earliestTime and the count of number of
+// schedules in between them
+func getMostRecentScheduleTime(earliestTime time.Time, now time.Time, schedule cron.Schedule) (*time.Time, int64, error) {
+	t1 := schedule.Next(earliestTime)
+	t2 := schedule.Next(t1)
+
+	if now.Before(t1) {
+		return nil, 0, nil
+	}
+	if now.Before(t2) {
+		return &t1, 1, nil
+	}
+
+	// It is possible for cron.ParseStandard("59 23 31 2 *") to return an invalid schedule
+	// seconds - 59, minute - 23, hour - 31 (?!)  dom - 2, and dow is optional, clearly 31 is invalid
+	// In this case the timeBetweenTwoSchedules will be 0, and we error out the invalid schedule
+	timeBetweenTwoSchedules := int64(t2.Sub(t1).Round(time.Second).Seconds())
+	if timeBetweenTwoSchedules < 1 {
+		return nil, 0, fmt.Errorf("time difference between two schedules less than 1 second")
+	}
+	timeElapsed := int64(now.Sub(t1).Seconds())
+	numberOfMissedSchedules := (timeElapsed / timeBetweenTwoSchedules) + 1
+	t := time.Unix(t1.Unix()+((numberOfMissedSchedules-1)*timeBetweenTwoSchedules), 0).UTC()
+	return &t, numberOfMissedSchedules, nil
 }
 
 // getJobFromTemplate makes a Job from a CronJob

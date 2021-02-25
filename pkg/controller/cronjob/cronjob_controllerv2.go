@@ -477,8 +477,15 @@ func (jm *ControllerV2) syncCronJob(
 		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "UnparseableSchedule", "unparseable schedule: %s : %s", cj.Spec.Schedule, err)
 		return cj, nil, nil
 	}
-	times := getUnmetScheduleTimes(*cj, now, sched, jm.recorder)
-	if len(times) == 0 {
+	scheduledTime, err := getNextScheduleTime(*cj, now, sched, jm.recorder)
+	if err != nil {
+		// this is likely a user error in defining the spec value
+		// we should log the error and not reconcile this cronjob until an update to spec
+		klog.V(2).InfoS("invalid schedule", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "schedule", cj.Spec.Schedule, "err", err)
+		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "InvalidSchedule", "invalid schedule schedule: %s : %s", cj.Spec.Schedule, err)
+		return cj, nil, nil
+	}
+	if scheduledTime == nil {
 		// no unmet start time, return cj,.
 		// The only time this should happen is if queue is filled after restart.
 		// Otherwise, the queue is always suppose to trigger sync function at the time of
@@ -488,7 +495,6 @@ func (jm *ControllerV2) syncCronJob(
 		return cj, t, nil
 	}
 
-	scheduledTime := times[len(times)-1]
 	tooLate := false
 	if cj.Spec.StartingDeadlineSeconds != nil {
 		tooLate = scheduledTime.Add(time.Second * time.Duration(*cj.Spec.StartingDeadlineSeconds)).Before(now)
@@ -509,9 +515,9 @@ func (jm *ControllerV2) syncCronJob(
 	}
 	if isJobInActiveList(&batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getJobName(cj, scheduledTime),
+			Name:      getJobName(cj, *scheduledTime),
 			Namespace: cj.Namespace,
-		}}, cj.Status.Active) || cj.Status.LastScheduleTime.Equal(&metav1.Time{Time: scheduledTime}) {
+		}}, cj.Status.Active) || cj.Status.LastScheduleTime.Equal(&metav1.Time{Time: *scheduledTime}) {
 		klog.V(4).InfoS("Not starting job because the scheduled time is already processed", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "schedule", scheduledTime)
 		t := nextScheduledTimeDuration(sched, now)
 		return cj, t, nil
@@ -546,7 +552,7 @@ func (jm *ControllerV2) syncCronJob(
 		}
 	}
 
-	jobReq, err := getJobFromTemplate2(cj, scheduledTime)
+	jobReq, err := getJobFromTemplate2(cj, *scheduledTime)
 	if err != nil {
 		klog.ErrorS(err, "Unable to make Job from template", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
 		return cj, nil, err
@@ -555,12 +561,15 @@ func (jm *ControllerV2) syncCronJob(
 	switch {
 	case errors.HasStatusCause(err, corev1.NamespaceTerminatingCause):
 	case errors.IsAlreadyExists(err):
+		// If the job is created by other actor, assume  it has updated the cronjob status accordingly
 		klog.InfoS("Job already exists", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "job", klog.KRef(jobReq.GetNamespace(), jobReq.GetName()))
+		return cj, nil, err
 	case err != nil:
 		// default error handling
 		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
 		return cj, nil, err
 	}
+
 	klog.V(4).InfoS("Created Job", "job", klog.KRef(jobResp.GetNamespace(), jobResp.GetName()), "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
 	jm.recorder.Eventf(cj, corev1.EventTypeNormal, "SuccessfulCreate", "Created job %v", jobResp.Name)
 
@@ -581,7 +590,7 @@ func (jm *ControllerV2) syncCronJob(
 		return cj, nil, fmt.Errorf("unable to make object reference for job for %s", klog.KRef(cj.GetNamespace(), cj.GetName()))
 	}
 	cj.Status.Active = append(cj.Status.Active, *jobRef)
-	cj.Status.LastScheduleTime = &metav1.Time{Time: scheduledTime}
+	cj.Status.LastScheduleTime = &metav1.Time{Time: *scheduledTime}
 	if _, err := jm.cronJobControl.UpdateStatus(cj); err != nil {
 		klog.InfoS("Unable to update status", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "resourceVersion", cj.ResourceVersion, "err", err)
 		return cj, nil, fmt.Errorf("unable to update status for %s (rv = %s): %v", klog.KRef(cj.GetNamespace(), cj.GetName()), cj.ResourceVersion, err)
