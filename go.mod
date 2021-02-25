@@ -26,7 +26,6 @@ require (
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/caddyserver/caddy v1.0.3
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
-	github.com/codegangsta/negroni v1.0.0 // indirect
 	github.com/container-storage-interface/spec v1.3.0
 	github.com/containernetworking/cni v0.8.0
 	github.com/coredns/corefile-migration v1.0.11
@@ -58,7 +57,6 @@ require (
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gnostic v0.4.1
-	github.com/gorilla/context v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/heketi/heketi v10.2.0+incompatible
 	github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6 // indirect
@@ -203,7 +201,6 @@ replace (
 	github.com/cilium/ebpf => github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775
 	github.com/clusterhq/flocker-go => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/cockroachdb/datadriven => github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa
-	github.com/codegangsta/negroni => github.com/codegangsta/negroni v1.0.0
 	github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.3.0
 	github.com/containerd/cgroups => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 	github.com/containerd/console => github.com/containerd/console v1.0.0
@@ -275,8 +272,6 @@ replace (
 	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 	github.com/golang/mock => github.com/golang/mock v1.4.4
 	github.com/golang/protobuf => github.com/golang/protobuf v1.4.3
-	github.com/golangplus/bytes => github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450
-	github.com/golangplus/fmt => github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	github.com/google/btree => github.com/google/btree v1.0.0
 	github.com/google/cadvisor => github.com/google/cadvisor v0.38.8
@@ -290,7 +285,6 @@ replace (
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
 	github.com/gophercloud/gophercloud => github.com/gophercloud/gophercloud v0.1.0
 	github.com/gopherjs/gopherjs => github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1
-	github.com/gorilla/context => github.com/gorilla/context v1.1.1
 	github.com/gorilla/mux => github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket => github.com/gorilla/websocket v1.4.2
 	github.com/gregjones/httpcache => github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7

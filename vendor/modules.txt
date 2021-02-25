@@ -225,9 +225,6 @@ github.com/cilium/ebpf/internal/unix
 github.com/clusterhq/flocker-go
 # github.com/clusterhq/flocker-go => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 # github.com/cockroachdb/datadriven => github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa
-# github.com/codegangsta/negroni v1.0.0 => github.com/codegangsta/negroni v1.0.0
-## explicit
-# github.com/codegangsta/negroni => github.com/codegangsta/negroni v1.0.0
 # github.com/container-storage-interface/spec v1.3.0 => github.com/container-storage-interface/spec v1.3.0
 ## explicit
 # github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.3.0
@@ -511,8 +508,6 @@ github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
-# github.com/golangplus/bytes => github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450
-# github.com/golangplus/fmt => github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995
 # github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 # github.com/google/btree v1.0.0 => github.com/google/btree v1.0.0
 github.com/google/btree
@@ -627,9 +622,6 @@ github.com/gophercloud/gophercloud/openstack/networking/v2/ports
 github.com/gophercloud/gophercloud/openstack/utils
 github.com/gophercloud/gophercloud/pagination
 # github.com/gopherjs/gopherjs => github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1
-# github.com/gorilla/context v1.1.1 => github.com/gorilla/context v1.1.1
-## explicit
-# github.com/gorilla/context => github.com/gorilla/context v1.1.1
 # github.com/gorilla/mux => github.com/gorilla/mux v1.8.0
 # github.com/gorilla/websocket v1.4.2 => github.com/gorilla/websocket v1.4.2
 github.com/gorilla/websocket
