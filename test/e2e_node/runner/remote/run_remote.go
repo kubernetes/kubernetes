@@ -237,6 +237,10 @@ func main() {
 		for shortName, imageConfig := range externalImageConfig.Images {
 			var image string
 			if (imageConfig.ImageRegex != "" || imageConfig.ImageFamily != "") && imageConfig.Image == "" {
+				// Just for testing if 89 is corrupted
+				if imageConfig.ImageFamily == "cos-89-lts" {
+					imageConfig.ImageFamily = "cos-85-lts"
+				}
 				image, err = getGCEImage(imageConfig.ImageRegex, imageConfig.ImageFamily, imageConfig.Project)
 				if err != nil {
 					klog.Fatalf("Could not retrieve a image based on image regex %q and family %q: %v",
