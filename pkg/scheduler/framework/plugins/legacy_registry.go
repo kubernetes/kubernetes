@@ -233,6 +233,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeports.Name, nil)
 			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, nodeports.Name, nil)
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeaffinity.Name, nil)
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, nodeaffinity.Name, nil)
 		})
 	registry.registerPredicateConfigProducer(PodToleratesNodeTaintsPred,
 		func(_ ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
@@ -259,6 +260,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 	registry.registerPredicateConfigProducer(MatchNodeSelectorPred,
 		func(_ ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeaffinity.Name, nil)
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, nodeaffinity.Name, nil)
 		})
 	registry.registerPredicateConfigProducer(CheckNodeUnschedulablePred,
 		func(_ ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
