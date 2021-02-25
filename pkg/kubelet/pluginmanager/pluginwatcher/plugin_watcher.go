@@ -159,7 +159,7 @@ func (w *Watcher) traversePluginDir(dir string) error {
 func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 	klog.V(6).Infof("Handling create event: %v", event)
 
-	fi, err := os.Stat(event.Name)
+	fi, err := os.Lstat(event.Name)
 	if err != nil {
 		return fmt.Errorf("stat file %s failed: %v", event.Name, err)
 	}
