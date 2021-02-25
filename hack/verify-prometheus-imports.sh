@@ -64,8 +64,6 @@ allowed_prometheus_importers=(
   ./staging/src/k8s.io/component-base/metrics/wrappers.go
   ./test/e2e/apimachinery/flowcontrol.go
   ./test/e2e/node/pods.go
-  ./test/e2e_node/dynamic_kubelet_config_test.go
-  ./test/e2e_node/resource_metrics_test.go
   ./test/instrumentation/main_test.go
   ./test/integration/apiserver/flowcontrol/concurrency_test.go
   ./test/integration/metrics/metrics_test.go

@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -37,6 +38,21 @@ var (
 	// QuantileLabel is label under which model.Sample stores latency quantile value
 	QuantileLabel model.LabelName = model.QuantileLabel
 )
+
+// Sample is model.Sample.
+type Sample model.Sample
+
+// NewSample returns new Sample which is initialized.
+func NewSample(kv map[string]string, value float64) *Sample {
+	m := model.Metric{}
+	for k, v := range kv {
+		m[model.LabelName(k)] = model.LabelValue(v)
+	}
+	return (*Sample)(&model.Sample{
+		Metric: m,
+		Value:  model.SampleValue(value),
+	})
+}
 
 // Metrics is generic metrics for other specific metrics
 type Metrics map[string]model.Samples
@@ -66,6 +82,19 @@ func (m *Metrics) Equal(o Metrics) bool {
 func NewMetrics() Metrics {
 	result := make(Metrics)
 	return result
+}
+
+// NewMetricsFromSample returns new Metrics which is initialized with Sample.
+func NewMetricsFromSample(kv map[string][]*Sample) Metrics {
+	m := Metrics{}
+	for key, samples := range kv {
+		s := model.Samples{}
+		for _, sample := range samples {
+			s = append(s, (*model.Sample)(sample))
+		}
+		m[key] = s
+	}
+	return m
 }
 
 // ParseMetrics parses Metrics from data returned from prometheus endpoint
@@ -153,6 +182,15 @@ func GetMetricValuesForLabel(ms Metrics, metricName, label string) map[string]in
 		result[dimensionName] = count
 	}
 	return result
+}
+
+// GetMetricLabelValue returns values of target labels in sample.
+func GetMetricLabelValue(sample *Sample, labels ...string) []string {
+	var value []string
+	for _, label := range labels {
+		value = append(value, string(sample.Metric[model.LabelName(label)]))
+	}
+	return value
 }
 
 // ValidateMetrics verifies if every sample of metric has all expected labels
@@ -432,4 +470,12 @@ func LabelsMatch(metric *dto.Metric, labelFilter map[string]string) bool {
 	}
 
 	return true
+}
+
+// GetModelTimeFunc returns a function which gets the local Time corresponding to the given model time.
+func GetModelTimeFunc(sec int64) interface{} {
+	return func(t model.Time) time.Time {
+		// model.Time is in Milliseconds since epoch
+		return time.Unix(sec, int64(t)*int64(time.Millisecond))
+	}
 }

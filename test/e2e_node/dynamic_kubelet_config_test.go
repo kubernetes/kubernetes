@@ -19,29 +19,25 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-base/metrics/testutil"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	controller "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	"github.com/prometheus/common/model"
-
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const itDescription = "status and events should match expectations"
@@ -1098,74 +1094,72 @@ func (tc *nodeConfigTestCase) checkConfigMetrics(f *framework.Framework) {
 		configErrorKey         = metrics.KubeletSubsystem + "_" + metrics.ConfigErrorKey
 	)
 	// local config helper
-	mkLocalSample := func(name model.LabelValue) *model.Sample {
-		return &model.Sample{
-			Metric: model.Metric(map[model.LabelName]model.LabelValue{
-				model.MetricNameLabel:                 name,
-				metrics.ConfigSourceLabelKey:          metrics.ConfigSourceLabelValueLocal,
-				metrics.ConfigUIDLabelKey:             "",
-				metrics.ConfigResourceVersionLabelKey: "",
-				metrics.KubeletConfigKeyLabelKey:      "",
-			}),
-			Value: 1,
+	mkLocalLabelValue := func(name string) map[string]string {
+		return map[string]string{
+			string(testutil.MetricNameLabel):      name,
+			metrics.ConfigSourceLabelKey:          metrics.ConfigSourceLabelValueLocal,
+			metrics.ConfigUIDLabelKey:             "",
+			metrics.ConfigResourceVersionLabelKey: "",
+			metrics.KubeletConfigKeyLabelKey:      "",
 		}
 	}
 	// remote config helper
-	mkRemoteSample := func(name model.LabelValue, source *v1.NodeConfigSource) *model.Sample {
-		return &model.Sample{
-			Metric: model.Metric(map[model.LabelName]model.LabelValue{
-				model.MetricNameLabel:                 name,
-				metrics.ConfigSourceLabelKey:          model.LabelValue(fmt.Sprintf("/api/v1/namespaces/%s/configmaps/%s", source.ConfigMap.Namespace, source.ConfigMap.Name)),
-				metrics.ConfigUIDLabelKey:             model.LabelValue(source.ConfigMap.UID),
-				metrics.ConfigResourceVersionLabelKey: model.LabelValue(source.ConfigMap.ResourceVersion),
-				metrics.KubeletConfigKeyLabelKey:      model.LabelValue(source.ConfigMap.KubeletConfigKey),
-			}),
-			Value: 1,
+	mkRemoteLabelValue := func(name string, source *v1.NodeConfigSource) map[string]string {
+		return map[string]string{
+			string(testutil.MetricNameLabel):      name,
+			metrics.ConfigSourceLabelKey:          fmt.Sprintf("/api/v1/namespaces/%s/configmaps/%s", source.ConfigMap.Namespace, source.ConfigMap.Name),
+			metrics.ConfigUIDLabelKey:             string(source.ConfigMap.UID),
+			metrics.ConfigResourceVersionLabelKey: source.ConfigMap.ResourceVersion,
+			metrics.KubeletConfigKeyLabelKey:      source.ConfigMap.KubeletConfigKey,
 		}
 	}
 	// error helper
-	mkErrorSample := func(expectError bool) *model.Sample {
-		v := model.SampleValue(0)
-		if expectError {
-			v = model.SampleValue(1)
-		}
-		return &model.Sample{
-			Metric: model.Metric(map[model.LabelName]model.LabelValue{model.MetricNameLabel: configErrorKey}),
-			Value:  v,
+	mkErrorLabelValue := func(expectError bool) map[string]string {
+		return map[string]string{
+			string(testutil.MetricNameLabel): configErrorKey,
 		}
 	}
 	// construct expected metrics
 	// assigned
-	assignedSamples := model.Samples{mkLocalSample(assignedConfigKey)}
+	assignedLabelValue := mkLocalLabelValue(assignedConfigKey)
 	assignedSource := tc.configSource.DeepCopy()
 	if assignedSource != nil && assignedSource.ConfigMap != nil {
 		assignedSource.ConfigMap.UID = tc.configMap.UID
 		assignedSource.ConfigMap.ResourceVersion = tc.configMap.ResourceVersion
-		assignedSamples = model.Samples{mkRemoteSample(assignedConfigKey, assignedSource)}
+		assignedLabelValue = mkRemoteLabelValue(assignedConfigKey, assignedSource)
 	}
+	assignedSample := testutil.NewSample(assignedLabelValue, 1)
 	// last-known-good
-	lastKnownGoodSamples := model.Samples{mkLocalSample(lastKnownGoodConfigKey)}
+	lastKnownGoodLabelValue := mkLocalLabelValue(lastKnownGoodConfigKey)
 	lastKnownGoodSource := tc.expectConfigStatus.lastKnownGood
 	if lastKnownGoodSource != nil && lastKnownGoodSource.ConfigMap != nil {
-		lastKnownGoodSamples = model.Samples{mkRemoteSample(lastKnownGoodConfigKey, lastKnownGoodSource)}
+		lastKnownGoodLabelValue = mkRemoteLabelValue(lastKnownGoodConfigKey, lastKnownGoodSource)
 	}
+	lastKnownGoodSample := testutil.NewSample(lastKnownGoodLabelValue, 1)
 	// active
-	activeSamples := model.Samples{mkLocalSample(activeConfigKey)}
+	activeLabelValue := mkLocalLabelValue(activeConfigKey)
 	activeSource := assignedSource
 	if tc.expectConfigStatus.lkgActive {
 		activeSource = lastKnownGoodSource
 	}
 	if activeSource != nil && activeSource.ConfigMap != nil {
-		activeSamples = model.Samples{mkRemoteSample(activeConfigKey, activeSource)}
+		activeLabelValue = mkRemoteLabelValue(activeConfigKey, activeSource)
 	}
+	activeSample := testutil.NewSample(activeLabelValue, 1)
 	// error
-	errorSamples := model.Samples{mkErrorSample(len(tc.expectConfigStatus.err) > 0)}
+	expectError := len(tc.expectConfigStatus.err) > 0
+	errorLabelValue := mkErrorLabelValue(expectError)
+	errorValue := 0
+	if expectError {
+		errorValue = 1
+	}
+	errorSample := testutil.NewSample(errorLabelValue, float64(errorValue))
 	// expected metrics
-	expect := e2emetrics.KubeletMetrics(map[string]model.Samples{
-		assignedConfigKey:      assignedSamples,
-		activeConfigKey:        activeSamples,
-		lastKnownGoodConfigKey: lastKnownGoodSamples,
-		configErrorKey:         errorSamples,
+	expect := testutil.NewMetricsFromSample(map[string][]*testutil.Sample{
+		assignedConfigKey:      {assignedSample},
+		activeConfigKey:        {activeSample},
+		lastKnownGoodConfigKey: {lastKnownGoodSample},
+		configErrorKey:         {errorSample},
 	})
 	// wait for expected metrics to appear
 	gomega.Eventually(func() error {
@@ -1185,7 +1179,7 @@ func (tc *nodeConfigTestCase) checkConfigMetrics(f *framework.Framework) {
 			}
 		}
 		// compare to expected
-		if !reflect.DeepEqual(expect, actual) {
+		if !expect.Equal(testutil.Metrics(actual)) {
 			return fmt.Errorf("checkConfigMetrics: case: %s: expect metrics %s but got %s", tc.desc, spew.Sprintf("%#v", expect), spew.Sprintf("%#v", actual))
 		}
 		return nil
