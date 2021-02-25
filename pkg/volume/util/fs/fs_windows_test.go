@@ -21,8 +21,9 @@ import (
 	"io/ioutil"
 	"os"
 
-	"k8s.io/apimachinery/pkg/api/resource"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func TestDiskUsage(t *testing.T) {
@@ -54,8 +55,8 @@ func TestDiskUsage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
-	file1 := dir1 + "/" + "test"
-	file2 := dir2 + "/" + "test"
+	file1 := tmpfile1.Name()
+	file2 := tmpfile2.Name()
 	fileInfo1, err := os.Lstat(file1)
 	if err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
@@ -74,8 +75,7 @@ func TestDiskUsage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
-	if size.Cmp(used) != 1 {
-		t.Fatalf("TestDiskUsage failed: %s", err.Error())
+	if size.Cmp(used) != 0 {
+		t.Fatalf("TestDiskUsage failed: expected 0, got %d", size.Cmp(used))
 	}
-
 }
