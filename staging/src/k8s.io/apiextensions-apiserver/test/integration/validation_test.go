@@ -19,6 +19,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"path"
 	"strings"
 	"testing"
 	"time"
@@ -27,11 +28,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	clientschema "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
@@ -698,8 +701,7 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 }
 
 func TestNonStructuralSchemaConditionUpdate(t *testing.T) {
-	t.Skip("non-structural schemas can no longer be created")
-	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
+	tearDown, apiExtensionClient, _, etcdclient, etcdStoragePrefix, err := fixtures.StartDefaultServerWithClientsAndEtcd(t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -735,16 +737,26 @@ spec:
 	if err != nil {
 		t.Fatalf("failed decoding of: %v\n\n%s", err, manifest)
 	}
-	crd := obj.(*apiextensionsv1.CustomResourceDefinition)
-	name := crd.Name
+	betaCRD := obj.(*apiextensionsv1beta1.CustomResourceDefinition)
+	name := betaCRD.Name
 
 	// save schema for later
-	origSchema := crd.Spec.Versions[0].Schema.OpenAPIV3Schema
+	origSchema := &apiextensionsv1.JSONSchemaProps{
+		Type: "object",
+		Properties: map[string]apiextensionsv1.JSONSchemaProps{
+			"a": apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+			},
+		},
+	}
 
-	// create CRDs
-	t.Logf("Creating CRD %s", crd.Name)
-	if _, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("unexpected create error: %v", err)
+	// create CRDs.  We cannot create these in v1, but they can exist in upgraded clusters
+	t.Logf("Creating CRD %s", betaCRD.Name)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
+	key := path.Join("/", etcdStoragePrefix, "apiextensions.k8s.io", "customresourcedefinitions/foos.tests.example.com")
+	val, _ := json.Marshal(betaCRD)
+	if _, err := etcdclient.Put(ctx, key, string(val)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// wait for condition with violations
@@ -768,24 +780,22 @@ spec:
 		t.Fatalf("expected violation %q, but got: %v", v, cond.Message)
 	}
 
-	// remove schema
-	t.Log("Remove schema")
+	t.Log("fix schema")
 	for retry := 0; retry < 5; retry++ {
-		// This patch fixes two fields to resolve
-		// 1. property type validation error
-		// 2. preserveUnknownFields validation error
-		patch := []byte("[{\"op\":\"add\",\"path\":\"/spec/validation/openAPIV3Schema/properties/a/type\",\"value\":\"int\"}," +
-			"{\"op\":\"replace\",\"path\":\"/spec/preserveUnknownFields\",\"value\":false}]")
-		if _, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(context.TODO(), name, types.JSONPatchType, patch, metav1.PatchOptions{}); apierrors.IsConflict(err) {
+		crd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		crd.Spec.Versions[0].Schema = fixtures.AllowAllSchema()
+		crd.Spec.PreserveUnknownFields = false
+		_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
+		if apierrors.IsConflict(err) {
 			continue
 		}
 		if err != nil {
-			t.Fatalf("unexpected update error: %v", err)
+			t.Fatal(err)
 		}
 		break
-	}
-	if err != nil {
-		t.Fatalf("unexpected update error: %v", err)
 	}
 
 	// wait for condition to go away
@@ -805,7 +815,7 @@ spec:
 	// re-add schema
 	t.Log("Re-add schema")
 	for retry := 0; retry < 5; retry++ {
-		crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+		crd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("unexpected get error: %v", err)
 		}
@@ -814,33 +824,13 @@ spec:
 		if _, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{}); apierrors.IsConflict(err) {
 			continue
 		}
-		if err != nil {
-			t.Fatalf("unexpected update error: %v", err)
+		if err == nil {
+			t.Fatalf("missing error")
+		}
+		if !strings.Contains(err.Error(), "spec.preserveUnknownFields") {
+			t.Fatal(err)
 		}
 		break
-	}
-	if err != nil {
-		t.Fatalf("unexpected update error: %v", err)
-	}
-
-	// wait for condition with violations
-	t.Log("Wait for condition to reappear")
-	err = wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		cond = findCRDCondition(obj, apiextensionsv1.NonStructuralSchema)
-		return cond != nil, nil
-	})
-	if err != nil {
-		t.Fatalf("unexpected error waiting for NonStructuralSchema condition: %v", cond)
-	}
-	if v := "spec.versions[0].schema.openAPIV3Schema.properties[a].type: Required value: must not be empty for specified object fields"; !strings.Contains(cond.Message, v) {
-		t.Fatalf("expected violation %q, but got: %v", v, cond.Message)
-	}
-	if v := "spec.preserveUnknownFields: Invalid value: true: must be false"; !strings.Contains(cond.Message, v) {
-		t.Fatalf("expected violation %q, but got: %v", v, cond.Message)
 	}
 }
 
