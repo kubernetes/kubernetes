@@ -27,8 +27,6 @@ import (
 	"testing"
 	"time"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -44,6 +42,7 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -336,10 +335,8 @@ func validateNonTrivialConverted(t *testing.T, ctc *conversionTestContext) {
 			client := ctc.versionedClient(ns, createVersion.Name)
 
 			fixture := newConversionMultiVersionFixture(ns, name, createVersion.Name)
-			if createVersion.Schema.OpenAPIV3Schema.XPreserveUnknownFields == nil || !*createVersion.Schema.OpenAPIV3Schema.XPreserveUnknownFields {
-				if err := unstructured.SetNestedField(fixture.Object, "foo", "garbage"); err != nil {
-					t.Fatal(err)
-				}
+			if err := unstructured.SetNestedField(fixture.Object, "foo", "garbage"); err != nil {
+				t.Fatal(err)
 			}
 			if _, err := client.Create(context.TODO(), fixture, metav1.CreateOptions{}); err != nil {
 				t.Fatal(err)
@@ -394,10 +391,8 @@ func validateNonTrivialConvertedList(t *testing.T, ctc *conversionTestContext) {
 		name := "converted-" + createVersion.Name
 		client := ctc.versionedClient(ns, createVersion.Name)
 		fixture := newConversionMultiVersionFixture(ns, name, createVersion.Name)
-		if createVersion.Schema.OpenAPIV3Schema.XPreserveUnknownFields == nil || !*createVersion.Schema.OpenAPIV3Schema.XPreserveUnknownFields {
-			if err := unstructured.SetNestedField(fixture.Object, "foo", "garbage"); err != nil {
-				t.Fatal(err)
-			}
+		if err := unstructured.SetNestedField(fixture.Object, "foo", "garbage"); err != nil {
+			t.Fatal(err)
 		}
 		_, err := client.Create(context.TODO(), fixture, metav1.CreateOptions{})
 		if err != nil {
@@ -432,9 +427,6 @@ func validateStoragePruning(t *testing.T, ctc *conversionTestContext) {
 	ns := ctc.namespace
 
 	for _, createVersion := range ctc.crd.Spec.Versions {
-		if createVersion.Schema.OpenAPIV3Schema.XPreserveUnknownFields == nil || !*createVersion.Schema.OpenAPIV3Schema.XPreserveUnknownFields {
-			continue
-		}
 		t.Run(fmt.Sprintf("getting objects created as %s", createVersion.Name), func(t *testing.T) {
 			name := "storagepruning-" + createVersion.Name
 			client := ctc.versionedClient(ns, createVersion.Name)

@@ -22,8 +22,6 @@ import (
 	"time"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -47,7 +45,7 @@ func TestAPIApproval(t *testing.T) {
 
 	newSigKubeAPIFn := func(resource, approvalAnnotation string) *apiextensionsv1.CustomResourceDefinition {
 		return &apiextensionsv1.CustomResourceDefinition{
-			ObjectMeta: metav1.ObjectMeta{Name: resource + ".sigs.k8s.io", Annotations: map[string]string{apiextensionsv1beta1.KubeAPIApprovedAnnotation: approvalAnnotation}},
+			ObjectMeta: metav1.ObjectMeta{Name: resource + ".sigs.k8s.io", Annotations: map[string]string{apiextensionsv1.KubeAPIApprovedAnnotation: approvalAnnotation}},
 			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 				Group: "sigs.k8s.io",
 				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{

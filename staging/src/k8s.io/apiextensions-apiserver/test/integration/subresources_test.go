@@ -388,7 +388,6 @@ func TestValidationSchemaWithStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// fields other than properties in root schema are not allowed
 	noxuDefinition := newNoxuValidationCRDs()[0]
 
 	// make sure we are not restricting fields to properties even in subschemas
@@ -457,12 +456,10 @@ func TestValidateOnlyStatus(t *testing.T) {
 	noxuDefinitions := NewNoxuSubresourcesCRDs(apiextensionsv1.NamespaceScoped)
 	for _, noxuDefinition := range noxuDefinitions {
 		noxuDefinition.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{
-			OpenAPIV3Schema: schema,
+			OpenAPIV3Schema: schema.DeepCopy(),
 		}
-		schemaWithDescription := schema.DeepCopy()
-		schemaWithDescription.Description = "test"
 		noxuDefinition.Spec.Versions[1].Schema = &apiextensionsv1.CustomResourceValidation{
-			OpenAPIV3Schema: schemaWithDescription,
+			OpenAPIV3Schema: schema.DeepCopy(),
 		}
 
 		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)

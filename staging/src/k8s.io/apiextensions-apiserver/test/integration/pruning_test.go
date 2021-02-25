@@ -41,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/utils/pointer"
 
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -62,8 +61,7 @@ var pruningFixture = &apiextensionsv1.CustomResourceDefinition{
 				},
 				Schema: &apiextensionsv1.CustomResourceValidation{
 					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-						XPreserveUnknownFields: pointer.BoolPtr(false),
-						Type:                   "object",
+						Type: "object",
 					},
 				},
 			},

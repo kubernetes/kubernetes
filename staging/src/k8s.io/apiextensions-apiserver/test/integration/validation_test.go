@@ -647,21 +647,24 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			// v1 doesn't allow additional properties at all. this isn't necessary in v1.
-			//validationSchema.OpenAPIV3Schema.AdditionalProperties.Allows = false
-			//_, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
-			//if err == nil {
-			//	t.Fatalf("unexpected non-error: additionalProperties cannot be set to false")
-			//}
+			existingProperties := validationSchema.OpenAPIV3Schema.Properties
+			validationSchema.OpenAPIV3Schema.Properties = nil
+			validationSchema.OpenAPIV3Schema.AdditionalProperties = &apiextensionsv1.JSONSchemaPropsOrBool{Allows: false}
+			_, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+			if err == nil {
+				t.Fatalf("unexpected non-error: additionalProperties cannot be set to false")
+			}
+			// reset
+			validationSchema.OpenAPIV3Schema.Properties = existingProperties
+			validationSchema.OpenAPIV3Schema.AdditionalProperties = nil
 
 			validationSchema.OpenAPIV3Schema.Properties["zeta"] = apiextensionsv1.JSONSchemaProps{
 				Type:        "array",
 				UniqueItems: true,
+				AdditionalProperties: &apiextensionsv1.JSONSchemaPropsOrBool{
+					Allows: true,
+				},
 			}
-
-			// v1 doesn't allow additional properties at all. this isn't necessary in v1.
-			//validationSchema.OpenAPIV3Schema.AdditionalProperties.Allows = true
-
 			_, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 			if err == nil {
 				t.Fatalf("unexpected non-error: uniqueItems cannot be set to true")
