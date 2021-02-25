@@ -235,9 +235,9 @@ var _ = SIGDescribe("KubeProxy", func() {
 			return false, fmt.Errorf("wrong TCP CLOSE_WAIT timeout: %v expected: %v", timeoutSeconds, expectedTimeoutSeconds)
 		}); err != nil {
 			// Dump all conntrack entries for debugging
-			result, err := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "conntrack -L")
-			if err != nil {
-				framework.Logf("failed to obtain conntrack entry: %v %v", result, err)
+			result, err2 := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "conntrack -L")
+			if err2 != nil {
+				framework.Logf("failed to obtain conntrack entry: %v %v", result, err2)
 			}
 			framework.Logf("conntrack entries for node %v:  %v", serverNodeInfo.nodeIP, result)
 			framework.Failf("no valid conntrack entry for port %d on node %s: %v", testDaemonTCPPort, serverNodeInfo.nodeIP, err)
