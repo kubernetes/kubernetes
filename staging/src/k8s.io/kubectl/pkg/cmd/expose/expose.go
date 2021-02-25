@@ -129,7 +129,7 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP|SCTP] [--target-port=number-or-name] [--name=name] [--external-ip=external-ip-of-service] [--type=type]",
+		Use:                   "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP|SCTP] [--target-port=number-or-name] [--node-port=number] [--name=name] [--external-ip=external-ip-of-service] [--type=type]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service"),
 		Long:                  exposeLong,
@@ -154,6 +154,7 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	cmd.Flags().String("container-port", "", i18n.T("Synonym for --target-port"))
 	cmd.Flags().MarkDeprecated("container-port", "--container-port will be removed in the future, please use --target-port instead")
 	cmd.Flags().String("target-port", "", i18n.T("Name or number for the port on the container that the service should direct traffic to. Optional."))
+	cmd.Flags().String("node-port", "", i18n.T("Port used to expose the service on each node in a cluster."))
 	cmd.Flags().String("external-ip", "", i18n.T("Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."))
 	cmd.Flags().String("overrides", "", i18n.T("An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."))
 	cmd.Flags().String("name", "", i18n.T("The name for the newly created object."))

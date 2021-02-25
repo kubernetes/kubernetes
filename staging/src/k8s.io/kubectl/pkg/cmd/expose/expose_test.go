@@ -630,6 +630,45 @@ func TestRunExposeService(t *testing.T) {
 			expected: "namespace: testns",
 			status:   200,
 		},
+		{
+			name: "multiple-nodeports",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "80,81", "name": "foo", "labels": "svc=test", "type": "NodePort", "node-port": "30080,30081", "dry-run": "client", "output": "yaml"},
+			output: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol:   corev1.ProtocolUDP,
+							Port:       80,
+							TargetPort: intstr.FromInt(80),
+							NodePort:   30080,
+						},
+						{
+							Protocol:   corev1.ProtocolUDP,
+							Port:       81,
+							TargetPort: intstr.FromInt(81),
+							NodePort:   30081,
+						},
+					},
+					Selector: map[string]string{"func": "stream"},
+					Type:     corev1.ServiceTypeNodePort,
+				},
+			},
+			expected: "  ports:\n  - name: port-1\n    nodePort: 30080\n    port: 80\n    protocol: UDP\n    targetPort: 80\n  - name: port-2\n    nodePort: 30081\n    port: 81\n    protocol: UDP\n    targetPort: 81",
+			status:   200,
+		},
 	}
 
 	for _, test := range tests {

@@ -71,6 +71,7 @@ func paramNames() []generate.GeneratorParam {
 		{Name: "protocols", Required: false},
 		{Name: "container-port", Required: false}, // alias of target-port
 		{Name: "target-port", Required: false},
+		{Name: "node-port", Required: false},
 		{Name: "port-name", Required: false},
 		{Name: "session-affinity", Required: false},
 		{Name: "cluster-ip", Required: false},
@@ -208,6 +209,19 @@ func generateService(genericParams map[string]interface{}) (runtime.Object, erro
 		for i := range service.Spec.Ports {
 			port := service.Spec.Ports[i].Port
 			service.Spec.Ports[i].TargetPort = intstr.FromInt(int(port))
+		}
+	}
+	if len(params["node-port"]) > 0 {
+		nodePortStringSlice := strings.Split(params["node-port"], ",")
+		if len(service.Spec.Ports) != len(nodePortStringSlice) {
+			return nil, fmt.Errorf("the quantity of ports(%d) should be equal to nodePorts(%d)", len(service.Spec.Ports), len(nodePortStringSlice))
+		}
+		for i, stillNodePortString := range nodePortStringSlice {
+			port, err := strconv.Atoi(stillNodePortString)
+			if err != nil {
+				return nil, err
+			}
+			service.Spec.Ports[i].NodePort = int32(port)
 		}
 	}
 	if len(params["external-ip"]) > 0 {

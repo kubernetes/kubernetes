@@ -294,7 +294,7 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericclioptions.
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmd.Flags().IntVar(&o.NodePort, "node-port", o.NodePort, "Port used to expose the service on each node in a cluster.")
+	cmd.Flags().IntVar(&o.NodePort, "node-port", o.NodePort, i18n.T("Port used to expose the service on each node in a cluster."))
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	cmd.Flags().StringSliceVar(&o.TCP, "tcp", o.TCP, "Port pairs can be specified as '<port>:<targetPort>'.")
 	cmdutil.AddDryRunFlag(cmd)
