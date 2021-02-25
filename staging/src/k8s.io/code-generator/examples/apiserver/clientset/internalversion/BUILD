@@ -16,6 +16,7 @@ go_library(
         "//staging/src/k8s.io/code-generator/examples/apiserver/clientset/internalversion/typed/example/internalversion:go_default_library",
         "//staging/src/k8s.io/code-generator/examples/apiserver/clientset/internalversion/typed/example2/internalversion:go_default_library",
         "//staging/src/k8s.io/code-generator/examples/apiserver/clientset/internalversion/typed/example3.io/internalversion:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

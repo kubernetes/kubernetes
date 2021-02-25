@@ -56,6 +56,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/typed/storage/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

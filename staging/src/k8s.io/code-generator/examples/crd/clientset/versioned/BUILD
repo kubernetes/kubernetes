@@ -15,6 +15,7 @@ go_library(
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/code-generator/examples/crd/clientset/versioned/typed/example/v1:go_default_library",
         "//staging/src/k8s.io/code-generator/examples/crd/clientset/versioned/typed/example2/v1:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
