@@ -744,7 +744,7 @@ spec:
 	origSchema := &apiextensionsv1.JSONSchemaProps{
 		Type: "object",
 		Properties: map[string]apiextensionsv1.JSONSchemaProps{
-			"a": apiextensionsv1.JSONSchemaProps{
+			"a": {
 				Type: "object",
 			},
 		},
@@ -1712,10 +1712,6 @@ func toValidationJSON(yml string) string {
 }
 
 func float64Ptr(f float64) *float64 {
-	return &f
-}
-
-func int64Ptr(f int64) *int64 {
 	return &f
 }
 
