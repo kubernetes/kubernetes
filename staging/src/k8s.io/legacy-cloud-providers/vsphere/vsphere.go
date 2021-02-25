@@ -411,6 +411,9 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 			klog.Error(msg)
 			return nil, errors.New(msg)
 		}
+		if len(cfg.VirtualCenter) > 1 {
+			klog.Warning("Multi vCenter support is deprecated. vSphere CSI Driver does not support Kubernetes nodes spread across multiple vCenter servers. Please consider moving all Kubernetes nodes to single vCenter server")
+		}
 
 		for vcServer, vcConfig := range cfg.VirtualCenter {
 			klog.V(4).Infof("Initializing vc server %s", vcServer)
