@@ -40,7 +40,7 @@ limitations under the License.
 // GlusterFS test is duplicated from test/e2e/volumes.go.  Any changes made there
 // should be duplicated here
 
-package common
+package storage
 
 import (
 	"context"
@@ -56,10 +56,9 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-// These tests need privileged containers, which are disabled by default.  Run
-// tests with "--ginkgo.focus=[Feature:Volumes]"
-var _ = SIGStorageDescribe("GCP Volumes", func() {
-	f := framework.NewDefaultFramework("gcp-volume")
+// TODO(#99468): Check if these tests are still needed.
+var _ = SIGDescribe("Volumes", func() {
+	f := framework.NewDefaultFramework("volume")
 
 	// note that namespace deletion is handled by delete-namespace flag
 	// filled in BeforeEach
