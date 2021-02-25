@@ -487,7 +487,9 @@ func (o *CopyOptions) untarAll(src fileSpec, reader io.Reader, destDir, prefix s
 			return err
 		}
 		defer outFile.Close()
-		if _, err := io.Copy(outFile, tarReader); err != nil {
+		//give a reading limitation to each tar file, to avoid unsafe tar
+		limit := io.LimitReader(tarReader, header.Size*64)
+		if _, err = io.Copy(outFile, limit); err != nil {
 			return err
 		}
 		if err := outFile.Close(); err != nil {
