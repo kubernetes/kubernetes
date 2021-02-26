@@ -1,6 +1,4 @@
 cluster/images/etcd/migrate
-pkg/controller/replicaset
-pkg/kubelet/dockershim
 vendor/k8s.io/apimachinery/pkg/api/apitesting/roundtrip
 vendor/k8s.io/apimachinery/pkg/apis/meta/v1/validation
 vendor/k8s.io/apimachinery/pkg/runtime/serializer/json
