@@ -56,6 +56,7 @@ import (
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -731,7 +732,7 @@ func getEndpointNodesWithInternalIP(jig *e2eservice.TestJig) (map[string]string,
 	return endpointsNodeMap, nil
 }
 
-var _ = SIGDescribe("Services", func() {
+var _ = common.SIGDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var cs clientset.Interface
@@ -2622,7 +2623,7 @@ func restartComponent(cs clientset.Interface, cName, ns string, matchLabels map[
 	return err
 }
 
-var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
+var _ = common.SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("sctp")
 
 	var cs clientset.Interface

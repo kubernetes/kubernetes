@@ -31,10 +31,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var _ = SIGDescribe("HostPort", func() {
+var _ = common.SIGDescribe("HostPort", func() {
 
 	f := framework.NewDefaultFramework("hostport")
 

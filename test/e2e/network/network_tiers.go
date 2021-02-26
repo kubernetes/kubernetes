@@ -32,12 +32,13 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("Services [Slow]", func() {
+var _ = common.SIGDescribe("Services [Slow]", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var cs clientset.Interface

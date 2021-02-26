@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -179,7 +180,7 @@ func iperf2ClientDaemonSet(client clientset.Interface, namespace string) (*appsv
 //     would require n^2 tests, n^2 time, and n^2 network resources which quickly become prohibitively large
 //     as the cluster size increases.
 //   Finally, after collecting all data, the results are analyzed and tabulated.
-var _ = SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]", func() {
+var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]", func() {
 	// this test runs iperf2: one pod as a server, and a daemonset of clients
 	f := framework.NewDefaultFramework("network-perf")
 

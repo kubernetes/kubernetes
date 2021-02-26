@@ -40,7 +40,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-
+	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilnet "k8s.io/utils/net"
 )
@@ -59,7 +59,7 @@ type protocolPort struct {
 	protocol v1.Protocol
 }
 
-var _ = SIGDescribeCopy("NetworkPolicy [LinuxOnly]", func() {
+var _ = common.SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 	var service *v1.Service
 	var podServer *v1.Pod
 	var podServerLabelSelector string
@@ -1725,7 +1725,7 @@ var _ = SIGDescribeCopy("NetworkPolicy [LinuxOnly]", func() {
 	})
 })
 
-var _ = SIGDescribeCopy("NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive]", func() {
+var _ = common.SIGDescribe("NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive]", func() {
 	var service *v1.Service
 	var podServer *v1.Pod
 	var podServerLabelSelector string
@@ -2181,7 +2181,7 @@ func cleanupNetworkPolicy(f *framework.Framework, policy *networkingv1.NetworkPo
 	}
 }
 
-var _ = SIGDescribeCopy("NetworkPolicy API", func() {
+var _ = common.SIGDescribe("NetworkPolicy API", func() {
 	f := framework.NewDefaultFramework("networkpolicies")
 	/*
 		Release: v1.20

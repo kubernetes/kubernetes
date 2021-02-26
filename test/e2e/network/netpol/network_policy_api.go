@@ -30,9 +30,10 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/network/common"
 )
 
-var _ = SIGDescribeCopy("Netpol API", func() {
+var _ = common.SIGDescribe("Netpol API", func() {
 	f := framework.NewDefaultFramework("netpol")
 	/*
 		Release: v1.20

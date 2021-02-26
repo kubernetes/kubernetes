@@ -33,6 +33,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -63,7 +64,7 @@ const (
 // Ref: https://api.semanticscholar.org/CorpusID:198903401
 // Boye, Magnus. "Netfilter Connection Tracking and NAT Implementation." (2012).
 
-var _ = SIGDescribe("Conntrack", func() {
+var _ = common.SIGDescribe("Conntrack", func() {
 
 	fr := framework.NewDefaultFramework("conntrack")
 

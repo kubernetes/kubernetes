@@ -20,7 +20,6 @@ go_library(
         "example_cluster_dns.go",
         "firewall.go",
         "fixture.go",
-        "framework.go",
         "hostport.go",
         "ingress.go",
         "ingress_scale.go",
@@ -89,6 +88,7 @@ go_library(
         "//test/e2e/framework/service:go_default_library",
         "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
+        "//test/e2e/network/common:go_default_library",
         "//test/e2e/network/netpol:go_default_library",
         "//test/e2e/network/scale:go_default_library",
         "//test/e2e/storage/utils:go_default_library",
@@ -115,6 +115,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/e2e/network/common:all-srcs",
         "//test/e2e/network/netpol:all-srcs",
         "//test/e2e/network/scale:all-srcs",
     ],

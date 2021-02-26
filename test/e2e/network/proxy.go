@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -68,7 +69,7 @@ type jsonResponse struct {
 	Body   string
 }
 
-var _ = SIGDescribe("Proxy", func() {
+var _ = common.SIGDescribe("Proxy", func() {
 	version := "v1"
 	ginkgo.Context("version "+version, func() {
 		options := framework.Options{

@@ -32,6 +32,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
 
@@ -40,7 +41,7 @@ import (
 
 var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
-var _ = SIGDescribe("KubeProxy", func() {
+var _ = common.SIGDescribe("KubeProxy", func() {
 	const (
 		testDaemonHTTPPort    = 11301
 		testDaemonTCPPort     = 11302
