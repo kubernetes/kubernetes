@@ -247,20 +247,29 @@ func TestValidateManagedFieldsInvalid(t *testing.T) {
 		{
 			Operation:  metav1.ManagedFieldsOperationUpdate,
 			FieldsType: "RandomVersion",
+			APIVersion: "v1",
 		},
 		{
 			Operation:  "RandomOperation",
 			FieldsType: "FieldsV1",
+			APIVersion: "v1",
 		},
 		{
 			// Operation is missing
 			FieldsType: "FieldsV1",
+			APIVersion: "v1",
 		},
 		{
 			Operation:  metav1.ManagedFieldsOperationUpdate,
 			FieldsType: "FieldsV1",
 			// Invalid fieldManager
-			Manager: "field\nmanager",
+			Manager:    "field\nmanager",
+			APIVersion: "v1",
+		},
+		{
+			Operation:  metav1.ManagedFieldsOperationUpdate,
+			FieldsType: "FieldsV1",
+			// APIVersion missing
 		},
 	}
 
@@ -277,20 +286,24 @@ func TestValidateManagedFieldsInvalid(t *testing.T) {
 func TestValidateMangedFieldsValid(t *testing.T) {
 	tests := []metav1.ManagedFieldsEntry{
 		{
-			Operation: metav1.ManagedFieldsOperationUpdate,
+			Operation:  metav1.ManagedFieldsOperationUpdate,
+			APIVersion: "v1",
 			// FieldsType is missing
 		},
 		{
 			Operation:  metav1.ManagedFieldsOperationUpdate,
 			FieldsType: "FieldsV1",
+			APIVersion: "v1",
 		},
 		{
 			Operation:  metav1.ManagedFieldsOperationApply,
 			FieldsType: "FieldsV1",
+			APIVersion: "v1",
 		},
 		{
 			Operation:  metav1.ManagedFieldsOperationApply,
 			FieldsType: "FieldsV1",
+			APIVersion: "v1",
 			Manager:    "🍔",
 		},
 	}
