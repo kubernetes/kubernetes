@@ -67,6 +67,9 @@ type Config struct {
 	Username string
 	Password string `datapolicy:"password"`
 
+	// Proxy URL to be used for specific cluster
+	ProxyURL string
+
 	// Server requires Bearer authentication. This client will not attempt to use
 	// refresh tokens for an OAuth2 flow.
 	// TODO: demonstrate an OAuth2 compatible client.

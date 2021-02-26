@@ -225,6 +225,7 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 	configClientConfig.CAData = configClusterInfo.CertificateAuthorityData
 	configClientConfig.Insecure = configClusterInfo.InsecureSkipTLSVerify
 	configClientConfig.ServerName = configClusterInfo.TLSServerName
+	configClientConfig.ProxyURL = configClusterInfo.ProxyURL
 	mergo.Merge(mergedConfig, configClientConfig, mergo.WithOverride)
 
 	return mergedConfig, nil
