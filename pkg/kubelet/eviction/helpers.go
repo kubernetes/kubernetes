@@ -744,7 +744,7 @@ func thresholdsMet(thresholds []evictionapi.Threshold, observations signalObserv
 		threshold := thresholds[i]
 		observed, found := observations[threshold.Signal]
 		if !found {
-			klog.InfoS("eviction manager: no observation found for eviction signal", "evictionSignal", threshold.Signal)
+			klog.InfoS("eviction manager: no observation found for eviction signal", "signal", threshold.Signal)
 			continue
 		}
 		// determine if we have met the specified threshold

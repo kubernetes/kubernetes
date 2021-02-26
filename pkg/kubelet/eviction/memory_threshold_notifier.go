@@ -98,7 +98,7 @@ func (m *memoryThresholdNotifier) UpdateThreshold(summary *statsapi.Summary) err
 	memcgThreshold.Sub(*evictionThresholdQuantity)
 	memcgThreshold.Add(*inactiveFile)
 
-	klog.V(3).InfoS("eviction manager changed setting:", "desc", m.Description(), "memThreshold", memcgThreshold.String())
+	klog.V(3).InfoS("eviction manager changed setting:", "desc", m.Description(), "threshold", memcgThreshold.String())
 	if m.notifier != nil {
 		m.notifier.Stop()
 	}
