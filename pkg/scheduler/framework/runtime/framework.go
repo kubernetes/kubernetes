@@ -88,7 +88,8 @@ type frameworkImpl struct {
 	metricsRecorder *metricsRecorder
 	profileName     string
 
-	preemptHandle framework.PreemptHandle
+	extenders []framework.Extender
+	framework.PodNominator
 
 	// Indicates that RunFilterPlugins should accumulate all failed statuses and not return
 	// after the first failure.
@@ -120,6 +121,11 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{plugins.Permit, &f.permitPlugins},
 		{plugins.QueueSort, &f.queueSortPlugins},
 	}
+}
+
+// Extenders returns the registered extenders.
+func (f *frameworkImpl) Extenders() []framework.Extender {
+	return f.extenders
 }
 
 type frameworkOptions struct {
@@ -218,19 +224,6 @@ func defaultFrameworkOptions() frameworkOptions {
 	}
 }
 
-var _ framework.PreemptHandle = &preemptHandle{}
-
-type preemptHandle struct {
-	extenders []framework.Extender
-	framework.PodNominator
-	framework.PluginsRunner
-}
-
-// Extenders returns the registered extenders.
-func (ph *preemptHandle) Extenders() []framework.Extender {
-	return ph.extenders
-}
-
 var _ framework.Framework = &frameworkImpl{}
 
 // NewFramework initializes plugins given the configuration and the registry.
@@ -251,11 +244,8 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		metricsRecorder:       options.metricsRecorder,
 		profileName:           options.profileName,
 		runAllFilters:         options.runAllFilters,
-	}
-	f.preemptHandle = &preemptHandle{
-		extenders:     options.extenders,
-		PodNominator:  options.podNominator,
-		PluginsRunner: f,
+		extenders:             options.extenders,
+		PodNominator:          options.podNominator,
 	}
 	if plugins == nil {
 		return f, nil
@@ -605,7 +595,6 @@ func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl framework.Po
 func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, state *framework.CycleState, pod *v1.Pod, info *framework.NodeInfo) *framework.Status {
 	var status *framework.Status
 
-	ph := f.PreemptHandle()
 	podsAdded := false
 	// We run filters twice in some cases. If the node has greater or equal priority
 	// nominated pods, we run them when those pods are added to PreFilter state and nodeInfo.
@@ -630,7 +619,7 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 		nodeInfoToUse := info
 		if i == 0 {
 			var err error
-			podsAdded, stateToUse, nodeInfoToUse, err = addNominatedPods(ctx, ph, pod, state, info)
+			podsAdded, stateToUse, nodeInfoToUse, err = addNominatedPods(ctx, f, pod, state, info)
 			if err != nil {
 				return framework.AsStatus(err)
 			}
@@ -638,7 +627,7 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 			break
 		}
 
-		statusMap := ph.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
+		statusMap := f.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
 		status = statusMap.Merge()
 		if !status.IsSuccess() && !status.IsUnschedulable() {
 			return status
@@ -651,12 +640,12 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 // addNominatedPods adds pods with equal or greater priority which are nominated
 // to run on the node. It returns 1) whether any pod was added, 2) augmented cycleState,
 // 3) augmented nodeInfo.
-func addNominatedPods(ctx context.Context, ph framework.PreemptHandle, pod *v1.Pod, state *framework.CycleState, nodeInfo *framework.NodeInfo) (bool, *framework.CycleState, *framework.NodeInfo, error) {
-	if ph == nil || nodeInfo.Node() == nil {
+func addNominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, state *framework.CycleState, nodeInfo *framework.NodeInfo) (bool, *framework.CycleState, *framework.NodeInfo, error) {
+	if fh == nil || nodeInfo.Node() == nil {
 		// This may happen only in tests.
 		return false, state, nodeInfo, nil
 	}
-	nominatedPodInfos := ph.NominatedPodsForNode(nodeInfo.Node().Name)
+	nominatedPodInfos := fh.NominatedPodsForNode(nodeInfo.Node().Name)
 	if len(nominatedPodInfos) == 0 {
 		return false, state, nodeInfo, nil
 	}
@@ -666,7 +655,7 @@ func addNominatedPods(ctx context.Context, ph framework.PreemptHandle, pod *v1.P
 	for _, pi := range nominatedPodInfos {
 		if corev1.PodPriority(pi.Pod) >= corev1.PodPriority(pod) && pi.Pod.UID != pod.UID {
 			nodeInfoOut.AddPodInfo(pi)
-			status := ph.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
+			status := fh.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
 			if !status.IsSuccess() {
 				return false, state, nodeInfo, status.AsError()
 			}
@@ -1131,11 +1120,6 @@ func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) map[string]config
 		find(e.plugins)
 	}
 	return pgMap
-}
-
-// PreemptHandle returns the internal preemptHandle object.
-func (f *frameworkImpl) PreemptHandle() framework.PreemptHandle {
-	return f.preemptHandle
 }
 
 // ProfileName returns the profile name associated to this framework.

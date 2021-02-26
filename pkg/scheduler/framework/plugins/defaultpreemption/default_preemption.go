@@ -116,7 +116,6 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.Cy
 // before it is retried after many other pending pods.
 func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.CycleState, pod *v1.Pod, m framework.NodeToStatusMap) (string, *framework.Status) {
 	cs := pl.fh.ClientSet()
-	ph := pl.fh.PreemptHandle()
 	nodeLister := pl.fh.SnapshotSharedLister().NodeInfos()
 
 	// 0) Fetch the latest version of <pod>.
@@ -156,7 +155,7 @@ func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.Cycle
 	}
 
 	// 3) Interact with registered Extenders to filter out some candidates if needed.
-	candidates, status = CallExtenders(ph.Extenders(), pod, nodeLister, candidates)
+	candidates, status = CallExtenders(pl.fh.Extenders(), pod, nodeLister, candidates)
 	if !status.IsSuccess() {
 		return "", status
 	}
@@ -606,12 +605,11 @@ func selectVictimsOnNode(
 	pdbs []*policy.PodDisruptionBudget,
 ) ([]*v1.Pod, int, *framework.Status) {
 	var potentialVictims []*framework.PodInfo
-	ph := fh.PreemptHandle()
 	removePod := func(rpi *framework.PodInfo) error {
 		if err := nodeInfo.RemovePod(rpi.Pod); err != nil {
 			return err
 		}
-		status := ph.RunPreFilterExtensionRemovePod(ctx, state, pod, rpi, nodeInfo)
+		status := fh.RunPreFilterExtensionRemovePod(ctx, state, pod, rpi, nodeInfo)
 		if !status.IsSuccess() {
 			return status.AsError()
 		}
@@ -619,7 +617,7 @@ func selectVictimsOnNode(
 	}
 	addPod := func(api *framework.PodInfo) error {
 		nodeInfo.AddPodInfo(api)
-		status := ph.RunPreFilterExtensionAddPod(ctx, state, pod, api, nodeInfo)
+		status := fh.RunPreFilterExtensionAddPod(ctx, state, pod, api, nodeInfo)
 		if !status.IsSuccess() {
 			return status.AsError()
 		}
@@ -714,7 +712,7 @@ func PrepareCandidate(c Candidate, fh framework.Handle, cs kubernetes.Interface,
 	// this node. So, we should remove their nomination. Removing their
 	// nomination updates these pods and moves them to the active queue. It
 	// lets scheduler find another place for them.
-	nominatedPods := getLowerPriorityNominatedPods(fh.PreemptHandle(), pod, c.Name())
+	nominatedPods := getLowerPriorityNominatedPods(fh, pod, c.Name())
 	if err := util.ClearNominatedNodeName(cs, nominatedPods...); err != nil {
 		klog.ErrorS(err, "cannot clear 'NominatedNodeName' field")
 		// We do not return as this error is not critical.
