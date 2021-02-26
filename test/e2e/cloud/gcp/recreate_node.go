@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package gcp
 
 import (
 	"context"
@@ -41,15 +41,7 @@ const (
 	recreateNodeReadyAgainTimeout = 10 * time.Minute
 )
 
-func nodeNames(nodes []v1.Node) []string {
-	result := make([]string, 0, len(nodes))
-	for i := range nodes {
-		result = append(result, nodes[i].Name)
-	}
-	return result
-}
-
-var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
+var _ = SIGDescribe("Recreate [Feature:Recreate]", func() {
 	f := framework.NewDefaultFramework("recreate")
 	var originalNodes []v1.Node
 	var originalPodNames []string
