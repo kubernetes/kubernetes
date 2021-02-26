@@ -24,9 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestAdmission(t *testing.T) {
@@ -96,7 +96,7 @@ func TestAdmission(t *testing.T) {
 		obj.SetManagedFields(test.beforeAdmission)
 		wrap.admit = replaceManagedFields(test.afterAdmission)
 
-		attrs := admission.NewAttributesRecord(obj, obj, api.Kind("ConfigMap").WithVersion("version"), "default", "", api.Resource("configmaps").WithVersion("version"), "", admission.Update, nil, false, nil)
+		attrs := admission.NewAttributesRecord(obj, obj, schema.GroupVersionKind{}, "default", "", schema.GroupVersionResource{}, "", admission.Update, nil, false, nil)
 		if err := ac.(admission.MutationInterface).Admit(context.TODO(), attrs, nil); err != nil {
 			t.Fatal(err)
 		}
