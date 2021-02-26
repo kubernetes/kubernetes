@@ -927,9 +927,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		createVolume := "CreateVolume"
 		deleteVolume := "DeleteVolume"
 		// publishVolume := "NodePublishVolume"
-		unpublishVolume := "NodeUnpublishVolume"
+		// unpublishVolume := "NodeUnpublishVolume"
 		// stageVolume := "NodeStageVolume"
-		unstageVolume := "NodeUnstageVolume"
+		// unstageVolume := "NodeUnstageVolume"
 
 		// These calls are assumed to occur in this order for
 		// each test run. NodeStageVolume and
@@ -939,12 +939,17 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		// (https://github.com/kubernetes/kubernetes/issues/90250).
 		// Therefore they are temporarily commented out until
 		// that issue is resolved.
+		//
+		// NodeUnpublishVolume and NodeUnstageVolume are racing
+		// with DeleteVolume, so we cannot assume a deterministic
+		// order and have to ignore them
+		// (https://github.com/kubernetes/kubernetes/issues/94108).
 		deterministicCalls := []string{
 			createVolume,
 			// stageVolume,
 			// publishVolume,
-			unpublishVolume,
-			unstageVolume,
+			// unpublishVolume,
+			// unstageVolume,
 			deleteVolume,
 		}
 
