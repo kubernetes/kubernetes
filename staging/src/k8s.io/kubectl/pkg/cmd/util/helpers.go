@@ -753,8 +753,8 @@ func GetDefaultContainerName(pod *corev1.Pod, enableSuggestedCmdUsage bool, w io
 	if len(pod.Spec.Containers) > 1 {
 		// in case the "kubectl.kubernetes.io/default-container" annotation is present, we preset the opts.Containers to default to selected
 		// container. This gives users ability to preselect the most interesting container in pod.
-		if annotations := pod.Annotations; annotations != nil && len(annotations[corev1.DefaultContainerAnnotationName]) > 0 {
-			containerName := annotations[corev1.DefaultContainerAnnotationName]
+		if annotations := pod.Annotations; annotations != nil && len(annotations[podutils.DefaultContainerAnnotationName]) > 0 {
+			containerName := annotations[podutils.DefaultContainerAnnotationName]
 			if exists, _ := podutils.FindContainerByName(pod, containerName); exists != nil {
 				return containerName
 			} else {

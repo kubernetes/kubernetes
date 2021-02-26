@@ -25,6 +25,10 @@ import (
 	"k8s.io/utils/integer"
 )
 
+// DefaultContainerAnnotationName is an annotation name that can be used to preselect the interesting container
+// from a pod when running kubectl.
+const DefaultContainerAnnotationName = "kubectl.kubernetes.io/default-container"
+
 // IsPodAvailable returns true if a pod is available; false otherwise.
 // Precondition for an available pod is that it must be ready. On top
 // of that, there are two cases when a pod can be considered available:

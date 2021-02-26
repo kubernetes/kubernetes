@@ -79,9 +79,9 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 			var containerName string
 			if len(annotations[defaultLogsContainerAnnotationName]) > 0 {
 				containerName = annotations[defaultLogsContainerAnnotationName]
-				fmt.Fprintf(os.Stderr, "Found deprecated `kubectl.kubernetes.io/default-logs-container` annotation %v in pod/%v\n", containerName, t.Name)
-			} else if len(annotations[corev1.DefaultContainerAnnotationName]) > 0 {
-				containerName = annotations[corev1.DefaultContainerAnnotationName]
+				fmt.Fprintf(os.Stderr, "Using deprecated annotation `kubectl.kubernetes.io/default-logs-container` in pod/%v. Please use `kubectl.kubernetes.io/default-container` instead\n", t.Name)
+			} else if len(annotations[podutils.DefaultContainerAnnotationName]) > 0 {
+				containerName = annotations[podutils.DefaultContainerAnnotationName]
 			}
 			if len(containerName) > 0 {
 				if exists, _ := podutils.FindContainerByName(t, containerName); exists != nil {
