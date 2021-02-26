@@ -26,8 +26,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -880,5 +882,304 @@ func TestApplyWithApplyConfiguration(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected status to contain DeploymentReplicaFailure condition set by apply")
+	}
+}
+
+func TestExtractModifyApply(t *testing.T) {
+	testCases := []struct {
+		name string
+		// modifyFunc modifies deployApply, defined below, after it is applied and "extracted"
+		// apply is skipped if this func is nil
+		modifyFunc       func(apply *appsv1ac.DeploymentApplyConfiguration)
+		modifyStatusFunc func(apply *appsv1ac.DeploymentApplyConfiguration) // same but for status
+		// verifyAppliedFunc verifies the results of applying the applied
+		// configuration after modifyFunc modifies it. Only called if modifyFunc is provided.
+		verifyAppliedFunc       func(applied *appsv1ac.DeploymentApplyConfiguration)
+		verifyStatusAppliedFunc func(applied *appsv1ac.DeploymentApplyConfiguration) // same but for status
+	}{
+		{
+			// With<fieldname>() on a scalar field replaces it with the given value
+			name: "modify-scalar",
+			modifyFunc: func(apply *appsv1ac.DeploymentApplyConfiguration) {
+				apply.Spec.WithReplicas(2)
+			},
+			verifyAppliedFunc: func(applied *appsv1ac.DeploymentApplyConfiguration) {
+				if *applied.Spec.Replicas != 2 {
+					t.Errorf("Expected 2 replicas but got: %d", *applied.Spec.Replicas)
+				}
+			},
+		},
+		{
+			// With<fieldname>() on a non-empty struct field replaces the entire struct
+			name: "modify-struct",
+			modifyFunc: func(apply *appsv1ac.DeploymentApplyConfiguration) {
+				apply.Spec.Template.WithSpec(corev1ac.PodSpec(). // replace the Spec of the existing Template
+											WithContainers(
+						corev1ac.Container().
+							WithName("modify-struct").
+							WithImage("nginx:1.14.3"),
+					),
+				)
+			},
+			verifyAppliedFunc: func(applied *appsv1ac.DeploymentApplyConfiguration) {
+				containers := applied.Spec.Template.Spec.Containers
+				if len(containers) != 1 {
+					t.Errorf("Expected 1 container but got %d", len(containers))
+				}
+				if *containers[0].Name != "modify-struct" {
+					t.Errorf("Expected container name modify-struct but got: %s", *containers[0].Name)
+				}
+			},
+		},
+		{
+			// With<fieldname>() on a non-empty map field puts all the given entries into the existing map
+			name: "modify-map",
+			modifyFunc: func(apply *appsv1ac.DeploymentApplyConfiguration) {
+				apply.WithLabels(map[string]string{"label2": "value2"})
+			},
+			verifyAppliedFunc: func(applied *appsv1ac.DeploymentApplyConfiguration) {
+				labels := applied.Labels
+				if len(labels) != 2 {
+					t.Errorf("Expected 2 label but got %d", len(labels))
+				}
+				if labels["label2"] != "value2" {
+					t.Errorf("Expected container name value2 but got: %s", labels["label2"])
+				}
+			},
+		},
+		{
+			// With<fieldname>() on a non-empty slice field appends all the given items to the existing slice
+			name: "modify-slice",
+			modifyFunc: func(apply *appsv1ac.DeploymentApplyConfiguration) {
+				apply.Spec.Template.Spec.WithContainers(corev1ac.Container().
+					WithName("modify-slice").
+					WithImage("nginx:1.14.2"),
+				)
+			},
+			verifyAppliedFunc: func(applied *appsv1ac.DeploymentApplyConfiguration) {
+				containers := applied.Spec.Template.Spec.Containers
+				if len(containers) != 2 {
+					t.Errorf("Expected 2 containers but got %d", len(containers))
+				}
+				if *containers[0].Name != "initial-container" {
+					t.Errorf("Expected container name initial-container but got: %s", *containers[0].Name)
+				}
+				if *containers[1].Name != "modify-slice" {
+					t.Errorf("Expected container name modify-slice but got: %s", *containers[1].Name)
+				}
+			},
+		},
+		{
+			// Append a condition to the status if the object
+			name: "modify-status-conditions",
+			modifyStatusFunc: func(apply *appsv1ac.DeploymentApplyConfiguration) {
+				apply.WithStatus(appsv1ac.DeploymentStatus().
+					WithConditions(appsv1ac.DeploymentCondition().
+						WithType(appsv1.DeploymentProgressing).
+						WithStatus(v1.ConditionUnknown).
+						WithLastTransitionTime(metav1.Now()).
+						WithLastUpdateTime(metav1.Now()).
+						WithMessage("progressing").
+						WithReason("TestExtractModifyApply_Status"),
+					),
+				)
+			},
+			verifyStatusAppliedFunc: func(applied *appsv1ac.DeploymentApplyConfiguration) {
+				conditions := applied.Status.Conditions
+				if len(conditions) != 1 {
+					t.Errorf("Expected 1 conditions but got %d", len(conditions))
+				}
+				if *conditions[0].Type != appsv1.DeploymentProgressing {
+					t.Errorf("Expected condition name DeploymentProgressing but got: %s", *conditions[0].Type)
+				}
+			},
+		},
+	}
+
+	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	defer testServer.TearDownFn()
+	c := clientset.NewForConfigOrDie(testServer.ClientConfig)
+	deploymentClient := c.AppsV1().Deployments("default")
+	fieldMgr := "test-mgr"
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Applied at the started of each test
+			deployApply := appsv1ac.Deployment(tc.name, "default").
+				WithLabels(map[string]string{"label1": "value1"}).
+				WithSpec(appsv1ac.DeploymentSpec().
+					WithSelector(metav1ac.LabelSelector().
+						WithMatchLabels(map[string]string{"app": tc.name}),
+					).
+					WithTemplate(corev1ac.PodTemplateSpec().
+						WithLabels(map[string]string{"app": tc.name}).
+						WithSpec(corev1ac.PodSpec().
+							WithContainers(
+								corev1ac.Container().
+									WithName("initial-container").
+									WithImage("nginx:1.14.2"),
+							),
+						),
+					),
+				)
+			actual, err := deploymentClient.Apply(context.TODO(), deployApply, metav1.ApplyOptions{FieldManager: fieldMgr})
+			if err != nil {
+				t.Fatalf("Failed to apply: %v", err)
+			}
+
+			extractedDeployment, err := appsv1ac.ExtractDeployment(actual, fieldMgr)
+			if err != nil {
+				t.Fatalf("Failed to extract: %v", err)
+			}
+
+			if tc.modifyFunc != nil {
+				tc.modifyFunc(extractedDeployment)
+				result, err := deploymentClient.Apply(context.TODO(), extractedDeployment, metav1.ApplyOptions{FieldManager: fieldMgr})
+				if err != nil {
+					t.Fatalf("Failed to apply extracted apply configuration: %v", err)
+				}
+				extractedResult, err := appsv1ac.ExtractDeployment(result, fieldMgr)
+				if err != nil {
+					t.Fatalf("Failed to extract: %v", err)
+				}
+				if tc.verifyAppliedFunc != nil {
+					tc.verifyAppliedFunc(extractedResult)
+				}
+			}
+
+			if tc.modifyStatusFunc != nil {
+				tc.modifyStatusFunc(extractedDeployment)
+				result, err := deploymentClient.ApplyStatus(context.TODO(), extractedDeployment, metav1.ApplyOptions{FieldManager: fieldMgr})
+				if err != nil {
+					t.Fatalf("Failed to apply extracted apply configuration to status: %v", err)
+				}
+				extractedResult, err := appsv1ac.ExtractDeployment(result, fieldMgr)
+				if err != nil {
+					t.Fatalf("Failed to extract: %v", err)
+				}
+				if tc.verifyStatusAppliedFunc != nil {
+					tc.verifyStatusAppliedFunc(extractedResult)
+				}
+			}
+		})
+	}
+}
+
+func TestExtractModifyApply_ForceOwnership(t *testing.T) {
+	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	defer testServer.TearDownFn()
+	c := clientset.NewForConfigOrDie(testServer.ClientConfig)
+	deploymentClient := c.AppsV1().Deployments("default")
+
+	// apply an initial state with one field manager
+	createApply := appsv1ac.Deployment("nginx-apply", "default").
+		WithSpec(appsv1ac.DeploymentSpec().
+			WithSelector(metav1ac.LabelSelector().
+				WithMatchLabels(map[string]string{"app": "nginx"}),
+			).
+			WithTemplate(corev1ac.PodTemplateSpec().
+				WithLabels(map[string]string{"app": "nginx"}).
+				WithSpec(corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().
+							WithName("nginx").
+							WithImage("nginx:1.14.2").
+							WithWorkingDir("/tmp/v1"),
+					),
+				),
+			),
+		)
+
+	_, err := deploymentClient.Apply(context.TODO(), createApply, metav1.ApplyOptions{FieldManager: "create-mgr", Force: true})
+	if err != nil {
+		t.Fatalf("Error creating createApply: %v", err)
+	}
+
+	// apply some non-overlapping fields with another field manager
+	sidecarApply := appsv1ac.Deployment("nginx-apply", "default").
+		WithSpec(appsv1ac.DeploymentSpec().
+			WithTemplate(corev1ac.PodTemplateSpec().
+				WithSpec(corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().
+							WithName("sidecar").
+							WithImage("nginx:1.14.2"),
+					),
+				),
+			),
+		)
+
+	applied, err := deploymentClient.Apply(context.TODO(), sidecarApply, metav1.ApplyOptions{FieldManager: "sidecar-mgr", Force: true})
+	if err != nil {
+		t.Fatalf("Error applying createApply: %v", err)
+	}
+	sidecarExtracted, err := appsv1ac.ExtractDeployment(applied, "sidecar-mgr")
+	if err != nil {
+		t.Fatalf("Error extracting createApply apply configuration: %v", err)
+	}
+	if !equality.Semantic.DeepEqual(sidecarApply, sidecarExtracted) {
+		t.Errorf("Expected sidecarExtracted apply configuration to match original, but got:\n%s\n", cmp.Diff(sidecarApply, sidecarExtracted))
+	}
+
+	// modify the extracted apply configuration that was just applied and add some fields that overlap
+	// with the fields owned by the other field manager to force ownership of them
+	sidecarExtracted.Spec.Template.Spec.Containers[0].WithImage("nginx:1.14.3")
+	sidecarExtracted.Spec.Template.Spec.WithContainers(corev1ac.Container().
+		WithName("nginx").
+		WithWorkingDir("/tmp/v2"),
+	)
+	reapplied, err := deploymentClient.Apply(context.TODO(), sidecarExtracted, metav1.ApplyOptions{FieldManager: "sidecar-mgr", Force: true})
+	if err != nil {
+		t.Fatalf("Unexpected error when applying manifest for Deployment: %v", err)
+	}
+
+	// extract apply configurations for both field managers and check that they are what we expect
+	reappliedExtracted, err := appsv1ac.ExtractDeployment(reapplied, "sidecar-mgr")
+	if err != nil {
+		t.Fatalf("Error extracting sidecarExtracted apply configuration: %v", err)
+	}
+
+	expectedReappliedExtracted := appsv1ac.Deployment("nginx-apply", "default").
+		WithSpec(appsv1ac.DeploymentSpec().
+			WithTemplate(corev1ac.PodTemplateSpec().
+				WithSpec(corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().
+							WithName("nginx").
+							WithWorkingDir("/tmp/v2"),
+						corev1ac.Container().
+							WithName("sidecar").
+							WithImage("nginx:1.14.3"),
+					),
+				),
+			),
+		)
+	if !equality.Semantic.DeepEqual(expectedReappliedExtracted, reappliedExtracted) {
+		t.Errorf("Reapplied apply configuration did not match expected, got:\n%s\n", cmp.Diff(expectedReappliedExtracted, reappliedExtracted))
+	}
+
+	createMgrExtracted, err := appsv1ac.ExtractDeployment(reapplied, "create-mgr")
+	if err != nil {
+		t.Fatalf("Error extracting createApply apply configuration: %v", err)
+	}
+
+	expectedCreateExtracted := appsv1ac.Deployment("nginx-apply", "default").
+		WithSpec(appsv1ac.DeploymentSpec().
+			WithSelector(metav1ac.LabelSelector().
+				WithMatchLabels(map[string]string{"app": "nginx"}),
+			).
+			WithTemplate(corev1ac.PodTemplateSpec().
+				WithLabels(map[string]string{"app": "nginx"}).
+				WithSpec(corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().
+							WithName("nginx").
+							WithImage("nginx:1.14.2"),
+					),
+				),
+			),
+		)
+	if !equality.Semantic.DeepEqual(expectedCreateExtracted, createMgrExtracted) {
+		t.Errorf("createMgrExtracted apply configuration did not match expected, got:\n%s\n", cmp.Diff(expectedCreateExtracted, createMgrExtracted))
 	}
 }

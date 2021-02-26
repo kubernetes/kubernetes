@@ -40,6 +40,8 @@ type CustomArgs struct {
 	//
 	// meta/v1 types (TypeMeta and ObjectMeta) are always included and do not need to be passed in.
 	ExternalApplyConfigurations map[types.Name]string
+
+	OpenAPISchemaFilePath string
 }
 
 // NewDefaults returns default arguments for the generator.
@@ -65,6 +67,8 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
 	pflag.Var(NewExternalApplyConfigurationValue(&ca.ExternalApplyConfigurations, nil), "external-applyconfigurations",
 		"list of comma separated external apply configurations locations in <type-package>.<type-name>:<applyconfiguration-package> form."+
 			"For example: k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1")
+	pflag.StringVar(&ca.OpenAPISchemaFilePath, "openapi-schema", "",
+		"path to the openapi schema containing all the types that apply configurations will be generated for")
 }
 
 // Validate checks the given arguments.
