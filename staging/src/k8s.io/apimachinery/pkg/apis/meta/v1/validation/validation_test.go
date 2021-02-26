@@ -256,6 +256,12 @@ func TestValidateManagedFieldsInvalid(t *testing.T) {
 			// Operation is missing
 			FieldsType: "FieldsV1",
 		},
+		{
+			Operation:  metav1.ManagedFieldsOperationUpdate,
+			FieldsType: "FieldsV1",
+			// Invalid fieldManager
+			Manager: "field\nmanager",
+		},
 	}
 
 	for _, test := range tests {
@@ -281,6 +287,11 @@ func TestValidateMangedFieldsValid(t *testing.T) {
 		{
 			Operation:  metav1.ManagedFieldsOperationApply,
 			FieldsType: "FieldsV1",
+		},
+		{
+			Operation:  metav1.ManagedFieldsOperationApply,
+			FieldsType: "FieldsV1",
+			Manager:    "🍔",
 		},
 	}
 
