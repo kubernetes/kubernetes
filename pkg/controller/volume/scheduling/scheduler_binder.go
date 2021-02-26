@@ -40,6 +40,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	storagelistersv1alpha1 "k8s.io/client-go/listers/storage/v1alpha1"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	csiplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
@@ -815,7 +816,7 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.Persi
 
 	for _, pvc := range claimsToBind {
 		// Get storage class name from each PVC
-		storageClassName := v1helper.GetPersistentVolumeClaimClass(pvc)
+		storageClassName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
 		allPVs := b.pvCache.ListPVs(storageClassName)
 		pvcName := getPVCName(pvc)
 
@@ -855,7 +856,7 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 	// fails or we encounter an error.
 	for _, claim := range claimsToProvision {
 		pvcName := getPVCName(claim)
-		className := v1helper.GetPersistentVolumeClaimClass(claim)
+		className := storagehelpers.GetPersistentVolumeClaimClass(claim)
 		if className == "" {
 			return false, false, nil, fmt.Errorf("no class for claim %q", pvcName)
 		}

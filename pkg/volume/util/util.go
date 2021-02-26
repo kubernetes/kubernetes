@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -42,7 +43,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -150,7 +150,7 @@ func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) 
 	if kubeClient == nil {
 		return nil, fmt.Errorf("cannot get kube client")
 	}
-	className := v1helper.GetPersistentVolumeClass(pv)
+	className := storagehelpers.GetPersistentVolumeClass(pv)
 	if className == "" {
 		return nil, fmt.Errorf("volume has no storage class")
 	}

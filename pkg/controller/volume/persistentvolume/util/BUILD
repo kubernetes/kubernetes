@@ -6,7 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -19,6 +18,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/listers/storage/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
+        "//staging/src/k8s.io/component-helpers/storage/volume:go_default_library",
     ],
 )
 

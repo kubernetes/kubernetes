@@ -21,7 +21,6 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//pkg/volume:go_default_library",
@@ -42,6 +41,7 @@ go_library(
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
+        "//staging/src/k8s.io/component-helpers/storage/volume:go_default_library",
         "//staging/src/k8s.io/mount-utils:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",
         "//vendor/google.golang.org/grpc/status:go_default_library",
