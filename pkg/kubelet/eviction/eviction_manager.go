@@ -165,7 +165,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	}
 
 	// reject pods when under memory pressure (if pod is best effort), or if under disk pressure.
-	klog.InfoS("Failed to admit pod and node has conditions", "pod", format.Pod(attrs.Pod), "conditions", m.nodeConditions)
+	klog.InfoS("Failed to admit pod and node has conditions", "pod", klog.KObj(attrs.Pod), "conditions", m.nodeConditions)
 	return lifecycle.PodAdmitResult{
 		Admit:   false,
 		Reason:  Reason,
@@ -336,18 +336,18 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	if !foundAny {
 		return nil
 	}
-	klog.InfoS("eviction manager: attempting to reclaim", "resourceToClaim", resourceToReclaim)
+	klog.InfoS("eviction manager: attempting to reclaim", "resourceName", resourceToReclaim)
 
 	// record an event about the resources we are now attempting to reclaim via eviction
 	m.recorder.Eventf(m.nodeRef, v1.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
 
 	// check if there are node-level resources we can reclaim to reduce pressure before evicting end-user pods.
 	if m.reclaimNodeLevelResources(thresholdToReclaim.Signal, resourceToReclaim) {
-		klog.InfoS("eviction manager: able to reduce pressure without evicting pods.", "resourceToReclaim", resourceToReclaim)
+		klog.InfoS("eviction manager: able to reduce pressure without evicting pods.", "resourceName", resourceToReclaim)
 		return nil
 	}
 
-	klog.InfoS("eviction manager: must evict pod(s) to reclaim ", "resourceToReclaim", resourceToReclaim)
+	klog.InfoS("eviction manager: must evict pod(s) to reclaim ", "resourceName", resourceToReclaim)
 
 	// rank the pods for eviction
 	rank, ok := m.signalToRankFunc[thresholdToReclaim.Signal]
@@ -557,7 +557,7 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	// do not evict such pods. Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
 	if kubelettypes.IsCriticalPod(pod) {
-		klog.ErrorS(nil, "eviction manager: cannot evict a critical pod %s", "pod", format.Pod(pod))
+		klog.ErrorS(nil, "eviction manager: cannot evict a critical pod %s", "pod", klog.KObj(pod))
 		return false
 	}
 	status := v1.PodStatus{
@@ -570,9 +570,9 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	// this is a blocking call and should only return when the pod and its containers are killed.
 	err := m.killPodFunc(pod, status, &gracePeriodOverride)
 	if err != nil {
-		klog.ErrorS(err, "eviction manager: pod %s failed to evict", "pod", format.Pod(pod))
+		klog.ErrorS(err, "eviction manager: pod %s failed to evict", "pod", klog.KObj(pod))
 	} else {
-		klog.InfoS("eviction manager: pod %s is evicted successfully", "pod" ,format.Pod(pod))
+		klog.InfoS("eviction manager: pod %s is evicted successfully", "pod", klog.KObj(pod))
 	}
 	return true
 }
