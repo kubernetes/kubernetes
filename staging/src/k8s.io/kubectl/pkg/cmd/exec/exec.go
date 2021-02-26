@@ -323,16 +323,7 @@ func (p *ExecOptions) Run() error {
 		return fmt.Errorf("cannot exec into a container in a completed pod; current phase is %s", pod.Status.Phase)
 	}
 
-	containerName := p.ContainerName
-	if len(containerName) == 0 {
-		if len(pod.Spec.Containers) > 1 {
-			fmt.Fprintf(p.ErrOut, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
-			if p.EnableSuggestedCmdUsage {
-				fmt.Fprintf(p.ErrOut, "Use '%s describe pod/%s -n %s' to see all of the containers in this pod.\n", p.ParentCommandName, pod.Name, p.Namespace)
-			}
-		}
-		containerName = pod.Spec.Containers[0].Name
-	}
+	containerName := getDefaultContainerName(p, pod)
 
 	// ensure we can recover the terminal while attached
 	t := p.SetupTTY()
@@ -376,4 +367,13 @@ func (p *ExecOptions) Run() error {
 	}
 
 	return nil
+}
+
+func getDefaultContainerName(p *ExecOptions, pod *corev1.Pod) string {
+	containerName := p.ContainerName
+	if len(containerName) != 0 {
+		return containerName
+	}
+
+	return cmdutil.GetDefaultContainerName(pod, p.EnableSuggestedCmdUsage, p.ErrOut)
 }

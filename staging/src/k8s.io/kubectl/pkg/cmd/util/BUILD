@@ -36,6 +36,7 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/openapi:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/openapi/validation:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/podutils:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/validation:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
