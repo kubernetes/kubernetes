@@ -317,21 +317,6 @@
     return a valid PreferredVersion unless the group suffix is example.com.
   release: v1.19
   file: test/e2e/apimachinery/discovery.go
-- testname: Event, delete a collection
-  codename: '[sig-api-machinery] Events should delete a collection of events [Conformance]'
-  description: A set of events is created with a label selector which MUST be found
-    when listed. The set of events is deleted and MUST NOT show up when listed by
-    its label selector.
-  release: v1.20
-  file: test/e2e/apimachinery/events.go
-- testname: Event resource lifecycle
-  codename: '[sig-api-machinery] Events should ensure that an event can be fetched,
-    patched, deleted, and listed [Conformance]'
-  description: Create an event, the event MUST exist. The event is patched with a
-    new message, the check MUST have the update message. The event is deleted and
-    MUST NOT show up when listing all events.
-  release: v1.20
-  file: test/e2e/apimachinery/events.go
 - testname: Garbage Collector, delete deployment,  propagation policy background
   codename: '[sig-api-machinery] Garbage collector should delete RS created by deployment
     when not orphaning [Conformance]'
@@ -1058,6 +1043,21 @@
     show up when listing all events.
   release: v1.19
   file: test/e2e/instrumentation/events.go
+- testname: Event, delete a collection
+  codename: '[sig-instrumentation] Events should delete a collection of events [Conformance]'
+  description: A set of events is created with a label selector which MUST be found
+    when listed. The set of events is deleted and MUST NOT show up when listed by
+    its label selector.
+  release: v1.20
+  file: test/e2e/instrumentation/core_events.go
+- testname: Event resource lifecycle
+  codename: '[sig-instrumentation] Events should ensure that an event can be fetched,
+    patched, deleted, and listed [Conformance]'
+  description: Create an event, the event MUST exist. The event is patched with a
+    new message, the check MUST have the update message. The event is deleted and
+    MUST NOT show up when listing all events.
+  release: v1.20
+  file: test/e2e/instrumentation/core_events.go
 - testname: DNS, cluster
   codename: '[sig-network] DNS should provide /etc/hosts entries for the cluster [LinuxOnly]
     [Conformance]'

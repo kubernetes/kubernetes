@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apimachinery
+package instrumentation
 
 import (
 	"context"
@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	"github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,7 +36,7 @@ const (
 	eventRetryTimeout = 1 * time.Minute
 )
 
-var _ = SIGDescribe("Events", func() {
+var _ = common.SIGDescribe("Events", func() {
 	f := framework.NewDefaultFramework("events")
 
 	/*
