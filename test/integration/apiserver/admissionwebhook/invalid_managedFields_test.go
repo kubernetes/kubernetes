@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -115,8 +117,8 @@ func TestMutatingWebhookResetsInvalidManagedFields(t *testing.T) {
 
 	var pod *corev1.Pod
 	var lastErr error
-	// TODO(kwiesmueller): define warning format in the apiserver and use here
-	// expectedWarning := fieldmanager.InvalidManagedFieldsAfterMutatingAdmissionWarningFormat
+	// We just expect the general warning text as the detail order might change
+	expectedWarning := fmt.Sprintf(fieldmanager.InvalidManagedFieldsAfterMutatingAdmissionWarningFormat, "")
 
 	// Make sure reset happens on patch requests
 	// wait until new webhook is called
@@ -125,16 +127,7 @@ func TestMutatingWebhookResetsInvalidManagedFields(t *testing.T) {
 		if err != nil {
 			return false, err
 		}
-		// if warningWriter.WarningCount() == 0 {
-		// 	lastErr = fmt.Sprintf("no warning, managedFields: %v", pod.ManagedFields)
-		// 	return false, nil
-		// }
-		// if !strings.Contains(recordedWarnings.String(), expectedWarning) {
-		// 	lastErr = fmt.Sprintf("unexpected warning, expected: %v, got: %v",
-		// 		expectedWarning, recordedWarnings.String())
-		// 	return false, nil
-		// }
-		if err := expectValidManagedFields(pod.ManagedFields); err != nil {
+		if err := fieldmanager.ValidateManagedFields(pod.ManagedFields); err != nil {
 			lastErr = err
 			return false, nil
 		}
@@ -145,47 +138,30 @@ func TestMutatingWebhookResetsInvalidManagedFields(t *testing.T) {
 	if lastErr != nil {
 		t.Fatal(lastErr)
 	}
-	// if warningWriter.WarningCount() != 1 {
-	// 	t.Errorf("expected one warning, got: %v", warningWriter.WarningCount())
-	// }
-	// recordedWarnings.Reset()
+	if warningWriter.WarningCount() != 1 {
+		t.Errorf("expected one warning, got: %v", warningWriter.WarningCount())
+	}
+	if !strings.Contains(recordedWarnings.String(), expectedWarning) {
+		t.Errorf("unexpected warning, expected: \n%v\n, got: \n%v",
+			expectedWarning, recordedWarnings.String())
+	}
+	recordedWarnings.Reset()
 
-	// Make sure dedup happens in update requests
+	// Make sure reset happens in update requests
 	pod, err = client.CoreV1().Pods("default").Update(context.TODO(), pod, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	// if warningWriter.WarningCount() != 2 {
-	// 	t.Errorf("expected two warnings, got: %v", warningWriter.WarningCount())
-	// }
-	// if !strings.Contains(recordedWarnings.String(), expectedWarning) {
-	// 	t.Errorf("unexpected warning, expected: %v, got: %v",
-	// 		expectedWarning, recordedWarnings.String())
-	// }
-	if err := expectValidManagedFields(pod.ManagedFields); err != nil {
+	if err := fieldmanager.ValidateManagedFields(pod.ManagedFields); err != nil {
 		t.Error(err)
 	}
-	// recordedWarnings.Reset()
-
-}
-
-func expectValidManagedFields(managedFields []metav1.ManagedFieldsEntry) error {
-	for i, managed := range managedFields {
-		// TODO: define what we want to validate
-		if len(managed.APIVersion) < 1 {
-			return fmt.Errorf(".metadata.managedFields[%d] is invalid: missing apiVersion", i)
-		}
-		if len(managed.FieldsType) < 1 {
-			return fmt.Errorf(".metadata.managedFields[%d] is invalid: missing fieldsType", i)
-		}
-		if len(managed.Manager) < 1 {
-			return fmt.Errorf(".metadata.managedFields[%d] is invalid: missing manager", i)
-		}
-		if managed.FieldsV1 == nil {
-			return fmt.Errorf(".metadata.managedFields[%d] is invalid: missing fieldsV1", i)
-		}
+	if warningWriter.WarningCount() != 2 {
+		t.Errorf("expected two warnings, got: %v", warningWriter.WarningCount())
 	}
-	return nil
+	if !strings.Contains(recordedWarnings.String(), expectedWarning) {
+		t.Errorf("unexpected warning, expected: \n%v\n, got: \n%v",
+			expectedWarning, recordedWarnings.String())
+	}
 }
 
 func newInvalidManagedFieldsWebhookHandler(t *testing.T) http.Handler {
