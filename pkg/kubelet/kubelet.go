@@ -835,6 +835,12 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// since this relies on the rest of the Kubelet having been constructed.
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.HostpathSymlinkForbidden) {
+		klog.V(4).Infof("Enable HostpathSymlinkForbidden")
+		hostpathSymlinkForbidden := lifecycle.NewHostpathSymlinkForbidden()
+		klet.admitHandlers.AddPodAdmitHandler(hostpathSymlinkForbidden)
+	}
+
 	return klet, nil
 }
 

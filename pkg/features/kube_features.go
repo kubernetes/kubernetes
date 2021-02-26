@@ -663,6 +663,12 @@ const (
 	//
 	// Enables the usage of different protocols in the same Service with type=LoadBalancer
 	MixedProtocolLBService featuregate.Feature = "MixedProtocolLBService"
+
+	// owner: @nicktming
+	// alpha: v1.20
+	//
+	// Enable support for hostpath symlink forbidden
+	HostpathSymlinkForbidden featuregate.Feature = "HostpathSymlinkForbidden"
 )
 
 func init() {
@@ -780,4 +786,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	// ...
 	HPAScaleToZero:         {Default: false, PreRelease: featuregate.Alpha},
 	LegacyNodeRoleBehavior: {Default: false, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
+	
+	HostpathSymlinkForbidden:                            {Default: false, PreRelease: featuregate.Alpha},
 }
