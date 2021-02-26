@@ -76,6 +76,7 @@ filegroup(
         "//test/integration/scheduler:all-srcs",
         "//test/integration/scheduler_perf:all-srcs",
         "//test/integration/secrets:all-srcs",
+        "//test/integration/service:all-srcs",
         "//test/integration/serviceaccount:all-srcs",
         "//test/integration/serving:all-srcs",
         "//test/integration/statefulset:all-srcs",
