@@ -19,7 +19,6 @@ package kuberuntime
 import (
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -301,7 +300,7 @@ func TestLifeCycleHook(t *testing.T) {
 
 	// Configured and working HTTP hook
 	t.Run("PreStop-HTTPGet", func(t *testing.T) {
-		defer func() { fakeHTTP.req, _ = http.NewRequest(http.MethodGet, "", nil) }()
+		defer func() { fakeHTTP.req = nil }()
 		testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
 		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriod)
 

@@ -19,8 +19,10 @@ package lifecycle
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -168,8 +170,8 @@ func TestRunHandlerHttp(t *testing.T) {
 }
 
 func TestRunHandlerHttpWithHeaders(t *testing.T) {
-	fakeHttp := fakeHTTP{}
-	handlerRunner := NewHandlerRunner(&fakeHttp, &fakeContainerCommandRunner{}, nil)
+	fakeHTTPDoer := fakeHTTP{}
+	handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, nil)
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
@@ -198,11 +200,11 @@ func TestRunHandlerHttpWithHeaders(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if fakeHttp.url != "http://foo:8080/bar" {
-		t.Errorf("unexpected url: %s", fakeHttp.url)
+	if fakeHTTPDoer.url != "http://foo:8080/bar" {
+		t.Errorf("unexpected url: %s", fakeHTTPDoer.url)
 	}
-	if fakeHttp.headers["Foo"][0] != "bar" {
-		t.Errorf("missing http header: %s", fakeHttp.headers)
+	if fakeHTTPDoer.headers["Foo"][0] != "bar" {
+		t.Errorf("missing http header: %s", fakeHTTPDoer.headers)
 	}
 }
 
@@ -298,5 +300,86 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 	}
 	if fakeHTTPGetter.url != "http://foo:8080/bar" {
 		t.Errorf("unexpected url: %s", fakeHTTPGetter.url)
+	}
+}
+
+func TestFormatURL(t *testing.T) {
+	tt := []struct {
+		name   string
+		scheme string
+		host   string
+		port   int
+		path   string
+	}{
+		{
+			name:   "https-scheme",
+			scheme: "https",
+			host:   "test",
+			port:   123,
+			path:   "test",
+		},
+		{
+			name:   "path",
+			scheme: "http",
+			host:   "test",
+			port:   123,
+			path:   "path",
+		},
+		{
+			name:   "path?query=/@?:%2F",
+			scheme: "http",
+			host:   "test",
+			port:   123,
+			path:   "path?query=/@?:%2F",
+		},
+		{
+			name:   "path?query=/@?:%",
+			scheme: "http",
+			host:   "test",
+			port:   123,
+			path:   "path?query=/@?:%",
+		},
+		{
+			name:   "path?query=%GG",
+			scheme: "http",
+			host:   "test",
+			port:   123,
+			path:   "path?query=%GG",
+		},
+		{
+			name:   "/test",
+			scheme: "http",
+			host:   "test",
+			port:   123,
+			path:   "/test",
+		},
+		{
+			name:   "//test/path",
+			scheme: "http",
+			host:   "test",
+			port:   123,
+			path:   "//test/path",
+		},
+		{
+			name:   "//test:123/path?query=/@?:%2F",
+			scheme: "http",
+			host:   "test",
+			port:   123,
+			path:   "//test:123/path?query=/@?:%2F",
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			path := test.path
+			if strings.HasPrefix(path, "/") {
+				path = path[1:]
+			}
+			expectURL := fmt.Sprintf("%s://%s/%s", test.scheme, net.JoinHostPort(test.host, strconv.Itoa(test.port)), path)
+			actualURL := formatURL(test.scheme, test.host, test.port, test.path)
+			if expectURL != actualURL.String() {
+				t.Errorf("expected url: %s\ngot url: %s", expectURL, actualURL)
+			}
+		})
 	}
 }

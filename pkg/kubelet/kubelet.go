@@ -499,16 +499,12 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			clusterDNS = append(clusterDNS, ip)
 		}
 	}
-	tr := &http.Transport{
+	// A TLS transport is needed to make HTTPS-based container lifecycle requests,
+	// but we do not have the information necessary to do TLS verification.
+	insecureTLSTransport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	httpClient := &http.Client{Transport: tr}
-	parsedNodeIP := net.ParseIP(nodeIP)
-	protocol := utilipt.ProtocolIPv4
-	if utilnet.IsIPv6(parsedNodeIP) {
-		klog.V(0).Infof("IPv6 node IP (%s), assume IPv6 operation", nodeIP)
-		protocol = utilipt.ProtocolIPv6
-	}
+	insecureContainerLifecycleHTTPClient := &http.Client{Transport: insecureTLSTransport}
 
 	klet := &Kubelet{
 		hostname:                                hostname,
@@ -664,7 +660,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.podWorkers,
 		kubeDeps.OSInterface,
 		klet,
-		httpClient,
+		insecureContainerLifecycleHTTPClient,
 		imageBackOff,
 		kubeCfg.SerializeImagePulls,
 		float32(kubeCfg.RegistryPullQPS),

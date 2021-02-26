@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -48,6 +49,7 @@ type podStatusProvider interface {
 	GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
 }
 
+// NewHandlerRunner returns a configured lifecycle handler for a container.
 func NewHandlerRunner(httpDoer kubetypes.HTTPDoer, commandRunner kubecontainer.CommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
 	return &handlerRunner{
 		httpDoer:         httpDoer,
@@ -105,17 +107,19 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
-// formatURL formats a URL from args.
-func formatURL(scheme string, host string, port int, path string) *url.URL {
-	u, err := url.Parse(path)
-	// Something is busted with the path, but it's too late to reject it. Pass it along as is.
-	if err != nil {
-		u = &url.URL{
-			Path: path,
-		}
+// formatURL formats a URL from args. It attempts to create a properly-formatted *url.URL
+// from the provided values, while preserving compatibility with legacy behavior.
+func formatURL(scheme string, host string, port int, rawPathAndQuery string) *url.URL {
+	// split rawPathAndQuery into slice with path and query
+	pathAndQuery := strings.SplitN(rawPathAndQuery, "?", 2)
+	u := &url.URL{
+		Scheme: scheme,
+		Host:   net.JoinHostPort(host, strconv.Itoa(port)),
+		Path:   pathAndQuery[0],
 	}
-	u.Scheme = scheme
-	u.Host = net.JoinHostPort(host, strconv.Itoa(port))
+	if len(pathAndQuery) == 2 {
+		u.RawQuery = pathAndQuery[1]
+	}
 	return u
 }
 
@@ -153,9 +157,12 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 		}
 	}
 	path := handler.HTTPGet.Path
-	scheme := "http"
-	if string(handler.HTTPGet.Scheme) != "" {
-		scheme = string(handler.HTTPGet.Scheme)
+	var scheme string
+	switch handler.HTTPGet.Scheme {
+	case v1.URISchemeHTTPS:
+		scheme = "https"
+	default:
+		scheme = "http"
 	}
 	url := formatURL(scheme, host, port, path)
 
