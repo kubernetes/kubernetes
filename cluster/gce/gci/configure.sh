@@ -218,13 +218,8 @@ function install-gci-mounter-tools {
 
 # Install node problem detector binary.
 function install-node-problem-detector {
-  if [[ -n "${NODE_PROBLEM_DETECTOR_VERSION:-}" ]]; then
-      local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
-      local -r npd_hash="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
-  else
-      local -r npd_version="${DEFAULT_NPD_VERSION}"
-      local -r npd_hash="${DEFAULT_NPD_HASH}"
-  fi
+  local -r npd_version="${DEFAULT_NPD_VERSION}"
+  local -r npd_hash="${DEFAULT_NPD_HASH}"
   local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
 
   if is-preloaded "${npd_tar}" "${npd_hash}"; then
@@ -233,7 +228,7 @@ function install-node-problem-detector {
   fi
 
   echo "Downloading ${npd_tar}."
-  local -r npd_release_path="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-https://storage.googleapis.com/kubernetes-release}"
+  local -r npd_release_path="https://storage.googleapis.com/kubernetes-release"
   download-or-bust "${npd_hash}" "${npd_release_path}/node-problem-detector/${npd_tar}"
   local -r npd_dir="${KUBE_HOME}/node-problem-detector"
   mkdir -p "${npd_dir}"
