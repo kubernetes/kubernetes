@@ -288,8 +288,10 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 		}
 	}
 
-	// If all metrics are invalid return error and set condition on hpa based on first invalid metric.
-	if invalidMetricsCount >= len(metricSpecs) {
+	// If all metrics are invalid or some are invalid and we would scale down,
+	// return an error and set the condition of the hpa based on the first invalid metric.
+	// Otherwise set the condition as scaling active as we're going to scale
+	if invalidMetricsCount >= len(metricSpecs) || (invalidMetricsCount > 0 && replicas < specReplicas) {
 		setCondition(hpa, invalidMetricCondition.Type, invalidMetricCondition.Status, invalidMetricCondition.Reason, invalidMetricCondition.Message)
 		return 0, "", statuses, time.Time{}, fmt.Errorf("invalid metrics (%v invalid out of %v), first error is: %v", invalidMetricsCount, len(metricSpecs), invalidMetricError)
 	}
