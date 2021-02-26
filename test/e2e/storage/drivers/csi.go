@@ -56,6 +56,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -75,6 +76,9 @@ const (
 	GCEPDCSIDriverName = "pd.csi.storage.gke.io"
 	// GCEPDCSIZoneTopologyKey is the key of GCE Persistent Disk CSI zone topology
 	GCEPDCSIZoneTopologyKey = "topology.gke.io/zone"
+
+	// Prefix of the mock driver grpc log
+	grpcCallPrefix = "gRPCCall:"
 )
 
 // hostpathCSI
@@ -373,6 +377,8 @@ func (c *MockCSICalls) LogGRPC(method string, request, reply interface{}, err er
 	}
 	json.Unmarshal(msg, &call)
 
+	klog.Infof("%s %s", grpcCallPrefix, string(msg))
+
 	// Trim gRPC service name, i.e. "/csi.v1.Identity/Probe" -> "Probe"
 	methodParts := strings.Split(call.Method, "/")
 	call.Method = methodParts[len(methodParts)-1]
@@ -650,8 +656,6 @@ func (m *mockCSIDriver) GetCalls() ([]MockCSICall, error) {
 	driverPodName := "csi-mockplugin-0"
 	// Name of CSI driver container name
 	driverContainerName := "mock"
-	// Prefix of the mock driver grpc log
-	grpcCallPrefix := "gRPCCall:"
 
 	// Load logs of driver pod
 	log, err := e2epod.GetPodLogs(m.clientSet, m.driverNamespace.Name, driverPodName, driverContainerName)
