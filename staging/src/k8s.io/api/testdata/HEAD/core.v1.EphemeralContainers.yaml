@@ -130,6 +130,11 @@ ephemeralContainers:
     runAsGroup: 8360795821384820753
     runAsNonRoot: false
     runAsUser: -1466062763730980131
+    procMount: Ðl恕ɍȇ廄裭4懙鏮嵒ƫS
+    readOnlyRootFilesystem: true
+    runAsGroup: 7608666948531988994
+    runAsNonRoot: true
+    runAsUser: -3031446704001093654
     seLinuxOptions:
       level: "83"
       role: "81"
@@ -142,6 +147,13 @@ ephemeralContainers:
       gmsaCredentialSpec: "85"
       gmsaCredentialSpecName: "84"
       runAsUserName: "86"
+      localhostProfile: "89"
+      type: ɷD¡轫n(鲼ƳÐƣKʘń
+    windowsOptions:
+      gmsaCredentialSpec: "87"
+      gmsaCredentialSpecName: "86"
+      hostProcess: false
+      runAsUserName: "88"
   startupProbe:
     exec:
       command:
@@ -167,6 +179,11 @@ ephemeralContainers:
   terminationMessagePath: "79"
   terminationMessagePolicy: ?讦ĭÐ
   tty: true
+    timeoutSeconds: 1229400382
+  stdinOnce: true
+  targetContainerName: "90"
+  terminationMessagePath: "81"
+  terminationMessagePolicy: Ņ£
   volumeDevices:
   - devicePath: "45"
     name: "44"

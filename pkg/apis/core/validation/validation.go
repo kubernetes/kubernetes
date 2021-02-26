@@ -3204,6 +3204,8 @@ type PodValidationOptions struct {
 	AllowInvalidPodDeletionCost bool
 	// Allow pod spec to use non-integer multiple of huge page unit size
 	AllowIndivisibleHugePagesValues bool
+	// Allow hostProcess field to be set in windows security context
+	AllowWindowsHostProcessField bool
 }
 
 // ValidatePodSingleHugePageResources checks if there are multiple huge
@@ -3327,6 +3329,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, validatePodDNSConfig(spec.DNSConfig, &spec.DNSPolicy, fldPath.Child("dnsConfig"))...)
 	allErrs = append(allErrs, validateReadinessGates(spec.ReadinessGates, fldPath.Child("readinessGates"))...)
 	allErrs = append(allErrs, validateTopologySpreadConstraints(spec.TopologySpreadConstraints, fldPath.Child("topologySpreadConstraints"))...)
+	allErrs = append(allErrs, validateWindowsHostProcessPod(spec, fldPath, opts)...)
 	if len(spec.ServiceAccountName) > 0 {
 		for _, msg := range ValidateServiceAccountName(spec.ServiceAccountName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccountName"), spec.ServiceAccountName, msg))
@@ -5968,6 +5971,91 @@ func validateWindowsSecurityContextOptions(windowsOptions *core.WindowsSecurityC
 				errMsg := `runAsUserName's User cannot contain the following characters: "/\:;|=,+*?<>@[]`
 				allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
 			}
+		}
+	}
+
+	return allErrs
+}
+
+func validateWindowsHostProcessPod(podSpec *core.PodSpec, fieldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// Keep track of container and hostProcess container count for validate
+	containerCount := 0
+	hostProcessContainerCount := 0
+
+	var podHostProcess *bool
+	if podSpec.SecurityContext != nil && podSpec.SecurityContext.WindowsOptions != nil {
+		podHostProcess = podSpec.SecurityContext.WindowsOptions.HostProcess
+	}
+
+	if !opts.AllowWindowsHostProcessField && podHostProcess != nil {
+		// Do not allow pods to persist data that sets hostProcess (true or false)
+		errMsg := "not allowed when feature gate 'WindowsHostProcessContainers' is not enabled"
+		allErrs = append(allErrs, field.Forbidden(fieldPath.Child("securityContext", "windowsOptions", "hostProcess"), errMsg))
+		return allErrs
+	}
+
+	hostNetwork := false
+	if podSpec.SecurityContext != nil {
+		hostNetwork = podSpec.SecurityContext.HostNetwork
+	}
+
+	podshelper.VisitContainersWithPath(podSpec, fieldPath, func(c *core.Container, cFieldPath *field.Path) bool {
+		containerCount++
+
+		var containerHostProcess *bool = nil
+		if c.SecurityContext != nil && c.SecurityContext.WindowsOptions != nil {
+			containerHostProcess = c.SecurityContext.WindowsOptions.HostProcess
+		}
+
+		if !opts.AllowWindowsHostProcessField && containerHostProcess != nil {
+			// Do not allow pods to persist data that sets hostProcess (true or false)
+			errMsg := "not allowed when feature gate 'WindowsHostProcessContainers' is not enabled"
+			allErrs = append(allErrs, field.Forbidden(cFieldPath.Child("securityContext", "windowsOptions", "hostProcess"), errMsg))
+		}
+
+		if podHostProcess != nil && containerHostProcess != nil && *podHostProcess != *containerHostProcess {
+			errMsg := fmt.Sprintf("pod hostProcess value must be identical if both are specified, was %v", *podHostProcess)
+			allErrs = append(allErrs, field.Invalid(cFieldPath.Child("securityContext", "windowsOptions", "hostProcess"), *containerHostProcess, errMsg))
+		}
+
+		switch {
+		case containerHostProcess != nil && *containerHostProcess:
+			// Container explitly sets hostProcess=true
+			hostProcessContainerCount++
+		case containerHostProcess == nil && podHostProcess != nil && *podHostProcess:
+			// Container inherits hostProcess=true from pod settings
+			hostProcessContainerCount++
+		}
+
+		return true
+	})
+
+	if hostProcessContainerCount > 0 {
+		// Fail Pod validation if feature is not enabled (unless podspec already exists and contains HostProcess fields) instead of dropping fields based on PRR reivew.
+		if !opts.AllowWindowsHostProcessField {
+			errMsg := "pod must not contain Windows hostProcess containers when feature gate 'WindowsHostProcessContainers' is not enabled"
+			allErrs = append(allErrs, field.Forbidden(fieldPath, errMsg))
+			return allErrs
+		}
+
+		// At present, if a Windows Pods contains any HostProcess containers than all containers must be
+		// HostProcess containers (explicitly set or inherited).
+		if hostProcessContainerCount != containerCount {
+			errMsg := "If pod contains any hostProcess containers then all containers must be HostProcess containers"
+			allErrs = append(allErrs, field.Invalid(fieldPath, "", errMsg))
+		}
+
+		// At present Windows Pods which contain HostProcess containers must also set HostNetwork.
+		if hostNetwork != true {
+			errMsg := "hostNetwork must be true if pod contains any hostProcess containers"
+			allErrs = append(allErrs, field.Invalid(fieldPath.Child("hostNetwork"), hostNetwork, errMsg))
+		}
+
+		if !capabilities.Get().AllowPrivileged {
+			errMsg := "hostProcess containers are disallowed by cluster policy"
+			allErrs = append(allErrs, field.Forbidden(fieldPath, errMsg))
 		}
 	}
 

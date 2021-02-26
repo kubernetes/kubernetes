@@ -6580,6 +6580,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: gmsaCredentialSpecName
       type:
         scalar: string
+    - name: hostProcess
+      type:
+        scalar: boolean
     - name: runAsUserName
       type:
         scalar: string
