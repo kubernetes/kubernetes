@@ -454,7 +454,7 @@ func ValidatePodSubnetNodeMask(subnetStr string, c *kubeadm.ClusterConfiguration
 func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, error) {
 	// defaultNodeMaskCIDRIPv4 is default mask size for IPv4 node cidr for use by the controller manager
 	const defaultNodeMaskCIDRIPv4 = 24
-	// DefaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr for use by the controller manager
+	// defaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr for use by the controller manager
 	const defaultNodeMaskCIDRIPv6 = 64
 	var maskSize int
 	var maskArg string
