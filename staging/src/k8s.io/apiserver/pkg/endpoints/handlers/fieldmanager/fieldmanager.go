@@ -110,23 +110,22 @@ func newDefaultFieldManager(f Manager, typeConverter TypeConverter, objectConver
 	return NewFieldManager(f, ignoreManagedFieldsFromRequestObject)
 }
 
-func decodeLiveManagedFields(liveObj runtime.Object) (Managed, error) {
+// DecodeManagedFields converts ManagedFields from the wire format (api format)
+// to the format used by sigs.k8s.io/structured-merge-diff
+func DecodeManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (Managed, error) {
+	return internal.DecodeManagedFields(encodedManagedFields)
+}
+
+func decodeLiveOrNew(liveObj, newObj runtime.Object, ignoreManagedFieldsFromRequestObject bool) (Managed, error) {
 	liveAccessor, err := meta.Accessor(liveObj)
 	if err != nil {
 		return nil, err
 	}
-	managed, err := internal.DecodeObjectManagedFields(liveAccessor.GetManagedFields())
-	if err != nil {
-		return internal.NewEmptyManaged(), nil
-	}
-	return managed, nil
-}
 
-func decodeManagedFields(liveObj, newObj runtime.Object, ignoreManagedFieldsFromRequestObject bool) (Managed, error) {
 	// We take the managedFields of the live object in case the request tries to
 	// manually set managedFields via a subresource.
 	if ignoreManagedFieldsFromRequestObject {
-		return decodeLiveManagedFields(liveObj)
+		return emptyManagedFieldsOnErr(DecodeManagedFields(liveAccessor.GetManagedFields()))
 	}
 
 	// If the object doesn't have metadata, we should just return without trying to
@@ -140,14 +139,20 @@ func decodeManagedFields(liveObj, newObj runtime.Object, ignoreManagedFieldsFrom
 		return internal.NewEmptyManaged(), nil
 	}
 
-	managed, err := internal.DecodeObjectManagedFields(newAccessor.GetManagedFields())
 	// If the managed field is empty or we failed to decode it,
 	// let's try the live object. This is to prevent clients who
 	// don't understand managedFields from deleting it accidentally.
+	managed, err := DecodeManagedFields(newAccessor.GetManagedFields())
 	if err != nil || len(managed.Fields()) == 0 {
-		return decodeLiveManagedFields(liveObj)
+		return emptyManagedFieldsOnErr(DecodeManagedFields(liveAccessor.GetManagedFields()))
 	}
+	return managed, nil
+}
 
+func emptyManagedFieldsOnErr(managed Managed, err error) (Managed, error) {
+	if err != nil {
+		return internal.NewEmptyManaged(), nil
+	}
 	return managed, nil
 }
 
@@ -157,7 +162,7 @@ func decodeManagedFields(liveObj, newObj runtime.Object, ignoreManagedFieldsFrom
 func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (object runtime.Object, err error) {
 	// First try to decode the managed fields provided in the update,
 	// This is necessary to allow directly updating managed fields.
-	managed, err := decodeManagedFields(liveObj, newObj, f.ignoreManagedFieldsFromRequestObject)
+	managed, err := decodeLiveOrNew(liveObj, newObj, f.ignoreManagedFieldsFromRequestObject)
 	if err != nil {
 		return newObj, nil
 	}
@@ -219,7 +224,7 @@ func (f *FieldManager) Apply(liveObj, appliedObj runtime.Object, manager string,
 	}
 
 	// Decode the managed fields in the live object, since it isn't allowed in the patch.
-	managed, err := internal.DecodeObjectManagedFields(accessor.GetManagedFields())
+	managed, err := DecodeManagedFields(accessor.GetManagedFields())
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 	}
