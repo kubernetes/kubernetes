@@ -43,7 +43,7 @@ type KubeletManagedHostConfig struct {
 	f              *framework.Framework
 }
 
-var _ = framework.KubeDescribe("KubeletManagedEtcHosts", func() {
+var _ = SIGNodeDescribe("KubeletManagedEtcHosts", func() {
 	f := framework.NewDefaultFramework("e2e-kubelet-etc-hosts")
 	config := &KubeletManagedHostConfig{
 		f: f,

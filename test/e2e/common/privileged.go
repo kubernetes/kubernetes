@@ -38,7 +38,7 @@ type PrivilegedPodTestConfig struct {
 	pod *v1.Pod
 }
 
-var _ = framework.KubeDescribe("PrivilegedPod [NodeConformance]", func() {
+var _ = SIGNodeDescribe("PrivilegedPod [NodeConformance]", func() {
 	config := &PrivilegedPodTestConfig{
 		f:                      framework.NewDefaultFramework("e2e-privileged-pod"),
 		privilegedPod:          "privileged-pod",

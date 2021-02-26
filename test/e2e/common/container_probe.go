@@ -45,7 +45,7 @@ const (
 	defaultObservationTimeout = time.Minute * 4
 )
 
-var _ = framework.KubeDescribe("Probing container", func() {
+var _ = SIGNodeDescribe("Probing container", func() {
 	f := framework.NewDefaultFramework("container-probe")
 	var podClient *framework.PodClient
 	probe := webserverProbeBuilder{}

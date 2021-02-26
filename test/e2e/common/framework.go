@@ -18,11 +18,6 @@ package common
 
 import "github.com/onsi/ginkgo"
 
-// SIGNetworkDescribe annotates the test with the SIG Network label.
-func SIGNetworkDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[sig-network] "+text, body)
-}
-
 // SIGNodeDescribe annotates the test with the SIG Node label.
 func SIGNodeDescribe(text string, body func()) bool {
 	return ginkgo.Describe("[sig-node] "+text, body)

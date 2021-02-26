@@ -179,7 +179,7 @@ func expectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interf
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), explain...)
 }
 
-var _ = framework.KubeDescribe("Pods", func() {
+var _ = SIGNodeDescribe("Pods", func() {
 	f := framework.NewDefaultFramework("pods")
 	var podClient *framework.PodClient
 	var dc dynamic.Interface

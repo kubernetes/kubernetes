@@ -32,7 +32,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
+var _ = SIGNodeDescribe("Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("container-lifecycle-hook")
 	var podClient *framework.PodClient
 	const (

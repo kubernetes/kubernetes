@@ -35,7 +35,7 @@ import (
 	gomegatypes "github.com/onsi/gomega/types"
 )
 
-var _ = framework.KubeDescribe("Container Runtime", func() {
+var _ = SIGNodeDescribe("Container Runtime", func() {
 	f := framework.NewDefaultFramework("container-runtime")
 
 	ginkgo.Describe("blackbox test", func() {

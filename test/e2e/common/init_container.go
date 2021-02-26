@@ -156,7 +156,7 @@ func initContainersInvariants(pod *v1.Pod) error {
 	return nil
 }
 
-var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
+var _ = SIGNodeDescribe("InitContainer [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("init-container")
 	var podClient *framework.PodClient
 	ginkgo.BeforeEach(func() {

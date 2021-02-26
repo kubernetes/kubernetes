@@ -30,7 +30,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
+var _ = SIGNodeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// sysctl is not supported on Windows.
