@@ -1302,10 +1302,10 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !exists {
-		t.Errorf("No expectations found for ReplicaSet %q", oldRSKey)
+		t.Errorf("No expectations found for ReplicaSet %q", newRSKey)
 	}
 	if rsExp.Fulfilled() {
-		t.Errorf("There should be unfulfilled expectations for creating new pods for ReplicaSet %q", oldRSKey)
+		t.Errorf("There should be unfulfilled expectations for creating new pods for ReplicaSet %q", newRSKey)
 	}
 
 	err = validateSyncReplicaSet(&fakePodControl, 1, 0, 0)
