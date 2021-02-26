@@ -404,6 +404,7 @@ ifeq ($(PRINT_HELP),y)
 release release-in-a-container:
 	@echo "$$RELEASE_HELP_INFO"
 else
+release release-in-a-container: KUBE_BUILD_CONFORMANCE = y
 release:
 	build/release.sh
 release-in-a-container:
@@ -421,6 +422,7 @@ define RELEASE_IMAGES_HELP_INFO
 endef
 .PHONY: release-images
 ifeq ($(PRINT_HELP),y)
+release-images: KUBE_BUILD_CONFORMANCE = y
 release-images:
 	@echo "$$RELEASE_IMAGES_HELP_INFO"
 else
@@ -457,7 +459,7 @@ define QUICK_RELEASE_IMAGES_HELP_INFO
 #
 # Args:
 #   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'false' to do so.
-#   KUBE_BUILD_CONFORMANCE: Whether to build conformance testing image as well. Set to 'n' to skip.
+#   KUBE_BUILD_CONFORMANCE: Whether to build conformance testing image as well. Set to 'y' to do so.
 #
 # Example:
 #   make quick-release-images
