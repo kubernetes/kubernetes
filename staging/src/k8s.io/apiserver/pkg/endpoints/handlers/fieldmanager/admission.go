@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/warning"
 )
@@ -65,7 +64,7 @@ func (admit *managedFieldsValidatingAdmissionController) Admit(ctx context.Conte
 		return err
 	}
 	managedFieldsAfterAdmission := objectMeta.GetManagedFields()
-	if err := validateManagedFields(managedFieldsAfterAdmission); err != nil {
+	if err := ValidateManagedFields(managedFieldsAfterAdmission); err != nil {
 		objectMeta.SetManagedFields(managedFieldsBeforeAdmission)
 		warning.AddWarning(ctx, "",
 			fmt.Sprintf(InvalidManagedFieldsAfterMutatingAdmissionWarningFormat,
@@ -79,24 +78,6 @@ func (admit *managedFieldsValidatingAdmissionController) Admit(ctx context.Conte
 func (admit *managedFieldsValidatingAdmissionController) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if validationInterface, isValidationInterface := admit.wrap.(admission.ValidationInterface); isValidationInterface {
 		return validationInterface.Validate(ctx, a, o)
-	}
-	return nil
-}
-
-func validateManagedFields(managedFields []metav1.ManagedFieldsEntry) error {
-	for i, managed := range managedFields {
-		if len(managed.APIVersion) < 1 {
-			return fmt.Errorf(".metadata.managedFields[%d]: missing apiVersion", i)
-		}
-		if len(managed.FieldsType) < 1 {
-			return fmt.Errorf(".metadata.managedFields[%d]: missing fieldsType", i)
-		}
-		if len(managed.Manager) < 1 {
-			return fmt.Errorf(".metadata.managedFields[%d]: missing manager", i)
-		}
-		if managed.FieldsV1 == nil {
-			return fmt.Errorf(".metadata.managedFields[%d]: missing fieldsV1", i)
-		}
 	}
 	return nil
 }
