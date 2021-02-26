@@ -19,7 +19,7 @@ package validation
 import (
 	"fmt"
 
-	"github.com/robfig/cron"
+	cronv3 "github.com/robfig/cron/v3"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -248,7 +248,7 @@ func validateConcurrencyPolicy(concurrencyPolicy *batch.ConcurrencyPolicy, fldPa
 
 func validateScheduleFormat(schedule string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if _, err := cron.ParseStandard(schedule); err != nil {
+	if _, err := cronv3.ParseStandard(schedule); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, schedule, err.Error()))
 	}
 

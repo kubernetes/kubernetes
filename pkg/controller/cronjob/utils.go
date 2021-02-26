@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/robfig/cron"
+	cronv3 "github.com/robfig/cron/v3"
 	"k8s.io/klog/v2"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -94,7 +94,7 @@ func groupJobsByParent(js []batchv1.Job) map[types.UID][]batchv1.Job {
 // If there were missed times prior to the last known start time, then those are not returned.
 func getRecentUnmetScheduleTimes(cj batchv1beta1.CronJob, now time.Time) ([]time.Time, error) {
 	starts := []time.Time{}
-	sched, err := cron.ParseStandard(cj.Spec.Schedule)
+	sched, err := cronv3.ParseStandard(cj.Spec.Schedule)
 	if err != nil {
 		return starts, fmt.Errorf("unparseable schedule: %s : %s", cj.Spec.Schedule, err)
 	}
@@ -154,7 +154,7 @@ func getRecentUnmetScheduleTimes(cj batchv1beta1.CronJob, now time.Time) ([]time
 //  it returns nil if no unmet schedule times.
 // If there are too many (>100) unstarted times, it will raise a warning and but still return
 // the list of missed times.
-func getNextScheduleTime(cj batchv1beta1.CronJob, now time.Time, schedule cron.Schedule, recorder record.EventRecorder) (*time.Time, error) {
+func getNextScheduleTime(cj batchv1beta1.CronJob, now time.Time, schedule cronv3.Schedule, recorder record.EventRecorder) (*time.Time, error) {
 	starts := []time.Time{}
 
 	var earliestTime time.Time
@@ -209,7 +209,7 @@ func getNextScheduleTime(cj batchv1beta1.CronJob, now time.Time, schedule cron.S
 
 // getMostRecentScheduleTime returns the latest schedule time between earliestTime and the count of number of
 // schedules in between them
-func getMostRecentScheduleTime(earliestTime time.Time, now time.Time, schedule cron.Schedule) (*time.Time, int64, error) {
+func getMostRecentScheduleTime(earliestTime time.Time, now time.Time, schedule cronv3.Schedule) (*time.Time, int64, error) {
 	t1 := schedule.Next(earliestTime)
 	t2 := schedule.Next(t1)
 
@@ -220,7 +220,7 @@ func getMostRecentScheduleTime(earliestTime time.Time, now time.Time, schedule c
 		return &t1, 1, nil
 	}
 
-	// It is possible for cron.ParseStandard("59 23 31 2 *") to return an invalid schedule
+	// It is possible for cronv3.ParseStandard("59 23 31 2 *") to return an invalid schedule
 	// seconds - 59, minute - 23, hour - 31 (?!)  dom - 2, and dow is optional, clearly 31 is invalid
 	// In this case the timeBetweenTwoSchedules will be 0, and we error out the invalid schedule
 	timeBetweenTwoSchedules := int64(t2.Sub(t1).Round(time.Second).Seconds())

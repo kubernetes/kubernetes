@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	cron "github.com/robfig/cron"
+	cronv3 "github.com/robfig/cron/v3"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
@@ -306,8 +306,8 @@ func TestGetNextScheduleTime(t *testing.T) {
 	// schedule is hourly on the hour
 	schedule := "0 * * * ?"
 
-	PraseSchedule := func(schedule string) cron.Schedule {
-		sched, err := cron.ParseStandard(schedule)
+	PraseSchedule := func(schedule string) cronv3.Schedule {
+		sched, err := cronv3.ParseStandard(schedule)
 		if err != nil {
 			t.Errorf("Error parsing schedule: %#v", err)
 			return nil
@@ -683,7 +683,7 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sched, err := cron.ParseStandard(tt.args.schedule)
+			sched, err := cronv3.ParseStandard(tt.args.schedule)
 			if err != nil {
 				t.Errorf("error setting up the test, %s", err)
 			}

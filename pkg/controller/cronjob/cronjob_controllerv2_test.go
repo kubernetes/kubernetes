@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/robfig/cron"
+	cronv3 "github.com/robfig/cron/v3"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
@@ -219,7 +219,7 @@ func Test_syncCronJob(t *testing.T) {
 				t.Errorf("%s: expected error got none with requeueAfter time: %#v", name, requeueAfter)
 			}
 			if tc.expectRequeueAfter {
-				sched, err := cron.ParseStandard(tc.schedule)
+				sched, err := cronv3.ParseStandard(tc.schedule)
 				if err != nil {
 					t.Errorf("%s: test setup error: the schedule %s is unparseable: %#v", name, tc.schedule, err)
 				}

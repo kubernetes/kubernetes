@@ -22,7 +22,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/robfig/cron"
+	cronv3 "github.com/robfig/cron/v3"
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -371,7 +371,7 @@ func (jm *ControllerV2) updateCronJob(old interface{}, curr interface{}) {
 	// the sync loop will essentially be a no-op for the already queued key with old schedule.
 	if oldCJ.Spec.Schedule != newCJ.Spec.Schedule {
 		// schedule changed, change the requeue time
-		sched, err := cron.ParseStandard(newCJ.Spec.Schedule)
+		sched, err := cronv3.ParseStandard(newCJ.Spec.Schedule)
 		if err != nil {
 			// this is likely a user error in defining the spec value
 			// we should log the error and not reconcile this cronjob until an update to spec
@@ -472,7 +472,7 @@ func (jm *ControllerV2) syncCronJob(
 		return cj, nil, nil
 	}
 
-	sched, err := cron.ParseStandard(cj.Spec.Schedule)
+	sched, err := cronv3.ParseStandard(cj.Spec.Schedule)
 	if err != nil {
 		// this is likely a user error in defining the spec value
 		// we should log the error and not reconcile this cronjob until an update to spec
@@ -613,7 +613,7 @@ func getJobName(cj *batchv1beta1.CronJob, scheduledTime time.Time) string {
 // for Network Time Protocol(NTP) time skews. If the time drifts are adjusted which in most
 // realistic cases would be around 100s, scheduled cron will still be executed without missing
 // the schedule.
-func nextScheduledTimeDuration(sched cron.Schedule, now time.Time) *time.Duration {
+func nextScheduledTimeDuration(sched cronv3.Schedule, now time.Time) *time.Duration {
 	t := sched.Next(now).Add(nextScheduleDelta).Sub(now)
 	return &t
 }
