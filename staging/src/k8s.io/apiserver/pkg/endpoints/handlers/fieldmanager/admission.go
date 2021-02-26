@@ -32,6 +32,9 @@ const InvalidManagedFieldsAfterMutatingAdmissionWarningFormat = ".metadata.manag
 // NewManagedFieldsValidatingAdmissionController validates the managedFields after calling
 // the provided admission and resets them to their original state if they got changed to an invalid value
 func NewManagedFieldsValidatingAdmissionController(wrap admission.Interface) admission.Interface {
+	if wrap == nil {
+		return nil
+	}
 	return &managedFieldsValidatingAdmissionController{wrap: wrap}
 }
 
