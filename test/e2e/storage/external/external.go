@@ -244,7 +244,7 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern storageframework.TestPatt
 	switch pattern.VolType {
 	case "":
 		supported = true
-	case storageframework.DynamicPV:
+	case storageframework.DynamicPV, storageframework.GenericEphemeralVolume:
 		if d.StorageClass.FromName || d.StorageClass.FromFile != "" || d.StorageClass.FromExistingClassName != "" {
 			supported = true
 		}
