@@ -512,6 +512,9 @@ func (r Request) finalURLTemplate() url.URL {
 	r.params = newParams
 	url := r.URL()
 
+	if url == nil {
+		return *url
+	}
 	segments := strings.Split(url.Path, "/")
 	groupIndex := 0
 	index := 0
