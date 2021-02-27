@@ -1024,7 +1024,7 @@ func TestRescheduleProvisioning(t *testing.T) {
 	}
 
 	// Prepare node and storage class.
-	testNode := makeNode(0)
+	testNode := makeNode(1)
 	if _, err := clientset.CoreV1().Nodes().Create(context.TODO(), testNode, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create Node %q: %v", testNode.Name, err)
 	}
@@ -1078,7 +1078,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	// Create shared objects
 	// Create nodes
 	for i := 0; i < numberOfNodes; i++ {
-		testNode := makeNode(i)
+		testNode := makeNode(i + 1)
 		if _, err := clientset.CoreV1().Nodes().Create(context.TODO(), testNode, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create Node %q: %v", testNode.Name, err)
 		}
@@ -1199,26 +1199,29 @@ func makePV(name, scName, pvcName, ns, node string) *v1.PersistentVolume {
 					Path: "/test-path",
 				},
 			},
-			NodeAffinity: &v1.VolumeNodeAffinity{
-				Required: &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{
-						{
-							MatchExpressions: []v1.NodeSelectorRequirement{
-								{
-									Key:      nodeAffinityLabelKey,
-									Operator: v1.NodeSelectorOpIn,
-									Values:   []string{node},
-								},
-							},
-						},
-					},
-				},
-			},
 		},
 	}
 
 	if pvcName != "" {
 		pv.Spec.ClaimRef = &v1.ObjectReference{Name: pvcName, Namespace: ns}
+	}
+
+	if node != "" {
+		pv.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
+			Required: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      nodeAffinityLabelKey,
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{node},
+							},
+						},
+					},
+				},
+			},
+		}
 	}
 
 	return pv
@@ -1280,11 +1283,13 @@ func makePod(name, ns string, pvcs []string) *v1.Pod {
 	}
 }
 
+// makeNode creates a node with the name "node-<index>"
 func makeNode(index int) *v1.Node {
+	name := fmt.Sprintf("node-%d", index)
 	return &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   fmt.Sprintf("node-%d", index+1),
-			Labels: map[string]string{nodeAffinityLabelKey: fmt.Sprintf("node-%d", index+1)},
+			Name:   name,
+			Labels: map[string]string{nodeAffinityLabelKey: name},
 		},
 		Spec: v1.NodeSpec{Unschedulable: false},
 		Status: v1.NodeStatus{
