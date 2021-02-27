@@ -697,7 +697,7 @@ func TestAudit(t *testing.T) {
 			expectedID := types.UID("")
 			for i, expect := range test.expected {
 				event := events[i]
-				if "admin" != event.User.Username {
+				if event.User.Username != "admin" {
 					t.Errorf("Unexpected username: %s", event.User.Username)
 				}
 				if event.Stage != expect.Stage {
