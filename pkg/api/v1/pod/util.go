@@ -82,11 +82,23 @@ func VisitContainers(podSpec *v1.PodSpec, visitor ContainerVisitor) bool {
 // Visitor is called with each object name, and returns true if visiting should continue
 type Visitor func(name string) (shouldContinue bool)
 
+func skipEmptyNames(visitor Visitor) Visitor {
+	return func(name string) bool {
+		if len(name) == 0 {
+			// continue visiting
+			return true
+		}
+		// delegate to visitor
+		return visitor(name)
+	}
+}
+
 // VisitPodSecretNames invokes the visitor function with the name of every secret
 // referenced by the pod spec. If visitor returns false, visiting is short-circuited.
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
 // Returns true if visiting completed, false if visiting was short-circuited.
 func VisitPodSecretNames(pod *v1.Pod, visitor Visitor) bool {
+	visitor = skipEmptyNames(visitor)
 	for _, reference := range pod.Spec.ImagePullSecrets {
 		if !visitor(reference.Name) {
 			return false
@@ -176,6 +188,7 @@ func visitContainerSecretNames(container *v1.Container, visitor Visitor) bool {
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
 // Returns true if visiting completed, false if visiting was short-circuited.
 func VisitPodConfigmapNames(pod *v1.Pod, visitor Visitor) bool {
+	visitor = skipEmptyNames(visitor)
 	VisitContainers(&pod.Spec, func(c *v1.Container) bool {
 		return visitContainerConfigmapNames(c, visitor)
 	})
