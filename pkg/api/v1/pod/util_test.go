@@ -531,6 +531,21 @@ func TestPodSecrets(t *testing.T) {
 		t.Logf("Extra secret names:\n%s", strings.Join(extraNames.List(), "\n"))
 		t.Error("Extra secret names extracted. Verify VisitPodSecretNames() is correctly extracting secret names")
 	}
+
+	// emptyPod is a stub containing empty object names
+	emptyPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				EnvFrom: []v1.EnvFromSource{{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: ""}}}}}},
+		},
+	}
+	VisitPodSecretNames(emptyPod, func(name string) bool {
+		t.Fatalf("expected no empty names collected, got %q", name)
+		return false
+	})
 }
 
 // collectResourcePaths traverses the object, computing all the struct paths that lead to fields with resourcename in the name.
@@ -660,6 +675,21 @@ func TestPodConfigmaps(t *testing.T) {
 		t.Logf("Extra names:\n%s", strings.Join(extraNames.List(), "\n"))
 		t.Error("Extra names extracted. Verify VisitPodConfigmapNames() is correctly extracting resource names")
 	}
+
+	// emptyPod is a stub containing empty object names
+	emptyPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				EnvFrom: []v1.EnvFromSource{{
+					ConfigMapRef: &v1.ConfigMapEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: ""}}}}}},
+		},
+	}
+	VisitPodConfigmapNames(emptyPod, func(name string) bool {
+		t.Fatalf("expected no empty names collected, got %q", name)
+		return false
+	})
 }
 
 func newPod(now metav1.Time, ready bool, beforeSec int) *v1.Pod {
