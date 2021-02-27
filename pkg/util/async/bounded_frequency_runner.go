@@ -301,7 +301,7 @@ func (bfr *BoundedFrequencyRunner) tryRun() {
 	elapsed := bfr.timer.Since(bfr.lastRun)   // how long since last run
 	nextPossible := bfr.minInterval - elapsed // time to next possible run
 	nextScheduled := bfr.timer.Remaining()    // time to next scheduled run
-	klog.V(4).Infof("%s: %v since last run, possible in %v, scheduled in %v", bfr.name, elapsed, nextPossible, nextScheduled)
+	klog.V(4).InfoS("%s: %v since last run, possible in %v, scheduled in %v", bfr.name, elapsed, nextPossible, nextScheduled)
 
 	// It's hard to avoid race conditions in the unit tests unless we always reset
 	// the timer here, even when it's unchanged
