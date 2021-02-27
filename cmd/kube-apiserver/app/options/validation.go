@@ -58,7 +58,7 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 	// while api-server dualstack bits does not have dependency on EndPointSlice, its
 	// a good idea to have validation consistent across all components (ControllerManager
 	// needs EndPointSlice + DualStack feature flags).
-	secondaryServiceClusterIPRangeUsed := (options.SecondaryServiceClusterIPRange.IP != nil)
+	secondaryServiceClusterIPRangeUsed := options.SecondaryServiceClusterIPRange.IP != nil
 	if secondaryServiceClusterIPRangeUsed && (!utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) || !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice)) {
 		errs = append(errs, fmt.Errorf("secondary service cluster-ip range(--service-cluster-ip-range[1]) can only be used if %v and %v feature is enabled", string(features.IPv6DualStack), string(features.EndpointSlice)))
 	}
@@ -106,7 +106,7 @@ func validateServiceNodePort(options *ServerRunOptions) []error {
 	}
 
 	if options.KubernetesServiceNodePort > 0 && !options.ServiceNodePortRange.Contains(options.KubernetesServiceNodePort) {
-		errs = append(errs, fmt.Errorf("kubernetes service port range %v doesn't contain %v", options.ServiceNodePortRange, (options.KubernetesServiceNodePort)))
+		errs = append(errs, fmt.Errorf("kubernetes service port range %v doesn't contain %v", options.ServiceNodePortRange, options.KubernetesServiceNodePort))
 	}
 	return errs
 }
