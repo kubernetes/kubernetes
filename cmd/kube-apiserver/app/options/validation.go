@@ -106,7 +106,7 @@ func validateServiceNodePort(options *ServerRunOptions) []error {
 	}
 
 	if options.KubernetesServiceNodePort > 0 && !options.ServiceNodePortRange.Contains(options.KubernetesServiceNodePort) {
-		errs = append(errs, fmt.Errorf("kubernetes service port range %v doesn't contain %v", options.ServiceNodePortRange, (options.KubernetesServiceNodePort)))
+		errs = append(errs, fmt.Errorf("kubernetes service node port range %v doesn't contain %v", options.ServiceNodePortRange, options.KubernetesServiceNodePort))
 	}
 	return errs
 }

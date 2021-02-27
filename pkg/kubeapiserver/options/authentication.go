@@ -185,7 +185,7 @@ func (o *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptio
 
 // Validate checks invalid config combination
 func (o *BuiltInAuthenticationOptions) Validate() []error {
-	allErrors := []error{}
+	var allErrors []error
 
 	if o.OIDC != nil && (len(o.OIDC.IssuerURL) > 0) != (len(o.OIDC.ClientID) > 0) {
 		allErrors = append(allErrors, fmt.Errorf("oidc-issuer-url and oidc-client-id should be specified together"))
@@ -219,7 +219,7 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 	if o.WebHook != nil {
 		retryBackoff := o.WebHook.RetryBackoff
 		if retryBackoff != nil && retryBackoff.Steps <= 0 {
-			allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 1, but is: %d", retryBackoff.Steps))
+			allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 0, but is: %d", retryBackoff.Steps))
 		}
 	}
 
