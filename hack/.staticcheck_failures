@@ -12,9 +12,6 @@ vendor/k8s.io/apimachinery/pkg/util/sets/types
 vendor/k8s.io/apimachinery/pkg/util/strategicpatch
 vendor/k8s.io/apimachinery/pkg/util/wait
 vendor/k8s.io/apiserver/pkg/endpoints/filters
-vendor/k8s.io/apiserver/pkg/endpoints/handlers
-vendor/k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager
-vendor/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters
 vendor/k8s.io/apiserver/pkg/endpoints/metrics
 vendor/k8s.io/apiserver/pkg/registry/generic/registry
 vendor/k8s.io/apiserver/pkg/registry/generic/rest
