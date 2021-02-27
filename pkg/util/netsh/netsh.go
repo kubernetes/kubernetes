@@ -66,7 +66,7 @@ func New(exec utilexec.Interface) Interface {
 
 // EnsurePortProxyRule checks if the specified redirect exists, if not creates it.
 func (runner *runner) EnsurePortProxyRule(args []string) (bool, error) {
-	klog.V(4).Infof("running netsh interface portproxy add v4tov4 %v", args)
+	klog.V(4).InfoS("running netsh interface portproxy add v4tov4", "args", args)
 	out, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
 
 	if err == nil {
@@ -85,7 +85,7 @@ func (runner *runner) EnsurePortProxyRule(args []string) (bool, error) {
 
 // DeletePortProxyRule deletes the specified portproxy rule.  If the rule did not exist, return error.
 func (runner *runner) DeletePortProxyRule(args []string) error {
-	klog.V(4).Infof("running netsh interface portproxy delete v4tov4 %v", args)
+	klog.V(4).InfoS("running netsh interface portproxy delete v4tov4", "args", args)
 	out, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
 
 	if err == nil {
@@ -114,12 +114,12 @@ func (runner *runner) EnsureIPAddress(args []string, ip net.IP) (bool, error) {
 
 	exists, _ := checkIPExists(ipToCheck, argsShowAddress, runner)
 	if exists == true {
-		klog.V(4).Infof("not adding IP address %q as it already exists", ipToCheck)
+		klog.V(4).InfoS("not adding IP address, as it already exists", "ipToCheck", ipToCheck)
 		return true, nil
 	}
 
 	// IP Address is not already added, add it now
-	klog.V(4).Infof("running netsh interface ipv4 add address %v", args)
+	klog.V(4).InfoS("running netsh interface ipv4 add address", "address", args)
 	out, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
 
 	if err == nil {
@@ -127,7 +127,7 @@ func (runner *runner) EnsureIPAddress(args []string, ip net.IP) (bool, error) {
 		// Query all the IP addresses and see if the one we added is present
 		// PS: We are using netsh interface ipv4 show address here to query all the IP addresses, instead of
 		// querying net.InterfaceAddrs() as it returns the IP address as soon as it is added even though it is uninitialized
-		klog.V(3).Infof("Waiting until IP: %v is added to the network adapter", ipToCheck)
+		klog.V(3).InfoS("Waiting until IP is added to the network adapter", "ip", ipToCheck)
 		for {
 			if exists, _ := checkIPExists(ipToCheck, argsShowAddress, runner); exists {
 				return true, nil
@@ -147,7 +147,7 @@ func (runner *runner) EnsureIPAddress(args []string, ip net.IP) (bool, error) {
 
 // DeleteIPAddress checks if the specified IP address is present and, if so, deletes it.
 func (runner *runner) DeleteIPAddress(args []string) error {
-	klog.V(4).Infof("running netsh interface ipv4 delete address %v", args)
+	klog.V(4).InfoS("running netsh interface ipv4 delete address", "address", args)
 	out, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
 
 	if err == nil {
@@ -185,7 +185,7 @@ func checkIPExists(ipToCheck string, args []string, runner *runner) (bool, error
 		return false, err
 	}
 	ipAddressString := string(ipAddress[:])
-	klog.V(3).Infof("Searching for IP: %v in IP dump: %v", ipToCheck, ipAddressString)
+	klog.V(3).InfoS("Searching for IP in IP dump", "ip", ipToCheck, "ipDump", ipAddressString)
 	showAddressArray := strings.Split(ipAddressString, "\n")
 	for _, showAddress := range showAddressArray {
 		if strings.Contains(showAddress, "IP") {
