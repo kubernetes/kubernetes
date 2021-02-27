@@ -18,9 +18,6 @@ package registry
 
 import (
 	"context"
-	"net/http"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 )
@@ -83,17 +80,4 @@ func (d *decoratedWatcher) Stop() {
 
 func (d *decoratedWatcher) ResultChan() <-chan watch.Event {
 	return d.resultCh
-}
-
-func makeStatusErrorEvent(err error) watch.Event {
-	status := &metav1.Status{
-		Status:  metav1.StatusFailure,
-		Message: err.Error(),
-		Code:    http.StatusInternalServerError,
-		Reason:  metav1.StatusReasonInternalError,
-	}
-	return watch.Event{
-		Type:   watch.Error,
-		Object: status,
-	}
 }
