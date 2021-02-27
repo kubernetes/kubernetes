@@ -87,6 +87,6 @@ func FlushCoverage() {
 	// This gets us atomic updates from the perspective of another process trying to access
 	// the file.
 	if err := os.Rename(tempCoveragePath(), coverageFile); err != nil {
-		klog.Errorf("Couldn't move coverage file from %s to %s", coverageFile, tempCoveragePath())
+		klog.ErrorS(err, "Couldn't move coverage file", "from", coverageFile, "to", tempCoveragePath())
 	}
 }

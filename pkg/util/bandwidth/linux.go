@@ -60,10 +60,10 @@ func NewTCShaper(iface string) Shaper {
 }
 
 func (t *tcShaper) execAndLog(cmdStr string, args ...string) error {
-	klog.V(6).Infof("Running: %s %s", cmdStr, strings.Join(args, " "))
+	klog.V(6).InfoS("Running", "cmdStr", cmdStr, "args", strings.Join(args, " "))
 	cmd := t.e.Command(cmdStr, args...)
 	out, err := cmd.CombinedOutput()
-	klog.V(6).Infof("Output from tc: %s", string(out))
+	klog.V(6).InfoS("print Output from tc", "out", string(out))
 	return err
 }
 
