@@ -189,13 +189,13 @@ func construct(name string, fn func(), minInterval, maxInterval time.Duration, b
 // Loop handles the periodic timer and run requests.  This is expected to be
 // called as a goroutine.
 func (bfr *BoundedFrequencyRunner) Loop(stop <-chan struct{}) {
-	klog.V(3).Infof("%s Loop running", bfr.name)
+	klog.V(3).InfoS("BoundedFrequencyRunner Loop running", "nameOfRunner", bfr.name)
 	bfr.timer.Reset(bfr.maxInterval)
 	for {
 		select {
 		case <-stop:
 			bfr.stop()
-			klog.V(3).Infof("%s Loop stopping", bfr.name)
+			klog.V(3).InfoS("BoundedFrequencyRunner Loop stopping", "nameOfRunner", bfr.name)
 			return
 		case <-bfr.timer.C():
 			bfr.tryRun()
@@ -276,7 +276,7 @@ func (bfr *BoundedFrequencyRunner) doRetry() {
 	retryInterval := bfr.retryTime.Sub(bfr.timer.Now())
 	bfr.retryTime = time.Time{}
 	if retryInterval < bfr.timer.Remaining() {
-		klog.V(3).Infof("%s: retrying in %v", bfr.name, retryInterval)
+		klog.V(3).InfoS("Runner retrying", "nameOfRunner", bfr.name, "retryInterval", retryInterval)
 		bfr.timer.Stop()
 		bfr.timer.Reset(retryInterval)
 	}
@@ -293,7 +293,7 @@ func (bfr *BoundedFrequencyRunner) tryRun() {
 		bfr.lastRun = bfr.timer.Now()
 		bfr.timer.Stop()
 		bfr.timer.Reset(bfr.maxInterval)
-		klog.V(3).Infof("%s: ran, next possible in %v, periodic in %v", bfr.name, bfr.minInterval, bfr.maxInterval)
+		klog.V(3).Infof("Runner ran", "nameOfRunner", bfr.name, "minInterval", bfr.minInterval, "maxInterval", bfr.maxInterval)
 		return
 	}
 
