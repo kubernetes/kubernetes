@@ -1181,6 +1181,15 @@ type ManagedFieldsEntry struct {
 	// FieldsV1 holds the first JSON version format as described in the "FieldsV1" type.
 	// +optional
 	FieldsV1 *FieldsV1 `json:"fieldsV1,omitempty" protobuf:"bytes,7,opt,name=fieldsV1"`
+
+	// Subresource is the name of the subresource used to update that object, or
+	// empty string if the object was updated through the main resource. The
+	// value of this field is used to distinguish between managers, even if they
+	// share the same name. For example, a status update will be distinct from a
+	// regular update using the same manager name.
+	// Note that the APIVersion field is not related to the Subresource field and
+	// it always corresponds to the version of the main resource.
+	Subresource string `json:"subresource,omitempty" protobuf:"bytes,8,opt,name=subresource"`
 }
 
 // ManagedFieldsOperationType is the type of operation which lead to a ManagedFieldsEntry being created.

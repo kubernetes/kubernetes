@@ -607,7 +607,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			a.group.Creater,
 			fqKindToRegister,
 			reqScope.HubGroupVersion,
-			isSubresource,
+			subresource,
 			resetFields,
 		)
 		if err != nil {

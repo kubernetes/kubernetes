@@ -872,7 +872,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				typeConverter,
 				reqScope,
 				resetFields,
-				false,
+				"",
 			)
 			if err != nil {
 				return nil, err
@@ -914,7 +914,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				typeConverter,
 				statusScope,
 				resetFields,
-				true,
+				"status",
 			)
 			if err != nil {
 				return nil, err
@@ -958,7 +958,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	return ret, nil
 }
 
-func scopeWithFieldManager(typeConverter fieldmanager.TypeConverter, reqScope handlers.RequestScope, resetFields map[fieldpath.APIVersion]*fieldpath.Set, ignoreManagedFieldsFromRequestObject bool) (handlers.RequestScope, error) {
+func scopeWithFieldManager(typeConverter fieldmanager.TypeConverter, reqScope handlers.RequestScope, resetFields map[fieldpath.APIVersion]*fieldpath.Set, subresource string) (handlers.RequestScope, error) {
 	fieldManager, err := fieldmanager.NewDefaultCRDFieldManager(
 		typeConverter,
 		reqScope.Convertor,
@@ -966,7 +966,7 @@ func scopeWithFieldManager(typeConverter fieldmanager.TypeConverter, reqScope ha
 		reqScope.Creater,
 		reqScope.Kind,
 		reqScope.HubGroupVersion,
-		ignoreManagedFieldsFromRequestObject,
+		subresource,
 		resetFields,
 	)
 	if err != nil {
