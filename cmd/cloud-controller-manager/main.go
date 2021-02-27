@@ -65,7 +65,7 @@ func main() {
 
 	s, err := options.NewCloudControllerManagerOptions()
 	if err != nil {
-		klog.Fatalf("unable to initialize command options: %v", err)
+		klog.ErrorS("unable to initialize command options: %v", err)
 	}
 	c, err := s.Config(controllerList, app.ControllersDisabledByDefault.List())
 	if err != nil {
@@ -75,17 +75,17 @@ func main() {
 
 	cloud, err := cloudprovider.InitCloudProvider(cloudProviderName, c.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile)
 	if err != nil {
-		klog.Fatalf("Cloud provider could not be initialized: %v", err)
+		klog.ErrorS("Cloud provider could not be initialized: %v", err)
 	}
 	if cloud == nil {
-		klog.Fatalf("cloud provider is nil")
+		klog.ErrorS("cloud provider is nil")
 	}
 
 	if !cloud.HasClusterID() {
 		if c.ComponentConfig.KubeCloudShared.AllowUntaggedCloud {
-			klog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
+			klog.InfoS("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
 		} else {
-			klog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
+			klog.ErrorS("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
 		}
 	}
 
