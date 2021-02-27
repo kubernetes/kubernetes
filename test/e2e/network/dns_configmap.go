@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	"k8s.io/kubernetes/test/e2e/network/common"
 
 	"github.com/onsi/ginkgo"
 )
@@ -314,7 +315,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 	t.restoreDNSConfigMap(originalConfigMapData)
 }
 
-var _ = SIGDescribe("DNS configMap nameserver", func() {
+var _ = common.SIGDescribe("DNS configMap nameserver", func() {
 
 	ginkgo.Context("Change stubDomain", func() {
 		nsTest := &dnsNameserverTest{dnsTestCommon: newDNSTestCommon()}

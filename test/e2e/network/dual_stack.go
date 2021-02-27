@@ -36,12 +36,13 @@ import (
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
 )
 
 // Tests for ipv6 dual stack feature
-var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
+var _ = common.SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("dualstack")
 
 	var cs clientset.Interface
