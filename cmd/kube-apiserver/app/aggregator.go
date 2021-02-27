@@ -175,7 +175,7 @@ func makeAPIService(gv schema.GroupVersion) *v1.APIService {
 	if !ok {
 		// if we aren't found, then we shouldn't register ourselves because it could result in a CRD group version
 		// being permanently stuck in the APIServices list.
-		klog.Infof("Skipping APIService creation for %v", gv)
+		klog.InfoS("Skipping APIService creation for %v", gv)
 		return nil
 	}
 	return &v1.APIService{
