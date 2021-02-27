@@ -39,6 +39,7 @@ import (
 // leakedConnection is a global variable that should leak the active
 // connection assigned here.
 //lint:ignore U1000 intentional unused variable
+var leakedConnection *net.TCPConn
 
 // CloseWaitServerOptions holds server JSON options.
 type CloseWaitServerOptions struct {
