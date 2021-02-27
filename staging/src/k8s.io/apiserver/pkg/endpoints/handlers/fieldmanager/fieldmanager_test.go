@@ -84,14 +84,14 @@ type TestFieldManager struct {
 }
 
 func NewDefaultTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
-	return NewTestFieldManager(gvk, false, nil)
+	return NewTestFieldManager(gvk, "", nil)
 }
 
 func NewSubresourceTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
-	return NewTestFieldManager(gvk, true, nil)
+	return NewTestFieldManager(gvk, "scale", nil)
 }
 
-func NewTestFieldManager(gvk schema.GroupVersionKind, ignoreManagedFieldsFromRequestObject bool, chainFieldManager func(Manager) Manager) TestFieldManager {
+func NewTestFieldManager(gvk schema.GroupVersionKind, subresource string, chainFieldManager func(Manager) Manager) TestFieldManager {
 	m := NewFakeOpenAPIModels()
 	typeConverter := NewFakeTypeConverter(m)
 	converter := newVersionConverter(typeConverter, &fakeObjectConvertor{}, gvk.GroupVersion())
@@ -112,7 +112,7 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, ignoreManagedFieldsFromReq
 	live.SetAPIVersion(gvk.GroupVersion().String())
 	f = NewStripMetaManager(f)
 	f = NewManagedFieldsUpdater(f)
-	f = NewBuildManagerInfoManager(f, gvk.GroupVersion())
+	f = NewBuildManagerInfoManager(f, gvk.GroupVersion(), subresource)
 	f = NewProbabilisticSkipNonAppliedManager(f, &fakeObjectCreater{gvk: gvk}, gvk, DefaultTrackOnCreateProbability)
 	f = NewLastAppliedManager(f, typeConverter, objectConverter, gvk.GroupVersion())
 	f = NewLastAppliedUpdater(f)
@@ -120,7 +120,7 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, ignoreManagedFieldsFromReq
 		f = chainFieldManager(f)
 	}
 	return TestFieldManager{
-		fieldManager: NewFieldManager(f, ignoreManagedFieldsFromRequestObject),
+		fieldManager: NewFieldManager(f, subresource),
 		emptyObj:     live,
 		liveObj:      live.DeepCopyObject(),
 	}
@@ -1249,7 +1249,7 @@ func TestUpdateViaSubresources(t *testing.T) {
 		},
 	})
 
-	// Check that managed fields cannot be changed via subresources
+	// Check that managed fields cannot be changed explicitly via subresources
 	expectedManager := "fieldmanager_test_subresource"
 	if err := f.Update(obj, expectedManager); err != nil {
 		t.Fatalf("failed to apply object: %v", err)

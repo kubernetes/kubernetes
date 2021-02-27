@@ -873,7 +873,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				reqScope.Creater,
 				reqScope.Kind,
 				reqScope.HubGroupVersion,
-				false,
+				"",
 			)
 			if err != nil {
 				return nil, err
@@ -909,7 +909,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				statusScope.Creater,
 				statusScope.Kind,
 				statusScope.HubGroupVersion,
-				true,
+				"status",
 			)
 			if err != nil {
 				return nil, err
