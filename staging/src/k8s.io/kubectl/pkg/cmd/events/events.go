@@ -17,12 +17,19 @@ limitations under the License.
 package events
 
 import (
+	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -43,7 +50,7 @@ var (
 		TODO`))
 
 	selectorTail       int64 = 10
-	eventssUsageErrStr       = fmt.Sprintf("expected '%s'.\nPOD or TYPE/NAME is a required argument for the logs command", eventsUsageStr)
+	eventssUsageErrStr       = fmt.Sprintf("TODO usage error string: %s", eventsUsageStr)
 )
 
 type EventsOptions struct {
@@ -51,7 +58,8 @@ type EventsOptions struct {
 	Namespace     string
 	Watch         bool
 
-	builder *resource.Builder
+	ctx    context.Context
+	client *kubernetes.Clientset
 
 	genericclioptions.IOStreams
 }
@@ -95,7 +103,8 @@ func (o *EventsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 		return err
 	}
 
-	o.builder = f.NewBuilder()
+	o.ctx = cmd.Context()
+	o.client, err = f.KubernetesClientSet()
 
 	return nil
 }
@@ -107,24 +116,59 @@ func (o EventsOptions) Validate() error {
 
 // Run retrieves events
 func (o EventsOptions) Run() error {
-	r := o.builder.
-		Unstructured().
-		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
-		ResourceTypes("events").
-		SelectAllParam(true).
-		Flatten().
-		Do()
+	namespace := o.Namespace
+	if o.AllNamespaces {
+		namespace = ""
+	}
+	el, err := o.client.CoreV1().Events(namespace).List(o.ctx, metav1.ListOptions{})
 
-	if err := r.Err(); err != nil {
+	if err != nil {
 		return err
 	}
 
-	r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			fmt.Printf("visit err: %#v\n", err)
+	w := printers.GetNewTabWriter(o.Out)
+	defer w.Flush()
+
+	w.Write([]byte("Type\tReason\tAge\tFrom\tMessage\n"))
+	w.Write([]byte("----\t------\t----\t----\t-------\n"))
+
+	for _, e := range el.Items {
+		var interval string
+		if e.Count > 1 {
+			interval = fmt.Sprintf("%s (x%d over %s)", translateTimestampSince(e.LastTimestamp.Time), e.Count, translateTimestampSince(e.FirstTimestamp.Time))
+		} else {
+			interval = translateTimestampSince(eventTime(e))
 		}
-		fmt.Printf("visit: %#v\n", info.Object)
-		return nil
-	})
+		source := e.Source.Component
+		if source == "" {
+			source = e.ReportingController
+		}
+		fmt.Fprintf(w, "%v\t%v\t%s\t%v\t%v\n",
+			e.Type,
+			e.Reason,
+			interval,
+			source,
+			strings.TrimSpace(e.Message),
+		)
+	}
+
 	return nil
+}
+
+// Some events have just an EventTime; if LastTimestamp is present we prefer that.
+func eventTime(event corev1.Event) time.Time {
+	if !event.LastTimestamp.Time.IsZero() {
+		return event.LastTimestamp.Time
+	}
+	return event.EventTime.Time
+}
+
+// translateTimestampSince returns the elapsed time since timestamp in
+// human-readable approximation.
+func translateTimestampSince(timestamp time.Time) string {
+	if timestamp.IsZero() {
+		return "<unknown>"
+	}
+
+	return duration.HumanDuration(time.Since(timestamp))
 }
