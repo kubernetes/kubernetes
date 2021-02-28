@@ -19,6 +19,7 @@ package events
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -129,6 +130,8 @@ func (o EventsOptions) Run() error {
 	w := printers.GetNewTabWriter(o.Out)
 	defer w.Flush()
 
+	sort.Sort(SortableEvents(el.Items))
+
 	w.Write([]byte("Type\tReason\tAge\tFrom\tMessage\n"))
 	w.Write([]byte("----\t------\t----\t----\t-------\n"))
 
@@ -153,6 +156,21 @@ func (o EventsOptions) Run() error {
 	}
 
 	return nil
+}
+
+// SortableEvents implements sort.Interface for []api.Event by time
+type SortableEvents []corev1.Event
+
+func (list SortableEvents) Len() int {
+	return len(list)
+}
+
+func (list SortableEvents) Swap(i, j int) {
+	list[i], list[j] = list[j], list[i]
+}
+
+func (list SortableEvents) Less(i, j int) bool {
+	return eventTime(list[i]).Before(eventTime(list[j]))
 }
 
 // Some events have just an EventTime; if LastTimestamp is present we prefer that.
