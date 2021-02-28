@@ -30,7 +30,7 @@ import (
 var (
 	preflightExample = cmdutil.Examples(`
 		# Run pre-flight checks for kubeadm init using a config file.
-		kubeadm init phase preflight --config kubeadm-config.yml
+		kubeadm init phase preflight --config kubeadm-config.yaml
 		`)
 )
 

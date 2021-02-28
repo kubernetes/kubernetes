@@ -36,7 +36,7 @@ import (
 var (
 	preflightExample = cmdutil.Examples(`
 		# Run join pre-flight checks using a config file.
-		kubeadm join phase preflight --config kubeadm-config.yml
+		kubeadm join phase preflight --config kubeadm-config.yaml
 		`)
 
 	notReadyToJoinControlPlaneTemp = template.Must(template.New("join").Parse(dedent.Dedent(`
