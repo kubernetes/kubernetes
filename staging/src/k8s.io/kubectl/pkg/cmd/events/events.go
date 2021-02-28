@@ -132,8 +132,10 @@ func (o EventsOptions) Run() error {
 
 	sort.Sort(SortableEvents(el.Items))
 
-	w.Write([]byte("Type\tReason\tAge\tFrom\tMessage\n"))
-	w.Write([]byte("----\t------\t----\t----\t-------\n"))
+	if o.AllNamespaces {
+		fmt.Fprintf(w, "NAMESPACE\t")
+	}
+	fmt.Fprintf(w, "LAST SEEN\tTYPE\tREASON\tOBJECT\tMESSAGE\n")
 
 	for _, e := range el.Items {
 		var interval string
@@ -146,11 +148,14 @@ func (o EventsOptions) Run() error {
 		if source == "" {
 			source = e.ReportingController
 		}
-		fmt.Fprintf(w, "%v\t%v\t%s\t%v\t%v\n",
+		if o.AllNamespaces {
+			fmt.Fprintf(w, "%v\t", e.Namespace)
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s/%s\t%v\n",
+			interval,
 			e.Type,
 			e.Reason,
-			interval,
-			source,
+			e.InvolvedObject.Kind, e.InvolvedObject.Name,
 			strings.TrimSpace(e.Message),
 		)
 	}
