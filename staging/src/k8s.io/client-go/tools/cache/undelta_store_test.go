@@ -22,7 +22,7 @@ import (
 )
 
 // store_test.go checks that UndeltaStore conforms to the Store interface
-// behavior.  This test just tests that it calls the push func in addition.
+// behavior.  This test tests that it calls the push func in addition.
 
 type testUndeltaObject struct {
 	name string

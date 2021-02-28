@@ -111,7 +111,9 @@ for more information about scheduling and the kube-scheduler component.`,
 		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
 		cliflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
 	})
-	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
+	if err := cmd.MarkFlagFilename("config", "yaml", "yml", "json"); err != nil {
+		klog.Fatalf("failed to mark flag filename, %v", err)
+	}
 
 	return cmd
 }
