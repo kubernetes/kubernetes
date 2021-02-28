@@ -41,9 +41,14 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	"k8s.io/klog/v2"
+	nodeipamcontrolleroptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
+	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 	// For existing cloud providers, the option to import legacy providers is still available.
 	// e.g. _"k8s.io/legacy-cloud-providers/<provider>"
 )
+
+var nodeIPAMControllerConfiguration nodeipamconfig.NodeIPAMControllerConfiguration
+var nodeIPAMControllerOptions nodeipamcontrolleroptions.NodeIPAMControllerOptions
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -59,11 +64,14 @@ func main() {
 	//delete(controllerInitializers, "cloud-node-lifecycle")
 
 	// Here is an example to add an controller(NodeIpamController) which will be used by cloud provider
-	// generate nodeIPAMConfig. Here is an sample code. Please pass the right parameter in your code.
+	// generate nodeIPAMConfig. Here is an sample code.
 	// If you do not need additional controller, please ignore.
+	nodeIPAMControllerOptions.NodeIPAMControllerConfiguration = &nodeIPAMControllerConfiguration
+	fs := pflag.NewFlagSet("fs", pflag.ContinueOnError)
+	nodeIPAMControllerOptions.AddFlags(fs)
 	controllerInitializers["nodeipam"] = startNodeIpamControllerWrapper
 
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers, wait.NeverStop)
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers, fs, wait.NeverStop)
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the

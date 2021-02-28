@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
@@ -65,7 +66,7 @@ const (
 
 // NewCloudControllerManagerCommand creates a *cobra.Command object with default parameters
 // initFuncConstructor is a map of named controller groups (you can start more than one in an init func) paired to their InitFuncConstructor.
-func NewCloudControllerManagerCommand(s *options.CloudControllerManagerOptions, cloudInitializer InitCloudFunc, initFuncConstructor map[string]InitFuncConstructor, stopCh <-chan struct{}) *cobra.Command {
+func NewCloudControllerManagerCommand(s *options.CloudControllerManagerOptions, cloudInitializer InitCloudFunc, initFuncConstructor map[string]InitFuncConstructor, additionalFlags *pflag.FlagSet, stopCh <-chan struct{}) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "cloud-controller-manager",
@@ -116,6 +117,9 @@ the cloud specific control loops shipped with Kubernetes.`,
 	}
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
+	}
+	if additionalFlags != nil {
+		fs.AddFlagSet(additionalFlags)
 	}
 	usageFmt := "Usage:\n  %s\n"
 	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
