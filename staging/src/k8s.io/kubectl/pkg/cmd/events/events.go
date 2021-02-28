@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/duration"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/kubernetes"
@@ -129,13 +130,33 @@ func (o EventsOptions) Run() error {
 	}
 
 	w := printers.GetNewTabWriter(o.Out)
-	defer w.Flush()
 
 	sort.Sort(SortableEvents(el.Items))
 
 	printHeadings(w, o.AllNamespaces)
 	for _, e := range el.Items {
 		printOneEvent(w, e, o.AllNamespaces)
+	}
+	w.Flush()
+	if o.Watch {
+		var rv string
+		if len(el.Items) > 0 {
+			// start watch from after the most recent item in the list
+			rv = el.Items[len(el.Items)-1].ResourceVersion
+		}
+		eventWatch, err := o.client.CoreV1().Events(namespace).Watch(o.ctx, metav1.ListOptions{ResourceVersion: rv})
+		if err != nil {
+			return err
+		}
+
+		for e := range eventWatch.ResultChan() {
+			if e.Type == watch.Deleted { // events are deleted after 1 hour; don't print that
+				continue
+			}
+			event := e.Object.(*corev1.Event)
+			printOneEvent(w, *event, o.AllNamespaces)
+			w.Flush()
+		}
 	}
 
 	return nil
