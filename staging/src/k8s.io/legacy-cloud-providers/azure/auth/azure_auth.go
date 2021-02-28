@@ -91,18 +91,18 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 	}
 
 	if config.UseManagedIdentityExtension {
-		klog.V(2).Infoln("azure: using managed identity extension to retrieve access token")
+		klog.V(2).InfoS("azure: using managed identity extension to retrieve access token")
 		msiEndpoint, err := adal.GetMSIVMEndpoint()
 		if err != nil {
 			return nil, fmt.Errorf("Getting the managed service identity endpoint: %v", err)
 		}
 		if len(config.UserAssignedIdentityID) > 0 {
-			klog.V(4).Info("azure: using User Assigned MSI ID to retrieve access token")
+			klog.V(4).InfoS("azure: using User Assigned MSI ID to retrieve access token")
 			return adal.NewServicePrincipalTokenFromMSIWithUserAssignedID(msiEndpoint,
 				env.ServiceManagementEndpoint,
 				config.UserAssignedIdentityID)
 		}
-		klog.V(4).Info("azure: using System Assigned MSI to retrieve access token")
+		klog.V(4).InfoS("azure: using System Assigned MSI to retrieve access token")
 		return adal.NewServicePrincipalTokenFromMSI(
 			msiEndpoint,
 			env.ServiceManagementEndpoint)
@@ -123,7 +123,7 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 	}
 
 	if len(config.AADClientCertPath) > 0 && len(config.AADClientCertPassword) > 0 {
-		klog.V(2).Infoln("azure: using jwt client_assertion (client_cert+client_private_key) to retrieve access token")
+		klog.V(2).InfoS("azure: using jwt client_assertion (client_cert+client_private_key) to retrieve access token")
 		certData, err := ioutil.ReadFile(config.AADClientCertPath)
 		if err != nil {
 			return nil, fmt.Errorf("reading the client certificate from file %s: %v", config.AADClientCertPath, err)
@@ -164,7 +164,7 @@ func GetMultiTenantServicePrincipalToken(config *AzureAuthConfig, env *azure.Env
 	}
 
 	if len(config.AADClientSecret) > 0 {
-		klog.V(2).Infoln("azure: using client_id+client_secret to retrieve multi-tenant access token")
+		klog.V(2).InfoS("azure: using client_id+client_secret to retrieve multi-tenant access token")
 		return adal.NewMultiTenantServicePrincipalToken(
 			multiTenantOAuthConfig,
 			config.AADClientID,
@@ -197,7 +197,7 @@ func GetNetworkResourceServicePrincipalToken(config *AzureAuthConfig, env *azure
 	}
 
 	if len(config.AADClientSecret) > 0 {
-		klog.V(2).Infoln("azure: using client_id+client_secret to retrieve access token for network resources tenant")
+		klog.V(2).InfoS("azure: using client_id+client_secret to retrieve access token for network resources tenant")
 		return adal.NewServicePrincipalToken(
 			*oauthConfig,
 			config.AADClientID,
@@ -219,17 +219,17 @@ func ParseAzureEnvironment(cloudName, resourceManagerEndpoint, identitySystem st
 	var env azure.Environment
 	var err error
 	if resourceManagerEndpoint != "" {
-		klog.V(4).Infof("Loading environment from resource manager endpoint: %s", resourceManagerEndpoint)
+		klog.V(4).InfoS("Loading environment from resource manager endpoint","endpoint", resourceManagerEndpoint)
 		nameOverride := azure.OverrideProperty{Key: azure.EnvironmentName, Value: cloudName}
 		env, err = azure.EnvironmentFromURL(resourceManagerEndpoint, nameOverride)
 		if err == nil {
 			azureStackOverrides(&env, resourceManagerEndpoint, identitySystem)
 		}
 	} else if cloudName == "" {
-		klog.V(4).Info("Using public cloud environment")
+		klog.V(4).InfoS("Using public cloud environment")
 		env = azure.PublicCloud
 	} else {
-		klog.V(4).Infof("Using %s environment", cloudName)
+		klog.V(4).InfoS("Using environment", "cloudName", cloudName)
 		env, err = azure.EnvironmentFromName(cloudName)
 	}
 	return &env, err
