@@ -135,19 +135,19 @@ func (c *Client) Send(ctx context.Context, request *http.Request) (*http.Respons
 	}()
 
 	bodyString := string(bodyBytes)
-	klog.V(5).Infof("Send.sendRequest original error message: %s", bodyString)
+	klog.V(5).InfoS("Send.sendRequest original error message", "responseBody", bodyString)
 
 	// Hack: retry the regional ARM endpoint in case of ARM traffic split and arm resource group replication is too slow
 	var body map[string]interface{}
 	if e := json.Unmarshal(bodyBytes, &body); e != nil {
-		klog.V(5).Infof("Send.sendRequest: error in parsing response body string: %s, Skip retrying regional host", e)
+		klog.V(5).InfoS("Send.sendRequest: error in parsing response body string, Skip retrying regional host", "error", e)
 		return response, rerr
 	}
 
 	if err, ok := body["error"].(map[string]interface{}); !ok ||
 		err["code"] == nil ||
 		!strings.EqualFold(err["code"].(string), "ResourceGroupNotFound") {
-		klog.V(5).Infof("Send.sendRequest: response body does not contain ResourceGroupNotFound error code. Skip retrying regional host")
+		klog.V(5).InfoS("Send.sendRequest: response body does not contain ResourceGroupNotFound error code. Skip retrying regional host")
 		return response, rerr
 	}
 
@@ -157,12 +157,12 @@ func (c *Client) Send(ctx context.Context, request *http.Request) (*http.Respons
 	}
 
 	if strings.HasPrefix(strings.ToLower(currentHost), c.clientRegion) {
-		klog.V(5).Infof("Send.sendRequest: current host %s is regional host. Skip retrying regional host.", currentHost)
+		klog.V(5).InfoS("Send.sendRequest: current host is regional host. Skip retrying regional host.", "currentHost",currentHost)
 		return response, rerr
 	}
 
 	request.Host = fmt.Sprintf("%s.%s", c.clientRegion, strings.ToLower(currentHost))
-	klog.V(5).Infof("Send.sendRegionalRequest on ResourceGroupNotFound error. Retrying regional host: %s", request.Host)
+	klog.V(5).InfoS("Send.sendRegionalRequest on ResourceGroupNotFound error. Retrying regional host", "regional host", request.Host)
 	regionalResponse, regionalError := c.sendRequest(ctx, request)
 
 	// only use the result if the regional request actually goes through and returns 2xx status code, for two reasons:
@@ -174,7 +174,7 @@ func (c *Client) Send(ctx context.Context, request *http.Request) (*http.Respons
 			regionalErrStr = regionalError.Error().Error()
 		}
 
-		klog.V(5).Infof("Send.sendRegionalRequest failed to get response from regional host, error: '%s'. Ignoring the result.", regionalErrStr)
+		klog.V(5).InfoS("Send.sendRegionalRequest failed to get response from regional host. Ignoring the result.", "error", regionalErrStr)
 		return response, rerr
 	}
 
@@ -248,14 +248,14 @@ func (c *Client) PrepareHeadRequest(ctx context.Context, decorators ...autorest.
 func (c *Client) WaitForAsyncOperationCompletion(ctx context.Context, future *azure.Future, asyncOperationName string) error {
 	err := future.WaitForCompletionRef(ctx, c.client)
 	if err != nil {
-		klog.V(5).Infof("Received error in WaitForCompletionRef: '%v'", err)
+		klog.V(5).InfoS("Received error in WaitForCompletionRef", "error", err)
 		return err
 	}
 
 	var done bool
 	done, err = future.DoneWithContext(ctx, c.client)
 	if err != nil {
-		klog.V(5).Infof("Received error in DoneWithContext: '%v'", err)
+		klog.V(5).InfoS("Received error in DoneWithContext", "error", err)
 		return autorest.NewErrorWithError(err, asyncOperationName, "Result", future.Response(), "Polling failure")
 	}
 	if !done {
@@ -269,7 +269,7 @@ func (c *Client) WaitForAsyncOperationCompletion(ctx context.Context, future *az
 func (c *Client) WaitForAsyncOperationResult(ctx context.Context, future *azure.Future, asyncOperationName string) (*http.Response, error) {
 	err := c.WaitForAsyncOperationCompletion(ctx, future, asyncOperationName)
 	if err != nil {
-		klog.V(5).Infof("Received error in WaitForAsyncOperationCompletion: '%v'", err)
+		klog.V(5).InfoS("Received error in WaitForAsyncOperationCompletion", "error", err)
 		return nil, err
 	}
 
@@ -285,13 +285,13 @@ func (c *Client) WaitForAsyncOperationResult(ctx context.Context, future *azure.
 func (c *Client) SendAsync(ctx context.Context, request *http.Request) (*azure.Future, *http.Response, *retry.Error) {
 	asyncResponse, rerr := c.Send(ctx, request)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "sendAsync.send", request.URL.String(), rerr.Error())
+		klog.V(5).Infof("Received error in sendAsync.send", "resourceID", request.URL.String(), "error",  rerr.Error())
 		return nil, nil, rerr
 	}
 
 	future, err := azure.NewFutureFromResponse(asyncResponse)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "sendAsync.respond", request.URL.String(), err)
+		klog.V(5).Infof("Received error in sendAsync.respond"," resourceID", request.URL.String(), "error", err)
 		return nil, asyncResponse, retry.GetError(asyncResponse, err)
 	}
 
@@ -311,7 +311,7 @@ func (c *Client) GetResource(ctx context.Context, resourceID, expand string) (*h
 	}
 	request, err := c.PrepareGetRequest(ctx, decorators...)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "get.prepare", resourceID, err)
+		klog.V(5).InfoS("Received error in get.prepare", "resourceID", resourceID, "error", err)
 		return nil, retry.NewError(false, err)
 	}
 
@@ -326,7 +326,7 @@ func (c *Client) GetResourceWithDecorators(ctx context.Context, resourceID strin
 	getDecorators = append(getDecorators, decorators...)
 	request, err := c.PrepareGetRequest(ctx, getDecorators...)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "get.prepare", resourceID, err)
+		klog.V(5).InfoS("Received error in get.prepare", "resourceID", resourceID, "error", err)
 		return nil, retry.NewError(false, err)
 	}
 
@@ -360,7 +360,7 @@ func (c *Client) PutResources(ctx context.Context, resources map[string]interfac
 		}
 		request, err := c.PreparePutRequest(ctx, decorators...)
 		if err != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "put.prepare", resourceID, err)
+			klog.V(5).InfoS("Received error in put.prepare","resourceID", resourceID, "error", err)
 			responses[resourceID] = &PutResourcesResponse{
 				Error: retry.NewError(false, err),
 			}
@@ -370,7 +370,7 @@ func (c *Client) PutResources(ctx context.Context, resources map[string]interfac
 		future, resp, clientErr := c.SendAsync(ctx, request)
 		defer c.CloseResponse(ctx, resp)
 		if clientErr != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "put.send", resourceID, clientErr.Error())
+			klog.V(5).Infof("Received error in put.send", "resourceID", resourceID, "error", clientErr.Error())
 			responses[resourceID] = &PutResourcesResponse{
 				Error: clientErr,
 			}
@@ -390,15 +390,15 @@ func (c *Client) PutResources(ctx context.Context, resources map[string]interfac
 			response, err := c.WaitForAsyncOperationResult(ctx, future, "armclient.PutResource")
 			if err != nil {
 				if response != nil {
-					klog.V(5).Infof("Received error in WaitForAsyncOperationResult: '%s', response code %d", err.Error(), response.StatusCode)
+					klog.V(5).InfoS("Received error in WaitForAsyncOperationResult", "error", err.Error(),"response code",  response.StatusCode)
 				} else {
-					klog.V(5).Infof("Received error in WaitForAsyncOperationResult: '%s', no response", err.Error())
+					klog.V(5).Infof("Received error in WaitForAsyncOperationResult, no response", "erroor",err.Error())
 				}
 
 				retriableErr := retry.GetError(response, err)
 				if !retriableErr.Retriable &&
 					strings.Contains(strings.ToUpper(err.Error()), strings.ToUpper("InternalServerError")) {
-					klog.V(5).Infof("Received InternalServerError in WaitForAsyncOperationResult: '%s', setting error retriable", err.Error())
+					klog.V(5).InfoS("Received InternalServerError in WaitForAsyncOperationResult, setting error retriable", "error", err.Error())
 					retriableErr.Retriable = true
 				}
 
@@ -426,29 +426,29 @@ func (c *Client) PutResources(ctx context.Context, resources map[string]interfac
 func (c *Client) PutResourceWithDecorators(ctx context.Context, resourceID string, parameters interface{}, decorators []autorest.PrepareDecorator) (*http.Response, *retry.Error) {
 	request, err := c.PreparePutRequest(ctx, decorators...)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "put.prepare", resourceID, err)
+		klog.V(5).InfoS("Received error in put.prepare","resourceID", resourceID, "error", "err)
 		return nil, retry.NewError(false, err)
 	}
 
 	future, resp, clientErr := c.SendAsync(ctx, request)
 	defer c.CloseResponse(ctx, resp)
 	if clientErr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "put.send", resourceID, clientErr.Error())
+		klog.V(5).Infof("Received error in put.send", "resourceID", resourceID,"error", clientErr.Error())
 		return nil, clientErr
 	}
 
 	response, err := c.WaitForAsyncOperationResult(ctx, future, "armclient.PutResource")
 	if err != nil {
 		if response != nil {
-			klog.V(5).Infof("Received error in WaitForAsyncOperationResult: '%s', response code %d", err.Error(), response.StatusCode)
+			klog.V(5).InfoS("Received error in WaitForAsyncOperationResult","error", err.Error(), "responseCode",response.StatusCode)
 		} else {
-			klog.V(5).Infof("Received error in WaitForAsyncOperationResult: '%s', no response", err.Error())
+			klog.V(5).InfoS("Received error in WaitForAsyncOperationResult, no response", "erro", err.Error())
 		}
 
 		retriableErr := retry.GetError(response, err)
 		if !retriableErr.Retriable &&
 			strings.Contains(strings.ToUpper(err.Error()), strings.ToUpper("InternalServerError")) {
-			klog.V(5).Infof("Received InternalServerError in WaitForAsyncOperationResult: '%s', setting error retriable", err.Error())
+			klog.V(5).InfoS("Received InternalServerError in WaitForAsyncOperationResult, setting error retriable", "error", err.Error())
 			retriableErr.Retriable = true
 		}
 		return nil, retriableErr
@@ -466,29 +466,29 @@ func (c *Client) PatchResource(ctx context.Context, resourceID string, parameter
 
 	request, err := c.PreparePatchRequest(ctx, decorators...)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "patch.prepare", resourceID, err)
+		klog.V(5).InfoS("Received error in patch.prepare", "resourceID", resourceID, "error", err)
 		return nil, retry.NewError(false, err)
 	}
 
 	future, resp, clientErr := c.SendAsync(ctx, request)
 	defer c.CloseResponse(ctx, resp)
 	if clientErr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "patch.send", resourceID, clientErr.Error())
+		klog.V(5).Infos("Received error in patch.send", "resourceID", resourceID, "error", clientErr.Error())
 		return nil, clientErr
 	}
 
 	response, err := c.WaitForAsyncOperationResult(ctx, future, "armclient.PatchResource")
 	if err != nil {
 		if response != nil {
-			klog.V(5).Infof("Received error in WaitForAsyncOperationResult: '%s', response code %d", err.Error(), response.StatusCode)
+			klog.V(5).InfoS("Received error in WaitForAsyncOperationResult", "error", err.Error(), "response code %d", response.StatusCode)
 		} else {
-			klog.V(5).Infof("Received error in WaitForAsyncOperationResult: '%s', no response", err.Error())
+			klog.V(5).Infof("Received error in WaitForAsyncOperationResult, no response", "error", err.Error())
 		}
 
 		retriableErr := retry.GetError(response, err)
 		if !retriableErr.Retriable &&
 			strings.Contains(strings.ToUpper(err.Error()), strings.ToUpper("InternalServerError")) {
-			klog.V(5).Infof("Received InternalServerError in WaitForAsyncOperationResult: '%s', setting error retriable", err.Error())
+			klog.V(5).InfoS("Received InternalServerError in WaitForAsyncOperationResult, setting error retriable", "error", err.Error())
 			retriableErr.Retriable = true
 		}
 		return nil, retriableErr
@@ -506,14 +506,14 @@ func (c *Client) PutResourceAsync(ctx context.Context, resourceID string, parame
 
 	request, err := c.PreparePutRequest(ctx, decorators...)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "put.prepare", resourceID, err)
+		klog.V(5).InfoS("Received error in put.prepare", "resourceID", resourceID, "error", err)
 		return nil, retry.NewError(false, err)
 	}
 
 	future, resp, rErr := c.SendAsync(ctx, request)
 	defer c.CloseResponse(ctx, resp)
 	if rErr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "put.send", resourceID, err)
+		klog.V(5).InfoS("Received error in put.send","resourceID", resourceID, "error", err)
 		return nil, rErr
 	}
 
@@ -533,7 +533,7 @@ func (c *Client) PostResource(ctx context.Context, resourceID, action string, pa
 	}
 	request, err := c.PreparePostRequest(ctx, decorators...)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "post.prepare", resourceID, err)
+		klog.V(5).InfoS("Received error in post.prepare","resourceID", resourceID, "error",err)
 		return nil, retry.NewError(false, err)
 	}
 
@@ -544,7 +544,7 @@ func (c *Client) PostResource(ctx context.Context, resourceID, action string, pa
 func (c *Client) DeleteResource(ctx context.Context, resourceID, ifMatch string) *retry.Error {
 	future, clientErr := c.DeleteResourceAsync(ctx, resourceID, ifMatch)
 	if clientErr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "delete.request", resourceID, clientErr.Error())
+		klog.V(5).Infof("Received error in delete.request","resourceID", resourceID, "error", clientErr.Error())
 		return clientErr
 	}
 
@@ -553,7 +553,7 @@ func (c *Client) DeleteResource(ctx context.Context, resourceID, ifMatch string)
 	}
 
 	if err := c.WaitForAsyncOperationCompletion(ctx, future, "armclient.DeleteResource"); err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "delete.wait", resourceID, clientErr.Error())
+		klog.V(5).InfoS("Received error in delete.wait", "resourceID", resourceID, "error", clientErr.Error())
 		return retry.NewError(true, err)
 	}
 
@@ -567,7 +567,7 @@ func (c *Client) HeadResource(ctx context.Context, resourceID string) (*http.Res
 	}
 	request, err := c.PrepareHeadRequest(ctx, decorators...)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "head.prepare", resourceID, err)
+		klog.V(5).InfoS("Received error in head.prepare", "resourceID", resourceID, "error", err)
 		return nil, retry.NewError(false, err)
 	}
 
@@ -585,14 +585,14 @@ func (c *Client) DeleteResourceAsync(ctx context.Context, resourceID, ifMatch st
 
 	deleteRequest, err := c.PrepareDeleteRequest(ctx, decorators...)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "deleteAsync.prepare", resourceID, err)
+		klog.V(5).InfoS("Received error in deleteAsync.prepare", "resourceID", resourceID, "error", err)
 		return nil, retry.NewError(false, err)
 	}
 
 	resp, rerr := c.sendRequest(ctx, deleteRequest)
 	defer c.CloseResponse(ctx, resp)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "deleteAsync.send", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in deleteAsync.sends","resourceID",resourceID, "error", rerr.Error())
 		return nil, rerr
 	}
 
@@ -600,7 +600,7 @@ func (c *Client) DeleteResourceAsync(ctx context.Context, resourceID, ifMatch st
 		resp,
 		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent, http.StatusNotFound))
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "deleteAsync.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in deleteAsync.respond","resourceID", resourceID, "error", err)
 		return nil, retry.GetError(resp, err)
 	}
 
@@ -610,7 +610,7 @@ func (c *Client) DeleteResourceAsync(ctx context.Context, resourceID, ifMatch st
 
 	future, err := azure.NewFutureFromResponse(resp)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "deleteAsync.future", resourceID, err)
+		klog.V(5).InfoS("Received error in deleteAsync.future", "resourceID", resourceID, "error: %s", err)
 		return nil, retry.GetError(resp, err)
 	}
 
