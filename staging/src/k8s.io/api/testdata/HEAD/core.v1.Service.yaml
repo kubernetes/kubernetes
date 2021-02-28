@@ -17,6 +17,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -31,52 +32,52 @@ metadata:
   uid: "7"
 spec:
   allocateLoadBalancerNodePorts: true
-  clusterIP: "24"
+  clusterIP: "25"
   clusterIPs:
-  - "25"
-  externalIPs:
   - "26"
-  externalName: "29"
+  externalIPs:
+  - "27"
+  externalName: "30"
   externalTrafficPolicy: ƏS$+½H牗洝尿
   healthCheckNodePort: -1965738697
   internalTrafficPolicy: ""
   ipFamilies:
   - 斬³;Ơ歿:狞夌碕ʂɭîcP$Iņɖ
   ipFamilyPolicy: 9ȫŚ
-  loadBalancerClass: "31"
-  loadBalancerIP: "27"
+  loadBalancerClass: "32"
+  loadBalancerIP: "28"
   loadBalancerSourceRanges:
-  - "28"
+  - "29"
   ports:
-  - appProtocol: "20"
-    name: "19"
+  - appProtocol: "21"
+    name: "20"
     nodePort: -474380055
     port: 202283346
     protocol: '@Hr鯹)晿'
-    targetPort: "21"
+    targetPort: "22"
   publishNotReadyAddresses: true
   selector:
-    "22": "23"
+    "23": "24"
   sessionAffinity: 甞谐颋ǅS
   sessionAffinityConfig:
     clientIP:
       timeoutSeconds: 2072604405
   topologyKeys:
-  - "30"
+  - "31"
   type: 鮽ort昍řČ扷5ƗǸƢ6/ʕVŚ(Ŀ
 status:
   conditions:
   - lastTransitionTime: "2404-01-10T11:35:42Z"
-    message: "37"
+    message: "38"
     observedGeneration: -8651056334266075769
-    reason: "36"
+    reason: "37"
     status: ž(-譵
-    type: "35"
+    type: "36"
   loadBalancer:
     ingress:
-    - hostname: "33"
-      ip: "32"
+    - hostname: "34"
+      ip: "33"
       ports:
-      - error: "34"
+      - error: "35"
         port: 684408190
         protocol: ƈ斎AO6ĴC浔Ű

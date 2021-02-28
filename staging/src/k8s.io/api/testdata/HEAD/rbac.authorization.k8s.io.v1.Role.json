@@ -36,26 +36,27 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
   "rules": [
     {
       "verbs": [
-        "19"
-      ],
-      "apiGroups": [
         "20"
       ],
-      "resources": [
+      "apiGroups": [
         "21"
       ],
-      "resourceNames": [
+      "resources": [
         "22"
       ],
-      "nonResourceURLs": [
+      "resourceNames": [
         "23"
+      ],
+      "nonResourceURLs": [
+        "24"
       ]
     }
   ]

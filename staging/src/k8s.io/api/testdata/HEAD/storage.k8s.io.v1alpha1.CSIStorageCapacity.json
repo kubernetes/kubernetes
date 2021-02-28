@@ -36,7 +36,8 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
@@ -54,7 +55,7 @@
       }
     ]
   },
-  "storageClassName": "25",
+  "storageClassName": "26",
   "capacity": "130",
   "maximumVolumeSize": "330"
 }

@@ -17,6 +17,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -31,22 +32,22 @@ metadata:
   uid: "7"
 spec:
   extra:
-    "23":
-    - "24"
+    "24":
+    - "25"
   groups:
-  - "22"
+  - "23"
   request: OA==
-  signerName: "19"
-  uid: "21"
+  signerName: "20"
+  uid: "22"
   usages:
   - J枊a
-  username: "20"
+  username: "21"
 status:
   certificate: cw==
   conditions:
   - lastTransitionTime: "2352-05-22T04:29:36Z"
     lastUpdateTime: "1985-03-23T14:10:57Z"
-    message: "26"
-    reason: "25"
+    message: "27"
+    reason: "26"
     status: ěĂ凗蓏Ŋ蛊ĉy緅縕
     type: o,c鮽ort昍řČ扷5Ɨ

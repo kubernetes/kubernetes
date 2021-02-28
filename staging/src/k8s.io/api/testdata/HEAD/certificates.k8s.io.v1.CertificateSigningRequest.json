@@ -36,24 +36,25 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
   "spec": {
     "request": "OA==",
-    "signerName": "19",
+    "signerName": "20",
     "usages": [
       "J枊a"
     ],
-    "username": "20",
-    "uid": "21",
+    "username": "21",
+    "uid": "22",
     "groups": [
-      "22"
+      "23"
     ],
     "extra": {
-      "23": [
-  "24"
+      "24": [
+  "25"
 ]
     }
   },
@@ -62,8 +63,8 @@
       {
         "type": "o,c鮽ort昍řČ扷5Ɨ",
         "status": "ěĂ凗蓏Ŋ蛊ĉy緅縕",
-        "reason": "25",
-        "message": "26",
+        "reason": "26",
+        "message": "27",
         "lastUpdateTime": "1985-03-23T14:10:57Z",
         "lastTransitionTime": "2352-05-22T04:29:36Z"
       }

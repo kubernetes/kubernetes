@@ -36,18 +36,19 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
   "spec": {
-    "controller": "19",
+    "controller": "20",
     "parameters": {
-      "apiGroup": "20",
-      "kind": "21",
-      "name": "22",
-      "scope": "23",
-      "namespace": "24"
+      "apiGroup": "21",
+      "kind": "22",
+      "name": "23",
+      "scope": "24",
+      "namespace": "25"
     }
   }
 }

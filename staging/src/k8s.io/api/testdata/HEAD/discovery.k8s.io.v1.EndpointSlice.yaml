@@ -2,27 +2,27 @@ addressType: īqJ枊a8衍`Ĩɘ.蘯
 apiVersion: discovery.k8s.io/v1
 endpoints:
 - addresses:
-  - "19"
+  - "20"
   conditions:
     ready: false
     serving: false
     terminating: false
   deprecatedTopology:
-    "27": "28"
+    "28": "29"
   hints:
     forZones:
-    - name: "31"
-  hostname: "20"
-  nodeName: "29"
+    - name: "32"
+  hostname: "21"
+  nodeName: "30"
   targetRef:
-    apiVersion: "24"
-    fieldPath: "26"
-    kind: "21"
-    name: "23"
-    namespace: "22"
-    resourceVersion: "25"
+    apiVersion: "25"
+    fieldPath: "27"
+    kind: "22"
+    name: "24"
+    namespace: "23"
+    resourceVersion: "26"
     uid: ɑ
-  zone: "30"
+  zone: "31"
 kind: EndpointSlice
 metadata:
   annotations:
@@ -41,6 +41,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -54,7 +55,7 @@ metadata:
   selfLink: "5"
   uid: "7"
 ports:
-- appProtocol: "33"
-  name: "32"
+- appProtocol: "34"
+  name: "33"
   port: -591435092
   protocol: ěĂ凗蓏Ŋ蛊ĉy緅縕

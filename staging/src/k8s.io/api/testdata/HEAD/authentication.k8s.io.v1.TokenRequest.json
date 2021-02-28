@@ -36,24 +36,25 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
   "spec": {
     "audiences": [
-      "19"
+      "20"
     ],
     "expirationSeconds": 3850803321873644574,
     "boundObjectRef": {
-      "kind": "20",
-      "apiVersion": "21",
-      "name": "22",
+      "kind": "21",
+      "apiVersion": "22",
+      "name": "23",
       "uid": "r鯹)晿\u003co,c鮽ort昍řČ扷5ƗǸ"
     }
   },
   "status": {
-    "token": "23",
+    "token": "24",
     "expirationTimestamp": "1999-07-03T22:31:10Z"
   }
 }
