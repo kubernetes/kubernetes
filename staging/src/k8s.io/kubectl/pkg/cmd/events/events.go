@@ -19,6 +19,7 @@ package events
 import (
 	"context"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"time"
@@ -132,35 +133,42 @@ func (o EventsOptions) Run() error {
 
 	sort.Sort(SortableEvents(el.Items))
 
-	if o.AllNamespaces {
-		fmt.Fprintf(w, "NAMESPACE\t")
-	}
-	fmt.Fprintf(w, "LAST SEEN\tTYPE\tREASON\tOBJECT\tMESSAGE\n")
-
+	printHeadings(w, o.AllNamespaces)
 	for _, e := range el.Items {
-		var interval string
-		if e.Count > 1 {
-			interval = fmt.Sprintf("%s (x%d over %s)", translateTimestampSince(e.LastTimestamp.Time), e.Count, translateTimestampSince(e.FirstTimestamp.Time))
-		} else {
-			interval = translateTimestampSince(eventTime(e))
-		}
-		source := e.Source.Component
-		if source == "" {
-			source = e.ReportingController
-		}
-		if o.AllNamespaces {
-			fmt.Fprintf(w, "%v\t", e.Namespace)
-		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s/%s\t%v\n",
-			interval,
-			e.Type,
-			e.Reason,
-			e.InvolvedObject.Kind, e.InvolvedObject.Name,
-			strings.TrimSpace(e.Message),
-		)
+		printOneEvent(w, e, o.AllNamespaces)
 	}
 
 	return nil
+}
+
+func printHeadings(w io.Writer, allNamespaces bool) {
+	if allNamespaces {
+		fmt.Fprintf(w, "NAMESPACE\t")
+	}
+	fmt.Fprintf(w, "LAST SEEN\tTYPE\tREASON\tOBJECT\tMESSAGE\n")
+}
+
+func printOneEvent(w io.Writer, e corev1.Event, allNamespaces bool) {
+	var interval string
+	if e.Count > 1 {
+		interval = fmt.Sprintf("%s (x%d over %s)", translateTimestampSince(e.LastTimestamp.Time), e.Count, translateTimestampSince(e.FirstTimestamp.Time))
+	} else {
+		interval = translateTimestampSince(eventTime(e))
+	}
+	source := e.Source.Component
+	if source == "" {
+		source = e.ReportingController
+	}
+	if allNamespaces {
+		fmt.Fprintf(w, "%v\t", e.Namespace)
+	}
+	fmt.Fprintf(w, "%s\t%s\t%s\t%s/%s\t%v\n",
+		interval,
+		e.Type,
+		e.Reason,
+		e.InvolvedObject.Kind, e.InvolvedObject.Name,
+		strings.TrimSpace(e.Message),
+	)
 }
 
 // SortableEvents implements sort.Interface for []api.Event by time
