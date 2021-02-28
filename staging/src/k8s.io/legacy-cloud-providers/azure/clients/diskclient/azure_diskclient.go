@@ -65,11 +65,11 @@ func New(config *azclients.ClientConfig) *Client {
 	armClient := armclient.New(authorizer, baseURI, config.UserAgent, apiVersion, config.Location, config.Backoff)
 	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 
-	klog.V(2).Infof("Azure DisksClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPS,
+	klog.V(2).InfoS("Azure DisksClient (read ops) using rate limit config", "QPS",
+		config.RateLimitConfig.CloudProviderRateLimitQPS, "bucket",
 		config.RateLimitConfig.CloudProviderRateLimitBucket)
-	klog.V(2).Infof("Azure DisksClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+	klog.V(2).InfoS("Azure DisksClient (write ops) using rate limit config", "QPS",
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite, "bucket",
 		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
 
 	client := &Client{
@@ -126,7 +126,7 @@ func (c *Client) getDisk(ctx context.Context, resourceGroupName string, diskName
 	response, rerr := c.armClient.GetResource(ctx, resourceID, "")
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "disk.get.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in disk.get.request", "resourceID", resourceID, "error", rerr.Error())
 		return result, rerr
 	}
 
@@ -135,7 +135,7 @@ func (c *Client) getDisk(ctx context.Context, resourceGroupName string, diskName
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result))
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "disk.get.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in disk.get.respond", "resourceID", resourceID, "error", err)
 		return result, retry.GetError(response, err)
 	}
 
@@ -186,14 +186,14 @@ func (c *Client) createOrUpdateDisk(ctx context.Context, resourceGroupName strin
 	response, rerr := c.armClient.PutResource(ctx, resourceID, diskParameter)
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "disk.put.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in disk.put.request", "resourceID",resourceID,  "error", rerr.Error())
 		return rerr
 	}
 
 	if response != nil && response.StatusCode != http.StatusNoContent {
 		_, rerr = c.createOrUpdateResponder(response)
 		if rerr != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "disk.put.respond", resourceID, rerr.Error())
+			klog.V(5).InfoS("Received error in disk.put.respond", "resourceID",resourceID,  "error", rerr.Error())
 			return rerr
 		}
 	}
@@ -254,14 +254,14 @@ func (c *Client) updateDisk(ctx context.Context, resourceGroupName string, diskN
 	response, rerr := c.armClient.PatchResource(ctx, resourceID, diskParameter)
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "disk.put.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in disk.put.request", "resourceID",  resourceID, "error",rerr.Error())
 		return rerr
 	}
 
 	if response != nil && response.StatusCode != http.StatusNoContent {
 		_, rerr = c.updateResponder(response)
 		if rerr != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "disk.put.respond", resourceID, rerr.Error())
+			klog.V(5).InfoS("Received error in disk.put.respond", "resourceID", resourceID, "error", rerr.Error())
 			return rerr
 		}
 	}
@@ -335,14 +335,14 @@ func (c *Client) ListByResourceGroup(ctx context.Context, resourceGroupName stri
 	resp, rerr := c.armClient.GetResource(ctx, resourceID, "")
 	defer c.armClient.CloseResponse(ctx, resp)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "disk.list.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in disk.list.request", "resourceID", resourceID, "error", rerr.Error())
 		return result, rerr
 	}
 
 	var err error
 	page.dl, err = c.listResponder(resp)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "disk.list.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in disk.list.respond", "resourceID", resourceID, "error", err)
 		return result, retry.GetError(resp, err)
 	}
 
@@ -355,7 +355,7 @@ func (c *Client) ListByResourceGroup(ctx context.Context, resourceGroupName stri
 		}
 
 		if err = page.NextWithContext(ctx); err != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "disk.list.next", resourceID, err)
+			klog.V(5).InfoS("Received error in disk.list.next", "resourceID", resourceID, "error", err)
 			return result, retry.GetError(page.Response().Response.Response, err)
 		}
 	}
