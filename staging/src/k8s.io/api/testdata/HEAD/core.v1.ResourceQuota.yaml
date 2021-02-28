@@ -17,6 +17,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -37,7 +38,7 @@ spec:
     - operator: 獚敆ȎțêɘĲ斬³;Ơ歿:狞夌碕ʂɭ
       scopeName: ʕVŚ(ĿȊ甞谐颋ǅSǡƏS$+½H牗
       values:
-      - "19"
+      - "20"
   scopes:
   - Ĩɘ.蘯6ċV夸eɑeʤ脽ěĂ
 status:

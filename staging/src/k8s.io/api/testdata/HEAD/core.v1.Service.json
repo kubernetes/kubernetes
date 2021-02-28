@@ -36,38 +36,39 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
   "spec": {
     "ports": [
       {
-        "name": "19",
+        "name": "20",
         "protocol": "@Hr鯹)晿",
-        "appProtocol": "20",
+        "appProtocol": "21",
         "port": 202283346,
-        "targetPort": "21",
+        "targetPort": "22",
         "nodePort": -474380055
       }
     ],
     "selector": {
-      "22": "23"
+      "23": "24"
     },
-    "clusterIP": "24",
+    "clusterIP": "25",
     "clusterIPs": [
-      "25"
+      "26"
     ],
     "type": "鮽ort昍řČ扷5ƗǸƢ6/ʕVŚ(Ŀ",
     "externalIPs": [
-      "26"
+      "27"
     ],
     "sessionAffinity": "甞谐颋ǅS",
-    "loadBalancerIP": "27",
+    "loadBalancerIP": "28",
     "loadBalancerSourceRanges": [
-      "28"
+      "29"
     ],
-    "externalName": "29",
+    "externalName": "30",
     "externalTrafficPolicy": "ƏS$+½H牗洝尿",
     "healthCheckNodePort": -1965738697,
     "publishNotReadyAddresses": true,
@@ -77,27 +78,27 @@
       }
     },
     "topologyKeys": [
-      "30"
+      "31"
     ],
     "ipFamilies": [
       "斬³;Ơ歿:狞夌碕ʂɭîcP$Iņɖ"
     ],
     "ipFamilyPolicy": "9ȫŚ",
     "allocateLoadBalancerNodePorts": true,
-    "loadBalancerClass": "31",
+    "loadBalancerClass": "32",
     "internalTrafficPolicy": ""
   },
   "status": {
     "loadBalancer": {
       "ingress": [
         {
-          "ip": "32",
-          "hostname": "33",
+          "ip": "33",
+          "hostname": "34",
           "ports": [
             {
               "port": 684408190,
               "protocol": "ƈ斎AO6ĴC浔Ű",
-              "error": "34"
+              "error": "35"
             }
           ]
         }
@@ -105,12 +106,12 @@
     },
     "conditions": [
       {
-        "type": "35",
+        "type": "36",
         "status": "ž(-譵",
         "observedGeneration": -8651056334266075769,
         "lastTransitionTime": "2404-01-10T11:35:42Z",
-        "reason": "36",
-        "message": "37"
+        "reason": "37",
+        "message": "38"
       }
     ]
   }

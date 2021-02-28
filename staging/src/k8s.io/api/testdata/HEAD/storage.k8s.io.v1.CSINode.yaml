@@ -17,6 +17,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -33,7 +34,7 @@ spec:
   drivers:
   - allocatable:
       count: 1305381319
-    name: "19"
-    nodeID: "20"
+    name: "20"
+    nodeID: "21"
     topologyKeys:
-    - "21"
+    - "22"

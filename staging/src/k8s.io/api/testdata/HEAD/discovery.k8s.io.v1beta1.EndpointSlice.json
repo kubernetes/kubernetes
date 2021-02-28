@@ -36,7 +36,8 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
@@ -44,31 +45,31 @@
   "endpoints": [
     {
       "addresses": [
-        "19"
+        "20"
       ],
       "conditions": {
         "ready": false,
         "serving": false,
         "terminating": false
       },
-      "hostname": "20",
+      "hostname": "21",
       "targetRef": {
-        "kind": "21",
-        "namespace": "22",
-        "name": "23",
+        "kind": "22",
+        "namespace": "23",
+        "name": "24",
         "uid": "ɑ",
-        "apiVersion": "24",
-        "resourceVersion": "25",
-        "fieldPath": "26"
+        "apiVersion": "25",
+        "resourceVersion": "26",
+        "fieldPath": "27"
       },
       "topology": {
-        "27": "28"
+        "28": "29"
       },
-      "nodeName": "29",
+      "nodeName": "30",
       "hints": {
         "forZones": [
           {
-            "name": "30"
+            "name": "31"
           }
         ]
       }
@@ -76,10 +77,10 @@
   ],
   "ports": [
     {
-      "name": "31",
+      "name": "32",
       "protocol": "ěĂ凗蓏Ŋ蛊ĉy緅縕",
       "port": -591435092,
-      "appProtocol": "32"
+      "appProtocol": "33"
     }
   ]
 }

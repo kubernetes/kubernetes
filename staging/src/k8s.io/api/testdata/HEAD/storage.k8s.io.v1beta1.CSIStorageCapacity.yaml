@@ -19,6 +19,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -39,4 +40,4 @@ nodeTopology:
     - D07.a_.y_y_o0_5qN2_---_M.N_._a6.9bHjdH.-.5_.I8__n
   matchLabels:
     8---jop9641lg.p-g8c2-k-912e5-c-e63-n-3n/E9.8ThjT9s-j41-0-6p-JFHn7y-74.-0MUORQQ.N2.3: 68._bQw.-dG6c-.6--_x.--0wmZk1_8._3s_-_Bq.m_4
-storageClassName: "25"
+storageClassName: "26"

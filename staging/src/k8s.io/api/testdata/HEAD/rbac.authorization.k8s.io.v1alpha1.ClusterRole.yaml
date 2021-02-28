@@ -26,6 +26,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -40,12 +41,12 @@ metadata:
   uid: "7"
 rules:
 - apiGroups:
-  - "20"
-  nonResourceURLs:
-  - "23"
-  resourceNames:
-  - "22"
-  resources:
   - "21"
+  nonResourceURLs:
+  - "24"
+  resourceNames:
+  - "23"
+  resources:
+  - "22"
   verbs:
-  - "19"
+  - "20"

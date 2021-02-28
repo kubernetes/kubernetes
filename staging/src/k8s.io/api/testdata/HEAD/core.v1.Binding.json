@@ -36,17 +36,18 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
   "target": {
-    "kind": "19",
-    "namespace": "20",
-    "name": "21",
+    "kind": "20",
+    "namespace": "21",
+    "name": "22",
     "uid": "īqJ枊a8衍`Ĩɘ.蘯",
-    "apiVersion": "22",
-    "resourceVersion": "23",
-    "fieldPath": "24"
+    "apiVersion": "23",
+    "resourceVersion": "24",
+    "fieldPath": "25"
   }
 }

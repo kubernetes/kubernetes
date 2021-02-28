@@ -17,6 +17,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -36,7 +37,7 @@ spec:
   requiresRepublish: false
   storageCapacity: true
   tokenRequests:
-  - audience: "19"
+  - audience: "20"
     expirationSeconds: -8506428344202195448
   volumeLifecycleModes:
   - r鯹)晿<o,c鮽ort昍řČ扷5ƗǸ
