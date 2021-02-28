@@ -60,11 +60,10 @@ func New(config *azclients.ClientConfig) *Client {
 	armClient := armclient.New(authorizer, baseURI, config.UserAgent, APIVersion, config.Location, config.Backoff)
 	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 
-	klog.V(2).Infof("Azure ContainerServiceClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPS,
-		config.RateLimitConfig.CloudProviderRateLimitBucket)
-	klog.V(2).Infof("Azure ContainerServiceClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+	klog.V(2).InfoS("Azure ContainerServiceClient (read ops) using rate limit config","QPS=",
+		config.RateLimitConfig.CloudProviderRateLimitQPS,"bucket", config.RateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).InfoS("Azure ContainerServiceClient (write ops) using rate limit config", "QPS=",
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite, "bucket",
 		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
 
 	client := &Client{
@@ -121,7 +120,7 @@ func (c *Client) getManagedCluster(ctx context.Context, resourceGroupName string
 	response, rerr := c.armClient.GetResource(ctx, resourceID, "")
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "managedcluster.get.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in managedcluster.get.request","resourceID", resourceID, "error", rerr.Error())
 		return result, rerr
 	}
 
@@ -130,7 +129,7 @@ func (c *Client) getManagedCluster(ctx context.Context, resourceGroupName string
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result))
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "managedcluster.get.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in managedcluster.get.respond", "resourceID", resourceID, "error", err)
 		return result, retry.GetError(response, err)
 	}
 
@@ -181,14 +180,14 @@ func (c *Client) listManagedCluster(ctx context.Context, resourceGroupName strin
 	resp, rerr := c.armClient.GetResource(ctx, resourceID, "")
 	defer c.armClient.CloseResponse(ctx, resp)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "managedcluster.list.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in managedcluster.list.request","resourceID", resourceID, "error", rerr.Error())
 		return result, rerr
 	}
 
 	var err error
 	page.mclr, err = c.listResponder(resp)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "managedcluster.list.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in managedcluster.list.respond", "resourceID", resourceID, "error", err)
 		return result, retry.GetError(resp, err)
 	}
 
@@ -201,7 +200,7 @@ func (c *Client) listManagedCluster(ctx context.Context, resourceGroupName strin
 		}
 
 		if err = page.NextWithContext(ctx); err != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "managedcluster.list.next", resourceID, err)
+			klog.V(5).InfoS("Received error in managedcluster.list.next", "resourceID", resourceID, "error", err)
 			return result, retry.GetError(page.Response().Response.Response, err)
 		}
 	}
@@ -349,14 +348,14 @@ func (c *Client) createOrUpdateManagedCluster(ctx context.Context, resourceGroup
 	response, rerr := c.armClient.PutResourceWithDecorators(ctx, resourceID, parameters, decorators)
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "managedCluster.put.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in managedCluster.put.request", "resourceID", resourceID, "error", rerr.Error())
 		return rerr
 	}
 
 	if response != nil && response.StatusCode != http.StatusNoContent {
 		_, rerr = c.createOrUpdateResponder(response)
 		if rerr != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "managedCluster.put.respond", resourceID, rerr.Error())
+			klog.V(5).InfoS("Received error in managedCluster.put.respond", "resourceID", resourceID, "error", rerr.Error())
 			return rerr
 		}
 	}
