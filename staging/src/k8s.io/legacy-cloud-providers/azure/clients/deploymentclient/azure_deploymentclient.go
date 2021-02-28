@@ -60,11 +60,11 @@ func New(config *azclients.ClientConfig) *Client {
 	armClient := armclient.New(authorizer, baseURI, config.UserAgent, APIVersion, config.Location, config.Backoff)
 	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 
-	klog.V(2).Infof("Azure DeploymentClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPS,
+	klog.V(2).InfoS("Azure DeploymentClient (read ops) using rate limit config", "QPS=",
+		config.RateLimitConfig.CloudProviderRateLimitQPS, "bucket",
 		config.RateLimitConfig.CloudProviderRateLimitBucket)
-	klog.V(2).Infof("Azure DeploymentClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+	klog.V(2).Infof("Azure DeploymentClient (write ops) using rate limit config", "QPS=",
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite, "bucket",
 		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
 
 	client := &Client{
@@ -121,7 +121,7 @@ func (c *Client) getDeployment(ctx context.Context, resourceGroupName string, de
 	response, rerr := c.armClient.GetResource(ctx, resourceID, "")
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "deployment.get.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in deployment.get.request","resourceID", resourceID, "error", rerr.Error())
 		return result, rerr
 	}
 
@@ -130,7 +130,7 @@ func (c *Client) getDeployment(ctx context.Context, resourceGroupName string, de
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result))
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "deployment.get.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in deployment.get.respond", "resourceID", resourceID, "error", err)
 		return result, retry.GetError(response, err)
 	}
 
@@ -181,14 +181,14 @@ func (c *Client) listDeployment(ctx context.Context, resourceGroupName string) (
 	resp, rerr := c.armClient.GetResource(ctx, resourceID, "")
 	defer c.armClient.CloseResponse(ctx, resp)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "deployment.list.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in deployment.list.request", "resource", resourceID, "error", rerr.Error())
 		return result, rerr
 	}
 
 	var err error
 	page.dplr, err = c.listResponder(resp)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "deployment.list.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in deployment.list.respond", "resourceID", resourceID, "error", err)
 		return result, retry.GetError(resp, err)
 	}
 
@@ -201,7 +201,7 @@ func (c *Client) listDeployment(ctx context.Context, resourceGroupName string) (
 		}
 
 		if err = page.NextWithContext(ctx); err != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "deployment.list.next", resourceID, err)
+			klog.V(5).Infof("Received error in deployment.list.next", "resourceID", resourceID, "error", err)
 			return result, retry.GetError(page.Response().Response.Response, err)
 		}
 	}
@@ -348,14 +348,14 @@ func (c *Client) createOrUpdateDeployment(ctx context.Context, resourceGroupName
 	response, rerr := c.armClient.PutResourceWithDecorators(ctx, resourceID, parameters, decorators)
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "deployment.put.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in deployment.put.request", "resourceID", resourceID,  "error",rerr.Error())
 		return rerr
 	}
 
 	if response != nil && response.StatusCode != http.StatusNoContent {
 		_, rerr = c.createOrUpdateResponder(response)
 		if rerr != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "deployment.put.respond", resourceID, rerr.Error())
+			klog.V(5).InfoS("Received error in deployment.put.respond", "resourceID", resourceID,  "error", rerr.Error())
 			return rerr
 		}
 	}
@@ -440,7 +440,7 @@ func (c *Client) ExportTemplate(ctx context.Context, resourceGroupName string, d
 	response, rerr := c.armClient.PostResource(ctx, resourceID, "exportTemplate", struct{}{})
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "deployment.exportTemplate.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in deployment.exportTemplate.request", "resourceID", resourceID, "error", rerr.Error())
 		return
 	}
 
@@ -449,7 +449,7 @@ func (c *Client) ExportTemplate(ctx context.Context, resourceGroupName string, d
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result))
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "deployment.exportTemplate.respond", resourceID, err)
+		klog.V(5).Infof("Received error in deployment.exportTemplate.respond", "resourceID", resourceID, "error", err)
 		return result, retry.GetError(response, err)
 	}
 
