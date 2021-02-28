@@ -173,9 +173,21 @@ func ScalesDown(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
+	// Update so set.Status is set for the next scaleDownStatefulSetControl call.
+	var err error
+	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
 	*set.Spec.Replicas = 0
 	if err := scaleDownStatefulSetControl(set, ssc, spc, invariants); err != nil {
 		t.Errorf("Failed to scale StatefulSet : %s", err)
+	}
+
+	// Check updated set.
+	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
 	if set.Status.Replicas != 0 {
 		t.Error("Failed to scale statefulset to 0 replicas")
@@ -306,10 +318,15 @@ func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil && isOrHasInternalError(err) {
 		t.Errorf("StatefulSetControl did not return InternalError found %s", err)
 	}
+	// Update so set.Status is set for the next scaleUpStatefulSetControl call.
+	var err error
+	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
 	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
-	var err error
 	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
@@ -377,10 +394,15 @@ func UpdateSetStatusFailure(t *testing.T, set *apps.StatefulSet, invariants inva
 	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil && isOrHasInternalError(err) {
 		t.Errorf("StatefulSetControl did not return InternalError found %s", err)
 	}
+	// Update so set.Status is set for the next scaleUpStatefulSetControl call.
+	var err error
+	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
 	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
-	var err error
 	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
@@ -462,6 +484,10 @@ func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
 	spc.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
 	if err := scaleDownStatefulSetControl(set, ssc, spc, invariants); err != nil && isOrHasInternalError(err) {
 		t.Errorf("StatefulSetControl failed to throw error on delete %s", err)
+	}
+	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
 	if err := scaleDownStatefulSetControl(set, ssc, spc, invariants); err != nil {
 		t.Errorf("Failed to turn down StatefulSet %s", err)
