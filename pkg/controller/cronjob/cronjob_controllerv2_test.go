@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -311,12 +310,23 @@ func Test_syncCronJob(t *testing.T) {
 
 }
 
+type fakeQueue struct {
+	workqueue.RateLimitingInterface
+	t   time.Duration
+	key interface{}
+}
+
+func (f *fakeQueue) AddAfter(key interface{}, t time.Duration) {
+	f.t = t
+	f.key = key
+}
+
 // this test will take around 61 seconds to complete
 func TestController2_updateCronJob(t *testing.T) {
 	cjc := &fakeCJControl{}
 	jc := &fakeJobControl{}
 	type fields struct {
-		queue          workqueue.RateLimitingInterface
+		queue          *fakeQueue
 		recorder       record.EventRecorder
 		jobControl     jobControlInterface
 		cronJobControl cjControlInterface
@@ -328,16 +338,15 @@ func TestController2_updateCronJob(t *testing.T) {
 		newJobSchedule string
 	}
 	tests := []struct {
-		name                 string
-		fields               fields
-		args                 args
-		deltaTimeForQueue    time.Duration
-		roundOffTimeDuration time.Duration
+		name              string
+		fields            fields
+		args              args
+		deltaTimeForQueue time.Duration
 	}{
 		{
 			name: "spec.template changed",
 			fields: fields{
-				queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-update-cronjob"),
+				queue:          &fakeQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-update-cronjob")},
 				recorder:       record.NewFakeRecorder(10),
 				jobControl:     jc,
 				cronJobControl: cjc,
@@ -358,13 +367,12 @@ func TestController2_updateCronJob(t *testing.T) {
 					Spec: jobSpec(),
 				},
 			},
-			deltaTimeForQueue:    0 * time.Second,
-			roundOffTimeDuration: 500*time.Millisecond + nextScheduleDelta,
+			deltaTimeForQueue: 0 * time.Second,
 		},
 		{
 			name: "spec.schedule changed",
 			fields: fields{
-				queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-update-cronjob"),
+				queue:          &fakeQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-update-cronjob")},
 				recorder:       record.NewFakeRecorder(10),
 				jobControl:     jc,
 				cronJobControl: cjc,
@@ -373,8 +381,7 @@ func TestController2_updateCronJob(t *testing.T) {
 				oldJobSchedule: "30 * * * *",
 				newJobSchedule: "*/1 * * * *",
 			},
-			deltaTimeForQueue:    1*time.Second + nextScheduleDelta,
-			roundOffTimeDuration: 750 * time.Millisecond,
+			deltaTimeForQueue: 1*time.Second + nextScheduleDelta,
 		},
 		// TODO: Add more test cases for updating scheduling.
 	}
@@ -401,22 +408,10 @@ func TestController2_updateCronJob(t *testing.T) {
 				cronJobControl: tt.fields.cronJobControl,
 			}
 			jm.now = justASecondBeforeTheHour
-			now := time.Now()
-			then := time.Now()
-			wg := sync.WaitGroup{}
-			wg.Add(1)
-			go func() {
-				now = time.Now()
-				jm.queue.Get()
-				then = time.Now()
-				wg.Done()
-				return
-			}()
 			jm.updateCronJob(&cj, &newCj)
-			wg.Wait()
-			d := then.Sub(now)
-			if d.Round(tt.roundOffTimeDuration).Seconds() != tt.deltaTimeForQueue.Round(tt.roundOffTimeDuration).Seconds() {
-				t.Errorf("Expected %#v got %#v", tt.deltaTimeForQueue.Round(tt.roundOffTimeDuration).String(), d.Round(tt.roundOffTimeDuration).String())
+
+			if tt.fields.queue.t.Seconds() != tt.deltaTimeForQueue.Seconds() {
+				t.Errorf("Expected %#v got %#v", tt.deltaTimeForQueue.Seconds(), tt.fields.queue.t.Seconds())
 			}
 		})
 	}
