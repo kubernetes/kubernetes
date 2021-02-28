@@ -102,7 +102,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		}
 		return cloud
 	}
-	command := app.NewCloudControllerManagerCommand(s, cloudInitializer, app.DefaultInitFuncConstructors, stopCh)
+	command := app.NewCloudControllerManagerCommand(s, cloudInitializer, app.DefaultInitFuncConstructors, nil, stopCh)
 	pflag.CommandLine.SetNormalizeFunc(flag.WordSepNormalizeFunc)
 
 	commandArgs := []string{}
