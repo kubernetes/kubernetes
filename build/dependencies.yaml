@@ -32,21 +32,10 @@ dependencies:
     - path: test/utils/image/manifest.go
       match: configs\[Agnhost\] = Config{promoterE2eRegistry, "agnhost", "\d+\.\d+"}
 
-  # Bazel
-  - name: "repo-infra"
-    version: 0.2.0
-    refPaths:
-    - path: build/root/WORKSPACE
-      match: strip_prefix = "repo-infra-\d+.\d+.\d+"
-    - path: build/root/WORKSPACE
-      match: https://github.com/kubernetes/repo-infra/archive/v\d+.\d+.\d+.tar.gz
-
   # CNI plugins
   - name: "cni"
     version: 0.8.7
     refPaths:
-    - path: build/workspace.bzl
-      match: CNI_VERSION =
     - path: cluster/gce/gci/configure.sh
       match: DEFAULT_CNI_VERSION=
     - path: cluster/gce/config-common.sh
@@ -75,8 +64,6 @@ dependencies:
   - name: "crictl"
     version: 1.20.0
     refPaths:
-    - path: build/workspace.bzl
-      match: CRI_TOOLS_VERSION =
     - path: cluster/gce/gci/configure.sh
       match: DEFAULT_CRICTL_VERSION=
     - path: cluster/gce/windows/k8s-node-setup.psm1
@@ -95,8 +82,6 @@ dependencies:
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
-    - path: build/workspace.bzl
-      match: ETCD_VERSION
     - path: cluster/gce/upgrade-aliases.sh
       match: ETCD_IMAGE|ETCD_VERSION
     - path: cmd/kubeadm/app/constants/constants.go
@@ -119,8 +104,6 @@ dependencies:
     version: 1.15.8
     refPaths:
     - path: build/build-image/cross/VERSION
-    - path: build/root/WORKSPACE
-      match: (override_)?go_version = "\d+.\d+(alpha|beta|rc)?\.?\d+"
     - path: cluster/addons/fluentd-elasticsearch/es-image/Dockerfile
       match: 'FROM golang\:\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
     - path: test/images/Makefile
@@ -139,8 +122,6 @@ dependencies:
   - name: "k8s.gcr.io/debian-base: dependents"
     version: buster-v1.4.0
     refPaths:
-    - path: build/workspace.bzl
-      match: tag =
     - path: cluster/images/etcd/Makefile
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
@@ -157,8 +138,6 @@ dependencies:
     refPaths:
     - path: build/common.sh
       match: __default_debian_iptables_version=
-    - path: build/workspace.bzl
-      match: tag =
     - path: test/utils/image/manifest.go
       match: configs\[DebianIptables\] = Config{buildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
 
@@ -167,8 +146,6 @@ dependencies:
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=
-    - path: build/workspace.bzl
-      match: tag =
 
   - name: "k8s.gcr.io/pause"
     version: 3.4
