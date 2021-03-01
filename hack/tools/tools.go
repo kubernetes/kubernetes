@@ -30,11 +30,6 @@ import (
 	_ "gotest.tools"
 	_ "gotest.tools/gotestsum"
 
-	// bazel-related tools
-	_ "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
-	_ "github.com/bazelbuild/buildtools/buildozer"
-	_ "k8s.io/repo-infra/cmd/kazel"
-
 	// dependencies
 	_ "sigs.k8s.io/zeitgeist"
 )
