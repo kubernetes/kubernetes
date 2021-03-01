@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	// "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
@@ -501,6 +502,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 
 	var jr *apiregistrationv1.APIService
 	err = json.Unmarshal([]byte(statusContent), &jr)
+	framework.Logf("wardle statusContent:\n%#v", jr)
 	framework.ExpectNoError(err, "Failed to process statusContent: %v | err: %v ", string(statusContent), err)
 	framework.ExpectEqual(jr.Status.Conditions[0].Message, "all checks passed", "The Message returned was %v", jr.Status.Conditions[0].Message)
 
@@ -535,6 +537,39 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 		}
 	}
 	framework.ExpectEqual(locatedWardle, true, "Unable to find v1alpha1.wardle.example.com in APIServiceList")
+
+	// ginkgo.By("List APIServices")
+	// listApiservices, err := restClient.Get().
+	// 	AbsPath("/apis/apiregistration.k8s.io/v1/apiservices").
+	// 	SetHeader("Accept", "application/json").DoRaw(context.TODO())
+
+	// flunderPatch, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&apiregistrationv1.APIService{
+	// 	Status: apiregistrationv1.APIServiceStatus{
+	// 		Conditions: []apiregistrationv1.APIServiceCondition{{
+	// 			Message: "patched",
+	// 		}},
+	// 	},
+	// })
+	// framework.ExpectNoError(err, "failed to unstructure flunder patch")
+
+	// flunderJSONPatch, err := json.Marshal(unstructuredv1.Unstructured{Object: flunderPatch})
+	// framework.ExpectNoError(err, "failed to marshal flunder patch into JSON")
+
+	// // push an update
+	// ginkgo.By(fmt.Sprintf("patching %v in %v", flunderName, namespace))
+	// _, err = dynamicClient.Patch(context.TODO(), flunderName, types.StrategicMergePatchType, flunderJSONPatch, metav1.PatchOptions{}, "status")
+	// framework.ExpectNoError(err, "failed to patch flunder resource")
+
+	patchStatusContent, err := restClient.Patch(types.MergePatchType).
+		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/v1alpha1.wardle.example.com/status").
+		SetHeader("Accept", "application/json").
+		// Body([]byte(`{"status":{"versionPriority": 400}}`)).
+		Body([]byte(`{"status":{"conditions": [{"message": "patched"}]}}`)).
+		// Body([]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},{"status":{"versionPriority": 400}}`)).
+		DoRaw(context.TODO())
+	framework.Logf("err: %#v", err)
+
+	framework.Logf("patchStatusContent:\n%#v", string(patchStatusContent))
 
 	// kubectl delete flunder test-flunder
 	err = dynamicClient.Delete(context.TODO(), flunderName, metav1.DeleteOptions{})
