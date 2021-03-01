@@ -91,6 +91,7 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 }
 
 func (a *TokenAuthenticator) AuthenticateToken(ctx context.Context, value string) (*authenticator.Response, bool, error) {
+	// This comment is from a DiRT patching exercise. See b/181568045.
 	user, ok := a.tokens[value]
 	if !ok {
 		return nil, false, nil
