@@ -285,7 +285,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [k8s.io] [sig-node] kubelet [k8s.io] [sig-node] host cleanup with volume mounts [sig-storage][HostCleanup][Flaky] Host cleanup after disrupting NFS volume [NFS] after stopping the nfs-server and deleting the (sleeping) client pod, the NFS mount and the pod's UID directory should be removed.": "after stopping the nfs-server and deleting the (sleeping) client pod, the NFS mount and the pod's UID directory should be removed. [Suite:k8s]",
 
-	"[Top Level] [sig-api-machinery] API priority and fairness should ensure that requests can be classified by testing flow-schemas/priority-levels": "should ensure that requests can be classified by testing flow-schemas/priority-levels [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-api-machinery] API priority and fairness should ensure that requests can be classified by adding FlowSchema and PriorityLevelConfiguration": "should ensure that requests can be classified by adding FlowSchema and PriorityLevelConfiguration [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-api-machinery] API priority and fairness should ensure that requests can't be drowned out (fairness)": "should ensure that requests can't be drowned out (fairness) [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
