@@ -261,7 +261,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		serviceIPAllocators[secondaryServiceClusterIPAllocator.IPFamily()] = secondaryServiceClusterIPAllocator
 	}
 
-	serviceRESTStorage, serviceStatusStorage, serviceRESTProxy, err := servicestore.NewGenericREST(
+	serviceRESTStorage, serviceStatusStorage, serviceRESTProxy, err := servicestore.NewREST(
 		restOptionsGetter,
 		serviceClusterIPAllocator.IPFamily(),
 		serviceIPAllocators,
