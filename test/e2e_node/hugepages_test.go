@@ -337,7 +337,8 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			setHugepages()
 
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
-			restartKubelet()
+			// stop the kubelet and wait until the server will restart it automatically
+			stopKubelet()
 
 			waitForHugepages()
 
@@ -352,7 +353,8 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			releaseHugepages()
 
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
-			restartKubelet()
+			// stop the kubelet and wait until the server will restart it automatically
+			stopKubelet()
 
 			waitForHugepages()
 		})
