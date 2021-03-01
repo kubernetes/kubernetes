@@ -24,14 +24,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	clientset "k8s.io/client-go/kubernetes"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
-
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 )
@@ -117,7 +118,15 @@ func BuildAuthz(client authorizationclient.SubjectAccessReviewInterface, authz k
 			DenyCacheTTL:              authz.Webhook.CacheUnauthorizedTTL.Duration,
 			WebhookRetryBackoff:       genericoptions.DefaultAuthWebhookRetryBackoff(),
 		}
-		return authorizerConfig.New()
+		delegatingAuthorizer, err := authorizerConfig.New()
+		if err != nil {
+			return nil, err
+		}
+
+		return union.New(
+			authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup),
+			delegatingAuthorizer,
+		), nil
 
 	case "":
 		return nil, fmt.Errorf("no authorization mode specified")
