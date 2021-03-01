@@ -241,7 +241,10 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 			values, err = parser.FindResults(reflect.ValueOf(obj).Elem().Interface())
 		}
 
-		if err != nil {
+		if err != nil && strings.Contains(fmt.Sprint(err), "array index out of bounds") {
+			// print <none> and the parsing error when out of bound error like .status.conditions[99].status and continue
+			fmt.Fprintln(out, err)
+		} else if err != nil {
 			return err
 		}
 		valueStrings := []string{}

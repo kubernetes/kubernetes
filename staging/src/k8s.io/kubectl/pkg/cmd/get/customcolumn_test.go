@@ -421,10 +421,13 @@ fake3
 			expectErr: false,
 		},
 		{
-			name:           "containers[5], illegal expression because it is out of bounds",
-			spec:           "CONTAINER:.spec.containers[5].name",
-			expectedOutput: "",
-			expectErr:      true,
+			name: "containers[5], print <none> because it is out of bounds",
+			spec: "CONTAINER:.spec.containers[5].name",
+			expectedOutput: `CONTAINER
+array index out of bounds: index 5, length 4
+<none>
+`,
+			expectErr: false,
 		},
 		{
 			name: "containers[-1], it equals containers[3]",
@@ -451,10 +454,13 @@ fake0
 			expectErr: false,
 		},
 		{
-			name:           "containers[-5], illegal expression because it is out of bounds",
-			spec:           "CONTAINER:.spec.containers[-5].name",
-			expectedOutput: "",
-			expectErr:      true,
+			name: "containers[-5], print <none> for illegal expression because it is out of bounds",
+			spec: "CONTAINER:.spec.containers[-5].name",
+			expectedOutput: `CONTAINER
+array index out of bounds: index -1, length 4
+<none>
+`,
+			expectErr: false,
 		},
 		{
 			name: "containers[0:0], it equals empty set",
@@ -538,6 +544,15 @@ fake1,fake2
 			name: "containers[-5:-5], it equals empty set",
 			spec: "CONTAINER:.spec.containers[-5:-5].name",
 			expectedOutput: `CONTAINER
+<none>
+`,
+			expectErr: false,
+		},
+		{
+			name: "conditions[99], print <none> because it is out of bounds",
+			spec: "STATUS:.status.conditions[99].status",
+			expectedOutput: `STATUS
+array index out of bounds: index 99, length 0
 <none>
 `,
 			expectErr: false,
