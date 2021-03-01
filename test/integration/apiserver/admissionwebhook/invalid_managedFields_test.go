@@ -34,7 +34,9 @@ import (
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	clientset "k8s.io/client-go/kubernetes"
@@ -127,7 +129,7 @@ func TestMutatingWebhookResetsInvalidManagedFields(t *testing.T) {
 		if err != nil {
 			return false, err
 		}
-		if err := fieldmanager.ValidateManagedFields(pod.ManagedFields); err != nil {
+		if err := validateManagedFieldsAndDecode(pod.ManagedFields); err != nil {
 			lastErr = err
 			return false, nil
 		}
@@ -152,7 +154,7 @@ func TestMutatingWebhookResetsInvalidManagedFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := fieldmanager.ValidateManagedFields(pod.ManagedFields); err != nil {
+	if err := validateManagedFieldsAndDecode(pod.ManagedFields); err != nil {
 		t.Error(err)
 	}
 	if warningWriter.WarningCount() != 2 {
@@ -162,6 +164,16 @@ func TestMutatingWebhookResetsInvalidManagedFields(t *testing.T) {
 		t.Errorf("unexpected warning, expected: \n%v\n, got: \n%v",
 			expectedWarning, recordedWarnings.String())
 	}
+}
+
+// validate against both decoding and validation to make sure we use the hardest rule between the both to reset
+// with decoding being as strict as it gets, only using it should be enough in admission
+func validateManagedFieldsAndDecode(managedFields []metav1.ManagedFieldsEntry) error {
+	if _, err := fieldmanager.DecodeManagedFields(managedFields); err != nil {
+		return err
+	}
+	validationErrs := v1validation.ValidateManagedFields(managedFields, field.NewPath("metadata").Child("managedFields"))
+	return validationErrs.ToAggregate()
 }
 
 func newInvalidManagedFieldsWebhookHandler(t *testing.T) http.Handler {
