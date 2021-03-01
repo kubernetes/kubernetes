@@ -43,7 +43,7 @@ func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.Net
 	for _, c := range containers {
 		cstats, err := fetchContainerStats(c)
 		if err != nil {
-			klog.V(4).Infof("Failed to fetch statistics for container %q with error '%v', continue to get stats for other containers", c.ID, err)
+			klog.V(4).InfoS("Failed to fetch statistics for container, continue to get stats for other containers", "containerID", c.ID, "err", err)
 			continue
 		}
 		if len(cstats.Network) > 0 {
@@ -86,7 +86,7 @@ func hcsStatsToNetworkStats(timestamp time.Time, hcsStats []hcsshim.NetworkStats
 	for _, stat := range hcsStats {
 		iStat, err := hcsStatsToInterfaceStats(stat)
 		if err != nil {
-			klog.Warningf("Failed to get HNS endpoint %q with error '%v', continue to get stats for other endpoints", stat.EndpointId, err)
+			klog.InfoS("Failed to get HNS endpoint, continue to get stats for other endpoints", "endpointID", stat.EndpointId, "err", err)
 			continue
 		}
 
