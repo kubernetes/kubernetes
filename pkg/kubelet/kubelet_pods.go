@@ -881,6 +881,11 @@ func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
 	pullSecrets := []v1.Secret{}
 
 	for _, secretRef := range pod.Spec.ImagePullSecrets {
+		if len(secretRef.Name) == 0 {
+			// API validation permitted entries with empty names (http://issue.k8s.io/99454#issuecomment-787838112).
+			// Ignore to avoid unnecessary warnings.
+			continue
+		}
 		secret, err := kl.secretManager.GetSecret(pod.Namespace, secretRef.Name)
 		if err != nil {
 			klog.Warningf("Unable to retrieve pull secret %s/%s for %s/%s due to %v.  The image pull may not succeed.", pod.Namespace, secretRef.Name, pod.Namespace, pod.Name, err)
