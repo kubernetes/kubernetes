@@ -99,7 +99,7 @@ func NewTestREST(t *testing.T, ipFamilies []api.IPFamily) (*GenericREST, *etcd3t
 		ResourcePrefix: "endpoints",
 	})
 
-	rest, _, _, err := NewGenericREST(restOptions, api.IPv4Protocol, ipAllocators, portAllocator, endpoints, nil, nil)
+	rest, _, _, err := NewREST(restOptions, api.IPv4Protocol, ipAllocators, portAllocator, endpoints, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
