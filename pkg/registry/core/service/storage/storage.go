@@ -78,8 +78,8 @@ var (
 	_ rest.Redirector             = &GenericREST{}
 )
 
-// NewGenericREST returns a RESTStorage object that will work against services.
-func NewGenericREST(
+// NewREST returns a RESTStorage object that will work against services.
+func NewREST(
 	optsGetter generic.RESTOptionsGetter,
 	serviceIPFamily api.IPFamily,
 	ipAllocs map[api.IPFamily]ipallocator.Interface,
