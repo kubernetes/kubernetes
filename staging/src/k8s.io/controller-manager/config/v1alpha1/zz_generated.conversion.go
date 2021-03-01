@@ -106,6 +106,10 @@ func autoConvert_v1alpha1_GenericControllerManagerConfiguration_To_config_Generi
 	if err := configv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
 	}
+	out.LeaderMigrationEnabled = in.LeaderMigrationEnabled
+	if err := Convert_v1alpha1_LeaderMigrationConfiguration_To_config_LeaderMigrationConfiguration(&in.LeaderMigration, &out.LeaderMigration, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -122,6 +126,10 @@ func autoConvert_config_GenericControllerManagerConfiguration_To_v1alpha1_Generi
 	}
 	out.Controllers = *(*[]string)(unsafe.Pointer(&in.Controllers))
 	if err := configv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
+		return err
+	}
+	out.LeaderMigrationEnabled = in.LeaderMigrationEnabled
+	if err := Convert_config_LeaderMigrationConfiguration_To_v1alpha1_LeaderMigrationConfiguration(&in.LeaderMigration, &out.LeaderMigration, s); err != nil {
 		return err
 	}
 	return nil

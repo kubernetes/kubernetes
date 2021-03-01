@@ -50,6 +50,12 @@ const (
 	// Enables ipv6 dual stack
 	// Original copy from k8s.io/kubernetes/pkg/features/kube_features.go
 	IPv6DualStack featuregate.Feature = "IPv6DualStack"
+
+	// owner: @jiahuif
+	// alpha: v1.21
+	//
+	// Enables Leader Migration for kube-controller-manager and cloud-controller-manager
+	ControllerManagerLeaderMigration featuregate.Feature = "ControllerManagerLeaderMigration"
 )
 
 func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.MutableFeatureGate) error {
@@ -59,7 +65,8 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 // cloudPublicFeatureGates consists of cloud-specific feature keys.
 // To add a new feature, define a key for it at k8s.io/api/pkg/features and add it here.
 var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	LegacyNodeRoleBehavior: {Default: false, PreRelease: featuregate.GA, LockToDefault: true},
-	ServiceNodeExclusion:   {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	IPv6DualStack:          {Default: true, PreRelease: featuregate.Beta},
+	LegacyNodeRoleBehavior:           {Default: false, PreRelease: featuregate.GA, LockToDefault: true},
+	ServiceNodeExclusion:             {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	IPv6DualStack:                    {Default: true, PreRelease: featuregate.Beta},
+	ControllerManagerLeaderMigration: {Default: false, PreRelease: featuregate.Alpha},
 }
