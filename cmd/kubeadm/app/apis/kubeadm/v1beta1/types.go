@@ -126,6 +126,10 @@ type ControlPlaneComponent struct {
 
 	// ExtraVolumes is an extra set of host volumes, mounted to the control plane component.
 	ExtraVolumes []HostPathMount `json:"extraVolumes,omitempty"`
+
+	UID int64
+
+	GID int64
 }
 
 // APIServer holds settings necessary for API server deployments in the cluster

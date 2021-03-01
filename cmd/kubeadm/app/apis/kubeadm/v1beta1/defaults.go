@@ -101,6 +101,12 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 	SetDefaults_DNS(obj)
 	SetDefaults_Etcd(obj)
 	SetDefaults_APIServer(&obj.APIServer)
+	SetDefaults_Scheduler(&obj.Scheduler)
+}
+
+func SetDefaults_Scheduler(obj *ControlPlaneComponent) {
+	obj.UID = 2000
+	obj.GID = 2000
 }
 
 // SetDefaults_APIServer assigns default values for the API Server

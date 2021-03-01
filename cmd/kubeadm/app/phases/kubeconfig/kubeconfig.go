@@ -77,21 +77,35 @@ func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitCo
 		externaCA = true
 	}
 
-	files := []string{
-		kubeadmconstants.AdminKubeConfigFileName,
-		kubeadmconstants.ControllerManagerKubeConfigFileName,
-		kubeadmconstants.SchedulerKubeConfigFileName,
+	if externaCA {
+		fmt.Printf("[kubeconfig] External CA mode: Using user provided %s\n", kubeadmconstants.AdminKubeConfigFileName)
+		fmt.Printf("[kubeconfig] External CA mode: Using user provided %s\n", kubeadmconstants.ControllerManagerKubeConfigFileName)
+		fmt.Printf("[kubeconfig] External CA mode: Using user provided %s\n", kubeadmconstants.SchedulerKubeConfigFileName)
+		return nil
 	}
 
-	for _, file := range files {
-		if externaCA {
-			fmt.Printf("[kubeconfig] External CA mode: Using user provided %s\n", file)
-			continue
-		}
-		if err := createKubeConfigFiles(outDir, cfg, file); err != nil {
-			return err
-		}
+	if err := createKubeConfigFiles(outDir, cfg, kubeadmconstants.AdminKubeConfigFileName); err != nil {
+		return err
 	}
+
+	if err := createKubeConfigFiles(outDir, cfg, kubeadmconstants.ControllerManagerKubeConfigFileName); err != nil {
+		return err
+	}
+
+	file := filepath.Join(outDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
+	if err := os.Chown(file, int(cfg.ControllerManager.UID), int(cfg.ControllerManager.GID)); err != nil {
+		return err
+	}
+
+	if err := createKubeConfigFiles(outDir, cfg, kubeadmconstants.SchedulerKubeConfigFileName); err != nil {
+		return err
+	}
+	fmt.Printf("[kubeconfig] setting owner of kubeconfig file %s to uid: %d gid: %d\n", kubeadmconstants.AdminKubeConfigFileName, cfg.Scheduler.UID, cfg.Scheduler.GID)
+	file = filepath.Join(outDir, kubeadmconstants.SchedulerKubeConfigFileName)
+	if err := os.Chown(file, int(cfg.Scheduler.UID), int(cfg.Scheduler.GID)); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -99,7 +113,17 @@ func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitCo
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
 func CreateKubeConfigFile(kubeConfigFileName string, outDir string, cfg *kubeadmapi.InitConfiguration) error {
 	klog.V(1).Infof("creating kubeconfig file for %s", kubeConfigFileName)
-	return createKubeConfigFiles(outDir, cfg, kubeConfigFileName)
+	if err := createKubeConfigFiles(outDir, cfg, kubeConfigFileName); err != nil {
+		return err
+	}
+	if kubeConfigFileName == kubeadmconstants.SchedulerKubeConfigFileName {
+		file := filepath.Join(outDir, kubeadmconstants.SchedulerKubeConfigFileName)
+		if err := os.Chown(file, int(cfg.Scheduler.UID), int(cfg.Scheduler.GID)); err != nil {
+			return err
+		}
+		klog.V(1).Infof("Set uid: %d and gid: %d kubeconfig file for %s", cfg.Scheduler.UID, cfg.Scheduler.GID, kubeConfigFileName)
+	}
+	return nil
 }
 
 // createKubeConfigFiles creates all the requested kubeconfig files.

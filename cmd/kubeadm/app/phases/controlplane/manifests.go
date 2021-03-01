@@ -75,17 +75,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			Resources:       staticpodutil.ComponentResources("200m"),
 			Env:             kubeadmutil.GetProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager), nil),
-		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
-			Name:            kubeadmconstants.KubeScheduler,
-			Image:           images.GetKubernetesImage(kubeadmconstants.KubeScheduler, cfg),
-			ImagePullPolicy: v1.PullIfNotPresent,
-			Command:         getSchedulerCommand(cfg),
-			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler)),
-			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS),
-			StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS, cfg.APIServer.TimeoutForControlPlane),
-			Resources:       staticpodutil.ComponentResources("100m"),
-			Env:             kubeadmutil.GetProxyEnvVars(),
-		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler), nil),
+		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(getSchedulerContainer(cfg, mounts), mounts.GetVolumes(kubeadmconstants.KubeScheduler), nil),
 	}
 	return staticPodSpecs
 }
@@ -351,4 +341,26 @@ func getSchedulerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
 	command := []string{"kube-scheduler"}
 	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.Scheduler.ExtraArgs)...)
 	return command
+}
+
+func getSchedulerContainer(cfg *kubeadmapi.ClusterConfiguration, mounts controlPlaneHostPathMounts) v1.Container {
+	return v1.Container{
+		Name:            kubeadmconstants.KubeScheduler,
+		Image:           images.GetKubernetesImage(kubeadmconstants.KubeScheduler, cfg),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Command:         getSchedulerCommand(cfg),
+		VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler)),
+		LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS),
+		StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS, cfg.APIServer.TimeoutForControlPlane),
+		Resources:       staticpodutil.ComponentResources("100m"),
+		Env:             kubeadmutil.GetProxyEnvVars(),
+		SecurityContext: &v1.SecurityContext{
+			RunAsUser:  &[]int64{cfg.Scheduler.UID}[0],
+			RunAsGroup: &[]int64{cfg.Scheduler.GID}[0],
+			Capabilities: &v1.Capabilities{
+				Drop: []v1.Capability{"ALL"},
+			},
+			AllowPrivilegeEscalation: &[]bool{false}[0],
+		},
+	}
 }
