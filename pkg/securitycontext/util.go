@@ -44,6 +44,20 @@ func HasCapabilitiesRequest(container *v1.Container) bool {
 	return len(container.SecurityContext.Capabilities.Add) > 0 || len(container.SecurityContext.Capabilities.Drop) > 0
 }
 
+// HasWindowsHostProcessRequest returns true if container should run as HostProcess container,
+// taking into account nils
+func HasWindowsHostProcessRequest(pod *v1.Pod, container *v1.Container) bool {
+	effectiveSc := DetermineEffectiveSecurityContext(pod, container)
+
+	if effectiveSc.WindowsOptions == nil {
+		return false
+	}
+	if effectiveSc.WindowsOptions.HostProcess == nil {
+		return false
+	}
+	return *effectiveSc.WindowsOptions.HostProcess
+}
+
 // DetermineEffectiveSecurityContext returns a synthesized SecurityContext for reading effective configurations
 // from the provided pod's and container's security context. Container's fields take precedence in cases where both
 // are set
@@ -78,6 +92,9 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 		}
 		if containerSc.WindowsOptions.RunAsUserName != nil {
 			effectiveSc.WindowsOptions.RunAsUserName = containerSc.WindowsOptions.RunAsUserName
+		}
+		if containerSc.WindowsOptions.HostProcess != nil {
+			effectiveSc.WindowsOptions.HostProcess = containerSc.WindowsOptions.HostProcess
 		}
 	}
 
