@@ -49,10 +49,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
-
-	"k8s.io/klog/v2"
 )
 
 // DeletionTimeout sets maximum time from the moment a pod is added to DisruptedPods in PDB.Status
@@ -679,7 +678,6 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 		controllerRef := metav1.GetControllerOf(pod)
 		if controllerRef == nil {
 			err = fmt.Errorf("found no controller ref for pod %q", pod.Name)
-			dc.recorder.Event(pdb, v1.EventTypeWarning, "NoControllerRef", err.Error())
 			return
 		}
 
@@ -704,7 +702,6 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 		}
 		if !foundController {
 			err = fmt.Errorf("found no controllers for pod %q", pod.Name)
-			dc.recorder.Event(pdb, v1.EventTypeWarning, "NoControllers", err.Error())
 			return
 		}
 	}
