@@ -312,7 +312,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 	}
 	// Updating a pod that is already in activeQ, should not change it.
 	q.Update(unschedulablePodInfo.Pod, unschedulablePodInfo.Pod)
-	if len(q.unschedulableQ.podInfoMap) != 0 {
+	if len(q.unschedulableQ.podIndexMap) != 0 && len(q.unschedulableQ.podInfoQueue) != 0 {
 		t.Error("Expected unschedulableQ to be empty.")
 	}
 	if _, exists, _ := q.activeQ.Get(newQueuedPodInfoForLookup(unschedulablePodInfo.Pod)); !exists {
@@ -324,7 +324,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 	// Updating a pod that is in unschedulableQ in a way that it may
 	// become schedulable should add the pod to the activeQ.
 	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(medPriorityPodInfo.Pod), q.SchedulingCycle())
-	if len(q.unschedulableQ.podInfoMap) != 1 {
+	if len(q.unschedulableQ.podIndexMap) != 1 && len(q.unschedulableQ.podInfoQueue) != 1 {
 		t.Error("Expected unschedulableQ to be 1.")
 	}
 	updatedPod := medPriorityPodInfo.Pod.DeepCopy()
@@ -635,66 +635,105 @@ func TestUnschedulablePodsMap(t *testing.T) {
 	updatedPods[3] = pods[3].DeepCopy()
 
 	tests := []struct {
-		name                   string
-		podsToAdd              []*v1.Pod
-		expectedMapAfterAdd    map[string]*framework.QueuedPodInfo
-		podsToUpdate           []*v1.Pod
-		expectedMapAfterUpdate map[string]*framework.QueuedPodInfo
-		podsToDelete           []*v1.Pod
-		expectedMapAfterDelete map[string]*framework.QueuedPodInfo
+		name                     string
+		podsToAdd                []*v1.Pod
+		expectedQueueAfterAdd    []*framework.QueuedPodInfo
+		expectedMapAfterAdd      map[string]int
+		podsToUpdate             []*v1.Pod
+		expectedQueueAfterUpdate []*framework.QueuedPodInfo
+		expectedMapAfterUpdate   map[string]int
+		podsToDelete             []*v1.Pod
+		expectedQueueAfterDelete []*framework.QueuedPodInfo
+		expectedMapAfterDelete   map[string]int
 	}{
 		{
 			name:      "create, update, delete subset of pods",
 			podsToAdd: []*v1.Pod{pods[0], pods[1], pods[2], pods[3]},
-			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: framework.NewPodInfo(pods[0])},
-				util.GetPodFullName(pods[1]): {PodInfo: framework.NewPodInfo(pods[1])},
-				util.GetPodFullName(pods[2]): {PodInfo: framework.NewPodInfo(pods[2])},
-				util.GetPodFullName(pods[3]): {PodInfo: framework.NewPodInfo(pods[3])},
+			expectedQueueAfterAdd: []*framework.QueuedPodInfo{
+				{PodInfo: framework.NewPodInfo(pods[0])},
+				{PodInfo: framework.NewPodInfo(pods[1])},
+				{PodInfo: framework.NewPodInfo(pods[2])},
+				{PodInfo: framework.NewPodInfo(pods[3])},
+			},
+			expectedMapAfterAdd: map[string]int{
+				util.GetPodFullName(pods[0]): 0,
+				util.GetPodFullName(pods[1]): 1,
+				util.GetPodFullName(pods[2]): 2,
+				util.GetPodFullName(pods[3]): 3,
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[0]},
-			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: framework.NewPodInfo(updatedPods[0])},
-				util.GetPodFullName(pods[1]): {PodInfo: framework.NewPodInfo(pods[1])},
-				util.GetPodFullName(pods[2]): {PodInfo: framework.NewPodInfo(pods[2])},
-				util.GetPodFullName(pods[3]): {PodInfo: framework.NewPodInfo(pods[3])},
+			expectedQueueAfterUpdate: []*framework.QueuedPodInfo{
+				{PodInfo: framework.NewPodInfo(updatedPods[0])},
+				{PodInfo: framework.NewPodInfo(pods[1])},
+				{PodInfo: framework.NewPodInfo(pods[2])},
+				{PodInfo: framework.NewPodInfo(pods[3])},
+			},
+			expectedMapAfterUpdate: map[string]int{
+				util.GetPodFullName(pods[0]): 0,
+				util.GetPodFullName(pods[1]): 1,
+				util.GetPodFullName(pods[2]): 2,
+				util.GetPodFullName(pods[3]): 3,
 			},
 			podsToDelete: []*v1.Pod{pods[0], pods[1]},
-			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[2]): {PodInfo: framework.NewPodInfo(pods[2])},
-				util.GetPodFullName(pods[3]): {PodInfo: framework.NewPodInfo(pods[3])},
+			expectedQueueAfterDelete: []*framework.QueuedPodInfo{
+				{PodInfo: framework.NewPodInfo(pods[2])},
+				{PodInfo: framework.NewPodInfo(pods[3])},
+			},
+			expectedMapAfterDelete: map[string]int{
+				util.GetPodFullName(pods[2]): 0,
+				util.GetPodFullName(pods[3]): 1,
 			},
 		},
 		{
 			name:      "create, update, delete all",
 			podsToAdd: []*v1.Pod{pods[0], pods[3]},
-			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: framework.NewPodInfo(pods[0])},
-				util.GetPodFullName(pods[3]): {PodInfo: framework.NewPodInfo(pods[3])},
+			expectedQueueAfterAdd: []*framework.QueuedPodInfo{
+				{PodInfo: framework.NewPodInfo(pods[0])},
+				{PodInfo: framework.NewPodInfo(pods[3])},
+			},
+			expectedMapAfterAdd: map[string]int{
+				util.GetPodFullName(pods[0]): 0,
+				util.GetPodFullName(pods[3]): 1,
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[3]},
-			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: framework.NewPodInfo(pods[0])},
-				util.GetPodFullName(pods[3]): {PodInfo: framework.NewPodInfo(updatedPods[3])},
+			expectedQueueAfterUpdate: []*framework.QueuedPodInfo{
+				{PodInfo: framework.NewPodInfo(pods[0])},
+				{PodInfo: framework.NewPodInfo(updatedPods[3])},
 			},
-			podsToDelete:           []*v1.Pod{pods[0], pods[3]},
-			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{},
+			expectedMapAfterUpdate: map[string]int{
+				util.GetPodFullName(pods[0]): 0,
+				util.GetPodFullName(pods[3]): 1,
+			},
+			podsToDelete:             []*v1.Pod{pods[0], pods[3]},
+			expectedQueueAfterDelete: []*framework.QueuedPodInfo{},
+			expectedMapAfterDelete:   map[string]int{},
 		},
 		{
 			name:      "delete non-existing and existing pods",
 			podsToAdd: []*v1.Pod{pods[1], pods[2]},
-			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: framework.NewPodInfo(pods[1])},
-				util.GetPodFullName(pods[2]): {PodInfo: framework.NewPodInfo(pods[2])},
+			expectedQueueAfterAdd: []*framework.QueuedPodInfo{
+				{PodInfo: framework.NewPodInfo(pods[1])},
+				{PodInfo: framework.NewPodInfo(pods[2])},
+			},
+			expectedMapAfterAdd: map[string]int{
+				util.GetPodFullName(pods[1]): 0,
+				util.GetPodFullName(pods[2]): 1,
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[1]},
-			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: framework.NewPodInfo(updatedPods[1])},
-				util.GetPodFullName(pods[2]): {PodInfo: framework.NewPodInfo(pods[2])},
+			expectedQueueAfterUpdate: []*framework.QueuedPodInfo{
+				{PodInfo: framework.NewPodInfo(updatedPods[1])},
+				{PodInfo: framework.NewPodInfo(pods[2])},
+			},
+			expectedMapAfterUpdate: map[string]int{
+				util.GetPodFullName(pods[1]): 0,
+				util.GetPodFullName(pods[2]): 1,
 			},
 			podsToDelete: []*v1.Pod{pods[2], pods[3]},
-			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: framework.NewPodInfo(updatedPods[1])},
+			expectedQueueAfterDelete: []*framework.QueuedPodInfo{
+				{PodInfo: framework.NewPodInfo(updatedPods[1])},
+			},
+			expectedMapAfterDelete: map[string]int{
+				util.GetPodFullName(pods[1]): 0,
 			},
 		},
 	}
@@ -703,32 +742,44 @@ func TestUnschedulablePodsMap(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			upm := newUnschedulablePodsMap(nil)
 			for _, p := range test.podsToAdd {
-				upm.addOrUpdate(newQueuedPodInfoForLookup(p))
+				upm.add(newQueuedPodInfoForLookup(p))
 			}
-			if !reflect.DeepEqual(upm.podInfoMap, test.expectedMapAfterAdd) {
+			if !reflect.DeepEqual(upm.podInfoQueue, test.expectedQueueAfterAdd) {
+				t.Errorf("Unexpected queue after adding pods. Expected: %v, got: %v",
+					test.expectedQueueAfterAdd, upm.podInfoQueue)
+			}
+			if !reflect.DeepEqual(upm.podIndexMap, test.expectedMapAfterAdd) {
 				t.Errorf("Unexpected map after adding pods. Expected: %v, got: %v",
-					test.expectedMapAfterAdd, upm.podInfoMap)
+					test.expectedMapAfterAdd, upm.podIndexMap)
 			}
 
 			if len(test.podsToUpdate) > 0 {
 				for _, p := range test.podsToUpdate {
-					upm.addOrUpdate(newQueuedPodInfoForLookup(p))
+					upm.update(newQueuedPodInfoForLookup(p))
 				}
-				if !reflect.DeepEqual(upm.podInfoMap, test.expectedMapAfterUpdate) {
+				if !reflect.DeepEqual(upm.podInfoQueue, test.expectedQueueAfterUpdate) {
+					t.Errorf("Unexpected queue after updating pods. Expected: %v, got: %v",
+						test.expectedQueueAfterUpdate, upm.podInfoQueue)
+				}
+				if !reflect.DeepEqual(upm.podIndexMap, test.expectedMapAfterUpdate) {
 					t.Errorf("Unexpected map after updating pods. Expected: %v, got: %v",
-						test.expectedMapAfterUpdate, upm.podInfoMap)
+						test.expectedMapAfterUpdate, upm.podIndexMap)
 				}
 			}
 			for _, p := range test.podsToDelete {
 				upm.delete(p)
 			}
-			if !reflect.DeepEqual(upm.podInfoMap, test.expectedMapAfterDelete) {
+			if !reflect.DeepEqual(upm.podInfoQueue, test.expectedQueueAfterDelete) {
+				t.Errorf("Unexpected queue after deleting pods. Expected: %v, got: %v",
+					test.expectedQueueAfterDelete, upm.podInfoQueue)
+			}
+			if !reflect.DeepEqual(upm.podIndexMap, test.expectedMapAfterDelete) {
 				t.Errorf("Unexpected map after deleting pods. Expected: %v, got: %v",
-					test.expectedMapAfterDelete, upm.podInfoMap)
+					test.expectedMapAfterDelete, upm.podIndexMap)
 			}
 			upm.clear()
-			if len(upm.podInfoMap) != 0 {
-				t.Errorf("Expected the map to be empty, but has %v elements.", len(upm.podInfoMap))
+			if len(upm.podInfoQueue) != 0 && len(upm.podIndexMap) != 0 {
+				t.Errorf("Expected the queue and map to be empty, but has %v elements in queue, has %v elements in map.", len(upm.podInfoQueue), len(upm.podIndexMap))
 			}
 		})
 	}
@@ -1054,7 +1105,7 @@ var (
 			Reason:  v1.PodReasonUnschedulable,
 			Message: "fake scheduling failure",
 		})
-		queue.unschedulableQ.addOrUpdate(pInfo)
+		queue.unschedulableQ.add(pInfo)
 	}
 	addPodBackoffQ = func(queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.podBackoffQ.Add(pInfo)
