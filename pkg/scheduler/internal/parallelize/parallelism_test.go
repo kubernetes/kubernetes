@@ -46,8 +46,8 @@ func TestChunkSize(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d", test.input), func(t *testing.T) {
-			if chunkSizeFor(test.input) != test.wantOutput {
-				t.Errorf("Expected: %d, got: %d", test.wantOutput, chunkSizeFor(test.input))
+			if chunkSizeFor(test.input, DefaultParallelism) != test.wantOutput {
+				t.Errorf("Expected: %d, got: %d", test.wantOutput, chunkSizeFor(test.input, DefaultParallelism))
 			}
 		})
 	}

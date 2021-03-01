@@ -44,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -360,7 +359,7 @@ func dryRunPreemption(ctx context.Context, fh framework.Handle,
 			statusesLock.Unlock()
 		}
 	}
-	parallelize.Until(parallelCtx, len(potentialNodes), checkNode)
+	fh.Parallelizer().Until(parallelCtx, len(potentialNodes), checkNode)
 	return append(nonViolatingCandidates.get(), violatingCandidates.get()...), nodeStatuses
 }
 

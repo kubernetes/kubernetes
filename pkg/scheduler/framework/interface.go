@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 )
 
 // NodeScoreList declares a list of nodes and their scores.
@@ -597,6 +598,9 @@ type Handle interface {
 
 	// Extenders returns registered scheduler extenders.
 	Extenders() []Extender
+
+	// Parallelizer returns a parallelizer holding parallelism for scheduler.
+	Parallelizer() parallelize.Parallelizer
 }
 
 // PostFilterResult wraps needed info for scheduler framework to act upon PostFilter phase.

@@ -27,7 +27,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
-	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 )
 
 const preFilterStateKey = "PreFilter" + Name
@@ -258,7 +257,7 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 			atomic.AddInt32(tpCount, int32(count))
 		}
 	}
-	parallelize.Until(context.Background(), len(allNodes), processNode)
+	pl.parallelizer.Until(context.Background(), len(allNodes), processNode)
 
 	// calculate min match for each topology pair
 	for i := 0; i < len(constraints); i++ {

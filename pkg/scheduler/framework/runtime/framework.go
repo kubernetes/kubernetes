@@ -101,6 +101,8 @@ type frameworkImpl struct {
 	extenders []framework.Extender
 	framework.PodNominator
 
+	parallelizer parallelize.Parallelizer
+
 	// Indicates that RunFilterPlugins should accumulate all failed statuses and not return
 	// after the first failure.
 	runAllFilters bool
@@ -149,6 +151,7 @@ type frameworkOptions struct {
 	runAllFilters        bool
 	captureProfile       CaptureProfile
 	clusterEventMap      map[framework.ClusterEvent]sets.String
+	parallelizer         parallelize.Parallelizer
 }
 
 // Option for the frameworkImpl.
@@ -204,6 +207,13 @@ func WithExtenders(extenders []framework.Extender) Option {
 	}
 }
 
+// WithParallelism sets parallelism for the scheduling frameworkImpl.
+func WithParallelism(parallelism int) Option {
+	return func(o *frameworkOptions) {
+		o.parallelizer = parallelize.NewParallelizer(parallelism)
+	}
+}
+
 // CaptureProfile is a callback to capture a finalized profile.
 type CaptureProfile func(config.KubeSchedulerProfile)
 
@@ -218,6 +228,7 @@ func defaultFrameworkOptions() frameworkOptions {
 	return frameworkOptions{
 		metricsRecorder: newMetricsRecorder(1000, time.Second),
 		clusterEventMap: make(map[framework.ClusterEvent]sets.String),
+		parallelizer:    parallelize.NewParallelizer(parallelize.DefaultParallelism),
 	}
 }
 
@@ -249,6 +260,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 		runAllFilters:         options.runAllFilters,
 		extenders:             options.extenders,
 		PodNominator:          options.podNominator,
+		parallelizer:          options.parallelizer,
 	}
 
 	if profile == nil {
@@ -757,7 +769,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	errCh := parallelize.NewErrorChannel()
 
 	// Run Score method for each node in parallel.
-	parallelize.Until(ctx, len(nodes), func(index int) {
+	f.Parallelizer().Until(ctx, len(nodes), func(index int) {
 		for _, pl := range f.scorePlugins {
 			nodeName := nodes[index].Name
 			s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
@@ -777,7 +789,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	}
 
 	// Run NormalizeScore method for each ScorePlugin in parallel.
-	parallelize.Until(ctx, len(f.scorePlugins), func(index int) {
+	f.Parallelizer().Until(ctx, len(f.scorePlugins), func(index int) {
 		pl := f.scorePlugins[index]
 		nodeScoreList := pluginToNodeScores[pl.Name()]
 		if pl.ScoreExtensions() == nil {
@@ -795,7 +807,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	}
 
 	// Apply score defaultWeights for each ScorePlugin in parallel.
-	parallelize.Until(ctx, len(f.scorePlugins), func(index int) {
+	f.Parallelizer().Until(ctx, len(f.scorePlugins), func(index int) {
 		pl := f.scorePlugins[index]
 		// Score plugins' weight has been checked when they are initialized.
 		weight := f.pluginNameToWeightMap[pl.Name()]
@@ -1168,4 +1180,9 @@ func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) map[string]config
 // ProfileName returns the profile name associated to this framework.
 func (f *frameworkImpl) ProfileName() string {
 	return f.profileName
+}
+
+// Parallelizer returns a parallelizer holding parallelism for scheduler.
+func (f *frameworkImpl) Parallelizer() parallelize.Parallelizer {
+	return f.parallelizer
 }

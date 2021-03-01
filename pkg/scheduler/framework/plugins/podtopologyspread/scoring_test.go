@@ -29,9 +29,9 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/utils/pointer"
 )
@@ -687,8 +687,8 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			allNodes := append([]*v1.Node{}, tt.nodes...)
 			allNodes = append(allNodes, tt.failedNodes...)
 			state := framework.NewCycleState()
-			snapshot := cache.NewSnapshot(tt.existingPods, allNodes)
-			p := &PodTopologySpread{sharedLister: snapshot}
+			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(tt.existingPods, allNodes))
+			p := pl.(*PodTopologySpread)
 
 			status := p.PreScore(context.Background(), state, tt.pod, tt.nodes)
 			if !status.IsSuccess() {
@@ -757,8 +757,8 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			state := framework.NewCycleState()
-			snapshot := cache.NewSnapshot(existingPods, allNodes)
-			p := &PodTopologySpread{sharedLister: snapshot}
+			pl := plugintesting.SetupPlugin(b, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes))
+			p := pl.(*PodTopologySpread)
 
 			status := p.PreScore(context.Background(), state, tt.pod, filteredNodes)
 			if !status.IsSuccess() {
@@ -854,7 +854,7 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 					score, _ := p.Score(ctx, state, pod, n.Name)
 					gotList[i] = framework.NodeScore{Name: n.Name, Score: score}
 				}
-				parallelize.Until(ctx, len(filteredNodes), scoreNode)
+				p.parallelizer.Until(ctx, len(filteredNodes), scoreNode)
 				status = p.NormalizeScore(ctx, state, pod, gotList)
 				if !status.IsSuccess() {
 					b.Fatal(status)
