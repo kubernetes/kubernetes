@@ -337,7 +337,6 @@ func SetDefaults_Namespace(obj *v1.Namespace) {
 			obj.Labels[v1.LabelMetadataName] = obj.Name
 		}
 	}
-
 }
 
 func SetDefaults_NamespaceStatus(obj *v1.NamespaceStatus) {
