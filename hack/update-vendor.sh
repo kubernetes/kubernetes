@@ -44,6 +44,15 @@ TMP_DIR="${TMP_DIR:-$(mktemp -d /tmp/update-vendor.XXXX)}"
 LOG_FILE="${LOG_FILE:-${TMP_DIR}/update-vendor.log}"
 kube::log::status "logfile at ${LOG_FILE}"
 
+function finish {
+  ret=$?
+  if [[ ${ret} != 0 ]]; then
+    echo "An error has occurred. Please see more details in ${LOG_FILE}"
+  fi
+  exit ${ret}
+}
+trap finish EXIT
+
 if [ -z "${BASH_XTRACEFD:-}" ]; then
   exec 19> "${LOG_FILE}"
   export BASH_XTRACEFD="19"
