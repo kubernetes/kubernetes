@@ -1173,7 +1173,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			if err := scheduler.cache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {
 				t.Fatal(err)
 			}
-			fwk.PreemptHandle().AddNominatedPod(framework.NewPodInfo(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "nominated"}, Spec: v1.PodSpec{Priority: &midPriority}}), "1")
+			fwk.AddNominatedPod(framework.NewPodInfo(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "nominated"}, Spec: v1.PodSpec{Priority: &midPriority}}), "1")
 
 			_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
 
