@@ -22,21 +22,23 @@ import (
 
 func TestFmtRawDoc(t *testing.T) {
 	tests := []struct {
-		t, expected string
+		t, expected      string
+		ignoreGenerators bool
 	}{
-		{"aaa\n  --- asd\n TODO: tooooodo\n toooodoooooo\n", "aaa"},
-		{"aaa\nasd\n TODO: tooooodo\nbbbb\n --- toooodoooooo\n", "aaa asd bbbb"},
-		{" TODO: tooooodo\n", ""},
-		{"Par1\n\nPar2\n\n", "Par1\\n\\nPar2"},
-		{"", ""},
-		{" ", ""},
-		{" \n", ""},
-		{" \n\n ", ""},
-		{"Example:\n\tl1\n\t\tl2\n", "Example:\\n\\tl1\\n\\t\\tl2"},
+		{"aaa\n  --- asd\n TODO: tooooodo\n toooodoooooo\n", "aaa", true},
+		{"aaa\n+xyz\n  --- asd\n TODO: tooooodo\n toooodoooooo\n", "aaa +xyz", false},
+		{"aaa\nasd\n TODO: tooooodo\nbbbb\n --- toooodoooooo\n", "aaa asd bbbb", true},
+		{" TODO: tooooodo\n", "", true},
+		{"Par1\n\nPar2\n\n", "Par1\\n\\nPar2", true},
+		{"", "", true},
+		{" ", "", true},
+		{" \n", "", true},
+		{" \n\n ", "", true},
+		{"Example:\n\tl1\n\t\tl2\n", "Example:\\n\\tl1\\n\\t\\tl2", true},
 	}
 
 	for _, test := range tests {
-		if o := fmtRawDoc(test.t); o != test.expected {
+		if o := fmtRawDoc(test.t, test.ignoreGenerators); o != test.expected {
 			t.Fatalf("Expected: %q, got %q", test.expected, o)
 		}
 	}

@@ -52,7 +52,7 @@ func astFrom(filePath string) *doc.Package {
 	return doc.New(apkg, "", 0)
 }
 
-func fmtRawDoc(rawDoc string) string {
+func fmtRawDoc(rawDoc string, ignoreGenerators bool) string {
 	var buffer bytes.Buffer
 	delPrevChar := func() {
 		if buffer.Len() > 0 {
@@ -71,7 +71,7 @@ func fmtRawDoc(rawDoc string) string {
 			delPrevChar()
 			buffer.WriteString("\n\n")
 		case strings.HasPrefix(leading, "TODO"): // Ignore one line TODOs
-		case strings.HasPrefix(leading, "+"): // Ignore instructions to the generators
+		case ignoreGenerators && strings.HasPrefix(leading, "+"): // Ignore instructions to the generators
 		default:
 			if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
 				delPrevChar()
@@ -171,7 +171,7 @@ func writeMapBody(b *buffer, kubeType []Pair, indent int) {
 // array. Each type is again represented as an array (we have to use arrays as we
 // need to be sure for the order of the fields). This function returns fields and
 // struct definitions that have no documentation as {name, ""}.
-func ParseDocumentationFrom(src string) []KubeTypes {
+func ParseDocumentationFrom(src string, ignoreGenerators bool) []KubeTypes {
 	var docForTypes []KubeTypes
 
 	pkg := astFrom(src)
@@ -179,11 +179,11 @@ func ParseDocumentationFrom(src string) []KubeTypes {
 	for _, kubType := range pkg.Types {
 		if structType, ok := kubType.Decl.Specs[0].(*ast.TypeSpec).Type.(*ast.StructType); ok {
 			var ks KubeTypes
-			ks = append(ks, Pair{kubType.Name, fmtRawDoc(kubType.Doc)})
+			ks = append(ks, Pair{kubType.Name, fmtRawDoc(kubType.Doc, ignoreGenerators)})
 
 			for _, field := range structType.Fields.List {
 				if n := fieldName(field); n != "-" {
-					fieldDoc := fmtRawDoc(field.Doc.Text())
+					fieldDoc := fmtRawDoc(field.Doc.Text(), ignoreGenerators)
 					ks = append(ks, Pair{n, fieldDoc})
 				}
 			}
