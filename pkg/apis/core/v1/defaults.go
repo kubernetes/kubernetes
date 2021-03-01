@@ -331,18 +331,13 @@ func SetDefaults_Namespace(obj *v1.Namespace) {
 	// we don't need to overwrite the pre-existing labelMetadataName
 	if len(obj.Name) > 0 && obj.Labels[v1.LabelMetadataName] != obj.Name {
 		if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
+			if obj.Labels == nil {
+				obj.Labels = map[string]string{}
+			}
+			obj.Labels[v1.LabelMetadataName] = obj.Name
 		}
-		if !utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
-			return
-		}
-		if obj.Labels == nil {
-			obj.Labels = map[string]string{}
-		}
-		// Default label that matches the name of the namespace, for selecting w/o apriori knowledge of labels.
-		// Update to this label is not allowed. Hence, the value of the label is intentionally overridden here
-		// with the namespace name.
-		obj.Labels[v1.LabelMetadataName] = obj.Name
 	}
+
 }
 
 func SetDefaults_NamespaceStatus(obj *v1.NamespaceStatus) {
