@@ -269,6 +269,7 @@ func (tw *baseTimeoutWriter) CloseNotify() <-chan bool {
 
 	// the outer ResponseWriter object returned by WrapForHTTP1Or2 implements
 	// http.CloseNotifier if the inner object (tw.w) implements http.CloseNotifier.
+	//lint:ignore SA1019 There are places in the code base requiring the CloseNotifier interface to be implemented.
 	return tw.w.(http.CloseNotifier).CloseNotify()
 }
 

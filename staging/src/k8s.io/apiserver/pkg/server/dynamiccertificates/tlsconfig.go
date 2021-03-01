@@ -108,11 +108,13 @@ func (c *DynamicServingCertificateController) GetConfigForClient(clientHello *tl
 		return tlsConfigCopy, nil
 	}
 
+	//lint:ignore SA1019 backwards compatibility
 	ipCert, ok := tlsConfigCopy.NameToCertificate[host]
 	if !ok {
 		return tlsConfigCopy, nil
 	}
 	tlsConfigCopy.Certificates = []tls.Certificate{*ipCert}
+	//lint:ignore SA1019 backwards compatibility
 	tlsConfigCopy.NameToCertificate = nil
 
 	return tlsConfigCopy, nil
@@ -206,6 +208,7 @@ func (c *DynamicServingCertificateController) syncCerts() error {
 	}
 
 	if len(newContent.sniCerts) > 0 {
+		//lint:ignore SA1019 backwards compatibility
 		newTLSConfigCopy.NameToCertificate, err = c.BuildNamedCertificates(newContent.sniCerts)
 		if err != nil {
 			return fmt.Errorf("unable to build named certificate map: %v", err)
@@ -215,6 +218,7 @@ func (c *DynamicServingCertificateController) syncCerts() error {
 		// is necessary because there is only one cert anyway.
 		// Moreover, if servingCert is not set, the first SNI
 		// cert will become the default cert. That's what we expect anyway.
+		//lint:ignore SA1019 backwards compatibility
 		for _, sniCert := range newTLSConfigCopy.NameToCertificate {
 			newTLSConfigCopy.Certificates = append(newTLSConfigCopy.Certificates, *sniCert)
 		}
