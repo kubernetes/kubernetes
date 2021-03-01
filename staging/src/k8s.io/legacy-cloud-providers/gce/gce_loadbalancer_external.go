@@ -170,7 +170,7 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 		return nil, err
 	}
 
-	firewallExists, firewallNeedsUpdate, err := g.firewallNeedsUpdate(loadBalancerName, serviceName.String(), g.region, ipAddressToUse, ports, sourceRanges)
+	firewallExists, firewallNeedsUpdate, err := g.firewallNeedsUpdate(loadBalancerName, serviceName.String(), ipAddressToUse, ports, sourceRanges)
 	if err != nil {
 		return nil, err
 	}
@@ -181,13 +181,13 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 		// without needing to be deleted and recreated.
 		if firewallExists {
 			klog.Infof("ensureExternalLoadBalancer(%s): Updating firewall.", lbRefStr)
-			if err := g.updateFirewall(apiService, MakeFirewallName(loadBalancerName), g.region, desc, sourceRanges, ports, hosts); err != nil {
+			if err := g.updateFirewall(apiService, MakeFirewallName(loadBalancerName), desc, sourceRanges, ports, hosts); err != nil {
 				return nil, err
 			}
 			klog.Infof("ensureExternalLoadBalancer(%s): Updated firewall.", lbRefStr)
 		} else {
 			klog.Infof("ensureExternalLoadBalancer(%s): Creating firewall.", lbRefStr)
-			if err := g.createFirewall(apiService, MakeFirewallName(loadBalancerName), g.region, desc, sourceRanges, ports, hosts); err != nil {
+			if err := g.createFirewall(apiService, MakeFirewallName(loadBalancerName), desc, sourceRanges, ports, hosts); err != nil {
 				return nil, err
 			}
 			klog.Infof("ensureExternalLoadBalancer(%s): Created firewall.", lbRefStr)
@@ -845,7 +845,7 @@ func translateAffinityType(affinityType v1.ServiceAffinity) string {
 	}
 }
 
-func (g *Cloud) firewallNeedsUpdate(name, serviceName, region, ipAddress string, ports []v1.ServicePort, sourceRanges utilnet.IPNetSet) (exists bool, needsUpdate bool, err error) {
+func (g *Cloud) firewallNeedsUpdate(name, serviceName, ipAddress string, ports []v1.ServicePort, sourceRanges utilnet.IPNetSet) (exists bool, needsUpdate bool, err error) {
 	fw, err := g.GetFirewall(MakeFirewallName(name))
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
@@ -860,15 +860,15 @@ func (g *Cloud) firewallNeedsUpdate(name, serviceName, region, ipAddress string,
 		return true, true, nil
 	}
 	// Make sure the allowed ports match.
-	allowedPorts := make([]string, len(ports))
-	for ix := range ports {
-		allowedPorts[ix] = strconv.Itoa(int(ports[ix].Port))
-	}
-	if !equalStringSets(allowedPorts, fw.Allowed[0].Ports) {
+	portNums, portRanges, _ := getPortsAndProtocol(ports)
+	// This logic checks if the existing firewall rules contains either enumerated service ports or port ranges.
+	// This is to prevent unnecessary noop updates to the firewall rule when the existing firewall rule is
+	// set up via the previous pattern using enumerated ports instead of port ranges.
+	if !equalStringSets(portNums, fw.Allowed[0].Ports) && !equalStringSets(portRanges, fw.Allowed[0].Ports) {
 		return true, true, nil
 	}
-	// The service controller already verified that the protocol matches on all ports, no need to check.
 
+	// The service controller already verified that the protocol matches on all ports, no need to check.
 	actualSourceRanges, err := utilnet.ParseIPNets(fw.SourceRanges...)
 	if err != nil {
 		// This really shouldn't happen... GCE has returned something unexpected
@@ -899,7 +899,7 @@ func (g *Cloud) ensureHTTPHealthCheckFirewall(svc *v1.Service, serviceName, ipAd
 			return fmt.Errorf("error getting firewall for health checks: %v", err)
 		}
 		klog.Infof("Creating firewall %v for health checks.", fwName)
-		if err := g.createFirewall(svc, fwName, region, desc, sourceRanges, ports, hosts); err != nil {
+		if err := g.createFirewall(svc, fwName, desc, sourceRanges, ports, hosts); err != nil {
 			return err
 		}
 		klog.Infof("Created firewall %v for health checks.", fwName)
@@ -912,7 +912,7 @@ func (g *Cloud) ensureHTTPHealthCheckFirewall(svc *v1.Service, serviceName, ipAd
 		!equalStringSets(fw.Allowed[0].Ports, []string{strconv.Itoa(int(ports[0].Port))}) ||
 		!equalStringSets(fw.SourceRanges, sourceRanges.StringSlice()) {
 		klog.Warningf("Firewall %v exists but parameters have drifted - updating...", fwName)
-		if err := g.updateFirewall(svc, fwName, region, desc, sourceRanges, ports, hosts); err != nil {
+		if err := g.updateFirewall(svc, fwName, desc, sourceRanges, ports, hosts); err != nil {
 			klog.Warningf("Failed to reconcile firewall %v parameters.", fwName)
 			return err
 		}
@@ -948,8 +948,8 @@ func createForwardingRule(s CloudForwardingRuleService, name, serviceName, regio
 	return nil
 }
 
-func (g *Cloud) createFirewall(svc *v1.Service, name, region, desc string, sourceRanges utilnet.IPNetSet, ports []v1.ServicePort, hosts []*gceInstance) error {
-	firewall, err := g.firewallObject(name, region, desc, sourceRanges, ports, hosts)
+func (g *Cloud) createFirewall(svc *v1.Service, name, desc string, sourceRanges utilnet.IPNetSet, ports []v1.ServicePort, hosts []*gceInstance) error {
+	firewall, err := g.firewallObject(name, desc, sourceRanges, ports, hosts)
 	if err != nil {
 		return err
 	}
@@ -966,8 +966,8 @@ func (g *Cloud) createFirewall(svc *v1.Service, name, region, desc string, sourc
 	return nil
 }
 
-func (g *Cloud) updateFirewall(svc *v1.Service, name, region, desc string, sourceRanges utilnet.IPNetSet, ports []v1.ServicePort, hosts []*gceInstance) error {
-	firewall, err := g.firewallObject(name, region, desc, sourceRanges, ports, hosts)
+func (g *Cloud) updateFirewall(svc *v1.Service, name, desc string, sourceRanges utilnet.IPNetSet, ports []v1.ServicePort, hosts []*gceInstance) error {
+	firewall, err := g.firewallObject(name, desc, sourceRanges, ports, hosts)
 	if err != nil {
 		return err
 	}
@@ -985,11 +985,11 @@ func (g *Cloud) updateFirewall(svc *v1.Service, name, region, desc string, sourc
 	return nil
 }
 
-func (g *Cloud) firewallObject(name, region, desc string, sourceRanges utilnet.IPNetSet, ports []v1.ServicePort, hosts []*gceInstance) (*compute.Firewall, error) {
-	allowedPorts := make([]string, len(ports))
-	for ix := range ports {
-		allowedPorts[ix] = strconv.Itoa(int(ports[ix].Port))
-	}
+func (g *Cloud) firewallObject(name, desc string, sourceRanges utilnet.IPNetSet, ports []v1.ServicePort, hosts []*gceInstance) (*compute.Firewall, error) {
+	// Concatenate service ports into port ranges. This help to workaround the gce firewall limitation where only
+	// 100 ports or port ranges can be used in a firewall rule.
+	_, portRanges, _ := getPortsAndProtocol(ports)
+
 	// If the node tags to be used for this cluster have been predefined in the
 	// provider config, just use them. Otherwise, invoke computeHostTags method to get the tags.
 	hostTags := g.nodeTags
@@ -1014,7 +1014,7 @@ func (g *Cloud) firewallObject(name, region, desc string, sourceRanges utilnet.I
 				// mixed TCP and UDP ports. It should be possible to use a
 				// single firewall rule for both a TCP and UDP lb.
 				IPProtocol: strings.ToLower(string(ports[0].Protocol)),
-				Ports:      allowedPorts,
+				Ports:      portRanges,
 			},
 		},
 	}
