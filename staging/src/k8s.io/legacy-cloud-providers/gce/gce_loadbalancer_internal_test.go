@@ -1351,6 +1351,15 @@ func TestForwardingRulesEqual(t *testing.T) {
 			AllowGlobalAccess:   true,
 			BackendService:      "http://compute.googleapis.com/projects/test/regions/us-central1/backendServices/bs1",
 		},
+		{
+			Name:                "udp-fwd-rule-allports",
+			IPAddress:           "10.0.0.0",
+			Ports:               []string{"123"},
+			AllPorts:            true,
+			IPProtocol:          "UDP",
+			LoadBalancingScheme: string(cloud.SchemeInternal),
+			BackendService:      "http://www.googleapis.com/projects/test/regions/us-central1/backendServices/bs1",
+		},
 	}
 
 	for _, tc := range []struct {
@@ -1388,6 +1397,12 @@ func TestForwardingRulesEqual(t *testing.T) {
 			oldFwdRule: fwdRules[3],
 			newFwdRule: fwdRules[4],
 			expect:     true,
+		},
+		{
+			desc:       "same forwarding rule, one uses AllPorts",
+			oldFwdRule: fwdRules[2],
+			newFwdRule: fwdRules[5],
+			expect:     false,
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -1713,6 +1728,89 @@ func TestEnsureInternalLoadBalancerModifyProtocol(t *testing.T) {
 	}
 	if fwdRule.IPProtocol != "UDP" {
 		t.Errorf("Unexpected protocol value %s, expected UDP", fwdRule.IPProtocol)
+	}
+
+	// Delete the service
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+}
+
+func TestEnsureInternalLoadBalancerAllPorts(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+	nodeNames := []string{"test-node-1"}
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	require.NoError(t, err)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("gce.GetRegionForwardingRule(%q, %q) = %v, want nil", lbName, gce.region, err)
+	}
+	if fwdRule.Ports[0] != "123" {
+		t.Errorf("Unexpected port value %v, expected [123]", fwdRule.Ports)
+	}
+
+	// Change service spec to use more than 5 ports
+	svc.Spec.Ports = []v1.ServicePort{
+		{Name: "testport", Port: int32(8080), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8090), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8100), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8200), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8300), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8400), Protocol: "TCP"},
+	}
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	fwdRule, err = gce.GetRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("gce.GetRegionForwardingRule(%q, %q) = %v, want nil", lbName, gce.region, err)
+	}
+	if !fwdRule.AllPorts {
+		t.Errorf("Unexpected AllPorts false value, expected true, FR - %v", fwdRule)
+	}
+	if len(fwdRule.Ports) != 0 {
+		t.Errorf("Unexpected port value %v, expected empty list", fwdRule.Ports)
+	}
+
+	// Change service spec back to use < 5 ports
+	svc.Spec.Ports = []v1.ServicePort{
+		{Name: "testport", Port: int32(8090), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8100), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8300), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8400), Protocol: "TCP"},
+	}
+	expectPorts := []string{"8090", "8100", "8300", "8400"}
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	fwdRule, err = gce.GetRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("gce.GetRegionForwardingRule(%q, %q) = %v, want nil", lbName, gce.region, err)
+	}
+	if fwdRule.AllPorts {
+		t.Errorf("Unexpected AllPorts true value, expected false, FR - %v", fwdRule)
+	}
+	if !equalStringSets(fwdRule.Ports, expectPorts) {
+		t.Errorf("Unexpected port value %v, expected %v", fwdRule.Ports, expectPorts)
 	}
 
 	// Delete the service
