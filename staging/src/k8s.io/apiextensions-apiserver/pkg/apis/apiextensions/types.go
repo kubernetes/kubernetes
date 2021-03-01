@@ -190,7 +190,6 @@ type CustomResourceDefinitionVersion struct {
 	// Top-level and per-version schemas are mutually exclusive.
 	// Per-version schemas must not all be set to identical values (top-level validation schema should be used instead)
 	// This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
-	// +optional
 	Schema *CustomResourceValidation
 	// Subresources describes the subresources for CustomResource
 	// Top-level and per-version subresources are mutually exclusive.
