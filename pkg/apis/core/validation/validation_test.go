@@ -14617,22 +14617,16 @@ func TestValidateResourceQuota(t *testing.T) {
 }
 
 func TestValidateNamespace(t *testing.T) {
-	validLabels := map[string]string{"a": "b"}
 	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	successCases := []core.Namespace{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Labels: validLabels},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Labels: map[string]string{"a": "b", v1.LabelMetadataName: "abc"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc-123"},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Labels: map[string]string{v1.LabelMetadataName: "abc-123"}},
 			Spec: core.NamespaceSpec{
 				Finalizers: []core.FinalizerName{"example.com/something", "example.com/other"},
 			},
-		},
-		// The following success case, when validated, confirms that GeneratedName implementations result in generated names that are
-		// additionally added as kubernetes.io/metadata.namespace labels
-		{
-			ObjectMeta: metav1.ObjectMeta{GenerateName: "abc"},
 		},
 	}
 	for _, successCase := range successCases {
