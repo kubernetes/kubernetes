@@ -5330,16 +5330,6 @@ type RangeAllocation struct {
 	Data []byte
 }
 
-const (
-	// DefaultHardPodAffinitySymmetricWeight is the weight of implicit PreferredDuringScheduling affinity rule.
-	//
-	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
-	// corresponding to every RequiredDuringScheduling affinity rule.
-	// When the --hard-pod-affinity-weight scheduler flag is not specified,
-	// DefaultHardPodAffinityWeight defines the weight of the implicit PreferredDuringScheduling affinity rule.
-	DefaultHardPodAffinitySymmetricWeight int32 = 1
-)
-
 // UnsatisfiableConstraintAction defines the actions that can be taken for an
 // unsatisfiable constraint.
 type UnsatisfiableConstraintAction string
