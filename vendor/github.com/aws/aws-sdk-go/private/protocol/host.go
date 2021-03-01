@@ -1,9 +1,10 @@
 package protocol
 
 import (
-	"strings"
-
 	"github.com/aws/aws-sdk-go/aws/request"
+	"net"
+	"strconv"
+	"strings"
 )
 
 // ValidateEndpointHostHandler is a request handler that will validate the
@@ -22,8 +23,26 @@ var ValidateEndpointHostHandler = request.NamedHandler{
 // 3986 host. Returns error if the host is not valid.
 func ValidateEndpointHost(opName, host string) error {
 	paramErrs := request.ErrInvalidParams{Context: opName}
-	labels := strings.Split(host, ".")
 
+	var hostname string
+	var port string
+	var err error
+
+	if strings.Contains(host, ":") {
+		hostname, port, err = net.SplitHostPort(host)
+
+		if err != nil {
+			paramErrs.Add(request.NewErrParamFormat("endpoint", err.Error(), host))
+		}
+
+		if !ValidPortNumber(port) {
+			paramErrs.Add(request.NewErrParamFormat("endpoint port number", "[0-65535]", port))
+		}
+	} else {
+		hostname = host
+	}
+
+	labels := strings.Split(hostname, ".")
 	for i, label := range labels {
 		if i == len(labels)-1 && len(label) == 0 {
 			// Allow trailing dot for FQDN hosts.
@@ -36,7 +55,11 @@ func ValidateEndpointHost(opName, host string) error {
 		}
 	}
 
-	if len(host) > 255 {
+	if len(hostname) == 0 {
+		paramErrs.Add(request.NewErrParamMinLen("endpoint host", 1))
+	}
+
+	if len(hostname) > 255 {
 		paramErrs.Add(request.NewErrParamMaxLen(
 			"endpoint host", 255, host,
 		))
@@ -64,5 +87,18 @@ func ValidHostLabel(label string) bool {
 		}
 	}
 
+	return true
+}
+
+// ValidPortNumber return if the port is valid RFC 3986 port
+func ValidPortNumber(port string) bool {
+	i, err := strconv.Atoi(port)
+	if err != nil {
+		return false
+	}
+
+	if i < 0 || i > 65535 {
+		return false
+	}
 	return true
 }
