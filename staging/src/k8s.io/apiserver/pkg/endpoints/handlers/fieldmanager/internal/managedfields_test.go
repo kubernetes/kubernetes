@@ -72,6 +72,84 @@ func TestHasFieldsType(t *testing.T) {
 	}
 }
 
+// TestHasAPIVersion makes sure that we fail if we don't have an
+// APIVersion set.
+func TestHasAPIVersion(t *testing.T) {
+	var unmarshaled []metav1.ManagedFieldsEntry
+	if err := yaml.Unmarshal([]byte(`- apiVersion: v1
+  fieldsType: FieldsV1
+  fieldsV1:
+    f:field: {}
+  manager: foo
+  operation: Apply
+`), &unmarshaled); err != nil {
+		t.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
+	}
+	if _, err := DecodeManagedFields(unmarshaled); err != nil {
+		t.Fatalf("did not expect decoding error but got: %v", err)
+	}
+
+	// Missing apiVersion.
+	unmarshaled = nil
+	if err := yaml.Unmarshal([]byte(`- fieldsType: FieldsV1
+  fieldsV1:
+    f:field: {}
+  manager: foo
+  operation: Apply
+`), &unmarshaled); err != nil {
+		t.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
+	}
+	if _, err := DecodeManagedFields(unmarshaled); err == nil {
+		t.Fatal("Expect decoding error but got none")
+	}
+}
+
+// TestHasOperation makes sure that we fail if we don't have an
+// Operation set properly.
+func TestHasOperation(t *testing.T) {
+	var unmarshaled []metav1.ManagedFieldsEntry
+	if err := yaml.Unmarshal([]byte(`- apiVersion: v1
+  fieldsType: FieldsV1
+  fieldsV1:
+    f:field: {}
+  manager: foo
+  operation: Apply
+`), &unmarshaled); err != nil {
+		t.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
+	}
+	if _, err := DecodeManagedFields(unmarshaled); err != nil {
+		t.Fatalf("did not expect decoding error but got: %v", err)
+	}
+
+	// Invalid operation.
+	if err := yaml.Unmarshal([]byte(`- apiVersion: v1
+  fieldsType: FieldsV1
+  fieldsV1:
+    f:field: {}
+  manager: foo
+  operation: Invalid
+`), &unmarshaled); err != nil {
+		t.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
+	}
+	if _, err := DecodeManagedFields(unmarshaled); err == nil {
+		t.Fatal("Expect decoding error but got none")
+	}
+
+	// Missing operation.
+	unmarshaled = nil
+	if err := yaml.Unmarshal([]byte(`- apiVersion: v1
+  fieldsType: FieldsV1
+  fieldsV1:
+    f:field: {}
+  manager: foo
+`), &unmarshaled); err != nil {
+		t.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
+	}
+	if _, err := DecodeManagedFields(unmarshaled); err == nil {
+		t.Fatal("Expect decoding error but got none")
+	}
+}
+
 // TestRoundTripManagedFields will roundtrip ManagedFields from the wire format
 // (api format) to the format used by sigs.k8s.io/structured-merge-diff and back
 func TestRoundTripManagedFields(t *testing.T) {

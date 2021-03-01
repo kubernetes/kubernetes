@@ -101,6 +101,14 @@ func DecodeManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (Mana
 	managed.times = make(map[string]*metav1.Time, len(encodedManagedFields))
 
 	for i, encodedVersionedSet := range encodedManagedFields {
+		switch encodedVersionedSet.Operation {
+		case metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate:
+		default:
+			return nil, fmt.Errorf("operation must be `Apply` or `Update`")
+		}
+		if len(encodedVersionedSet.APIVersion) < 1 {
+			return nil, fmt.Errorf("apiVersion must not be empty")
+		}
 		switch encodedVersionedSet.FieldsType {
 		case "FieldsV1":
 			// Valid case.
