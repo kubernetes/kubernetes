@@ -67,7 +67,7 @@ func (admit *managedFieldsValidatingAdmissionController) Admit(ctx context.Conte
 		return err
 	}
 	managedFieldsAfterAdmission := objectMeta.GetManagedFields()
-	if err := ValidateManagedFields(managedFieldsAfterAdmission); err != nil {
+	if _, err := DecodeManagedFields(managedFieldsAfterAdmission); err != nil {
 		objectMeta.SetManagedFields(managedFieldsBeforeAdmission)
 		warning.AddWarning(ctx, "",
 			fmt.Sprintf(InvalidManagedFieldsAfterMutatingAdmissionWarningFormat,
