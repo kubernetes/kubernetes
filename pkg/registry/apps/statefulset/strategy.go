@@ -88,6 +88,7 @@ func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 	statefulSet.Status = apps.StatefulSetStatus{}
 
 	statefulSet.Generation = 1
+
 	dropStatefulSetDisabledFields(statefulSet, nil)
 	pod.DropDisabledTemplateFields(&statefulSet.Spec.Template, nil)
 }
@@ -120,6 +121,12 @@ func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.Stateful
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
 		if !minReadySecondsFieldsInUse(oldSS) {
 			newSS.Spec.MinReadySeconds = int32(0)
+		}
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+		if oldStatefulSet == nil || oldStatefulSet.Spec.PersistentVolumeClaimRetentionPolicy == nil {
+			newStatefulSet.Spec.PersistentVolumeClaimRetentionPolicy = nil
 		}
 	}
 }
