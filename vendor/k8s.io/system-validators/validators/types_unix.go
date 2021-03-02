@@ -70,7 +70,7 @@ var DefaultSysSpec = SysSpec{
 	CgroupsV2Optional: []string{"hugetlb"},
 	RuntimeSpec: RuntimeSpec{
 		DockerSpec: &DockerSpec{
-			Version:     []string{`1\.1[1-3]\..*`, `17\.0[3,6,9]\..*`, `18\.0[6,9]\..*`, `19\.03\..*`},
+			Version:     []string{`1\.1[1-3]\..*`, `17\.0[3,6,9]\..*`, `18\.0[6,9]\..*`, `19\.03\..*`, `20\.10\..*`},
 			GraphDriver: []string{"aufs", "overlay", "overlay2", "devicemapper", "zfs"},
 		},
 	},

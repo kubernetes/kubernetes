@@ -2553,9 +2553,9 @@ k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 # k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 # k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
-# k8s.io/system-validators v1.3.0 => k8s.io/system-validators v1.3.0
+# k8s.io/system-validators v1.4.0 => k8s.io/system-validators v1.4.0
 ## explicit
-# k8s.io/system-validators => k8s.io/system-validators v1.3.0
+# k8s.io/system-validators => k8s.io/system-validators v1.4.0
 k8s.io/system-validators/validators
 # k8s.io/utils v0.0.0-20201110183641-67b214c5f920 => k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 ## explicit
