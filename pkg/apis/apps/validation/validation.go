@@ -174,9 +174,9 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 	// statefulset updates aren't super common and general updates are likely to be touching spec, so we'll do this
 	// deep copy right away.  This avoids mutating our inputs
 	newStatefulSetClone := statefulSet.DeepCopy()
-	newStatefulSetClone.Spec.Replicas = oldStatefulSet.Spec.Replicas                                                         // +k8s:verify-mutation:reason=clone
-	newStatefulSetClone.Spec.Template = oldStatefulSet.Spec.Template                                                         // +k8s:verify-mutation:reason=clone
-	newStatefulSetClone.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy                                             // +k8s:verify-mutation:reason=clone
+	newStatefulSetClone.Spec.Replicas = oldStatefulSet.Spec.Replicas             // +k8s:verify-mutation:reason=clone
+	newStatefulSetClone.Spec.Template = oldStatefulSet.Spec.Template             // +k8s:verify-mutation:reason=clone
+	newStatefulSetClone.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy // +k8s:verify-mutation:reason=clone
 	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
 		newStatefulSetClone.Spec.MinReadySeconds = oldStatefulSet.Spec.MinReadySeconds // +k8s:verify-mutation:reason=clone
 	}

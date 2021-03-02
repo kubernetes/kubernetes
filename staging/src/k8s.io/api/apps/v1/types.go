@@ -226,7 +226,7 @@ type StatefulSetSpec struct {
 	// volume claims when their stateful set is deleted, or when their pod is scaled
 	// down. This requires the StatefulSetAutoDeletePVC feature gate to be enabled,
 	// which is alpha.  +optional
-	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty" protobuf:"bytes,9,opt,name=persistentVolumeClaimRetentionPolicy"`
+	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty" protobuf:"bytes,10,opt,name=persistentVolumeClaimRetentionPolicy"`
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.

@@ -1693,26 +1693,30 @@
       }
     },
     "revisionHistoryLimit": -1166275743,
-    "minReadySeconds": -1056262432
+    "minReadySeconds": -1056262432,
+    "persistentVolumeClaimRetentionPolicy": {
+      "whenDeleted": "/Ş槀墺=Ĉ鳟/d",
+      "whenScaled": "á"
+    }
   },
   "status": {
-    "observedGeneration": 1124654959171263717,
-    "replicas": -1775998279,
-    "readyReplicas": 233229473,
-    "currentReplicas": 99917513,
-    "updatedReplicas": 421164481,
+    "observedGeneration": 6696165662757041544,
+    "replicas": -629510776,
+    "readyReplicas": -69450448,
+    "currentReplicas": -212409426,
+    "updatedReplicas": 17761427,
     "currentRevision": "538",
     "updateRevision": "539",
-    "collisionCount": -1137929768,
+    "collisionCount": -168103644,
     "conditions": [
       {
-        "type": "/d\u0026蒡榤Ⱦ盜ŭ飼蒱鄆",
-        "status": "",
-        "lastTransitionTime": "2358-03-12T13:17:54Z",
+        "type": "",
+        "status": "嬜Š\u0026?鳢.ǀŭ瘢颦z疵",
+        "lastTransitionTime": "2455-07-16T22:37:15Z",
         "reason": "540",
         "message": "541"
       }
     ],
-    "availableReplicas": 171558604
+    "availableReplicas": 2136031303
   }
 }
