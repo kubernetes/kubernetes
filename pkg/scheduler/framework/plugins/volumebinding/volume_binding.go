@@ -247,19 +247,20 @@ func (pl *VolumeBinding) Score(ctx context.Context, cs *framework.CycleState, po
 		return 0, nil
 	}
 	// group by storage class
-	classToWeight := make(classToWeightMap)
-	requestedClassToValueMap := make(map[string]int64)
-	capacityClassToValueMap := make(map[string]int64)
+	classResources := make(classResourceMap)
 	for _, staticBinding := range podVolumes.StaticBindings {
 		class := staticBinding.StorageClassName()
-		volumeResource := staticBinding.VolumeResource()
-		if _, ok := requestedClassToValueMap[class]; !ok {
-			classToWeight[class] = 1 // in alpha stage, all classes have the same weight
+		storageResource := staticBinding.StorageResource()
+		if _, ok := classResources[class]; !ok {
+			classResources[class] = &scheduling.StorageResource{
+				Requested: 0,
+				Capacity:  0,
+			}
 		}
-		requestedClassToValueMap[class] += volumeResource.Requested
-		capacityClassToValueMap[class] += volumeResource.Capacity
+		classResources[class].Requested += storageResource.Requested
+		classResources[class].Capacity += storageResource.Capacity
 	}
-	return pl.scorer(requestedClassToValueMap, capacityClassToValueMap, classToWeight), nil
+	return pl.scorer(classResources), nil
 }
 
 // ScoreExtensions of the Score plugin.

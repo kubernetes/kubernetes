@@ -87,20 +87,20 @@ func (b *BindingInfo) StorageClassName() string {
 	return b.pv.Spec.StorageClassName
 }
 
-// VolumeResource represents volume resource.
-type VolumeResource struct {
+// StorageResource represents storage resource.
+type StorageResource struct {
 	Requested int64
 	Capacity  int64
 }
 
-// VolumeResource returns volume resource.
-func (b *BindingInfo) VolumeResource() *VolumeResource {
+// StorageResource returns storage resource.
+func (b *BindingInfo) StorageResource() *StorageResource {
 	// both fields are mandatory
 	requestedQty := b.pvc.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	capacitQty := b.pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
-	return &VolumeResource{
+	capacityQty := b.pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
+	return &StorageResource{
 		Requested: requestedQty.Value(),
-		Capacity:  capacitQty.Value(),
+		Capacity:  capacityQty.Value(),
 	}
 }
 
