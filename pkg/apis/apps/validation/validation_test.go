@@ -131,7 +131,7 @@ func TestValidateStatefulSet(t *testing.T) {
 
 	for i, successCase := range successCases {
 		t.Run("success case "+strconv.Itoa(i), func(t *testing.T) {
-			if errs := ValidateStatefulSet(&successCase); len(errs) != 0 {
+			if errs := ValidateStatefulSet(&successCase, corevalidation.PodValidationOptions{}); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -356,7 +356,7 @@ func TestValidateStatefulSet(t *testing.T) {
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			errs := ValidateStatefulSet(&v)
+			errs := ValidateStatefulSet(&v, corevalidation.PodValidationOptions{})
 			if len(errs) == 0 {
 				t.Errorf("expected failure for %s", k)
 			}
