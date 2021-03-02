@@ -704,7 +704,7 @@ kubelet_running_containers{container_state="unknown"} 2
 			wants: `
 # HELP kubelet_running_pods [ALPHA] Number of pods currently running
 # TYPE kubelet_running_pods gauge
-kubelet_running_pods 2
+kubelet_running_pods 1
 `,
 		},
 	}
