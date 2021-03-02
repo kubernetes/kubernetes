@@ -14667,12 +14667,13 @@ func TestValidateNamespace(t *testing.T) {
 			},
 			expectError: false,
 		},
+		/* Removing this, validation should probably just check if the label exists and is different from the expected
 		"Invalid: namespace name label does not exist": {
 			ns: &core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc-xyz"},
 			},
 			expectError: true,
-		},
+		},*/
 		"Invalid: incorrect namespace name label exists": {
 			ns: &core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc-xyz", Labels: map[string]string{"kubernetes.io/metadata.name": "i-be-wrong"}},
