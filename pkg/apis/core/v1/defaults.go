@@ -326,7 +326,7 @@ func SetDefaults_HTTPGetAction(obj *v1.HTTPGetAction) {
 
 // SetDefaults_Namespace adds a default label for all namespaces
 func SetDefaults_Namespace(obj *v1.Namespace) {
-	// TODO, remove this in 1.22
+	// TODO, remove the feature gate in 1.22
 	// we cant SetDefaults for nameless namespaces (generateName),
 	// we don't need to overwrite the pre-existing labelMetadataName
 	if len(obj.Name) > 0 && obj.Labels[v1.LabelMetadataName] != obj.Name {

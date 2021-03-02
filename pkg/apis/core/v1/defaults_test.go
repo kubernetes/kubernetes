@@ -1429,15 +1429,8 @@ func TestSetDefaultNamespaceLabels(t *testing.T) {
 	obj2 := roundTrip(t, runtime.Object(s))
 	s2 := obj2.(*v1.Namespace)
 
-	if s2.Status.Phase != v1.NamespaceActive {
-		t.Errorf("Expected phase %v, got %v", v1.NamespaceActive, s2.Status.Phase)
-	}
-	if _, ok := s2.ObjectMeta.Labels[v1.LabelMetadataName]; !ok {
-		t.Errorf("Missing default namespace label key for %v", s)
-	} else {
-		if s2.ObjectMeta.Labels[v1.LabelMetadataName] != theNs {
-			t.Errorf("Expected default namespace label value of %v, but got %v", theNs, s2.ObjectMeta.Labels[v1.LabelMetadataName])
-		}
+	if s2.ObjectMeta.Labels[v1.LabelMetadataName] != theNs {
+		t.Errorf("Expected default namespace label value of %v, but got %v", theNs, s2.ObjectMeta.Labels[v1.LabelMetadataName])
 	}
 
 	// And let's disable the FG and check if it still defaults creating the labels
@@ -1452,11 +1445,22 @@ func TestSetDefaultNamespaceLabels(t *testing.T) {
 	obj2 = roundTrip(t, runtime.Object(s))
 	s2 = obj2.(*v1.Namespace)
 
-	if s2.Status.Phase != v1.NamespaceActive {
-		t.Errorf("Expected phase %v, got %v", v1.NamespaceActive, s2.Status.Phase)
-	}
 	if _, ok := s2.ObjectMeta.Labels[v1.LabelMetadataName]; ok {
 		t.Errorf("Default namespace shouldn't exist here, as the feature gate is disabled %v", s)
+	}
+}
+
+func TestSetDefaultNamespaceLabelsForGenerateName(t *testing.T) {
+
+	s := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "default-ns-labels-are-great-generated",
+		},
+	}
+	obj2 := roundTrip(t, runtime.Object(s))
+	s2 := obj2.(*v1.Namespace)
+	if _, ok := s2.ObjectMeta.Labels[v1.LabelMetadataName]; !ok {
+		t.Errorf("Missing default namespace label key for %v", s)
 	}
 }
 

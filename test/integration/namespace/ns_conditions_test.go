@@ -20,9 +20,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -127,8 +128,8 @@ func TestNamespaceLabels(t *testing.T) {
 		},
 	}, metav1.CreateOptions{})
 
-	if _, ok := ns.ObjectMeta.Labels[corev1.LabelMetadataName]; !ok {
-		t.Fatal(fmt.Errorf("missing metadata name label from namespace (initial create) "))
+	if ns.Name != ns.Labels[corev1.LabelMetadataName] {
+		t.Fatal(fmt.Errorf("expected %q, got %q", ns.Name, ns.Labels[corev1.LabelMetadataName]))
 	}
 
 	if err != nil {
@@ -137,8 +138,8 @@ func TestNamespaceLabels(t *testing.T) {
 
 	if nsList, err := kubeClient.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{}); err != nil {
 		for _, ns := range nsList.Items {
-			if _, ok := ns.ObjectMeta.Labels[corev1.LabelMetadataName]; !ok {
-				t.Fatal(fmt.Errorf("missing metadata name label from namespace (post create)"))
+			if ns.Name != ns.Labels[corev1.LabelMetadataName] {
+				t.Fatal(fmt.Errorf("expected %q, got %q", ns.Name, ns.Labels[corev1.LabelMetadataName]))
 			}
 		}
 	}
