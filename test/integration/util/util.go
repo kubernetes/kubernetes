@@ -42,6 +42,7 @@ import (
 	"k8s.io/klog/v2"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/scheduler"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	schedulerapiv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
@@ -74,7 +75,7 @@ func StartApiserver() (string, ShutdownFunc) {
 
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
 // and event broadcaster. It returns the running scheduler, podInformer and the shutdown function to stop it.
-func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, coreinformers.PodInformer, ShutdownFunc) {
+func StartScheduler(clientSet clientset.Interface, cfg *kubeschedulerconfig.KubeSchedulerConfiguration) (*scheduler.Scheduler, coreinformers.PodInformer, ShutdownFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
@@ -87,7 +88,14 @@ func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, corein
 		clientSet,
 		informerFactory,
 		profile.NewRecorderFactory(evtBroadcaster),
-		ctx.Done())
+		ctx.Done(),
+		scheduler.WithProfiles(cfg.Profiles...),
+		scheduler.WithAlgorithmSource(cfg.AlgorithmSource),
+		scheduler.WithPercentageOfNodesToScore(cfg.PercentageOfNodesToScore),
+		scheduler.WithPodMaxBackoffSeconds(cfg.PodMaxBackoffSeconds),
+		scheduler.WithPodInitialBackoffSeconds(cfg.PodInitialBackoffSeconds),
+		scheduler.WithExtenders(cfg.Extenders...),
+		scheduler.WithParallelism(cfg.Parallelism))
 	if err != nil {
 		klog.Fatalf("Error creating scheduler: %v", err)
 	}

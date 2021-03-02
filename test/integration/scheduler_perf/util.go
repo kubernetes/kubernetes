@@ -40,6 +40,9 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	"k8s.io/kube-scheduler/config/v1beta1"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/test/integration/util"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -53,6 +56,16 @@ const (
 
 var dataItemsDir = flag.String("data-items-dir", "", "destination directory for storing generated data items for perf dashboard")
 
+func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
+	gvk := v1beta1.SchemeGroupVersion.WithKind("KubeSchedulerConfiguration")
+	cfg := config.KubeSchedulerConfiguration{}
+	_, _, err := kubeschedulerscheme.Codecs.UniversalDecoder().Decode(nil, &gvk, &cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
 // mustSetupScheduler starts the following components:
 // - k8s api server (a.k.a. master)
 // - scheduler
@@ -60,9 +73,12 @@ var dataItemsDir = flag.String("data-items-dir", "", "destination directory for 
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
+func mustSetupScheduler(config *config.KubeSchedulerConfiguration) (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
 	apiURL, apiShutdown := util.StartApiserver()
+	var err error
 
+	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
+	// support this when there is any testcase that depends on such configuration.
 	cfg := &restclient.Config{
 		Host:          apiURL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
@@ -70,10 +86,20 @@ func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clients
 		Burst:         5000,
 	}
 
+	// use default component config if config here is nil
+	if config == nil {
+		config, err = newDefaultComponentConfig()
+		if err != nil {
+			klog.Fatalf("Error creating default component config: %v", err)
+		}
+	}
+
 	client := clientset.NewForConfigOrDie(cfg)
 	dynClient := dynamic.NewForConfigOrDie(cfg)
 
-	_, podInformer, schedulerShutdown := util.StartScheduler(client)
+	// Not all config options will be effective but only those mostly related with scheduler performance will
+	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
+	_, podInformer, schedulerShutdown := util.StartScheduler(client, config)
 	fakePVControllerShutdown := util.StartFakePVController(client)
 
 	shutdownFunc := func() {
