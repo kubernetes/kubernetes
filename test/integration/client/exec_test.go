@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -35,7 +34,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
 
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -271,7 +269,7 @@ func TestExecPlugin(t *testing.T) {
 				}
 			},
 			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientUnauthorizedToken}},
-			wantCertificate:               x509KeyPair([]byte(unauthorizedCert), []byte(unauthorizedKey), true),
+			wantCertificate:               x509KeyPair(unauthorizedCert, unauthorizedKey, true),
 			wantClientErrorPrefix:         "Unauthorized",
 		},
 		{
@@ -337,17 +335,11 @@ func TestExecPlugin(t *testing.T) {
 				c.KeyData = unauthorizedKey
 			},
 			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientAuthorizedToken}},
-			wantCertificate:               x509KeyPair([]byte(unauthorizedCert), []byte(unauthorizedKey), false),
+			wantCertificate:               x509KeyPair(unauthorizedCert, unauthorizedKey, false),
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tmpDir, err := ioutil.TempDir("", "kubernetes-client-exec-test-plugin-dir-*")
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer os.RemoveAll(tmpDir)
-
 			var authorizationHeaderValues syncedHeaderValues
 			clientConfig := rest.AnonymousClientConfig(result.ClientConfig)
 			clientConfig.ExecProvider = &clientcmdapi.ExecConfig{
@@ -355,12 +347,12 @@ func TestExecPlugin(t *testing.T) {
 				// TODO(ankeesler): move to v1 once exec plugins go GA.
 				APIVersion: "client.authentication.k8s.io/v1beta1",
 			}
-			clientConfig.Wrap(transport.WrapperFunc(func(rt http.RoundTripper) http.RoundTripper {
+			clientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 				return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 					authorizationHeaderValues.append(req.Header.Values("Authorization"))
 					return rt.RoundTrip(req)
 				})
-			}))
+			})
 
 			if test.clientConfigFunc != nil {
 				test.clientConfigFunc(clientConfig)
