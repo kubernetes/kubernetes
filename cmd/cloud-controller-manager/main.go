@@ -61,10 +61,12 @@ func main() {
 	// Here is an example to add an controller(NodeIpamController) which will be used by cloud provider
 	// generate nodeIPAMConfig. Here is an sample code.
 	// If you do not need additional controller, please ignore.
-	nodeIPAMControllerOptions.NodeIPAMControllerConfiguration = &nodeIPAMControllerConfiguration
+
+	nodeIpamController := nodeIPAMController{}
+	nodeIpamController.nodeIPAMControllerOptions.NodeIPAMControllerConfiguration = &nodeIpamController.nodeIPAMControllerConfiguration
 	fs := pflag.NewFlagSet("fs", pflag.ContinueOnError)
-	nodeIPAMControllerOptions.AddFlags(fs)
-	controllerInitializers["nodeipam"] = startNodeIpamControllerWrapper
+	nodeIpamController.nodeIPAMControllerOptions.AddFlags(fs)
+	controllerInitializers["nodeipam"] = nodeIpamController.startNodeIpamControllerWrapper
 
 	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers, fs, wait.NeverStop)
 

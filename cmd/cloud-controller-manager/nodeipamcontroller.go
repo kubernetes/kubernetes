@@ -22,7 +22,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	nodeipamcontrolleroptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"net"
 	"net/http"
 	"strings"
@@ -34,6 +33,7 @@ import (
 	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
+	nodeipamcontrolleroptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	nodeipamcontroller "k8s.io/kubernetes/pkg/controller/nodeipam"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
@@ -47,18 +47,20 @@ const (
 	defaultNodeMaskCIDRIPv6 = 64
 )
 
-var nodeIPAMControllerConfiguration nodeipamconfig.NodeIPAMControllerConfiguration
-var nodeIPAMControllerOptions nodeipamcontrolleroptions.NodeIPAMControllerOptions
+type nodeIPAMController struct {
+	nodeIPAMControllerConfiguration nodeipamconfig.NodeIPAMControllerConfiguration
+	nodeIPAMControllerOptions       nodeipamcontrolleroptions.NodeIPAMControllerOptions
+}
 
-func startNodeIpamControllerWrapper(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) app.InitFunc {
-	errors := nodeIPAMControllerOptions.Validate()
+func (nodeIpamController *nodeIPAMController) startNodeIpamControllerWrapper(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) app.InitFunc {
+	errors := nodeIpamController.nodeIPAMControllerOptions.Validate()
 	if len(errors) > 0 {
 		klog.Fatal("NodeIPAM controller values are not properly set.")
 	}
-	nodeIPAMControllerOptions.ApplyTo(&nodeIPAMControllerConfiguration)
+	nodeIpamController.nodeIPAMControllerOptions.ApplyTo(&nodeIpamController.nodeIPAMControllerConfiguration)
 
 	return func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
-		return startNodeIpamController(completedConfig, nodeIPAMControllerConfiguration, ctx, cloud)
+		return startNodeIpamController(completedConfig, nodeIpamController.nodeIPAMControllerConfiguration, ctx, cloud)
 	}
 }
 
