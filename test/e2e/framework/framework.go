@@ -213,10 +213,6 @@ func (f *Framework) BeforeEach() {
 		ExpectNoError(err)
 		f.DynamicClient, err = dynamic.NewForConfig(config)
 		ExpectNoError(err)
-		// node.k8s.io is based on CRD, which is served only as JSON
-		jsonConfig := config
-		jsonConfig.ContentType = "application/json"
-		ExpectNoError(err)
 
 		// create scales getter, set GroupVersion and NegotiatedSerializer to default values
 		// as they are required when creating a REST client.
