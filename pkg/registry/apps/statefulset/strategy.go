@@ -18,8 +18,6 @@ package statefulset
 
 import (
 	"context"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
@@ -125,8 +123,8 @@ func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.Stateful
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-		if oldStatefulSet == nil || oldStatefulSet.Spec.PersistentVolumeClaimRetentionPolicy == nil {
-			newStatefulSet.Spec.PersistentVolumeClaimRetentionPolicy = nil
+		if oldSS == nil || oldSS.Spec.PersistentVolumeClaimRetentionPolicy == nil {
+			newSS.Spec.PersistentVolumeClaimRetentionPolicy = nil
 		}
 	}
 }
