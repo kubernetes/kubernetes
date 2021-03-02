@@ -40,11 +40,6 @@ func TestCertificateSubjectRestrictionPlugin(t *testing.T) {
 			group:      "system:masters",
 			error:      `certificatesigningrequests.certificates.k8s.io "csr" is forbidden: use of kubernetes.io/kube-apiserver-client signer with system:masters group is not allowed`,
 		},
-		// legacy unknown signer is no longer allowed in v1.
-		//"should admit a request if signerName is NOT kube-apiserver-client and org is system:masters": {
-		//	signerName: certv1.LegacyUnknownSignerName,
-		//	group:      "system:masters",
-		//},
 		"should admit a request if signerName is kube-apiserver-client and group is NOT system:masters": {
 			signerName: certv1.KubeAPIServerClientSignerName,
 			group:      "system:notmasters",

@@ -79,12 +79,6 @@ func TestController_AutoApproval(t *testing.T) {
 			grantNodeClient: true,
 			autoApproved:    true,
 		},
-		// usages are now required in v1.
-		//"should not auto-approve CSR that has kube-apiserver-client-kubelet signerName that does not match requirements": {
-		//	signerName:   certv1.KubeAPIServerClientKubeletSignerName,
-		//	request:      pemWithGroup("system:notnodes"),
-		//	autoApproved: false,
-		//},
 		"should not auto-approve CSR that has kube-apiserver-client signerName that DOES match kubelet CSR requirements": {
 			signerName:   certv1.KubeAPIServerClientSignerName,
 			request:      validKubeAPIServerClientKubeletCSR,
