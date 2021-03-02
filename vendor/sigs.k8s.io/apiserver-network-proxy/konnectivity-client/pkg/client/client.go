@@ -115,6 +115,12 @@ func (t *grpcTunnel) serve(c clientConn) {
 					connid: resp.ConnectID,
 				}
 			}
+
+			if resp.Error != "" {
+				// On dial error, avoid leaking serve goroutine.
+				return
+			}
+
 		case client.PacketType_DATA:
 			resp := pkt.GetData()
 			// TODO: flow control
