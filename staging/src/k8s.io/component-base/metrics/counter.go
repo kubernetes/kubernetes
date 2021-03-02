@@ -20,6 +20,7 @@ import (
 	"context"
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 )
 
 // Counter is our internal representation for our wrapping struct around prometheus
@@ -30,6 +31,9 @@ type Counter struct {
 	lazyMetric
 	selfCollector
 }
+
+// The implementation of the Metric interface is expected by testutil.GetCounterMetricValue.
+var _ Metric = &Counter{}
 
 // NewCounter returns an object which satisfies the kubeCollector and CounterMetric interfaces.
 // However, the object returned will not measure anything unless the collector is first
@@ -44,6 +48,14 @@ func NewCounter(opts *CounterOpts) *Counter {
 	kc.setPrometheusCounter(noop)
 	kc.lazyInit(kc, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return kc
+}
+
+func (c *Counter) Desc() *prometheus.Desc {
+	return c.metric.Desc()
+}
+
+func (c *Counter) Write(to *dto.Metric) error {
+	return c.metric.Write(to)
 }
 
 // Reset resets the underlying prometheus Counter to start counting from 0 again
