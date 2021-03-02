@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"reflect"
 	"strings"
@@ -1210,4 +1211,61 @@ func TestWriteBytesLine(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWriteCountLines(t *testing.T) {
+
+	testCases := []struct {
+		name     string
+		expected int
+	}{
+		{
+			name:     "write no line",
+			expected: 0,
+		},
+		{
+			name:     "write one line",
+			expected: 1,
+		},
+		{
+			name:     "write 100 lines",
+			expected: 100,
+		},
+		{
+			name:     "write 1000 lines",
+			expected: 1000,
+		},
+		{
+			name:     "write 10000 lines",
+			expected: 10000,
+		},
+		{
+			name:     "write 100000 lines",
+			expected: 100000,
+		},
+	}
+	testBuffer := bytes.NewBuffer(nil)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testBuffer.Reset()
+			for i := 0; i < testCase.expected; i++ {
+				WriteLine(testBuffer, randSeq())
+			}
+			n := CountBytesLines(testBuffer.Bytes())
+			if n != testCase.expected {
+				t.Fatalf("lines expected: %d, got: %d", testCase.expected, n)
+			}
+		})
+	}
+}
+
+// obtained from https://stackoverflow.com/a/22892986
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randSeq() string {
+	b := make([]rune, 30)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }
