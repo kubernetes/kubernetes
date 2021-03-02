@@ -56,6 +56,8 @@ func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string) (boo
 		return resizefs.extResize(devicePath)
 	case "xfs":
 		return resizefs.xfsResize(deviceMountPath)
+	case "btrfs":
+		return resizefs.btrfsResize(deviceMountPath)
 	}
 	return false, fmt.Errorf("ResizeFS.Resize - resize of format %s is not supported for device %s mounted at %s", format, devicePath, deviceMountPath)
 }
@@ -82,5 +84,18 @@ func (resizefs *ResizeFs) xfsResize(deviceMountPath string) (bool, error) {
 	}
 
 	resizeError := fmt.Errorf("resize of device %s failed: %v. xfs_growfs output: %s", deviceMountPath, err, string(output))
+	return false, resizeError
+}
+
+func (resizefs *ResizeFs) btrfsResize(deviceMountPath string) (bool, error) {
+	args := []string{"filesystem", "resize", "max", deviceMountPath}
+	output, err := resizefs.exec.Command("btrfs", args...).CombinedOutput()
+
+	if err == nil {
+		klog.V(2).Infof("Device %s resized successfully", deviceMountPath)
+		return true, nil
+	}
+
+	resizeError := fmt.Errorf("resize of device %s failed: %v. btrfs output: %s", deviceMountPath, err, string(output))
 	return false, resizeError
 }
