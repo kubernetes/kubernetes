@@ -196,7 +196,6 @@ type CustomResourceDefinitionVersion struct {
 	// Top-level and per-version subresources are mutually exclusive.
 	// Per-version subresources must not all be set to identical values (top-level subresources should be used instead)
 	// This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
-	// +optional
 	Subresources *CustomResourceSubresources
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
 	// Top-level and per-version columns are mutually exclusive.

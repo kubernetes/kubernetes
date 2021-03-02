@@ -186,8 +186,7 @@ type CustomResourceDefinitionVersion struct {
 	// +optional
 	DeprecationWarning *string `json:"deprecationWarning,omitempty" protobuf:"bytes,8,opt,name=deprecationWarning"`
 	// schema describes the schema used for validation, pruning, and defaulting of this version of the custom resource.
-	// +optional
-	Schema *CustomResourceValidation `json:"schema,omitempty" protobuf:"bytes,4,opt,name=schema"`
+	Schema *CustomResourceValidation `json:"schema" protobuf:"bytes,4,opt,name=schema"`
 	// subresources specify what subresources this version of the defined custom resource have.
 	// +optional
 	Subresources *CustomResourceSubresources `json:"subresources,omitempty" protobuf:"bytes,5,opt,name=subresources"`
