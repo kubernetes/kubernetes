@@ -54,7 +54,7 @@ func (c *conn) Write(data []byte) (n int, err error) {
 		},
 	}
 
-	klog.V(6).Infof("[tracing] send req, type: %s", req.Type)
+	klog.V(5).InfoS("[tracing] send req", "type", req.Type)
 
 	err = c.stream.Send(req)
 	if err != nil {
@@ -112,7 +112,7 @@ func (c *conn) SetWriteDeadline(t time.Time) error {
 // Close closes the connection. It also sends CLOSE_REQ packet over
 // proxy service to notify remote to drop the connection.
 func (c *conn) Close() error {
-	klog.Info("conn.Close()")
+	klog.V(4).Infoln("closing connection")
 	req := &client.Packet{
 		Type: client.PacketType_CLOSE_REQ,
 		Payload: &client.Packet_CloseRequest{
@@ -122,7 +122,7 @@ func (c *conn) Close() error {
 		},
 	}
 
-	klog.V(6).Infof("[tracing] send req, type: %s", req.Type)
+	klog.V(5).InfoS("[tracing] send req", "type", req.Type)
 
 	if err := c.stream.Send(req); err != nil {
 		return err
