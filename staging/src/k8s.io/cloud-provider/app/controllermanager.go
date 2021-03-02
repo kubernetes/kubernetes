@@ -66,6 +66,7 @@ const (
 
 // NewCloudControllerManagerCommand creates a *cobra.Command object with default parameters
 // initFuncConstructor is a map of named controller groups (you can start more than one in an init func) paired to their InitFuncConstructor.
+// additionalFlags provides controller specific flags to be included in the complete set of controller manager flags
 func NewCloudControllerManagerCommand(s *options.CloudControllerManagerOptions, cloudInitializer InitCloudFunc, initFuncConstructor map[string]InitFuncConstructor, additionalFlags *pflag.FlagSet, stopCh <-chan struct{}) *cobra.Command {
 
 	cmd := &cobra.Command{
