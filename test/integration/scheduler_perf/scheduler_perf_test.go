@@ -34,6 +34,9 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	"sigs.k8s.io/yaml"
@@ -77,6 +80,8 @@ type testCase struct {
 	// TODO(#93792): reduce config toil by having a default pod and node spec per
 	// testCase? CreatePods and CreateNodes ops will inherit these unless
 	// manually overridden.
+	// SchedulerConf is the path of scheduler configuration
+	SchedulerConf string
 }
 
 func (tc *testCase) collectsMetrics() bool {
@@ -305,11 +310,38 @@ func BenchmarkPerfScheduling(b *testing.B) {
 	}
 }
 
+func loadConfigFromFile(file string) (*config.KubeSchedulerConfiguration, error) {
+	data, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	// The UniversalDecoder runs defaulting and returns the internal type by default.
+	obj, gvk, err := scheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if cfgObj, ok := obj.(*config.KubeSchedulerConfiguration); ok {
+		return cfgObj, nil
+	}
+	return nil, fmt.Errorf("couldn't decode as KubeSchedulerConfiguration, got %s: ", gvk)
+}
+
 func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 	// 30 minutes should be plenty enough even for the 5000-node tests.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	var cfg *config.KubeSchedulerConfiguration
+	var err error
 	defer cancel()
-	finalFunc, podInformer, clientset := mustSetupScheduler()
+	if len(tc.SchedulerConf) != 0 {
+		cfg, err = loadConfigFromFile(tc.SchedulerConf)
+		if err != nil {
+			b.Fatalf("error loading scheduler config file: %v", err)
+		}
+		if err = validation.ValidateKubeSchedulerConfiguration(cfg).ToAggregate(); err != nil {
+			b.Fatalf("validate scheduler config file failed: %v", err)
+		}
+	}
+	finalFunc, podInformer, clientset := mustSetupScheduler(cfg)
 	b.Cleanup(finalFunc)
 
 	var mu sync.Mutex

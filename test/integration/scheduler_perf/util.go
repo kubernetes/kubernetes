@@ -39,6 +39,9 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	"k8s.io/kube-scheduler/config/v1beta1"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/test/integration/util"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -52,6 +55,17 @@ const (
 
 var dataItemsDir = flag.String("data-items-dir", "", "destination directory for storing generated data items for perf dashboard")
 
+func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
+	versionedCfg := v1beta1.KubeSchedulerConfiguration{}
+
+	kubeschedulerscheme.Scheme.Default(&versionedCfg)
+	cfg := config.KubeSchedulerConfiguration{}
+	if err := kubeschedulerscheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
 // mustSetupScheduler starts the following components:
 // - k8s api server (a.k.a. master)
 // - scheduler
@@ -59,15 +73,25 @@ var dataItemsDir = flag.String("data-items-dir", "", "destination directory for 
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface) {
+func mustSetupScheduler(cfg *config.KubeSchedulerConfiguration) (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface) {
 	apiURL, apiShutdown := util.StartApiserver()
+	var err error
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          apiURL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
 		QPS:           5000.0,
 		Burst:         5000,
 	})
-	_, podInformer, schedulerShutdown := util.StartScheduler(clientSet)
+
+	// use default component config if cfg is nil
+	if cfg == nil {
+		cfg, err = newDefaultComponentConfig()
+		if err != nil {
+			klog.Fatalf("Error creating default component config: %v", err)
+		}
+	}
+
+	_, podInformer, schedulerShutdown := util.StartScheduler(clientSet, cfg)
 	fakePVControllerShutdown := util.StartFakePVController(clientSet)
 
 	shutdownFunc := func() {
