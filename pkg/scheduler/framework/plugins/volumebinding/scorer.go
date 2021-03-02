@@ -23,10 +23,13 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
 
-type classResourceMap map[string]*scheduling.VolumeResource
+// classResourceMap holds a map of storage class to resource.
+type classResourceMap map[string]*scheduling.StorageResource
 
+// volumeCapacityScorer calculates the score based on class storage resource information.
 type volumeCapacityScorer func(classResourceMap) int64
 
+// buildScorerFunction builds volumeCapacityScorer from the scoring function shape.
 func buildScorerFunction(scoringFunctionShape helper.FunctionShape) volumeCapacityScorer {
 	rawScoringFunction := helper.BuildBrokenLinearFunction(scoringFunctionShape)
 	f := func(requested, capacity int64) int64 {
@@ -37,15 +40,15 @@ func buildScorerFunction(scoringFunctionShape helper.FunctionShape) volumeCapaci
 		return rawScoringFunction(requested * maxUtilization / capacity)
 	}
 	return func(classResources classResourceMap) int64 {
-		var nodeScore, weightSum int64
+		var nodeScore int64
+		// in alpha stage, all classes have the same weight
+		weightSum := len(classResources)
+		if weightSum == 0 {
+			return 0
+		}
 		for _, resource := range classResources {
 			classScore := f(resource.Requested, resource.Capacity)
 			nodeScore += classScore
-			// in alpha stage, all classes have the same weight
-			weightSum += 1
-		}
-		if weightSum == 0 {
-			return 0
 		}
 		return int64(math.Round(float64(nodeScore) / float64(weightSum)))
 	}
