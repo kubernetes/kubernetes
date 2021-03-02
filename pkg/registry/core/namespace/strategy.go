@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,9 +28,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // namespaceStrategy implements behavior for Namespaces
@@ -88,6 +91,15 @@ func (namespaceStrategy) Validate(ctx context.Context, obj runtime.Object) field
 
 // Canonicalize normalizes the object after validation.
 func (namespaceStrategy) Canonicalize(obj runtime.Object) {
+	ns := obj.(*api.Namespace)
+	if len(ns.Name) > 0 && ns.Labels[v1.LabelMetadataName] != ns.Name {
+		if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
+			if ns.Labels == nil {
+				ns.Labels = map[string]string{}
+			}
+			ns.Labels[v1.LabelMetadataName] = ns.Name
+		}
+	}
 }
 
 // AllowCreateOnUpdate is false for namespaces.
