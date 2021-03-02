@@ -46,6 +46,7 @@ import (
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/cronjob/metrics"
 )
 
 var (
@@ -113,6 +114,8 @@ func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer 
 			jm.enqueueController(obj)
 		},
 	})
+
+	metrics.Register()
 
 	return jm, nil
 }
@@ -570,6 +573,7 @@ func (jm *ControllerV2) syncCronJob(
 		return cj, nil, err
 	}
 
+	metrics.CronJobCreationSkew.Observe(jobResp.ObjectMeta.GetCreationTimestamp().Sub(*scheduledTime).Seconds())
 	klog.V(4).InfoS("Created Job", "job", klog.KRef(jobResp.GetNamespace(), jobResp.GetName()), "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
 	jm.recorder.Eventf(cj, corev1.EventTypeNormal, "SuccessfulCreate", "Created job %v", jobResp.Name)
 
