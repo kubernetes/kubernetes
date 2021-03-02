@@ -2255,6 +2255,9 @@ k8s.io/controller-manager/pkg/clientbuilder
 k8s.io/controller-manager/pkg/features
 k8s.io/controller-manager/pkg/features/register
 k8s.io/controller-manager/pkg/informerfactory
+k8s.io/controller-manager/pkg/leadermigration
+k8s.io/controller-manager/pkg/leadermigration/config
+k8s.io/controller-manager/pkg/leadermigration/options
 # k8s.io/cri-api v0.0.0 => ./staging/src/k8s.io/cri-api
 ## explicit
 # k8s.io/cri-api => ./staging/src/k8s.io/cri-api
