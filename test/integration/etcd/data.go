@@ -165,6 +165,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("certificates.k8s.io", "v1beta1", "certificatesigningrequests"): {
 			Stub:             `{"metadata": {"name": "csr1"}, "spec": {"request": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0KTUlJQnlqQ0NBVE1DQVFBd2dZa3hDekFKQmdOVkJBWVRBbFZUTVJNd0VRWURWUVFJRXdwRFlXeHBabTl5Ym1saApNUll3RkFZRFZRUUhFdzFOYjNWdWRHRnBiaUJXYVdWM01STXdFUVlEVlFRS0V3cEhiMjluYkdVZ1NXNWpNUjh3CkhRWURWUVFMRXhaSmJtWnZjbTFoZEdsdmJpQlVaV05vYm05c2IyZDVNUmN3RlFZRFZRUURFdzUzZDNjdVoyOXYKWjJ4bExtTnZiVENCbnpBTkJna3Foa2lHOXcwQkFRRUZBQU9CalFBd2dZa0NnWUVBcFp0WUpDSEo0VnBWWEhmVgpJbHN0UVRsTzRxQzAzaGpYK1prUHl2ZFlkMVE0K3FiQWVUd1htQ1VLWUhUaFZSZDVhWFNxbFB6eUlCd2llTVpyCldGbFJRZGRaMUl6WEFsVlJEV3dBbzYwS2VjcWVBWG5uVUsrNWZYb1RJL1VnV3NocmU4dEoreC9UTUhhUUtSL0oKY0lXUGhxYVFoc0p1elpidkFkR0E4MEJMeGRNQ0F3RUFBYUFBTUEwR0NTcUdTSWIzRFFFQkJRVUFBNEdCQUlobAo0UHZGcStlN2lwQVJnSTVaTStHWng2bXBDejQ0RFRvMEprd2ZSRGYrQnRyc2FDMHE2OGVUZjJYaFlPc3E0ZmtIClEwdUEwYVZvZzNmNWlKeENhM0hwNWd4YkpRNnpWNmtKMFRFc3VhYU9oRWtvOXNkcENvUE9uUkJtMmkvWFJEMkQKNmlOaDhmOHowU2hHc0ZxakRnRkh5RjNvK2xVeWorVUM2SDFRVzdibgotLS0tLUVORCBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0="}}`,
 			ExpectedEtcdPath: "/registry/certificatesigningrequests/csr1",
+			ExpectedGVK:      gvkP("certificates.k8s.io", "v1", "CertificateSigningRequest"),
 		},
 		// --
 
@@ -172,7 +173,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("certificates.k8s.io", "v1", "certificatesigningrequests"): {
 			Stub:             `{"metadata": {"name": "csr2"}, "spec": {"signerName":"example.com/signer", "usages":["any"], "request": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0KTUlJQnlqQ0NBVE1DQVFBd2dZa3hDekFKQmdOVkJBWVRBbFZUTVJNd0VRWURWUVFJRXdwRFlXeHBabTl5Ym1saApNUll3RkFZRFZRUUhFdzFOYjNWdWRHRnBiaUJXYVdWM01STXdFUVlEVlFRS0V3cEhiMjluYkdVZ1NXNWpNUjh3CkhRWURWUVFMRXhaSmJtWnZjbTFoZEdsdmJpQlVaV05vYm05c2IyZDVNUmN3RlFZRFZRUURFdzUzZDNjdVoyOXYKWjJ4bExtTnZiVENCbnpBTkJna3Foa2lHOXcwQkFRRUZBQU9CalFBd2dZa0NnWUVBcFp0WUpDSEo0VnBWWEhmVgpJbHN0UVRsTzRxQzAzaGpYK1prUHl2ZFlkMVE0K3FiQWVUd1htQ1VLWUhUaFZSZDVhWFNxbFB6eUlCd2llTVpyCldGbFJRZGRaMUl6WEFsVlJEV3dBbzYwS2VjcWVBWG5uVUsrNWZYb1RJL1VnV3NocmU4dEoreC9UTUhhUUtSL0oKY0lXUGhxYVFoc0p1elpidkFkR0E4MEJMeGRNQ0F3RUFBYUFBTUEwR0NTcUdTSWIzRFFFQkJRVUFBNEdCQUlobAo0UHZGcStlN2lwQVJnSTVaTStHWng2bXBDejQ0RFRvMEprd2ZSRGYrQnRyc2FDMHE2OGVUZjJYaFlPc3E0ZmtIClEwdUEwYVZvZzNmNWlKeENhM0hwNWd4YkpRNnpWNmtKMFRFc3VhYU9oRWtvOXNkcENvUE9uUkJtMmkvWFJEMkQKNmlOaDhmOHowU2hHc0ZxakRnRkh5RjNvK2xVeWorVUM2SDFRVzdibgotLS0tLUVORCBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0="}}`,
 			ExpectedEtcdPath: "/registry/certificatesigningrequests/csr2",
-			ExpectedGVK:      gvkP("certificates.k8s.io", "v1beta1", "CertificateSigningRequest"),
 		},
 		// --
 
@@ -180,7 +180,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("coordination.k8s.io", "v1", "leases"): {
 			Stub:             `{"metadata": {"name": "leasev1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
 			ExpectedEtcdPath: "/registry/leases/" + namespace + "/leasev1",
-			ExpectedGVK:      gvkP("coordination.k8s.io", "v1beta1", "Lease"),
 		},
 		// --
 
@@ -188,6 +187,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("coordination.k8s.io", "v1beta1", "leases"): {
 			Stub:             `{"metadata": {"name": "leasev1beta1"}, "spec": {"holderIdentity": "holder", "leaseDurationSeconds": 5}}`,
 			ExpectedEtcdPath: "/registry/leases/" + namespace + "/leasev1beta1",
+			ExpectedGVK:      gvkP("coordination.k8s.io", "v1", "Lease"),
 		},
 		// --
 
@@ -218,7 +218,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("extensions", "v1beta1", "ingresses"): {
 			Stub:             `{"metadata": {"name": "ingress1"}, "spec": {"backend": {"serviceName": "service", "servicePort": 5000}}}`,
 			ExpectedEtcdPath: "/registry/ingress/" + namespace + "/ingress1",
-			ExpectedGVK:      gvkP("networking.k8s.io", "v1beta1", "Ingress"),
+			ExpectedGVK:      gvkP("networking.k8s.io", "v1", "Ingress"),
 		},
 		// --
 
@@ -226,10 +226,12 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("networking.k8s.io", "v1beta1", "ingresses"): {
 			Stub:             `{"metadata": {"name": "ingress2"}, "spec": {"backend": {"serviceName": "service", "servicePort": 5000}}}`,
 			ExpectedEtcdPath: "/registry/ingress/" + namespace + "/ingress2",
+			ExpectedGVK:      gvkP("networking.k8s.io", "v1", "Ingress"),
 		},
 		gvr("networking.k8s.io", "v1beta1", "ingressclasses"): {
 			Stub:             `{"metadata": {"name": "ingressclass2"}, "spec": {"controller": "example.com/controller"}}`,
 			ExpectedEtcdPath: "/registry/ingressclasses/ingressclass2",
+			ExpectedGVK:      gvkP("networking.k8s.io", "v1", "IngressClass"),
 		},
 		// --
 
@@ -237,12 +239,10 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("networking.k8s.io", "v1", "ingresses"): {
 			Stub:             `{"metadata": {"name": "ingress3"}, "spec": {"defaultBackend": {"service":{"name":"service", "port":{"number": 5000}}}}}`,
 			ExpectedEtcdPath: "/registry/ingress/" + namespace + "/ingress3",
-			ExpectedGVK:      gvkP("networking.k8s.io", "v1beta1", "Ingress"),
 		},
 		gvr("networking.k8s.io", "v1", "ingressclasses"): {
 			Stub:             `{"metadata": {"name": "ingressclass3"}, "spec": {"controller": "example.com/controller"}}`,
 			ExpectedEtcdPath: "/registry/ingressclasses/ingressclass3",
-			ExpectedGVK:      gvkP("networking.k8s.io", "v1beta1", "IngressClass"),
 		},
 		gvr("networking.k8s.io", "v1", "networkpolicies"): {
 			Stub:             `{"metadata": {"name": "np2"}, "spec": {"podSelector": {"matchLabels": {"e": "f"}}}}`,
@@ -398,12 +398,10 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("admissionregistration.k8s.io", "v1", "validatingwebhookconfigurations"): {
 			Stub:             `{"metadata":{"name":"hook2","creationTimestamp":null},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore","sideEffects":"None","admissionReviewVersions":["v1beta1"]}]}`,
 			ExpectedEtcdPath: "/registry/validatingwebhookconfigurations/hook2",
-			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1beta1", "ValidatingWebhookConfiguration"),
 		},
 		gvr("admissionregistration.k8s.io", "v1", "mutatingwebhookconfigurations"): {
 			Stub:             `{"metadata":{"name":"hook2","creationTimestamp":null},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore","sideEffects":"None","admissionReviewVersions":["v1beta1"]}]}`,
 			ExpectedEtcdPath: "/registry/mutatingwebhookconfigurations/hook2",
-			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1beta1", "MutatingWebhookConfiguration"),
 		},
 		// --
 
@@ -411,10 +409,12 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): {
 			Stub:             `{"metadata":{"name":"hook1","creationTimestamp":null},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore"}]}`,
 			ExpectedEtcdPath: "/registry/validatingwebhookconfigurations/hook1",
+			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1", "ValidatingWebhookConfiguration"),
 		},
 		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingwebhookconfigurations"): {
 			Stub:             `{"metadata":{"name":"hook1","creationTimestamp":null},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore"}]}`,
 			ExpectedEtcdPath: "/registry/mutatingwebhookconfigurations/hook1",
+			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1", "MutatingWebhookConfiguration"),
 		},
 		// --
 
@@ -446,6 +446,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("apiregistration.k8s.io", "v1beta1", "apiservices"): {
 			Stub:             `{"metadata": {"name": "as1.foo.com"}, "spec": {"group": "foo.com", "version": "as1", "groupPriorityMinimum":100, "versionPriority":10}}`,
 			ExpectedEtcdPath: "/registry/apiregistration.k8s.io/apiservices/as1.foo.com",
+			ExpectedGVK:      gvkP("apiregistration.k8s.io", "v1", "APIService"),
 		},
 		// --
 
@@ -454,7 +455,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("apiregistration.k8s.io", "v1", "apiservices"): {
 			Stub:             `{"metadata": {"name": "as2.foo.com"}, "spec": {"group": "foo.com", "version": "as2", "groupPriorityMinimum":100, "versionPriority":10}}`,
 			ExpectedEtcdPath: "/registry/apiregistration.k8s.io/apiservices/as2.foo.com",
-			ExpectedGVK:      gvkP("apiregistration.k8s.io", "v1beta1", "APIService"),
 		},
 		// --
 
@@ -499,7 +499,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("node.k8s.io", "v1alpha1", "runtimeclasses"): {
 			Stub:             `{"metadata": {"name": "rc1"}, "spec": {"runtimeHandler": "h1"}}`,
 			ExpectedEtcdPath: "/registry/runtimeclasses/rc1",
-			ExpectedGVK:      gvkP("node.k8s.io", "v1beta1", "RuntimeClass"),
+			ExpectedGVK:      gvkP("node.k8s.io", "v1", "RuntimeClass"),
 		},
 		// --
 
@@ -507,6 +507,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("node.k8s.io", "v1beta1", "runtimeclasses"): {
 			Stub:             `{"metadata": {"name": "rc2"}, "handler": "h2"}`,
 			ExpectedEtcdPath: "/registry/runtimeclasses/rc2",
+			ExpectedGVK:      gvkP("node.k8s.io", "v1", "RuntimeClass"),
 		},
 		// --
 
@@ -514,9 +515,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("node.k8s.io", "v1", "runtimeclasses"): {
 			Stub:             `{"metadata": {"name": "rc3"}, "handler": "h3"}`,
 			ExpectedEtcdPath: "/registry/runtimeclasses/rc3",
-			// TODO (SergeyKanzhelev): in 1.21 this should be switched to v1. See https://github.com/kubernetes/kubernetes/pull/95718/files#r520967927
-			// this has to stay at v1beta1 for a release, otherwise a 1.19 API server won't be able to read the data persisted in etcd and will break during a multi-server upgrade
-			ExpectedGVK: gvkP("node.k8s.io", "v1beta1", "RuntimeClass"),
 		},
 		// --
 
@@ -547,14 +545,13 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 	etcdStorageData[gvr("storage.k8s.io", "v1beta1", "csidrivers")] = StorageData{
 		Stub:             `{"metadata": {"name": "csid1"}, "spec": {"attachRequired": true, "podInfoOnMount": true}}`,
 		ExpectedEtcdPath: "/registry/csidrivers/csid1",
+		ExpectedGVK:      gvkP("storage.k8s.io", "v1", "CSIDriver"),
 	}
 
 	// k8s.io/kubernetes/pkg/apis/storage/v1
-	// TODO: Remove ExpectedGVK in next release
 	etcdStorageData[gvr("storage.k8s.io", "v1", "csidrivers")] = StorageData{
 		Stub:             `{"metadata": {"name": "csid2"}, "spec": {"attachRequired": true, "podInfoOnMount": true}}`,
 		ExpectedEtcdPath: "/registry/csidrivers/csid2",
-		ExpectedGVK:      gvkP("storage.k8s.io", "v1beta1", "CSIDriver"),
 	}
 
 	return etcdStorageData
