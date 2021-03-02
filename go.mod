@@ -24,7 +24,6 @@ require (
 	github.com/aws/aws-sdk-go v1.35.24
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/boltdb/bolt v1.3.1 // indirect
-	github.com/caddyserver/caddy v1.0.3
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/codegangsta/negroni v1.0.0 // indirect
 	github.com/container-storage-interface/spec v1.3.0

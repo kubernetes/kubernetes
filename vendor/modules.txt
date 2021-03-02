@@ -191,7 +191,6 @@ github.com/blang/semver
 ## explicit
 # github.com/boltdb/bolt => github.com/boltdb/bolt v1.3.1
 # github.com/caddyserver/caddy v1.0.3 => github.com/caddyserver/caddy v1.0.3
-## explicit
 # github.com/caddyserver/caddy => github.com/caddyserver/caddy v1.0.3
 github.com/caddyserver/caddy/caddyfile
 # github.com/cenkalti/backoff => github.com/cenkalti/backoff v2.1.1+incompatible
