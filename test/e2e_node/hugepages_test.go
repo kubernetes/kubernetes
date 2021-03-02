@@ -339,6 +339,14 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
 			// stop the kubelet and wait until the server will restart it automatically
 			stopKubelet()
+			// wait until the kubelet health check will fail
+			gomega.Eventually(func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, time.Minute, time.Second).Should(gomega.BeFalse())
+			// wait until the kubelet health check will pass
+			gomega.Eventually(func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, 2*time.Minute, 10*time.Second).Should(gomega.BeTrue())
 
 			waitForHugepages()
 
