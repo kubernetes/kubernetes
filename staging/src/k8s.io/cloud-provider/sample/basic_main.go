@@ -21,17 +21,17 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/apimachinery/pkg/util/wait"
 	"math/rand"
 	"os"
 	"time"
 
 	"github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/app/config"
 	"k8s.io/cloud-provider/options"
-	"k8s.io/component-base/cli/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
@@ -48,13 +48,14 @@ func main() {
 		klog.Fatalf("unable to initialize command options: %v", err)
 	}
 
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors, nil, wait.NeverStop)
+	fss := cliflag.NamedFlagSets{}
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, app.DefaultInitFuncConstructors, fss, wait.NeverStop)
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
 	// normalize func and add the go flag set by hand.
 	// Here is an sample
-	pflag.CommandLine.SetNormalizeFunc(flag.WordSepNormalizeFunc)
+	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	// utilflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()

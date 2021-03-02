@@ -36,7 +36,7 @@ import (
 	"k8s.io/cloud-provider/app"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
 	"k8s.io/cloud-provider/options"
-	"k8s.io/component-base/cli/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
@@ -64,17 +64,17 @@ func main() {
 
 	nodeIpamController := nodeIPAMController{}
 	nodeIpamController.nodeIPAMControllerOptions.NodeIPAMControllerConfiguration = &nodeIpamController.nodeIPAMControllerConfiguration
-	fs := pflag.NewFlagSet("fs", pflag.ContinueOnError)
-	nodeIpamController.nodeIPAMControllerOptions.AddFlags(fs)
+	fss := cliflag.NamedFlagSets{}
+	nodeIpamController.nodeIPAMControllerOptions.AddFlags(fss.FlagSet("nodeipam controller"))
 	controllerInitializers["nodeipam"] = nodeIpamController.startNodeIpamControllerWrapper
 
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers, fs, wait.NeverStop)
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers, fss, wait.NeverStop)
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
 	// normalize func and add the go flag set by hand.
 	// Here is an sample
-	pflag.CommandLine.SetNormalizeFunc(flag.WordSepNormalizeFunc)
+	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	// utilflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()

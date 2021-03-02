@@ -33,7 +33,7 @@ import (
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/app/config"
 	"k8s.io/cloud-provider/options"
-	"k8s.io/component-base/cli/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
 // TearDownFunc is to be called to tear down a test server.
@@ -102,8 +102,9 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		}
 		return cloud
 	}
-	command := app.NewCloudControllerManagerCommand(s, cloudInitializer, app.DefaultInitFuncConstructors, nil, stopCh)
-	pflag.CommandLine.SetNormalizeFunc(flag.WordSepNormalizeFunc)
+	fss := cliflag.NamedFlagSets{}
+	command := app.NewCloudControllerManagerCommand(s, cloudInitializer, app.DefaultInitFuncConstructors, fss, stopCh)
+	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
 	commandArgs := []string{}
 	listeners := []net.Listener{}

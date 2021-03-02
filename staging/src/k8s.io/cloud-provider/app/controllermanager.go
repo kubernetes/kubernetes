@@ -26,27 +26,23 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	cacheddiscovery "k8s.io/client-go/discovery/cached"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/metadata"
-	"k8s.io/client-go/metadata/metadatainformer"
-	"k8s.io/client-go/restmapper"
-	cloudprovider "k8s.io/cloud-provider"
-	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
-	"k8s.io/cloud-provider/options"
-	"k8s.io/controller-manager/pkg/clientbuilder"
-	"k8s.io/controller-manager/pkg/informerfactory"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
+	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/metadata/metadatainformer"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	cloudprovider "k8s.io/cloud-provider"
+	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
+	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
@@ -54,6 +50,8 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	genericcontrollermanager "k8s.io/controller-manager/app"
+	"k8s.io/controller-manager/pkg/clientbuilder"
+	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
 )
 
@@ -67,8 +65,7 @@ const (
 // NewCloudControllerManagerCommand creates a *cobra.Command object with default parameters
 // initFuncConstructor is a map of named controller groups (you can start more than one in an init func) paired to their InitFuncConstructor.
 // additionalFlags provides controller specific flags to be included in the complete set of controller manager flags
-func NewCloudControllerManagerCommand(s *options.CloudControllerManagerOptions, cloudInitializer InitCloudFunc, initFuncConstructor map[string]InitFuncConstructor, additionalFlags *pflag.FlagSet, stopCh <-chan struct{}) *cobra.Command {
-
+func NewCloudControllerManagerCommand(s *options.CloudControllerManagerOptions, cloudInitializer InitCloudFunc, initFuncConstructor map[string]InitFuncConstructor, additionalFlags cliflag.NamedFlagSets, stopCh <-chan struct{}) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "cloud-controller-manager",
 		Long: `The Cloud controller manager is a daemon that embeds
@@ -119,9 +116,10 @@ the cloud specific control loops shipped with Kubernetes.`,
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
-	if additionalFlags != nil {
-		fs.AddFlagSet(additionalFlags)
+	for _, f := range additionalFlags.FlagSets {
+		fs.AddFlagSet(f)
 	}
+
 	usageFmt := "Usage:\n  %s\n"
 	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
 	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
