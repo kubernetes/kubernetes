@@ -181,20 +181,19 @@ func NewKubeletFlags() *KubeletFlags {
 	}
 
 	return &KubeletFlags{
-		ContainerRuntimeOptions: *NewContainerRuntimeOptions(),
-		CertDirectory:           "/var/lib/kubelet/pki",
-		RootDirectory:           defaultRootDir,
-		MasterServiceNamespace:  metav1.NamespaceDefault,
-		MaxContainerCount:       -1,
-		MaxPerPodContainerCount: 1,
-		MinimumGCAge:            metav1.Duration{Duration: 0},
-		NonMasqueradeCIDR:       "10.0.0.0/8",
-		RegisterSchedulable:     true,
-		RemoteRuntimeEndpoint:   remoteRuntimeEndpoint,
-		NodeLabels:              make(map[string]string),
-		RegisterNode:            true,
-		SeccompProfileRoot:      filepath.Join(defaultRootDir, "seccomp"),
-		// prior to the introduction of this flag, there was a hardcoded cap of 50 images
+		ContainerRuntimeOptions:     *NewContainerRuntimeOptions(),
+		CertDirectory:               "/var/lib/kubelet/pki",
+		RootDirectory:               defaultRootDir,
+		MasterServiceNamespace:      metav1.NamespaceDefault,
+		MaxContainerCount:           -1,
+		MaxPerPodContainerCount:     1,
+		MinimumGCAge:                metav1.Duration{Duration: 0},
+		NonMasqueradeCIDR:           "10.0.0.0/8",
+		RegisterSchedulable:         true,
+		RemoteRuntimeEndpoint:       remoteRuntimeEndpoint,
+		NodeLabels:                  make(map[string]string),
+		RegisterNode:                true,
+		SeccompProfileRoot:          filepath.Join(defaultRootDir, "seccomp"),
 		EnableCAdvisorJSONEndpoints: false,
 	}
 }
