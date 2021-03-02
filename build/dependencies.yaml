@@ -85,6 +85,7 @@ dependencies:
     - path: cluster/gce/upgrade-aliases.sh
       match: ETCD_IMAGE|ETCD_VERSION
     - path: cmd/kubeadm/app/constants/constants.go
+      match: DefaultEtcdVersion =
     - path: hack/lib/etcd.sh
       match: ETCD_VERSION=
     - path: staging/src/k8s.io/sample-apiserver/artifacts/example/deployment.yaml
@@ -98,6 +99,7 @@ dependencies:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
     - path: cluster/images/etcd/migrate/options.go
+      match: supportedEtcdVersions
 
   # Golang
   - name: "golang: upstream version"
