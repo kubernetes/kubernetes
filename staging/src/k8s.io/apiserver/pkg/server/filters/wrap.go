@@ -59,8 +59,12 @@ func WithPanicRecovery(handler http.Handler, resolver request.RequestInfoResolve
 	})
 }
 
+// WithHTTPLogging enables logging of incoming requests.
+func WithHTTPLogging(handler http.Handler) http.Handler {
+	return httplog.WithLogging(handler, httplog.DefaultStacktracePred)
+}
+
 func withPanicRecovery(handler http.Handler, crashHandler func(http.ResponseWriter, *http.Request, interface{})) http.Handler {
-	handler = httplog.WithLogging(handler, httplog.DefaultStacktracePred)
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer runtime.HandleCrash(func(err interface{}) {
 			crashHandler(w, req, err)
