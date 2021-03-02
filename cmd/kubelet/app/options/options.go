@@ -167,8 +167,6 @@ type KubeletFlags struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool
-	// EnableCAdvisorJSONEndpoints enables some cAdvisor endpoints that will be removed in future versions
-	EnableCAdvisorJSONEndpoints bool
 }
 
 // NewKubeletFlags will create a new KubeletFlags with default values
@@ -181,20 +179,19 @@ func NewKubeletFlags() *KubeletFlags {
 	}
 
 	return &KubeletFlags{
-		ContainerRuntimeOptions:     *NewContainerRuntimeOptions(),
-		CertDirectory:               "/var/lib/kubelet/pki",
-		RootDirectory:               defaultRootDir,
-		MasterServiceNamespace:      metav1.NamespaceDefault,
-		MaxContainerCount:           -1,
-		MaxPerPodContainerCount:     1,
-		MinimumGCAge:                metav1.Duration{Duration: 0},
-		NonMasqueradeCIDR:           "10.0.0.0/8",
-		RegisterSchedulable:         true,
-		RemoteRuntimeEndpoint:       remoteRuntimeEndpoint,
-		NodeLabels:                  make(map[string]string),
-		RegisterNode:                true,
-		SeccompProfileRoot:          filepath.Join(defaultRootDir, "seccomp"),
-		EnableCAdvisorJSONEndpoints: false,
+		ContainerRuntimeOptions: *NewContainerRuntimeOptions(),
+		CertDirectory:           "/var/lib/kubelet/pki",
+		RootDirectory:           defaultRootDir,
+		MasterServiceNamespace:  metav1.NamespaceDefault,
+		MaxContainerCount:       -1,
+		MaxPerPodContainerCount: 1,
+		MinimumGCAge:            metav1.Duration{Duration: 0},
+		NonMasqueradeCIDR:       "10.0.0.0/8",
+		RegisterSchedulable:     true,
+		RemoteRuntimeEndpoint:   remoteRuntimeEndpoint,
+		NodeLabels:              make(map[string]string),
+		RegisterNode:            true,
+		SeccompProfileRoot:      filepath.Join(defaultRootDir, "seccomp"),
 	}
 }
 
@@ -368,9 +365,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("non-masquerade-cidr", "will be removed in a future version")
 	fs.BoolVar(&f.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", f.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
 	fs.MarkDeprecated("keep-terminated-pod-volumes", "will be removed in a future version")
-	fs.BoolVar(&f.EnableCAdvisorJSONEndpoints, "enable-cadvisor-json-endpoints", f.EnableCAdvisorJSONEndpoints, "Enable cAdvisor json /spec and /stats/* endpoints. This flag has no effect on the /stats/summary endpoint.  [default=false]")
-	// TODO: Remove this flag in 1.20+.  https://github.com/kubernetes/kubernetes/issues/68522
-	fs.MarkDeprecated("enable-cadvisor-json-endpoints", "will be removed in a future version")
 	fs.BoolVar(&f.ReallyCrashForTesting, "really-crash-for-testing", f.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.MarkDeprecated("really-crash-for-testing", "will be removed in a future version.")
 	fs.Float64Var(&f.ChaosChance, "chaos-chance", f.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing.")
