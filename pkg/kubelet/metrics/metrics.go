@@ -467,7 +467,7 @@ func SetAssignedConfig(source *corev1.NodeConfigSource) error {
 	}
 	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
 	if !AssignedConfig.Delete(assignedConfigLabels) {
-		klog.Warningf("Failed to delete metric for labels %v. This may result in ambiguity from multiple metrics concurrently indicating different assigned configs.", assignedConfigLabels)
+		klog.InfoS("Failed to delete metric for labels. This may result in ambiguity from multiple metrics concurrently indicating different assigned configs.", "labels", assignedConfigLabels)
 	}
 	// record the new timeseries
 	assignedConfigLabels = labels
@@ -489,7 +489,7 @@ func SetActiveConfig(source *corev1.NodeConfigSource) error {
 	}
 	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
 	if !ActiveConfig.Delete(activeConfigLabels) {
-		klog.Warningf("Failed to delete metric for labels %v. This may result in ambiguity from multiple metrics concurrently indicating different active configs.", activeConfigLabels)
+		klog.InfoS("Failed to delete metric for labels. This may result in ambiguity from multiple metrics concurrently indicating different active configs.", "labels", activeConfigLabels)
 	}
 	// record the new timeseries
 	activeConfigLabels = labels
@@ -511,7 +511,7 @@ func SetLastKnownGoodConfig(source *corev1.NodeConfigSource) error {
 	}
 	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
 	if !LastKnownGoodConfig.Delete(lastKnownGoodConfigLabels) {
-		klog.Warningf("Failed to delete metric for labels %v. This may result in ambiguity from multiple metrics concurrently indicating different last known good configs.", lastKnownGoodConfigLabels)
+		klog.InfoS("Failed to delete metric for labels. This may result in ambiguity from multiple metrics concurrently indicating different last known good configs.", "labels", lastKnownGoodConfigLabels)
 	}
 	// record the new timeseries
 	lastKnownGoodConfigLabels = labels
