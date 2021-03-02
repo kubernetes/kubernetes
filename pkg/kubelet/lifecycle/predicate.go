@@ -18,8 +18,11 @@ package lifecycle
 
 import (
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/wait"
 	v1affinityhelper "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -69,6 +72,8 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Message: "Kubelet cannot get node info.",
 		}
 	}
+	nodeCapacity := node.Status.Capacity
+
 	admitPod := attrs.Pod
 	pods := attrs.OtherPods
 	nodeInfo := schedulerframework.NewNodeInfo(pods...)
@@ -94,7 +99,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// the Resource Class API in the future.
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
-	reasons, err := GeneralPredicates(podWithoutMissingExtendedResources, nodeInfo)
+	reasons, err := GeneralPredicates(podWithoutMissingExtendedResources, nodeInfo, nodeCapacity)
 	fit := len(reasons) == 0 && err == nil
 	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
@@ -221,20 +226,25 @@ func (e *PredicateFailureError) GetReason() string {
 }
 
 // GeneralPredicates checks a group of predicates that the kubelet cares about.
-func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]PredicateFailureReason, error) {
+func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo, nodeCapacity v1.ResourceList) ([]PredicateFailureReason, error) {
 	if nodeInfo.Node() == nil {
 		return nil, fmt.Errorf("node not found")
 	}
 
-	var reasons []PredicateFailureReason
-	for _, r := range noderesources.Fits(pod, nodeInfo) {
-		reasons = append(reasons, &InsufficientResourceError{
-			ResourceName: r.ResourceName,
-			Requested:    r.Requested,
-			Used:         r.Used,
-			Capacity:     r.Capacity,
-		})
-	}
+	// retry if ephemeral storage doesn't fit for not initialized
+	wait.PollImmediate(1*time.Second, 2*time.Minute, func() (bool, error) {
+		for _, r := range noderesources.Fits(pod, nodeInfo) {
+			if r.ResourceName == v1.ResourceEphemeralStorage {
+				zeroQuantity := resource.MustParse("0")
+				if zeroQuantity.Cmp(nodeCapacity[v1.ResourceEphemeralStorage]) == 0 {
+					// if ephemeral storage is not initialized yet, need to retry.
+					return false, nil
+				}
+			}
+		}
+		return true, nil
+	})
+	reasons := predicatesNodeResources(pod, nodeInfo, nodeCapacity)
 
 	// Ignore parsing errors for backwards compatibility.
 	match, _ := v1affinityhelper.GetRequiredNodeAffinity(pod).Match(nodeInfo.Node())
@@ -249,4 +259,17 @@ func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]Pr
 	}
 
 	return reasons, nil
+}
+
+func predicatesNodeResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo, nodeCapacity v1.ResourceList) []PredicateFailureReason {
+	var reasons []PredicateFailureReason
+	for _, r := range noderesources.Fits(pod, nodeInfo) {
+		reasons = append(reasons, &InsufficientResourceError{
+			ResourceName: r.ResourceName,
+			Requested:    r.Requested,
+			Used:         r.Used,
+			Capacity:     r.Capacity,
+		})
+	}
+	return reasons
 }

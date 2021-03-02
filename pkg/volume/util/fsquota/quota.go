@@ -46,5 +46,5 @@ type Interface interface {
 }
 
 func enabledQuotasForMonitoring() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring)
+	return utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) && utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring)
 }

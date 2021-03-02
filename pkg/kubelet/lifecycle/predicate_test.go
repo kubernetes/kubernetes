@@ -176,28 +176,50 @@ func newPodWithPort(hostPorts ...int) *v1.Pod {
 
 func TestGeneralPredicates(t *testing.T) {
 	resourceTests := []struct {
-		pod      *v1.Pod
-		nodeInfo *schedulerframework.NodeInfo
-		node     *v1.Node
-		fits     bool
-		name     string
-		wErr     error
-		reasons  []PredicateFailureReason
+		pod          *v1.Pod
+		nodeInfo     *schedulerframework.NodeInfo
+		nodeCapacity v1.ResourceList
+		node         *v1.Node
+		fits         bool
+		name         string
+		wErr         error
+		reasons      []PredicateFailureReason
 	}{
 		{
 			pod: &v1.Pod{},
 			nodeInfo: schedulerframework.NewNodeInfo(
 				newResourcePod(v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewMilliQuantity(9, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
+					v1.ResourceCPU:              *resource.NewMilliQuantity(9, resource.DecimalSI),
+					v1.ResourceMemory:           *resource.NewQuantity(19, resource.BinarySI),
+					v1.ResourceEphemeralStorage: *resource.NewQuantity(1, resource.BinarySI),
 				})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
+			nodeCapacity: v1.ResourceList{
+				v1.ResourceEphemeralStorage: resource.MustParse("10G"),
+			},
 			fits: true,
 			wErr: nil,
 			name: "no resources/port/host requested always fits",
+		},
+		{
+			pod: &v1.Pod{},
+			nodeInfo: schedulerframework.NewNodeInfo(
+				newResourcePod(v1.ResourceList{
+					v1.ResourceCPU:              *resource.NewMilliQuantity(9, resource.DecimalSI),
+					v1.ResourceMemory:           *resource.NewQuantity(19, resource.BinarySI),
+					v1.ResourceEphemeralStorage: *resource.NewQuantity(1, resource.BinarySI),
+				})),
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			nodeCapacity: v1.ResourceList{},
+			fits:         true,
+			wErr:         nil,
+			name:         "no ephemeral capacity always fits and retries",
 		},
 		{
 			pod: newResourcePod(v1.ResourceList{
@@ -212,6 +234,9 @@ func TestGeneralPredicates(t *testing.T) {
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			nodeCapacity: v1.ResourceList{
+				v1.ResourceEphemeralStorage: resource.MustParse("10G"),
 			},
 			fits: false,
 			wErr: nil,
@@ -232,6 +257,9 @@ func TestGeneralPredicates(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
+			nodeCapacity: v1.ResourceList{
+				v1.ResourceEphemeralStorage: resource.MustParse("10G"),
+			},
 			fits:    false,
 			wErr:    nil,
 			reasons: []PredicateFailureReason{&PredicateFailureError{nodename.Name, nodename.ErrReason}},
@@ -244,6 +272,9 @@ func TestGeneralPredicates(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
+			nodeCapacity: v1.ResourceList{
+				v1.ResourceEphemeralStorage: resource.MustParse("10G"),
+			},
 			fits:    false,
 			wErr:    nil,
 			reasons: []PredicateFailureReason{&PredicateFailureError{nodeports.Name, nodeports.ErrReason}},
@@ -253,7 +284,7 @@ func TestGeneralPredicates(t *testing.T) {
 	for _, test := range resourceTests {
 		t.Run(test.name, func(t *testing.T) {
 			test.nodeInfo.SetNode(test.node)
-			reasons, err := GeneralPredicates(test.pod, test.nodeInfo)
+			reasons, err := GeneralPredicates(test.pod, test.nodeInfo, test.nodeCapacity)
 			fits := len(reasons) == 0 && err == nil
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
