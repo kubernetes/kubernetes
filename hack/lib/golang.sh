@@ -339,25 +339,25 @@ readonly KUBE_COVERAGE_INSTRUMENTED_PACKAGES=(
 # KUBE_CGO_OVERRIDES is a space-separated list of binaries which should be built
 # with CGO enabled, assuming CGO is supported on the target platform.
 # This overrides any entry in KUBE_STATIC_LIBRARIES.
-IFS=" " read -ra KUBE_CGO_OVERRIDES <<< "${KUBE_CGO_OVERRIDES:-}"
-readonly KUBE_CGO_OVERRIDES
+IFS=" " read -ra KUBE_CGO_OVERRIDES_LIST <<< "${KUBE_CGO_OVERRIDES:-}"
+readonly KUBE_CGO_OVERRIDES_LIST
 # KUBE_STATIC_OVERRIDES is a space-separated list of binaries which should be
 # built with CGO disabled. This is in addition to the list in
 # KUBE_STATIC_LIBRARIES.
-IFS=" " read -ra KUBE_STATIC_OVERRIDES <<< "${KUBE_STATIC_OVERRIDES:-}"
-readonly KUBE_STATIC_OVERRIDES
+IFS=" " read -ra KUBE_STATIC_OVERRIDES_LIST <<< "${KUBE_STATIC_OVERRIDES:-}"
+readonly KUBE_STATIC_OVERRIDES_LIST
 
 kube::golang::is_statically_linked_library() {
   local e
   # Explicitly enable cgo when building kubectl for darwin from darwin.
   [[ "$(go env GOHOSTOS)" == "darwin" && "$(go env GOOS)" == "darwin" &&
     "$1" == *"/kubectl" ]] && return 1
-  if [[ -n "${KUBE_CGO_OVERRIDES:+x}" ]]; then
-    for e in "${KUBE_CGO_OVERRIDES[@]}"; do [[ "${1}" == *"/${e}" ]] && return 1; done;
+  if [[ -n "${KUBE_CGO_OVERRIDES_LIST:+x}" ]]; then
+    for e in "${KUBE_CGO_OVERRIDES_LIST[@]}"; do [[ "${1}" == *"/${e}" ]] && return 1; done;
   fi
   for e in "${KUBE_STATIC_LIBRARIES[@]}"; do [[ "${1}" == *"/${e}" ]] && return 0; done;
-  if [[ -n "${KUBE_STATIC_OVERRIDES:+x}" ]]; then
-    for e in "${KUBE_STATIC_OVERRIDES[@]}"; do [[ "${1}" == *"/${e}" ]] && return 0; done;
+  if [[ -n "${KUBE_STATIC_OVERRIDES_LIST:+x}" ]]; then
+    for e in "${KUBE_STATIC_OVERRIDES_LIST[@]}"; do [[ "${1}" == *"/${e}" ]] && return 0; done;
   fi
   return 1;
 }
