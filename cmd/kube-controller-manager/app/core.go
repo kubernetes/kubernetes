@@ -441,7 +441,8 @@ func startPodGCController(ctx ControllerContext) (http.Handler, bool, error) {
 
 func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, error) {
 	resourceQuotaControllerClient := ctx.ClientBuilder.ClientOrDie("resourcequota-controller")
-	discoveryFunc := resourceQuotaControllerClient.Discovery().ServerPreferredNamespacedResources
+	resourceQuotaControllerDiscoveryClient := ctx.ClientBuilder.DiscoveryClientOrDie("resourcequota-controller")
+	discoveryFunc := resourceQuotaControllerDiscoveryClient.ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(ctx.InformerFactory.ForResource)
 	quotaConfiguration := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
 
@@ -535,6 +536,7 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 	}
 
 	gcClientset := ctx.ClientBuilder.ClientOrDie("generic-garbage-collector")
+	discoveryClient := ctx.ClientBuilder.DiscoveryClientOrDie("generic-garbage-collector")
 
 	config := ctx.ClientBuilder.ConfigOrDie("generic-garbage-collector")
 	metadataClient, err := metadata.NewForConfig(config)
@@ -564,7 +566,7 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 
 	// Periodically refresh the RESTMapper with new discovery information and sync
 	// the garbage collector.
-	go garbageCollector.Sync(gcClientset.Discovery(), 30*time.Second, ctx.Stop)
+	go garbageCollector.Sync(discoveryClient, 30*time.Second, ctx.Stop)
 
 	return garbagecollector.NewDebugHandler(garbageCollector), true, nil
 }
