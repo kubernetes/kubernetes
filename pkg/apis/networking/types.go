@@ -502,6 +502,7 @@ type IngressServiceBackend struct {
 // ServiceBackendPort is the service port being referenced.
 type ServiceBackendPort struct {
 	// Name is the name of the port on the Service.
+	// This must be an IANA_SVC_NAME (following RFC6335).
 	// This is a mutually exclusive setting with "Number".
 	// +optional
 	Name string
