@@ -38,6 +38,7 @@ var (
 
 // NewContainerRuntimeOptions will create a new ContainerRuntimeOptions with
 // default values.
+//testing
 func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
 	dockerEndpoint := ""
 	if runtime.GOOS != "windows" {
