@@ -2201,14 +2201,14 @@ func TestCapacity(t *testing.T) {
 		},
 	}
 
-	run := func(t *testing.T, scenario scenarioType) {
+	run := func(t *testing.T, scenario scenarioType, featureEnabled, optIn bool) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, featureEnabled)()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		// Setup
-		withCSIStorageCapacity := true
-		testEnv := newTestBinder(t, ctx.Done(), withCSIStorageCapacity)
-		testEnv.addCSIDriver(makeCSIDriver(provisioner, withCSIStorageCapacity))
+		// Setup: the driver has the feature enabled, but the scheduler might not.
+		testEnv := newTestBinder(t, ctx.Done(), featureEnabled)
+		testEnv.addCSIDriver(makeCSIDriver(provisioner, optIn))
 		testEnv.addCSIStorageCapacities(scenario.capacities)
 
 		// a. Init pvc cache
@@ -2221,13 +2221,19 @@ func TestCapacity(t *testing.T) {
 		podVolumes, reasons, err := findPodVolumes(testEnv.binder, pod, testNode)
 
 		// Validate
-		if !scenario.shouldFail && err != nil {
+		shouldFail := scenario.shouldFail
+		expectedReasons := scenario.reasons
+		if !featureEnabled || !optIn {
+			shouldFail = false
+			expectedReasons = nil
+		}
+		if !shouldFail && err != nil {
 			t.Errorf("returned error: %v", err)
 		}
-		if scenario.shouldFail && err == nil {
+		if shouldFail && err == nil {
 			t.Error("returned success but expected error")
 		}
-		checkReasons(t, reasons, scenario.reasons)
+		checkReasons(t, reasons, expectedReasons)
 		provisions := scenario.pvcs
 		if len(reasons) > 0 {
 			provisions = nil
@@ -2235,7 +2241,18 @@ func TestCapacity(t *testing.T) {
 		testEnv.validatePodCache(t, pod.Spec.NodeName, pod, podVolumes, nil, provisions)
 	}
 
-	for name, scenario := range scenarios {
-		t.Run(name, func(t *testing.T) { run(t, scenario) })
+	yesNo := []bool{true, false}
+	for _, featureEnabled := range yesNo {
+		name := fmt.Sprintf("CSIStorageCapacity=%v", featureEnabled)
+		t.Run(name, func(t *testing.T) {
+			for _, optIn := range yesNo {
+				name := fmt.Sprintf("CSIDriver.StorageCapacity=%v", optIn)
+				t.Run(name, func(t *testing.T) {
+					for name, scenario := range scenarios {
+						t.Run(name, func(t *testing.T) { run(t, scenario, featureEnabled, optIn) })
+					}
+				})
+			}
+		})
 	}
 }
