@@ -261,3 +261,47 @@ func TestManager(t *testing.T) {
 		})
 	}
 }
+
+func TestFeatureEnabled(t *testing.T) {
+	var tests = []struct {
+		desc                         string
+		shutdownGracePeriodRequested time.Duration
+		featureGateEnabled           bool
+		expectEnabled                bool
+	}{
+		{
+			desc:                         "shutdownGracePeriodRequested 0; disables feature",
+			shutdownGracePeriodRequested: time.Duration(0 * time.Second),
+			featureGateEnabled:           true,
+			expectEnabled:                false,
+		},
+		{
+			desc:                         "feature gate disabled; disables feature",
+			shutdownGracePeriodRequested: time.Duration(100 * time.Second),
+			featureGateEnabled:           false,
+			expectEnabled:                false,
+		},
+		{
+			desc:                         "feature gate enabled; shutdownGracePeriodRequested > 0; enables feature",
+			shutdownGracePeriodRequested: time.Duration(100 * time.Second),
+			featureGateEnabled:           true,
+			expectEnabled:                true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			activePodsFunc := func() []*v1.Pod {
+				return nil
+			}
+			killPodsFunc := func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+				return nil
+			}
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, tc.featureGateEnabled)()
+
+			manager, _ := NewManager(activePodsFunc, killPodsFunc, func() {}, tc.shutdownGracePeriodRequested, 0 /*shutdownGracePeriodCriticalPods*/)
+			manager.clock = clock.NewFakeClock(time.Now())
+
+			assert.Equal(t, tc.expectEnabled, manager.isFeatureEnabled())
+		})
+	}
+}
