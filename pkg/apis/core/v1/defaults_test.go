@@ -1450,20 +1450,6 @@ func TestSetDefaultNamespaceLabels(t *testing.T) {
 	}
 }
 
-func TestSetDefaultNamespaceLabelsForGenerateName(t *testing.T) {
-
-	s := &v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "default-ns-labels-are-great-generated",
-		},
-	}
-	obj2 := roundTrip(t, runtime.Object(s))
-	s2 := obj2.(*v1.Namespace)
-	if _, ok := s2.ObjectMeta.Labels[v1.LabelMetadataName]; !ok {
-		t.Errorf("Missing default namespace label key for %v", s)
-	}
-}
-
 func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
 	portNum := int32(8080)
 	s := v1.PodSpec{}
