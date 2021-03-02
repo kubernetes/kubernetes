@@ -278,6 +278,7 @@ message CustomResourceDefinitionVersion {
   optional string deprecationWarning = 8;
 
   // schema describes the schema used for validation, pruning, and defaulting of this version of the custom resource.
+  // schema is required when creating via v1.
   // +optional
   optional CustomResourceValidation schema = 4;
 
