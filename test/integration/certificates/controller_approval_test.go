@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	certv1beta1 "k8s.io/api/certificates/v1beta1"
+	certv1 "k8s.io/api/certificates/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -49,22 +49,22 @@ func TestController_AutoApproval(t *testing.T) {
 			Organization: []string{"system:nodes"},
 		},
 	})
-	validKubeAPIServerClientKubeletUsages := []certv1beta1.KeyUsage{
-		certv1beta1.UsageDigitalSignature,
-		certv1beta1.UsageKeyEncipherment,
-		certv1beta1.UsageClientAuth,
+	validKubeAPIServerClientKubeletUsages := []certv1.KeyUsage{
+		certv1.UsageDigitalSignature,
+		certv1.UsageKeyEncipherment,
+		certv1.UsageClientAuth,
 	}
 	tests := map[string]struct {
 		signerName          string
 		request             []byte
-		usages              []certv1beta1.KeyUsage
+		usages              []certv1.KeyUsage
 		username            string
 		autoApproved        bool
 		grantNodeClient     bool
 		grantSelfNodeClient bool
 	}{
 		"should auto-approve CSR that has kube-apiserver-client-kubelet signerName and matches requirements": {
-			signerName:          certv1beta1.KubeAPIServerClientKubeletSignerName,
+			signerName:          certv1.KubeAPIServerClientKubeletSignerName,
 			request:             validKubeAPIServerClientKubeletCSR,
 			usages:              validKubeAPIServerClientKubeletUsages,
 			username:            validKubeAPIServerClientKubeletUsername,
@@ -72,20 +72,21 @@ func TestController_AutoApproval(t *testing.T) {
 			autoApproved:        true,
 		},
 		"should auto-approve CSR that has kube-apiserver-client-kubelet signerName and matches requirements despite missing username if nodeclient permissions are granted": {
-			signerName:      certv1beta1.KubeAPIServerClientKubeletSignerName,
+			signerName:      certv1.KubeAPIServerClientKubeletSignerName,
 			request:         validKubeAPIServerClientKubeletCSR,
 			usages:          validKubeAPIServerClientKubeletUsages,
 			username:        "does-not-match-cn",
 			grantNodeClient: true,
 			autoApproved:    true,
 		},
-		"should not auto-approve CSR that has kube-apiserver-client-kubelet signerName that does not match requirements": {
-			signerName:   certv1beta1.KubeAPIServerClientKubeletSignerName,
-			request:      pemWithGroup("system:notnodes"),
-			autoApproved: false,
-		},
+		// usages are now required in v1.
+		//"should not auto-approve CSR that has kube-apiserver-client-kubelet signerName that does not match requirements": {
+		//	signerName:   certv1.KubeAPIServerClientKubeletSignerName,
+		//	request:      pemWithGroup("system:notnodes"),
+		//	autoApproved: false,
+		//},
 		"should not auto-approve CSR that has kube-apiserver-client signerName that DOES match kubelet CSR requirements": {
-			signerName:   certv1beta1.KubeAPIServerClientSignerName,
+			signerName:   certv1.KubeAPIServerClientSignerName,
 			request:      validKubeAPIServerClientKubeletCSR,
 			usages:       validKubeAPIServerClientKubeletUsages,
 			username:     validKubeAPIServerClientKubeletUsername,
@@ -124,17 +125,17 @@ func TestController_AutoApproval(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error in create clientset: %v", err)
 			}
-			csr := &certv1beta1.CertificateSigningRequest{
+			csr := &certv1.CertificateSigningRequest{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "csr",
 				},
-				Spec: certv1beta1.CertificateSigningRequestSpec{
+				Spec: certv1.CertificateSigningRequestSpec{
 					Request:    test.request,
 					Usages:     test.usages,
-					SignerName: &test.signerName,
+					SignerName: test.signerName,
 				},
 			}
-			_, err = impersonationClient.CertificatesV1beta1().CertificateSigningRequests().Create(context.TODO(), csr, metav1.CreateOptions{})
+			_, err = impersonationClient.CertificatesV1().CertificateSigningRequests().Create(context.TODO(), csr, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("failed to create testing CSR: %v", err)
 			}
@@ -212,7 +213,7 @@ func buildNodeClientRoleForUser(name string, resourceType string) *rbacv1.Cluste
 		Rules: []rbacv1.PolicyRule{
 			{
 				Verbs:     []string{"create"},
-				APIGroups: []string{certv1beta1.SchemeGroupVersion.Group},
+				APIGroups: []string{certv1.SchemeGroupVersion.Group},
 				Resources: []string{resourceType},
 			},
 		},

@@ -20,15 +20,16 @@ import (
 	"context"
 	"testing"
 
-	capi "k8s.io/api/certificates/v1beta1"
+	certv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-
+	capi "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
+// TODO this test can be removed once we get to 1.22 and v1beta1 is no longer allowed
 // Verifies that the signerName field defaulting is wired up correctly.
 // An exhaustive set of test cases for all permutations of the possible
 // defaulting cases is written as a unit tests in the
@@ -38,20 +39,20 @@ import (
 func TestCSRSignerNameDefaulting(t *testing.T) {
 	strPtr := func(s string) *string { return &s }
 	tests := map[string]struct {
-		csr                capi.CertificateSigningRequestSpec
+		csr                certv1beta1.CertificateSigningRequestSpec
 		expectedSignerName string
 	}{
 		"defaults to legacy-unknown if not recognised": {
-			csr: capi.CertificateSigningRequestSpec{
+			csr: certv1beta1.CertificateSigningRequestSpec{
 				Request: pemWithGroup(""),
-				Usages:  []capi.KeyUsage{capi.UsageKeyEncipherment, capi.UsageDigitalSignature},
+				Usages:  []certv1beta1.KeyUsage{certv1beta1.UsageKeyEncipherment, certv1beta1.UsageDigitalSignature},
 			},
 			expectedSignerName: capi.LegacyUnknownSignerName,
 		},
 		"does not default signerName if an explicit value is provided": {
-			csr: capi.CertificateSigningRequestSpec{
+			csr: certv1beta1.CertificateSigningRequestSpec{
 				Request:    pemWithGroup(""),
-				Usages:     []capi.KeyUsage{capi.UsageKeyEncipherment, capi.UsageDigitalSignature},
+				Usages:     []certv1beta1.KeyUsage{certv1beta1.UsageKeyEncipherment, certv1beta1.UsageDigitalSignature},
 				SignerName: strPtr("example.com/my-custom-signer"),
 			},
 			expectedSignerName: "example.com/my-custom-signer",
@@ -63,7 +64,7 @@ func TestCSRSignerNameDefaulting(t *testing.T) {
 			defer closeFn()
 			client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			csrClient := client.CertificatesV1beta1().CertificateSigningRequests()
-			csr := &capi.CertificateSigningRequest{
+			csr := &certv1beta1.CertificateSigningRequest{
 				ObjectMeta: metav1.ObjectMeta{Name: "testcsr"},
 				Spec:       test.csr,
 			}

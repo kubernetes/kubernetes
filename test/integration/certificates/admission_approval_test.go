@@ -20,7 +20,8 @@ import (
 	"context"
 	"testing"
 
-	certv1beta1 "k8s.io/api/certificates/v1beta1"
+	certv1 "k8s.io/api/certificates/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -64,7 +65,7 @@ func TestCSRSignerNameApprovalPlugin(t *testing.T) {
 			const username = "test-user"
 			grantUserPermissionToApproveFor(t, client, username, test.allowedSignerName)
 			// Create a CSR to attempt to approve.
-			csr := createTestingCSR(t, client.CertificatesV1beta1().CertificateSigningRequests(), "csr", test.signerName, "")
+			csr := createTestingCSR(t, client.CertificatesV1().CertificateSigningRequests(), "csr", test.signerName, "")
 
 			// Create a second client, impersonating the 'test-user' for us to test with.
 			testuserConfig := restclient.CopyConfig(s.ClientConfig)
@@ -72,12 +73,13 @@ func TestCSRSignerNameApprovalPlugin(t *testing.T) {
 			testuserClient := clientset.NewForConfigOrDie(testuserConfig)
 
 			// Attempt to update the Approved condition.
-			csr.Status.Conditions = append(csr.Status.Conditions, certv1beta1.CertificateSigningRequestCondition{
-				Type:    certv1beta1.CertificateApproved,
+			csr.Status.Conditions = append(csr.Status.Conditions, certv1.CertificateSigningRequestCondition{
+				Type:    certv1.CertificateApproved,
+				Status:  v1.ConditionTrue,
 				Reason:  "AutoApproved",
 				Message: "Approved during integration test",
 			})
-			_, err := testuserClient.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{})
+			_, err := testuserClient.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{})
 			if err != nil && test.error != err.Error() {
 				t.Errorf("expected error %q but got: %v", test.error, err)
 			}
@@ -114,13 +116,13 @@ func buildApprovalClusterRoleForSigners(name string, signerNames ...string) *rba
 			// 'signerName' to approve CSRs with the given signerName.
 			{
 				Verbs:         []string{"approve"},
-				APIGroups:     []string{certv1beta1.SchemeGroupVersion.Group},
+				APIGroups:     []string{certv1.SchemeGroupVersion.Group},
 				Resources:     []string{"signers"},
 				ResourceNames: signerNames,
 			},
 			{
 				Verbs:     []string{"update"},
-				APIGroups: []string{certv1beta1.SchemeGroupVersion.Group},
+				APIGroups: []string{certv1.SchemeGroupVersion.Group},
 				Resources: []string{"certificatesigningrequests/approval"},
 			},
 		},
