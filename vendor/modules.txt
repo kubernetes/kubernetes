@@ -1268,7 +1268,6 @@ golang.org/x/crypto/poly1305
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
-golang.org/x/crypto/ssh/terminal
 # golang.org/x/exp v0.0.0-20210220032938-85be41e4509f => golang.org/x/exp v0.0.0-20210220032938-85be41e4509f
 ## explicit
 # golang.org/x/exp => golang.org/x/exp v0.0.0-20210220032938-85be41e4509f
@@ -1324,9 +1323,10 @@ golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
 golang.org/x/sys/windows/svc/mgr
-# golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1 => golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
+# golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d => golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
+## explicit
 golang.org/x/term
-# golang.org/x/term => golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
+# golang.org/x/term => golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
 # golang.org/x/text v0.3.4 => golang.org/x/text v0.3.4
 # golang.org/x/text => golang.org/x/text v0.3.4
 golang.org/x/text/encoding

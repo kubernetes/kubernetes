@@ -99,6 +99,7 @@ require (
 	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/sys v0.0.0-20210225134936-a50acf3fe073
+	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	golang.org/x/tools v0.1.0
 	gonum.org/v1/gonum v0.6.2
@@ -454,7 +455,7 @@ replace (
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20210225134936-a50acf3fe073
-	golang.org/x/term => golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
+	golang.org/x/term => golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
 	golang.org/x/text => golang.org/x/text v0.3.4
 	golang.org/x/time => golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	golang.org/x/tools => golang.org/x/tools v0.1.0
