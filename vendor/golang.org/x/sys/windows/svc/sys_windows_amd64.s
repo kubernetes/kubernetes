@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build windows
-
 // func servicemain(argc uint32, argv **uint16)
 TEXT ·servicemain(SB),7,$0
 	MOVQ	SP, AX

@@ -2,7 +2,7 @@
 
 module k8s.io/api
 
-go 1.15
+go 1.16
 
 require (
 	github.com/gogo/protobuf v1.3.2

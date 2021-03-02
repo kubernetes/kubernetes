@@ -2,7 +2,7 @@
 
 module k8s.io/kube-aggregator
 
-go 1.15
+go 1.16
 
 require (
 	github.com/davecgh/go-spew v1.1.1
@@ -13,7 +13,7 @@ require (
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
-	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0

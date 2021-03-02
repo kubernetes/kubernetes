@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build linux && !s390x && !386
 // +build linux,!s390x,!386
 
 package socket
