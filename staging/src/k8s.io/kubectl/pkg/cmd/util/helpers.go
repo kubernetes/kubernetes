@@ -756,6 +756,7 @@ func GetDefaultContainerName(pod *corev1.Pod, enableSuggestedCmdUsage bool, w io
 		if annotations := pod.Annotations; annotations != nil && len(annotations[podutils.DefaultContainerAnnotationName]) > 0 {
 			containerName := annotations[podutils.DefaultContainerAnnotationName]
 			if exists, _ := podutils.FindContainerByName(pod, containerName); exists != nil {
+				fmt.Fprintf(w, "Defaulting container name to container %s.\n", containerName)
 				return containerName
 			} else {
 				fmt.Fprintf(w, "Default container name %q in annotation not found in a pod\n", containerName)
