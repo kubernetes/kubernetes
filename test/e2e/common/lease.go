@@ -49,7 +49,7 @@ func getPatchBytes(oldLease, newLease *coordinationv1.Lease) ([]byte, error) {
 	return patchBytes, nil
 }
 
-var _ = framework.KubeDescribe("Lease", func() {
+var _ = SIGNodeDescribe("Lease", func() {
 	f := framework.NewDefaultFramework("lease-test")
 
 	/*

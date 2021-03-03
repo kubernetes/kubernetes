@@ -35,7 +35,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Security Context", func() {
+var _ = SIGNodeDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context-test")
 	var podClient *framework.PodClient
 	ginkgo.BeforeEach(func() {
