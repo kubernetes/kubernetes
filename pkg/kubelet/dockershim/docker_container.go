@@ -73,7 +73,7 @@ func (ds *dockerService) ListContainers(_ context.Context, r *runtimeapi.ListCon
 
 		converted, err := toRuntimeAPIContainer(&c)
 		if err != nil {
-			klog.V(4).Infof("Unable to convert docker to runtime API container: %v", err)
+			klog.V(4).InfoS("Unable to convert docker to runtime API container", "err", err)
 			continue
 		}
 
@@ -234,7 +234,7 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 	}
 
 	if path == "" {
-		klog.V(5).Infof("Container %s log path isn't specified, will not create the symlink", containerID)
+		klog.V(5).InfoS("Container log path isn't specified, will not create the symlink", "containerID", containerID)
 		return nil
 	}
 
@@ -242,7 +242,7 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 		// Only create the symlink when container log path is specified and log file exists.
 		// Delete possibly existing file first
 		if err = ds.os.Remove(path); err == nil {
-			klog.Warningf("Deleted previously existing symlink file: %q", path)
+			klog.InfoS("Deleted previously existing symlink file", "path", path)
 		}
 		if err = ds.os.Symlink(realPath, path); err != nil {
 			return fmt.Errorf("failed to create symbolic link %q to the container log file %q for container %q: %v",
@@ -251,14 +251,14 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 	} else {
 		supported, err := ds.IsCRISupportedLogDriver()
 		if err != nil {
-			klog.Warningf("Failed to check supported logging driver by CRI: %v", err)
+			klog.InfoS("Failed to check supported logging driver by CRI", "err", err)
 			return nil
 		}
 
 		if supported {
-			klog.Warningf("Cannot create symbolic link because container log file doesn't exist!")
+			klog.InfoS("Cannot create symbolic link because container log file doesn't exist!")
 		} else {
-			klog.V(5).Infof("Unsupported logging driver by CRI")
+			klog.V(5).InfoS("Unsupported logging driver by CRI")
 		}
 	}
 
@@ -371,7 +371,7 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 		if !libdocker.IsImageNotFoundError(err) {
 			return nil, fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", r.Image, containerID, err)
 		}
-		klog.Warningf("ignore error image %q not found while inspecting docker container %q: %v", r.Image, containerID, err)
+		klog.InfoS("Ignore error image not found while inspecting docker container", "containerID", containerID, "image", r.Image, "err", err)
 	}
 	imageID := toPullableImageID(r.Image, ir)
 
@@ -498,7 +498,7 @@ func (ds *dockerService) performPlatformSpecificContainerCleanupAndLogErrors(con
 
 	errors := ds.performPlatformSpecificContainerCleanup(cleanupInfo)
 	for _, err := range errors {
-		klog.Warningf("error when cleaning up after container %q: %v", containerNameOrID, err)
+		klog.InfoS("Error when cleaning up after container", "containerNameOrID", containerNameOrID, "err", err)
 	}
 
 	return errors

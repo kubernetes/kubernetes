@@ -150,7 +150,7 @@ func (*NativeExecHandler) ExecInContainer(ctx context.Context, client libdocker.
 
 		retries++
 		if retries == maxRetries {
-			klog.Errorf("Exec session %s in container %s terminated but process still running!", execObj.ID, container.ID)
+			klog.ErrorS(nil, "Exec session in the container terminated but process still running!", "execSession", execObj.ID, "containerID", container.ID)
 			return nil
 		}
 

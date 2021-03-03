@@ -69,7 +69,7 @@ func NewHostportManager(iptables utiliptables.Interface) HostPortManager {
 	}
 	h.conntrackFound = conntrack.Exists(h.execer)
 	if !h.conntrackFound {
-		klog.Warningf("The binary conntrack is not installed, this can cause failures in network connection cleanup.")
+		klog.InfoS("The binary conntrack is not installed, this can cause failures in network connection cleanup.")
 	}
 	return h
 }
@@ -189,11 +189,11 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 	// create a new conntrack entry without any DNAT. That will result in blackhole of the traffic even after correct
 	// iptables rules have been added back.
 	if hm.execer != nil && hm.conntrackFound {
-		klog.Infof("Starting to delete udp conntrack entries: %v, isIPv6 - %v", conntrackPortsToRemove, isIPv6)
+		klog.InfoS("Starting to delete udp conntrack entries", "conntrackEntries", conntrackPortsToRemove, "isIPv6", isIPv6)
 		for _, port := range conntrackPortsToRemove {
 			err = conntrack.ClearEntriesForPort(hm.execer, port, isIPv6, v1.ProtocolUDP)
 			if err != nil {
-				klog.Errorf("Failed to clear udp conntrack for port %d, error: %v", port, err)
+				klog.ErrorS(err, "Failed to clear udp conntrack for port", "port", port)
 			}
 		}
 	}
@@ -268,7 +268,7 @@ func (hm *hostportManager) Remove(id string, podPortMapping *PodPortMapping) (er
 
 // syncIPTables executes iptables-restore with given lines
 func (hm *hostportManager) syncIPTables(lines []byte) error {
-	klog.V(3).Infof("Restoring iptables rules: %s", lines)
+	klog.V(3).InfoS("Restoring iptables rules", "iptableRules", lines)
 	err := hm.iptables.RestoreAll(lines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
 		return fmt.Errorf("failed to execute iptables-restore: %v", err)
@@ -310,7 +310,7 @@ func (hm *hostportManager) openHostports(podPortMapping *PodPortMapping) (map[ho
 	if retErr != nil {
 		for hp, socket := range ports {
 			if err := socket.Close(); err != nil {
-				klog.Errorf("Cannot clean up hostport %d for pod %s: %v", hp.port, getPodFullName(podPortMapping), err)
+				klog.ErrorS(err, "Cannot clean up hostport for the pod", "podFullName", getPodFullName(podPortMapping), "port", hp.port)
 			}
 		}
 		return nil, retErr
@@ -324,14 +324,14 @@ func (hm *hostportManager) closeHostports(hostportMappings []*PortMapping) error
 	for _, pm := range hostportMappings {
 		hp := portMappingToHostport(pm, hm.getIPFamily())
 		if socket, ok := hm.hostPortMap[hp]; ok {
-			klog.V(2).Infof("Closing host port %s", hp.String())
+			klog.V(2).InfoS("Closing host port", "port", hp.String())
 			if err := socket.Close(); err != nil {
 				errList = append(errList, fmt.Errorf("failed to close host port %s: %v", hp.String(), err))
 				continue
 			}
 			delete(hm.hostPortMap, hp)
 		} else {
-			klog.V(5).Infof("host port %s does not have an open socket", hp.String())
+			klog.V(5).InfoS("Host port does not have an open socket", "port", hp.String())
 		}
 	}
 	return utilerrors.NewAggregate(errList)

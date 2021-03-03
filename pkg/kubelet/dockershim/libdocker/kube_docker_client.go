@@ -337,14 +337,14 @@ func (p *progressReporter) start() {
 				progress, timestamp := p.progress.get()
 				// If there is no progress for p.imagePullProgressDeadline, cancel the operation.
 				if time.Since(timestamp) > p.imagePullProgressDeadline {
-					klog.Errorf("Cancel pulling image %q because of no progress for %v, latest progress: %q", p.image, p.imagePullProgressDeadline, progress)
+					klog.ErrorS(nil, "Cancel pulling image because of exceed image pull deadline, record latest progress", "image", p.image, "deadline", p.imagePullProgressDeadline, "progress", progress)
 					p.cancel()
 					return
 				}
-				klog.V(2).Infof("Pulling image %q: %q", p.image, progress)
+				klog.V(2).InfoS("Pulling image", "image", p.image, "progress", progress)
 			case <-p.stopCh:
 				progress, _ := p.progress.get()
-				klog.V(2).Infof("Stop pulling image %q: %q", p.image, progress)
+				klog.V(2).InfoS("Stop pulling image", "image", p.image, "progress", progress)
 				return
 			}
 		}
