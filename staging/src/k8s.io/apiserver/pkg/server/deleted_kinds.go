@@ -153,7 +153,8 @@ type removedInterface interface {
 // versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
 func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage) {
 	versionsToRemove := sets.NewString()
-	for apiVersion, versionToResource := range versionedResourcesStorageMap {
+	for apiVersion := range sets.StringKeySet(versionedResourcesStorageMap) {
+		versionToResource := versionedResourcesStorageMap[apiVersion]
 		resourcesToRemove := sets.NewString()
 		for resourceName, resourceServingInfo := range versionToResource {
 			if !e.shouldServe(schema.GroupVersion{Group: groupName, Version: apiVersion}, versioner, resourceServingInfo) {
@@ -167,8 +168,9 @@ func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versi
 			}
 
 			klog.V(1).Infof("Removing resource %v.%v.%v because it is time to stop serving it per APILifecycle.", resourceName, apiVersion, groupName)
-			delete(versionedResourcesStorageMap[apiVersion], resourceName)
+			delete(versionToResource, resourceName)
 		}
+		versionedResourcesStorageMap[apiVersion] = versionToResource
 
 		if len(versionedResourcesStorageMap[apiVersion]) == 0 {
 			versionsToRemove.Insert(apiVersion)
