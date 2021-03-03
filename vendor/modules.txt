@@ -496,6 +496,7 @@ github.com/golang/groupcache/lru
 # github.com/golang/mock => github.com/golang/mock v1.4.4
 github.com/golang/mock/gomock
 # github.com/golang/protobuf v1.4.3 => github.com/golang/protobuf v1.4.3
+## explicit
 # github.com/golang/protobuf => github.com/golang/protobuf v1.4.3
 github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto

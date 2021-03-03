@@ -22,6 +22,7 @@ spec:
             # ("storage capacity" in csi_mock_volume.go).
             - "--feature-gates=Topology=true"
             - "-v=5"
+            - "--timeout=1m"
             # Needed for fsGroup support.
             - "--default-fstype=ext4"
             # We don't need much concurrency and having many gouroutines
@@ -39,14 +40,13 @@ spec:
             - --v=5
             - --csi-address=/csi/csi.sock
             - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-mock/csi.sock
+            - --timeout=1m
           env:
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-          securityContext:
-            privileged: true
           volumeMounts:
           - mountPath: /csi
             name: socket-dir
@@ -55,21 +55,31 @@ spec:
         - name: mock
           image: k8s.gcr.io/sig-storage/mock-driver:v4.1.0
           args:
-            - "--name=mock.storage.k8s.io"
-            - "-v=3" # enabled the gRPC call logging
+            # -v3 shows when connections get established. Higher log levels print information about
+            # transferred bytes, but cannot print message content (no gRPC parsing), so this is usually
+            # not interesting.
+            - -v=3
+            - -proxy-endpoint=tcp://:9000
           env:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
-            - name: KUBE_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: spec.nodeName
-          securityContext:
-            privileged: true
+          ports:
+            - containerPort: 9000
+              name: socat
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
+        # The busybox container is needed for running shell commands which
+        # test for directories or create them. It needs additional privileges
+        # for that.
+        - name: busybox
+          image: k8s.gcr.io/busybox
+          securityContext:
+            privileged: true
+          command:
+            - sleep
+            - "100000"
+          volumeMounts:
             - mountPath: /var/lib/kubelet/pods
               name: kubelet-pods-dir
             - mountPath: /var/lib/kubelet/plugins/kubernetes.io/csi
