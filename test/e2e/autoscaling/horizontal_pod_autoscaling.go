@@ -34,7 +34,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 	titleUp := "Should scale from 1 pod to 3 pods and from 3 to 5"
 	titleDown := "Should scale from 5 pods to 3 pods and from 3 to 1"
 
-	SIGDescribe("[Serial] [Slow] Deployment", func() {
+	ginkgo.Describe("[Serial] [Slow] Deployment", func() {
 		// CPU tests via deployments
 		ginkgo.It(titleUp, func() {
 			scaleUp("test-deployment", e2eautoscaling.KindDeployment, false, f)
@@ -44,7 +44,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 		})
 	})
 
-	SIGDescribe("[Serial] [Slow] ReplicaSet", func() {
+	ginkgo.Describe("[Serial] [Slow] ReplicaSet", func() {
 		// CPU tests via ReplicaSets
 		ginkgo.It(titleUp, func() {
 			scaleUp("rs", e2eautoscaling.KindReplicaSet, false, f)
@@ -55,7 +55,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 	})
 
 	// These tests take ~20 minutes each.
-	SIGDescribe("[Serial] [Slow] ReplicationController", func() {
+	ginkgo.Describe("[Serial] [Slow] ReplicationController", func() {
 		// CPU tests via replication controllers
 		ginkgo.It(titleUp+" and verify decision stability", func() {
 			scaleUp("rc", e2eautoscaling.KindRC, true, f)
@@ -65,7 +65,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 		})
 	})
 
-	SIGDescribe("ReplicationController light", func() {
+	ginkgo.Describe("ReplicationController light", func() {
 		ginkgo.It("Should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    1,
