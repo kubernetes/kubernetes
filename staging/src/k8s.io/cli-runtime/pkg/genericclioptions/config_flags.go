@@ -98,6 +98,9 @@ type ConfigFlags struct {
 	Username         *string
 	Password         *string
 	Timeout          *string
+	// If non-nil, wrap config function can transform the Config
+	// before it is returned in ToRESTConfig function.
+	WrapConfigFn func(*rest.Config) *rest.Config
 
 	clientConfig clientcmd.ClientConfig
 	lock         sync.Mutex
@@ -113,9 +116,17 @@ type ConfigFlags struct {
 // ToRESTConfig implements RESTClientGetter.
 // Returns a REST client configuration based on a provided path
 // to a .kubeconfig file, loading rules, and config flag overrides.
-// Expects the AddFlags method to have been called.
+// Expects the AddFlags method to have been called. If WrapConfigFn
+// is non-nil this function can transform config before return.
 func (f *ConfigFlags) ToRESTConfig() (*rest.Config, error) {
-	return f.ToRawKubeConfigLoader().ClientConfig()
+	c, err := f.ToRawKubeConfigLoader().ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	if f.WrapConfigFn != nil {
+		return f.WrapConfigFn(c), nil
+	}
+	return c, nil
 }
 
 // ToRawKubeConfigLoader binds config flag values to config overrides
