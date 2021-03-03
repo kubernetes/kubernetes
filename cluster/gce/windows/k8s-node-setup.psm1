@@ -1754,12 +1754,12 @@ function DownloadAndInstall-LoggingAgents {
 function Create-LoggingAgentServices {
   cd $LOGGINGAGENT_ROOT
 
-  Log-Output 'Creating service: ${LOGGINGAGENT_SERVICE}'
+  Log-Output "Creating service: ${LOGGINGAGENT_SERVICE}"
   sc.exe create $LOGGINGAGENT_SERVICE binpath= "${LOGGINGAGENT_ROOT}\bin\fluent-bit.exe -c \fluent-bit\conf\fluent-bit.conf"
   sc.exe failure $LOGGINGAGENT_SERVICE reset= 30 actions= restart/5000
   sc.exe query $LOGGINGAGENT_SERVICE
 
-  Log-Output 'Creating service: ${LOGGINGEXPORTER_SERVICE}'
+  Log-Output "Creating service: ${LOGGINGEXPORTER_SERVICE}"
   sc.exe create  $LOGGINGEXPORTER_SERVICE  binpath= "${LOGGINGEXPORTER_ROOT}\flb-exporter.exe --kubernetes-separator=_ --stackdriver-resource-model=k8s --enable-pod-label-discovery --logtostderr --winsvc  --pod-label-dot-replacement=_"
   sc.exe failure $LOGGINGEXPORTER_SERVICE reset= 30 actions= restart/5000
   sc.exe query $LOGGINGEXPORTER_SERVICE
