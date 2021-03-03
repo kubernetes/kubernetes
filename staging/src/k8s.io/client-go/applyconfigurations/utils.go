@@ -1273,6 +1273,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragev1beta1.CSINodeDriverApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("CSINodeSpec"):
 		return &applyconfigurationsstoragev1beta1.CSINodeSpecApplyConfiguration{}
+	case storagev1beta1.SchemeGroupVersion.WithKind("CSIStorageCapacity"):
+		return &applyconfigurationsstoragev1beta1.CSIStorageCapacityApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("StorageClass"):
 		return &applyconfigurationsstoragev1beta1.StorageClassApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("TokenRequest"):

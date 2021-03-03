@@ -129,6 +129,7 @@ func autoConvert_v1alpha1_CSIStorageCapacity_To_storage_CSIStorageCapacity(in *v
 	out.NodeTopology = (*v1.LabelSelector)(unsafe.Pointer(in.NodeTopology))
 	out.StorageClassName = in.StorageClassName
 	out.Capacity = (*resource.Quantity)(unsafe.Pointer(in.Capacity))
+	out.MaximumVolumeSize = (*resource.Quantity)(unsafe.Pointer(in.MaximumVolumeSize))
 	return nil
 }
 
@@ -142,6 +143,7 @@ func autoConvert_storage_CSIStorageCapacity_To_v1alpha1_CSIStorageCapacity(in *s
 	out.NodeTopology = (*v1.LabelSelector)(unsafe.Pointer(in.NodeTopology))
 	out.StorageClassName = in.StorageClassName
 	out.Capacity = (*resource.Quantity)(unsafe.Pointer(in.Capacity))
+	out.MaximumVolumeSize = (*resource.Quantity)(unsafe.Pointer(in.MaximumVolumeSize))
 	return nil
 }
 
