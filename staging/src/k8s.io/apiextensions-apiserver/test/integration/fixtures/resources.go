@@ -44,6 +44,16 @@ const (
 	noxuInstanceNum int64 = 9223372036854775807
 )
 
+// AllowAllSchema doesn't enforce any schema restrictions
+func AllowAllSchema() *apiextensionsv1.CustomResourceValidation {
+	return &apiextensionsv1.CustomResourceValidation{
+		OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+			XPreserveUnknownFields: pointer.BoolPtr(true),
+			Type:                   "object",
+		},
+	}
+}
+
 // NewRandomNameV1CustomResourceDefinition generates a CRD with random name to avoid name conflict in e2e tests
 func NewRandomNameV1CustomResourceDefinition(scope apiextensionsv1.ResourceScope) *apiextensionsv1.CustomResourceDefinition {
 	// ensure the singular doesn't end in an s for now
@@ -57,12 +67,7 @@ func NewRandomNameV1CustomResourceDefinition(scope apiextensionsv1.ResourceScope
 					Name:    "v1beta1",
 					Served:  true,
 					Storage: true,
-					Schema: &apiextensionsv1.CustomResourceValidation{
-						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-							XPreserveUnknownFields: pointer.BoolPtr(true),
-							Type:                   "object",
-						},
-					},
+					Schema:  AllowAllSchema(),
 				},
 			},
 			Names: apiextensionsv1.CustomResourceDefinitionNames{
@@ -70,46 +75,6 @@ func NewRandomNameV1CustomResourceDefinition(scope apiextensionsv1.ResourceScope
 				Singular: gName,
 				Kind:     gName,
 				ListKind: gName + "List",
-			},
-			Scope: scope,
-		},
-	}
-}
-
-// NewRandomNameCustomResourceDefinition generates a CRD with random name to avoid name conflict in e2e tests
-func NewRandomNameCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
-	// ensure the singular doesn't end in an s for now
-	gName := names.SimpleNameGenerator.GenerateName("foo") + "a"
-	return &apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{Name: gName + "s.mygroup.example.com"},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "mygroup.example.com",
-			Version: "v1beta1",
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural:   gName + "s",
-				Singular: gName,
-				Kind:     gName,
-				ListKind: gName + "List",
-			},
-			Scope: scope,
-		},
-	}
-}
-
-// NewNoxuCustomResourceDefinition returns a WishIHadChosenNoxu CRD.
-func NewNoxuCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
-	return &apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "mygroup.example.com",
-			Version: "v1beta1",
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural:     "noxus",
-				Singular:   "nonenglishnoxu",
-				Kind:       "WishIHadChosenNoxu",
-				ShortNames: []string{"foo", "bar", "abc", "def"},
-				ListKind:   "NoxuItemList",
-				Categories: []string{"all"},
 			},
 			Scope: scope,
 		},
@@ -126,12 +91,7 @@ func NewNoxuV1CustomResourceDefinition(scope apiextensionsv1.ResourceScope) *api
 				Name:    "v1beta1",
 				Served:  true,
 				Storage: true,
-				Schema: &apiextensionsv1.CustomResourceValidation{
-					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-						XPreserveUnknownFields: pointer.BoolPtr(true),
-						Type:                   "object",
-					},
-				},
+				Schema:  AllowAllSchema(),
 			}},
 			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural:     "noxus",
@@ -173,13 +133,12 @@ func NewNoxuInstance(namespace, name string) *unstructured.Unstructured {
 }
 
 // NewMultipleVersionNoxuCRD returns a WishIHadChosenNoxu with multiple versions.
-func NewMultipleVersionNoxuCRD(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
-	return &apiextensionsv1beta1.CustomResourceDefinition{
+func NewMultipleVersionNoxuCRD(scope apiextensionsv1.ResourceScope) *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "mygroup.example.com",
-			Version: "v1beta1",
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "mygroup.example.com",
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural:     "noxus",
 				Singular:   "nonenglishnoxu",
 				Kind:       "WishIHadChosenNoxu",
@@ -188,38 +147,52 @@ func NewMultipleVersionNoxuCRD(scope apiextensionsv1beta1.ResourceScope) *apiext
 				Categories: []string{"all"},
 			},
 			Scope: scope,
-			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 				{
 					Name:    "v1beta1",
 					Served:  true,
 					Storage: false,
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					},
+					Schema: AllowAllSchema(),
 				},
 				{
 					Name:    "v1beta2",
 					Served:  true,
 					Storage: true,
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					},
+					Schema: AllowAllSchema(),
 				},
 				{
 					Name:    "v0",
 					Served:  false,
 					Storage: false,
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					},
+					Schema: AllowAllSchema(),
 				},
-			},
-			Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-				Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
 			},
 		},
 	}
 }
 
 // NewNoxu2CustomResourceDefinition returns a WishIHadChosenNoxu2 CRD.
-func NewNoxu2CustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
-	return &apiextensionsv1beta1.CustomResourceDefinition{
+func NewNoxu2CustomResourceDefinition(scope apiextensionsv1.ResourceScope) *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "noxus2.mygroup.example.com"},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "mygroup.example.com",
-			Version: "v1alpha1",
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "mygroup.example.com",
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{
+				Name:    "v1alpha1",
+				Served:  true,
+				Storage: true,
+				Schema:  AllowAllSchema(),
+			}},
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural:     "noxus2",
 				Singular:   "nonenglishnoxu2",
 				Kind:       "WishIHadChosenNoxu2",
@@ -231,14 +204,21 @@ func NewNoxu2CustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) 
 	}
 }
 
-// NewCurletCustomResourceDefinition returns a Curlet CRD.
-func NewCurletCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
-	return &apiextensionsv1beta1.CustomResourceDefinition{
+// NewCurletV1CustomResourceDefinition returns a Curlet CRD.
+func NewCurletV1CustomResourceDefinition(scope apiextensionsv1.ResourceScope) *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "curlets.mygroup.example.com"},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "mygroup.example.com",
-			Version: "v1beta1",
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "mygroup.example.com",
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: true,
+					Schema:  AllowAllSchema(),
+				},
+			},
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural:   "curlets",
 				Singular: "curlet",
 				Kind:     "Curlet",
@@ -506,23 +486,6 @@ func isWatchCachePrimed(crd *apiextensionsv1.CustomResourceDefinition, dynamicCl
 	return true, nil
 }
 
-// DeleteCustomResourceDefinition deletes a CRD and waits until it disappears from discovery.
-func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
-	if err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, metav1.DeleteOptions{}); err != nil {
-		return err
-	}
-	for _, version := range servedVersions(crd) {
-		err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
-			exists, err := existsInDiscovery(crd, apiExtensionsClient, version)
-			return !exists, err
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // DeleteV1CustomResourceDefinition deletes a CRD and waits until it disappears from discovery.
 func DeleteV1CustomResourceDefinition(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
 	if err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, metav1.DeleteOptions{}); err != nil {
@@ -564,7 +527,7 @@ func DeleteV1CustomResourceDefinitions(deleteListOpts metav1.ListOptions, apiExt
 }
 
 // CreateNewVersionedScaleClient returns a scale client.
-func CreateNewVersionedScaleClient(crd *apiextensionsv1beta1.CustomResourceDefinition, config *rest.Config, version string) (scale.ScalesGetter, error) {
+func CreateNewVersionedScaleClient(crd *apiextensionsv1.CustomResourceDefinition, config *rest.Config, version string) (scale.ScalesGetter, error) {
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
 		return nil, err
