@@ -119,6 +119,15 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	}
 	storage["csidrivers"] = csiDriverStorage.CSIDriver
 
+	// register csistoragecapacity if CSIStorageCapacity feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+		csiStorageStorage, err := csistoragecapacitystore.NewStorage(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage["csistoragecapacities"] = csiStorageStorage.CSIStorageCapacity
+	}
+
 	return storage, nil
 }
 

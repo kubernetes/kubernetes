@@ -233,6 +233,7 @@ const (
 
 	// owner: @pohly
 	// alpha: v1.19
+	// beta: v1.21
 	//
 	// Enables tracking of available storage capacity that CSI drivers provide.
 	CSIStorageCapacity featuregate.Feature = "CSIStorageCapacity"
@@ -767,7 +768,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ConfigurableFSGroupPolicy:                      {Default: true, PreRelease: featuregate.Beta},
 	BalanceAttachedNodeVolumes:                     {Default: false, PreRelease: featuregate.Alpha},
 	CSIInlineVolume:                                {Default: true, PreRelease: featuregate.Beta},
-	CSIStorageCapacity:                             {Default: false, PreRelease: featuregate.Alpha},
+	CSIStorageCapacity:                             {Default: true, PreRelease: featuregate.Beta},
 	CSIServiceAccountToken:                         {Default: false, PreRelease: featuregate.Alpha},
 	GenericEphemeralVolume:                         {Default: false, PreRelease: featuregate.Alpha},
 	CSIVolumeFSGroupPolicy:                         {Default: true, PreRelease: featuregate.Beta},

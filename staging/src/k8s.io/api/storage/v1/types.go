@@ -331,7 +331,7 @@ type CSIDriverSpec struct {
 	// unset or false and it can be flipped later when storage
 	// capacity information has been published.
 	//
-	// This is an alpha field and only available when the CSIStorageCapacity
+	// This is a beta field and only available when the CSIStorageCapacity
 	// feature is enabled. The default is false.
 	//
 	// +optional

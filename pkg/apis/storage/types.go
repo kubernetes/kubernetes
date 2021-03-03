@@ -341,7 +341,7 @@ type CSIDriverSpec struct {
 	// unset or false and it can be flipped later when storage
 	// capacity information has been published.
 	//
-	// This is an alpha field and only available when the CSIStorageCapacity
+	// This is a beta field and only available when the CSIStorageCapacity
 	// feature is enabled. The default is false.
 	//
 	// +optional
@@ -564,7 +564,9 @@ type CSINodeList struct {
 //
 // The producer of these objects can decide which approach is more suitable.
 //
-// This is an alpha feature and only available when the CSIStorageCapacity feature is enabled.
+// They are consumed by the kube-scheduler if the CSIStorageCapacity beta feature gate
+// is enabled there and a CSI driver opts into capacity-aware scheduling with
+// CSIDriver.StorageCapacity.
 type CSIStorageCapacity struct {
 	metav1.TypeMeta
 	// Standard object's metadata. The name has no particular meaning. It must be
