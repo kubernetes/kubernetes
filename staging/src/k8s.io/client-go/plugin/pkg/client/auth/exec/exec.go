@@ -198,7 +198,7 @@ func newAuthenticator(c *cache, config *api.ExecConfig, cluster *clientauthentic
 
 		stdin:       os.Stdin,
 		stderr:      os.Stderr,
-		interactive: term.IsTerminal(int(os.Stdout.Fd())),
+		interactive: term.IsTerminal(int(os.Stdin.Fd())),
 		now:         time.Now,
 		environ:     os.Environ,
 
