@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"fmt"
@@ -25,13 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGNodeDescribe("Downward API", func() {
+var _ = SIGDescribe("Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	/*
@@ -284,81 +283,6 @@ var _ = SIGNodeDescribe("Downward API", func() {
 	})
 })
 
-var _ = SIGStorageDescribe("Downward API [Serial] [Disruptive] [NodeFeature:EphemeralStorage]", func() {
-	f := framework.NewDefaultFramework("downward-api")
-
-	ginkgo.Context("Downward API tests for local ephemeral storage", func() {
-		ginkgo.BeforeEach(func() {
-			e2eskipper.SkipUnlessLocalEphemeralStorageEnabled()
-		})
-
-		ginkgo.It("should provide container's limits.ephemeral-storage and requests.ephemeral-storage as env vars", func() {
-			podName := "downward-api-" + string(uuid.NewUUID())
-			env := []v1.EnvVar{
-				{
-					Name: "EPHEMERAL_STORAGE_LIMIT",
-					ValueFrom: &v1.EnvVarSource{
-						ResourceFieldRef: &v1.ResourceFieldSelector{
-							Resource: "limits.ephemeral-storage",
-						},
-					},
-				},
-				{
-					Name: "EPHEMERAL_STORAGE_REQUEST",
-					ValueFrom: &v1.EnvVarSource{
-						ResourceFieldRef: &v1.ResourceFieldSelector{
-							Resource: "requests.ephemeral-storage",
-						},
-					},
-				},
-			}
-			expectations := []string{
-				fmt.Sprintf("EPHEMERAL_STORAGE_LIMIT=%d", 64*1024*1024),
-				fmt.Sprintf("EPHEMERAL_STORAGE_REQUEST=%d", 32*1024*1024),
-			}
-
-			testDownwardAPIForEphemeralStorage(f, podName, env, expectations)
-		})
-
-		ginkgo.It("should provide default limits.ephemeral-storage from node allocatable", func() {
-			podName := "downward-api-" + string(uuid.NewUUID())
-			env := []v1.EnvVar{
-				{
-					Name: "EPHEMERAL_STORAGE_LIMIT",
-					ValueFrom: &v1.EnvVarSource{
-						ResourceFieldRef: &v1.ResourceFieldSelector{
-							Resource: "limits.ephemeral-storage",
-						},
-					},
-				},
-			}
-			expectations := []string{
-				"EPHEMERAL_STORAGE_LIMIT=[1-9]",
-			}
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   podName,
-					Labels: map[string]string{"name": podName},
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:    "dapi-container",
-							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-							Command: []string{"sh", "-c", "env"},
-							Env:     env,
-						},
-					},
-					RestartPolicy: v1.RestartPolicyNever,
-				},
-			}
-
-			testDownwardAPIUsingPod(f, pod, env, expectations)
-		})
-	})
-
-})
-
 func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, expectations []string) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -379,36 +303,6 @@ func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, ex
 						Limits: v1.ResourceList{
 							v1.ResourceCPU:    resource.MustParse("1250m"),
 							v1.ResourceMemory: resource.MustParse("64Mi"),
-						},
-					},
-					Env: env,
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
-
-	testDownwardAPIUsingPod(f, pod, env, expectations)
-}
-
-func testDownwardAPIForEphemeralStorage(f *framework.Framework, podName string, env []v1.EnvVar, expectations []string) {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   podName,
-			Labels: map[string]string{"name": podName},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    "dapi-container",
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-					Command: []string{"sh", "-c", "env"},
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceEphemeralStorage: resource.MustParse("32Mi"),
-						},
-						Limits: v1.ResourceList{
-							v1.ResourceEphemeralStorage: resource.MustParse("64Mi"),
 						},
 					},
 					Env: env,

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	v1 "k8s.io/api/core/v1"
@@ -30,7 +30,7 @@ import (
 // These tests exercise the Kubernetes expansion syntax $(VAR).
 // For more information, see:
 // https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/expansion.md
-var _ = SIGNodeDescribe("Variable Expansion", func() {
+var _ = SIGDescribe("Variable Expansion", func() {
 	f := framework.NewDefaultFramework("var-expansion")
 
 	/*

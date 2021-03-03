@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"fmt"
@@ -32,7 +32,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGNodeDescribe("Container Lifecycle Hook", func() {
+var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("container-lifecycle-hook")
 	var podClient *framework.PodClient
 	const (

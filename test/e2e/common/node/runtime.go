@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"context"
@@ -35,7 +35,7 @@ import (
 	gomegatypes "github.com/onsi/gomega/types"
 )
 
-var _ = SIGNodeDescribe("Container Runtime", func() {
+var _ = SIGDescribe("Container Runtime", func() {
 	f := framework.NewDefaultFramework("container-runtime")
 
 	ginkgo.Describe("blackbox test", func() {

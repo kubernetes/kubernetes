@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"bytes"
@@ -179,7 +179,7 @@ func expectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interf
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), explain...)
 }
 
-var _ = SIGNodeDescribe("Pods", func() {
+var _ = SIGDescribe("Pods", func() {
 	f := framework.NewDefaultFramework("pods")
 	var podClient *framework.PodClient
 	var dc dynamic.Interface

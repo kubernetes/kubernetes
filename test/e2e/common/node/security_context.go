@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"fmt"
@@ -35,7 +35,12 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGNodeDescribe("Security Context", func() {
+var (
+	// non-root UID used in tests.
+	nonRootTestUserID = int64(1000)
+)
+
+var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context-test")
 	var podClient *framework.PodClient
 	ginkgo.BeforeEach(func() {
