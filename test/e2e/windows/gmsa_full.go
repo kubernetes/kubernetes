@@ -375,7 +375,12 @@ func createPodWithGmsa(f *framework.Framework, serviceAccountName string) string
 			Containers: []v1.Container{
 				{
 					Name:  podName,
-					Image: imageutils.GetPauseImageName(),
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{
+						"powershell.exe",
+						"-Command",
+						"sleep -Seconds 600",
+					},
 				},
 			},
 			SecurityContext: &v1.PodSecurityContext{

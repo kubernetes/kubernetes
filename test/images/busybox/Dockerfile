@@ -16,4 +16,4 @@
 ARG BASEIMAGE
 FROM $BASEIMAGE
 
-LABEL image_version="1.29"
+LABEL image_version="1.29-1"
