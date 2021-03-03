@@ -25,7 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,11 +35,11 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
-	storageinformersv1alpha1 "k8s.io/client-go/informers/storage/v1alpha1"
+	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
-	storagelistersv1alpha1 "k8s.io/client-go/listers/storage/v1alpha1"
+	storagelistersv1beta1 "k8s.io/client-go/listers/storage/v1beta1"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	csiplugins "k8s.io/csi-translation-lib/plugins"
@@ -210,7 +210,7 @@ type volumeBinder struct {
 
 	capacityCheckEnabled     bool
 	csiDriverLister          storagelisters.CSIDriverLister
-	csiStorageCapacityLister storagelistersv1alpha1.CSIStorageCapacityLister
+	csiStorageCapacityLister storagelistersv1beta1.CSIStorageCapacityLister
 }
 
 // CapacityCheck contains additional parameters for NewVolumeBinder that
@@ -218,7 +218,7 @@ type volumeBinder struct {
 // capacity is desired.
 type CapacityCheck struct {
 	CSIDriverInformer          storageinformers.CSIDriverInformer
-	CSIStorageCapacityInformer storageinformersv1alpha1.CSIStorageCapacityInformer
+	CSIStorageCapacityInformer storageinformersv1beta1.CSIStorageCapacityInformer
 }
 
 // NewVolumeBinder sets up all the caches needed for the scheduler to make volume binding decisions.
@@ -989,7 +989,7 @@ func (b *volumeBinder) hasEnoughCapacity(provisioner string, claim *v1.Persisten
 	return false, nil
 }
 
-func (b *volumeBinder) nodeHasAccess(node *v1.Node, capacity *storagev1alpha1.CSIStorageCapacity) bool {
+func (b *volumeBinder) nodeHasAccess(node *v1.Node, capacity *storagev1beta1.CSIStorageCapacity) bool {
 	if capacity.NodeTopology == nil {
 		// Unavailable
 		return false
