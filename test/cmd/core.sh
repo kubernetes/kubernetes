@@ -1313,17 +1313,13 @@ run_rc_tests() {
   kubectl expose pod valid-pod --port=444 --name=frontend-3 "${kube_flags[@]}"
   # Post-condition: service exists and the port is unnamed
   kube::test::get_object_assert 'service frontend-3' "{{$port_name}} {{$port_field}}" '<no value> 444'
-  # Create a service using service/v1 generator
-  kubectl expose rc frontend --port=80 --name=frontend-4 --generator=service/v1 "${kube_flags[@]}"
-  # Post-condition: service exists and the port is named default.
-  kube::test::get_object_assert 'service frontend-4' "{{$port_name}} {{$port_field}}" 'default 80'
   # Verify that expose service works without specifying a port.
-  kubectl expose service frontend --name=frontend-5 "${kube_flags[@]}"
+  kubectl expose service frontend --name=frontend-4 "${kube_flags[@]}"
   # Post-condition: service exists with the same port as the original service.
-  kube::test::get_object_assert 'service frontend-5' "{{$port_field}}" '80'
+  kube::test::get_object_assert 'service frontend-4' "{{$port_field}}" '80'
   # Cleanup services
   kubectl delete pod valid-pod "${kube_flags[@]}"
-  kubectl delete service frontend{,-2,-3,-4,-5} "${kube_flags[@]}"
+  kubectl delete service frontend{,-2,-3,-4} "${kube_flags[@]}"
 
   ### Expose negative invalid resource test
   # Pre-condition: don't need
