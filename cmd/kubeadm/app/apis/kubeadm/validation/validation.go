@@ -508,8 +508,10 @@ func ValidateNetworking(c *kubeadm.ClusterConfiguration, fldPath *field.Path) fi
 	}
 	if len(c.Networking.PodSubnet) != 0 {
 		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInPodSubnet, isDualStack, field.NewPath("podSubnet"))...)
-		// Pod subnet was already validated, we need to validate now against the node-mask
-		allErrs = append(allErrs, ValidatePodSubnetNodeMask(c.Networking.PodSubnet, c, field.NewPath("podSubnet"))...)
+		if c.ControllerManager.ExtraArgs["allocate-node-cidrs"] != "false" {
+			// Pod subnet was already validated, we need to validate now against the node-mask
+			allErrs = append(allErrs, ValidatePodSubnetNodeMask(c.Networking.PodSubnet, c, field.NewPath("podSubnet"))...)
+		}
 	}
 	return allErrs
 }
