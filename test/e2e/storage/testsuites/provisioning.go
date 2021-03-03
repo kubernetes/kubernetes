@@ -744,68 +744,6 @@ func StopPod(c clientset.Interface, pod *v1.Pod) {
 	e2epod.DeletePodWithWait(c, pod)
 }
 
-// StopPodAndDependents first tries to log the output of the pod's container,
-// then deletes the pod and waits for that to succeed. Also waits for all owned
-// resources to be deleted.
-func StopPodAndDependents(c clientset.Interface, timeouts *framework.TimeoutContext, pod *v1.Pod) {
-	if pod == nil {
-		return
-	}
-	body, err := c.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &v1.PodLogOptions{}).Do(context.TODO()).Raw()
-	if err != nil {
-		framework.Logf("Error getting logs for pod %s: %v", pod.Name, err)
-	} else {
-		framework.Logf("Pod %s has the following logs: %s", pod.Name, body)
-	}
-
-	// We must wait explicitly for removal of the generic ephemeral volume PVs.
-	// For that we must find them first...
-	pvs, err := c.CoreV1().PersistentVolumes().List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err, "list PVs")
-	var podPVs []v1.PersistentVolume
-	for _, pv := range pvs.Items {
-		if pv.Spec.ClaimRef == nil ||
-			pv.Spec.ClaimRef.Namespace != pod.Namespace {
-			continue
-		}
-		pvc, err := c.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(context.TODO(), pv.Spec.ClaimRef.Name, metav1.GetOptions{})
-		if err != nil && apierrors.IsNotFound(err) {
-			// Must have been some unrelated PV, otherwise the PVC should exist.
-			continue
-		}
-		framework.ExpectNoError(err, "get PVC")
-		if pv.Spec.ClaimRef.UID == pvc.UID && metav1.IsControlledBy(pvc, pod) {
-			podPVs = append(podPVs, pv)
-		}
-	}
-
-	framework.Logf("Deleting pod %q in namespace %q", pod.Name, pod.Namespace)
-	deletionPolicy := metav1.DeletePropagationForeground
-	err = c.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name,
-		metav1.DeleteOptions{
-			// If the pod is the owner of some resources (like ephemeral inline volumes),
-			// then we want to be sure that those are also gone before we return.
-			// Blocking pod deletion via metav1.DeletePropagationForeground achieves that.
-			PropagationPolicy: &deletionPolicy,
-		})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return // assume pod was already deleted
-		}
-		framework.Logf("pod Delete API error: %v", err)
-	}
-	framework.Logf("Wait up to %v for pod %q to be fully deleted", timeouts.PodDelete, pod.Name)
-	e2epod.WaitForPodNotFoundInNamespace(c, pod.Name, pod.Namespace, timeouts.PodDelete)
-	if len(podPVs) > 0 {
-		for _, pv := range podPVs {
-			// As with CSI inline volumes, we use the pod delete timeout here because conceptually
-			// the volume deletion needs to be that fast (whatever "that" is).
-			framework.Logf("Wait up to %v for pod PV %s to be fully deleted", timeouts.PodDelete, pv.Name)
-			e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, timeouts.PodDelete)
-		}
-	}
-}
-
 func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeClaim) {
 	for _, claim := range pvcs {
 		// Get new copy of the claim
