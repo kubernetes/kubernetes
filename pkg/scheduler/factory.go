@@ -221,7 +221,11 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	} else {
 		for _, predicate := range policy.Predicates {
 			klog.V(2).InfoS("Registering predicate", "predicate", predicate.Name)
-			predicateKeys.Insert(lr.ProcessPredicatePolicy(predicate, args))
+			predicateName, err := lr.ProcessPredicatePolicy(predicate, args)
+			if err != nil {
+				return nil, err
+			}
+			predicateKeys.Insert(predicateName)
 		}
 	}
 
@@ -236,7 +240,11 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 				continue
 			}
 			klog.V(2).InfoS("Registering priority", "priority", priority.Name)
-			priorityKeys[lr.ProcessPriorityPolicy(priority, args)] = priority.Weight
+			priorityName, err := lr.ProcessPriorityPolicy(priority, args)
+			if err != nil {
+				return nil, err
+			}
+			priorityKeys[priorityName] = priority.Weight
 		}
 	}
 

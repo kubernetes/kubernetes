@@ -546,8 +546,10 @@ func appendToPluginSet(set config.PluginSet, name string, weight *int32) config.
 
 // ProcessPredicatePolicy given a PredicatePolicy, return the plugin name implementing the predicate and update
 // the ConfigProducerArgs if necessary.
-func (lr *LegacyRegistry) ProcessPredicatePolicy(policy config.PredicatePolicy, pluginArgs *ConfigProducerArgs) string {
-	validatePredicateOrDie(policy)
+func (lr *LegacyRegistry) ProcessPredicatePolicy(policy config.PredicatePolicy, pluginArgs *ConfigProducerArgs) (string, error) {
+	if err := validatePredicate(policy); err != nil {
+		return "", err
+	}
 
 	predicateName := policy.Name
 	if policy.Name == "PodFitsPorts" {
@@ -558,12 +560,12 @@ func (lr *LegacyRegistry) ProcessPredicatePolicy(policy config.PredicatePolicy, 
 	if _, ok := lr.predicateToConfigProducer[predicateName]; ok {
 		// checking to see if a pre-defined predicate is requested
 		klog.V(2).Infof("Predicate type %s already registered, reusing.", policy.Name)
-		return predicateName
+		return predicateName, nil
 	}
 
 	if policy.Argument == nil || (policy.Argument.ServiceAffinity == nil &&
 		policy.Argument.LabelsPresence == nil) {
-		klog.Fatalf("Invalid configuration: Predicate type not found for %q", policy.Name)
+		return "", fmt.Errorf("predicate type not found for %q", predicateName)
 	}
 
 	// generate the predicate function, if a custom type is requested
@@ -597,13 +599,15 @@ func (lr *LegacyRegistry) ProcessPredicatePolicy(policy config.PredicatePolicy, 
 		predicateName = CheckNodeLabelPresencePred
 
 	}
-	return predicateName
+	return predicateName, nil
 }
 
 // ProcessPriorityPolicy given a PriorityPolicy, return the plugin name implementing the priority and update
 // the ConfigProducerArgs if necessary.
-func (lr *LegacyRegistry) ProcessPriorityPolicy(policy config.PriorityPolicy, configProducerArgs *ConfigProducerArgs) string {
-	validatePriorityOrDie(policy)
+func (lr *LegacyRegistry) ProcessPriorityPolicy(policy config.PriorityPolicy, configProducerArgs *ConfigProducerArgs) (string, error) {
+	if err := validatePriority(policy); err != nil {
+		return "", err
+	}
 
 	priorityName := policy.Name
 	if policy.Name == ServiceSpreadingPriority {
@@ -613,7 +617,7 @@ func (lr *LegacyRegistry) ProcessPriorityPolicy(policy config.PriorityPolicy, co
 
 	if _, ok := lr.priorityToConfigProducer[priorityName]; ok {
 		klog.V(2).Infof("Priority type %s already registered, reusing.", priorityName)
-		return priorityName
+		return priorityName, nil
 	}
 
 	// generate the priority function, if a custom priority is requested
@@ -621,7 +625,7 @@ func (lr *LegacyRegistry) ProcessPriorityPolicy(policy config.PriorityPolicy, co
 		(policy.Argument.ServiceAntiAffinity == nil &&
 			policy.Argument.RequestedToCapacityRatioArguments == nil &&
 			policy.Argument.LabelPreference == nil) {
-		klog.Fatalf("Invalid configuration: Priority type not found for %q", priorityName)
+		return "", fmt.Errorf("priority type not found for %q", priorityName)
 	}
 
 	if policy.Argument.ServiceAntiAffinity != nil {
@@ -686,10 +690,10 @@ func (lr *LegacyRegistry) ProcessPriorityPolicy(policy config.PriorityPolicy, co
 		priorityName = noderesources.RequestedToCapacityRatioName
 	}
 
-	return priorityName
+	return priorityName, nil
 }
 
-func validatePredicateOrDie(predicate config.PredicatePolicy) {
+func validatePredicate(predicate config.PredicatePolicy) error {
 	if predicate.Argument != nil {
 		numArgs := 0
 		if predicate.Argument.ServiceAffinity != nil {
@@ -699,12 +703,13 @@ func validatePredicateOrDie(predicate config.PredicatePolicy) {
 			numArgs++
 		}
 		if numArgs != 1 {
-			klog.Fatalf("Exactly 1 predicate argument is required, numArgs: %v, Predicate: %s", numArgs, predicate.Name)
+			return fmt.Errorf("exactly 1 predicate argument is required, numArgs: %v, predicate %v", numArgs, predicate)
 		}
 	}
+	return nil
 }
 
-func validatePriorityOrDie(priority config.PriorityPolicy) {
+func validatePriority(priority config.PriorityPolicy) error {
 	if priority.Argument != nil {
 		numArgs := 0
 		if priority.Argument.ServiceAntiAffinity != nil {
@@ -717,7 +722,8 @@ func validatePriorityOrDie(priority config.PriorityPolicy) {
 			numArgs++
 		}
 		if numArgs != 1 {
-			klog.Fatalf("Exactly 1 priority argument is required, numArgs: %v, Priority: %s", numArgs, priority.Name)
+			return fmt.Errorf("exactly 1 priority argument is required, numArgs: %v, priority %v", numArgs, priority)
 		}
 	}
+	return nil
 }
