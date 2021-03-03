@@ -39,21 +39,26 @@ import (
 )
 
 const (
-	eventsUsageStr = "events TODO"
+	eventsUsageStr = "events"
 )
 
 var (
-	logsLong = templates.LongDesc(i18n.T(`
-		Get events TODO.`))
+	eventsLong = templates.LongDesc(i18n.T(`
+		Experimental: Display events
 
-	logsExample = templates.Examples(i18n.T(`
-		# Return recent events
-		kubectl events
+		Prints a table of the most important information about events.
+		You can request events for a namespace, for all namespace, or
+		filtered to only those pertaining to a specified resource.`))
 
-		TODO`))
+	eventsExample = templates.Examples(i18n.T(`
+	# List recent events in the default namespace.
+	kubectl alpha events
 
-	selectorTail       int64 = 10
-	eventssUsageErrStr       = fmt.Sprintf("TODO usage error string: %s", eventsUsageStr)
+	# List recent events in all namespaces.
+	kubectl alpha events --all-namespaces
+
+	# List recent events, then wait for more events and list them as they arrive.
+	kubectl alpha events --watch`))
 )
 
 type EventsOptions struct {
@@ -81,9 +86,9 @@ func NewCmdEvents(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd := &cobra.Command{
 		Use:                   eventsUsageStr,
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Print the logs for a container in a pod"),
-		Long:                  logsLong,
-		Example:               logsExample,
+		Short:                 i18n.T("Experimental: List events"),
+		Long:                  eventsLong,
+		Example:               eventsExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
