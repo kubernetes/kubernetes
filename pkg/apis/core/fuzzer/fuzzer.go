@@ -473,7 +473,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			s.Finalizers = []core.FinalizerName{core.FinalizerKubernetes}
 		},
 		func(s *core.Namespace, c fuzz.Continue) {
-			s.Finalizers = []core.FinalizerName{core.FinalizerKubernetes}
+			// s.Finalizers = []core.FinalizerName{core.FinalizerKubernetes}
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
 			// Match name --> label defaulting
 			if len(s.Name) > 0 {
