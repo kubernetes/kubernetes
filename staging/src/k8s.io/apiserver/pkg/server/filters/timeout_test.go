@@ -263,7 +263,7 @@ func TestErrConnKilled(t *testing.T) {
 	if strings.Count(capturedOutput, "\n") != 1 {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
-	if !strings.Contains(capturedOutput, `timeout or abort while handling: GET "/"`) {
+	if !strings.Contains(capturedOutput, `timeout or abort while handling: method=GET URI="/" audit-ID=""`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
 }
@@ -353,7 +353,7 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	if strings.Count(capturedOutput, "\n") != 1 {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
-	if !strings.Contains(capturedOutput, `timeout or abort while handling: GET "/"`) {
+	if !strings.Contains(capturedOutput, `timeout or abort while handling: method=GET URI="/" audit-ID=""`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
 

@@ -36,6 +36,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -575,6 +576,46 @@ func TestGetContextForNewRequest(t *testing.T) {
 		t.Error(string(body))
 	}
 
+}
+
+func TestNewRequestForProxyWithAuditID(t *testing.T) {
+	tests := []struct {
+		name    string
+		auditID string
+	}{
+		{
+			name:    "original request has Audit-ID",
+			auditID: "foo-bar",
+		},
+		{
+			name:    "original request does not have Audit-ID",
+			auditID: "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, "/api/group/version/foos/namespace/foo", nil)
+			if err != nil {
+				t.Fatalf("failed to create new http request - %v", err)
+			}
+
+			req = req.WithContext(genericapirequest.WithRequestInfo(req.Context(), &genericapirequest.RequestInfo{Path: req.URL.Path}))
+			if len(test.auditID) > 0 {
+				req = req.WithContext(genericapirequest.WithAuditID(req.Context(), types.UID(test.auditID)))
+			}
+
+			newReq, _ := newRequestForProxy(req.URL, req)
+			if newReq == nil {
+				t.Fatal("expected a non nil Request object")
+			}
+
+			auditIDGot := newReq.Header.Get("Audit-ID")
+			if test.auditID != auditIDGot {
+				t.Errorf("expected an Audit-ID value: %q, but got: %q", test.auditID, auditIDGot)
+			}
+		})
+	}
 }
 
 // TestProxyCertReload verifies that the proxy reloading of certificates work

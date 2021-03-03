@@ -25,6 +25,7 @@ import (
 	"runtime"
 	"time"
 
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
 )
 
@@ -157,12 +158,14 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 
 func (rl *respLogger) LogArgs() []interface{} {
 	latency := time.Since(rl.startTime)
+	auditID := request.GetAuditIDTruncated(rl.req)
 	if rl.hijacked {
 		return []interface{}{
 			"verb", rl.req.Method,
 			"URI", rl.req.RequestURI,
 			"latency", latency,
 			"userAgent", rl.req.UserAgent(),
+			"audit-ID", auditID,
 			"srcIP", rl.req.RemoteAddr,
 			"hijacked", true,
 		}
@@ -172,6 +175,7 @@ func (rl *respLogger) LogArgs() []interface{} {
 		"URI", rl.req.RequestURI,
 		"latency", latency,
 		"userAgent", rl.req.UserAgent(),
+		"audit-ID", auditID,
 		"srcIP", rl.req.RemoteAddr,
 		"resp", rl.status,
 	}
