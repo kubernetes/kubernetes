@@ -10,5 +10,5 @@ require (
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/gotestsum v0.3.5
 	honnef.co/go/tools v0.0.1-2020.1.6
-	sigs.k8s.io/zeitgeist v0.1.1-0.20210222132743-e06e27751b7f
+	sigs.k8s.io/zeitgeist v0.2.0
 )
