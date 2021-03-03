@@ -636,12 +636,8 @@ run_rs_tests() {
   kubectl expose rs frontend --port=80 "${kube_flags[@]:?}"
   # Post-condition: service exists and the port is unnamed
   kube::test::get_object_assert 'service frontend' "{{${port_name:?}}} {{${port_field:?}}}" '<no value> 80'
-  # Create a service using service/v1 generator
-  kubectl expose rs frontend --port=80 --name=frontend-2 --generator=service/v1 "${kube_flags[@]:?}"
-  # Post-condition: service exists and the port is named default.
-  kube::test::get_object_assert 'service frontend-2' "{{${port_name:?}}} {{${port_field:?}}}" 'default 80'
   # Cleanup services
-  kubectl delete service frontend{,-2} "${kube_flags[@]:?}"
+  kubectl delete service frontend "${kube_flags[@]:?}"
 
   # Test set commands
   # Pre-condition: frontend replica set exists at generation 1
