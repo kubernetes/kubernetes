@@ -420,6 +420,7 @@ message MetricValueStatus {
 // ObjectMetricSource indicates how to scale on a metric describing a
 // kubernetes object (for example, hits-per-second on an Ingress object).
 message ObjectMetricSource {
+  // describedObject is a reference to the described kubernetes object
   optional CrossVersionObjectReference describedObject = 1;
 
   // target specifies the target value for the given metric
@@ -438,6 +439,7 @@ message ObjectMetricStatus {
   // current contains the current value for the given metric
   optional MetricValueStatus current = 2;
 
+  // describedObject is a reference to the described kubernetes object
   optional CrossVersionObjectReference describedObject = 3;
 }
 

@@ -235,9 +235,10 @@ func (MetricValueStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ObjectMetricSource = map[string]string{
-	"":       "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
-	"target": "target specifies the target value for the given metric",
-	"metric": "metric identifies the target metric by name and selector",
+	"":                "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+	"describedObject": "describedObject is a reference to the described kubernetes object",
+	"target":          "target specifies the target value for the given metric",
+	"metric":          "metric identifies the target metric by name and selector",
 }
 
 func (ObjectMetricSource) SwaggerDoc() map[string]string {
@@ -245,9 +246,10 @@ func (ObjectMetricSource) SwaggerDoc() map[string]string {
 }
 
 var map_ObjectMetricStatus = map[string]string{
-	"":        "ObjectMetricStatus indicates the current value of a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
-	"metric":  "metric identifies the target metric by name and selector",
-	"current": "current contains the current value for the given metric",
+	"":                "ObjectMetricStatus indicates the current value of a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+	"metric":          "metric identifies the target metric by name and selector",
+	"current":         "current contains the current value for the given metric",
+	"describedObject": "describedObject is a reference to the described kubernetes object",
 }
 
 func (ObjectMetricStatus) SwaggerDoc() map[string]string {

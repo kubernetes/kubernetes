@@ -247,6 +247,7 @@ const (
 // ObjectMetricSource indicates how to scale on a metric describing a
 // kubernetes object (for example, hits-per-second on an Ingress object).
 type ObjectMetricSource struct {
+	// describedObject is a reference to the described kubernetes object
 	DescribedObject CrossVersionObjectReference `json:"describedObject" protobuf:"bytes,1,name=describedObject"`
 	// target specifies the target value for the given metric
 	Target MetricTarget `json:"target" protobuf:"bytes,2,name=target"`
@@ -459,7 +460,7 @@ type ObjectMetricStatus struct {
 	Metric MetricIdentifier `json:"metric" protobuf:"bytes,1,name=metric"`
 	// current contains the current value for the given metric
 	Current MetricValueStatus `json:"current" protobuf:"bytes,2,name=current"`
-
+	// describedObject is a reference to the described kubernetes object
 	DescribedObject CrossVersionObjectReference `json:"describedObject" protobuf:"bytes,3,name=describedObject"`
 }
 
