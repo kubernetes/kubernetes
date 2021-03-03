@@ -1720,11 +1720,6 @@ type EphemeralVolumeSource struct {
 	//
 	// Required, must not be nil.
 	VolumeClaimTemplate *PersistentVolumeClaimTemplate
-
-	// ReadOnly specifies a read-only configuration for the volume.
-	// Defaults to false (read/write).
-	// +optional
-	ReadOnly bool
 }
 
 // PersistentVolumeClaimTemplate is used to produce

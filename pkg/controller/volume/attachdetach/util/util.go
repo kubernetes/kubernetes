@@ -48,7 +48,6 @@ func CreateVolumeSpec(podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName,
 	}
 	if ephemeralSource := podVolume.VolumeSource.Ephemeral; ephemeralSource != nil && utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
 		claimName = pod.Name + "-" + podVolume.Name
-		readOnly = ephemeralSource.ReadOnly
 	}
 	if claimName != "" {
 		klog.V(10).Infof(

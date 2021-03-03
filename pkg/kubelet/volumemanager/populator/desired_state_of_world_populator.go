@@ -530,7 +530,6 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 		// owned by the pod.
 		pvcSource = &v1.PersistentVolumeClaimVolumeSource{
 			ClaimName: pod.Name + "-" + podVolume.Name,
-			ReadOnly:  podVolume.VolumeSource.Ephemeral.ReadOnly,
 		}
 		ephemeral = true
 	}

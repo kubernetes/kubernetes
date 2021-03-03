@@ -1798,10 +1798,8 @@ type EphemeralVolumeSource struct {
 	// Required, must not be nil.
 	VolumeClaimTemplate *PersistentVolumeClaimTemplate `json:"volumeClaimTemplate,omitempty" protobuf:"bytes,1,opt,name=volumeClaimTemplate"`
 
-	// Specifies a read-only configuration for the volume.
-	// Defaults to false (read/write).
-	// +optional
-	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
+	// ReadOnly is tombstoned to show why 2 is a reserved protobuf tag.
+	// ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
 }
 
 // PersistentVolumeClaimTemplate is used to produce
