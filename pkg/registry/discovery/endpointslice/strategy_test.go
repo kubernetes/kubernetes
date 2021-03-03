@@ -20,8 +20,10 @@ import (
 	"context"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/discovery"
@@ -624,6 +626,244 @@ func TestPrepareForUpdate(t *testing.T) {
 			Strategy.PrepareForUpdate(context.TODO(), tc.newEPS, tc.oldEPS)
 			if !apiequality.Semantic.DeepEqual(tc.newEPS, tc.expectedEPS) {
 				t.Errorf("Expected %+v\nGot: %+v", tc.expectedEPS, tc.newEPS)
+			}
+		})
+	}
+}
+
+func Test_dropTopologyOnV1(t *testing.T) {
+	testcases := []struct {
+		name        string
+		v1Request   bool
+		newEPS      *discovery.EndpointSlice
+		originalEPS *discovery.EndpointSlice
+		expectedEPS *discovery.EndpointSlice
+	}{
+		{
+			name:      "v1 request, without deprecated topology",
+			v1Request: true,
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{Hostname: utilpointer.StringPtr("hostname-1")},
+					{Hostname: utilpointer.StringPtr("hostname-1")},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{Hostname: utilpointer.StringPtr("hostname-1")},
+					{Hostname: utilpointer.StringPtr("hostname-1")},
+				},
+			},
+		},
+		{
+			name: "v1beta1 request, without deprecated topology",
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{Hostname: utilpointer.StringPtr("hostname-1")},
+					{Hostname: utilpointer.StringPtr("hostname-1")},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{Hostname: utilpointer.StringPtr("hostname-1")},
+					{Hostname: utilpointer.StringPtr("hostname-1")},
+				},
+			},
+		},
+		{
+			name:      "v1 request, with deprecated topology",
+			v1Request: true,
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{DeprecatedTopology: map[string]string{"key": "value"}},
+					{DeprecatedTopology: map[string]string{"key": "value"}},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{{}, {}},
+			},
+		},
+		{
+			name: "v1beta1 request, with deprecated topology",
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{DeprecatedTopology: map[string]string{"key": "value"}},
+					{DeprecatedTopology: map[string]string{"key": "value"}},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{DeprecatedTopology: map[string]string{"key": "value"}},
+					{DeprecatedTopology: map[string]string{"key": "value"}},
+				},
+			},
+		},
+		{
+			name:      "v1 request, updated metadata",
+			v1Request: true,
+			originalEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName:           utilpointer.StringPtr("node-1"),
+						DeprecatedTopology: map[string]string{"key": "value"},
+					},
+					{
+						NodeName:           utilpointer.StringPtr("node-1"),
+						DeprecatedTopology: map[string]string{"key": "value"},
+					},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"example": "one"},
+				},
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName:           utilpointer.StringPtr("node-1"),
+						DeprecatedTopology: map[string]string{"key": "value"},
+					},
+					{
+						NodeName:           utilpointer.StringPtr("node-1"),
+						DeprecatedTopology: map[string]string{"key": "value"},
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"example": "one"},
+				},
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName:           utilpointer.StringPtr("node-1"),
+						DeprecatedTopology: map[string]string{"key": "value"},
+					},
+					{
+						NodeName:           utilpointer.StringPtr("node-1"),
+						DeprecatedTopology: map[string]string{"key": "value"},
+					},
+				},
+			},
+		},
+		{
+			name: "v1beta1 request, updated metadata",
+			originalEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName:           utilpointer.StringPtr("node-1"),
+						DeprecatedTopology: map[string]string{"key": "value"},
+					},
+					{
+						NodeName:           utilpointer.StringPtr("node-1"),
+						DeprecatedTopology: map[string]string{"key": "value"},
+					},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"example": "one"},
+				},
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName:           utilpointer.StringPtr("node-1"),
+						DeprecatedTopology: map[string]string{"key": "value"},
+					},
+					{
+						NodeName:           utilpointer.StringPtr("node-1"),
+						DeprecatedTopology: map[string]string{"key": "value"},
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"example": "one"},
+				},
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName:           utilpointer.StringPtr("node-1"),
+						DeprecatedTopology: map[string]string{"key": "value"},
+					},
+					{
+						NodeName:           utilpointer.StringPtr("node-1"),
+						DeprecatedTopology: map[string]string{"key": "value"},
+					},
+				},
+			},
+		},
+		{
+			name:      "v1 request, updated endpoints",
+			v1Request: true,
+			originalEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{DeprecatedTopology: map[string]string{"key": "value"}},
+					{DeprecatedTopology: map[string]string{"key": "value"}},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hostname:           utilpointer.StringPtr("hostname-1"),
+						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
+					},
+					{
+						Hostname:           utilpointer.StringPtr("hostname-1"),
+						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{Hostname: utilpointer.StringPtr("hostname-1")},
+					{Hostname: utilpointer.StringPtr("hostname-1")},
+				},
+			},
+		},
+		{
+			name: "v1beta1 request, updated endpoints",
+			originalEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{DeprecatedTopology: map[string]string{"key": "value"}},
+					{DeprecatedTopology: map[string]string{"key": "value"}},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hostname:           utilpointer.StringPtr("hostname-1"),
+						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
+					},
+					{
+						Hostname:           utilpointer.StringPtr("hostname-1"),
+						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hostname:           utilpointer.StringPtr("hostname-1"),
+						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
+					},
+					{
+						Hostname:           utilpointer.StringPtr("hostname-1"),
+						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{APIGroup: "discovery.k8s.io", APIVersion: "v1beta1", Resource: "endpointslices"})
+			if tc.v1Request {
+				ctx = genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{APIGroup: "discovery.k8s.io", APIVersion: "v1", Resource: "endpointslices"})
+			}
+
+			dropTopologyOnV1(ctx, tc.originalEPS, tc.newEPS)
+			if !apiequality.Semantic.DeepEqual(tc.newEPS, tc.expectedEPS) {
+				t.Logf("actual endpointslice: %v", tc.newEPS)
+				t.Logf("expected endpointslice: %v", tc.expectedEPS)
+				t.Errorf("unexpected EndpointSlice on API topology strategy")
 			}
 		})
 	}
