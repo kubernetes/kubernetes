@@ -503,7 +503,7 @@ func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPatter
 	if pattern.FsType == "xfs" {
 		e2eskipper.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
 	}
-	if pattern.FeatureTag == "[sig-windows]" {
+	if pattern.FeatureTag == "[Feature:Windows]" {
 		e2eskipper.Skipf("Skipping tests for windows since CSI does not support it yet")
 	}
 }
