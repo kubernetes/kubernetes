@@ -209,12 +209,12 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 
 	if len(missingPods) > 0 {
 		if usageRatio < 1.0 {
-			// on a scale-down, treat missing pods as using 100% of the resource request
+			// on a scale-down, treat missing pods as using target utilization
 			for podName := range missingPods {
 				metrics[podName] = metricsclient.PodMetric{Value: targetUtilization}
 			}
 		} else {
-			// on a scale-up, treat missing pods as using 0% of the resource request
+			// on a scale-up, treat missing pods as 0
 			for podName := range missingPods {
 				metrics[podName] = metricsclient.PodMetric{Value: 0}
 			}
@@ -222,7 +222,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 	}
 
 	if rebalanceIgnored {
-		// on a scale-up, treat unready pods as using 0% of the resource request
+		// on a scale-up, treat unready pods as 0
 		for podName := range unreadyPods {
 			metrics[podName] = metricsclient.PodMetric{Value: 0}
 		}

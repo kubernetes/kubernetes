@@ -747,7 +747,7 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 	stop := make(chan struct{})
 	defer close(stop)
 	informerFactory.Start(stop)
-	go hpaController.Run(stop)
+	go hpaController.Run(1, stop)
 
 	tc.Lock()
 	shouldWait := tc.verifyEvents

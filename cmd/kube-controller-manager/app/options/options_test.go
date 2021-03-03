@@ -91,6 +91,7 @@ var args = []string{
 	"--concurrent-service-syncs=2",
 	"--concurrent-serviceaccount-token-syncs=10",
 	"--concurrent_rc_syncs=10",
+	"--concurrent-horizontal-pod-autoscaler-syncs=2",
 	"--configure-cloud-routes=false",
 	"--contention-profiling=true",
 	"--controller-start-interval=2m",
@@ -308,6 +309,7 @@ func TestAddFlags(t *testing.T) {
 				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
 				HorizontalPodAutoscalerTolerance:                    0.1,
 				HorizontalPodAutoscalerUseRESTClients:               true,
+				ConcurrentHorizontalPodAutoscalerSyncs:              2,
 			},
 		},
 		JobController: &JobControllerOptions{
@@ -569,6 +571,7 @@ func TestApplyTo(t *testing.T) {
 				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
 				HorizontalPodAutoscalerTolerance:                    0.1,
 				HorizontalPodAutoscalerUseRESTClients:               true,
+				ConcurrentHorizontalPodAutoscalerSyncs:              2,
 			},
 			JobController: jobconfig.JobControllerConfiguration{
 				ConcurrentJobSyncs: 5,

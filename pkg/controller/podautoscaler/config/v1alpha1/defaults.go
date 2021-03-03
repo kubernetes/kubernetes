@@ -59,4 +59,7 @@ func RecommendedDefaultHPAControllerConfiguration(obj *kubectrlmgrconfigv1alpha1
 	if obj.HorizontalPodAutoscalerTolerance == 0 {
 		obj.HorizontalPodAutoscalerTolerance = 0.1
 	}
+	if obj.ConcurrentHorizontalPodAutoscalerSyncs == 0 {
+		obj.ConcurrentHorizontalPodAutoscalerSyncs = 5
+	}
 }

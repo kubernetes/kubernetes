@@ -340,6 +340,10 @@ type HPAControllerConfiguration struct {
 	// HPA will disregard CPU samples from unready pods that had last readiness change during that
 	// period.
 	HorizontalPodAutoscalerInitialReadinessDelay metav1.Duration
+	// concurrentHorizontalPodAutoscalerSyncs is the number of horizontalPodAutoscalers that are allowed to sync
+	// concurrently. Larger number = more responsive horizontalPodAutoscalers, but more
+	// CPU (and network) load.
+	ConcurrentHorizontalPodAutoscalerSyncs int32
 }
 
 // JobControllerConfiguration contains elements describing JobController.

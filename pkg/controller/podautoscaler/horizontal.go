@@ -162,7 +162,7 @@ func NewHorizontalController(
 }
 
 // Run begins watching and syncing.
-func (a *HorizontalController) Run(stopCh <-chan struct{}) {
+func (a *HorizontalController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer a.queue.ShutDown()
 
@@ -173,8 +173,9 @@ func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 		return
 	}
 
-	// start a single worker (we may wish to start more in the future)
-	go wait.Until(a.worker, time.Second, stopCh)
+	for i := 0; i < workers; i++ {
+		go wait.Until(a.worker, time.Second, stopCh)
+	}
 
 	<-stopCh
 }

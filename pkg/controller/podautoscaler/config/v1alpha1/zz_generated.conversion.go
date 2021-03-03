@@ -91,6 +91,7 @@ func autoConvert_v1alpha1_HPAControllerConfiguration_To_config_HPAControllerConf
 	}
 	out.HorizontalPodAutoscalerCPUInitializationPeriod = in.HorizontalPodAutoscalerCPUInitializationPeriod
 	out.HorizontalPodAutoscalerInitialReadinessDelay = in.HorizontalPodAutoscalerInitialReadinessDelay
+	out.ConcurrentHorizontalPodAutoscalerSyncs = in.ConcurrentHorizontalPodAutoscalerSyncs
 	return nil
 }
 
@@ -105,5 +106,6 @@ func autoConvert_config_HPAControllerConfiguration_To_v1alpha1_HPAControllerConf
 	}
 	out.HorizontalPodAutoscalerCPUInitializationPeriod = in.HorizontalPodAutoscalerCPUInitializationPeriod
 	out.HorizontalPodAutoscalerInitialReadinessDelay = in.HorizontalPodAutoscalerInitialReadinessDelay
+	out.ConcurrentHorizontalPodAutoscalerSyncs = in.ConcurrentHorizontalPodAutoscalerSyncs
 	return nil
 }

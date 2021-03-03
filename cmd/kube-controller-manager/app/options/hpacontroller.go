@@ -44,6 +44,7 @@ func (o *HPAControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.HorizontalPodAutoscalerCPUInitializationPeriod.Duration, "horizontal-pod-autoscaler-cpu-initialization-period", o.HorizontalPodAutoscalerCPUInitializationPeriod.Duration, "The period after pod start when CPU samples might be skipped.")
 	fs.MarkDeprecated("horizontal-pod-autoscaler-use-rest-clients", "Heapster is no longer supported as a source for Horizontal Pod Autoscaler metrics.")
 	fs.DurationVar(&o.HorizontalPodAutoscalerInitialReadinessDelay.Duration, "horizontal-pod-autoscaler-initial-readiness-delay", o.HorizontalPodAutoscalerInitialReadinessDelay.Duration, "The period after pod start during which readiness changes will be treated as initial readiness.")
+	fs.Int32Var(&o.ConcurrentHorizontalPodAutoscalerSyncs, "concurrent-horizontal-pod-autoscaler-syncs", o.ConcurrentHorizontalPodAutoscalerSyncs, "The number of horizontalPodAutoscalers that are allowed to sync concurrently. Larger number = more responsive horizontalPodAutoscalers, but more CPU (and network) load")
 }
 
 // ApplyTo fills up HPAController config with options.
@@ -60,6 +61,7 @@ func (o *HPAControllerOptions) ApplyTo(cfg *poautosclerconfig.HPAControllerConfi
 	cfg.HorizontalPodAutoscalerInitialReadinessDelay = o.HorizontalPodAutoscalerInitialReadinessDelay
 	cfg.HorizontalPodAutoscalerUpscaleForbiddenWindow = o.HorizontalPodAutoscalerUpscaleForbiddenWindow
 	cfg.HorizontalPodAutoscalerDownscaleForbiddenWindow = o.HorizontalPodAutoscalerDownscaleForbiddenWindow
+	cfg.ConcurrentHorizontalPodAutoscalerSyncs = o.ConcurrentHorizontalPodAutoscalerSyncs
 
 	return nil
 }

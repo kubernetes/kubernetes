@@ -523,7 +523,7 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	informerFactory.Start(stop)
-	go hpaController.Run(stop)
+	go hpaController.Run(1, stop)
 
 	// Wait for HPA to be processed.
 	<-tc.processed
