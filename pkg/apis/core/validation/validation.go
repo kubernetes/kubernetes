@@ -1641,6 +1641,8 @@ var allowedPVCTemplateObjectMetaFields = map[string]bool{
 
 // PersistentVolumeSpecValidationOptions contains the different settings for PeristentVolume validation
 type PersistentVolumeSpecValidationOptions struct {
+	// Allow spec to contain the "ReadWiteOncePod" access mode
+	AllowReadWriteOncePod bool
 }
 
 // ValidatePersistentVolumeName checks that a name is appropriate for a
@@ -1654,7 +1656,18 @@ var supportedReclaimPolicy = sets.NewString(string(core.PersistentVolumeReclaimD
 var supportedVolumeModes = sets.NewString(string(core.PersistentVolumeBlock), string(core.PersistentVolumeFilesystem))
 
 func ValidationOptionsForPersistentVolume(pv, oldPv *core.PersistentVolume) PersistentVolumeSpecValidationOptions {
-	return PersistentVolumeSpecValidationOptions{}
+	opts := PersistentVolumeSpecValidationOptions{
+		AllowReadWriteOncePod: utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
+	}
+	if oldPv == nil {
+		// If there's no old PV, use the options based solely on feature enablement
+		return opts
+	}
+	if helper.ContainsAccessMode(oldPv.Spec.AccessModes, core.ReadWriteOncePod) {
+		// If the old object allowed "ReadWriteOncePod", continue to allow it in the new object
+		opts.AllowReadWriteOncePod = true
+	}
+	return opts
 }
 
 func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName string, validateInlinePersistentVolumeSpec bool, fldPath *field.Path, opts PersistentVolumeSpecValidationOptions) field.ErrorList {
@@ -1675,10 +1688,26 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 	if len(pvSpec.AccessModes) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("accessModes"), ""))
 	}
+
+	expandedSupportedAccessModes := sets.StringKeySet(supportedAccessModes)
+	if opts.AllowReadWriteOncePod {
+		expandedSupportedAccessModes.Insert(string(core.ReadWriteOncePod))
+	}
+
+	foundReadWriteOncePod, foundNonReadWriteOncePod := false, false
 	for _, mode := range pvSpec.AccessModes {
-		if !supportedAccessModes.Has(string(mode)) {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("accessModes"), mode, supportedAccessModes.List()))
+		if !expandedSupportedAccessModes.Has(string(mode)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("accessModes"), mode, expandedSupportedAccessModes.List()))
 		}
+
+		if mode == core.ReadWriteOncePod {
+			foundReadWriteOncePod = true
+		} else if supportedAccessModes.Has(string(mode)) {
+			foundNonReadWriteOncePod = true
+		}
+	}
+	if foundReadWriteOncePod && foundNonReadWriteOncePod {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("accessModes"), "may not use ReadWriteOncePod with other access modes"))
 	}
 
 	if !validateInlinePersistentVolumeSpec {
@@ -1976,14 +2005,38 @@ func ValidatePersistentVolumeStatusUpdate(newPv, oldPv *core.PersistentVolume) f
 
 // PersistentVolumeClaimSpecValidationOptions contains the different settings for PersistentVolumeClaim validation
 type PersistentVolumeClaimSpecValidationOptions struct {
+	// Allow spec to contain the "ReadWiteOncePod" access mode
+	AllowReadWriteOncePod bool
 }
 
 func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
-	return PersistentVolumeClaimSpecValidationOptions{}
+	opts := PersistentVolumeClaimSpecValidationOptions{
+		AllowReadWriteOncePod: utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
+	}
+	if oldPvc == nil {
+		// If there's no old PVC, use the options based solely on feature enablement
+		return opts
+	}
+	if helper.ContainsAccessMode(oldPvc.Spec.AccessModes, core.ReadWriteOncePod) {
+		// If the old object allowed "ReadWriteOncePod", continue to allow it in the new object
+		opts.AllowReadWriteOncePod = true
+	}
+	return opts
 }
 
 func ValidationOptionsForPersistentVolumeClaimTemplate(claimTemplate, oldClaimTemplate *core.PersistentVolumeClaimTemplate) PersistentVolumeClaimSpecValidationOptions {
-	return PersistentVolumeClaimSpecValidationOptions{}
+	opts := PersistentVolumeClaimSpecValidationOptions{
+		AllowReadWriteOncePod: utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
+	}
+	if oldClaimTemplate == nil {
+		// If there's no old PVC template, use the options based solely on feature enablement
+		return opts
+	}
+	if helper.ContainsAccessMode(oldClaimTemplate.Spec.AccessModes, core.ReadWriteOncePod) {
+		// If the old object allowed "ReadWriteOncePod", continue to allow it in the new object
+		opts.AllowReadWriteOncePod = true
+	}
+	return opts
 }
 
 // ValidatePersistentVolumeClaim validates a PersistentVolumeClaim
@@ -2002,11 +2055,28 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 	if spec.Selector != nil {
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
 	}
+
+	expandedSupportedAccessModes := sets.StringKeySet(supportedAccessModes)
+	if opts.AllowReadWriteOncePod {
+		expandedSupportedAccessModes.Insert(string(core.ReadWriteOncePod))
+	}
+
+	foundReadWriteOncePod, foundNonReadWriteOncePod := false, false
 	for _, mode := range spec.AccessModes {
-		if mode != core.ReadWriteOnce && mode != core.ReadOnlyMany && mode != core.ReadWriteMany {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("accessModes"), mode, supportedAccessModes.List()))
+		if !expandedSupportedAccessModes.Has(string(mode)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("accessModes"), mode, expandedSupportedAccessModes.List()))
+		}
+
+		if mode == core.ReadWriteOncePod {
+			foundReadWriteOncePod = true
+		} else if supportedAccessModes.Has(string(mode)) {
+			foundNonReadWriteOncePod = true
 		}
 	}
+	if foundReadWriteOncePod && foundNonReadWriteOncePod {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("accessModes"), "may not use ReadWriteOncePod with other access modes"))
+	}
+
 	storageValue, ok := spec.Resources.Requests[core.ResourceStorage]
 	if !ok {
 		allErrs = append(allErrs, field.Required(fldPath.Child("resources").Key(string(core.ResourceStorage)), ""))
