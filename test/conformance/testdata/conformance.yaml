@@ -2090,6 +2090,30 @@
     support running as UID / GID, or privilege escalation.'
   release: v1.15
   file: test/e2e/common/node/security_context.go
+- testname: Sysctls, reject invalid sysctls
+  codename: '[sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should reject invalid
+    sysctls [MinimumKubeletVersion:1.21] [Conformance]'
+  description: 'Pod is created with one valid and two invalid sysctls. Pod should
+    not apply invalid sysctls. [LinuxOnly]: This test is marked as LinuxOnly since
+    Windows does not support sysctls'
+  release: v1.21
+  file: test/e2e/common/node/sysctl.go
+- testname: Sysctl, test sysctls
+  codename: '[sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support sysctls
+    [MinimumKubeletVersion:1.21] [Conformance]'
+  description: 'Pod is created with kernel.shm_rmid_forced sysctl. Kernel.shm_rmid_forced
+    must be set to 1 [LinuxOnly]: This test is marked as LinuxOnly since Windows does
+    not support sysctls'
+  release: v1.21
+  file: test/e2e/common/node/sysctl.go
+- testname: Sysctl, allow specified unsafe sysctls
+  codename: '[sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support unsafe
+    sysctls which are actually allowed [MinimumKubeletVersion:1.21] [Conformance]'
+  description: 'Pod is created with kernel.shm_rmid_forced. Should allow unsafe sysctls
+    that are specified. [LinuxOnly]: This test is marked as LinuxOnly since Windows
+    does not support sysctls'
+  release: v1.21
+  file: test/e2e/common/node/sysctl.go
 - testname: Environment variables, expansion
   codename: '[sig-node] Variable Expansion should allow composing env vars into new
     env vars [NodeConformance] [Conformance]'
