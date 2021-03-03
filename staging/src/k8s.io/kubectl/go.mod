@@ -13,10 +13,10 @@ require (
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 	github.com/fatih/camelcase v1.0.0
-	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/fvbommel/sortorder v1.0.1
 	github.com/go-openapi/spec v0.19.3
-	github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e // indirect
+	github.com/golangplus/bytes v1.0.0 // indirect
+	github.com/golangplus/fmt v1.0.0 // indirect
 	github.com/google/go-cmp v0.5.2
 	github.com/googleapis/gnostic v0.4.1
 	github.com/jonboulle/clockwork v0.1.0
@@ -48,6 +48,7 @@ require (
 )
 
 replace (
+	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime

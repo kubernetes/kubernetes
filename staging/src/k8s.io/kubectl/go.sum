@@ -155,6 +155,10 @@ github.com/golang/protobuf v1.4.1/go.mod h1:U8fpvMrcmy5pZrNK1lt4xCsGvpyWQ/VVv6QD
 github.com/golang/protobuf v1.4.2/go.mod h1:oDoupMAO8OvCJWAcko0GGGIgR6R6ocIYbsSw735rRwI=
 github.com/golang/protobuf v1.4.3 h1:JjCZWpVbqXDqFVmTfYWEVTMIYrL/NPdPSCHPJ0T/raM=
 github.com/golang/protobuf v1.4.3/go.mod h1:oDoupMAO8OvCJWAcko0GGGIgR6R6ocIYbsSw735rRwI=
+github.com/golangplus/bytes v1.0.0 h1:YQKBijBVMsBxIiXT4IEhlKR2zHohjEqPole4umyDX+c=
+github.com/golangplus/bytes v1.0.0/go.mod h1:AdRaCFwmc/00ZzELMWb01soso6W1R/++O1XL80yAn+A=
+github.com/golangplus/fmt v1.0.0 h1:FnUKtw86lXIPfBMc3FimNF3+ABcV+aH5F17OOitTN+E=
+github.com/golangplus/fmt v1.0.0/go.mod h1:zpM0OfbMCjPtd2qkTD/jX2MgiFCqklhSUFyDW44gVQE=
 github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e h1:KhcknUwkWHKZPbFy2P7jH5LKJ3La+0ZeknkkmrSgqb0=
 github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e/go.mod h1:0AA//k/eakGydO4jKRoRL2j92ZKSzTgj9tclaCrvXHk=
 github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
