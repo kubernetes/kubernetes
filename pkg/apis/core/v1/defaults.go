@@ -131,37 +131,6 @@ func SetDefaults_Service(obj *v1.Service) {
 		obj.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		// Default obj.Spec.IPFamilyPolicy if we *know* we can, otherwise it will
-		// be handled later in allocation.
-		if obj.Spec.Type != v1.ServiceTypeExternalName {
-			if obj.Spec.IPFamilyPolicy == nil {
-				if len(obj.Spec.ClusterIPs) == 2 || len(obj.Spec.IPFamilies) == 2 {
-					requireDualStack := v1.IPFamilyPolicyRequireDualStack
-					obj.Spec.IPFamilyPolicy = &requireDualStack
-				}
-			}
-
-			// If the user demanded dual-stack, but only specified one family, we add
-			// the other.
-			if obj.Spec.IPFamilyPolicy != nil && *(obj.Spec.IPFamilyPolicy) == v1.IPFamilyPolicyRequireDualStack && len(obj.Spec.IPFamilies) == 1 {
-				if obj.Spec.IPFamilies[0] == v1.IPv4Protocol {
-					obj.Spec.IPFamilies = append(obj.Spec.IPFamilies, v1.IPv6Protocol)
-				} else {
-					obj.Spec.IPFamilies = append(obj.Spec.IPFamilies, v1.IPv4Protocol)
-				}
-
-				// Any other dual-stack defaulting depends on cluster configuration.
-				// Further IPFamilies, IPFamilyPolicy defaulting is in ClusterIP alloc/reserve logic
-				// NOTE: strategy handles cases where ClusterIPs is used (but not ClusterIP).
-			}
-		}
-
-		// any other defaulting depends on cluster configuration.
-		// further IPFamilies, IPFamilyPolicy defaulting is in ClusterIP alloc/reserve logic
-		// note: conversion logic handles cases where ClusterIPs is used (but not ClusterIP).
-	}
-
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
 		if obj.Spec.Type == v1.ServiceTypeLoadBalancer {
 			if obj.Spec.AllocateLoadBalancerNodePorts == nil {
