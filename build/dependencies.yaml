@@ -71,7 +71,7 @@ dependencies:
 
   # Docker
   - name: "docker"
-    version: 19.03
+    version: 20.10
     refPaths:
     - path: vendor/k8s.io/system-validators/validators/docker_validator.go
       match: latestValidatedDockerVersion
