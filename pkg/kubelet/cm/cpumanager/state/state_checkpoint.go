@@ -133,8 +133,8 @@ func (sc *stateCheckpoint) restoreState() error {
 	sc.cache.SetDefaultCPUSet(tmpDefaultCPUSet)
 	sc.cache.SetCPUAssignments(tmpAssignments)
 
-	klog.V(2).Info("[cpumanager] state checkpoint: restored state from checkpoint")
-	klog.V(2).Infof("[cpumanager] state checkpoint: defaultCPUSet: %s", tmpDefaultCPUSet.String())
+	klog.V(2).InfoS("State checkpoint: restored state from checkpoint")
+	klog.V(2).InfoS("State checkpoint: defaultCPUSet", "defaultCpuSet", tmpDefaultCPUSet.String())
 
 	return nil
 }
@@ -155,7 +155,7 @@ func (sc *stateCheckpoint) storeState() error {
 
 	err := sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
 	if err != nil {
-		klog.Errorf("[cpumanager] could not save checkpoint: %v", err)
+		klog.ErrorS(err, "Failed to save checkpoint")
 		return err
 	}
 	return nil
@@ -201,7 +201,7 @@ func (sc *stateCheckpoint) SetCPUSet(podUID string, containerName string, cset c
 	sc.cache.SetCPUSet(podUID, containerName, cset)
 	err := sc.storeState()
 	if err != nil {
-		klog.Warningf("store state to checkpoint error: %v", err)
+		klog.InfoS("Store state to checkpoint error", "err", err)
 	}
 }
 
@@ -212,7 +212,7 @@ func (sc *stateCheckpoint) SetDefaultCPUSet(cset cpuset.CPUSet) {
 	sc.cache.SetDefaultCPUSet(cset)
 	err := sc.storeState()
 	if err != nil {
-		klog.Warningf("store state to checkpoint error: %v", err)
+		klog.InfoS("Store state to checkpoint error", "err", err)
 	}
 }
 
@@ -223,7 +223,7 @@ func (sc *stateCheckpoint) SetCPUAssignments(a ContainerCPUAssignments) {
 	sc.cache.SetCPUAssignments(a)
 	err := sc.storeState()
 	if err != nil {
-		klog.Warningf("store state to checkpoint error: %v", err)
+		klog.InfoS("Store state to checkpoint error", "err", err)
 	}
 }
 
@@ -234,7 +234,7 @@ func (sc *stateCheckpoint) Delete(podUID string, containerName string) {
 	sc.cache.Delete(podUID, containerName)
 	err := sc.storeState()
 	if err != nil {
-		klog.Warningf("store state to checkpoint error: %v", err)
+		klog.InfoS("Store state to checkpoint error", "err", err)
 	}
 }
 
@@ -245,6 +245,6 @@ func (sc *stateCheckpoint) ClearState() {
 	sc.cache.ClearState()
 	err := sc.storeState()
 	if err != nil {
-		klog.Warningf("store state to checkpoint error: %v", err)
+		klog.InfoS("Store state to checkpoint error", "err", err)
 	}
 }
