@@ -18,14 +18,13 @@ package memorymanager
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 	"sync"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -57,10 +56,9 @@ type Manager interface {
 	// Start is called during Kubelet initialization.
 	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
 
-	// AddContainer is called between container create and container start
-	// so that initial memory affinity settings can be written through to the
-	// container runtime before the first process begins to execute.
-	AddContainer(p *v1.Pod, c *v1.Container, containerID string) error
+	// AddContainer adds the mapping between container ID to pod UID and the container name
+	// The mapping used to remove the memory allocation during the container removal
+	AddContainer(p *v1.Pod, c *v1.Container, containerID string)
 
 	// Allocate is called to pre-allocate memory resources during Pod admission.
 	// This must be called at some point prior to the AddContainer() call for a container, e.g. at pod admission time.
@@ -82,6 +80,9 @@ type Manager interface {
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
 	GetPodTopologyHints(*v1.Pod) map[string][]topologymanager.TopologyHint
+
+	// GetMemoryNUMANodes provides NUMA nodes that are used to allocate the container memory
+	GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Int
 }
 
 type manager struct {
@@ -176,38 +177,31 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 }
 
 // AddContainer saves the value of requested memory for the guaranteed pod under the state and set memory affinity according to the topolgy manager
-func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
+func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
 	m.Lock()
-	m.containerMap.Add(string(pod.UID), container.Name, containerID)
-	m.Unlock()
+	defer m.Unlock()
 
+	m.containerMap.Add(string(pod.UID), container.Name, containerID)
+}
+
+// GetMemory provides NUMA nodes that used to allocate the container memory
+func (m *manager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Int {
 	// Get NUMA node affinity of blocks assigned to the container during Allocate()
-	var nodes []string
+	numaNodes := sets.NewInt()
 	for _, block := range m.state.GetMemoryBlocks(string(pod.UID), container.Name) {
 		for _, nodeID := range block.NUMAAffinity {
-			nodes = append(nodes, strconv.Itoa(nodeID))
+			// avoid nodes duplication when hugepages and memory blocks pinned to the same NUMA node
+			numaNodes.Insert(nodeID)
 		}
 	}
 
-	if len(nodes) < 1 {
-		klog.V(5).Infof("[memorymanager] update container resources is skipped due to memory blocks are empty")
+	if numaNodes.Len() == 0 {
+		klog.V(5).Infof("No allocation is available for (Pod: %s, Container: %s)", pod.Name, container.Name)
 		return nil
 	}
 
-	affinity := strings.Join(nodes, ",")
-	klog.Infof("[memorymanager] Set container %q cpuset.mems to %q", containerID, affinity)
-	err := m.containerRuntime.UpdateContainerResources(containerID, &runtimeapi.LinuxContainerResources{CpusetMems: affinity})
-	if err != nil {
-		klog.Errorf("[memorymanager] AddContainer error: error updating cpuset.mems for container (pod: %s, container: %s, container id: %s, err: %v)", pod.Name, container.Name, containerID, err)
-
-		m.Lock()
-		err = m.policyRemoveContainerByRef(string(pod.UID), container.Name)
-		if err != nil {
-			klog.Errorf("[memorymanager] AddContainer rollback state error: %v", err)
-		}
-		m.Unlock()
-	}
-	return err
+	klog.Infof("(Pod: %s, Container: %s) memory affinity is %v", pod.Name, container.Name, numaNodes)
+	return numaNodes
 }
 
 // Allocate is called to pre-allocate memory resources during Pod admission.

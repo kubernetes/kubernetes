@@ -18,6 +18,7 @@ package memorymanager
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
@@ -45,8 +46,12 @@ func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
 	return nil
 }
 
-func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
+func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
 	klog.Infof("[fake memorymanager] AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
+}
+
+func (m *fakeManager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Int {
+	klog.Infof("[fake memorymanager] GetMemoryNUMANodes (pod: %s, container: %s)", pod.Name, container.Name)
 	return nil
 }
 
