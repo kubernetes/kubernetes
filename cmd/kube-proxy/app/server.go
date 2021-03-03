@@ -136,6 +136,9 @@ type Options struct {
 
 	// hostnameOverride, if set from the command line flag, takes precedence over the `HostnameOverride` value from the config file
 	hostnameOverride string
+
+	// NodePortAddresses, if set from the command line flag, takes precedence over the `NodePortAddresses` valud from the config file
+	NodePortAddresses []string
 }
 
 // AddFlags adds flags to fs and binds them to options.
@@ -158,7 +161,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 			"rather than being surprised when they are permanently removed in the release after that.")
 
 	fs.StringSliceVar(&o.config.IPVS.ExcludeCIDRs, "ipvs-exclude-cidrs", o.config.IPVS.ExcludeCIDRs, "A comma-separated list of CIDR's which the ipvs proxier should not touch when cleaning up IPVS rules.")
-	fs.StringSliceVar(&o.config.NodePortAddresses, "nodeport-addresses", o.config.NodePortAddresses,
+	fs.StringSliceVar(&o.NodePortAddresses, "nodeport-addresses", o.config.NodePortAddresses,
 		"A string slice of values which specify the addresses to use for NodePorts. Values may be valid IP blocks (e.g. 1.2.3.0/24, 1.2.3.4/32). The default empty string slice ([]) means to use all local addresses.")
 
 	fs.BoolVar(&o.CleanupAndExit, "cleanup", o.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
@@ -244,6 +247,10 @@ func (o *Options) Complete() error {
 		return err
 	}
 
+	if err := o.processNodePortAddressesFlag(); err != nil {
+		return err
+	}
+
 	return utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates)
 }
 
@@ -287,6 +294,18 @@ func (o *Options) processHostnameOverrideFlag() error {
 			return fmt.Errorf("empty hostname-override is invalid")
 		}
 		o.config.HostnameOverride = strings.ToLower(hostName)
+	}
+
+	return nil
+}
+
+// processNodePortAddressesFlag processes nodeport-addresses flag
+func (o *Options) processNodePortAddressesFlag() error {
+	// Check if nodeport-addresses flag is set and use value since configFile always overrides
+	if len(o.NodePortAddresses) > 0 {
+		for i := 0; i < len(o.NodePortAddresses); i++ {
+			o.config.NodePortAddresses = append(o.config.NodePortAddresses, o.NodePortAddresses[i])
+		}
 	}
 
 	return nil
