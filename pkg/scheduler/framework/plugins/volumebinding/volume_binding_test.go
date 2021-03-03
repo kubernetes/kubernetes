@@ -257,7 +257,7 @@ func TestVolumeBinding(t *testing.T) {
 				runtime.WithClientSet(client),
 				runtime.WithInformerFactory(informerFactory),
 			}
-			fh, err := runtime.NewFramework(nil, nil, nil, opts...)
+			fh, err := runtime.NewFramework(nil, nil, opts...)
 			if err != nil {
 				t.Fatal(err)
 			}
