@@ -229,35 +229,35 @@ var (
 		Name:       "Inline-volume (ntfs)",
 		VolType:    InlineVolume,
 		FsType:     "ntfs",
-		FeatureTag: "[sig-windows]",
+		FeatureTag: "[Feature:Windows]",
 	}
 	// NtfsCSIEphemeralVolume is TestPattern for "CSI Ephemeral-volume (ntfs)"
 	NtfsCSIEphemeralVolume = TestPattern{
 		Name:       "CSI Ephemeral-volume (ntfs) [alpha]",
 		VolType:    CSIInlineVolume,
 		FsType:     "ntfs",
-		FeatureTag: "[sig-windows]",
+		FeatureTag: "[Feature:Windows]",
 	}
 	// NtfsGenericEphemeralVolume is TestPattern for "Generic Ephemeral-volume (ntfs)"
 	NtfsGenericEphemeralVolume = TestPattern{
 		Name:       "Generic Ephemeral-volume (ntfs) [Feature:GenericEphemeralVolume]",
 		VolType:    GenericEphemeralVolume,
 		FsType:     "ntfs",
-		FeatureTag: "[sig-windows]",
+		FeatureTag: "[Feature:Windows]",
 	}
 	// NtfsPreprovisionedPV is TestPattern for "Pre-provisioned PV (ntfs)"
 	NtfsPreprovisionedPV = TestPattern{
 		Name:       "Pre-provisioned PV (ntfs)",
 		VolType:    PreprovisionedPV,
 		FsType:     "ntfs",
-		FeatureTag: "[sig-windows]",
+		FeatureTag: "[Feature:Windows]",
 	}
 	// NtfsDynamicPV is TestPattern for "Dynamic PV (ntfs)"
 	NtfsDynamicPV = TestPattern{
 		Name:                   "Dynamic PV (ntfs)",
 		VolType:                DynamicPV,
 		FsType:                 "ntfs",
-		FeatureTag:             "[sig-windows]",
+		FeatureTag:             "[Feature:Windows]",
 		SnapshotDeletionPolicy: DeleteSnapshot,
 		SnapshotType:           DynamicCreatedSnapshot,
 	}
@@ -340,7 +340,7 @@ var (
 		VolType:        DynamicPV,
 		AllowExpansion: true,
 		FsType:         "ntfs",
-		FeatureTag:     "[sig-windows]",
+		FeatureTag:     "[Feature:Windows]",
 	}
 
 	// BlockVolModeDynamicPVAllowExpansion is TestPattern for "Dynamic PV (block volmode)(allowExpansion)"
