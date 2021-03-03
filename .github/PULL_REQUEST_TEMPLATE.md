@@ -27,6 +27,7 @@ Optionally add one or more of the following kinds if applicable:
 -->
 
 #### What this PR does / why we need it:
+<!-- OPTIONAL: Add additional SIGs with  /sig <foo> -->
 
 #### Which issue(s) this PR fixes:
 <!--
