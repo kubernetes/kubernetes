@@ -992,7 +992,7 @@ func TestGenericScheduler(t *testing.T) {
 			}
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
 			fwk, err := st.NewFramework(
-				test.registerPlugins,
+				test.registerPlugins, "",
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
@@ -1057,6 +1057,7 @@ func TestFindFitAllError(t *testing.T) {
 			st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
+		"",
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 	)
 	if err != nil {
@@ -1089,6 +1090,7 @@ func TestFindFitSomeError(t *testing.T) {
 			st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
+		"",
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 	)
 	if err != nil {
@@ -1162,7 +1164,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 			fwk, err := st.NewFramework(
-				registerPlugins,
+				registerPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 			)
 			if err != nil {
@@ -1315,7 +1317,7 @@ func TestZeroRequest(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 			fwk, err := st.NewFramework(
-				pluginRegistrations,
+				pluginRegistrations, "",
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithClientSet(client),
@@ -1421,6 +1423,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 			st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
+		"",
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 	)
 	if err != nil {
@@ -1505,7 +1508,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 			fwk, err := st.NewFramework(
-				registerPlugins,
+				registerPlugins, "",
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 			)

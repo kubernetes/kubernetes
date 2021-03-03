@@ -43,7 +43,7 @@ func SetupPlugin(
 ) framework.Plugin {
 	objs = append([]runtime.Object{&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}, objs...)
 	informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(objs...), 0)
-	fh, err := frameworkruntime.NewFramework(nil, nil, nil,
+	fh, err := frameworkruntime.NewFramework(nil, nil,
 		frameworkruntime.WithSnapshotSharedLister(sharedLister),
 		frameworkruntime.WithInformerFactory(informerFactory))
 	if err != nil {

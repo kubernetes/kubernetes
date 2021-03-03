@@ -23,13 +23,17 @@ import (
 )
 
 // NewFramework creates a Framework from the register functions and options.
-func NewFramework(fns []RegisterPluginFunc, opts ...runtime.Option) (framework.Framework, error) {
+func NewFramework(fns []RegisterPluginFunc, profileName string, opts ...runtime.Option) (framework.Framework, error) {
 	registry := runtime.Registry{}
 	plugins := &schedulerapi.Plugins{}
 	for _, f := range fns {
 		f(&registry, plugins)
 	}
-	return runtime.NewFramework(registry, plugins, nil, opts...)
+	profile := &schedulerapi.KubeSchedulerProfile{
+		SchedulerName: profileName,
+		Plugins:       plugins,
+	}
+	return runtime.NewFramework(registry, profile, opts...)
 }
 
 // RegisterPluginFunc is a function signature used in method RegisterFilterPlugin()
