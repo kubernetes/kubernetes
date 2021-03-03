@@ -128,19 +128,23 @@ func TestNamespaceLabels(t *testing.T) {
 		},
 	}, metav1.CreateOptions{})
 
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if ns.Name != ns.Labels[corev1.LabelMetadataName] {
 		t.Fatal(fmt.Errorf("expected %q, got %q", ns.Name, ns.Labels[corev1.LabelMetadataName]))
 	}
+
+	nsList, err := kubeClient.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if nsList, err := kubeClient.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{}); err != nil {
-		for _, ns := range nsList.Items {
-			if ns.Name != ns.Labels[corev1.LabelMetadataName] {
-				t.Fatal(fmt.Errorf("expected %q, got %q", ns.Name, ns.Labels[corev1.LabelMetadataName]))
-			}
+	for _, ns := range nsList.Items {
+		if ns.Name != ns.Labels[corev1.LabelMetadataName] {
+			t.Fatal(fmt.Errorf("expected %q, got %q", ns.Name, ns.Labels[corev1.LabelMetadataName]))
 		}
 	}
 }
