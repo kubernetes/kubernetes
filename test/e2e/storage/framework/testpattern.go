@@ -102,7 +102,7 @@ var (
 	}
 	// DefaultFsGenericEphemeralVolume is TestPattern for "Generic Ephemeral-volume (default fs)"
 	DefaultFsGenericEphemeralVolume = TestPattern{
-		Name:    "Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume]",
+		Name:    "Generic Ephemeral-volume (default fs)",
 		VolType: GenericEphemeralVolume,
 	}
 	// DefaultFsPreprovisionedPV is TestPattern for "Pre-provisioned PV (default fs)"
@@ -134,7 +134,7 @@ var (
 	}
 	// Ext3GenericEphemeralVolume is TestPattern for "Generic Ephemeral-volume (ext3)"
 	Ext3GenericEphemeralVolume = TestPattern{
-		Name:    "Generic Ephemeral-volume (ext3) [Feature:GenericEphemeralVolume]",
+		Name:    "Generic Ephemeral-volume (ext3)",
 		VolType: GenericEphemeralVolume,
 		FsType:  "ext3",
 	}
@@ -167,7 +167,7 @@ var (
 	}
 	// Ext4GenericEphemeralVolume is TestPattern for "Generic Ephemeral-volume (ext4)"
 	Ext4GenericEphemeralVolume = TestPattern{
-		Name:    "Generic Ephemeral-volume (ext4) [Feature:GenericEphemeralVolume]",
+		Name:    "Generic Ephemeral-volume (ext4)",
 		VolType: GenericEphemeralVolume,
 		FsType:  "ext4",
 	}
@@ -202,7 +202,7 @@ var (
 	}
 	// XfsGenericEphemeralVolume is TestPattern for "Generic Ephemeral-volume (xfs)"
 	XfsGenericEphemeralVolume = TestPattern{
-		Name:       "Generic Ephemeral-volume (xfs) [Feature:GenericEphemeralVolume]",
+		Name:       "Generic Ephemeral-volume (xfs)",
 		VolType:    GenericEphemeralVolume,
 		FsType:     "xfs",
 		FeatureTag: "[Slow]",
@@ -240,7 +240,7 @@ var (
 	}
 	// NtfsGenericEphemeralVolume is TestPattern for "Generic Ephemeral-volume (ntfs)"
 	NtfsGenericEphemeralVolume = TestPattern{
-		Name:       "Generic Ephemeral-volume (ntfs) [Feature:GenericEphemeralVolume]",
+		Name:       "Generic Ephemeral-volume (ntfs)",
 		VolType:    GenericEphemeralVolume,
 		FsType:     "ntfs",
 		FeatureTag: "[Feature:Windows]",
