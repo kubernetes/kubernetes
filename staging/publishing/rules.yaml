@@ -154,8 +154,8 @@ rules:
         branch: release-1.20
   smoke-test: |
     # assumes GO111MODULE=on
-    go build ./...
-    go test ./...
+    go build -mod=mod ./...
+    go test -mod=mod ./...
 
 - destination: component-base
   library: true
@@ -510,7 +510,7 @@ rules:
     - k8s.io/code-generator
   smoke-test: |
     # assumes GO111MODULE=on
-    go build .
+    go build -mod=mod .
 
 - destination: sample-controller
   branches:
@@ -594,7 +594,7 @@ rules:
     - k8s.io/code-generator
   smoke-test: |
     # assumes GO111MODULE=on
-    go build .
+    go build -mod=mod .
 
 - destination: apiextensions-apiserver
   branches:
