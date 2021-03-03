@@ -1474,21 +1474,23 @@
         "setHostnameAsFQDN": false
       }
     },
-    "ttlSecondsAfterFinished": 1192652907
+    "ttlSecondsAfterFinished": 1192652907,
+    "completionMode": "莾簏ì淵歔ųd,"
   },
   "status": {
     "conditions": [
       {
-        "type": "",
-        "status": "簏ì淵歔ųd,4",
-        "lastProbeTime": "2813-03-11T20:08:42Z",
-        "lastTransitionTime": "2793-11-20T00:30:11Z",
+        "type": ";蛡媈U",
+        "status": "Oa2ƒƈɈ达iʍjʒu+,妧縖%Á",
+        "lastProbeTime": "2823-10-04T11:14:04Z",
+        "lastTransitionTime": "2882-02-07T11:38:45Z",
         "reason": "464",
         "message": "465"
       }
     ],
-    "active": -1983720493,
-    "succeeded": -2026748262,
-    "failed": 1049326966
+    "active": -1993578228,
+    "succeeded": 1971731732,
+    "failed": 165851549,
+    "completedIndexes": "466"
   }
 }

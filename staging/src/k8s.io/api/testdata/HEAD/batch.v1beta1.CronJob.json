@@ -1522,11 +1522,12 @@
             "setHostnameAsFQDN": false
           }
         },
-        "ttlSecondsAfterFinished": -339602975
+        "ttlSecondsAfterFinished": -339602975,
+        "completionMode": "泐ɻvŰ`Ǧɝ憑ǖ菐u鸚Y髬.ʂmD"
       }
     },
-    "successfulJobsHistoryLimit": 305459364,
-    "failedJobsHistoryLimit": -1565042829
+    "successfulJobsHistoryLimit": 1380163777,
+    "failedJobsHistoryLimit": -406189540
   },
   "status": {
     "active": [
@@ -1534,7 +1535,7 @@
         "kind": "479",
         "namespace": "480",
         "name": "481",
-        "uid": "vÐ仆ǆdĄ跞肞=ɴ",
+        "uid": "ɅĀ埰ʀ",
         "apiVersion": "482",
         "resourceVersion": "483",
         "fieldPath": "484"

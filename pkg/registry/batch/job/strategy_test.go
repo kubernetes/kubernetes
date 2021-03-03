@@ -43,16 +43,21 @@ func newInt32(i int32) *int32 {
 
 func TestJobStrategy(t *testing.T) {
 	cases := map[string]struct {
-		ttlEnabled bool
+		ttlEnabled        bool
+		indexedJobEnabled bool
 	}{
 		"features disabled": {},
 		"ttl enabled": {
 			ttlEnabled: true,
 		},
+		"indexed job enabled": {
+			indexedJobEnabled: true,
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, tc.ttlEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IndexedJob, tc.indexedJobEnabled)()
 			testJobStrategy(t)
 		})
 	}
@@ -60,6 +65,7 @@ func TestJobStrategy(t *testing.T) {
 
 func testJobStrategy(t *testing.T) {
 	ttlEnabled := utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished)
+	indexedJobEnabled := utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob)
 	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("Job must be namespace scoped")
@@ -87,10 +93,13 @@ func testJobStrategy(t *testing.T) {
 			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: batch.JobSpec{
-			Selector:                validSelector,
-			Template:                validPodTemplateSpec,
-			TTLSecondsAfterFinished: newInt32(0), // Set TTL
-			ManualSelector:          newBool(true),
+			Selector:       validSelector,
+			Template:       validPodTemplateSpec,
+			ManualSelector: newBool(true),
+			Completions:    newInt32(2),
+			// Set gated values.
+			TTLSecondsAfterFinished: newInt32(0),
+			CompletionMode:          batch.IndexedCompletion,
 		},
 		Status: batch.JobStatus{
 			Active: 11,
@@ -106,15 +115,21 @@ func testJobStrategy(t *testing.T) {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
 	if ttlEnabled != (job.Spec.TTLSecondsAfterFinished != nil) {
-		t.Errorf("Job should allow setting .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)
+		t.Errorf("Job should allow setting .spec.ttlSecondsAfterFinished only when %v feature is enabled", features.TTLAfterFinished)
+	}
+	if indexedJobEnabled != (job.Spec.CompletionMode != batch.NonIndexedCompletion) {
+		t.Errorf("Job should allow setting .spec.completionMode=Indexed only when %v feature is enabled", features.IndexedJob)
 	}
 
 	parallelism := int32(10)
 	updatedJob := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.JobSpec{
-			Parallelism:             &parallelism,
-			TTLSecondsAfterFinished: newInt32(1), // Update TTL
+			Parallelism: &parallelism,
+			Completions: newInt32(2),
+			// Update gated features.
+			TTLSecondsAfterFinished: newInt32(1),
+			CompletionMode:          batch.IndexedCompletion, // No change because field is immutable.
 		},
 		Status: batch.JobStatus{
 			Active: 11,
@@ -135,12 +150,17 @@ func testJobStrategy(t *testing.T) {
 		t.Errorf("Expected a validation error")
 	}
 
-	// Existing TTLSecondsAfterFinished should be preserved
+	// Existing gated fields should be preserved
 	job.Spec.TTLSecondsAfterFinished = newInt32(1)
+	job.Spec.CompletionMode = batch.IndexedCompletion
 	updatedJob.Spec.TTLSecondsAfterFinished = newInt32(2)
+	updatedJob.Spec.CompletionMode = batch.IndexedCompletion
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
 	if job.Spec.TTLSecondsAfterFinished == nil || updatedJob.Spec.TTLSecondsAfterFinished == nil {
 		t.Errorf("existing TTLSecondsAfterFinished should be preserved")
+	}
+	if job.Spec.CompletionMode == "" || updatedJob.Spec.CompletionMode == "" {
+		t.Errorf("existing completionMode should be preserved")
 	}
 
 	// Make sure we correctly implement the interface.

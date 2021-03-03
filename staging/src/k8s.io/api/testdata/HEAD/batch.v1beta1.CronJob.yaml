@@ -31,7 +31,7 @@ metadata:
   uid: "7"
 spec:
   concurrencyPolicy: Hr鯹)晿<o,c鮽ort昍řČ扷5Ɨ
-  failedJobsHistoryLimit: -1565042829
+  failedJobsHistoryLimit: -406189540
   jobTemplate:
     metadata:
       annotations:
@@ -65,6 +65,7 @@ spec:
     spec:
       activeDeadlineSeconds: -1483125035702892746
       backoffLimit: -1822122846
+      completionMode: 泐ɻvŰ`Ǧɝ憑ǖ菐u鸚Y髬.ʂmD
       completions: -106888179
       manualSelector: true
       parallelism: -856030588
@@ -1046,7 +1047,7 @@ spec:
       ttlSecondsAfterFinished: -339602975
   schedule: "19"
   startingDeadlineSeconds: -2555947251840004808
-  successfulJobsHistoryLimit: 305459364
+  successfulJobsHistoryLimit: 1380163777
   suspend: true
 status:
   active:
@@ -1056,4 +1057,4 @@ status:
     name: "481"
     namespace: "480"
     resourceVersion: "483"
-    uid: vÐ仆ǆdĄ跞肞=ɴ
+    uid: ɅĀ埰ʀ

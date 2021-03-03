@@ -46,4 +46,7 @@ func SetDefaults_Job(obj *batchv1.Job) {
 	if labels != nil && len(obj.Labels) == 0 {
 		obj.Labels = labels
 	}
+	if len(obj.Spec.CompletionMode) == 0 {
+		obj.Spec.CompletionMode = batchv1.NonIndexedCompletion
+	}
 }

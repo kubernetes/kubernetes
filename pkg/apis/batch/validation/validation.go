@@ -31,6 +31,11 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
+// maxParallelismForIndexJob is the maximum parallelism that an Indexed Job
+// is allowed to have. This threshold allows to cap the length of
+// .status.completedIndexes.
+const maxParallelismForIndexedJob = 100000
+
 // ValidateGeneratedSelector validates that the generated selector on a controller object match the controller object
 // metadata, and the labels on the pod template are as generated.
 //
@@ -124,6 +129,20 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	if spec.TTLSecondsAfterFinished != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.TTLSecondsAfterFinished), fldPath.Child("ttlSecondsAfterFinished"))...)
 	}
+	// CompletionMode might be empty when IndexedJob feature gate is disabled.
+	if spec.CompletionMode != "" {
+		if spec.CompletionMode != batch.NonIndexedCompletion && spec.CompletionMode != batch.IndexedCompletion {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("completionMode"), spec.CompletionMode, []string{string(batch.NonIndexedCompletion), string(batch.IndexedCompletion)}))
+		}
+		if spec.CompletionMode == batch.IndexedCompletion {
+			if spec.Completions == nil {
+				allErrs = append(allErrs, field.Required(fldPath.Child("completions"), fmt.Sprintf("when completion mode is %s", batch.IndexedCompletion)))
+			}
+			if spec.Parallelism != nil && *spec.Parallelism > maxParallelismForIndexedJob {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("parallelism"), *spec.Parallelism, fmt.Sprintf("must be less than or equal to %d when completion mode is %s", maxParallelismForIndexedJob, batch.IndexedCompletion)))
+			}
+		}
+	}
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"), opts)...)
 
@@ -170,6 +189,7 @@ func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opt
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath.Child("completions"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Selector, oldSpec.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Template, oldSpec.Template, fldPath.Child("template"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.CompletionMode, oldSpec.CompletionMode, fldPath.Child("completionMode"))...)
 	return allErrs
 }
 

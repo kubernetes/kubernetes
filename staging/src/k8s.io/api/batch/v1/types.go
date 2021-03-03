@@ -21,6 +21,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const JobCompletionIndexAnnotationAlpha = "batch.alpha.kubernetes.io/job-completion-index"
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -56,6 +58,22 @@ type JobList struct {
 	// items is the list of Jobs.
 	Items []Job `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// CompletionMode specifies how Pod completions of a Job are tracked.
+type CompletionMode string
+
+const (
+	// NonIndexedCompletion is a Job completion mode. In this mode, the Job is
+	// considered complete when there have been .spec.completions
+	// successfully completed Pods. Pod completions are homologous to each other.
+	NonIndexedCompletion CompletionMode = "NonIndexed"
+
+	// IndexedCompletion is a Job completion mode. In this mode, the Pods of a
+	// Job get an associated completion index from 0 to (.spec.completions - 1).
+	// The Job is  considered complete when a Pod completes for each completion
+	// index.
+	IndexedCompletion CompletionMode = "Indexed"
+)
 
 // JobSpec describes how the job execution will look like.
 type JobSpec struct {
@@ -126,6 +144,28 @@ type JobSpec struct {
 	// TTLAfterFinished feature.
 	// +optional
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,8,opt,name=ttlSecondsAfterFinished"`
+
+	// CompletionMode specifies how Pod completions are tracked. It can be
+	// `NonIndexed` (default) or `Indexed`.
+	//
+	// `NonIndexed` means that the Job is considered complete when there have
+	// been .spec.completions successfully completed Pods. Each Pod completion is
+	// homologous to each other.
+	//
+	// `Indexed` means that the Pods of a
+	// Job get an associated completion index from 0 to (.spec.completions - 1),
+	// available in the annotation batch.alpha.kubernetes.io/job-completion-index.
+	// The Job is considered complete when there is one successfully completed Pod
+	// for each index.
+	// When value is `Indexed`, .spec.completions must be specified and
+	// `.spec.parallelism` must be less than or equal to 10^5.
+	//
+	// This field is alpha-level and is only honored by servers that enable the
+	// IndexedJob feature gate. More completion modes can be added in the future.
+	// If the Job controller observes a mode that it doesn't recognize, the
+	// controller skips updates for the Job.
+	// +optional
+	CompletionMode CompletionMode `json:"completionMode,omitempty" protobuf:"bytes,9,opt,name=completionMode,casttype=CompletionMode"`
 }
 
 // JobStatus represents the current state of a Job.
@@ -162,6 +202,16 @@ type JobStatus struct {
 	// The number of pods which reached phase Failed.
 	// +optional
 	Failed int32 `json:"failed,omitempty" protobuf:"varint,6,opt,name=failed"`
+
+	// CompletedIndexes holds the completed indexes when .spec.completionMode =
+	// "Indexed" in a text format. The indexes are represented as decimal integers
+	// separated by commas. The numbers are listed in increasing order. Three or
+	// more consecutive numbers are compressed and represented by the first and
+	// last element of the series, separated by a hyphen.
+	// For example, if the completed indexes are 1, 3, 4, 5 and 7, they are
+	// represented as "1,3-5,7".
+	// +optional
+	CompletedIndexes string `json:"completedIndexes,omitempty" protobuf:"bytes,7,opt,name=completedIndexes"`
 }
 
 type JobConditionType string

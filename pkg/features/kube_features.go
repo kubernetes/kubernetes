@@ -311,6 +311,12 @@ const (
 	// Allow TTL controller to clean up Pods and Jobs after they finish.
 	TTLAfterFinished featuregate.Feature = "TTLAfterFinished"
 
+	// owner: @alculquicondor
+	// alpha: v1.21
+	//
+	// Allows Job controller to manage Pod completions per completion index.
+	IndexedJob featuregate.Feature = "IndexedJob"
+
 	// owner: @dashpole
 	// alpha: v1.13
 	// beta: v1.15
@@ -733,6 +739,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	VolumeSnapshotDataSource:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	ProcMountType:                                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:                               {Default: true, PreRelease: featuregate.Beta},
+	IndexedJob:                                     {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:                            {Default: true, PreRelease: featuregate.Beta},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: true, PreRelease: featuregate.Beta},
