@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// StringSlice implements goflag.Value and plfag.Value,
+// StringSlice implements goflag.Value and pflag.Value,
 // and allows set to be invoked repeatedly to accumulate values.
 type StringSlice struct {
 	value   *[]string
@@ -38,6 +38,9 @@ var _ goflag.Value = &StringSlice{}
 var _ pflag.Value = &StringSlice{}
 
 func (s *StringSlice) String() string {
+	if s == nil || s.value == nil {
+		return ""
+	}
 	return strings.Join(*s.value, " ")
 }
 
