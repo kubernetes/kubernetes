@@ -25,14 +25,17 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"go.etcd.io/etcd/clientv3"
 	admissionreviewv1 "k8s.io/api/admission/v1"
 	"k8s.io/api/admission/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -49,11 +52,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	dynamic "k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	apisv1beta1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -64,6 +69,10 @@ const (
 
 	mutation   = "mutation"
 	validation = "validation"
+)
+
+var (
+	noSideEffects = admissionregistrationv1.SideEffectClassNone
 )
 
 type testContext struct {
@@ -592,10 +601,10 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 		holder.gvrToConvertedGVK[metaGVR] = schema.GroupVersionKind{Group: resourcesByGVR[convertedGVR].Group, Version: resourcesByGVR[convertedGVR].Version, Kind: resourcesByGVR[convertedGVR].Kind}
 	}
 
-	if err := createV1beta1MutationWebhook(client, webhookServer.URL+"/v1beta1/"+mutation, webhookServer.URL+"/v1beta1/convert/"+mutation, convertedV1beta1Rules); err != nil {
+	if err := createV1beta1MutationWebhook(server.EtcdClient, server.EtcdStoragePrefix, client, webhookServer.URL+"/v1beta1/"+mutation, webhookServer.URL+"/v1beta1/convert/"+mutation, convertedV1beta1Rules); err != nil {
 		t.Fatal(err)
 	}
-	if err := createV1beta1ValidationWebhook(client, webhookServer.URL+"/v1beta1/"+validation, webhookServer.URL+"/v1beta1/convert/"+validation, convertedV1beta1Rules); err != nil {
+	if err := createV1beta1ValidationWebhook(server.EtcdClient, server.EtcdStoragePrefix, client, webhookServer.URL+"/v1beta1/"+validation, webhookServer.URL+"/v1beta1/convert/"+validation, convertedV1beta1Rules); err != nil {
 		t.Fatal(err)
 	}
 	if err := createV1MutationWebhook(client, webhookServer.URL+"/v1/"+mutation, webhookServer.URL+"/v1/convert/"+mutation, convertedV1Rules); err != nil {
@@ -1500,11 +1509,10 @@ func shouldTestResourceVerb(gvr schema.GroupVersionResource, resource metav1.API
 // webhook registration helpers
 //
 
-func createV1beta1ValidationWebhook(client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionv1beta1.RuleWithOperations) error {
+func createV1beta1ValidationWebhook(etcdClient *clientv3.Client, etcdStoragePrefix string, client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionv1beta1.RuleWithOperations) error {
 	fail := admissionv1beta1.Fail
 	equivalent := admissionv1beta1.Equivalent
-	// Attaching Admission webhook to API server
-	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.ValidatingWebhookConfiguration{
+	webhookConfig := &admissionv1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "admission.integration.test"},
 		Webhooks: []admissionv1beta1.ValidatingWebhook{
 			{
@@ -1532,15 +1540,32 @@ func createV1beta1ValidationWebhook(client clientset.Interface, endpoint, conver
 				AdmissionReviewVersions: []string{"v1beta1"},
 			},
 		},
-	}, metav1.CreateOptions{})
-	return err
+	}
+	// run through to get defaulting
+	apisv1beta1.SetObjectDefaults_ValidatingWebhookConfiguration(webhookConfig)
+	webhookConfig.TypeMeta.Kind = "ValidatingWebhookConfiguration"
+	webhookConfig.TypeMeta.APIVersion = "admissionregistration.k8s.io/v1beta1"
+
+	// Attaching Mutation webhook to API server
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
+	key := path.Join("/", etcdStoragePrefix, "validatingwebhookconfigurations", webhookConfig.Name)
+	val, _ := json.Marshal(webhookConfig)
+	if _, err := etcdClient.Put(ctx, key, string(val)); err != nil {
+		return err
+	}
+
+	// make sure we can get the webhook
+	if _, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.TODO(), webhookConfig.Name, metav1.GetOptions{}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func createV1beta1MutationWebhook(client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionv1beta1.RuleWithOperations) error {
+func createV1beta1MutationWebhook(etcdClient *clientv3.Client, etcdStoragePrefix string, client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionv1beta1.RuleWithOperations) error {
 	fail := admissionv1beta1.Fail
 	equivalent := admissionv1beta1.Equivalent
-	// Attaching Mutation webhook to API server
-	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.MutatingWebhookConfiguration{
+	webhookConfig := &admissionv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "mutation.integration.test"},
 		Webhooks: []admissionv1beta1.MutatingWebhook{
 			{
@@ -1568,8 +1593,26 @@ func createV1beta1MutationWebhook(client clientset.Interface, endpoint, converte
 				AdmissionReviewVersions: []string{"v1beta1"},
 			},
 		},
-	}, metav1.CreateOptions{})
-	return err
+	}
+	// run through to get defaulting
+	apisv1beta1.SetObjectDefaults_MutatingWebhookConfiguration(webhookConfig)
+	webhookConfig.TypeMeta.Kind = "MutatingWebhookConfiguration"
+	webhookConfig.TypeMeta.APIVersion = "admissionregistration.k8s.io/v1beta1"
+
+	// Attaching Mutation webhook to API server
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
+	key := path.Join("/", etcdStoragePrefix, "mutatingwebhookconfigurations", webhookConfig.Name)
+	val, _ := json.Marshal(webhookConfig)
+	if _, err := etcdClient.Put(ctx, key, string(val)); err != nil {
+		return err
+	}
+
+	// make sure we can get the webhook
+	if _, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(context.TODO(), webhookConfig.Name, metav1.GetOptions{}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func createV1ValidationWebhook(client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionv1.RuleWithOperations) error {
