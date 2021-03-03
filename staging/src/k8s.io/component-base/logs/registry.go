@@ -21,14 +21,7 @@ import (
 	"sort"
 
 	"github.com/go-logr/logr"
-	json "k8s.io/component-base/logs/json"
 )
-
-const (
-	jsonLogFormat = "json"
-)
-
-var logRegistry = NewLogFormatRegistry()
 
 // LogFormatRegistry store klog format registry
 type LogFormatRegistry struct {
@@ -44,7 +37,7 @@ func NewLogFormatRegistry() *LogFormatRegistry {
 	}
 }
 
-// Register new log format registry to global logRegistry
+// Register new log format registry to global LogRegistry
 func (lfr *LogFormatRegistry) Register(name string, logger logr.Logger) error {
 	if lfr.frozen {
 		return fmt.Errorf("log format is frozen, unable to register log format")
@@ -98,9 +91,4 @@ func (lfr *LogFormatRegistry) List() []string {
 // Freeze freezes the log format registry
 func (lfr *LogFormatRegistry) Freeze() {
 	lfr.frozen = true
-}
-func init() {
-	// Text format is default klog format
-	logRegistry.Register(defaultLogFormat, nil)
-	logRegistry.Register(jsonLogFormat, json.JSONLogger)
 }

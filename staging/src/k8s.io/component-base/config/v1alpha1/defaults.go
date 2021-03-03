@@ -20,6 +20,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/component-base/config/options"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -108,6 +109,6 @@ func NewRecommendedDebuggingConfiguration() *DebuggingConfiguration {
 // run it in your wrapper struct of this type in its `SetDefaults_` method.
 func RecommendedLoggingConfiguration(obj *LoggingConfiguration) {
 	if obj.Format == "" {
-		obj.Format = "text"
+		obj.Format = options.DefaultLogFormat
 	}
 }

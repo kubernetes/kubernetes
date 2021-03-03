@@ -31,7 +31,7 @@ import (
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
 	cpoptions "k8s.io/cloud-provider/options"
 	componentbaseconfig "k8s.io/component-base/config"
-	"k8s.io/component-base/logs"
+	logsoptions "k8s.io/component-base/logs/options"
 	"k8s.io/component-base/metrics"
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
@@ -428,7 +428,7 @@ func TestAddFlags(t *testing.T) {
 		Kubeconfig: "/kubeconfig",
 		Master:     "192.168.4.20",
 		Metrics:    &metrics.Options{},
-		Logs:       logs.NewOptions(),
+		Logs:       logsoptions.NewOptions(),
 	}
 
 	// Sort GCIgnoredResources because it's built from a map, which means the

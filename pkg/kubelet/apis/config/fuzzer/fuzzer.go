@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	componentbaseconfig "k8s.io/component-base/config/options"
 	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -103,7 +104,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.AllowedUnsafeSysctls = []string{}
 			obj.VolumePluginDir = kubeletconfigv1beta1.DefaultVolumePluginDir
 			if obj.Logging.Format == "" {
-				obj.Logging.Format = "text"
+				obj.Logging.Format = componentbaseconfig.DefaultLogFormat
 			}
 			obj.EnableSystemLogHandler = true
 		},

@@ -1896,6 +1896,7 @@ k8s.io/component-base/logs
 k8s.io/component-base/logs/datapol
 k8s.io/component-base/logs/json
 k8s.io/component-base/logs/logreduction
+k8s.io/component-base/logs/options
 k8s.io/component-base/logs/sanitization
 k8s.io/component-base/metrics
 k8s.io/component-base/metrics/legacyregistry

@@ -33,7 +33,7 @@ import (
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/logs"
+	logsoptions "k8s.io/component-base/logs/options"
 	"k8s.io/component-base/metrics"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -309,7 +309,7 @@ func TestAddFlags(t *testing.T) {
 		ProxyClientKeyFile:                "/var/run/kubernetes/proxy.key",
 		ProxyClientCertFile:               "/var/run/kubernetes/proxy.crt",
 		Metrics:                           &metrics.Options{},
-		Logs:                              logs.NewOptions(),
+		Logs:                              logsoptions.NewOptions(),
 		IdentityLeaseDurationSeconds:      3600,
 		IdentityLeaseRenewIntervalSeconds: 10,
 	}

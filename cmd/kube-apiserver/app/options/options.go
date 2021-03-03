@@ -27,7 +27,7 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/logs"
+	logsoptions "k8s.io/component-base/logs/options"
 	"k8s.io/component-base/metrics"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -57,7 +57,7 @@ type ServerRunOptions struct {
 	APIEnablement           *genericoptions.APIEnablementOptions
 	EgressSelector          *genericoptions.EgressSelectorOptions
 	Metrics                 *metrics.Options
-	Logs                    *logs.Options
+	Logs                    *logsoptions.Options
 
 	AllowPrivileged           bool
 	EnableLogsHandler         bool
@@ -111,7 +111,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		APIEnablement:           genericoptions.NewAPIEnablementOptions(),
 		EgressSelector:          genericoptions.NewEgressSelectorOptions(),
 		Metrics:                 metrics.NewOptions(),
-		Logs:                    logs.NewOptions(),
+		Logs:                    logsoptions.NewOptions(),
 
 		EnableLogsHandler:                 true,
 		EventTTL:                          1 * time.Hour,

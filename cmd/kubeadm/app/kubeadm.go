@@ -30,9 +30,11 @@ import (
 
 // Run creates and executes new kubeadm command
 func Run() error {
-	klog.InitFlags(nil)
+
+	local := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	klog.InitFlags(local)
 	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(local)
 
 	pflag.Set("logtostderr", "true")
 	// We do not want these flags to show up in --help
