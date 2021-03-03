@@ -64,6 +64,9 @@ type TestJig struct {
 	Name      string
 	ID        string
 	Labels    map[string]string
+	// ExternalIPs should be false for Conformance test
+	// Don't check nodeport on external addrs in conformance test, but in e2e test.
+	ExternalIPs bool
 }
 
 // NewTestJig allocates and inits a new TestJig.
@@ -828,9 +831,8 @@ func testReachabilityOverExternalIP(externalIP string, sp v1.ServicePort, execPo
 	return testEndpointReachability(externalIP, sp.Port, sp.Protocol, execPod)
 }
 
-func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod, clusterIP string) error {
+func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod, clusterIP string, externalIPs bool) error {
 	internalAddrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
-	externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
 	isClusterIPV4 := utilsnet.IsIPv4String(clusterIP)
 
 	for _, internalAddr := range internalAddrs {
@@ -851,14 +853,17 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 			return err
 		}
 	}
-	for _, externalAddr := range externalAddrs {
-		if isClusterIPV4 != utilsnet.IsIPv4String(externalAddr) {
-			framework.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
-			continue
-		}
-		err := testEndpointReachability(externalAddr, sp.NodePort, sp.Protocol, pod)
-		if err != nil {
-			return err
+	if externalIPs {
+		externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
+		for _, externalAddr := range externalAddrs {
+			if isClusterIPV4 != utilsnet.IsIPv4String(externalAddr) {
+				framework.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
+				continue
+			}
+			err := testEndpointReachability(externalAddr, sp.NodePort, sp.Protocol, pod)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -969,7 +974,7 @@ func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod)
 		if err != nil {
 			return err
 		}
-		err = testReachabilityOverNodePorts(nodes, servicePort, pod, clusterIP)
+		err = testReachabilityOverNodePorts(nodes, servicePort, pod, clusterIP, j.ExternalIPs)
 		if err != nil {
 			return err
 		}
