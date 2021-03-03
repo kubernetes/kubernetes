@@ -108,6 +108,9 @@ func (o *EventsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 
 	o.ctx = cmd.Context()
 	o.client, err = f.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -175,10 +178,6 @@ func printOneEvent(w io.Writer, e corev1.Event, allNamespaces bool) {
 		interval = fmt.Sprintf("%s (x%d over %s)", translateTimestampSince(e.LastTimestamp.Time), e.Count, translateTimestampSince(e.FirstTimestamp.Time))
 	} else {
 		interval = translateTimestampSince(eventTime(e))
-	}
-	source := e.Source.Component
-	if source == "" {
-		source = e.ReportingController
 	}
 	if allNamespaces {
 		fmt.Fprintf(w, "%v\t", e.Namespace)
