@@ -761,9 +761,17 @@ func (s ActivePods) Less(i, j int) bool {
 	if podutil.IsPodReady(s[i]) != podutil.IsPodReady(s[j]) {
 		return !podutil.IsPodReady(s[i])
 	}
+	// 4. higher pod-deletion-cost < lower pod-deletion cost
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost) {
+		pi, _ := helper.GetDeletionCostFromPodAnnotations(s[i].Annotations)
+		pj, _ := helper.GetDeletionCostFromPodAnnotations(s[j].Annotations)
+		if pi != pj {
+			return pi < pj
+		}
+	}
 	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
 	//       see https://github.com/kubernetes/kubernetes/issues/22065
-	// 4. Been ready for empty time < less time < more time
+	// 5. Been ready for empty time < less time < more time
 	// If both pods are ready, the latest ready one is smaller
 	if podutil.IsPodReady(s[i]) && podutil.IsPodReady(s[j]) {
 		readyTime1 := podReadyTime(s[i])
@@ -772,11 +780,11 @@ func (s ActivePods) Less(i, j int) bool {
 			return afterOrZero(readyTime1, readyTime2)
 		}
 	}
-	// 5. Pods with containers with higher restart counts < lower restart counts
+	// 6. Pods with containers with higher restart counts < lower restart counts
 	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
 		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
 	}
-	// 6. Empty creation time pods < newer pods < older pods
+	// 7. Empty creation time pods < newer pods < older pods
 	if !s[i].CreationTimestamp.Equal(&s[j].CreationTimestamp) {
 		return afterOrZero(&s[i].CreationTimestamp, &s[j].CreationTimestamp)
 	}
