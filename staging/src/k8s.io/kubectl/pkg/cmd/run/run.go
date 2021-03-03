@@ -115,15 +115,14 @@ type RunOptions struct {
 	ArgsLenAtDash  int
 	Attach         bool
 	Expose         bool
-	Generator      string
 	Image          string
 	Interactive    bool
 	LeaveStdinOpen bool
 	Port           string
 	Privileged     bool
 	Quiet          bool
-	Schedule       string
 	TTY            bool
+	Overrides      string
 	fieldManager   string
 
 	Namespace        string
@@ -137,8 +136,6 @@ func NewRunOptions(streams genericclioptions.IOStreams) *RunOptions {
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		DeleteFlags: delete.NewDeleteFlags("to use to replace the resource."),
 		RecordFlags: genericclioptions.NewRecordFlags(),
-
-		Generator: generateversioned.RunPodV1GeneratorName,
 
 		Recorder: genericclioptions.NoopRecorder{},
 
@@ -174,19 +171,17 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringArray("annotations", []string{}, i18n.T("Annotations to apply to the pod."))
-	cmd.Flags().StringVar(&opt.Generator, "generator", opt.Generator, i18n.T("The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."))
-	cmd.Flags().MarkDeprecated("generator", "has no effect and will be removed in the future.")
 	cmd.Flags().StringVar(&opt.Image, "image", opt.Image, i18n.T("The image for the container to run."))
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"))
-	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
-	cmd.Flags().MarkDeprecated("replicas", "has no effect and will be removed in the future.")
 	cmd.Flags().Bool("rm", false, "If true, delete resources created in this command for attached containers.")
-	cmd.Flags().String("overrides", "", i18n.T("An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."))
+	cmd.Flags().StringVar(&opt.Overrides, "overrides", "", i18n.T("An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."))
 	cmd.Flags().StringArray("env", []string{}, "Environment variables to set in the container.")
 	cmd.Flags().String("serviceaccount", "", "Service account to set in the pod spec.")
+	cmd.Flags().MarkDeprecated("serviceaccount", "has no effect and will be removed in the future.")
 	cmd.Flags().StringVar(&opt.Port, "port", opt.Port, i18n.T("The port that this container exposes."))
 	cmd.Flags().Int("hostport", -1, "The host port mapping for the container port. To demonstrate a single-machine container.")
+	cmd.Flags().MarkDeprecated("hostport", "has no effect and will be removed in the future.")
 	cmd.Flags().StringP("labels", "l", "", "Comma separated labels to apply to the pod(s). Will override previous values.")
 	cmd.Flags().BoolVarP(&opt.Interactive, "stdin", "i", opt.Interactive, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
 	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, "Allocated a TTY for each container in the pod.")
@@ -195,15 +190,11 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().String("restart", "Always", i18n.T("The restart policy for this Pod.  Legal values [Always, OnFailure, Never]."))
 	cmd.Flags().Bool("command", false, "If true and extra arguments are present, use them as the 'command' field in the container, rather than the 'args' field which is the default.")
 	cmd.Flags().String("requests", "", i18n.T("The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."))
+	cmd.Flags().MarkDeprecated("requests", "has no effect and will be removed in the future.")
 	cmd.Flags().String("limits", "", i18n.T("The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."))
+	cmd.Flags().MarkDeprecated("limits", "has no effect and will be removed in the future.")
 	cmd.Flags().BoolVar(&opt.Expose, "expose", opt.Expose, "If true, service is created for the container(s) which are run")
-	cmd.Flags().String("service-generator", "service/v2", i18n.T("The name of the generator to use for creating a service.  Only used if --expose is true"))
-	cmd.Flags().MarkDeprecated("service-generator", "and will be removed in the future.")
-	cmd.Flags().String("service-overrides", "", i18n.T("An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true."))
-	cmd.Flags().MarkDeprecated("service-overrides", "and will be removed in the future.")
 	cmd.Flags().BoolVarP(&opt.Quiet, "quiet", "q", opt.Quiet, "If true, suppress prompt messages.")
-	cmd.Flags().StringVar(&opt.Schedule, "schedule", opt.Schedule, i18n.T("A schedule in the Cron format the job should be run with."))
-	cmd.Flags().MarkDeprecated("schedule", "has no effect and will be removed in the future.")
 	cmd.Flags().BoolVar(&opt.Privileged, "privileged", opt.Privileged, i18n.T("If true, run the container in privileged mode."))
 	cmdutil.AddFieldManagerFlagVar(cmd, &opt.fieldManager, "kubectl-run")
 }
@@ -309,7 +300,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	generators := generateversioned.GeneratorFn("run")
 	generator, found := generators[generateversioned.RunPodV1GeneratorName]
 	if !found {
-		return cmdutil.UsageErrorf(cmd, "generator %q not found", o.Generator)
+		return cmdutil.UsageErrorf(cmd, "generator %q not found", generateversioned.RunPodV1GeneratorName)
 	}
 
 	names := generator.ParamNames()
@@ -323,7 +314,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	params["env"] = cmdutil.GetFlagStringArray(cmd, "env")
 
 	var createdObjects = []*RunObject{}
-	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"))
+	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, o.Overrides)
 	if err != nil {
 		return err
 	}
@@ -331,11 +322,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	allErrs := []error{}
 	if o.Expose {
-		serviceGenerator := cmdutil.GetFlagString(cmd, "service-generator")
-		if len(serviceGenerator) == 0 {
-			return cmdutil.UsageErrorf(cmd, "No service generator specified")
-		}
-		serviceRunObject, err := o.generateService(f, cmd, serviceGenerator, params)
+		serviceRunObject, err := o.generateService(f, cmd, params)
 		if err != nil {
 			allErrs = append(allErrs, err)
 		} else {
@@ -562,11 +549,11 @@ func verifyImagePullPolicy(cmd *cobra.Command) error {
 	return cmdutil.UsageErrorf(cmd, "invalid image pull policy: %s", pullPolicy)
 }
 
-func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serviceGenerator string, paramsIn map[string]interface{}) (*RunObject, error) {
+func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, paramsIn map[string]interface{}) (*RunObject, error) {
 	generators := generateversioned.GeneratorFn("expose")
-	generator, found := generators[serviceGenerator]
+	generator, found := generators[generateversioned.ServiceV2GeneratorName]
 	if !found {
-		return nil, fmt.Errorf("missing service generator: %s", serviceGenerator)
+		return nil, fmt.Errorf("missing service generator: %s", generateversioned.ServiceV2GeneratorName)
 	}
 	names := generator.ParamNames()
 
@@ -592,7 +579,7 @@ func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serv
 		params["default-name"] = name
 	}
 
-	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "service-overrides"))
+	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, "")
 	if err != nil {
 		return nil, err
 	}
