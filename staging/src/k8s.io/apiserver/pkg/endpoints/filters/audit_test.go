@@ -673,6 +673,7 @@ func TestAudit(t *testing.T) {
 				// simplified long-running check
 				return ri.Verb == "watch"
 			})
+			handler = WithAuditID(handler)
 
 			req, _ := http.NewRequest(test.verb, test.path, nil)
 			req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
@@ -772,16 +773,20 @@ func TestAuditIDHttpHeader(t *testing.T) {
 		expectedHeader bool
 	}{
 		{
-			"no http header when there is no audit",
+			// we always want an audit ID since it can appear in logging/tracing and it is propagated
+			// to the aggregated apiserver(s) to improve correlation.
+			"http header when there is no audit",
 			"",
 			auditinternal.LevelNone,
-			false,
+			true,
 		},
 		{
-			"no http header when there is no audit even the request header specified",
+			// we always want an audit ID since it can appear in logging/tracing and it is propagated
+			// to the aggregated apiserver(s) to improve correlation.
+			"http header when there is no audit even the request header specified",
 			uuid.New().String(),
 			auditinternal.LevelNone,
-			false,
+			true,
 		},
 		{
 			"server generated header",
@@ -796,38 +801,42 @@ func TestAuditIDHttpHeader(t *testing.T) {
 			true,
 		},
 	} {
-		sink := &fakeAuditSink{}
-		var handler http.Handler
-		handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(200)
+		t.Run(test.desc, func(t *testing.T) {
+			sink := &fakeAuditSink{}
+			var handler http.Handler
+			handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(200)
+			})
+			policyChecker := policy.FakeChecker(test.level, nil)
+
+			handler = WithAudit(handler, sink, policyChecker, nil)
+			handler = WithAuditID(handler)
+
+			req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+			req.RemoteAddr = "127.0.0.1"
+			req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
+			if test.requestHeader != "" {
+				req.Header.Add("Audit-ID", test.requestHeader)
+			}
+
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			resp := w.Result()
+			if test.expectedHeader {
+				if resp.Header.Get("Audit-ID") == "" {
+					t.Errorf("[%s] expected Audit-ID http header returned, but not returned", test.desc)
+					return
+				}
+				// if get Audit-ID returned, it should be the same with the requested one
+				if test.requestHeader != "" && resp.Header.Get("Audit-ID") != test.requestHeader {
+					t.Errorf("[%s] returned audit http header is not the same with the requested http header, expected: %s, get %s", test.desc, test.requestHeader, resp.Header.Get("Audit-ID"))
+				}
+			} else {
+				if resp.Header.Get("Audit-ID") != "" {
+					t.Errorf("[%s] expected no Audit-ID http header returned, but got %s", test.desc, resp.Header.Get("Audit-ID"))
+				}
+			}
 		})
-		policyChecker := policy.FakeChecker(test.level, nil)
-		handler = WithAudit(handler, sink, policyChecker, nil)
-
-		req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
-		req.RemoteAddr = "127.0.0.1"
-		req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
-		if test.requestHeader != "" {
-			req.Header.Add("Audit-ID", test.requestHeader)
-		}
-
-		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, req)
-		resp := w.Result()
-		if test.expectedHeader {
-			if resp.Header.Get("Audit-ID") == "" {
-				t.Errorf("[%s] expected Audit-ID http header returned, but not returned", test.desc)
-				continue
-			}
-			// if get Audit-ID returned, it should be the same with the requested one
-			if test.requestHeader != "" && resp.Header.Get("Audit-ID") != test.requestHeader {
-				t.Errorf("[%s] returned audit http header is not the same with the requested http header, expected: %s, get %s", test.desc, test.requestHeader, resp.Header.Get("Audit-ID"))
-			}
-		} else {
-			if resp.Header.Get("Audit-ID") != "" {
-				t.Errorf("[%s] expected no Audit-ID http header returned, but got %s", test.desc, resp.Header.Get("Audit-ID"))
-			}
-		}
 	}
 }
 
