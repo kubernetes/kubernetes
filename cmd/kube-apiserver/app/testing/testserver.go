@@ -28,6 +28,9 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/pkg/transport"
+	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,10 +62,12 @@ type TestServerInstanceOptions struct {
 
 // TestServer return values supplied by kube-test-ApiServer
 type TestServer struct {
-	ClientConfig *restclient.Config        // Rest client config
-	ServerOpts   *options.ServerRunOptions // ServerOpts
-	TearDownFn   TearDownFunc              // TearDown function
-	TmpDir       string                    // Temp Dir used, by the apiserver
+	ClientConfig      *restclient.Config        // Rest client config
+	ServerOpts        *options.ServerRunOptions // ServerOpts
+	TearDownFn        TearDownFunc              // TearDown function
+	TmpDir            string                    // Temp Dir used, by the apiserver
+	EtcdClient        *clientv3.Client          // used by tests that need to check data migrated from APIs that are no longer served
+	EtcdStoragePrefix string                    // storage prefix in etcd
 }
 
 // Logger allows t.Testing and b.Testing to be passed to StartTestServer and StartTestServerOrDie
@@ -258,12 +263,36 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		return result, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
 	}
 
+	tlsInfo := transport.TLSInfo{
+		CertFile:      storageConfig.Transport.CertFile,
+		KeyFile:       storageConfig.Transport.KeyFile,
+		TrustedCAFile: storageConfig.Transport.TrustedCAFile,
+	}
+	tlsConfig, err := tlsInfo.ClientConfig()
+	if err != nil {
+		return result, err
+	}
+	etcdConfig := clientv3.Config{
+		Endpoints:   storageConfig.Transport.ServerList,
+		DialTimeout: 20 * time.Second,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: tlsConfig,
+	}
+	etcdClient, err := clientv3.New(etcdConfig)
+	if err != nil {
+		return result, err
+	}
+
 	// from here the caller must call tearDown
 	result.ClientConfig = restclient.CopyConfig(server.GenericAPIServer.LoopbackClientConfig)
 	result.ClientConfig.QPS = 1000
 	result.ClientConfig.Burst = 10000
 	result.ServerOpts = s
 	result.TearDownFn = tearDown
+	result.EtcdClient = etcdClient
+	result.EtcdStoragePrefix = storageConfig.Prefix
 
 	return result, nil
 }
