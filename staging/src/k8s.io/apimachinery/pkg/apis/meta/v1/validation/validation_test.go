@@ -266,11 +266,6 @@ func TestValidateManagedFieldsInvalid(t *testing.T) {
 			Manager:    "field\nmanager",
 			APIVersion: "v1",
 		},
-		{
-			Operation:  metav1.ManagedFieldsOperationUpdate,
-			FieldsType: "FieldsV1",
-			// APIVersion missing
-		},
 	}
 
 	for _, test := range tests {
