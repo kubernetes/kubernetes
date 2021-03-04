@@ -123,7 +123,7 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				{Name: imagelocality.Name, Weight: 1},
 				{Name: interpodaffinity.Name, Weight: 1},
 				{Name: noderesources.LeastAllocatedName, Weight: 1},
-				{Name: nodeaffinity.Name, Weight: 1},
+				{Name: nodeaffinity.Name, Weight: 2}, // This is a score coming from user preference.
 				{Name: nodepreferavoidpods.Name, Weight: 10000},
 				// Weight is doubled because:
 				// - This is a score coming from user preference.
