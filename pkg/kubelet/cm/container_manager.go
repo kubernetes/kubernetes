@@ -194,15 +194,26 @@ func containerDevicesFromResourceDeviceInstances(devs devicemanager.ResourceDevi
 
 	for resourceName, resourceDevs := range devs {
 		for devID, dev := range resourceDevs {
-			for _, node := range dev.GetTopology().GetNodes() {
-				numaNode := node.GetID()
+			topo := dev.GetTopology()
+			if topo == nil {
+				// Some device plugin do not report the topology information.
+				// This is legal, so we report the devices anyway,
+				// let the client decide what to do.
+				respDevs = append(respDevs, &podresourcesapi.ContainerDevices{
+					ResourceName: resourceName,
+					DeviceIds:    []string{devID},
+				})
+				continue
+			}
+
+			for _, node := range topo.GetNodes() {
 				respDevs = append(respDevs, &podresourcesapi.ContainerDevices{
 					ResourceName: resourceName,
 					DeviceIds:    []string{devID},
 					Topology: &podresourcesapi.TopologyInfo{
 						Nodes: []*podresourcesapi.NUMANode{
 							{
-								ID: numaNode,
+								ID: node.GetID(),
 							},
 						},
 					},
