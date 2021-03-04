@@ -91,6 +91,10 @@ func runPlan(flags *planFlags, args []string) error {
 		return errors.WithMessage(err, "[upgrade/versions] FATAL")
 	}
 
+	// Warn if the kubelet component config is missing an explicit 'cgroupDriver'.
+	// TODO: https://github.com/kubernetes/kubeadm/issues/2376
+	componentconfigs.WarnCgroupDriver(&cfg.ClusterConfiguration)
+
 	// No upgrades available
 	if len(availUpgrades) == 0 {
 		klog.V(1).Infoln("[upgrade/plan] Awesome, you're up-to-date! Enjoy!")

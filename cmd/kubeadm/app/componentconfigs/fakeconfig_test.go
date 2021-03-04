@@ -96,6 +96,14 @@ func (cc *clusterConfig) Unmarshal(docmap kubeadmapi.DocumentMap) error {
 	return cc.configBase.Unmarshal(docmap, &cc.config)
 }
 
+func (cc *clusterConfig) Get() interface{} {
+	return &cc.config
+}
+
+func (cc *clusterConfig) Set(cfg interface{}) {
+	cc.config = *cfg.(*kubeadmapiv1.ClusterConfiguration)
+}
+
 func (cc *clusterConfig) Default(_ *kubeadmapi.ClusterConfiguration, _ *kubeadmapi.APIEndpoint, _ *kubeadmapi.NodeRegistrationOptions) {
 	cc.config.ClusterName = "foo"
 	cc.config.KubernetesVersion = "bar"
