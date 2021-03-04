@@ -173,6 +173,11 @@ func (dc *DeploymentController) addDeployment(obj interface{}) {
 func (dc *DeploymentController) updateDeployment(old, cur interface{}) {
 	oldD := old.(*apps.Deployment)
 	curD := cur.(*apps.Deployment)
+	if oldD.ResourceVersion == curD.ResourceVersion {
+		// Periodic resync will send update events for all known deployments.
+		// Two different versions of the same deployment will always have different RVs.
+		return
+	}
 	klog.V(4).InfoS("Updating deployment", "deployment", klog.KObj(oldD))
 	dc.enqueueDeployment(curD)
 }
