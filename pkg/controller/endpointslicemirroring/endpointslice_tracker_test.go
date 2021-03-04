@@ -19,8 +19,7 @@ package endpointslicemirroring
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
+	"k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -29,72 +28,59 @@ import (
 func TestEndpointSliceTrackerUpdate(t *testing.T) {
 	epSlice1 := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            "example-1",
-			Namespace:       "ns1",
-			ResourceVersion: "rv1",
-			Labels:          map[string]string{discovery.LabelServiceName: "svc1"},
+			Name:       "example-1",
+			Namespace:  "ns1",
+			UID:        "original",
+			Generation: 1,
+			Labels:     map[string]string{discovery.LabelServiceName: "svc1"},
 		},
 	}
 
 	epSlice1DifferentNS := epSlice1.DeepCopy()
 	epSlice1DifferentNS.Namespace = "ns2"
+	epSlice1DifferentNS.UID = "diff-ns"
 
 	epSlice1DifferentService := epSlice1.DeepCopy()
 	epSlice1DifferentService.Labels[discovery.LabelServiceName] = "svc2"
+	epSlice1DifferentService.UID = "diff-svc"
 
-	epSlice1DifferentRV := epSlice1.DeepCopy()
-	epSlice1DifferentRV.ResourceVersion = "rv2"
+	epSlice1NewerGen := epSlice1.DeepCopy()
+	epSlice1NewerGen.Generation = 2
 
 	testCases := map[string]struct {
-		updateParam                     *discovery.EndpointSlice
-		checksParam                     *discovery.EndpointSlice
-		expectHas                       bool
-		expectStale                     bool
-		expectResourceVersionsByService map[types.NamespacedName]endpointSliceResourceVersions
+		updateParam      *discovery.EndpointSlice
+		checksParam      *discovery.EndpointSlice
+		expectHas        bool
+		expectShouldSync bool
+		expectGeneration int64
 	}{
 		"same slice": {
-			updateParam: epSlice1,
-			checksParam: epSlice1,
-			expectHas:   true,
-			expectStale: false,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
-				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
-					epSlice1.Name: epSlice1.ResourceVersion,
-				},
-			},
+			updateParam:      epSlice1,
+			checksParam:      epSlice1,
+			expectHas:        true,
+			expectShouldSync: false,
+			expectGeneration: epSlice1.Generation,
 		},
 		"different namespace": {
-			updateParam: epSlice1,
-			checksParam: epSlice1DifferentNS,
-			expectHas:   false,
-			expectStale: true,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
-				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
-					epSlice1.Name: epSlice1.ResourceVersion,
-				},
-			},
+			updateParam:      epSlice1,
+			checksParam:      epSlice1DifferentNS,
+			expectHas:        false,
+			expectShouldSync: true,
+			expectGeneration: epSlice1.Generation,
 		},
 		"different service": {
-			updateParam: epSlice1,
-			checksParam: epSlice1DifferentService,
-			expectHas:   false,
-			expectStale: true,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
-				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
-					epSlice1.Name: epSlice1.ResourceVersion,
-				},
-			},
+			updateParam:      epSlice1,
+			checksParam:      epSlice1DifferentService,
+			expectHas:        false,
+			expectShouldSync: true,
+			expectGeneration: epSlice1.Generation,
 		},
-		"different resource version": {
-			updateParam: epSlice1,
-			checksParam: epSlice1DifferentRV,
-			expectHas:   true,
-			expectStale: true,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
-				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
-					epSlice1.Name: epSlice1.ResourceVersion,
-				},
-			},
+		"newer generation": {
+			updateParam:      epSlice1,
+			checksParam:      epSlice1NewerGen,
+			expectHas:        true,
+			expectShouldSync: true,
+			expectGeneration: epSlice1.Generation,
 		},
 	}
 
@@ -105,80 +91,195 @@ func TestEndpointSliceTrackerUpdate(t *testing.T) {
 			if esTracker.Has(tc.checksParam) != tc.expectHas {
 				t.Errorf("tc.tracker.Has(%+v) == %t, expected %t", tc.checksParam, esTracker.Has(tc.checksParam), tc.expectHas)
 			}
-			if esTracker.Stale(tc.checksParam) != tc.expectStale {
-				t.Errorf("tc.tracker.Stale(%+v) == %t, expected %t", tc.checksParam, esTracker.Stale(tc.checksParam), tc.expectStale)
+			if esTracker.ShouldSync(tc.checksParam) != tc.expectShouldSync {
+				t.Errorf("tc.tracker.ShouldSync(%+v) == %t, expected %t", tc.checksParam, esTracker.ShouldSync(tc.checksParam), tc.expectShouldSync)
 			}
-			assert.Equal(t, tc.expectResourceVersionsByService, esTracker.resourceVersionsByService)
+			serviceNN := types.NamespacedName{Namespace: epSlice1.Namespace, Name: "svc1"}
+			gfs, ok := esTracker.generationsByService[serviceNN]
+			if !ok {
+				t.Fatalf("expected tracker to have generations for %s Service", serviceNN.Name)
+			}
+			generation, ok := gfs[epSlice1.UID]
+			if !ok {
+				t.Fatalf("expected tracker to have generation for %s EndpointSlice", epSlice1.Name)
+			}
+			if tc.expectGeneration != generation {
+				t.Fatalf("expected generation to be %d, got %d", tc.expectGeneration, generation)
+			}
 		})
 	}
 }
 
-func TestEndpointSliceTrackerDelete(t *testing.T) {
+func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 	epSlice1 := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            "example-1",
-			Namespace:       "ns1",
-			ResourceVersion: "rv1",
-			Labels:          map[string]string{discovery.LabelServiceName: "svc1"},
+			Name:       "example-1",
+			Namespace:  "ns1",
+			UID:        "original",
+			Generation: 1,
+			Labels:     map[string]string{discovery.LabelServiceName: "svc1"},
+		},
+	}
+
+	epSlice1NewerGen := epSlice1.DeepCopy()
+	epSlice1NewerGen.Generation = 2
+
+	testCases := []struct {
+		name         string
+		tracker      *endpointSliceTracker
+		serviceParam *v1.Service
+		slicesParam  []*discovery.EndpointSlice
+		expectNewer  bool
+	}{{
+		name: "empty tracker",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{},
+		},
+		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
+		slicesParam:  []*discovery.EndpointSlice{},
+		expectNewer:  false,
+	}, {
+		name: "empty slices",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {},
+			},
+		},
+		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
+		slicesParam:  []*discovery.EndpointSlice{},
+		expectNewer:  false,
+	}, {
+		name: "matching slices",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {
+					epSlice1.UID: epSlice1.Generation,
+				},
+			},
+		},
+		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
+		slicesParam:  []*discovery.EndpointSlice{epSlice1},
+		expectNewer:  false,
+	}, {
+		name: "newer slice in tracker",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {
+					epSlice1.UID: epSlice1NewerGen.Generation,
+				},
+			},
+		},
+		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
+		slicesParam:  []*discovery.EndpointSlice{epSlice1},
+		expectNewer:  true,
+	}, {
+		name: "newer slice in params",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {
+					epSlice1.UID: epSlice1.Generation,
+				},
+			},
+		},
+		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
+		slicesParam:  []*discovery.EndpointSlice{epSlice1NewerGen},
+		expectNewer:  false,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actualNewer := tc.tracker.StaleSlices(tc.serviceParam, tc.slicesParam)
+			if actualNewer != tc.expectNewer {
+				t.Errorf("Expected %t, got %t", tc.expectNewer, actualNewer)
+			}
+		})
+	}
+}
+func TestEndpointSliceTrackerDeletion(t *testing.T) {
+	epSlice1 := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "example-1",
+			Namespace:  "ns1",
+			UID:        "original",
+			Generation: 1,
+			Labels:     map[string]string{discovery.LabelServiceName: "svc1"},
 		},
 	}
 
 	epSlice1DifferentNS := epSlice1.DeepCopy()
 	epSlice1DifferentNS.Namespace = "ns2"
+	epSlice1DifferentNS.UID = "diff-ns"
 
 	epSlice1DifferentService := epSlice1.DeepCopy()
 	epSlice1DifferentService.Labels[discovery.LabelServiceName] = "svc2"
+	epSlice1DifferentService.UID = "diff-svc"
 
-	epSlice1DifferentRV := epSlice1.DeepCopy()
-	epSlice1DifferentRV.ResourceVersion = "rv2"
+	epSlice1NewerGen := epSlice1.DeepCopy()
+	epSlice1NewerGen.Generation = 2
 
 	testCases := map[string]struct {
-		deleteParam *discovery.EndpointSlice
-		checksParam *discovery.EndpointSlice
-		expectHas   bool
-		expectStale bool
+		expectDeletionParam        *discovery.EndpointSlice
+		checksParam                *discovery.EndpointSlice
+		deleteParam                *discovery.EndpointSlice
+		expectHas                  bool
+		expectShouldSync           bool
+		expectedHandleDeletionResp bool
 	}{
 		"same slice": {
-			deleteParam: epSlice1,
-			checksParam: epSlice1,
-			expectHas:   false,
-			expectStale: true,
+			expectDeletionParam:        epSlice1,
+			checksParam:                epSlice1,
+			deleteParam:                epSlice1,
+			expectHas:                  true,
+			expectShouldSync:           true,
+			expectedHandleDeletionResp: true,
 		},
 		"different namespace": {
-			deleteParam: epSlice1DifferentNS,
-			checksParam: epSlice1DifferentNS,
-			expectHas:   false,
-			expectStale: true,
+			expectDeletionParam:        epSlice1DifferentNS,
+			checksParam:                epSlice1DifferentNS,
+			deleteParam:                epSlice1DifferentNS,
+			expectHas:                  true,
+			expectShouldSync:           true,
+			expectedHandleDeletionResp: false,
 		},
 		"different namespace, check original ep slice": {
-			deleteParam: epSlice1DifferentNS,
-			checksParam: epSlice1,
-			expectHas:   true,
-			expectStale: false,
+			expectDeletionParam:        epSlice1DifferentNS,
+			checksParam:                epSlice1,
+			deleteParam:                epSlice1DifferentNS,
+			expectHas:                  true,
+			expectShouldSync:           false,
+			expectedHandleDeletionResp: false,
 		},
 		"different service": {
-			deleteParam: epSlice1DifferentService,
-			checksParam: epSlice1DifferentService,
-			expectHas:   false,
-			expectStale: true,
+			expectDeletionParam:        epSlice1DifferentService,
+			checksParam:                epSlice1DifferentService,
+			deleteParam:                epSlice1DifferentService,
+			expectHas:                  true,
+			expectShouldSync:           true,
+			expectedHandleDeletionResp: false,
 		},
-		"different service, check original ep slice": {
-			deleteParam: epSlice1DifferentService,
-			checksParam: epSlice1,
-			expectHas:   true,
-			expectStale: false,
+		"expectDelete different service, check original ep slice, delete original": {
+			expectDeletionParam:        epSlice1DifferentService,
+			checksParam:                epSlice1,
+			deleteParam:                epSlice1,
+			expectHas:                  true,
+			expectShouldSync:           false,
+			expectedHandleDeletionResp: false,
 		},
-		"different resource version": {
-			deleteParam: epSlice1DifferentRV,
-			checksParam: epSlice1DifferentRV,
-			expectHas:   false,
-			expectStale: true,
+		"different generation": {
+			expectDeletionParam:        epSlice1NewerGen,
+			checksParam:                epSlice1NewerGen,
+			deleteParam:                epSlice1NewerGen,
+			expectHas:                  true,
+			expectShouldSync:           true,
+			expectedHandleDeletionResp: true,
 		},
-		"different resource version, check original ep slice": {
-			deleteParam: epSlice1DifferentRV,
-			checksParam: epSlice1,
-			expectHas:   false,
-			expectStale: true,
+		"expectDelete different generation, check original ep slice, delete original": {
+			expectDeletionParam:        epSlice1NewerGen,
+			checksParam:                epSlice1,
+			deleteParam:                epSlice1,
+			expectHas:                  true,
+			expectShouldSync:           true,
+			expectedHandleDeletionResp: true,
 		},
 	}
 
@@ -187,13 +288,20 @@ func TestEndpointSliceTrackerDelete(t *testing.T) {
 			esTracker := newEndpointSliceTracker()
 			esTracker.Update(epSlice1)
 
-			esTracker.Delete(tc.deleteParam)
+			esTracker.ExpectDeletion(tc.expectDeletionParam)
 			if esTracker.Has(tc.checksParam) != tc.expectHas {
 				t.Errorf("esTracker.Has(%+v) == %t, expected %t", tc.checksParam, esTracker.Has(tc.checksParam), tc.expectHas)
 			}
-			if esTracker.Stale(tc.checksParam) != tc.expectStale {
-				t.Errorf("esTracker.Stale(%+v) == %t, expected %t", tc.checksParam, esTracker.Stale(tc.checksParam), tc.expectStale)
+			if esTracker.ShouldSync(tc.checksParam) != tc.expectShouldSync {
+				t.Errorf("esTracker.ShouldSync(%+v) == %t, expected %t", tc.checksParam, esTracker.ShouldSync(tc.checksParam), tc.expectShouldSync)
 			}
+			if esTracker.HandleDeletion(epSlice1) != tc.expectedHandleDeletionResp {
+				t.Errorf("esTracker.ShouldSync(%+v) == %t, expected %t", epSlice1, esTracker.HandleDeletion(epSlice1), tc.expectedHandleDeletionResp)
+			}
+			if esTracker.Has(epSlice1) != false {
+				t.Errorf("esTracker.Has(%+v) == %t, expected false", epSlice1, esTracker.Has(epSlice1))
+			}
+
 		})
 	}
 }
@@ -203,48 +311,39 @@ func TestEndpointSliceTrackerDeleteService(t *testing.T) {
 	svcName2, svcNS2 := "svc2", "ns2"
 	epSlice1 := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            "example-1",
-			Namespace:       svcNS1,
-			ResourceVersion: "rv1",
-			Labels:          map[string]string{discovery.LabelServiceName: svcName1},
+			Name:       "example-1",
+			Namespace:  svcNS1,
+			Generation: 1,
+			Labels:     map[string]string{discovery.LabelServiceName: svcName1},
 		},
 	}
 
 	testCases := map[string]struct {
-		updateParam                     *discovery.EndpointSlice
-		deleteServiceParam              *types.NamespacedName
-		expectHas                       bool
-		expectStale                     bool
-		expectResourceVersionsByService map[types.NamespacedName]endpointSliceResourceVersions
+		updateParam        *discovery.EndpointSlice
+		deleteServiceParam *types.NamespacedName
+		expectHas          bool
+		expectShouldSync   bool
+		expectGeneration   int64
 	}{
 		"same service": {
-			updateParam:                     epSlice1,
-			deleteServiceParam:              &types.NamespacedName{Namespace: svcNS1, Name: svcName1},
-			expectHas:                       false,
-			expectStale:                     true,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{},
+			updateParam:        epSlice1,
+			deleteServiceParam: &types.NamespacedName{Namespace: svcNS1, Name: svcName1},
+			expectHas:          false,
+			expectShouldSync:   true,
 		},
 		"different namespace": {
 			updateParam:        epSlice1,
 			deleteServiceParam: &types.NamespacedName{Namespace: svcNS2, Name: svcName1},
 			expectHas:          true,
-			expectStale:        false,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
-				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
-					epSlice1.Name: epSlice1.ResourceVersion,
-				},
-			},
+			expectShouldSync:   false,
+			expectGeneration:   epSlice1.Generation,
 		},
 		"different service": {
 			updateParam:        epSlice1,
 			deleteServiceParam: &types.NamespacedName{Namespace: svcNS1, Name: svcName2},
 			expectHas:          true,
-			expectStale:        false,
-			expectResourceVersionsByService: map[types.NamespacedName]endpointSliceResourceVersions{
-				{Namespace: epSlice1.Namespace, Name: "svc1"}: {
-					epSlice1.Name: epSlice1.ResourceVersion,
-				},
-			},
+			expectShouldSync:   false,
+			expectGeneration:   epSlice1.Generation,
 		},
 	}
 
@@ -256,10 +355,23 @@ func TestEndpointSliceTrackerDeleteService(t *testing.T) {
 			if esTracker.Has(tc.updateParam) != tc.expectHas {
 				t.Errorf("tc.tracker.Has(%+v) == %t, expected %t", tc.updateParam, esTracker.Has(tc.updateParam), tc.expectHas)
 			}
-			if esTracker.Stale(tc.updateParam) != tc.expectStale {
-				t.Errorf("tc.tracker.Stale(%+v) == %t, expected %t", tc.updateParam, esTracker.Stale(tc.updateParam), tc.expectStale)
+			if esTracker.ShouldSync(tc.updateParam) != tc.expectShouldSync {
+				t.Errorf("tc.tracker.ShouldSync(%+v) == %t, expected %t", tc.updateParam, esTracker.ShouldSync(tc.updateParam), tc.expectShouldSync)
 			}
-			assert.Equal(t, tc.expectResourceVersionsByService, esTracker.resourceVersionsByService)
+			if tc.expectGeneration != 0 {
+				serviceNN := types.NamespacedName{Namespace: epSlice1.Namespace, Name: "svc1"}
+				gfs, ok := esTracker.generationsByService[serviceNN]
+				if !ok {
+					t.Fatalf("expected tracker to have status for %s Service", serviceNN.Name)
+				}
+				generation, ok := gfs[epSlice1.UID]
+				if !ok {
+					t.Fatalf("expected tracker to have generation for %s EndpointSlice", epSlice1.Name)
+				}
+				if tc.expectGeneration != generation {
+					t.Fatalf("expected generation to be %d, got %d", tc.expectGeneration, generation)
+				}
+			}
 		})
 	}
 }
