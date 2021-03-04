@@ -311,23 +311,16 @@ func (c *Controller) podUsesPVC(pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool
 // podIsShutDown returns true if kubelet is done with the pod or
 // it was force-deleted.
 func podIsShutDown(pod *v1.Pod) bool {
-	// The following text is based on how pod shutdown was
-	// initially described to me. During PR review, it was pointed out
-	// that this is not correct: "deleteGracePeriodSeconds tells
-	// kubelet when it can start force terminating the
-	// containers. Volume teardown only starts after containers
-	// are termianted. So there is an additional time period after
-	// the grace period where volume teardown is happening."
-	//
-	// TODO (https://github.com/kubernetes/enhancements/issues/1698#issuecomment-655344680):
-	// investigate what kubelet really does and if necessary,
-	// add some other signal for "kubelet is done". For now the check
-	// is used only for ephemeral volumes, because it
-	// is needed to avoid the deadlock.
-	//
 	// A pod that has a deletionTimestamp and a zero
 	// deletionGracePeriodSeconds
-	// a) has been processed by kubelet and is ready for deletion or
+	// a) has been processed by kubelet and was set up for deletion
+	//    by the apiserver:
+	//    - canBeDeleted has verified that volumes were unpublished
+	//      https://github.com/kubernetes/kubernetes/blob/5404b5a28a2114299608bab00e4292960dd864a0/pkg/kubelet/kubelet_pods.go#L980
+	//    - deletionGracePeriodSeconds was set via a delete
+	//      with zero GracePeriodSeconds
+	//      https://github.com/kubernetes/kubernetes/blob/5404b5a28a2114299608bab00e4292960dd864a0/pkg/kubelet/status/status_manager.go#L580-L592
+	// or
 	// b) was force-deleted.
 	//
 	// It's now just waiting for garbage collection. We could wait
