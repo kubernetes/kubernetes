@@ -5,7 +5,7 @@ This is a basic sketch of the workflow needed to add translations:
 # Adding/Updating Translations
 
 ## New languages
-Create `translations/kubectl/<language>/LC_MESSAGES/k8s.po`. There's
+Create `staging/src/k8s.io/kubectl/pkg/util/i18n/translations/kubectl/<language>/LC_MESSAGES/k8s.po`. There's
 no need to update `translations/test/...` which is only used for unit tests.
 
 There is an example [PR here](https://github.com/kubernetes/kubernetes/pull/40645) which adds support for French.
@@ -14,7 +14,7 @@ Once you've added a new language, you'll need to register it in
 `staging/src/k8s.io/kubectl/pkg/util/i18n/i18n.go` by adding it to the `knownTranslations` map.
 
 ## Wrapping strings
-There is a simple script in `translations/extract.py` that performs
+There is a simple script in `staging/src/k8s.io/kubectl/pkg/util/i18n/translations/extract.py` that performs
 simple regular expression based wrapping of strings. It can always
 use improvements to understand additional strings.
 
@@ -31,7 +31,7 @@ will extract and sort any new strings.
 
 ## Adding new translations
 Edit the appropriate `k8s.po` file, `poedit` is a popular open source tool
-for translations. You can load the `translations/kubectl/template.pot` file
+for translations. You can load the `staging/src/k8s.io/kubectl/pkg/util/i18n/translations/kubectl/template.pot` file
 to find messages that might be missing.
 
 Once you are done with your `k8s.po` file, generate the corresponding `k8s.mo`
@@ -55,7 +55,7 @@ binaries.
 
 ## Extracting strings
 
-There is a script in `translations/extract.py` that knows how to do some
+There is a script in `staging/src/k8s.io/kubectl/pkg/util/i18n/translations/extract.py` that knows how to do some
 simple extraction. It needs a lot of work.
 
 # Using translations
