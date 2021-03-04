@@ -1,16 +1,32 @@
+/*
+Copyright 2021 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package cache
 
 import (
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	fcache "k8s.io/client-go/tools/cache/testing"
-
 	"errors"
 	"fmt"
 	"testing"
 	"time"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	fcache "k8s.io/client-go/tools/cache/testing"
 )
 
 const (
@@ -37,6 +53,7 @@ func fakeInformer() *sharedIndexInformer {
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "h-dev", Labels: map[string]string{"app": "hello", "env": "dev"}}})
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "h-prod", Labels: map[string]string{"app": "hello", "env": "prod"}}})
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "h2-dev", Labels: map[string]string{"app": "hello2", "env": "dev"}}})
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "h2-dev2", Labels: map[string]string{"app": "hello2", "env": "dev"}}})
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "h2-prod", Labels: map[string]string{"app": "hello2", "env": "prod"}}})
 
 	// create the shared informer and resync every 1s
@@ -58,7 +75,6 @@ func (l *args) appendFunc(m interface{}) {
 }
 
 func (l *args) matchResult(resources map[string]bool) error {
-
 	for _, r := range l.ret {
 		if _, ok := resources[r.Name]; !ok {
 			return errors.New(fmt.Sprintf("test error,should not find item: %s", r.Name))
@@ -79,7 +95,6 @@ func (l *args) matchResult(resources map[string]bool) error {
 }
 
 func TestListByIndex(t *testing.T) {
-
 	// prepare base env
 	informer := fakeInformer()
 	stop := make(chan struct{})
@@ -88,13 +103,14 @@ func TestListByIndex(t *testing.T) {
 	WaitForCacheSync(stop, informer.HasSynced)
 
 	devEnvSelector, _ := labels.Parse("env=dev")
+	emptySelector := labels.NewSelector()
 	tests := []struct {
 		name      string
 		args      args
 		resources map[string]bool
 	}{
 		{
-			name: "hello-dev",
+			name: "locate-one-item",
 			args: args{
 				name:     IndexApp,
 				key:      "hello",
@@ -104,17 +120,27 @@ func TestListByIndex(t *testing.T) {
 			resources: map[string]bool{"h-dev": false},
 		},
 		{
-			name: "hello2-dev",
+			name: "locate-multiple-items",
 			args: args{
 				name:     IndexApp,
 				key:      "hello2",
 				selector: devEnvSelector,
 				indexer:  informer.GetIndexer(),
 			},
-			resources: map[string]bool{"h2-dev": false},
+			resources: map[string]bool{"h2-dev": false, "h2-dev2": false},
 		},
 		{
-			name: "hello3-dev",
+			name: "locate-all-items",
+			args: args{
+				name:     IndexApp,
+				key:      "hello2",
+				selector: emptySelector,
+				indexer:  informer.GetIndexer(),
+			},
+			resources: map[string]bool{"h2-dev": false, "h2-dev2": false, "h2-prod": false},
+		},
+		{
+			name: "find-empty",
 			args: args{
 				name:     IndexApp,
 				key:      "hello3",

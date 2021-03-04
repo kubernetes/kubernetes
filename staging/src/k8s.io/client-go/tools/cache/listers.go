@@ -110,12 +110,11 @@ func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selec
 
 // ListByIndex used to list items using specific index
 func ListByIndex(indexer Indexer, name, key string, selector labels.Selector, appendFn AppendFunc) error {
-
 	items, err := indexer.ByIndex(name, key)
 	if err != nil {
 		// if err found, we should not list all , return err instead.
 		// if caller needs list all, do not need use specific index, use ListAll
-		klog.Warningf("can not retrieve list of objects using index : %v", err)
+		klog.InfoS("can not retrieve list of objects using index : %v", err)
 		return err
 	}
 
