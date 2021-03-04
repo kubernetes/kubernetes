@@ -327,6 +327,9 @@ type DeploymentList struct {
 	Items []Deployment `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// DaemonSetUpdateStrategy indicates the strategy that the DaemonSet
+// controller will use to perform updates. It includes any additional parameters
+// necessary to perform the update for the indicated strategy.
 type DaemonSetUpdateStrategy struct {
 	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
 	// Default is OnDelete.
@@ -729,6 +732,13 @@ type IngressRuleValue struct {
 	// 2. Consider adding fields for ingress-type specific global options
 	// usable by a loadbalancer, like http keep-alive.
 
+	// HTTP is a pointer pointing to a list of http selectors.
+	// The list is a collection of paths that map requests to backends.
+	// A path is matched against the path of an incoming request. Currently it can
+	// contain characters disallowed from the conventional "path" part of a URL
+	// as defined by RFC 3986. Paths must begin with a '/'.
+	// A backend defines the referenced service endpoint to which the traffic
+	// will be forwarded to.
 	// +optional
 	HTTP *HTTPIngressRuleValue `json:"http,omitempty" protobuf:"bytes,1,opt,name=http"`
 }
