@@ -42,6 +42,10 @@ We use the English translation as the `msgid`.
 
 ## Regenerating the bindata file
 
+> Note: Regeneration of bindata is no more necessary for Kubernetes 1.22+ as
+> the translations are now embedded into the binary at compile time.
+> See: https://github.com/kubernetes/kubernetes/pull/99829
+
 With the `mo` files up to date, you can now convert the generated files
 into code using `go-bindata` command which can be installed with:
 
