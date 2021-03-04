@@ -21,26 +21,29 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"strconv"
 	"time"
-
-	"k8s.io/apimachinery/pkg/fields"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
 
 var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNodeShutdown]", func() {
 	f := framework.NewDefaultFramework("graceful-node-shutdown")
 	ginkgo.Context("when gracefully shutting down", func() {
-
+		if !isGdbusAvailable() {
+			e2eskipper.Skipf("gdbus is not supported.")
+		}
 		const (
 			pollInterval                        = 1 * time.Second
 			podStatusUpdateTimeout              = 5 * time.Second
@@ -225,4 +228,10 @@ func getNodeReadyStatus(f *framework.Framework) bool {
 	// Assuming that there is only one node, because this is a node e2e test.
 	framework.ExpectEqual(len(nodeList.Items), 1)
 	return isNodeReady(&nodeList.Items[0])
+}
+
+// isGdbusAvailable returns whether the system executing the tests uses gdbus.
+func isGdbusAvailable() bool {
+	_, err := exec.LookPath("gdbus")
+	return err == nil
 }
