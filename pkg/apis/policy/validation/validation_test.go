@@ -19,10 +19,13 @@ package validation
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -98,26 +101,150 @@ func TestValidateMinAvailablePodAndMaxUnavailableDisruptionBudgetSpec(t *testing
 }
 
 func TestValidatePodDisruptionBudgetStatus(t *testing.T) {
-	successCases := []policy.PodDisruptionBudgetStatus{
-		{DisruptionsAllowed: 10},
-		{CurrentHealthy: 5},
-		{DesiredHealthy: 3},
-		{ExpectedPods: 2}}
-	for _, c := range successCases {
-		errors := ValidatePodDisruptionBudgetStatus(c, field.NewPath("status"))
-		if len(errors) > 0 {
-			t.Errorf("unexpected failure %v for %v", errors, c)
-		}
+	const expectNoErrors = false
+	const expectErrors = true
+	testCases := []struct {
+		name                string
+		pdbStatus           policy.PodDisruptionBudgetStatus
+		expectErrForVersion map[schema.GroupVersion]bool
+	}{
+		{
+			name: "DisruptionsAllowed: 10",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				DisruptionsAllowed: 10,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectNoErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "CurrentHealthy: 5",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				CurrentHealthy: 5,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectNoErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "DesiredHealthy: 3",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				DesiredHealthy: 3,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectNoErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "ExpectedPods: 2",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				ExpectedPods: 2,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectNoErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "DisruptionsAllowed: -10",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				DisruptionsAllowed: -10,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "CurrentHealthy: -5",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				CurrentHealthy: -5,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "DesiredHealthy: -3",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				DesiredHealthy: -3,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "ExpectedPods: -2",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				ExpectedPods: -2,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "Conditions valid",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   policyv1beta1.DisruptionAllowedCondition,
+						Status: metav1.ConditionTrue,
+						LastTransitionTime: metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
+						},
+						Reason:             policyv1beta1.SufficientPodsReason,
+						Message:            "message",
+						ObservedGeneration: 3,
+					},
+				},
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectNoErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "Conditions not valid",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   policyv1beta1.DisruptionAllowedCondition,
+						Status: metav1.ConditionTrue,
+					},
+					{
+						Type:   policyv1beta1.DisruptionAllowedCondition,
+						Status: metav1.ConditionFalse,
+					},
+				},
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectErrors,
+				policyv1beta1.SchemeGroupVersion: expectErrors,
+			},
+		},
 	}
-	failureCases := []policy.PodDisruptionBudgetStatus{
-		{DisruptionsAllowed: -10},
-		{CurrentHealthy: -5},
-		{DesiredHealthy: -3},
-		{ExpectedPods: -2}}
-	for _, c := range failureCases {
-		errors := ValidatePodDisruptionBudgetStatus(c, field.NewPath("status"))
-		if len(errors) == 0 {
-			t.Errorf("unexpected success for %v", c)
+
+	for _, tc := range testCases {
+		for apiVersion, expectErrors := range tc.expectErrForVersion {
+			t.Run(fmt.Sprintf("apiVersion: %s, %s", apiVersion.String(), tc.name), func(t *testing.T) {
+				errors := ValidatePodDisruptionBudgetStatusUpdate(tc.pdbStatus, policy.PodDisruptionBudgetStatus{},
+					field.NewPath("status"), apiVersion)
+				errCount := len(errors)
+
+				if errCount > 0 && !expectErrors {
+					t.Errorf("unexpected failure %v for %v", errors, tc.pdbStatus)
+				}
+
+				if errCount == 0 && expectErrors {
+					t.Errorf("expected errors but didn't one for %v", tc.pdbStatus)
+				}
+			})
 		}
 	}
 }

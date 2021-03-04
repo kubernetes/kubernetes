@@ -77,7 +77,43 @@ type PodDisruptionBudgetStatus struct {
 
 	// total number of pods counted by this disruption budget
 	ExpectedPods int32 `json:"expectedPods" protobuf:"varint,6,opt,name=expectedPods"`
+
+	// Conditions contain conditions for PDB. The disruption controller sets the
+	// DisruptionAllowed condition. The following are known values for the reason field
+	// (additional reasons could be added in the future):
+	// - SyncFailed: The controller encountered an error and wasn't able to compute
+	//               the number of allowed disruptions. Therefore no disruptions are
+	//               allowed and the status of the condition will be False.
+	// - InsufficientPods: The number of pods are either at or below the number
+	//                     required by the PodDisruptionBudget. No disruptions are
+	//                     allowed and the status of the condition will be False.
+	// - SufficientPods: There are more pods than required by the PodDisruptionBudget.
+	//                   The condition will be True, and the number of allowed
+	//                   disruptions are provided by the disruptionsAllowed property.
+	//
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type", protobuf:"bytes,7,rep,name=conditions"`
 }
+
+const (
+	// DisruptionAllowedCondition is a condition set by the disruption controller
+	// that signal whether any of the pods covered by the PDB can be disrupted.
+	DisruptionAllowedCondition = "DisruptionAllowed"
+
+	// SyncFailedReason is set on the DisruptionAllowed condition if reconcile
+	// of the PDB failed and therefore disruption of pods are not allowed.
+	SyncFailedReason       = "SyncFailed"
+	// SufficientPodsReason is set on the DisruptionAllowed condition if there are
+	// more pods covered by the PDB than required and at least one can be disrupted.
+	SufficientPodsReason   = "SufficientPods"
+	// InsufficientPodsReason is set on the DisruptionAllowed condition if the number
+	// of pods are equal to or fewer than required by the PDB.
+	InsufficientPodsReason = "InsufficientPods"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
