@@ -41,7 +41,7 @@ func TestNamespaceStrategy(t *testing.T) {
 		t.Errorf("Namespaces should not allow create on update")
 	}
 	namespace := &api.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10", Labels: map[string]string{v1.LabelMetadataName: "foo"}},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
 	}
 	Strategy.PrepareForCreate(ctx, namespace)
@@ -80,7 +80,7 @@ func TestNamespaceDefaultLabelCanonicalize(t *testing.T) {
 	}
 
 	Strategy.Canonicalize(namespace)
-	if label, ok := namespace.Labels[v1.LabelMetadataName]; len(namespace.Name) > 0 && !ok || label != namespace.Name {
+	if namespace.Labels[v1.LabelMetadataName] != namespace.Name {
 		t.Errorf("Invalid namespace, default label was not added")
 	}
 }

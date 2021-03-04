@@ -329,6 +329,8 @@ func SetDefaults_Namespace(obj *v1.Namespace) {
 	// TODO, remove the feature gate in 1.22
 	// we cant SetDefaults for nameless namespaces (generateName),
 	// we don't need to overwrite the pre-existing labelMetadataName
+	// This code needs to be kept in sync with the implementation that exists
+	// in Namespace Canonicalize strategy (pkg/registry/core/namespace)
 	if len(obj.Name) > 0 && obj.Labels[v1.LabelMetadataName] != obj.Name {
 		if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
 			if obj.Labels == nil {

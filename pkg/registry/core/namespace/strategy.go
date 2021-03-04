@@ -91,6 +91,10 @@ func (namespaceStrategy) Validate(ctx context.Context, obj runtime.Object) field
 
 // Canonicalize normalizes the object after validation.
 func (namespaceStrategy) Canonicalize(obj runtime.Object) {
+	// Ensure the label matches the name for namespaces just created using GenerateName,
+	// where the final name wasn't available for defaulting to make this change.
+	// This code needs to be kept in sync with the implementation that exists
+	// in Namespace defaulting (pkg/apis/core/v1)
 	ns := obj.(*api.Namespace)
 	if len(ns.Name) > 0 && ns.Labels[v1.LabelMetadataName] != ns.Name {
 		if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
