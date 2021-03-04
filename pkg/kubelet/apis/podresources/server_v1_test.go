@@ -177,6 +177,10 @@ func TestAllocatableResources(t *testing.T) {
 				},
 			},
 		},
+		{
+			ResourceName: "resource-nt",
+			DeviceIds:    []string{"devA"},
+		},
 	}
 
 	allCPUs := []int64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
@@ -230,6 +234,10 @@ func TestAllocatableResources(t *testing.T) {
 							},
 						},
 					},
+					{
+						ResourceName: "resource-nt",
+						DeviceIds:    []string{"devA"},
+					},
 				},
 			},
 		},
@@ -260,6 +268,10 @@ func TestAllocatableResources(t *testing.T) {
 								},
 							},
 						},
+					},
+					{
+						ResourceName: "resource-nt",
+						DeviceIds:    []string{"devA"},
 					},
 				},
 			},
