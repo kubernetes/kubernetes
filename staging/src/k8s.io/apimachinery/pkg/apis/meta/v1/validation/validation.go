@@ -180,9 +180,6 @@ func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *fiel
 		default:
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("operation"), fields.Operation, "must be `Apply` or `Update`"))
 		}
-		if len(fields.APIVersion) < 1 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVersion"), fields.APIVersion, "must not be empty"))
-		}
 		if len(fields.FieldsType) > 0 && fields.FieldsType != "FieldsV1" {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldsType"), fields.FieldsType, "must be `FieldsV1`"))
 		}
