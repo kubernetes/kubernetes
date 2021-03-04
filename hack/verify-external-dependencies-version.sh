@@ -38,7 +38,7 @@ cd -
 # Prefer full path for running zeitgeist
 ZEITGEIST_BIN="$(which zeitgeist)"
 
-"${ZEITGEIST_BIN}" validate \
+CLICOLOR=0 "${ZEITGEIST_BIN}" validate \
   --local \
   --base-path "${KUBE_ROOT}" \
   --config "${KUBE_ROOT}"/build/dependencies.yaml
