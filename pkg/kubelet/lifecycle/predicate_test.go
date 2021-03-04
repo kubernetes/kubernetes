@@ -244,7 +244,7 @@ func TestGeneralPredicates(t *testing.T) {
 	for _, test := range resourceTests {
 		t.Run(test.name, func(t *testing.T) {
 			test.nodeInfo.SetNode(test.node)
-			reasons, err := GeneralPredicates(test.pod, test.nodeInfo)
+			reasons, err := generalPredicates(test.pod, test.nodeInfo)
 			fits := len(reasons) == 0 && err == nil
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)

@@ -825,48 +825,6 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	checkPodStatus(t, kl, fittingPod, v1.PodPending)
 }
 
-// Tests that we handle not matching labels selector correctly by setting the failed status in status map.
-func TestHandleNodeSelector(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kl := testKubelet.kubelet
-	nodes := []*v1.Node{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}},
-			Status: v1.NodeStatus{
-				Allocatable: v1.ResourceList{
-					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
-				},
-			},
-		},
-	}
-	kl.nodeLister = testNodeLister{nodes: nodes}
-
-	recorder := record.NewFakeRecorder(20)
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      string("testNode"),
-		UID:       types.UID("testNode"),
-		Namespace: "",
-	}
-	testClusterDNSDomain := "TEST"
-	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
-
-	pods := []*v1.Pod{
-		podWithUIDNameNsSpec("123456789", "podA", "foo", v1.PodSpec{NodeSelector: map[string]string{"key": "A"}}),
-		podWithUIDNameNsSpec("987654321", "podB", "foo", v1.PodSpec{NodeSelector: map[string]string{"key": "B"}}),
-	}
-	// The first pod should be rejected.
-	notfittingPod := pods[0]
-	fittingPod := pods[1]
-
-	kl.HandlePodAdditions(pods)
-
-	// Check pod status stored in the status map.
-	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
-	checkPodStatus(t, kl, fittingPod, v1.PodPending)
-}
-
 // Tests that we handle exceeded resources correctly by setting the failed status in status map.
 func TestHandleMemExceeded(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)

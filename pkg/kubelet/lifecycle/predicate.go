@@ -20,12 +20,10 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	v1affinityhelper "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
@@ -94,10 +92,10 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// the Resource Class API in the future.
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
-	reasons, err := GeneralPredicates(podWithoutMissingExtendedResources, nodeInfo)
+	reasons, err := generalPredicates(podWithoutMissingExtendedResources, nodeInfo)
 	fit := len(reasons) == 0 && err == nil
 	if err != nil {
-		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
+		message := fmt.Sprintf("generalPredicates failed due to %v, which is unexpected.", err)
 		klog.InfoS("Failed to admit pod, GeneralPredicates failed", "pod", klog.KObj(admitPod), "err", err)
 		return PodAdmitResult{
 			Admit:   fit,
@@ -122,7 +120,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		var reason string
 		var message string
 		if len(reasons) == 0 {
-			message = fmt.Sprint("GeneralPredicates failed due to unknown reason, which is unexpected.")
+			message = fmt.Sprint("generalPredicates failed due to unknown reason, which is unexpected.")
 			klog.InfoS("Failed to admit pod: GeneralPredicates failed due to unknown reason, which is unexpected", "pod", klog.KObj(admitPod))
 			return PodAdmitResult{
 				Admit:   fit,
@@ -143,7 +141,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			klog.V(2).InfoS("Predicate failed on Pod", "pod", format.Pod(admitPod), "err", message)
 		default:
 			reason = "UnexpectedPredicateFailureType"
-			message = fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
+			message = fmt.Sprintf("generalPredicates failed due to %v, which is unexpected.", r)
 			klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "err", message)
 		}
 		return PodAdmitResult{
@@ -220,8 +218,8 @@ func (e *PredicateFailureError) GetReason() string {
 	return e.PredicateDesc
 }
 
-// GeneralPredicates checks a group of predicates that the kubelet cares about.
-func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]PredicateFailureReason, error) {
+// generalPredicates checks a group of predicates that the kubelet cares about.
+func generalPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]PredicateFailureReason, error) {
 	if nodeInfo.Node() == nil {
 		return nil, fmt.Errorf("node not found")
 	}
@@ -236,11 +234,6 @@ func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]Pr
 		})
 	}
 
-	// Ignore parsing errors for backwards compatibility.
-	match, _ := v1affinityhelper.GetRequiredNodeAffinity(pod).Match(nodeInfo.Node())
-	if !match {
-		reasons = append(reasons, &PredicateFailureError{nodeaffinity.Name, nodeaffinity.ErrReasonPod})
-	}
 	if !nodename.Fits(pod, nodeInfo) {
 		reasons = append(reasons, &PredicateFailureError{nodename.Name, nodename.ErrReason})
 	}
