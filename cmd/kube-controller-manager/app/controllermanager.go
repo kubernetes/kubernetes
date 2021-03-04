@@ -71,6 +71,8 @@ import (
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+
+	libgorestclient "github.com/openshift/library-go/pkg/config/client"
 )
 
 func init() {
@@ -127,6 +129,11 @@ controller, and serviceaccounts controller.`,
 				os.Exit(1)
 			}
 			cliflag.PrintFlags(cmd.Flags())
+
+			if err := SetUpPreferredHostForOpenShift(s); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
 
 			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List())
 			if err != nil {
@@ -191,6 +198,17 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		cfgz.Set(c.ComponentConfig)
 	} else {
 		klog.Errorf("unable to register configz: %v", err)
+	}
+
+	// start the localhost health monitor early so that it can be used by the LE client
+	if c.OpenShiftContext.PreferredHostHealthMonitor != nil {
+		hmCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go func() {
+			<-stopCh
+			cancel()
+		}()
+		go c.OpenShiftContext.PreferredHostHealthMonitor.Run(hmCtx)
 	}
 
 	// Setup any healthz checks we will want to use.
@@ -708,7 +726,7 @@ func createClientBuilders(c *config.CompletedConfig) (clientBuilder clientbuilde
 		}
 
 		clientBuilder = clientbuilder.NewDynamicClientBuilder(
-			restclient.AnonymousClientConfig(c.Kubeconfig),
+			libgorestclient.AnonymousClientConfigWithWrapTransport(c.Kubeconfig),
 			c.Client.CoreV1(),
 			metav1.NamespaceSystem)
 	} else {
