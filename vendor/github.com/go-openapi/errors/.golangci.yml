@@ -1,0 +1,20 @@
+linters-settings:
+  govet:
+    check-shadowing: true
+  golint:
+    min-confidence: 0
+  gocyclo:
+    min-complexity: 30
+  maligned:
+    suggest-new: true
+  dupl:
+    threshold: 100
+  goconst:
+    min-len: 2
+    min-occurrences: 4
+linters:
+  enable-all: true
+  disable:
+    - maligned
+    - lll
+    - gochecknoglobals

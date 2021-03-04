@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"test":1234}
+  name: test-rc
+  labels:
+    name: test-rc
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: test-rc
+    spec:
+      containers:
+        - name: test-rc
+          image: nginx
+          ports:
+          - containerPort: 80

@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-depl
+  labels:
+    l1: l1
+spec:
+  selector:
+    matchLabels:
+      l1: l1
+  template:
+    metadata:
+      labels:
+        l1: l1
+    spec:
+      containers:
+      - name: nginx
+        image: k8s.gcr.io/nginx:1.7.9

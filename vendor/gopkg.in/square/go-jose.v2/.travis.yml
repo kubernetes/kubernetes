@@ -1,0 +1,47 @@
+language: go
+
+sudo: false
+
+matrix:
+  fast_finish: true
+  allow_failures:
+    - go: tip
+
+go:
+- '1.5.x'
+- '1.6.x'
+- '1.7.x'
+- '1.8.x'
+- '1.9.x'
+- '1.10.x'
+
+go_import_path: gopkg.in/square/go-jose.v2
+
+before_script:
+- export PATH=$HOME/.local/bin:$PATH
+
+before_install:
+# Install encrypted gitcookies to get around bandwidth-limits
+# that is causing Travis-CI builds to fail. For more info, see
+# https://github.com/golang/go/issues/12933
+- openssl aes-256-cbc -K $encrypted_1528c3c2cafd_key -iv $encrypted_1528c3c2cafd_iv -in .gitcookies.sh.enc -out .gitcookies.sh -d || true
+- bash .gitcookies.sh || true
+- go get github.com/wadey/gocovmerge
+- go get github.com/mattn/goveralls
+- go get github.com/stretchr/testify/assert
+- go get golang.org/x/tools/cmd/cover || true
+- go get code.google.com/p/go.tools/cmd/cover || true
+- pip install cram --user
+
+script:
+- go test . -v -covermode=count -coverprofile=profile.cov
+- go test ./cipher -v -covermode=count -coverprofile=cipher/profile.cov
+- go test ./jwt -v -covermode=count -coverprofile=jwt/profile.cov
+- go test ./json -v # no coverage for forked encoding/json package
+- cd jose-util && go build && PATH=$PWD:$PATH cram -v jose-util.t
+- cd ..
+
+after_success:
+- gocovmerge *.cov */*.cov > merged.coverprofile
+- $HOME/gopath/bin/goveralls -coverprofile merged.coverprofile -service=travis-ci
+

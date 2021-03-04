@@ -1,0 +1,16 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# This is the owner of the test code.  The test data itself is owned by sig-architecture.
+reviewers:
+  - cheftako
+  - oomichi
+  - johnbelamaric
+approvers:
+  - cheftako
+  - spiffxp
+  - johnbelamaric
+emeritus_approvers:
+  - mml
+labels:
+  - area/conformance
+  - sig/architecture

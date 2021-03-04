@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: invalid-pod
+spec:
+  containers:
+  - name: kubernetes-serve-hostname
+    image: k8s.gcr.io/serve_hostname
+    resources:
+      limits:
+        cpu: "3"
+        memory: 100Mi

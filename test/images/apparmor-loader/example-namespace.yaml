@@ -1,0 +1,6 @@
+# The example Namespace used by other example objects.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apparmor

@@ -1,0 +1,139 @@
+package internal
+
+import (
+	"fmt"
+	"path/filepath"
+	"runtime"
+	"unsafe"
+
+	"github.com/cilium/ebpf/internal/unix"
+)
+
+//go:generate stringer -output syscall_string.go -type=BPFCmd
+
+// BPFCmd identifies a subcommand of the bpf syscall.
+type BPFCmd int
+
+// Well known BPF commands.
+const (
+	BPF_MAP_CREATE BPFCmd = iota
+	BPF_MAP_LOOKUP_ELEM
+	BPF_MAP_UPDATE_ELEM
+	BPF_MAP_DELETE_ELEM
+	BPF_MAP_GET_NEXT_KEY
+	BPF_PROG_LOAD
+	BPF_OBJ_PIN
+	BPF_OBJ_GET
+	BPF_PROG_ATTACH
+	BPF_PROG_DETACH
+	BPF_PROG_TEST_RUN
+	BPF_PROG_GET_NEXT_ID
+	BPF_MAP_GET_NEXT_ID
+	BPF_PROG_GET_FD_BY_ID
+	BPF_MAP_GET_FD_BY_ID
+	BPF_OBJ_GET_INFO_BY_FD
+	BPF_PROG_QUERY
+	BPF_RAW_TRACEPOINT_OPEN
+	BPF_BTF_LOAD
+	BPF_BTF_GET_FD_BY_ID
+	BPF_TASK_FD_QUERY
+	BPF_MAP_LOOKUP_AND_DELETE_ELEM
+	BPF_MAP_FREEZE
+	BPF_BTF_GET_NEXT_ID
+	BPF_MAP_LOOKUP_BATCH
+	BPF_MAP_LOOKUP_AND_DELETE_BATCH
+	BPF_MAP_UPDATE_BATCH
+	BPF_MAP_DELETE_BATCH
+	BPF_LINK_CREATE
+	BPF_LINK_UPDATE
+	BPF_LINK_GET_FD_BY_ID
+	BPF_LINK_GET_NEXT_ID
+	BPF_ENABLE_STATS
+	BPF_ITER_CREATE
+)
+
+// BPF wraps SYS_BPF.
+//
+// Any pointers contained in attr must use the Pointer type from this package.
+func BPF(cmd BPFCmd, attr unsafe.Pointer, size uintptr) (uintptr, error) {
+	r1, _, errNo := unix.Syscall(unix.SYS_BPF, uintptr(cmd), uintptr(attr), size)
+	runtime.KeepAlive(attr)
+
+	var err error
+	if errNo != 0 {
+		err = errNo
+	}
+
+	return r1, err
+}
+
+type BPFProgAttachAttr struct {
+	TargetFd     uint32
+	AttachBpfFd  uint32
+	AttachType   uint32
+	AttachFlags  uint32
+	ReplaceBpfFd uint32
+}
+
+func BPFProgAttach(attr *BPFProgAttachAttr) error {
+	_, err := BPF(BPF_PROG_ATTACH, unsafe.Pointer(attr), unsafe.Sizeof(*attr))
+	return err
+}
+
+type BPFProgDetachAttr struct {
+	TargetFd    uint32
+	AttachBpfFd uint32
+	AttachType  uint32
+}
+
+func BPFProgDetach(attr *BPFProgDetachAttr) error {
+	_, err := BPF(BPF_PROG_DETACH, unsafe.Pointer(attr), unsafe.Sizeof(*attr))
+	return err
+}
+
+type bpfObjAttr struct {
+	fileName  Pointer
+	fd        uint32
+	fileFlags uint32
+}
+
+const bpfFSType = 0xcafe4a11
+
+// BPFObjPin wraps BPF_OBJ_PIN.
+func BPFObjPin(fileName string, fd *FD) error {
+	dirName := filepath.Dir(fileName)
+	var statfs unix.Statfs_t
+	if err := unix.Statfs(dirName, &statfs); err != nil {
+		return err
+	}
+	if uint64(statfs.Type) != bpfFSType {
+		return fmt.Errorf("%s is not on a bpf filesystem", fileName)
+	}
+
+	value, err := fd.Value()
+	if err != nil {
+		return err
+	}
+
+	attr := bpfObjAttr{
+		fileName: NewStringPointer(fileName),
+		fd:       value,
+	}
+	_, err = BPF(BPF_OBJ_PIN, unsafe.Pointer(&attr), unsafe.Sizeof(attr))
+	if err != nil {
+		return fmt.Errorf("pin object %s: %w", fileName, err)
+	}
+	return nil
+}
+
+// BPFObjGet wraps BPF_OBJ_GET.
+func BPFObjGet(fileName string) (*FD, error) {
+	attr := bpfObjAttr{
+		fileName: NewStringPointer(fileName),
+	}
+	ptr, err := BPF(BPF_OBJ_GET, unsafe.Pointer(&attr), unsafe.Sizeof(attr))
+	if err != nil {
+		return nil, fmt.Errorf("get object %s: %w", fileName, err)
+	}
+	return NewFD(uint32(ptr)), nil
+}

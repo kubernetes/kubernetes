@@ -1,0 +1,471 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package openstorage.api;
+
+option go_package = "api";
+option java_multiple_files = true;
+option java_package = "com.openstorage.api";
+
+enum Status {
+  STATUS_NONE = 0;
+  STATUS_INIT = 1;
+  STATUS_OK = 2;
+  STATUS_OFFLINE = 3;
+  STATUS_ERROR = 4;
+  STATUS_NOT_IN_QUORUM = 5;
+  STATUS_DECOMMISSION = 6;
+  STATUS_MAINTENANCE = 7;
+  STATUS_STORAGE_DOWN = 8;
+  STATUS_STORAGE_DEGRADED = 9;
+  STATUS_NEEDS_REBOOT = 10;
+  STATUS_STORAGE_REBALANCE = 11;
+  STATUS_STORAGE_DRIVE_REPLACE = 12;
+  // Add statuses before MAX and update the number for MAX
+  STATUS_MAX = 13;
+}
+
+enum DriverType {
+  DRIVER_TYPE_NONE = 0;
+  DRIVER_TYPE_FILE = 1;
+  DRIVER_TYPE_BLOCK = 2;
+  DRIVER_TYPE_OBJECT = 3;
+  DRIVER_TYPE_CLUSTERED = 4;
+  DRIVER_TYPE_GRAPH = 5;
+}
+
+enum FSType {
+  FS_TYPE_NONE = 0;
+  FS_TYPE_BTRFS = 1;
+  FS_TYPE_EXT4 = 2;
+  FS_TYPE_FUSE = 3;
+  FS_TYPE_NFS = 4;
+  FS_TYPE_VFS = 5;
+  FS_TYPE_XFS = 6;
+  FS_TYPE_ZFS = 7;
+}
+
+enum GraphDriverChangeType {
+  GRAPH_DRIVER_CHANGE_TYPE_NONE = 0;
+  GRAPH_DRIVER_CHANGE_TYPE_MODIFIED = 1;
+  GRAPH_DRIVER_CHANGE_TYPE_ADDED = 2;
+  GRAPH_DRIVER_CHANGE_TYPE_DELETED = 3;
+}
+
+enum SeverityType {
+  SEVERITY_TYPE_NONE = 0;
+  SEVERITY_TYPE_ALARM = 1;
+  SEVERITY_TYPE_WARNING = 2;
+  SEVERITY_TYPE_NOTIFY = 3;
+}
+
+enum ResourceType {
+  RESOURCE_TYPE_NONE = 0;
+  RESOURCE_TYPE_VOLUME = 1;
+  RESOURCE_TYPE_NODE = 2;
+  RESOURCE_TYPE_CLUSTER = 3;
+  RESOURCE_TYPE_DRIVE = 4;
+}
+
+enum AlertActionType {
+  ALERT_ACTION_TYPE_NONE = 0;
+  ALERT_ACTION_TYPE_DELETE = 1;
+  ALERT_ACTION_TYPE_CREATE = 2;
+  ALERT_ACTION_TYPE_UPDATE = 3;
+}
+
+enum VolumeActionParam {
+  VOLUME_ACTION_PARAM_NONE = 0;
+  // Maps to the boolean value false
+  VOLUME_ACTION_PARAM_OFF = 1;
+  // Maps to the boolean value true.
+  VOLUME_ACTION_PARAM_ON = 2;
+}
+
+enum CosType {
+  NONE = 0;
+  LOW = 1;
+  MEDIUM = 2;
+  HIGH = 3;
+}
+
+enum IoProfile {
+  IO_PROFILE_SEQUENTIAL = 0;
+  IO_PROFILE_RANDOM= 1;
+  IO_PROFILE_DB = 2;
+  IO_PROFILE_DB_REMOTE = 3;
+}
+
+// VolumeState represents the state of a volume.
+enum VolumeState {
+  VOLUME_STATE_NONE = 0;
+  // Volume is transitioning to new state
+  VOLUME_STATE_PENDING = 1;
+  // Volume is ready to be assigned to a container
+  VOLUME_STATE_AVAILABLE = 2;
+  // Volume is attached to container
+  VOLUME_STATE_ATTACHED = 3;
+  // Volume is detached but associated with a container
+  VOLUME_STATE_DETACHED = 4;
+  // Volume detach is in progress
+  VOLUME_STATE_DETATCHING = 5;
+  // Volume is in error state
+  VOLUME_STATE_ERROR = 6;
+  // Volume is deleted, it will remain in this state
+  // while resources are asynchronously reclaimed
+  VOLUME_STATE_DELETED = 7;
+  // Volume is trying to be detached
+  VOLUME_STATE_TRY_DETACHING = 8;
+  // Volume is undergoing restore
+  VOLUME_STATE_RESTORE = 9;
+}
+
+// VolumeStatus represents a health status for a volume.
+enum VolumeStatus {
+  VOLUME_STATUS_NONE = 0;
+  // Volume is not present
+  VOLUME_STATUS_NOT_PRESENT = 1;
+  // Volume is healthy
+  VOLUME_STATUS_UP = 2;
+  // Volume is in fail mode
+  VOLUME_STATUS_DOWN = 3;
+  // Volume is up but with degraded performance
+  // In a RAID group, this may indicate a problem with one or more drives
+  VOLUME_STATUS_DEGRADED = 4;
+}
+
+enum StorageMedium {
+  // Magnetic spinning disk.
+  STORAGE_MEDIUM_MAGNETIC = 0;
+  // SSD disk
+  STORAGE_MEDIUM_SSD = 1;
+  // NVME disk
+  STORAGE_MEDIUM_NVME = 2;
+}
+
+enum ClusterNotify {
+ // Node is down
+ CLUSTER_NOTIFY_DOWN = 0;
+}
+
+enum AttachState {
+    // Attached and available externally
+    ATTACH_STATE_EXTERNAL = 0;
+    // Attached but only available internally
+    ATTACH_STATE_INTERNAL = 1;
+    // Switching from External to Internal
+    ATTACH_STATE_INTERNAL_SWITCH = 2;
+}
+
+// StorageResource groups properties of a storage device.
+message StorageResource {
+  // Id is the LUN identifier.
+  string id = 1;
+  // Path device path for this storage resource.
+  string path = 2;
+  // Storage medium.
+  StorageMedium medium = 3;
+  // True if this device is online.
+  bool online = 4;;
+  // IOPS
+  uint64 iops = 5;;
+  // SeqWrite
+  double seq_write = 6;
+  // SeqRead
+  double seq_read = 7;
+  // RandRW
+  double randRW  = 8;
+  // Total size in bytes.
+  uint64 size = 9;;
+  // Physical Bytes used.
+  uint64 used = 10;
+  // True if this device is rotational.
+  string rotation_speed = 11;
+  // Timestamp of last time this device was scanned.
+  google.protobuf.Timestamp last_scan = 12;
+}
+
+// StoragePool groups different storage devices based on their CosType
+message StoragePool {
+  // ID pool ID
+  int32 ID = 1;
+  // Cos reflects the capabilities of this drive pool
+  CosType Cos = 2;
+  // Medium underlying storage type
+  StorageMedium Medium = 3;
+  // RaidLevel storage raid level
+  string RaidLevel = 4;
+  // TotalSize of the pool
+  uint64 TotalSize = 7;
+  // Used size of the pool
+  uint64 Used = 8;
+  // Labels is a list of user defined name-value pairs
+  map<string, string> labels = 9;
+}
+
+// VolumeLocator is a structure that is attached to a volume
+// and is used to carry opaque metadata.
+message VolumeLocator {
+  // User friendly identifier
+  string name = 1;
+  // A set of name-value pairs that acts as search filters
+  map<string, string> volume_labels = 2;
+}
+
+message Source {
+  // A volume id, if specified will create a clone of the parent.
+  string parent = 1;
+  // Seed will seed the volume from the specified URI
+  // Any additional config for the source comes from the labels in the spec
+  string seed = 2;
+}
+
+message Group {
+  // Id common identifier across volumes that have the same group.
+  string id = 1;
+}
+
+// VolumeSpec has the properties needed to create a volume.
+message VolumeSpec {
+  // Ephemeral storage
+  bool ephemeral = 1;
+  // Size specifies the thin provisioned volume size.
+  uint64 size = 2;
+  // Format specifies the filesystem for this volume.
+  FSType format = 3;
+  // BlockSize for the filesystem.
+  int64 block_size = 4;
+  // HaLevel specifies the number of copies of data.
+  int64 ha_level = 5;
+  // Cos specifies the relative class of service.
+  CosType cos = 6;
+  // IoProfile provides a hint about application using this volume.
+  IoProfile io_profile = 7;
+  // Dedupe specifies if the volume data is to be de-duplicated.
+  bool dedupe = 8;
+  // SnapshotInterval in minutes, set to 0 to disable snapshots
+  uint32 snapshot_interval = 9;
+  // VolumeLabels configuration labels
+  map<string, string> volume_labels = 10;
+  // Shared is true if this volume can be remotely accessed.
+  bool shared = 11;
+  // ReplicaSet is the desired set of nodes for the volume data.
+  ReplicaSet replica_set = 12;
+  // Aggregatiokn level Specifies the number of parts the volume can be aggregated from.
+  uint32 aggregation_level = 13;
+  // Encrypted is true if this volume will be cryptographically secured.
+  bool encrypted = 14;
+  // Passphrase for an encrypted volume
+  string passphrase = 15;
+  // SnapshotSchedule a well known string that specifies when snapshots should be taken. 
+  string snapshot_schedule = 16;
+  // Scale allows autocreation of volumes.
+  uint32 scale = 17;
+  // Sticky volumes cannot be deleted until the flag is removed.
+  bool sticky = 18;
+  // Group identifies a consistency group
+  Group group = 21;
+  // GroupEnforced is true if consistency group creation is enforced.
+  bool group_enforced = 22;
+  // Compressed is true if this volume is to be compressed.
+  bool compressed = 23;
+}
+
+// ReplicaSet set of machine IDs (nodes) to which part of this volume is erasure 
+// coded - for clustered storage arrays
+message ReplicaSet {
+  repeated string nodes = 1;
+}
+
+// RuntimeStateMap is a list of name value mapping of driver specific runtime 
+// information.
+message RuntimeStateMap {
+  map<string, string> runtime_state = 1;
+}
+
+// Volume represents an abstract storage volume.
+// Volume represents an abstract storage volume.
+message Volume {
+  // Self referential volume ID.
+  string id = 1;
+  // Source specified seed data for the volume.
+  Source source = 2;
+  // Group volumes in the same group have the same group id.
+  Group group = 3;
+  // Readonly is true if this volume is to be mounted with readonly access.
+  bool readonly = 4;
+  // User specified locator
+  VolumeLocator locator = 5;
+  // Volume creation time
+  google.protobuf.Timestamp ctime = 6;
+  // User specified VolumeSpec
+  VolumeSpec spec = 7;
+  // Usage is bytes consumed by vtheis volume.
+  uint64 usage = 8;
+  // LastScan is the time when an integrity check was run.
+  google.protobuf.Timestamp last_scan = 9;
+  // Format specifies the filesytem for this volume.
+  FSType format = 10;
+  // Status is the availability status of this volume.
+  VolumeStatus status = 11;
+  // State is the current runtime state of this volume.
+  VolumeState state = 12;
+  // AttachedOn is the node instance identifier for clustered systems.
+  string attached_on = 13;
+  // AttachedState shows whether the device is attached for internal or external use.
+  AttachState attached_state = 14;
+  // DevicePath is the device exported by block device implementations.
+  string device_path = 15;
+  // SecureDevicePath is the device path for an encrypted volume.
+  string secure_device_path = 16;
+  // AttachPath is the mounted path in the host namespace.
+  repeated string attach_path = 17;
+  // AttachInfo is a list of name value mappings that provides attach information.
+  map<string, string> attach_info = 18;
+  // ReplicatSets storage for this volumefor clustered storage arrays.
+  repeated ReplicaSet replica_sets = 19;
+  // RuntimeState is a lst of name value mapping of driver specific runtime 
+  // information.
+  repeated RuntimeStateMap runtime_state = 20;
+  // Error is the Last recorded error.
+  string error = 21;
+}
+
+message Stats {
+  // Reads completed successfully
+  uint64 reads = 1;
+  // Time spent in reads in ms
+  uint64 read_ms = 2;
+  uint64 read_bytes = 3;
+  // Writes completed successfully
+  uint64 writes = 4;
+  // Time spent in writes in ms
+  uint64 write_ms = 5;
+  uint64 write_bytes = 6;
+  // IOs curently in progress
+  uint64 io_progress = 7;
+  // Time spent doing IOs ms
+  uint64 io_ms = 8;
+  // BytesUsed
+  uint64 bytes_used = 9;
+  // Interval in ms during which stats were collected
+  uint64 interval_ms = 10;
+}
+
+message Alert {
+  // Id for Alert
+  int64 id = 1;
+  // Severity of the Alert
+  SeverityType severity = 2;
+  // AlertType user defined alert type
+  int64 alert_type = 3;
+  // Message describing the Alert
+  string message = 4;
+  //Timestamp when Alert occured
+  google.protobuf.Timestamp timestamp = 5;	
+  // ResourceId where Alert occured
+  string resource_id = 6;
+  // Resource where Alert occured
+  ResourceType resource = 7;
+  // Cleared Flag
+  bool cleared = 8;
+  // TTL in seconds for this Alert
+  uint64 ttl = 9;
+  // UniqueTag helps identify a unique alert for a given resouce
+  string unique_tag = 10;
+}
+
+message Alerts {
+  repeated Alert alert = 1;
+}
+
+message VolumeCreateRequest {
+  // User specified volume name and labels
+  VolumeLocator locator = 1;
+  // Source to create volume
+  Source source = 2;
+  // The storage spec for the volume
+  VolumeSpec spec = 3;
+}
+
+message VolumeResponse {
+  string error = 1;
+}
+
+message VolumeCreateResponse {
+  // ID of the newly created volume
+  string id = 1;
+  VolumeResponse volume_response = 2;
+}
+
+// VolumeStateAction specifies desired actions.
+message VolumeStateAction {
+  // Attach or Detach volume
+  VolumeActionParam attach = 1;
+  // Mount or unmount volume
+  VolumeActionParam mount = 2;
+  // MountPath Path where the device is mounted
+  string mount_path = 3;
+  // DevicePath Path returned in attach
+  string device_path = 4;
+  // UnmountBeforeDetach is used to check whether unmount should be done before
+  // a detach
+  bool unmount_before_detach = 5;
+}
+
+message VolumeSetRequest {
+  // User specified volume name and labels
+  VolumeLocator locator = 1;
+  // The storage spec for the volume
+  VolumeSpec spec = 2;
+  // State modification on this volume.
+  VolumeStateAction action = 3;
+  // additional options
+  // required for the Set operation.
+  map<string, string> options = 4;
+}
+
+message VolumeSetResponse {
+  Volume volume = 1;
+  VolumeResponse volume_response = 2;
+}
+
+message SnapCreateRequest {
+  // volume id
+  string id = 1;
+  VolumeLocator locator = 2;
+  bool readonly = 3;
+}
+
+message SnapCreateResponse {
+  VolumeCreateResponse volume_create_response = 1;
+}
+
+message VolumeInfo {
+  string volume_id = 1;
+  string path = 2;
+  VolumeSpec storage = 3;
+}
+
+// GraphDriverChanges represent a list of changes between the filesystem layers
+// specified by the ID and Parent.  // Parent may be an empty string, in which
+// case there is no parent.
+// Where the Path is the filesystem path within the layered filesystem
+message GraphDriverChanges {
+  string path = 1;
+  GraphDriverChangeType kind = 2;
+}
+
+message ClusterResponse {
+  string error = 1;
+}
+
+message ActiveRequest {
+  map<int64, string> ReqestKV = 1;
+}
+
+message ActiveRequests {
+  int64 RequestCount = 1;
+  repeated ActiveRequest ActiveRequest = 2;
+}

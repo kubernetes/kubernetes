@@ -1,0 +1,25 @@
+sudo: false
+language: go
+# * github.com/grpc/grpc-go still supports go1.6
+#   - When we drop support for go1.6 we can remove golang.org/x/net/context
+#     below as it is part of the Go std library since go1.7
+# * github.com/prometheus/client_golang already requires at least go1.7 since
+#   September 2017
+go:
+  - 1.6.x
+  - 1.7.x
+  - 1.8.x
+  - 1.9.x
+  - 1.10.x
+  - master
+
+install:
+  - go get github.com/prometheus/client_golang/prometheus
+  - go get google.golang.org/grpc
+  - go get golang.org/x/net/context
+  - go get github.com/stretchr/testify
+script:
+ - make test 
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

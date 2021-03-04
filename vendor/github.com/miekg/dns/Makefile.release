@@ -1,0 +1,52 @@
+# Makefile for releasing.
+#
+# The release is controlled from version.go. The version found there is
+# used to tag the git repo, we're not building any artifects so there is nothing
+# to upload to github.
+#
+# * Up the version in version.go
+# * Run: make -f Makefile.release release
+#   * will *commit* your change with 'Release $VERSION'
+#   * push to github
+#
+
+define GO
+//+build ignore
+
+package main
+
+import (
+	"fmt"
+
+	"github.com/miekg/dns"
+)
+
+func main() {
+	fmt.Println(dns.Version.String())
+}
+endef
+
+$(file > version_release.go,$(GO))
+VERSION:=$(shell go run version_release.go)
+TAG="v$(VERSION)"
+
+all:
+	@echo Use the \'release\' target to start a release $(VERSION)
+	rm -f version_release.go
+
+.PHONY: release
+release: commit push
+	@echo Released $(VERSION)
+	rm -f version_release.go
+
+.PHONY: commit
+commit:
+	@echo Committing release $(VERSION)
+	git commit -am"Release $(VERSION)"
+	git tag $(TAG)
+
+.PHONY: push
+push:
+	@echo Pushing release $(VERSION) to master
+	git push --tags
+	git push

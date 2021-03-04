@@ -1,0 +1,9 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- sig-auth-policy-approvers
+reviewers:
+- sig-auth-policy-reviewers
+labels:
+- sig/auth
+

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: valid-pod
+  labels:
+    name: valid-pod
+spec:
+  containers:
+  - name: kubernetes-serve-hostname
+    image: k8s.gcr.io/serve_hostname
+    resources:
+      limits:
+        cpu: "1"
+        memory: 512Mi

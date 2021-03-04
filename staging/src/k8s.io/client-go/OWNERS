@@ -1,0 +1,19 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- caesarxuchao
+- deads2k
+- lavalamp
+- liggitt
+- smarterclayton
+- sttts
+reviewers:
+- caesarxuchao
+- deads2k
+- lavalamp
+- liggitt
+- soltysh
+- sttts
+- yliaog
+labels:
+- sig/api-machinery

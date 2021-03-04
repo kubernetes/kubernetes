@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package containerd.v1.types;
+
+import weak "gogoproto/gogo.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+
+enum Status {
+	option (gogoproto.goproto_enum_prefix) = false;
+	option (gogoproto.enum_customname) = "Status";
+
+	UNKNOWN = 0 [(gogoproto.enumvalue_customname) = "StatusUnknown"];
+	CREATED = 1 [(gogoproto.enumvalue_customname) = "StatusCreated"];
+	RUNNING = 2 [(gogoproto.enumvalue_customname) = "StatusRunning"];
+	STOPPED = 3 [(gogoproto.enumvalue_customname) = "StatusStopped"];
+	PAUSED = 4 [(gogoproto.enumvalue_customname) = "StatusPaused"];
+	PAUSING = 5 [(gogoproto.enumvalue_customname) = "StatusPausing"];
+}
+
+message Process {
+	string container_id = 1;
+	string id = 2;
+	uint32 pid = 3;
+	Status status = 4;
+	string stdin = 5;
+	string stdout = 6;
+	string stderr = 7;
+	bool terminal = 8;
+	uint32 exit_status = 9;
+	google.protobuf.Timestamp exited_at = 10 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
+message ProcessInfo {
+	// PID is the process ID.
+	uint32 pid = 1;
+	// Info contains additional process information.
+	//
+	// Info varies by platform.
+	google.protobuf.Any info = 2;
+}

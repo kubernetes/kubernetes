@@ -1,0 +1,82 @@
+{
+	"kind": "ReplicationController",
+	"apiVersion": "v1",
+	"metadata": {
+		"name": "heapster-v1.3.0",
+		"labels": {
+			"k8s-app": "heapster",
+			"version": "v1.3.0"
+		}
+	},
+	"spec": {
+		"replicas": 1,
+		"selector": {
+			"k8s-app": "heapster",
+			"version": "v1.3.0"
+		},
+		"template": {
+			"metadata": {
+				"labels": {
+					"k8s-app": "heapster",
+					"version": "v1.3.0"
+				}
+			},
+			"spec": {
+				"volumes": [
+					{
+						"name": "kubeconfig-volume",
+						"secret": {
+							"secretName": "kubeconfig"
+						}
+					}
+				],
+				"containers": [
+				{
+					"name": "heapster",
+					"image": "k8s.gcr.io/heapster:v1.3.0",
+					"resources": {
+						"requests": {
+							"cpu": "{{METRICS_CPU}}m",
+							"memory": "{{METRICS_MEM}}Mi"
+						}
+					},
+					"command": [
+						"/heapster"
+					],
+					"args": [
+						"--source=kubernetes:https://{{MASTER_IP}}:443?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/heapster.kubeconfig"
+					],
+					"volumeMounts": [
+						{
+							"name": "kubeconfig-volume",
+							"mountPath": "/kubeconfig"
+						}
+					]
+				},
+				{
+					"name": "eventer",
+					"image": "k8s.gcr.io/heapster:v1.3.0",
+					"resources": {
+						"requests": {
+							"memory": "{{EVENTER_MEM}}Ki"
+						}
+					},
+					"command": [
+						"/eventer"
+					],
+					"args": [
+						"--source=kubernetes:https://{{MASTER_IP}}:443?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/heapster.kubeconfig"
+					],
+					"volumeMounts": [
+						{
+							"name": "kubeconfig-volume",
+							"mountPath": "/kubeconfig"
+						}
+					]
+
+				}]
+			}
+		}
+	}
+}
+

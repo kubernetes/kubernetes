@@ -1,0 +1,23 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - bentheelder
+  - cblecker
+  - dims
+  - fejta
+  - hasheddan # Release Manager / SIG Technical Lead
+  - justaugustus # Release Manager / SIG Chair
+  - lavalamp
+  - saschagrunert # Release Manager / SIG Chair
+  - spiffxp
+approvers:
+  - bentheelder
+  - cblecker
+  - fejta
+  - justaugustus
+  - lavalamp
+  - mikedanese
+  - spiffxp
+emeritus_approvers:
+  - jbeda
+  - zmerlynn

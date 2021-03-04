@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  labels:
+    name: nginx
+spec:
+  selector:
+    matchLabels:
+      name: nginx1
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        name: nginx1
+    spec:
+      containers:
+      - name: nginx
+        image: k8s.gcr.io/nginx:test-cmd
+        ports:
+        - containerPort: 80

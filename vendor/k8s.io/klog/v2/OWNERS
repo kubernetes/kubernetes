@@ -1,0 +1,19 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+reviewers:
+  - jayunit100
+  - hoegaarden
+  - andyxning
+  - neolit123
+  - pohly
+  - yagonobre
+  - vincepri
+  - detiber
+approvers:
+  - dims
+  - thockin
+  - justinsb
+  - tallclair
+  - piosz
+  - brancz
+  - DirectXMan12
+  - lavalamp
