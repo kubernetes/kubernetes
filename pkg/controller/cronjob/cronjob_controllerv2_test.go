@@ -17,7 +17,6 @@ limitations under the License.
 package cronjob
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -29,13 +28,15 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	batchv1listers "k8s.io/client-go/listers/batch/v1"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 func justASecondBeforeTheHour() time.Time {
@@ -46,7 +47,7 @@ func justASecondBeforeTheHour() time.Time {
 	return T1
 }
 
-func Test_syncCronJob(t *testing.T) {
+func TestControllerV2SyncCronJob(t *testing.T) {
 	// Check expectations on deadline parameters
 	if shortDead/60/60 >= 1 {
 		t.Errorf("shortDead should be less than one hour")
@@ -312,240 +313,166 @@ func Test_syncCronJob(t *testing.T) {
 
 type fakeQueue struct {
 	workqueue.RateLimitingInterface
-	t   time.Duration
-	key interface{}
+	delay time.Duration
+	key   interface{}
 }
 
-func (f *fakeQueue) AddAfter(key interface{}, t time.Duration) {
-	f.t = t
+func (f *fakeQueue) AddAfter(key interface{}, delay time.Duration) {
+	f.delay = delay
 	f.key = key
 }
 
-// this test will take around 1 seconds to complete
-func TestController2_updateCronJob(t *testing.T) {
-	cjc := &fakeCJControl{}
-	jc := &fakeJobControl{}
-	type fields struct {
-		queue          *fakeQueue
-		recorder       record.EventRecorder
-		jobControl     jobControlInterface
-		cronJobControl cjControlInterface
-	}
-	type args struct {
-		oldJobTemplate *batchv1.JobTemplateSpec
-		newJobTemplate *batchv1.JobTemplateSpec
-		oldJobSchedule string
-		newJobSchedule string
-	}
+// this test will take around 61 seconds to complete
+func TestControllerV2UpdateCronJob(t *testing.T) {
 	tests := []struct {
-		name              string
-		fields            fields
-		args              args
-		deltaTimeForQueue time.Duration
+		name          string
+		oldCronJob    *batchv1.CronJob
+		newCronJob    *batchv1.CronJob
+		expectedDelay time.Duration
 	}{
 		{
 			name: "spec.template changed",
-			fields: fields{
-				queue:          &fakeQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-update-cronjob")},
-				recorder:       record.NewFakeRecorder(10),
-				jobControl:     jc,
-				cronJobControl: cjc,
-			},
-			args: args{
-				oldJobTemplate: &batchv1.JobTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels:      map[string]string{"a": "b"},
-						Annotations: map[string]string{"x": "y"},
+			oldCronJob: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels:      map[string]string{"a": "b"},
+							Annotations: map[string]string{"x": "y"},
+						},
+						Spec: jobSpec(),
 					},
-					Spec: jobSpec(),
-				},
-				newJobTemplate: &batchv1.JobTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels:      map[string]string{"a": "foo"},
-						Annotations: map[string]string{"x": "y"},
-					},
-					Spec: jobSpec(),
 				},
 			},
-			deltaTimeForQueue: 0 * time.Second,
+			newCronJob: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels:      map[string]string{"a": "foo"},
+							Annotations: map[string]string{"x": "y"},
+						},
+						Spec: jobSpec(),
+					},
+				},
+			},
+			expectedDelay: 0 * time.Second,
 		},
 		{
 			name: "spec.schedule changed",
-			fields: fields{
-				queue:          &fakeQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-update-cronjob")},
-				recorder:       record.NewFakeRecorder(10),
-				jobControl:     jc,
-				cronJobControl: cjc,
+			oldCronJob: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 * * * *",
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels:      map[string]string{"a": "b"},
+							Annotations: map[string]string{"x": "y"},
+						},
+						Spec: jobSpec(),
+					},
+				},
 			},
-			args: args{
-				oldJobSchedule: "30 * * * *",
-				newJobSchedule: "*/1 * * * *",
+			newCronJob: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					Schedule: "*/1 * * * *",
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels:      map[string]string{"a": "foo"},
+							Annotations: map[string]string{"x": "y"},
+						},
+						Spec: jobSpec(),
+					},
+				},
 			},
-			deltaTimeForQueue: 1*time.Second + nextScheduleDelta,
+			expectedDelay: 1*time.Second + nextScheduleDelta,
 		},
 		// TODO: Add more test cases for updating scheduling.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cj := cronJob()
-			newCj := cronJob()
-			if tt.args.oldJobTemplate != nil {
-				cj.Spec.JobTemplate = *tt.args.oldJobTemplate
-			}
-			if tt.args.newJobTemplate != nil {
-				newCj.Spec.JobTemplate = *tt.args.newJobTemplate
-			}
-			if tt.args.oldJobSchedule != "" {
-				cj.Spec.Schedule = tt.args.oldJobSchedule
-			}
-			if tt.args.newJobSchedule != "" {
-				newCj.Spec.Schedule = tt.args.newJobSchedule
-			}
-			jm := &ControllerV2{
-				queue:          tt.fields.queue,
-				recorder:       tt.fields.recorder,
-				jobControl:     tt.fields.jobControl,
-				cronJobControl: tt.fields.cronJobControl,
+			kubeClient := fake.NewSimpleClientset()
+			sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+			jm, err := NewControllerV2(sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
 			}
 			jm.now = justASecondBeforeTheHour
-			jm.updateCronJob(&cj, &newCj)
+			queue := &fakeQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-update-cronjob")}
+			jm.queue = queue
+			jm.jobControl = &fakeJobControl{}
+			jm.cronJobControl = &fakeCJControl{}
+			jm.recorder = record.NewFakeRecorder(10)
 
-			if tt.fields.queue.t.Seconds() != tt.deltaTimeForQueue.Seconds() {
-				t.Errorf("Expected %#v got %#v", tt.deltaTimeForQueue.Seconds(), tt.fields.queue.t.Seconds())
+			jm.updateCronJob(tt.oldCronJob, tt.newCronJob)
+			if queue.delay.Seconds() != tt.expectedDelay.Seconds() {
+				t.Errorf("Expected delay %#v got %#v", tt.expectedDelay.Seconds(), queue.delay.Seconds())
 			}
 		})
 	}
 }
 
-type FakeNamespacedJobLister struct {
-	jobs      []*batchv1.Job
-	namespace string
-}
-
-func (f *FakeNamespacedJobLister) Get(name string) (*batchv1.Job, error) {
-	for _, j := range f.jobs {
-		if j.Namespace == f.namespace && j.Namespace == name {
-			return j, nil
-		}
-	}
-	return nil, fmt.Errorf("Not Found")
-}
-
-func (f *FakeNamespacedJobLister) List(selector labels.Selector) ([]*batchv1.Job, error) {
-	ret := []*batchv1.Job{}
-	for _, j := range f.jobs {
-		if f.namespace != "" && f.namespace != j.Namespace {
-			continue
-		}
-		if selector.Matches(labels.Set(j.GetLabels())) {
-			ret = append(ret, j)
-		}
-	}
-	return ret, nil
-}
-
-func (f *FakeNamespacedJobLister) Jobs(namespace string) batchv1listers.JobNamespaceLister {
-	f.namespace = namespace
-	return f
-}
-
-func (f *FakeNamespacedJobLister) GetPodJobs(pod *v1.Pod) (jobs []batchv1.Job, err error) {
-	panic("implement me")
-}
-
-func TestControllerV2_getJobList(t *testing.T) {
+func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 	trueRef := true
-	type fields struct {
-		jobLister batchv1listers.JobLister
-	}
-	type args struct {
-		cronJob *batchv1.CronJob
-	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    []*batchv1.Job
-		wantErr bool
+		name     string
+		cronJob  *batchv1.CronJob
+		jobs     []runtime.Object
+		expected []*batchv1.Job
 	}{
 		{
-			name: "test getting jobs in namespace without controller reference",
-			fields: fields{
-				&FakeNamespacedJobLister{jobs: []*batchv1.Job{
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns"},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns"},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns"},
-					},
-				}}},
-			args: args{cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
-			want: []*batchv1.Job{},
+			name:    "test getting jobs in namespace without controller reference",
+			cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}},
+			jobs: []runtime.Object{
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns"}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns"}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns"}},
+			},
+			expected: []*batchv1.Job{},
 		},
 		{
-			name: "test getting jobs in namespace with a controller reference",
-			fields: fields{
-				&FakeNamespacedJobLister{jobs: []*batchv1.Job{
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns"},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
-							OwnerReferences: []metav1.OwnerReference{
-								{
-									Name:       "fooer",
-									Controller: &trueRef,
-								},
-							}},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns"},
-					},
-				}}},
-			args: args{cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
-			want: []*batchv1.Job{{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							Name:       "fooer",
-							Controller: &trueRef,
-						},
-					}},
-			}},
+			name:    "test getting jobs in namespace with a controller reference",
+			cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}},
+			jobs: []runtime.Object{
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns"}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns"}},
+			},
+			expected: []*batchv1.Job{
+				{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}}},
+			},
 		},
 		{
-			name: "test getting jobs in other namespaces ",
-			fields: fields{
-				&FakeNamespacedJobLister{jobs: []*batchv1.Job{
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar-ns"},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "bar-ns"},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "bar-ns"},
-					},
-				}}},
-			args: args{cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
-			want: []*batchv1.Job{},
+			name:    "test getting jobs in other namespaces",
+			cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}},
+			jobs: []runtime.Object{
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar-ns"}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "bar-ns"}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "bar-ns"}},
+			},
+			expected: []*batchv1.Job{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			jm := &ControllerV2{
-				jobLister: tt.fields.jobLister,
+			kubeClient := fake.NewSimpleClientset()
+			sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+			for _, job := range tt.jobs {
+				sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			}
-			got, err := jm.getJobsToBeReconciled(tt.args.cronJob)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getJobsToBeReconciled() error = %v, wantErr %v", err, tt.wantErr)
+			jm, err := NewControllerV2(sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getJobsToBeReconciled() got = %v, want %v", got, tt.want)
+
+			actual, err := jm.getJobsToBeReconciled(tt.cronJob)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
+			if !reflect.DeepEqual(actual, tt.expected) {
+				t.Errorf("\nExpected %#v,\nbut got %#v", tt.expected, actual)
 			}
 		})
 	}
