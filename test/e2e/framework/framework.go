@@ -625,12 +625,6 @@ func (kc *KubeConfig) FindCluster(name string) *KubeCluster {
 	return nil
 }
 
-// KubeDescribe is wrapper function for ginkgo describe.  Adds namespacing.
-// TODO: Support type safe tagging as well https://github.com/kubernetes/kubernetes/pull/22401.
-func KubeDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[k8s.io] "+text, body)
-}
-
 // ConformanceIt is wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
 func ConformanceIt(text string, body interface{}, timeout ...float64) bool {
 	return ginkgo.It(text+" [Conformance]", body, timeout...)
