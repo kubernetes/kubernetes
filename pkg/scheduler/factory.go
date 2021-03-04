@@ -132,6 +132,8 @@ func (c *Configurator) create() (*Scheduler, error) {
 
 	// The nominator will be passed all the way to framework instantiation.
 	nominator := internalqueue.NewPodNominator()
+	// It's a "cluster event" -> "plugin names" map.
+	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 	profiles, err := profile.NewMap(c.profiles, c.registry, c.recorderFactory,
 		frameworkruntime.WithClientSet(c.client),
 		frameworkruntime.WithInformerFactory(c.informerFactory),
@@ -139,6 +141,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),
 		frameworkruntime.WithPodNominator(nominator),
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(c.frameworkCapturer)),
+		frameworkruntime.WithClusterEventMap(clusterEventMap),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
@@ -153,6 +156,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
 		internalqueue.WithPodNominator(nominator),
+		internalqueue.WithClusterEventMap(clusterEventMap),
 	)
 
 	// Setup cache debugger.
@@ -317,7 +321,9 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 		pod := podInfo.Pod
 		if err == core.ErrNoNodesAvailable {
 			klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
-		} else if _, ok := err.(*framework.FitError); ok {
+		} else if fitError, ok := err.(*framework.FitError); ok {
+			// Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
+			podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
 			klog.V(2).InfoS("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", err)
 		} else if apierrors.IsNotFound(err) {
 			klog.V(2).InfoS("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", err)

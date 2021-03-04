@@ -241,6 +241,7 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, fwk framewor
 		for _, n := range allNodes {
 			diagnosis.NodeToStatusMap[n.Node().Name] = s
 		}
+		// Status satisfying IsUnschedulable() gets injected into diagnosis.UnschedulablePlugins.
 		diagnosis.UnschedulablePlugins.Insert(s.FailedPlugin())
 		return nil, diagnosis, nil
 	}

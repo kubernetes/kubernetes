@@ -40,6 +40,52 @@ import (
 
 var generation int64
 
+// ActionType is an integer to represent one type of resource change.
+// Different ActionTypes can be bit-wised to compose new semantics.
+type ActionType int64
+
+// Constants for ActionTypes.
+const (
+	Add    ActionType = 1 << iota // 1
+	Delete                        // 10
+	// UpdateNodeXYZ is only applicable for Node events.
+	UpdateNodeAllocatable // 100
+	UpdateNodeLabel       // 1000
+	UpdateNodeTaint       // 10000
+	UpdateNodeCondition   // 100000
+
+	All ActionType = 1<<iota - 1 // 111111
+
+	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition
+)
+
+// GVK is short for group/version/kind, which can uniquely represent a particular API resource.
+type GVK string
+
+// Constants for GVKs.
+const (
+	Pod                   GVK = "Pod"
+	Node                  GVK = "Node"
+	PersistentVolume      GVK = "PersistentVolume"
+	PersistentVolumeClaim GVK = "PersistentVolumeClaim"
+	Service               GVK = "Service"
+	StorageClass          GVK = "storage.k8s.io/StorageClass"
+	CSINode               GVK = "storage.k8s.io/CSINode"
+	WildCard              GVK = "*"
+)
+
+// WildCardEvent semantically matches all resources on all actions.
+var WildCardEvent = ClusterEvent{Resource: WildCard, ActionType: All}
+
+// ClusterEvent abstracts how a system resource's state gets changed.
+// Resource represents the standard API resources such as Pod, Node, etc.
+// ActionType denotes the specific change such as Add, Update or Delete.
+type ClusterEvent struct {
+	Resource   GVK
+	ActionType ActionType
+}
+
 // QueuedPodInfo is a Pod wrapper with additional information related to
 // the pod's status in the scheduling queue, such as the timestamp when
 // it's added to the queue.
@@ -55,6 +101,8 @@ type QueuedPodInfo struct {
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
 	// latency for a pod.
 	InitialAttemptTimestamp time.Time
+	// If a Pod failed in a scheduling cycle, record the plugin names it failed by.
+	UnschedulablePlugins sets.String
 }
 
 // DeepCopy returns a deep copy of the QueuedPodInfo object.
