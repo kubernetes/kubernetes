@@ -21,89 +21,80 @@ import (
 	"reflect"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 func TestAdmission(t *testing.T) {
 	wrap := &mockAdmissionController{}
 	ac := fieldmanager.NewManagedFieldsValidatingAdmissionController(wrap)
+	now := metav1.Now()
 
-	tests := []struct {
-		beforeAdmission []metav1.ManagedFieldsEntry
-		afterAdmission  []metav1.ManagedFieldsEntry
-		expected        []metav1.ManagedFieldsEntry
-	}{
-		{
-			beforeAdmission: []metav1.ManagedFieldsEntry{
-				{
-					Manager: "test",
-				},
-			},
-			afterAdmission: []metav1.ManagedFieldsEntry{
-				{
-					Manager: "",
-				},
-			},
-			expected: []metav1.ManagedFieldsEntry{
-				{
-					Manager: "test",
-				},
-			},
+	validFieldsV1, err := internal.SetToFields(*fieldpath.NewSet(fieldpath.MakePathOrDie("metadata", "labels", "test-label")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	validManagedFieldsEntry := metav1.ManagedFieldsEntry{
+		APIVersion: "v1",
+		Operation:  metav1.ManagedFieldsOperationApply,
+		Time:       &now,
+		Manager:    "test",
+		FieldsType: "FieldsV1",
+		FieldsV1:   &validFieldsV1,
+	}
+
+	managedFieldsMutators := map[string]func(in metav1.ManagedFieldsEntry) (out metav1.ManagedFieldsEntry, shouldReset bool){
+		"invalid APIVersion": func(managedFields metav1.ManagedFieldsEntry) (metav1.ManagedFieldsEntry, bool) {
+			managedFields.APIVersion = ""
+			return managedFields, true
 		},
-		{
-			beforeAdmission: []metav1.ManagedFieldsEntry{
-				{
-					APIVersion: "test",
-				},
-			},
-			afterAdmission: []metav1.ManagedFieldsEntry{
-				{
-					APIVersion: "",
-				},
-			},
-			expected: []metav1.ManagedFieldsEntry{
-				{
-					APIVersion: "test",
-				},
-			},
+		"invalid Operation": func(managedFields metav1.ManagedFieldsEntry) (metav1.ManagedFieldsEntry, bool) {
+			managedFields.Operation = "invalid operation"
+			return managedFields, true
 		},
-		{
-			beforeAdmission: []metav1.ManagedFieldsEntry{
-				{
-					FieldsType: "FieldsV1",
-				},
-			},
-			afterAdmission: []metav1.ManagedFieldsEntry{
-				{
-					FieldsType: "test",
-				},
-			},
-			expected: []metav1.ManagedFieldsEntry{
-				{
-					FieldsType: "FieldsV1",
-				},
-			},
+		"invalid fieldsType": func(managedFields metav1.ManagedFieldsEntry) (metav1.ManagedFieldsEntry, bool) {
+			managedFields.FieldsType = "invalid fieldsType"
+			return managedFields, true
+		},
+		"invalid fieldsV1": func(managedFields metav1.ManagedFieldsEntry) (metav1.ManagedFieldsEntry, bool) {
+			managedFields.FieldsV1 = &metav1.FieldsV1{Raw: []byte("{invalid}")}
+			return managedFields, true
+		},
+		"invalid manager": func(managedFields metav1.ManagedFieldsEntry) (metav1.ManagedFieldsEntry, bool) {
+			managedFields.Manager = ""
+			return managedFields, false
 		},
 	}
 
-	for _, test := range tests {
-		obj := &unstructured.Unstructured{}
-		obj.SetManagedFields(test.beforeAdmission)
-		wrap.admit = replaceManagedFields(test.afterAdmission)
+	for name, mutate := range managedFieldsMutators {
+		t.Run(name, func(t *testing.T) {
+			mutated, shouldReset := mutate(validManagedFieldsEntry)
+			validEntries := []metav1.ManagedFieldsEntry{validManagedFieldsEntry}
+			mutatedEntries := []metav1.ManagedFieldsEntry{mutated}
 
-		attrs := admission.NewAttributesRecord(obj, obj, schema.GroupVersionKind{}, "default", "", schema.GroupVersionResource{}, "", admission.Update, nil, false, nil)
-		if err := ac.(admission.MutationInterface).Admit(context.TODO(), attrs, nil); err != nil {
-			t.Fatal(err)
-		}
+			obj := &v1.ConfigMap{}
+			obj.SetManagedFields(validEntries)
 
-		if !reflect.DeepEqual(obj.GetManagedFields(), test.expected) {
-			t.Fatalf("expected: \n%v\ngot:\n%v", test.expected, obj.GetManagedFields())
-		}
+			wrap.admit = replaceManagedFields(mutatedEntries)
+
+			attrs := admission.NewAttributesRecord(obj, obj, schema.GroupVersionKind{}, "default", "", schema.GroupVersionResource{}, "", admission.Update, nil, false, nil)
+			if err := ac.(admission.MutationInterface).Admit(context.TODO(), attrs, nil); err != nil {
+				t.Fatal(err)
+			}
+
+			if shouldReset && !reflect.DeepEqual(obj.GetManagedFields(), validEntries) {
+				t.Fatalf("expected: \n%v\ngot:\n%v", validEntries, obj.GetManagedFields())
+			}
+			if !shouldReset && reflect.DeepEqual(obj.GetManagedFields(), validEntries) {
+				t.Fatalf("expected: \n%v\ngot:\n%v", mutatedEntries, obj.GetManagedFields())
+			}
+		})
 	}
 }
 
