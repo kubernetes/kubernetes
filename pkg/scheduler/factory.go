@@ -153,6 +153,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	lessFn := profiles[c.profiles[0].SchedulerName].QueueSortFunc()
 	podQueue := internalqueue.NewSchedulingQueue(
 		lessFn,
+		c.informerFactory,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
 		internalqueue.WithPodNominator(nominator),
