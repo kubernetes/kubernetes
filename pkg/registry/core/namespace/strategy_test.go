@@ -19,10 +19,14 @@ package namespace
 import (
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -65,6 +69,19 @@ func TestNamespaceStrategy(t *testing.T) {
 	}
 	if invalidNamespace.ResourceVersion != "4" {
 		t.Errorf("Incoming resource version on update should not be mutated")
+	}
+}
+
+func TestNamespaceDefaultLabelCanonicalize(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NamespaceDefaultLabelName, true)()
+
+	namespace := &api.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+	}
+
+	Strategy.Canonicalize(namespace)
+	if label, ok := namespace.Labels[v1.LabelMetadataName]; len(namespace.Name) > 0 && !ok || label != namespace.Name {
+		t.Errorf("Invalid namespace, default label was not added")
 	}
 }
 
