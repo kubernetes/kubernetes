@@ -321,7 +321,7 @@ func (f *fakeQueue) AddAfter(key interface{}, t time.Duration) {
 	f.key = key
 }
 
-// this test will take around 61 seconds to complete
+// this test will take around 1 seconds to complete
 func TestController2_updateCronJob(t *testing.T) {
 	cjc := &fakeCJControl{}
 	jc := &fakeJobControl{}
