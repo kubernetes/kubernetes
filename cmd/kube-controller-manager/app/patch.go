@@ -1,17 +1,61 @@
 package app
 
 import (
+	"fmt"
 	"io/ioutil"
 	"path"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/json"
 	kyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
+
+	libgorestclient "github.com/openshift/library-go/pkg/config/client"
+	"github.com/openshift/library-go/pkg/monitor/health"
 )
 
 var InformerFactoryOverride informers.SharedInformerFactory
+
+func SetUpPreferredHostForOpenShift(controllerManagerOptions *options.KubeControllerManagerOptions) error {
+	if !controllerManagerOptions.OpenShiftContext.UnsupportedKubeAPIOverPreferredHost {
+		return nil
+	}
+
+	config, err := clientcmd.BuildConfigFromFlags(controllerManagerOptions.Master, controllerManagerOptions.Generic.ClientConnection.Kubeconfig)
+	if err != nil {
+		return err
+	}
+	libgorestclient.DefaultServerName(config)
+
+	targetProvider := health.StaticTargetProvider{"localhost:6443"}
+	controllerManagerOptions.OpenShiftContext.PreferredHostHealthMonitor, err = health.New(targetProvider, createRestConfigForHealthMonitor(config))
+	if err != nil {
+		return err
+	}
+	controllerManagerOptions.OpenShiftContext.PreferredHostHealthMonitor.
+		WithHealthyProbesThreshold(3).
+		WithUnHealthyProbesThreshold(5).
+		WithProbeInterval(5 * time.Second).
+		WithProbeResponseTimeout(2 * time.Second).
+		WithMetrics(health.Register(legacyregistry.MustRegister))
+
+	controllerManagerOptions.OpenShiftContext.PreferredHostRoundTripperWrapperFn = libgorestclient.NewPreferredHostRoundTripper(func() string {
+		healthyTargets, _ := controllerManagerOptions.OpenShiftContext.PreferredHostHealthMonitor.Targets()
+		if len(healthyTargets) == 1 {
+			return healthyTargets[0]
+		}
+		return ""
+	})
+
+	controllerManagerOptions.Authentication.WithCustomRoundTripper(controllerManagerOptions.OpenShiftContext.PreferredHostRoundTripperWrapperFn)
+	controllerManagerOptions.Authorization.WithCustomRoundTripper(controllerManagerOptions.OpenShiftContext.PreferredHostRoundTripperWrapperFn)
+	return nil
+}
 
 func ShimForOpenShift(controllerManagerOptions *options.KubeControllerManagerOptions, controllerManager *config.Config) error {
 	if len(controllerManager.OpenShiftContext.OpenShiftConfig) == 0 {
@@ -81,4 +125,11 @@ func applyOpenShiftConfigDefaultProjectSelector(controllerManagerOptions *option
 	controllerManagerOptions.OpenShiftContext.OpenShiftDefaultProjectNodeSelector = defaultNodeSelector.(string)
 
 	return nil
+}
+
+func createRestConfigForHealthMonitor(restConfig *rest.Config) *rest.Config {
+	restConfigCopy := *restConfig
+	rest.AddUserAgent(&restConfigCopy, fmt.Sprintf("%s-health-monitor", options.KubeControllerManagerUserAgent))
+
+	return &restConfigCopy
 }

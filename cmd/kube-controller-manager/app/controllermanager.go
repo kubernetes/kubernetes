@@ -89,6 +89,8 @@ import (
 	configv1alpha1conversion "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
 	garbagecollector "k8s.io/kubernetes/pkg/controller/garbagecollector"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+
+	libgorestclient "github.com/openshift/library-go/pkg/config/client"
 )
 
 func init() {
@@ -140,6 +142,11 @@ controller, and serviceaccounts controller.`,
 				return err
 			}
 			cliflag.PrintFlags(cmd.Flags())
+
+			if err := SetUpPreferredHostForOpenShift(s); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
 
 			// We use context.Background() here still because using server.SetupSignalContext() would cause
 			// components like the event broadcaster to terminate on signal immediately, which is not what we want.
@@ -225,6 +232,17 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		return fmt.Errorf("unable to register configz: %w", err)
 	} else if err := cfgz.Set(externalConfig); err != nil {
 		return fmt.Errorf("unable to set configz: %w", err)
+	}
+
+	// start the localhost health monitor early so that it can be used by the LE client
+	if c.OpenShiftContext.PreferredHostHealthMonitor != nil {
+		hmCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go func() {
+			<-stopCh
+			cancel()
+		}()
+		go c.OpenShiftContext.PreferredHostHealthMonitor.Run(hmCtx)
 	}
 
 	// Setup any healthz checks we will want to use.
@@ -839,7 +857,7 @@ func createClientBuilders(c *config.CompletedConfig) (clientBuilder clientbuilde
 	if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
 
 		clientBuilder = clientbuilder.NewDynamicClientBuilder(
-			restclient.AnonymousClientConfig(c.Kubeconfig),
+			libgorestclient.AnonymousClientConfigWithWrapTransport(c.Kubeconfig),
 			c.Client.CoreV1(),
 			metav1.NamespaceSystem)
 	} else {
