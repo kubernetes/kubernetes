@@ -17,11 +17,11 @@ limitations under the License.
 package etcd
 
 import (
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/pointer"
 )
 
 // GetEtcdStorageData returns etcd data for all persisted objects.
@@ -574,35 +574,60 @@ type Prerequisite struct {
 
 // GetCustomResourceDefinitionData returns the resource definitions that back the custom resources
 // included in GetEtcdStorageData.  They should be created using CreateTestCRDs before running any tests.
-func GetCustomResourceDefinitionData() []*apiextensionsv1beta1.CustomResourceDefinition {
-	return []*apiextensionsv1beta1.CustomResourceDefinition{
-		// namespaced with legacy version field
+// We can switch this to v1 CRDs based on transitive call site analysis.
+// Call sites:
+// 1. TestDedupOwnerReferences - beta doesn't matter
+// 2. TestWebhookAdmissionWithWatchCache/TestWebhookAdmissionWithoutWatchCache - beta doesn't matter
+// 3. TestApplyStatus - the version fields don't matter.  Pruning isn't checked, just ownership.
+// 4. TestDryRun - versions and pruning don't matter
+// 5. TestStorageVersionBootstrap - versions and pruning don't matter.
+// 6. TestEtcdStoragePath - beta doesn't matter
+// 7. TestCrossGroupStorage - beta doesn't matter
+// 8. TestOverlappingCustomResourceCustomResourceDefinition - beta doesn't matter
+// 9. TestOverlappingCustomResourceAPIService - beta doesn't matter
+func GetCustomResourceDefinitionData() []*apiextensionsv1.CustomResourceDefinition {
+	return []*apiextensionsv1.CustomResourceDefinition{
+		// namespaced
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foos.cr.bar.com",
 			},
-			Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-				Group:   "cr.bar.com",
-				Version: "v1",
-				Scope:   apiextensionsv1beta1.NamespaceScoped,
-				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: "cr.bar.com",
+				Scope: apiextensionsv1.NamespaceScoped,
+				Names: apiextensionsv1.CustomResourceDefinitionNames{
 					Plural: "foos",
 					Kind:   "Foo",
 				},
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+					{
+						Name:    "v1",
+						Served:  true,
+						Storage: true,
+						Schema:  fixtures.AllowAllSchema(),
+					},
+				},
 			},
 		},
-		// cluster scoped with legacy version field
+		// cluster scoped
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pants.custom.fancy.com",
 			},
-			Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-				Group:   "custom.fancy.com",
-				Version: "v2",
-				Scope:   apiextensionsv1beta1.ClusterScoped,
-				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: "custom.fancy.com",
+				Scope: apiextensionsv1.ClusterScoped,
+				Names: apiextensionsv1.CustomResourceDefinitionNames{
 					Plural: "pants",
 					Kind:   "Pant",
+				},
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+					{
+						Name:    "v2",
+						Served:  true,
+						Storage: true,
+						Schema:  fixtures.AllowAllSchema(),
+					},
 				},
 			},
 		},
@@ -611,25 +636,29 @@ func GetCustomResourceDefinitionData() []*apiextensionsv1beta1.CustomResourceDef
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "integers.random.numbers.com",
 			},
-			Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-				Group:   "random.numbers.com",
-				Version: "v1",
-				Scope:   apiextensionsv1beta1.ClusterScoped,
-				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: "random.numbers.com",
+				Scope: apiextensionsv1.ClusterScoped,
+				Names: apiextensionsv1.CustomResourceDefinitionNames{
 					Plural: "integers",
 					Kind:   "Integer",
 				},
-				Validation: &apiextensionsv1beta1.CustomResourceValidation{
-					OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
-						Type: "object",
-						Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-							"value": {
-								Type: "number",
-							},
-						},
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+					{
+						Name:    "v1",
+						Served:  true,
+						Storage: true,
+						Schema: &apiextensionsv1.CustomResourceValidation{
+							OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+								Type: "object",
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
+									"value": {
+										Type: "number",
+									},
+								},
+							}},
 					},
 				},
-				PreserveUnknownFields: pointer.BoolPtr(false),
 			},
 		},
 		// cluster scoped with versions field
@@ -637,37 +666,56 @@ func GetCustomResourceDefinitionData() []*apiextensionsv1beta1.CustomResourceDef
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pandas.awesome.bears.com",
 			},
-			Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 				Group: "awesome.bears.com",
-				Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 					{
 						Name:    "v1",
 						Served:  true,
 						Storage: true,
+						Schema:  fixtures.AllowAllSchema(),
+						Subresources: &apiextensionsv1.CustomResourceSubresources{
+							Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+							Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+								SpecReplicasPath:   ".spec.replicas",
+								StatusReplicasPath: ".status.replicas",
+								LabelSelectorPath:  func() *string { path := ".status.selector"; return &path }(),
+							},
+						},
 					},
 					{
 						Name:    "v2",
 						Served:  false,
 						Storage: false,
+						Schema:  fixtures.AllowAllSchema(),
+						Subresources: &apiextensionsv1.CustomResourceSubresources{
+							Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+							Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+								SpecReplicasPath:   ".spec.replicas",
+								StatusReplicasPath: ".status.replicas",
+								LabelSelectorPath:  func() *string { path := ".status.selector"; return &path }(),
+							},
+						},
 					},
 					{
 						Name:    "v3",
 						Served:  true,
 						Storage: false,
+						Schema:  fixtures.AllowAllSchema(),
+						Subresources: &apiextensionsv1.CustomResourceSubresources{
+							Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+							Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+								SpecReplicasPath:   ".spec.replicas",
+								StatusReplicasPath: ".status.replicas",
+								LabelSelectorPath:  func() *string { path := ".status.selector"; return &path }(),
+							},
+						},
 					},
 				},
-				Scope: apiextensionsv1beta1.ClusterScoped,
-				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Scope: apiextensionsv1.ClusterScoped,
+				Names: apiextensionsv1.CustomResourceDefinitionNames{
 					Plural: "pandas",
 					Kind:   "Panda",
-				},
-				Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-					Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
-					Scale: &apiextensionsv1beta1.CustomResourceSubresourceScale{
-						SpecReplicasPath:   ".spec.replicas",
-						StatusReplicasPath: ".status.replicas",
-						LabelSelectorPath:  func() *string { path := ".status.selector"; return &path }(),
-					},
 				},
 			},
 		},

@@ -22,9 +22,12 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -105,7 +108,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 
 	crdDefinition := newCustomResourceDefinition()
 	etcd.CreateTestCRDs(t, apiExtensionClient, true, crdDefinition)
-	gvr := schema.GroupVersionResource{Group: crdDefinition.Spec.Group, Version: crdDefinition.Spec.Version, Resource: crdDefinition.Spec.Names.Plural}
+	gvr := schema.GroupVersionResource{Group: crdDefinition.Spec.Group, Version: crdDefinition.Spec.Versions[0].Name, Resource: crdDefinition.Spec.Names.Plural}
 	resourceClient := dynamicClient.Resource(gvr).Namespace(nsName)
 
 	replicas := 4
@@ -115,7 +118,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 	resource := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       crdDefinition.Spec.Names.Kind,
-			"apiVersion": crdDefinition.Spec.Group + "/" + crdDefinition.Spec.Version,
+			"apiVersion": crdDefinition.Spec.Group + "/" + crdDefinition.Spec.Versions[0].Name,
 			"metadata": map[string]interface{}{
 				"name":      "resource",
 				"namespace": nsName,
@@ -134,7 +137,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 	ownerRef := metav1.OwnerReference{
 		Name:       resource.GetName(),
 		Kind:       crdDefinition.Spec.Names.Kind,
-		APIVersion: crdDefinition.Spec.Group + "/" + crdDefinition.Spec.Version,
+		APIVersion: crdDefinition.Spec.Group + "/" + crdDefinition.Spec.Versions[0].Name,
 		UID:        createdResource.GetUID(),
 		Controller: &trueValue,
 	}
@@ -232,23 +235,30 @@ func addPodConditionReady(pod *v1.Pod) {
 	}
 }
 
-func newCustomResourceDefinition() *apiextensionsv1beta1.CustomResourceDefinition {
-	return &apiextensionsv1beta1.CustomResourceDefinition{
+func newCustomResourceDefinition() *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "crds.mygroup.example.com"},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "mygroup.example.com",
-			Version: "v1beta1",
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "mygroup.example.com",
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural:   "crds",
 				Singular: "crd",
 				Kind:     "Crd",
 				ListKind: "CrdList",
 			},
-			Scope: apiextensionsv1beta1.NamespaceScoped,
-			Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-				Scale: &apiextensionsv1beta1.CustomResourceSubresourceScale{
-					SpecReplicasPath:   ".spec.replicas",
-					StatusReplicasPath: ".status.replicas",
+			Scope: apiextensionsv1.NamespaceScoped,
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: true,
+					Schema:  fixtures.AllowAllSchema(),
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+							SpecReplicasPath:   ".spec.replicas",
+							StatusReplicasPath: ".status.replicas",
+						},
+					},
 				},
 			},
 		},
