@@ -1361,6 +1361,8 @@ message EphemeralContainerCommon {
 
 // A list of ephemeral containers used with the Pod ephemeralcontainers subresource.
 message EphemeralContainers {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -2122,12 +2124,15 @@ message NamespaceCondition {
   // Status of the condition, one of True, False, Unknown.
   optional string status = 2;
 
+  // Last time the condition transitioned from one status to another.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
+  // Unique, one-word, CamelCase reason for the condition's last transition.
   // +optional
   optional string reason = 5;
 
+  // Human-readable message indicating details about last transition.
   // +optional
   optional string message = 6;
 }
@@ -2620,8 +2625,10 @@ message PersistentVolumeClaim {
 
 // PersistentVolumeClaimCondition contails details about state of pvc
 message PersistentVolumeClaimCondition {
+  // Type of pvc condition.
   optional string type = 1;
 
+  // Status of the condition, one of True, False, Unknown.
   optional string status = 2;
 
   // Last time we probed the condition.
@@ -3134,9 +3141,11 @@ message PodDNSConfig {
 
 // PodDNSConfigOption defines DNS resolver options of a pod.
 message PodDNSConfigOption {
+  // Dns option name
   // Required.
   optional string name = 1;
 
+  // Dns option value
   // +optional
   optional string value = 2;
 }
@@ -3771,6 +3780,7 @@ message PodTemplateSpec {
   optional PodSpec spec = 2;
 }
 
+// PortStatus represents the error condition of a service port
 message PortStatus {
   // Port is the port number of the service port of which status is recorded here
   optional int32 port = 1;

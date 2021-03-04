@@ -619,6 +619,7 @@ func (EphemeralContainerCommon) SwaggerDoc() map[string]string {
 
 var map_EphemeralContainers = map[string]string{
 	"":                    "A list of ephemeral containers used with the Pod ephemeralcontainers subresource.",
+	"metadata":            "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"ephemeralContainers": "A list of ephemeral containers associated with this pod. New ephemeral containers may be appended to this list, but existing ephemeral containers may not be removed or modified.",
 }
 
@@ -1011,9 +1012,12 @@ func (Namespace) SwaggerDoc() map[string]string {
 }
 
 var map_NamespaceCondition = map[string]string{
-	"":       "NamespaceCondition contains details about state of namespace.",
-	"type":   "Type of namespace controller condition.",
-	"status": "Status of the condition, one of True, False, Unknown.",
+	"":                   "NamespaceCondition contains details about state of namespace.",
+	"type":               "Type of namespace controller condition.",
+	"status":             "Status of the condition, one of True, False, Unknown.",
+	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
+	"reason":             "Unique, one-word, CamelCase reason for the condition's last transition.",
+	"message":            "Human-readable message indicating details about last transition.",
 }
 
 func (NamespaceCondition) SwaggerDoc() map[string]string {
@@ -1283,6 +1287,8 @@ func (PersistentVolumeClaim) SwaggerDoc() map[string]string {
 
 var map_PersistentVolumeClaimCondition = map[string]string{
 	"":                   "PersistentVolumeClaimCondition contails details about state of pvc",
+	"type":               "Type of pvc condition.",
+	"status":             "Status of the condition, one of True, False, Unknown.",
 	"lastProbeTime":      "Last time we probed the condition.",
 	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
 	"reason":             "Unique, this should be a short, machine understandable string that gives the reason for condition's last transition. If it reports \"ResizeStarted\" that means the underlying persistent volume is being resized.",
@@ -1508,8 +1514,9 @@ func (PodDNSConfig) SwaggerDoc() map[string]string {
 }
 
 var map_PodDNSConfigOption = map[string]string{
-	"":     "PodDNSConfigOption defines DNS resolver options of a pod.",
-	"name": "Required.",
+	"":      "PodDNSConfigOption defines DNS resolver options of a pod.",
+	"name":  "Dns option name Required.",
+	"value": "Dns option value",
 }
 
 func (PodDNSConfigOption) SwaggerDoc() map[string]string {
@@ -1725,6 +1732,7 @@ func (PodTemplateSpec) SwaggerDoc() map[string]string {
 }
 
 var map_PortStatus = map[string]string{
+	"":         "PortStatus represents the error condition of a service port",
 	"port":     "Port is the port number of the service port of which status is recorded here",
 	"protocol": "Protocol is the protocol of the service port of which status is recorded here The supported values are: \"TCP\", \"UDP\", \"SCTP\"",
 	"error":    "Error is to record the problem with the service port The format of the error shall comply with the following rules: - built-in error values shall be specified in this file and those shall use\n  CamelCase names\n- cloud provider specific error values must have names that comply with the\n  format foo.example.com/CamelCase.",
