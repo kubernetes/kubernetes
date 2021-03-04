@@ -80,7 +80,7 @@ func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clients
 }
 
 // Returns the list of scheduled pods in the specified namespaces.
-// Note that no namespces specified matches all namespaces.
+// Note that no namespaces specified matches all namespaces.
 func getScheduledPods(podInformer coreinformers.PodInformer, namespaces ...string) ([]*v1.Pod, error) {
 	pods, err := podInformer.Lister().List(labels.Everything())
 	if err != nil {
