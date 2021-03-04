@@ -62,24 +62,4 @@ fi
 
 rm -f "${BINDATA_OUTPUT}.tmp"
 
-# These are files for runtime code
-BINDATA_OUTPUT="staging/src/k8s.io/kubectl/pkg/generated/bindata.go"
-go-bindata -nometadata -nocompress -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
-	-ignore .jpg -ignore .png -ignore .md \
-	"translations/..."
-
-gofmt -s -w "${BINDATA_OUTPUT}.tmp"
-
-# Here we compare and overwrite only if different to avoid updating the
-# timestamp and triggering a rebuild. The 'cat' redirect trick to preserve file
-# permissions of the target file.
-if ! cmp -s "${BINDATA_OUTPUT}.tmp" "${BINDATA_OUTPUT}" ; then
-	cat "${BINDATA_OUTPUT}.tmp" > "${BINDATA_OUTPUT}"
-	V=2 kube::log::info "Generated bindata file : ${BINDATA_OUTPUT} has $(wc -l ${BINDATA_OUTPUT}) lines of lovely automated artifacts"
-else
-	V=2 kube::log::info "No changes in generated bindata file: ${BINDATA_OUTPUT}"
-fi
-
-rm -f "${BINDATA_OUTPUT}.tmp"
-
 popd >/dev/null
