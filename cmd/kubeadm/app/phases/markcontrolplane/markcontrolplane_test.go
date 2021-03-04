@@ -48,27 +48,28 @@ func TestMarkControlPlane(t *testing.T) {
 			existingLabels: []string{""},
 			existingTaints: nil,
 			newTaints:      []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
-			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/control-plane":"","node-role.kubernetes.io/master":""}},"spec":{"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/master"}]}}`,
+			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/control-plane":"","node-role.kubernetes.io/master":"","node.kubernetes.io/exclude-from-external-load-balancers":""}},"spec":{"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/master"}]}}`,
 		},
 		{
 			name:           "control-plane label and taint missing but taint not wanted",
 			existingLabels: []string{""},
 			existingTaints: nil,
 			newTaints:      nil,
-			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/control-plane":"","node-role.kubernetes.io/master":""}}}`,
+			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/control-plane":"","node-role.kubernetes.io/master":"","node.kubernetes.io/exclude-from-external-load-balancers":""}}}`,
 		},
 		{
 			name:           "control-plane label missing",
 			existingLabels: []string{""},
 			existingTaints: []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
 			newTaints:      []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
-			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/control-plane":"","node-role.kubernetes.io/master":""}}}`,
+			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/control-plane":"","node-role.kubernetes.io/master":"","node.kubernetes.io/exclude-from-external-load-balancers":""}}}`,
 		},
 		{
 			name: "control-plane taint missing",
 			existingLabels: []string{
 				kubeadmconstants.LabelNodeRoleOldControlPlane,
 				kubeadmconstants.LabelNodeRoleControlPlane,
+				kubeadmconstants.LabelExcludeFromExternalLB,
 			},
 			existingTaints: nil,
 			newTaints:      []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
@@ -79,6 +80,7 @@ func TestMarkControlPlane(t *testing.T) {
 			existingLabels: []string{
 				kubeadmconstants.LabelNodeRoleOldControlPlane,
 				kubeadmconstants.LabelNodeRoleControlPlane,
+				kubeadmconstants.LabelExcludeFromExternalLB,
 			},
 			existingTaints: []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
 			newTaints:      []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
@@ -89,6 +91,7 @@ func TestMarkControlPlane(t *testing.T) {
 			existingLabels: []string{
 				kubeadmconstants.LabelNodeRoleOldControlPlane,
 				kubeadmconstants.LabelNodeRoleControlPlane,
+				kubeadmconstants.LabelExcludeFromExternalLB,
 			},
 			existingTaints: []v1.Taint{
 				{
@@ -104,6 +107,7 @@ func TestMarkControlPlane(t *testing.T) {
 			existingLabels: []string{
 				kubeadmconstants.LabelNodeRoleOldControlPlane,
 				kubeadmconstants.LabelNodeRoleControlPlane,
+				kubeadmconstants.LabelExcludeFromExternalLB,
 			},
 			existingTaints: []v1.Taint{
 				{
