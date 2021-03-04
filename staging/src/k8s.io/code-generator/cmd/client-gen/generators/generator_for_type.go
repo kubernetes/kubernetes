@@ -302,7 +302,7 @@ func generateInterface(tags util.Tags) string {
 	// need an ordered list here to guarantee order of generated methods.
 	out := []string{}
 	for _, m := range util.SupportedVerbs {
-		if tags.HasVerb(m) {
+		if tags.HasVerb(m) && len(defaultVerbTemplates[m]) > 0 {
 			out = append(out, defaultVerbTemplates[m])
 		}
 	}
