@@ -65,7 +65,7 @@ func (endpointSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	newEPS.ObjectMeta = v1.ObjectMeta{}
 	oldEPS.ObjectMeta = v1.ObjectMeta{}
 
-	if !apiequality.Semantic.DeepEqual(newEPS, oldEPS) {
+	if !apiequality.Semantic.DeepEqual(newEPS, oldEPS) || !apiequality.Semantic.DeepEqual(ogNewMeta.Labels, ogOldMeta.Labels) {
 		ogNewMeta.Generation = ogOldMeta.Generation + 1
 	}
 

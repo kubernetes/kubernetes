@@ -17,9 +17,11 @@ limitations under the License.
 package endpointslice
 
 import (
+	"context"
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/discovery"
@@ -531,6 +533,97 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 				t.Logf("actual endpointslice: %v", testcase.newEPS)
 				t.Logf("expected endpointslice: %v", testcase.expectedEPS)
 				t.Errorf("unexpected EndpointSlice from update API strategy")
+			}
+		})
+	}
+}
+
+func TestPrepareForUpdate(t *testing.T) {
+	testCases := []struct {
+		name        string
+		oldEPS      *discovery.EndpointSlice
+		newEPS      *discovery.EndpointSlice
+		expectedEPS *discovery.EndpointSlice
+	}{
+		{
+			name: "unchanged EPS should not increment generation",
+			oldEPS: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"1.2.3.4"},
+				}},
+			},
+			newEPS: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"1.2.3.4"},
+				}},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"1.2.3.4"},
+				}},
+			},
+		},
+		{
+			name: "changed endpoints should increment generation",
+			oldEPS: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"1.2.3.4"},
+				}},
+			},
+			newEPS: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{Generation: 1},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"1.2.3.5"},
+				}},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{Generation: 2},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"1.2.3.5"},
+				}},
+			},
+		},
+		{
+			name: "changed labels should increment generation",
+			oldEPS: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 1,
+					Labels:     map[string]string{"example": "one"},
+				},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"1.2.3.4"},
+				}},
+			},
+			newEPS: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 1,
+					Labels:     map[string]string{"example": "two"},
+				},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"1.2.3.4"},
+				}},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 2,
+					Labels:     map[string]string{"example": "two"},
+				},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"1.2.3.4"},
+				}},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			Strategy.PrepareForUpdate(context.TODO(), tc.newEPS, tc.oldEPS)
+			if !apiequality.Semantic.DeepEqual(tc.newEPS, tc.expectedEPS) {
+				t.Errorf("Expected %+v\nGot: %+v", tc.expectedEPS, tc.newEPS)
 			}
 		})
 	}
