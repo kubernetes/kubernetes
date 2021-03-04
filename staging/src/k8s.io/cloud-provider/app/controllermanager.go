@@ -52,6 +52,7 @@ import (
 	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/controller-manager/pkg/clientbuilder"
 	"k8s.io/controller-manager/pkg/informerfactory"
+	"k8s.io/controller-manager/pkg/leadermigration"
 	"k8s.io/klog/v2"
 )
 
@@ -173,7 +174,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		}
 	}
 
-	run := func(ctx context.Context) {
+	run := func(ctx context.Context, controllerInitializers map[string]InitFunc) {
 		clientBuilder := clientbuilder.SimpleControllerClientBuilder{
 			ClientConfig: c.Kubeconfig,
 		}
@@ -187,7 +188,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	}
 
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		run(context.TODO())
+		run(context.TODO(), controllerInitializers)
 		panic("unreachable")
 	}
 
@@ -199,35 +200,96 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
 
-	// Lock required for leader election
-	rl, err := resourcelock.NewFromKubeconfig(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
-		c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
-		c.ComponentConfig.Generic.LeaderElection.ResourceName,
-		resourcelock.ResourceLockConfig{
-			Identity:      id,
-			EventRecorder: c.EventRecorder,
-		},
-		c.Kubeconfig,
-		c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration)
-	if err != nil {
-		klog.Fatalf("error creating lock: %v", err)
+	// leaderElectAndRun runs the callbacks once the leader lease is acquired.
+	leaderElectAndRun := func(resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks) {
+		// Lock required for leader election
+		rl, err := resourcelock.NewFromKubeconfig(resourceLock,
+			c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
+			leaseName,
+			resourcelock.ResourceLockConfig{
+				Identity:      id,
+				EventRecorder: c.EventRecorder,
+			},
+			c.Kubeconfig,
+			c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration)
+		if err != nil {
+			klog.Fatalf("error creating lock: %v", err)
+		}
+
+		// Try and become the leader and start cloud controller manager loops
+		leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+			Lock:          rl,
+			LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
+			RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
+			RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
+			Callbacks:     callbacks,
+			WatchDog:      electionChecker,
+			Name:          leaseName,
+		})
 	}
 
-	// Try and become the leader and start cloud controller manager loops
-	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
-		Lock:          rl,
-		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
-		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: run,
+	// If leader migration is enabled, use the redirected initialization
+	// Check feature gate and configuration separately so that any error in configuration checking will not
+	//  affect the result if the feature is not enabled.
+	if leadermigration.FeatureEnabled() && leadermigration.Enabled(&c.ComponentConfig.Generic) {
+		klog.Info("starting leader migration")
+
+		leaderMigrator := leadermigration.NewLeaderMigrator(&c.ComponentConfig.Generic.LeaderMigration,
+			"cloud-controller-manager")
+
+		// Split initializers based on which lease they require, main lease or migration lease.
+		migratedInitializers, unmigratedInitializers := devideInitializers(controllerInitializers, leaderMigrator.FilterFunc(true))
+
+		// We need to signal acquiring the main lock before attempting to acquire the migration lock
+		//  so that no instance will hold the migration lock but not the main lock at any point.
+		mainLockAcquired := make(chan struct{})
+
+		// Start the main lock.
+		go leaderElectAndRun(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+			c.ComponentConfig.Generic.LeaderElection.ResourceName,
+			leaderelection.LeaderCallbacks{
+				OnStartedLeading: func(ctx context.Context) {
+					klog.Info("leader migration: starting main controllers.")
+					// signal acquiring the main lock
+					close(mainLockAcquired)
+					run(ctx, unmigratedInitializers)
+				},
+				OnStoppedLeading: func() {
+					klog.Fatalf("leaderelection lost")
+				},
+			})
+
+		// Wait for the main lease to be acquired before attempting the migration lease.
+		<-mainLockAcquired
+
+		// Start the migration lock.
+		leaderElectAndRun(c.ComponentConfig.Generic.LeaderMigration.ResourceLock,
+			c.ComponentConfig.Generic.LeaderMigration.LeaderName,
+			leaderelection.LeaderCallbacks{
+				OnStartedLeading: func(ctx context.Context) {
+					klog.Info("leader migration: starting migrated controllers.")
+					run(ctx, migratedInitializers)
+				},
+				OnStoppedLeading: func() {
+					klog.Fatalf("migration leaderelection lost")
+				},
+			})
+
+		panic("unreachable")
+	} // end of leader migration
+
+	// Normal leader election, without leader migration
+	leaderElectAndRun(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+		c.ComponentConfig.Generic.LeaderElection.ResourceName,
+		leaderelection.LeaderCallbacks{
+			OnStartedLeading: func(ctx context.Context) {
+				run(ctx, controllerInitializers)
+			},
 			OnStoppedLeading: func() {
 				klog.Fatalf("leaderelection lost")
 			},
-		},
-		WatchDog: electionChecker,
-		Name:     "cloud-controller-manager",
-	})
+		})
+
 	panic("unreachable")
 }
 
@@ -416,4 +478,24 @@ func ResyncPeriod(c *cloudcontrollerconfig.CompletedConfig) func() time.Duration
 		factor := rand.Float64() + 1
 		return time.Duration(float64(c.ComponentConfig.Generic.MinResyncPeriod.Nanoseconds()) * factor)
 	}
+}
+
+// devideInitializers applies filterFunc to each of the given intializiers.
+// filtered contains all controllers that have filterFunc(name) == true
+// rest contains all controllers that have filterFunc(name) == false
+func devideInitializers(allInitializers map[string]InitFunc,
+	filterFunc leadermigration.FilterFunc) (filtered map[string]InitFunc, rest map[string]InitFunc) {
+	if filterFunc == nil {
+		return make(map[string]InitFunc), allInitializers
+	}
+	filtered = make(map[string]InitFunc)
+	rest = make(map[string]InitFunc)
+	for name, initFunc := range allInitializers {
+		if filterFunc(name) {
+			filtered[name] = initFunc
+		} else {
+			rest[name] = initFunc
+		}
+	}
+	return
 }
