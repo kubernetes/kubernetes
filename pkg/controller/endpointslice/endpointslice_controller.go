@@ -288,7 +288,7 @@ func (c *Controller) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(cKey)
 
-	err := c.syncService(cKey.(string))
+	err := controller.RunSyncAndRecord("endpointslice", cKey.(string), c.syncService)
 	c.handleErr(err, cKey)
 
 	return true

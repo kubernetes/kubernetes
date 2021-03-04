@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	"k8s.io/kubernetes/pkg/controller"
 
 	"k8s.io/klog/v2"
 )
@@ -94,27 +95,29 @@ func (gcc *PodGCController) Run(stop <-chan struct{}) {
 		return
 	}
 
-	go wait.Until(gcc.gc, gcCheckPeriod, stop)
+	sync := controller.SyncAndRecordAll("podgc", gcc.gc)
+	go wait.Until(sync, gcCheckPeriod, stop)
 
 	<-stop
 }
 
-func (gcc *PodGCController) gc() {
+func (gcc *PodGCController) gc() error {
 	pods, err := gcc.podLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("Error while listing all pods: %v", err)
-		return
+		return err
 	}
 	nodes, err := gcc.nodeLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("Error while listing all nodes: %v", err)
-		return
+		return err
 	}
 	if gcc.terminatedPodThreshold > 0 {
 		gcc.gcTerminated(pods)
 	}
 	gcc.gcOrphaned(pods, nodes)
 	gcc.gcUnscheduledTerminating(pods)
+	return nil
 }
 
 func isPodTerminated(pod *v1.Pod) bool {

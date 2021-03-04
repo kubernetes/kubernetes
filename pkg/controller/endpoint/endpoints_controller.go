@@ -353,7 +353,7 @@ func (e *Controller) processNextWorkItem() bool {
 	}
 	defer e.queue.Done(eKey)
 
-	err := e.syncService(eKey.(string))
+	err := controller.RunSyncAndRecord("endpoints", eKey.(string), e.syncService)
 	e.handleErr(err, eKey)
 
 	return true

@@ -201,7 +201,7 @@ func NewDaemonSetsController(
 	dsc.nodeStoreSynced = nodeInformer.Informer().HasSynced
 	dsc.nodeLister = nodeInformer.Lister()
 
-	dsc.syncHandler = dsc.syncDaemonSet
+	dsc.syncHandler = controller.SyncAndRecord("daemonset", dsc.syncDaemonSet)
 	dsc.enqueueDaemonSet = dsc.enqueue
 
 	dsc.failedPodsBackoff = failedPodsBackoff

@@ -145,7 +145,7 @@ func (nm *NamespaceController) worker() {
 		}
 		defer nm.queue.Done(key)
 
-		err := nm.syncNamespaceFromKey(key.(string))
+		err := controller.RunSyncAndRecord("namespace", key.(string), nm.syncNamespaceFromKey)
 		if err == nil {
 			// no error, forget this entry and return
 			nm.queue.Forget(key)

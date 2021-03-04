@@ -133,7 +133,7 @@ func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInfor
 		DeleteFunc: dc.deletePod,
 	})
 
-	dc.syncHandler = dc.syncDeployment
+	dc.syncHandler = controller.SyncAndRecord("deployment", dc.syncDeployment)
 	dc.enqueueDeployment = dc.enqueue
 
 	dc.dLister = dInformer.Lister()

@@ -525,7 +525,7 @@ func (dc *DisruptionController) processNextWorkItem() bool {
 	}
 	defer dc.queue.Done(dKey)
 
-	err := dc.sync(dKey.(string))
+	err := controller.RunSyncAndRecord("disruption", dKey.(string), dc.sync)
 	if err == nil {
 		dc.queue.Forget(dKey)
 		return true

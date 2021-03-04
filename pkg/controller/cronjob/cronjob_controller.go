@@ -50,6 +50,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
@@ -94,13 +95,14 @@ func (jm *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	klog.Infof("Starting CronJob Manager")
 	// Check things every 10 second.
-	go wait.Until(jm.syncAll, 10*time.Second, stopCh)
+	sync := controller.SyncAndRecordAll("cronjob", jm.syncAll)
+	go wait.Until(sync, 10*time.Second, stopCh)
 	<-stopCh
 	klog.Infof("Shutting down CronJob Manager")
 }
 
 // syncAll lists all the CronJobs and Jobs and reconciles them.
-func (jm *Controller) syncAll() {
+func (jm *Controller) syncAll() error {
 	// List children (Jobs) before parents (CronJob).
 	// This guarantees that if we see any Job that got orphaned by the GC orphan finalizer,
 	// we must also see that the parent CronJob has non-nil DeletionTimestamp (see #42639).
@@ -120,7 +122,7 @@ func (jm *Controller) syncAll() {
 	})
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Failed to extract job list: %v", err))
-		return
+		return err
 	}
 	klog.V(4).Infof("Found %d jobs", len(js))
 
@@ -141,8 +143,9 @@ func (jm *Controller) syncAll() {
 
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Failed to extract cronJobs list: %v", err))
-		return
+		return err
 	}
+	return nil
 }
 
 // cleanupFinishedJobs cleanups finished jobs created by a CronJob

@@ -222,7 +222,7 @@ func (a *HorizontalController) processNextWorkItem() bool {
 	}
 	defer a.queue.Done(key)
 
-	deleted, err := a.reconcileKey(key.(string))
+	deleted, err := controller.RunSyncAndRecordWithBool("horizontalpodautoscaler", key.(string), a.reconcileKey)
 	if err != nil {
 		utilruntime.HandleError(err)
 	}

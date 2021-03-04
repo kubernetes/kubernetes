@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 // ServiceAccountsControllerOptions contains options for running a ServiceAccountsController
@@ -87,7 +88,7 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 	e.nsLister = nsInformer.Lister()
 	e.nsListerSynced = nsInformer.Informer().HasSynced
 
-	e.syncHandler = e.syncNamespace
+	e.syncHandler = controller.SyncAndRecord("serviceaccount", e.syncNamespace)
 
 	return e, nil
 }

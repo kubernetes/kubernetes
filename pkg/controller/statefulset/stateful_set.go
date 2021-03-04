@@ -409,7 +409,8 @@ func (ssc *StatefulSetController) processNextWorkItem() bool {
 		return false
 	}
 	defer ssc.queue.Done(key)
-	if err := ssc.sync(key.(string)); err != nil {
+	err := controller.RunSyncAndRecord("statefulset", key.(string), ssc.sync)
+	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error syncing StatefulSet %v, requeuing: %v", key.(string), err))
 		ssc.queue.AddRateLimited(key)
 	} else {

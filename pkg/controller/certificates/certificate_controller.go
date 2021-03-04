@@ -143,7 +143,8 @@ func (cc *CertificateController) processNextWorkItem() bool {
 	}
 	defer cc.queue.Done(cKey)
 
-	if err := cc.syncFunc(cKey.(string)); err != nil {
+	err := controller.RunSyncAndRecord(fmt.Sprintf("%s_%s", "certificate", cc.name), cKey.(string), cc.syncFunc)
+	if err != nil {
 		cc.queue.AddRateLimited(cKey)
 		if _, ignorable := err.(ignorableError); !ignorable {
 			utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", cKey, err))

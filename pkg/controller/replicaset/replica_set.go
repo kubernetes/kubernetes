@@ -164,7 +164,7 @@ func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer 
 	rsc.podLister = podInformer.Lister()
 	rsc.podListerSynced = podInformer.Informer().HasSynced
 
-	rsc.syncHandler = rsc.syncReplicaSet
+	rsc.syncHandler = controller.SyncAndRecord("replicaset", rsc.syncReplicaSet)
 
 	return rsc
 }

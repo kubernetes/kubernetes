@@ -156,7 +156,7 @@ func NewController(podInformer coreinformers.PodInformer, jobInformer batchinfor
 
 	jm.updateStatusHandler = jm.updateJobStatus
 	jm.patchJobHandler = jm.patchJob
-	jm.syncHandler = jm.syncJob
+	jm.syncHandler = controller.SyncAndRecordWithBool("job", jm.syncJob)
 
 	metrics.Register()
 

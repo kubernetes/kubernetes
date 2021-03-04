@@ -114,7 +114,7 @@ func NewController(options *ControllerOptions) (*Controller, error) {
 		registry:            options.Registry,
 	}
 	// set the synchronization handler
-	rq.syncHandler = rq.syncResourceQuotaFromKey
+	rq.syncHandler = controller.SyncAndRecord("resourcequota", rq.syncResourceQuotaFromKey)
 
 	options.ResourceQuotaInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{

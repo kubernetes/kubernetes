@@ -240,7 +240,7 @@ func (c *Controller) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(cKey)
 
-	err := c.syncEndpoints(cKey.(string))
+	err := controller.RunSyncAndRecord("endpointslicemirroring", cKey.(string), c.syncEndpoints)
 	c.handleErr(err, cKey)
 
 	return true
