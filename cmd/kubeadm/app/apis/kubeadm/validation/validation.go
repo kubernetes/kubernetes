@@ -57,6 +57,7 @@ func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 // ValidateClusterConfiguration validates an ClusterConfiguration object and collects all encountered errors
 func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateDNS(&c.DNS, field.NewPath("dns"))...)
 	allErrs = append(allErrs, ValidateNetworking(c, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateAPIServer(&c.APIServer, field.NewPath("apiServer"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
@@ -482,6 +483,16 @@ func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, erro
 		maskSize = defaultNodeMaskCIDRIPv4
 	}
 	return maskSize, nil
+}
+
+// ValidateDNS validates the DNS object and collects all encountered errors
+func ValidateDNS(dns *kubeadm.DNS, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	const kubeDNSType = "kube-dns"
+	if dns.Type == kubeDNSType {
+		allErrs = append(allErrs, field.Invalid(fldPath, dns.Type, fmt.Sprintf("DNS type %q is no longer supported", kubeDNSType)))
+	}
+	return allErrs
 }
 
 // ValidateNetworking validates networking configuration
