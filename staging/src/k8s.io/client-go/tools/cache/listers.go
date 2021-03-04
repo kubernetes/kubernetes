@@ -108,6 +108,42 @@ func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selec
 	return nil
 }
 
+// ListByIndex used to list items using specific index
+func ListByIndex(indexer Indexer, name, key string, selector labels.Selector, appendFn AppendFunc) error {
+
+	items, err := indexer.ByIndex(name, key)
+	if err != nil {
+		// if err found, we should not list all , return err instead.
+		// if caller needs list all, do not need use specific index, use ListAll
+		klog.Warningf("can not retrieve list of objects using index : %v", err)
+		return err
+	}
+
+	selectAll := selector.Empty()
+	for _, m := range items {
+
+		if selectAll {
+			// Avoid computing labels of the objects to speed up common flows
+			// of listing all objects.
+			appendFn(m)
+			continue
+		}
+
+		metadata, err := meta.Accessor(m)
+		if err != nil {
+			klog.Warningf("get item meta object err : %v", err)
+			return err
+		}
+
+		if selector.Matches(labels.Set(metadata.GetLabels())) {
+			appendFn(m)
+		}
+	}
+
+	return nil
+}
+
+
 // GenericLister is a lister skin on a generic Indexer
 type GenericLister interface {
 	// List will return all objects across namespaces
