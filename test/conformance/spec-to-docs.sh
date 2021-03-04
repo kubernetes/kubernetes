@@ -22,5 +22,5 @@ set -o pipefail
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd -P)
 cd "${KUBE_ROOT}"
 
-# convert dumped spec (see dump-spec.sh) to conformance.yaml
-go run ./test/conformance/walk.go --source="${KUBE_ROOT}" ./_output/specsummaries.json > ./_output/conformance.yaml
+# convert dumped spec (see dump-spec.sh) to conformance.md
+go run ./test/conformance/walk.go --source="${KUBE_ROOT}" --docs ./_output/specsummaries.json > ./_output/conformance.md
