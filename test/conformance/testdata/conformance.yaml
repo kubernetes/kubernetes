@@ -1452,7 +1452,7 @@
     a container lifecycle specifying a post start that invokes the server pod using
     ExecAction to validate that the post start is executed.
   release: v1.9
-  file: test/e2e/common/lifecycle_hook.go
+  file: test/e2e/common/node/lifecycle_hook.go
 - testname: Pod Lifecycle, post start http hook
   codename: '[sig-node] Container Lifecycle Hook when create a pod with lifecycle
     hook should execute poststart http hook properly [NodeConformance] [Conformance]'
@@ -1462,7 +1462,7 @@
     a container lifecycle specifying a post start that invokes the server pod to validate
     that the post start is executed.
   release: v1.9
-  file: test/e2e/common/lifecycle_hook.go
+  file: test/e2e/common/node/lifecycle_hook.go
 - testname: Pod Lifecycle, prestop exec hook
   codename: '[sig-node] Container Lifecycle Hook when create a pod with lifecycle
     hook should execute prestop exec hook properly [NodeConformance] [Conformance]'
@@ -1472,7 +1472,7 @@
     a container lifecycle specifying a pre-stop that invokes the server pod using
     ExecAction to validate that the pre-stop is executed.
   release: v1.9
-  file: test/e2e/common/lifecycle_hook.go
+  file: test/e2e/common/node/lifecycle_hook.go
 - testname: Pod Lifecycle, prestop http hook
   codename: '[sig-node] Container Lifecycle Hook when create a pod with lifecycle
     hook should execute prestop http hook properly [NodeConformance] [Conformance]'
@@ -1482,7 +1482,7 @@
     a container lifecycle specifying a pre-stop that invokes the server pod to validate
     that the pre-stop is executed.
   release: v1.9
-  file: test/e2e/common/lifecycle_hook.go
+  file: test/e2e/common/node/lifecycle_hook.go
 - testname: Container Runtime, TerminationMessage, from log output of succeeding container
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
     report termination message [LinuxOnly] as empty when pod succeeds and TerminationMessagePolicy
@@ -1492,7 +1492,7 @@
     terminationMessage MUST have no content as container succeed. [LinuxOnly]: Cannot
     mount files in Windows Containers.'
   release: v1.15
-  file: test/e2e/common/runtime.go
+  file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, TerminationMessage, from file of succeeding container
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
     report termination message [LinuxOnly] from file when pod succeeds and TerminationMessagePolicy
@@ -1502,7 +1502,7 @@
     terminated, terminationMessage MUST match with the content from file. [LinuxOnly]:
     Cannot mount files in Windows Containers.'
   release: v1.15
-  file: test/e2e/common/runtime.go
+  file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, TerminationMessage, from container's log output of
     failing container
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
@@ -1513,7 +1513,7 @@
     message MUST match the expected output recorded from container''s log. [LinuxOnly]:
     Cannot mount files in Windows Containers.'
   release: v1.15
-  file: test/e2e/common/runtime.go
+  file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, TerminationMessagePath, non-root user and non-default
     path
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
@@ -1525,7 +1525,7 @@
     the expected output logged in the provided custom path. [LinuxOnly]: Tagged LinuxOnly
     due to use of ''uid'' and unable to mount files in Windows Containers.'
   release: v1.15
-  file: test/e2e/common/runtime.go
+  file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, Restart Policy, Pod Phases
   codename: '[sig-node] Container Runtime blackbox test when starting a container
     that exits should run with the expected status [NodeConformance] [Conformance]'
@@ -1535,7 +1535,7 @@
     never be restarted. All these three test cases MUST verify the restart counts
     accordingly.
   release: v1.13
-  file: test/e2e/common/runtime.go
+  file: test/e2e/common/node/runtime.go
 - testname: Docker containers, with arguments
   codename: '[sig-node] Docker Containers should be able to override the image''s
     default arguments (docker cmd) [NodeConformance] [Conformance]'
@@ -1543,7 +1543,7 @@
     when Pod does not specify the container command but the arguments from Pod spec
     MUST override when specified.
   release: v1.9
-  file: test/e2e/common/docker_containers.go
+  file: test/e2e/common/node/docker_containers.go
 - testname: Docker containers, with command
   codename: '[sig-node] Docker Containers should be able to override the image''s
     default command (docker entrypoint) [NodeConformance] [Conformance]'
@@ -1551,7 +1551,7 @@
     Pod specifies the container command.  Command from Pod spec MUST override the
     command in the image.
   release: v1.9
-  file: test/e2e/common/docker_containers.go
+  file: test/e2e/common/node/docker_containers.go
 - testname: Docker containers, with command and arguments
   codename: '[sig-node] Docker Containers should be able to override the image''s
     default command and arguments [NodeConformance] [Conformance]'
@@ -1559,28 +1559,28 @@
     NOT be used when Pod specifies the container command and arguments.  Command and
     arguments from Pod spec MUST override the command and arguments in the image.
   release: v1.9
-  file: test/e2e/common/docker_containers.go
+  file: test/e2e/common/node/docker_containers.go
 - testname: Docker containers, without command and arguments
   codename: '[sig-node] Docker Containers should use the image defaults if command
     and args are blank [NodeConformance] [Conformance]'
   description: Default command and arguments from the docker image entrypoint MUST
     be used when Pod does not specify the container command
   release: v1.9
-  file: test/e2e/common/docker_containers.go
+  file: test/e2e/common/node/docker_containers.go
 - testname: DownwardAPI, environment for CPU and memory limits and requests
   codename: '[sig-node] Downward API should provide container''s limits.cpu/memory
     and requests.cpu/memory as env vars [NodeConformance] [Conformance]'
   description: Downward API MUST expose CPU request and Memory request set through
     environment variables at runtime in the container.
   release: v1.9
-  file: test/e2e/common/downwardapi.go
+  file: test/e2e/common/node/downwardapi.go
 - testname: DownwardAPI, environment for default CPU and memory limits and requests
   codename: '[sig-node] Downward API should provide default limits.cpu/memory from
     node allocatable [NodeConformance] [Conformance]'
   description: Downward API MUST expose CPU request and Memory limits set through
     environment variables at runtime in the container.
   release: v1.9
-  file: test/e2e/common/downwardapi.go
+  file: test/e2e/common/node/downwardapi.go
 - testname: DownwardAPI, environment for host ip
   codename: '[sig-node] Downward API should provide host IP as an env var [NodeConformance]
     [Conformance]'
@@ -1588,14 +1588,14 @@
     Specify host IP as environment variable in the Pod Spec are visible at runtime
     in the container.
   release: v1.9
-  file: test/e2e/common/downwardapi.go
+  file: test/e2e/common/node/downwardapi.go
 - testname: DownwardAPI, environment for Pod UID
   codename: '[sig-node] Downward API should provide pod UID as env vars [NodeConformance]
     [Conformance]'
   description: Downward API MUST expose Pod UID set through environment variables
     at runtime in the container.
   release: v1.9
-  file: test/e2e/common/downwardapi.go
+  file: test/e2e/common/node/downwardapi.go
 - testname: DownwardAPI, environment for name, namespace and ip
   codename: '[sig-node] Downward API should provide pod name, namespace and IP address
     as env vars [NodeConformance] [Conformance]'
@@ -1603,7 +1603,7 @@
     Specify Pod Name, namespace and IP as environment variable in the Pod Spec are
     visible at runtime in the container.
   release: v1.9
-  file: test/e2e/common/downwardapi.go
+  file: test/e2e/common/node/downwardapi.go
 - testname: Pod events, verify event from Scheduler and Kubelet
   codename: '[sig-node] Events should be sent by kubelets and the scheduler about
     pods scheduling and running  [Conformance]'
@@ -1621,7 +1621,7 @@
     started and at least one container is still running or is in the process of being
     restarted when Pod has restart policy as RestartAlways.
   release: v1.12
-  file: test/e2e/common/init_container.go
+  file: test/e2e/common/node/init_container.go
 - testname: init-container-starts-app-restartnever-pod
   codename: '[sig-node] InitContainer [NodeConformance] should invoke init containers
     on a RestartNever pod [Conformance]'
@@ -1629,14 +1629,14 @@
     are voluntarily terminated with exit status 0, and the system is not going to
     restart any of these containers when Pod has restart policy as RestartNever.
   release: v1.12
-  file: test/e2e/common/init_container.go
+  file: test/e2e/common/node/init_container.go
 - testname: init-container-fails-stops-app-restartnever-pod
   codename: '[sig-node] InitContainer [NodeConformance] should not start app containers
     and fail the pod if init containers fail on a RestartNever pod [Conformance]'
   description: Ensure that app container is not started when at least one InitContainer
     fails to start and Pod has restart policy as RestartNever.
   release: v1.12
-  file: test/e2e/common/init_container.go
+  file: test/e2e/common/node/init_container.go
 - testname: init-container-fails-stops-app-restartalways-pod
   codename: '[sig-node] InitContainer [NodeConformance] should not start app containers
     if init containers fail on a RestartAlways pod [Conformance]'
@@ -1644,7 +1644,7 @@
     to start and Pod has restarted for few occurrences and pod has restart policy
     as RestartAlways.
   release: v1.12
-  file: test/e2e/common/init_container.go
+  file: test/e2e/common/node/init_container.go
 - testname: Kubelet, hostAliases
   codename: '[sig-node] Kubelet when scheduling a busybox Pod with hostAliases should
     write entries to /etc/hosts [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1654,28 +1654,28 @@
     its containers, however, mounting individual files is not supported on Windows
     Containers. For this reason, this test is marked LinuxOnly.
   release: v1.13
-  file: test/e2e/common/kubelet.go
+  file: test/e2e/common/node/kubelet.go
 - testname: Kubelet, log output, default
   codename: '[sig-node] Kubelet when scheduling a busybox command in a pod should
     print the output to logs [NodeConformance] [Conformance]'
   description: By default the stdout and stderr from the process being executed in
     a pod MUST be sent to the pod's logs.
   release: v1.13
-  file: test/e2e/common/kubelet.go
+  file: test/e2e/common/node/kubelet.go
 - testname: Kubelet, failed pod, delete
   codename: '[sig-node] Kubelet when scheduling a busybox command that always fails
     in a pod should be possible to delete [NodeConformance] [Conformance]'
   description: Create a Pod with terminated state. This terminated pod MUST be able
     to be deleted.
   release: v1.13
-  file: test/e2e/common/kubelet.go
+  file: test/e2e/common/node/kubelet.go
 - testname: Kubelet, failed pod, terminated reason
   codename: '[sig-node] Kubelet when scheduling a busybox command that always fails
     in a pod should have an terminated reason [NodeConformance] [Conformance]'
   description: Create a Pod with terminated state. Pod MUST have only one container.
     Container MUST be in terminated state and MUST have an terminated reason.
   release: v1.13
-  file: test/e2e/common/kubelet.go
+  file: test/e2e/common/node/kubelet.go
 - testname: Kubelet, pod with read only root file system
   codename: '[sig-node] Kubelet when scheduling a read only busybox container should
     not write to root filesystem [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1684,7 +1684,7 @@
     to the root filesystem MUST fail as expected. This test is marked LinuxOnly since
     Windows does not support creating containers with read-only access.
   release: v1.13
-  file: test/e2e/common/kubelet.go
+  file: test/e2e/common/node/kubelet.go
 - testname: Kubelet, managed etc hosts
   codename: '[sig-node] KubeletManagedEtcHosts should test kubelet managed /etc/hosts
     file [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1697,7 +1697,7 @@
     not be managed by the Kubelet. This test is marked LinuxOnly since Windows cannot
     mount individual files in Containers.
   release: v1.9
-  file: test/e2e/common/kubelet_etc_hosts.go
+  file: test/e2e/common/node/kubelet_etc_hosts.go
 - testname: lease API should be available
   codename: '[sig-node] Lease lease API should be available [Conformance]'
   description: "Create Lease object, and get it; create and get MUST be successful
@@ -1711,7 +1711,7 @@
     list MUST be successful and MUST return just the remaining lease. Delete the lease;
     delete MUST be successful. Get the lease; get MUST return not found error."
   release: v1.17
-  file: test/e2e/common/lease.go
+  file: test/e2e/common/node/lease.go
 - testname: Pod Eviction, Toleration limits
   codename: '[sig-node] NoExecuteTaintManager Multiple Pods [Serial] evicts pods with
     minTolerationSeconds [Disruptive] [Conformance]'
@@ -1755,7 +1755,7 @@
     as selector MUST be successful. The Pod is updated with ActiveDeadlineSeconds
     set on the Pod spec. Pod MUST terminate of the specified time elapses.
   release: v1.9
-  file: test/e2e/common/pods.go
+  file: test/e2e/common/node/pods.go
 - testname: Pods, lifecycle
   codename: '[sig-node] Pods should be submitted and removed [NodeConformance] [Conformance]'
   description: A Pod is created with a unique label. Pod MUST be accessible when queried
@@ -1764,14 +1764,14 @@
     the pod deleted event. Query with the original selector for the Pod MUST return
     empty list.
   release: v1.9
-  file: test/e2e/common/pods.go
+  file: test/e2e/common/node/pods.go
 - testname: Pods, update
   codename: '[sig-node] Pods should be updated [NodeConformance] [Conformance]'
   description: Create a Pod with a unique label. Query for the Pod with the label
     as selector MUST be successful. Update the pod to change the value of the Label.
     Query for the Pod with the new value for the label MUST be successful.
   release: v1.9
-  file: test/e2e/common/pods.go
+  file: test/e2e/common/node/pods.go
 - testname: Pods, service environment variables
   codename: '[sig-node] Pods should contain environment variables for services [NodeConformance]
     [Conformance]'
@@ -1783,20 +1783,20 @@
     FOOSERVICE_PORT_8765_TCP_PORT, FOOSERVICE_PORT_8765_TCP_PROTO, FOOSERVICE_PORT_8765_TCP
     and FOOSERVICE_PORT_8765_TCP_ADDR that are populated with proper values.
   release: v1.9
-  file: test/e2e/common/pods.go
+  file: test/e2e/common/node/pods.go
 - testname: Pods, delete a collection
   codename: '[sig-node] Pods should delete a collection of pods [Conformance]'
   description: A set of pods is created with a label selector which MUST be found
     when listed. The set of pods is deleted and MUST NOT show up when listed by its
     label selector.
   release: v1.19
-  file: test/e2e/common/pods.go
+  file: test/e2e/common/node/pods.go
 - testname: Pods, assigned hostip
   codename: '[sig-node] Pods should get a host IP [NodeConformance] [Conformance]'
   description: Create a Pod. Pod status MUST return successfully and contains a valid
     IP address.
   release: v1.9
-  file: test/e2e/common/pods.go
+  file: test/e2e/common/node/pods.go
 - testname: Pods, completes the lifecycle of a Pod and the PodStatus
   codename: '[sig-node] Pods should run through the lifecycle of Pods and PodStatus
     [Conformance]'
@@ -1804,7 +1804,7 @@
     when patching the label and the pod data. When checking and replacing the PodStatus
     it MUST succeed. It MUST succeed when deleting the Pod.
   release: v1.20
-  file: test/e2e/common/pods.go
+  file: test/e2e/common/node/pods.go
 - testname: Pods, remote command execution over websocket
   codename: '[sig-node] Pods should support remote command execution over websockets
     [NodeConformance] [Conformance]'
@@ -1812,14 +1812,14 @@
     from this pod. Message retrieved form Websocket MUST match with expected exec
     command output.
   release: v1.13
-  file: test/e2e/common/pods.go
+  file: test/e2e/common/node/pods.go
 - testname: Pods, logs from websockets
   codename: '[sig-node] Pods should support retrieving logs from the container over
     websockets [NodeConformance] [Conformance]'
   description: A Pod is created. Websocket is created to retrieve log of a container
     from this pod. Message retrieved form Websocket MUST match with container's output.
   release: v1.13
-  file: test/e2e/common/pods.go
+  file: test/e2e/common/node/pods.go
 - testname: Pods, prestop hook
   codename: '[sig-node] PreStop should call prestop when killing a pod  [Conformance]'
   description: Create a server pod with a rest endpoint '/write' that changes state.Received
@@ -1837,7 +1837,7 @@
     probe on this endpoint will not fail. When liveness probe does not fail then the
     restart count MUST remain zero.
   release: v1.9
-  file: test/e2e/common/container_probe.go
+  file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using local file, no restart
   codename: '[sig-node] Probing container should *not* be restarted with a exec "cat
     /tmp/health" liveness probe [NodeConformance] [Conformance]'
@@ -1845,7 +1845,7 @@
     /temp/health file. Liveness probe MUST not fail to check health and the restart
     count should remain 0.
   release: v1.9
-  file: test/e2e/common/container_probe.go
+  file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using tcp socket, no restart
   codename: '[sig-node] Probing container should *not* be restarted with a tcp:8080
     liveness probe [NodeConformance] [Conformance]'
@@ -1854,7 +1854,7 @@
     open. Liveness probe MUST not fail to check health and the restart count should
     remain 0.
   release: v1.18
-  file: test/e2e/common/container_probe.go
+  file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using http endpoint, restart
   codename: '[sig-node] Probing container should be restarted with a /healthz http
     liveness probe [NodeConformance] [Conformance]'
@@ -1863,7 +1863,7 @@
     Pod is started. This MUST result in liveness check failure. The Pod MUST now be
     killed and restarted incrementing restart count to 1.
   release: v1.9
-  file: test/e2e/common/container_probe.go
+  file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using local file, restart
   codename: '[sig-node] Probing container should be restarted with a exec "cat /tmp/health"
     liveness probe [NodeConformance] [Conformance]'
@@ -1872,7 +1872,7 @@
     triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing
     restart count to 1.
   release: v1.9
-  file: test/e2e/common/container_probe.go
+  file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, container exec timeout, restart
   codename: '[sig-node] Probing container should be restarted with an exec liveness
     probe with timeout [NodeConformance] [Conformance]'
@@ -1880,7 +1880,7 @@
     If the liveness probe call does not return within the timeout specified, liveness
     probe MUST restart the Pod.
   release: v1.9
-  file: test/e2e/common/container_probe.go
+  file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using http endpoint, multiple restarts (slow)
   codename: '[sig-node] Probing container should have monotonically increasing restart
     count [NodeConformance] [Conformance]'
@@ -1892,7 +1892,7 @@
     returns an http error after 10 seconds from the start. Restart counts MUST increment
     everytime health check fails, measure upto 5 restart.
   release: v1.9
-  file: test/e2e/common/container_probe.go
+  file: test/e2e/common/node/container_probe.go
 - testname: Pod readiness probe, container exec timeout, not ready
   codename: '[sig-node] Probing container should not be ready with an exec readiness
     probe timeout [NodeConformance] [Conformance]'
@@ -1900,7 +1900,7 @@
     If the readiness probe call does not return within the timeout specified, readiness
     probe MUST not be Ready.
   release: v1.20
-  file: test/e2e/common/container_probe.go
+  file: test/e2e/common/node/container_probe.go
 - testname: Pod readiness probe, with initial delay
   codename: '[sig-node] Probing container with readiness probe should not be ready
     before initial delay and never restart [NodeConformance] [Conformance]'
@@ -1908,7 +1908,7 @@
     probe. Check the Pod Start time to compare to the initial delay. The Pod MUST
     be ready only after the specified initial delay.
   release: v1.9
-  file: test/e2e/common/container_probe.go
+  file: test/e2e/common/node/container_probe.go
 - testname: Pod readiness probe, failure
   codename: '[sig-node] Probing container with readiness probe that fails should never
     be ready and never restart [NodeConformance] [Conformance]'
@@ -1916,7 +1916,7 @@
     Pod is created, then the Pod MUST never be ready, never be running and restart
     count MUST be zero.
   release: v1.9
-  file: test/e2e/common/container_probe.go
+  file: test/e2e/common/node/container_probe.go
 - testname: RuntimeClass API
   codename: '[sig-node] RuntimeClass  should support RuntimeClasses API operations
     [Conformance]'
@@ -1966,7 +1966,7 @@
     run as unpriviledged user. Pod MUST be in Succeeded phase. [LinuxOnly]: This test
     is marked as LinuxOnly since Windows does not support running as UID / GID.'
   release: v1.15
-  file: test/e2e/common/security_context.go
+  file: test/e2e/common/node/security_context.go
 - testname: Security Context, privileged=false.
   codename: '[sig-node] Security Context When creating a pod with privileged should
     run the container as unprivileged when false [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1974,7 +1974,7 @@
     Privileged option as false. Pod MUST be in Succeeded phase. [LinuxOnly]: This
     test is marked as LinuxOnly since it runs a Linux-specific command.'
   release: v1.15
-  file: test/e2e/common/security_context.go
+  file: test/e2e/common/node/security_context.go
 - testname: Security Context, readOnlyRootFilesystem=false.
   codename: '[sig-node] Security Context When creating a pod with readOnlyRootFilesystem
     should run the container with writable rootfs when readOnlyRootFilesystem=false
@@ -1982,7 +1982,7 @@
   description: Container is configured to run with readOnlyRootFilesystem to false.
     Write operation MUST be allowed and Pod MUST be in Succeeded state.
   release: v1.15
-  file: test/e2e/common/security_context.go
+  file: test/e2e/common/node/security_context.go
 - testname: Security Context, test RunAsGroup at container level
   codename: '[sig-node] Security Context should support container.SecurityContext.RunAsUser
     And container.SecurityContext.RunAsGroup [LinuxOnly] [Conformance]'
@@ -2012,14 +2012,14 @@
     i.e. uid=1000. [LinuxOnly]: This test is marked LinuxOnly since Windows does not
     support running as UID / GID, or privilege escalation.'
   release: v1.15
-  file: test/e2e/common/security_context.go
+  file: test/e2e/common/node/security_context.go
 - testname: Environment variables, expansion
   codename: '[sig-node] Variable Expansion should allow composing env vars into new
     env vars [NodeConformance] [Conformance]'
   description: Create a Pod with environment variables. Environment variables defined
     using previously defined environment variables MUST expand to proper values.
   release: v1.9
-  file: test/e2e/common/expansion.go
+  file: test/e2e/common/node/expansion.go
 - testname: Environment variables, command argument expansion
   codename: '[sig-node] Variable Expansion should allow substituting values in a container''s
     args [NodeConformance] [Conformance]'
@@ -2027,7 +2027,7 @@
     using them. Container command arguments using the  defined environment variables
     MUST expand to proper values.
   release: v1.9
-  file: test/e2e/common/expansion.go
+  file: test/e2e/common/node/expansion.go
 - testname: Environment variables, command expansion
   codename: '[sig-node] Variable Expansion should allow substituting values in a container''s
     command [NodeConformance] [Conformance]'
@@ -2035,28 +2035,28 @@
     them. Container command using the  defined environment variables MUST expand to
     proper values.
   release: v1.9
-  file: test/e2e/common/expansion.go
+  file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath expansion
   codename: '[sig-node] Variable Expansion should allow substituting values in a volume
     subpath [sig-storage] [Conformance]'
   description: Make sure a container's subpath can be set using an expansion of environment
     variables.
   release: v1.19
-  file: test/e2e/common/expansion.go
+  file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath with absolute path
   codename: '[sig-node] Variable Expansion should fail substituting values in a volume
     subpath with absolute path [sig-storage][Slow] [Conformance]'
   description: Make sure a container's subpath can not be set using an expansion of
     environment variables when absolute path is supplied.
   release: v1.19
-  file: test/e2e/common/expansion.go
+  file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath with backticks
   codename: '[sig-node] Variable Expansion should fail substituting values in a volume
     subpath with backticks [sig-storage][Slow] [Conformance]'
   description: Make sure a container's subpath can not be set using an expansion of
     environment variables when backticks are supplied.
   release: v1.19
-  file: test/e2e/common/expansion.go
+  file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath test writes
   codename: '[sig-node] Variable Expansion should succeed in writing subpaths in container
     [sig-storage][Slow] [Conformance]'
@@ -2064,14 +2064,14 @@
     1.\tvalid subpathexpr starts a container running 2.\ttest for valid subpath writes
     3.\tsuccessful expansion of the subpathexpr isn't required for volume cleanup"
   release: v1.19
-  file: test/e2e/common/expansion.go
+  file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath ready from failed state
   codename: '[sig-node] Variable Expansion should verify that a failing subpath expansion
     can be modified during the lifecycle of a container [sig-storage][Slow] [Conformance]'
   description: Verify that a failing subpath expansion can be modified during the
     lifecycle of a container.
   release: v1.19
-  file: test/e2e/common/expansion.go
+  file: test/e2e/common/node/expansion.go
 - testname: LimitRange, resources
   codename: '[sig-scheduling] LimitRange should create a LimitRange with defaults
     and ensure pod has those defaults applied. [Conformance]'

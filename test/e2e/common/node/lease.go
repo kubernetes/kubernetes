@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"context"
@@ -49,7 +49,7 @@ func getPatchBytes(oldLease, newLease *coordinationv1.Lease) ([]byte, error) {
 	return patchBytes, nil
 }
 
-var _ = SIGNodeDescribe("Lease", func() {
+var _ = SIGDescribe("Lease", func() {
 	f := framework.NewDefaultFramework("lease-test")
 
 	/*

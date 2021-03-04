@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"context"
@@ -36,7 +36,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGNodeDescribe("NodeLease", func() {
+var _ = SIGDescribe("NodeLease", func() {
 	var nodeName string
 	f := framework.NewDefaultFramework("node-lease-test")
 

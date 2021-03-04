@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"context"
@@ -45,7 +45,7 @@ const (
 	defaultObservationTimeout = time.Minute * 4
 )
 
-var _ = SIGNodeDescribe("Probing container", func() {
+var _ = SIGDescribe("Probing container", func() {
 	f := framework.NewDefaultFramework("container-probe")
 	var podClient *framework.PodClient
 	probe := webserverProbeBuilder{}

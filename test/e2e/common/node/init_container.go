@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"context"
@@ -156,7 +156,7 @@ func initContainersInvariants(pod *v1.Pod) error {
 	return nil
 }
 
-var _ = SIGNodeDescribe("InitContainer [NodeConformance]", func() {
+var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("init-container")
 	var podClient *framework.PodClient
 	ginkgo.BeforeEach(func() {

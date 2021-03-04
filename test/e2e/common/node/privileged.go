@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"fmt"
@@ -38,7 +38,7 @@ type PrivilegedPodTestConfig struct {
 	pod *v1.Pod
 }
 
-var _ = SIGNodeDescribe("PrivilegedPod [NodeConformance]", func() {
+var _ = SIGDescribe("PrivilegedPod [NodeConformance]", func() {
 	config := &PrivilegedPodTestConfig{
 		f:                      framework.NewDefaultFramework("e2e-privileged-pod"),
 		privilegedPod:          "privileged-pod",

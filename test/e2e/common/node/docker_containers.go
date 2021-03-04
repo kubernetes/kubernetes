@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"github.com/onsi/gomega"
@@ -25,7 +25,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
-var _ = SIGNodeDescribe("Docker Containers", func() {
+var _ = SIGDescribe("Docker Containers", func() {
 	f := framework.NewDefaultFramework("containers")
 
 	/*

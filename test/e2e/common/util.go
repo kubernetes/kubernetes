@@ -36,6 +36,8 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
+// TODO: Cleanup this file.
+
 // Suite represents test suite.
 type Suite string
 
@@ -44,11 +46,6 @@ const (
 	E2E Suite = "e2e"
 	// NodeE2E represents a test suite for node e2e.
 	NodeE2E Suite = "node e2e"
-)
-
-var (
-	// non-root UID used in tests.
-	nonRootTestUserID = int64(1000)
 )
 
 // CurrentSuite represents current test suite.

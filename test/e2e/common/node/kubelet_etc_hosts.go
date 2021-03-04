@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"strings"
@@ -43,7 +43,7 @@ type KubeletManagedHostConfig struct {
 	f              *framework.Framework
 }
 
-var _ = SIGNodeDescribe("KubeletManagedEtcHosts", func() {
+var _ = SIGDescribe("KubeletManagedEtcHosts", func() {
 	f := framework.NewDefaultFramework("e2e-kubelet-etc-hosts")
 	config := &KubeletManagedHostConfig{
 		f: f,

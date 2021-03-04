@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package node
 
 import (
 	"context"
@@ -30,7 +30,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGNodeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
+var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// sysctl is not supported on Windows.
