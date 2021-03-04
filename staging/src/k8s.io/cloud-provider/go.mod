@@ -20,7 +20,6 @@ require (
 )
 
 replace (
-	github.com/containerd/continuity => github.com/containerd/continuity v0.0.0-20190426062206-aaeac12a7ffc
 	github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
 	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9

@@ -6,7 +6,6 @@ go 1.15
 
 require (
 	github.com/davecgh/go-spew v1.1.1
-	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/go-openapi/spec v0.19.3
 	github.com/gogo/protobuf v1.3.1
@@ -14,9 +13,7 @@ require (
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
-	go.etcd.io/bbolt v1.3.5 // indirect
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
-	google.golang.org/genproto v0.0.0-20201110150050-8816d57aaa9a // indirect
 	k8s.io/api v0.20.0
 	k8s.io/apimachinery v0.20.0
 	k8s.io/apiserver v0.20.0
@@ -29,11 +26,15 @@ require (
 )
 
 replace (
+	github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
+	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
 	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.5.0-origin.1+incompatible
+	github.com/robfig/cron => github.com/robfig/cron v1.1.0
 	go.uber.org/multierr => go.uber.org/multierr v1.1.0
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api => ../api
+	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver
 	k8s.io/client-go => ../client-go

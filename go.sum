@@ -77,7 +77,6 @@ github.com/caddyserver/caddy v1.0.3 h1:i9gRhBgvc5ifchwWtSe7pDpsdS9+Q0Rw9oYQmYUTw
 github.com/caddyserver/caddy v1.0.3/go.mod h1:G+ouvOY32gENkJC+jhgl62TyhvqEsFaDiZ4uw0RzP1E=
 github.com/cenkalti/backoff v2.1.1+incompatible/go.mod h1:90ReRw6GdpyfrHakVjL/QHaoyV4aDUVVkXQJJJ3NXXM=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
-github.com/certifi/gocertifi v0.0.0-20180905225744-ee1a9a0726d2/go.mod h1:GJKEexRPVJrBSOjoqN5VNOIKJ5Q3RViH6eu3puDRwx4=
 github.com/cespare/xxhash/v2 v2.1.1 h1:6MnRN8NT7+YBpUIWxHtefFZOKTAPgGjpQSxqLNn0+qY=
 github.com/cespare/xxhash/v2 v2.1.1/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5 h1:7aWHqerlJ41y6FOsEUvknqgXnGmJyJSbjhAWq5pO4F8=
@@ -153,7 +152,6 @@ github.com/docker/go-connections v0.4.0/go.mod h1:Gbd7IOopHjR8Iph03tsViu4nIes5Xh
 github.com/docker/go-metrics v0.0.1/go.mod h1:cG1hvH2utMXtqgqqYE9plW6lDxS3/5ayHzueweSI3Vw=
 github.com/docker/go-units v0.4.0 h1:3uh0PgVws3nIA0Q+MwDC8yjEPf9zjRfZZWXZYDct3Tw=
 github.com/docker/go-units v0.4.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
-github.com/docker/libnetwork v0.0.0-20190731215715-7f13a5c99f4b/go.mod h1:93m0aTqz6z+g32wla4l4WxTrdtvBRmVzYRkYvasA5Z8=
 github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7/go.mod h1:cyGadeNEkKy96OOhEzfZl+yxihPEzKnqJwvfuSUqbZE=
 github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96 h1:cenwrSVm+Z7QLSV/BsnenAOcDXdX4cMv4wP0B/5QbPg=
 github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96/go.mod h1:Qh8CwZgvJUkLughtfhJv5dyTYa91l1fOUCrgjqmcifM=
@@ -181,10 +179,8 @@ github.com/form3tech-oss/jwt-go v3.2.2+incompatible h1:TcekIExNqud5crz4xD2pavyTg
 github.com/form3tech-oss/jwt-go v3.2.2+incompatible/go.mod h1:pbq4aXjuKjdthFRnoDwaVPLA+WlJuPGy+QneDUgJi2k=
 github.com/fsnotify/fsnotify v1.4.9 h1:hsms1Qyu0jgnwNXIxa+/V/PDsU6CfLf6CNO8H7IWoS4=
 github.com/fsnotify/fsnotify v1.4.9/go.mod h1:znqG4EE+3YCdAaPaxE2ZRY/06pZUdp0tY4IgpuI1SZQ=
-github.com/fsouza/go-dockerclient v0.0.0-20171004212419-da3951ba2e9e/go.mod h1:KpcjM623fQYE9MZiTGzKhjfxXAV9wbyX2C1cyRHfhl0=
 github.com/fvbommel/sortorder v1.0.1 h1:dSnXLt4mJYH25uDDGa3biZNQsozaUWDSWeKJ0qqFfzE=
 github.com/fvbommel/sortorder v1.0.1/go.mod h1:uk88iVf1ovNn1iLfgUVU2F9o5eO30ui720w+kxuqRs0=
-github.com/getsentry/raven-go v0.0.0-20190513200303-c977f96e1095/go.mod h1:KungGk8q33+aIAZUIVWZDr2OfAEBsO49PX4NzFV5kcQ=
 github.com/ghodss/yaml v1.0.0 h1:wQHKEahhL6wmXdzwWG11gIVCkOv05bNOh+Rxn0yngAk=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/go-acme/lego v2.5.0+incompatible/go.mod h1:yzMNe9CasVUhkquNvti5nAtPmG94USbYxYrZfTkIn0M=
@@ -428,8 +424,8 @@ github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49 h1:7NmjUkJtGHp
 github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49/go.mod h1:9/jG4I6sh+5QublJpZZ4Zs/P4/QCXMsQQ/K/058bSB8=
 github.com/openshift/ginkgo v4.5.0-origin.1+incompatible h1:AGewrYJW8aXFkkf86sSoiO9L/a/QYKZvODVCaB/wk4o=
 github.com/openshift/ginkgo v4.5.0-origin.1+incompatible/go.mod h1:8METQ1gDhl0KW+pGH4c0DIJYEN/ksVCL6hOuHPmXGnk=
-github.com/openshift/library-go v0.0.0-20201214135256-d265f469e75b h1:zKZCcZgL3jf02/jf/ldUg8TvudOFcPGIdf8kFkWh5MI=
-github.com/openshift/library-go v0.0.0-20201214135256-d265f469e75b/go.mod h1:udseDnqxn5ON8i+NBjDp00fBTK0JRu1/6Y6tf6EivDE=
+github.com/openshift/library-go v0.0.0-20210223155927-2d5e9a25578e h1:knbWpqNMffd08lD2mwO8QoG4/PfAm0gOVnRo93ak5zE=
+github.com/openshift/library-go v0.0.0-20210223155927-2d5e9a25578e/go.mod h1:hip2mwymSDfiip0aiTaePpUC1dxOHkjzMqaS0e3lWhw=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pelletier/go-toml v1.2.0 h1:T5zMGML61Wp+FlcbWjRDT7yAxhJNAiPPLOFECq181zc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=

@@ -110,6 +110,7 @@ github.com/containerd/console v1.0.0/go.mod h1:8Pf4gM6VEbTNRIT26AyyU7hxdQU3MvAvx
 github.com/containerd/containerd v1.3.2/go.mod h1:bC6axHOhabU15QhwfG7w5PipXdVtMXFTttgp+kVtyUA=
 github.com/containerd/containerd v1.4.1/go.mod h1:bC6axHOhabU15QhwfG7w5PipXdVtMXFTttgp+kVtyUA=
 github.com/containerd/continuity v0.0.0-20190426062206-aaeac12a7ffc/go.mod h1:GL3xCUCBDV3CZiTSEKksMWbLE66hEyuu9qyDOOqM47Y=
+github.com/containerd/continuity v0.0.0-20190827140505-75bee3e2ccb6/go.mod h1:GL3xCUCBDV3CZiTSEKksMWbLE66hEyuu9qyDOOqM47Y=
 github.com/containerd/fifo v0.0.0-20190226154929-a9fb20d87448/go.mod h1:ODA38xgv3Kuk8dQz2ZQXpnv/UZZUHUCL7pnLehbXgQI=
 github.com/containerd/go-runc v0.0.0-20180907222934-5a6d9f37cfa3/go.mod h1:IV7qH3hrUgRmyYrtgEeGWJfWbgcHL9CSRruz2Vqcph0=
 github.com/containerd/ttrpc v0.0.0-20190828154514-0e0f228740de/go.mod h1:PvCDdDGpgqzQIzDW1TphrGLssLDZp2GuS+X5DkEJB8o=
@@ -489,6 +490,8 @@ github.com/openshift/client-go v0.0.0-20201214125552-e615e336eb49/go.mod h1:9/jG
 github.com/openshift/ginkgo v4.5.0-origin.1+incompatible h1:AGewrYJW8aXFkkf86sSoiO9L/a/QYKZvODVCaB/wk4o=
 github.com/openshift/ginkgo v4.5.0-origin.1+incompatible/go.mod h1:8METQ1gDhl0KW+pGH4c0DIJYEN/ksVCL6hOuHPmXGnk=
 github.com/openshift/library-go v0.0.0-20201214135256-d265f469e75b/go.mod h1:udseDnqxn5ON8i+NBjDp00fBTK0JRu1/6Y6tf6EivDE=
+github.com/openshift/library-go v0.0.0-20210223155927-2d5e9a25578e h1:knbWpqNMffd08lD2mwO8QoG4/PfAm0gOVnRo93ak5zE=
+github.com/openshift/library-go v0.0.0-20210223155927-2d5e9a25578e/go.mod h1:hip2mwymSDfiip0aiTaePpUC1dxOHkjzMqaS0e3lWhw=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pborman/uuid v1.2.0/go.mod h1:X/NO0urCmaxf9VXbdlT7C2Yzkj2IKimNn4k+gtPdI/k=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
