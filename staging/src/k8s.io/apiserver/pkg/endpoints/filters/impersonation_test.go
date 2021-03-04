@@ -75,11 +75,27 @@ func (impersonateAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 	}
 
 	if len(user.GetGroups()) > 1 && user.GetGroups()[1] == "extra-setter-particular-scopes" &&
-		a.GetVerb() == "impersonate" && a.GetResource() == "userextras" && a.GetSubresource() == "scopes" && a.GetName() == "scope-a" {
+		a.GetVerb() == "impersonate" && a.GetResource() == "userextras" && a.GetSubresource() == "scopes" && a.GetName() == "scope-a" && a.GetAPIGroup() == "authentication.k8s.io" {
 		return authorizer.DecisionAllow, "", nil
 	}
 
-	if len(user.GetGroups()) > 1 && user.GetGroups()[1] == "extra-setter-project" && a.GetVerb() == "impersonate" && a.GetResource() == "userextras" && a.GetSubresource() == "project" {
+	if len(user.GetGroups()) > 1 && user.GetGroups()[1] == "extra-setter-project" && a.GetVerb() == "impersonate" && a.GetResource() == "userextras" && a.GetSubresource() == "project" && a.GetAPIGroup() == "authentication.k8s.io" {
+		return authorizer.DecisionAllow, "", nil
+	}
+
+	if len(user.GetGroups()) > 0 && user.GetGroups()[0] == "everything-impersonater" && a.GetVerb() == "impersonate" && a.GetResource() == "users" && a.GetAPIGroup() == "" {
+		return authorizer.DecisionAllow, "", nil
+	}
+
+	if len(user.GetGroups()) > 0 && user.GetGroups()[0] == "everything-impersonater" && a.GetVerb() == "impersonate" && a.GetResource() == "uids" && a.GetName() == "some-uid" && a.GetAPIGroup() == "authentication.k8s.io" {
+		return authorizer.DecisionAllow, "", nil
+	}
+
+	if len(user.GetGroups()) > 0 && user.GetGroups()[0] == "everything-impersonater" && a.GetVerb() == "impersonate" && a.GetResource() == "groups" && a.GetAPIGroup() == "" {
+		return authorizer.DecisionAllow, "", nil
+	}
+
+	if len(user.GetGroups()) > 0 && user.GetGroups()[0] == "everything-impersonater" && a.GetVerb() == "impersonate" && a.GetResource() == "userextras" && a.GetSubresource() == "scopes" && a.GetAPIGroup() == "authentication.k8s.io" {
 		return authorizer.DecisionAllow, "", nil
 	}
 
@@ -93,6 +109,7 @@ func TestImpersonationFilter(t *testing.T) {
 		impersonationUser       string
 		impersonationGroups     []string
 		impersonationUserExtras map[string][]string
+		impersonationUid        string
 		expectedUser            user.Info
 		expectedCode            int
 	}{
@@ -134,6 +151,17 @@ func TestImpersonationFilter(t *testing.T) {
 				Name: "tester",
 			},
 			impersonationUserExtras: map[string][]string{"scopes": {"scope-a"}},
+			expectedUser: &user.DefaultInfo{
+				Name: "tester",
+			},
+			expectedCode: http.StatusInternalServerError,
+		},
+		{
+			name: "impersonating-uid-without-user",
+			user: &user.DefaultInfo{
+				Name: "tester",
+			},
+			impersonationUid: "some-uid",
 			expectedUser: &user.DefaultInfo{
 				Name: "tester",
 			},
@@ -383,6 +411,60 @@ func TestImpersonationFilter(t *testing.T) {
 			},
 			expectedCode: http.StatusOK,
 		},
+		{
+			name: "allowed-user-impersonation-with-uid",
+			user: &user.DefaultInfo{
+				Name: "dev",
+				Groups: []string{
+					"everything-impersonater",
+				},
+			},
+			impersonationUser: "tester",
+			impersonationUid:  "some-uid",
+			expectedUser: &user.DefaultInfo{
+				Name:   "tester",
+				Groups: []string{"system:authenticated"},
+				Extra:  map[string][]string{},
+				UID:    "some-uid",
+			},
+			expectedCode: http.StatusOK,
+		},
+		{
+			name: "disallowed-user-impersonation-with-uid",
+			user: &user.DefaultInfo{
+				Name: "dev",
+				Groups: []string{
+					"everything-impersonater",
+				},
+			},
+			impersonationUser: "tester",
+			impersonationUid:  "disallowed-uid",
+			expectedUser: &user.DefaultInfo{
+				Name:   "dev",
+				Groups: []string{"everything-impersonater"},
+			},
+			expectedCode: http.StatusForbidden,
+		},
+		{
+			name: "allowed-impersonation-with-all-headers",
+			user: &user.DefaultInfo{
+				Name: "dev",
+				Groups: []string{
+					"everything-impersonater",
+				},
+			},
+			impersonationUser:       "tester",
+			impersonationUid:        "some-uid",
+			impersonationGroups:     []string{"system:authenticated"},
+			impersonationUserExtras: map[string][]string{"scopes": {"scope-a", "scope-b"}},
+			expectedUser: &user.DefaultInfo{
+				Name:   "tester",
+				Groups: []string{"system:authenticated"},
+				UID:    "some-uid",
+				Extra:  map[string][]string{"scopes": {"scope-a", "scope-b"}},
+			},
+			expectedCode: http.StatusOK,
+		},
 	}
 
 	var ctx context.Context
@@ -409,6 +491,9 @@ func TestImpersonationFilter(t *testing.T) {
 			if strings.HasPrefix(key, authenticationapi.ImpersonateUserExtraHeaderPrefix) {
 				t.Fatalf("extra header still present: %v", key)
 			}
+		}
+		if _, ok := req.Header[authenticationapi.ImpersonateUIDHeader]; ok {
+			t.Fatal("uid header still present")
 		}
 
 	})
@@ -462,6 +547,9 @@ func TestImpersonationFilter(t *testing.T) {
 				for _, value := range values {
 					req.Header.Add(authenticationapi.ImpersonateUserExtraHeaderPrefix+extraKey, value)
 				}
+			}
+			if len(tc.impersonationUid) > 0 {
+				req.Header.Add(authenticationapi.ImpersonateUIDHeader, tc.impersonationUid)
 			}
 
 			resp, err := http.DefaultClient.Do(req)
