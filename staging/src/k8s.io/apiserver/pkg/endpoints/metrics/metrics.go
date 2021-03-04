@@ -49,7 +49,6 @@ type resettableCollector interface {
 
 const (
 	APIServerComponent string = "apiserver"
-	OtherContentType   string = "other"
 	OtherRequestMethod string = "other"
 )
 
@@ -76,14 +75,10 @@ var (
 	requestCounter = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Name:           "apiserver_request_total",
-			Help:           "Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response contentType and code.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Help:           "Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.",
+			StabilityLevel: compbasemetrics.STABLE,
 		},
-		// The label_name contentType doesn't follow the label_name convention defined here:
-		// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/instrumentation.md
-		// But changing it would break backwards compatibility. Future label_names
-		// should be all lowercase and separated by underscores.
-		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component", "contentType", "code"},
+		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component", "code"},
 	)
 	longRunningRequestGauge = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -235,19 +230,6 @@ var (
 		requestAbortsTotal,
 	}
 
-	// these are the known (e.g. whitelisted/known) content types which we will report for
-	// request metrics. Any other RFC compliant content types will be aggregated under 'unknown'
-	knownMetricContentTypes = utilsets.NewString(
-		"application/apply-patch+yaml",
-		"application/json",
-		"application/json-patch+json",
-		"application/merge-patch+json",
-		"application/strategic-merge-patch+json",
-		"application/vnd.kubernetes.protobuf",
-		"application/vnd.kubernetes.protobuf;stream=watch",
-		"application/yaml",
-		"text/plain",
-		"text/plain;charset=utf-8")
 	// these are the valid request methods which we report in our metrics. Any other request methods
 	// will be aggregated under 'unknown'
 	validRequestMethods = utilsets.NewString(
@@ -392,7 +374,7 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 
 // MonitorRequest handles standard transformations for client and the reported verb and then invokes Monitor to record
 // a request. verb must be uppercase to be backwards compatible with existing monitoring tooling.
-func MonitorRequest(req *http.Request, verb, group, version, resource, subresource, scope, component string, deprecated bool, removedRelease string, contentType string, httpCode, respSize int, elapsed time.Duration) {
+func MonitorRequest(req *http.Request, verb, group, version, resource, subresource, scope, component string, deprecated bool, removedRelease string, httpCode, respSize int, elapsed time.Duration) {
 	// We don't use verb from <requestInfo>, as this may be propagated from
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
@@ -401,8 +383,7 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 
 	dryRun := cleanDryRun(req.URL)
 	elapsedSeconds := elapsed.Seconds()
-	cleanContentType := cleanContentType(contentType)
-	requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, cleanContentType, codeToString(httpCode)).Inc()
+	requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, codeToString(httpCode)).Inc()
 	// MonitorRequest happens after authentication, so we can trust the username given by the request
 	info, ok := request.UserFrom(req.Context())
 	if ok && info.GetName() == user.APIServerUser {
@@ -446,7 +427,7 @@ func InstrumentRouteFunc(verb, group, version, resource, subresource, scope, com
 
 		routeFunc(req, response)
 
-		MonitorRequest(req.Request, verb, group, version, resource, subresource, scope, component, deprecated, removedRelease, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(requestReceivedTimestamp))
+		MonitorRequest(req.Request, verb, group, version, resource, subresource, scope, component, deprecated, removedRelease, delegate.Status(), delegate.ContentLength(), time.Since(requestReceivedTimestamp))
 	})
 }
 
@@ -471,21 +452,8 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 
 		handler(w, req)
 
-		MonitorRequest(req, verb, group, version, resource, subresource, scope, component, deprecated, removedRelease, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(requestReceivedTimestamp))
+		MonitorRequest(req, verb, group, version, resource, subresource, scope, component, deprecated, removedRelease, delegate.Status(), delegate.ContentLength(), time.Since(requestReceivedTimestamp))
 	}
-}
-
-// cleanContentType binds the contentType (for metrics related purposes) to a
-// bounded set of known/expected content-types.
-func cleanContentType(contentType string) string {
-	normalizedContentType := strings.ToLower(contentType)
-	if strings.HasSuffix(contentType, " stream=watch") || strings.HasSuffix(contentType, " charset=utf-8") {
-		normalizedContentType = strings.ReplaceAll(contentType, " ", "")
-	}
-	if knownMetricContentTypes.Has(normalizedContentType) {
-		return normalizedContentType
-	}
-	return OtherContentType
 }
 
 // CleanScope returns the scope of the request.
