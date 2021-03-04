@@ -1569,11 +1569,24 @@ function Install_Containerd {
   Remove-Item -Force -Recurse $tmp_dir
 }
 
+# Lookup the path of containerd config if exists, else returns a default.
+function Get_Containerd_ConfigPath {
+  $service = Get-WMIObject -Class Win32_Service -Filter  "Name='containerd'"
+  if (!($service -eq $null) -and
+      $service.PathName -match ".*\s--config\s*(\S+).*" -and
+      $matches.Length -eq 2) {
+    return $matches[1]
+  } else {
+    return 'C:\Program Files\containerd\config.toml'
+  }
+}
+
 # Generates the containerd config.toml file.
 function Configure_Containerd {
-  $config_dir = 'C:\Program Files\containerd'
+  $config_path = Get_Containerd_ConfigPath
+  $config_dir = [System.IO.Path]::GetDirectoryName($config_path)
   New-Item $config_dir -ItemType 'directory' -Force | Out-Null
-  Set-Content "$config_dir\config.toml" @"
+  Set-Content ${config_path} @"
 [plugins.cri]
   sandbox_image = 'INFRA_CONTAINER_IMAGE'
 [plugins.cri.cni]
@@ -1584,12 +1597,16 @@ function Configure_Containerd {
     replace('CNI_CONF_DIR', ${env:CNI_CONFIG_DIR})
 }
 
-# Register and start containerd service.
+# Register if needed and start containerd service.
 function Start_Containerd {
-  Log-Output "Creating containerd service"
-  & containerd.exe --register-service --log-file ${env:LOGS_DIR}/containerd.log
+  # Do the registration only if the containerd service does not exist.
+  if (Get-WMIObject -Class Win32_Service -Filter  "Name='containerd'" -eq $null) {
+    Log-Output "Creating containerd service"
+    & containerd.exe --register-service --log-file "${env:LOGS_DIR}/containerd.log"
+  }
+
   Log-Output "Starting containerd service"
-  Start-Service containerd
+  Restart-Service containerd
 }
 
 # Pigz Resources
