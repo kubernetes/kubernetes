@@ -23,9 +23,19 @@ package auth
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
 	"io/ioutil"
+	certificatesv1 "k8s.io/api/certificates/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -57,6 +67,12 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 const (
 	AliceToken   string = "abc123" // username: alice.  Present in token file.
@@ -873,6 +889,100 @@ func TestImpersonateIsForbidden(t *testing.T) {
 		}()
 	}
 
+}
+
+func TestImpersonateWithUID(t *testing.T) {
+	t.Run("impersonation with uid header", func(t *testing.T) {
+		req := csrPEM(t)
+
+		result := kubeapiservertesting.StartTestServerOrDie(
+			t,
+			nil,
+			nil,
+			framework.SharedEtcd(),
+		)
+		t.Cleanup(result.TearDownFn)
+
+		clientConfig := result.ClientConfig
+		clientConfig.Impersonate = rest.ImpersonationConfig{
+			UserName: "alice",
+		}
+		clientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+			return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				req.Header.Set("Impersonate-Uid", "1")
+				return rt.RoundTrip(req)
+			})
+		})
+
+		client := clientset.NewForConfigOrDie(clientConfig)
+		createdCsr, err := client.CertificatesV1().CertificateSigningRequests().Create(
+			context.Background(),
+			&certificatesv1.CertificateSigningRequest{
+				Spec: certificatesv1.CertificateSigningRequestSpec{
+					Groups:     []string{"system:authenticated"},
+					SignerName: "kubernetes.io/kube-apiserver-client",
+					Request:    req,
+					Usages:     []certificatesv1.KeyUsage{"client auth"},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "impersonated-csr",
+				},
+			},
+			metav1.CreateOptions{},
+		)
+
+		if err != nil {
+			t.Fatalf("Unexpected error creating Certificate Signing Request: %v", err)
+		}
+		// require that all the original fields and the impersonated user's info
+		// is in the returned spec.
+
+		expectedCsrSpec := certificatesv1.CertificateSigningRequestSpec{
+			Groups:     []string{"system:authenticated"},
+			SignerName: "kubernetes.io/kube-apiserver-client",
+			Request:    req,
+			Usages:     []certificatesv1.KeyUsage{"client auth"},
+			Username:   "alice",
+			UID:        "1",
+		}
+		actualCsrSpec := createdCsr.Spec
+
+		if diff := cmp.Diff(expectedCsrSpec, actualCsrSpec); diff != "" {
+			t.Fatalf("CSR spec was different than expected, -got, +want:\n %s", diff)
+		}
+	})
+}
+
+func csrPEM(t *testing.T) []byte {
+	t.Helper()
+
+	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Unexpected error generating ed25519 key: %v", err)
+	}
+
+	csrDER, err := x509.CreateCertificateRequest(
+		rand.Reader,
+		&x509.CertificateRequest{
+			Subject: pkix.Name{
+				Organization: []string{},
+			},
+		},
+		privateKey)
+	if err != nil {
+		t.Fatalf("Unexpected error creating x509 certificate request: %v", err)
+	}
+
+	csrPemBlock := &pem.Block{
+		Type:  "CERTIFICATE REQUEST",
+		Bytes: csrDER,
+	}
+
+	req := pem.EncodeToMemory(csrPemBlock)
+	if req == nil {
+		t.Fatalf("Failed to encode PEM to memory.")
+	}
+	return req
 }
 
 func newAuthorizerWithContents(t *testing.T, contents string) authorizer.Authorizer {

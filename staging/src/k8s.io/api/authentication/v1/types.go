@@ -31,6 +31,9 @@ const (
 	// It can be repeated multiplied times for multiple groups.
 	ImpersonateGroupHeader = "Impersonate-Group"
 
+	// ImpersonateUIDHeader is used to impersonate a particular UID during an API server request
+	ImpersonateUIDHeader = "Impersonate-Uid"
+
 	// ImpersonateUserExtraHeaderPrefix is a prefix for any header used to impersonate an entry in the
 	// extra map[string][]string for user.Info.  The key will be every after the prefix.
 	// It can be repeated multiplied times for multiple map keys and the same key can be repeated multiple
