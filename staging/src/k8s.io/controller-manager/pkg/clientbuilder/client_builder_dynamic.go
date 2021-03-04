@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -149,6 +150,26 @@ func (t *DynamicControllerClientBuilder) Client(name string) (clientset.Interfac
 
 func (t *DynamicControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
 	client, err := t.Client(name)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	return client
+}
+
+func (t *DynamicControllerClientBuilder) DiscoveryClient(name string) (discovery.DiscoveryInterface, error) {
+	clientConfig, err := t.Config(name)
+	if err != nil {
+		return nil, err
+	}
+	// Discovery makes a lot of requests infrequently.  This allows the burst to succeed and refill to happen
+	// in just a few seconds.
+	clientConfig.Burst = 200
+	clientConfig.QPS = 20
+	return clientset.NewForConfig(clientConfig)
+}
+
+func (t *DynamicControllerClientBuilder) DiscoveryClientOrDie(name string) discovery.DiscoveryInterface {
+	client, err := t.DiscoveryClient(name)
 	if err != nil {
 		klog.Fatal(err)
 	}
