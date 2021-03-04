@@ -244,9 +244,6 @@ function start-kube-apiserver {
     RUNTIME_CONFIG="${RUNTIME_CONFIG},auditconfiguration.k8s.io/v1alpha1=true"
   fi
 
-  if [[ "${ENABLE_APISERVER_LOGS_HANDLER:-}" == "false" ]]; then
-    params+=" --enable-logs-handler=false"
-  fi
   if [[ "${APISERVER_SET_KUBELET_CA:-false}" == "true" ]]; then
     params+=" --kubelet-certificate-authority=${CA_CERT_BUNDLE_PATH}"
   fi

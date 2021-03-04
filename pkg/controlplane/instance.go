@@ -143,9 +143,7 @@ type ExtraConfig struct {
 	EndpointReconcilerConfig EndpointReconcilerConfig
 	EventTTL                 time.Duration
 	KubeletClientConfig      kubeletclient.KubeletClientConfig
-
-	EnableLogsSupport bool
-	ProxyTransport    *http.Transport
+	ProxyTransport           *http.Transport
 
 	// Values to build the IP addresses used by discovery
 	// The range of IPs to be assigned to services with type=ClusterIP or greater
@@ -349,10 +347,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	s, err := c.GenericConfig.New("kube-apiserver", delegationTarget)
 	if err != nil {
 		return nil, err
-	}
-
-	if c.ExtraConfig.EnableLogsSupport {
-		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
 	}
 
 	// Metadata and keys are expected to only change across restarts at present,

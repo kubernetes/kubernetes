@@ -269,7 +269,6 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 			StorageFactory:          storageFactory,
 			EventTTL:                s.EventTTL,
 			KubeletClientConfig:     s.KubeletConfig,
-			EnableLogsSupport:       s.EnableLogsHandler,
 			ProxyTransport:          proxyTransport,
 
 			ServiceIPRange:          s.PrimaryServiceClusterIPRange,

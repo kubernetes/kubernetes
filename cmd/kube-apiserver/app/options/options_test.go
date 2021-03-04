@@ -100,7 +100,6 @@ func TestAddFlags(t *testing.T) {
 		"--egress-selector-config-file=/var/run/kubernetes/egress-selector/connectivity.yaml",
 		"--enable-aggregator-routing=true",
 		"--enable-priority-and-fairness=false",
-		"--enable-logs-handler=false",
 		"--endpoint-reconciler-type=" + string(reconcilers.LeaseEndpointReconcilerType),
 		"--etcd-keyfile=/var/run/kubernetes/etcd.key",
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
@@ -305,7 +304,6 @@ func TestAddFlags(t *testing.T) {
 		EgressSelector: &apiserveroptions.EgressSelectorOptions{
 			ConfigFile: "/var/run/kubernetes/egress-selector/connectivity.yaml",
 		},
-		EnableLogsHandler:       false,
 		EnableAggregatorRouting: true,
 		ProxyClientKeyFile:      "/var/run/kubernetes/proxy.key",
 		ProxyClientCertFile:     "/var/run/kubernetes/proxy.crt",

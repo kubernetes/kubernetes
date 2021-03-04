@@ -61,7 +61,6 @@ type ServerRunOptions struct {
 	Traces                  *genericoptions.TracingOptions
 
 	AllowPrivileged           bool
-	EnableLogsHandler         bool
 	EventTTL                  time.Duration
 	KubeletConfig             kubeletclient.KubeletClientConfig
 	KubernetesServiceNodePort int
@@ -113,7 +112,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		Logs:                    logs.NewOptions(),
 		Traces:                  genericoptions.NewTracingOptions(),
 
-		EnableLogsHandler:                 true,
 		EventTTL:                          1 * time.Hour,
 		MasterCount:                       1,
 		EndpointReconcilerType:            string(reconcilers.LeaseEndpointReconcilerType),
@@ -192,10 +190,6 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged,
 		"If true, allow privileged containers. [default=false]")
-
-	fs.BoolVar(&s.EnableLogsHandler, "enable-logs-handler", s.EnableLogsHandler,
-		"If true, install a /logs handler for the apiserver logs.")
-	fs.MarkDeprecated("enable-logs-handler", "This flag will be removed in v1.19")
 
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+

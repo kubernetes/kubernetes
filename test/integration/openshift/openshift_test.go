@@ -30,9 +30,6 @@ func TestApiserverExportsSymbols(t *testing.T) {
 		GenericConfig: &genericapiserver.Config{
 			EnableMetrics: true,
 		},
-		ExtraConfig: controlplane.ExtraConfig{
-			EnableLogsSupport: false,
-		},
 	}
 	_ = &controlplane.Instance{
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
