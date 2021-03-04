@@ -46,12 +46,12 @@ var _ admission.Interface = &managedFieldsValidatingAdmissionController{}
 var _ admission.MutationInterface = &managedFieldsValidatingAdmissionController{}
 var _ admission.ValidationInterface = &managedFieldsValidatingAdmissionController{}
 
-// Handles calls the wrapped admission.Interface if aplicable
+// Handles calls the wrapped admission.Interface if applicable
 func (admit *managedFieldsValidatingAdmissionController) Handles(operation admission.Operation) bool {
 	return admit.wrap.Handles(operation)
 }
 
-// Admit calls the wrapped admission.Interface if aplicable and resets the managedFields to their state before admission if they
+// Admit calls the wrapped admission.Interface if applicable and resets the managedFields to their state before admission if they
 // got modified in an invalid way
 func (admit *managedFieldsValidatingAdmissionController) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	mutationInterface, isMutationInterface := admit.wrap.(admission.MutationInterface)
