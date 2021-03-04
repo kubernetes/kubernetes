@@ -172,13 +172,13 @@ func newClientset() *fake.Clientset {
 			endpointSlice.ObjectMeta.Name = fmt.Sprintf("%s-%s", endpointSlice.ObjectMeta.GenerateName, rand.String(8))
 			endpointSlice.ObjectMeta.GenerateName = ""
 		}
-		endpointSlice.ObjectMeta.ResourceVersion = "100"
+		endpointSlice.ObjectMeta.Generation = 1
 
 		return false, endpointSlice, nil
 	}))
 	client.PrependReactor("update", "endpointslices", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
 		endpointSlice := action.(k8stesting.CreateAction).GetObject().(*discovery.EndpointSlice)
-		endpointSlice.ObjectMeta.ResourceVersion = "200"
+		endpointSlice.ObjectMeta.Generation++
 		return false, endpointSlice, nil
 	}))
 
