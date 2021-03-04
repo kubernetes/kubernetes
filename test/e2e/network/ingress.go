@@ -205,7 +205,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 		// zone based on pod labels.
 	})
 
-	ginkgo.Describe("GCE [Slow] [Feature:NEG]", func() {
+	ginkgo.Describe("GCE [Slow] [Feature:NEG] [Flaky]", func() {
 		var gceController *gce.IngressController
 
 		// Platform specific setup
