@@ -437,13 +437,18 @@ func prioritizeNodes(
 	}
 
 	// Summarize all scores.
-	result := make(framework.NodeScoreList, 0, len(nodes))
+	result := make(framework.NodeScoreList, len(nodes))
 
-	for i := range nodes {
-		result = append(result, framework.NodeScore{Name: nodes[i].Name, Score: 0})
-		for j := range scoresMap {
-			result[i].Score += scoresMap[j][i].Score
+	pluginIndex := 0
+	for _, nodeScores := range scoresMap {
+		for i := range nodeScores {
+			result[i].Score += nodeScores[i].Score
+			// for the first time through, we also need to populate Node names in result[]
+			if pluginIndex == 0 {
+				result[i].Name = nodes[i].Name
+			}
 		}
+		pluginIndex++
 	}
 
 	if len(extenders) != 0 && nodes != nil {
