@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -1072,8 +1073,8 @@ func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podr
 	return cm.deviceManager.GetDevices(podUID, containerName)
 }
 
-func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
-	return cm.cpuManager.GetCPUs(podUID, containerName).ToSliceNoSortInt64()
+func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) cpuset.CPUSet {
+	return cm.cpuManager.GetCPUs(podUID, containerName).Clone()
 }
 
 func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {

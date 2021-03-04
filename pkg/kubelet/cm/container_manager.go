@@ -107,7 +107,7 @@ type ContainerManager interface {
 	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
 
 	// GetCPUs returns information about the cpus assigned to pods and containers
-	GetCPUs(podUID, containerName string) []int64
+	GetCPUs(podUID, containerName string) cpuset.CPUSet
 
 	// ShouldResetExtendedResourceCapacity returns whether or not the extended resources should be zeroed,
 	// due to node recreation.

@@ -60,7 +60,7 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *v1.ListPodResource
 			pRes.Containers[j] = &v1.ContainerResources{
 				Name:    container.Name,
 				Devices: p.devicesProvider.GetDevices(string(pod.UID), container.Name),
-				CpuIds:  p.cpusProvider.GetCPUs(string(pod.UID), container.Name),
+				CpuIds:  p.cpusProvider.GetCPUs(string(pod.UID), container.Name).ToSliceNoSortInt64(),
 			}
 		}
 		podResources[i] = &pRes

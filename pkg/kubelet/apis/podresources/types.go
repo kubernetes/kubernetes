@@ -19,6 +19,7 @@ package podresources
 import (
 	"k8s.io/api/core/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 // DevicesProvider knows how to provide the devices used by the given container
@@ -34,5 +35,5 @@ type PodsProvider interface {
 
 // CPUsProvider knows how to provide the cpus used by the given container
 type CPUsProvider interface {
-	GetCPUs(podUID, containerName string) []int64
+	GetCPUs(podUID, containerName string) cpuset.CPUSet
 }

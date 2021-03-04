@@ -232,6 +232,6 @@ func (cm *containerManagerImpl) UpdateAllocatedDevices() {
 	return
 }
 
-func (cm *containerManagerImpl) GetCPUs(_, _ string) []int64 {
-	return nil
+func (cm *containerManagerImpl) GetCPUs(_, _ string) cpuset.CPUSet {
+	return cpuset.CPUSet{}
 }
