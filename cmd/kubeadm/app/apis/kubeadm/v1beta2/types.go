@@ -141,9 +141,6 @@ type DNSAddOnType string
 const (
 	// CoreDNS add-on type
 	CoreDNS DNSAddOnType = "CoreDNS"
-
-	// KubeDNS add-on type
-	KubeDNS DNSAddOnType = "kube-dns"
 )
 
 // DNS defines the DNS addon that should be used in the cluster
