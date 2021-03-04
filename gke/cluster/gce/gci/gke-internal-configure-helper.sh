@@ -1,5 +1,101 @@
 #!/bin/bash
 
+# Create TLS enabled or disabled kubeconfig files for component static pods.
+function gke-internal-create-kubeconfig {
+  local component=$1
+  local token=$2
+  local path=$3
+  if [[ "${KUBE_APISERVER_TLS_VERIFY_ENABLED:-}" == "true" ]]; then
+    if [[ -z "${KUBE_APISERVER_INTERNAL_ADDRESS}" ]]; then
+      echo "Error: TLS verification is enabled, but KUBE_APISERVER_INTERNAL_ADDRESS is missing in env var."
+      exit 1
+    fi
+    echo "Creating TLS verification enabled kubeconfig file for component ${component}"
+    cat <<EOF >${path}
+apiVersion: v1
+kind: Config
+users:
+- name: ${component}
+  user:
+    token: ${token}
+clusters:
+- name: local
+  cluster:
+    certificate-authority-data: ${CA_CERT}
+    server: https://${KUBE_APISERVER_INTERNAL_ADDRESS}:443
+contexts:
+- context:
+    cluster: local
+    user: ${component}
+  name: ${component}
+current-context: ${component}
+EOF
+  else
+    echo "Creating TLS verification disabled kubeconfig file for component ${component}"
+    cat <<EOF >${path}
+apiVersion: v1
+kind: Config
+users:
+- name: ${component}
+  user:
+    token: ${token}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: ${component}
+  name: ${component}
+current-context: ${component}
+EOF
+  fi
+}
+
+# Returns TLS SNI param for kube-apiserver.
+function gke-kube-apiserver-internal-sni-param {
+  if [[ "${KUBE_APISERVER_TLS_VERIFY_ENABLED:-}" == "true" ]]; then
+    if [[ -z "${KUBE_APISERVER_SERVER_INTERNAL_CERT_PATH}" || -z "${KUBE_APISERVER_SERVER_INTERNAL_KEY_PATH}" || -z "${KUBE_APISERVER_INTERNAL_ADDRESS}" ]]; then
+      echo "Error: TLS verification is enabled, but KUBE_APISERVER_SERVER_INTERNAL_CERT_PATH or KUBE_APISERVER_SERVER_INTERNAL_KEY_PATH or KUBE_APISERVER_INTERNAL_ADDRESS is missing in env var."
+      exit 1
+    fi
+
+    echo " --tls-sni-cert-key=${KUBE_APISERVER_SERVER_INTERNAL_CERT_PATH},${KUBE_APISERVER_SERVER_INTERNAL_KEY_PATH}:${KUBE_APISERVER_INTERNAL_ADDRESS}"
+  fi
+}
+
+# Writes a cert/key pair for kube-apiserver to server TLS on a GKE internal address.
+function write-kube-apiserver-internal-cert-key {
+  if [[ "${KUBE_APISERVER_TLS_VERIFY_ENABLED:-}" == "true" ]]; then
+    if [[ -z "${KUBE_APISERVER_INTERNAL_TLS_CERT}" || -z "${KUBE_APISERVER_INTERNAL_TLS_KEY}" ]]; then
+      echo "Error: TLS verification is enabled, but KUBE_APISERVER_INTERNAL_TLS_CERT or KUBE_APISERVER_INTERNAL_TLS_KEY is missing in env var."
+      exit 1
+    fi
+
+    local -r pki_dir="/etc/srv/kubernetes/pki"
+    mkdir -p "${pki_dir}"
+
+    KUBE_APISERVER_SERVER_INTERNAL_CERT_PATH="${pki_dir}/internal-apiserver.crt"
+    write-pki-data "${KUBE_APISERVER_INTERNAL_TLS_CERT}" "${KUBE_APISERVER_SERVER_INTERNAL_CERT_PATH}"
+    KUBE_APISERVER_SERVER_INTERNAL_KEY_PATH="${pki_dir}/internal-apiserver.key"
+    write-pki-data "${KUBE_APISERVER_INTERNAL_TLS_KEY}" "${KUBE_APISERVER_SERVER_INTERNAL_KEY_PATH}"
+  fi
+}
+
+# Add entry to hostfile to redirect internal name to master internal IP.
+function setup-kube-apiserver-internal-address-redirect {
+  if [[ "${KUBE_APISERVER_TLS_VERIFY_ENABLED:-}" == "true" ]]; then
+    if [[ -z "${KUBE_APISERVER_INTERNAL_ADDRESS}" ]]; then
+      echo "Error: TLS verification is enabled, but KUBE_APISERVER_INTERNAL_ADDRESS is missing in env var."
+      exit 1
+    fi
+
+    echo "$(hostname -i) ${KUBE_APISERVER_INTERNAL_ADDRESS}" >>/etc/hosts
+  fi
+}
+
 function start_internal_cluster_autoscaler {
   if [[ "${GKE_CLUSTER_AUTOSCALER_ON_CRP:-}" == "true" ]]; then
     echo "Cluster Autoscaler will be deployed by CRP, nothing to do here."
@@ -165,6 +261,10 @@ function create-static-auth-kubeconfig-for-component {
 function gke-internal-master-start {
   echo "Internal GKE configuration start"
   compute-master-manifest-variables
+
+  write-kube-apiserver-internal-cert-key
+  setup-kube-apiserver-internal-address-redirect
+
   start_internal_cluster_autoscaler
   start_pod_autoscaler
   setup_master_prom_to_sd_monitor_component
