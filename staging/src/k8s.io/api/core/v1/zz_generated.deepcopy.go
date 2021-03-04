@@ -3360,6 +3360,11 @@ func (in *PodAffinityTerm) DeepCopyInto(out *PodAffinityTerm) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.NamespaceSelector != nil {
+		in, out := &in.NamespaceSelector, &out.NamespaceSelector
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

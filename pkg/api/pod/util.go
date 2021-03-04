@@ -523,6 +523,7 @@ func dropDisabledFields(
 		podSpec.SetHostnameAsFQDN = nil
 	}
 
+	dropDisabledPodAffinityTermFields(podSpec, oldPodSpec)
 }
 
 // dropDisabledProcMountField removes disabled fields from PodSpec related
@@ -570,6 +571,66 @@ func dropDisabledEphemeralVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSp
 			podSpec.Volumes[i].Ephemeral = nil
 		}
 	}
+}
+
+func dropPodAffinityTermNamespaceSelector(terms []api.PodAffinityTerm) {
+	for i := range terms {
+		terms[i].NamespaceSelector = nil
+	}
+}
+
+func dropWeightedPodAffinityTermNamespaceSelector(terms []api.WeightedPodAffinityTerm) {
+	for i := range terms {
+		terms[i].PodAffinityTerm.NamespaceSelector = nil
+	}
+}
+
+// dropDisabledPodAffinityTermFields removes disabled fields from PodSpec related
+// to PodAffinityTerm only if it is not already used by the old spec
+func dropDisabledPodAffinityTermFields(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector) &&
+		podSpec != nil && podSpec.Affinity != nil &&
+		!podAffinityNamespaceSelectorInUse(oldPodSpec) {
+		if podSpec.Affinity.PodAffinity != nil {
+			dropPodAffinityTermNamespaceSelector(podSpec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+			dropWeightedPodAffinityTermNamespaceSelector(podSpec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+		}
+		if podSpec.Affinity.PodAntiAffinity != nil {
+			dropPodAffinityTermNamespaceSelector(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+			dropWeightedPodAffinityTermNamespaceSelector(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+		}
+	}
+}
+
+func podAffinityNamespaceSelectorInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil || podSpec.Affinity == nil {
+		return false
+	}
+	if podSpec.Affinity.PodAffinity != nil {
+		for _, t := range podSpec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+			if t.NamespaceSelector != nil {
+				return true
+			}
+		}
+		for _, t := range podSpec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+			if t.PodAffinityTerm.NamespaceSelector != nil {
+				return true
+			}
+		}
+	}
+	if podSpec.Affinity.PodAntiAffinity != nil {
+		for _, t := range podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+			if t.NamespaceSelector != nil {
+				return true
+			}
+		}
+		for _, t := range podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+			if t.PodAffinityTerm.NamespaceSelector == nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
