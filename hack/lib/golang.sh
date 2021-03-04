@@ -306,10 +306,11 @@ readonly KUBE_TEST_SERVER_BINARIES=("${KUBE_TEST_SERVER_TARGETS[@]##*/}")
 readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]:+"${KUBE_SERVER_PLATFORMS[@]}"}")
 
 # Gigabytes necessary for parallel platform builds.
-# As of January 2018, RAM usage is exceeding 30G.
+# As of March 2021 (go 1.16/amd64), the RSS usage is 2GiB by using cached
+# memory of 15GiB.
 # This variable can be overwritten at your own risk.
-# It's defaulting to 40G to provide some headroom
-readonly KUBE_PARALLEL_BUILD_MEMORY=${KUBE_PARALLEL_BUILD_MEMORY:-40}
+# It's defaulting to 20G to provide some headroom.
+readonly KUBE_PARALLEL_BUILD_MEMORY=${KUBE_PARALLEL_BUILD_MEMORY:-20}
 
 readonly KUBE_ALL_TARGETS=(
   "${KUBE_SERVER_TARGETS[@]}"
