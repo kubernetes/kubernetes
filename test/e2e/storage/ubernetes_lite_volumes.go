@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduling
+package storage
 
 import (
 	"context"
@@ -28,15 +28,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = SIGDescribe("Multi-AZ Cluster Volumes [sig-storage]", func() {
+var _ = utils.SIGDescribe("Multi-AZ Cluster Volumes", func() {
 	f := framework.NewDefaultFramework("multi-az")
 	var zoneCount int
 	var err error
@@ -177,6 +179,15 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 		pvZones.Insert(pvZone)
 	}
 	framework.ExpectEqual(pvZones.Equal(expectedZones), true, fmt.Sprintf("PDs provisioned in unwanted zones. We want zones: %v, got: %v", expectedZones, pvZones))
+}
+
+// Return the number of zones in which we have nodes in this cluster.
+func getZoneCount(c clientset.Interface) (int, error) {
+	zoneNames, err := e2enode.GetClusterZones(c)
+	if err != nil {
+		return -1, err
+	}
+	return len(zoneNames), nil
 }
 
 type staticPVTestConfig struct {
