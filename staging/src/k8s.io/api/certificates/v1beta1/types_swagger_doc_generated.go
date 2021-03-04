@@ -28,9 +28,10 @@ package v1beta1
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_CertificateSigningRequest = map[string]string{
-	"":       "Describes a certificate signing request",
-	"spec":   "The certificate request itself and any additional information.",
-	"status": "Derived information about the request.",
+	"":         "Describes a certificate signing request",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "The certificate request itself and any additional information.",
+	"status":   "Derived information about the request.",
 }
 
 func (CertificateSigningRequest) SwaggerDoc() map[string]string {
@@ -48,6 +49,15 @@ var map_CertificateSigningRequestCondition = map[string]string{
 
 func (CertificateSigningRequestCondition) SwaggerDoc() map[string]string {
 	return map_CertificateSigningRequestCondition
+}
+
+var map_CertificateSigningRequestList = map[string]string{
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "items is a collection of CertificateSigningRequest objects",
+}
+
+func (CertificateSigningRequestList) SwaggerDoc() map[string]string {
+	return map_CertificateSigningRequestList
 }
 
 var map_CertificateSigningRequestSpec = map[string]string{
