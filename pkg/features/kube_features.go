@@ -748,7 +748,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	EndpointSlice:                                  {Default: true, PreRelease: featuregate.Beta},
 	EndpointSliceProxying:                          {Default: true, PreRelease: featuregate.Beta},
 	EndpointSliceTerminatingCondition:              {Default: false, PreRelease: featuregate.Alpha},
-	EndpointSliceNodeName:                          {Default: false, PreRelease: featuregate.Alpha},
+	EndpointSliceNodeName:                          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, //remove in 1.25
 	WindowsEndpointSliceProxying:                   {Default: false, PreRelease: featuregate.Alpha},
 	StartupProbe:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},

@@ -31,7 +31,6 @@ func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 	testcases := []struct {
 		name                   string
 		terminatingGateEnabled bool
-		nodeNameGateEnabled    bool
 		eps                    *discovery.EndpointSlice
 		expectedEPS            *discovery.EndpointSlice
 	}{
@@ -132,8 +131,7 @@ func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 			},
 		},
 		{
-			name:                "node name gate enabled, field should be allowed",
-			nodeNameGateEnabled: true,
+			name: "node name gate enabled, field should be allowed",
 			eps: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
@@ -151,30 +149,6 @@ func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 					},
 					{
 						NodeName: utilpointer.StringPtr("node-2"),
-					},
-				},
-			},
-		},
-		{
-			name:                "node name gate disabled, field should be allowed",
-			nodeNameGateEnabled: false,
-			eps: &discovery.EndpointSlice{
-				Endpoints: []discovery.Endpoint{
-					{
-						NodeName: utilpointer.StringPtr("node-1"),
-					},
-					{
-						NodeName: utilpointer.StringPtr("node-2"),
-					},
-				},
-			},
-			expectedEPS: &discovery.EndpointSlice{
-				Endpoints: []discovery.Endpoint{
-					{
-						NodeName: nil,
-					},
-					{
-						NodeName: nil,
 					},
 				},
 			},
@@ -184,7 +158,6 @@ func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTerminatingCondition, testcase.terminatingGateEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceNodeName, testcase.nodeNameGateEnabled)()
 
 			dropDisabledFieldsOnCreate(testcase.eps)
 			if !apiequality.Semantic.DeepEqual(testcase.eps, testcase.expectedEPS) {
@@ -200,7 +173,6 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 	testcases := []struct {
 		name                   string
 		terminatingGateEnabled bool
-		nodeNameGateEnabled    bool
 		oldEPS                 *discovery.EndpointSlice
 		newEPS                 *discovery.EndpointSlice
 		expectedEPS            *discovery.EndpointSlice
@@ -483,8 +455,7 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 			},
 		},
 		{
-			name:                "node name gate enabled, set on new EPS",
-			nodeNameGateEnabled: true,
+			name: "node name gate enabled, set on new EPS",
 			oldEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
@@ -517,42 +488,7 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 			},
 		},
 		{
-			name:                "node name gate disabled, set on new EPS",
-			nodeNameGateEnabled: false,
-			oldEPS: &discovery.EndpointSlice{
-				Endpoints: []discovery.Endpoint{
-					{
-						NodeName: nil,
-					},
-					{
-						NodeName: nil,
-					},
-				},
-			},
-			newEPS: &discovery.EndpointSlice{
-				Endpoints: []discovery.Endpoint{
-					{
-						NodeName: utilpointer.StringPtr("node-1"),
-					},
-					{
-						NodeName: utilpointer.StringPtr("node-2"),
-					},
-				},
-			},
-			expectedEPS: &discovery.EndpointSlice{
-				Endpoints: []discovery.Endpoint{
-					{
-						NodeName: nil,
-					},
-					{
-						NodeName: nil,
-					},
-				},
-			},
-		},
-		{
-			name:                "node name gate disabled, set on old and updated EPS",
-			nodeNameGateEnabled: false,
+			name: "node name gate disabled, set on old and updated EPS",
 			oldEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
@@ -589,7 +525,6 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTerminatingCondition, testcase.terminatingGateEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceNodeName, testcase.nodeNameGateEnabled)()
 
 			dropDisabledFieldsOnUpdate(testcase.oldEPS, testcase.newEPS)
 			if !apiequality.Semantic.DeepEqual(testcase.newEPS, testcase.expectedEPS) {

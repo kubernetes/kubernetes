@@ -452,6 +452,7 @@ func TestSyncService(t *testing.T) {
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
 					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
+					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 				{
 					Conditions: discovery.EndpointConditions{
@@ -460,6 +461,7 @@ func TestSyncService(t *testing.T) {
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
 					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
+					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 			},
 		},
@@ -565,6 +567,7 @@ func TestSyncService(t *testing.T) {
 					Addresses: []string{"fd08::5678:0000:0000:9abc:def0"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
 					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
+					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 			},
 		},
@@ -670,6 +673,7 @@ func TestSyncService(t *testing.T) {
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
 					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
+					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 				{
 					Conditions: discovery.EndpointConditions{
@@ -680,6 +684,7 @@ func TestSyncService(t *testing.T) {
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
 					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
+					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 			},
 			terminatingGateEnabled: true,
@@ -784,6 +789,7 @@ func TestSyncService(t *testing.T) {
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
 					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
+					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 			},
 			terminatingGateEnabled: false,
@@ -890,6 +896,7 @@ func TestSyncService(t *testing.T) {
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
 					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
+					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 				{
 					Conditions: discovery.EndpointConditions{
@@ -900,6 +907,7 @@ func TestSyncService(t *testing.T) {
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
 					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
+					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 			},
 			terminatingGateEnabled: true,
@@ -1004,6 +1012,7 @@ func TestSyncService(t *testing.T) {
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
 					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
+					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 			},
 			terminatingGateEnabled: false,
