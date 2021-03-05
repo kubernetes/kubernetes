@@ -2115,7 +2115,6 @@ k8s.io/kubectl/pkg/drain
 k8s.io/kubectl/pkg/explain
 k8s.io/kubectl/pkg/generate
 k8s.io/kubectl/pkg/generate/versioned
-k8s.io/kubectl/pkg/generated
 k8s.io/kubectl/pkg/metricsutil
 k8s.io/kubectl/pkg/polymorphichelpers
 k8s.io/kubectl/pkg/proxy
