@@ -110,8 +110,8 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 		return nil, false, err
 	}
 
-	// failure: more than one cidr and dual stack is not enabled and/or endpoint slice is not enabled
-	if len(clusterCIDRs) > 1 && (!utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) || !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice)) {
+	// failure: more than one cidr and dual stack is not enabled
+	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and dualstack or EndpointSlice feature is not enabled", len(clusterCIDRs))
 	}
 

@@ -122,7 +122,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			BindAddress:        "10.10.12.11",
 			HealthzBindAddress: "0.0.0.0:12345",
 			MetricsBindAddress: "127.0.0.1:10249",
-			FeatureGates:       map[string]bool{"IPv6DualStack": true, "EndpointSlice": true},
+			FeatureGates:       map[string]bool{"IPv6DualStack": true},
 			ClusterCIDR:        "192.168.59.0/24",
 			UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 			ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
@@ -285,7 +285,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				HealthzBindAddress: "0.0.0.0:12345",
 				MetricsBindAddress: "127.0.0.1:10249",
 				// DualStack ClusterCIDR without feature flag enabled
-				FeatureGates:     map[string]bool{"IPv6DualStack": false, "EndpointSlice": false},
+				FeatureGates:     map[string]bool{"IPv6DualStack": false},
 				ClusterCIDR:      "192.168.59.0/24,fd00:192:168::/64",
 				UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
 				ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
@@ -303,36 +303,12 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ClusterCIDR"), "192.168.59.0/24,fd00:192:168::/64", "only one CIDR allowed (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)")},
 		},
-		"DualStack feature-enabled but EndpointSlice feature disabled": {
-			config: kubeproxyconfig.KubeProxyConfiguration{
-				BindAddress:        "10.10.12.11",
-				HealthzBindAddress: "0.0.0.0:12345",
-				MetricsBindAddress: "127.0.0.1:10249",
-				// DualStack ClusterCIDR with feature flag enabled but EndpointSlice is not enabled
-				FeatureGates:     map[string]bool{"IPv6DualStack": true, "EndpointSlice": false},
-				ClusterCIDR:      "192.168.59.0/24,fd00:192:168::/64",
-				UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
-				ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
-				IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-					MasqueradeAll: true,
-					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
-					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
-				},
-				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-					MaxPerCore:            pointer.Int32Ptr(1),
-					Min:                   pointer.Int32Ptr(1),
-					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-				},
-			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("FeatureGates"), map[string]bool{"EndpointSlice": false, "IPv6DualStack": true}, "EndpointSlice feature flag must be turned on when turning on DualStack")},
-		},
 		"Invalid number of ClusterCIDRs": {
 			config: kubeproxyconfig.KubeProxyConfiguration{
 				BindAddress:        "10.10.12.11",
 				HealthzBindAddress: "0.0.0.0:12345",
 				MetricsBindAddress: "127.0.0.1:10249",
-				FeatureGates:       map[string]bool{"IPv6DualStack": true, "EndpointSlice": true},
+				FeatureGates:       map[string]bool{"IPv6DualStack": true},
 				ClusterCIDR:        "192.168.59.0/24,fd00:192:168::/64,10.0.0.0/16",
 				UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 				ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},

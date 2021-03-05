@@ -55,12 +55,10 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 	}
 
 	// Secondary IP validation
-	// while api-server dualstack bits does not have dependency on EndPointSlice, its
-	// a good idea to have validation consistent across all components (ControllerManager
-	// needs EndPointSlice + DualStack feature flags).
+	// ControllerManager needs DualStack feature flags
 	secondaryServiceClusterIPRangeUsed := (options.SecondaryServiceClusterIPRange.IP != nil)
-	if secondaryServiceClusterIPRangeUsed && (!utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) || !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice)) {
-		errs = append(errs, fmt.Errorf("secondary service cluster-ip range(--service-cluster-ip-range[1]) can only be used if %v and %v feature is enabled", string(features.IPv6DualStack), string(features.EndpointSlice)))
+	if secondaryServiceClusterIPRangeUsed && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		errs = append(errs, fmt.Errorf("secondary service cluster-ip range(--service-cluster-ip-range[1]) can only be used if %v feature is enabled", string(features.IPv6DualStack)))
 	}
 
 	// note: While the cluster might be dualstack (i.e. pods with multiple IPs), the user may choose
