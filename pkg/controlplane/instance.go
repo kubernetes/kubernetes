@@ -91,7 +91,6 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/controlplane/tunneler"
-	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/routes"
@@ -250,10 +249,7 @@ type Instance struct {
 
 func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
 	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	var endpointSliceClient discoveryclient.EndpointSlicesGetter
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
-		endpointSliceClient = discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	}
+	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
 
 	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointsAdapter)
@@ -265,10 +261,7 @@ func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
 
 func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	var endpointSliceClient discoveryclient.EndpointSlicesGetter
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
-		endpointSliceClient = discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	}
+	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
 
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
