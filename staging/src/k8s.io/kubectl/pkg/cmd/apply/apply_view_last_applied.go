@@ -24,6 +24,8 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/kubectl/pkg/cmd/apiresources"
+	"k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -77,6 +79,15 @@ func NewCmdApplyViewLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 		Short:                 i18n.T("View latest last-applied-configuration annotations of a resource/object"),
 		Long:                  applyViewLastAppliedLong,
 		Example:               applyViewLastAppliedExample,
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var comps []string
+			if len(args) == 0 {
+				comps = apiresources.CompGetResourceList(f, cmd, toComplete)
+			} else if len(args) == 1 {
+				comps = get.CompGetResource(f, cmd, args[0], toComplete)
+			}
+			return comps, cobra.ShellCompDirectiveNoFileComp
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(cmd, f, args))
 			cmdutil.CheckErr(options.Validate(cmd))

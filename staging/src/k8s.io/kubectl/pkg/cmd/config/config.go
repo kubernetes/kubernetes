@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -30,8 +31,22 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
+var (
+	// CompListContextsInConfig returns a list of context names which begin with `toComplete`
+	// We allow to pass in a factory to be ready for a future improvement
+	CompListContextsInConfig func(f cmdutil.Factory, toComplete string) []string
+	// CompListClustersInConfig returns a list of cluster names which begin with `toComplete`
+	// We allow to pass in a factory to be ready for a future improvement
+	CompListClustersInConfig func(f cmdutil.Factory, toComplete string) []string
+	// CompListUsersInConfig returns a list of user names which begin with `toComplete`
+	// We allow to pass in a factory to be ready for a future improvement
+	CompListUsersInConfig func(f cmdutil.Factory, toComplete string) []string
+)
+
 // NewCmdConfig creates a command object for the "config" action, and adds all child commands to it.
 func NewCmdConfig(f cmdutil.Factory, pathOptions *clientcmd.PathOptions, streams genericclioptions.IOStreams) *cobra.Command {
+	initCompletionFunctions(f)
+
 	if len(pathOptions.ExplicitFileFlag) == 0 {
 		pathOptions.ExplicitFileFlag = clientcmd.RecommendedConfigPathFlag
 	}
@@ -91,4 +106,49 @@ func helpErrorf(cmd *cobra.Command, format string, args ...interface{}) error {
 	cmd.Help()
 	msg := fmt.Sprintf(format, args...)
 	return fmt.Errorf("%s", msg)
+}
+
+// The completion function need the factory, so we initialize them once it is available
+func initCompletionFunctions(f cmdutil.Factory) {
+	CompListContextsInConfig = func(notused cmdutil.Factory, toComplete string) []string {
+		config, err := f.ToRawKubeConfigLoader().RawConfig()
+		if err != nil {
+			return nil
+		}
+		var ret []string
+		for name := range config.Contexts {
+			if strings.HasPrefix(name, toComplete) {
+				ret = append(ret, name)
+			}
+		}
+		return ret
+	}
+
+	CompListClustersInConfig = func(notused cmdutil.Factory, toComplete string) []string {
+		config, err := f.ToRawKubeConfigLoader().RawConfig()
+		if err != nil {
+			return nil
+		}
+		var ret []string
+		for name := range config.Clusters {
+			if strings.HasPrefix(name, toComplete) {
+				ret = append(ret, name)
+			}
+		}
+		return ret
+	}
+
+	CompListUsersInConfig = func(notused cmdutil.Factory, toComplete string) []string {
+		config, err := f.ToRawKubeConfigLoader().RawConfig()
+		if err != nil {
+			return nil
+		}
+		var ret []string
+		for name := range config.AuthInfos {
+			if strings.HasPrefix(name, toComplete) {
+				ret = append(ret, name)
+			}
+		}
+		return ret
+	}
 }

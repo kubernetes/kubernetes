@@ -18,6 +18,7 @@ package rollout
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -26,6 +27,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/kubectl/pkg/cmd/get"
 	"k8s.io/kubectl/pkg/cmd/set"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
@@ -86,12 +88,24 @@ func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Short:                 i18n.T("Resume a paused resource"),
 		Long:                  resumeLong,
 		Example:               resumeExample,
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var comps []string
+			if len(args) == 0 {
+				for _, comp := range validArgs {
+					if strings.HasPrefix(comp, toComplete) {
+						comps = append(comps, comp)
+					}
+				}
+			} else if len(args) == 1 {
+				comps = get.CompGetResource(f, cmd, args[0], toComplete)
+			}
+			return comps, cobra.ShellCompDirectiveNoFileComp
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunResume())
 		},
-		ValidArgs: validArgs,
 	}
 
 	usage := "identifying the resource to get from a server."

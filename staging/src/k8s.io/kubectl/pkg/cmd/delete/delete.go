@@ -33,6 +33,8 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kubectl/pkg/cmd/apiresources"
+	"k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	cmdwait "k8s.io/kubectl/pkg/cmd/wait"
 	"k8s.io/kubectl/pkg/rawhttp"
@@ -135,6 +137,15 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Short:                 i18n.T("Delete resources by filenames, stdin, resources and names, or by resources and label selector"),
 		Long:                  deleteLong,
 		Example:               deleteExample,
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var comps []string
+			if len(args) == 0 {
+				comps = apiresources.CompGetResourceList(f, cmd, toComplete)
+			} else if len(args) == 1 {
+				comps = get.CompGetResource(f, cmd, args[0], toComplete)
+			}
+			return comps, cobra.ShellCompDirectiveNoFileComp
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := deleteFlags.ToOptions(nil, streams)
 			cmdutil.CheckErr(err)
