@@ -69,7 +69,7 @@ func ListAlgorithmProviders() string {
 }
 
 func getDefaultConfig() *schedulerapi.Plugins {
-	return &schedulerapi.Plugins{
+	plugins := &schedulerapi.Plugins{
 		QueueSort: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: queuesort.Name},
@@ -148,6 +148,10 @@ func getDefaultConfig() *schedulerapi.Plugins {
 			},
 		},
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
+		plugins.Score.Enabled = append(plugins.Score.Enabled, schedulerapi.Plugin{Name: volumebinding.Name, Weight: 1})
+	}
+	return plugins
 }
 
 func getClusterAutoscalerConfig() *schedulerapi.Plugins {

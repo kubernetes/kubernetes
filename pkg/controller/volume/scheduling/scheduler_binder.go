@@ -82,6 +82,28 @@ type BindingInfo struct {
 	pv *v1.PersistentVolume
 }
 
+// StorageClassName returns the name of the storage class.
+func (b *BindingInfo) StorageClassName() string {
+	return b.pv.Spec.StorageClassName
+}
+
+// StorageResource represents storage resource.
+type StorageResource struct {
+	Requested int64
+	Capacity  int64
+}
+
+// StorageResource returns storage resource.
+func (b *BindingInfo) StorageResource() *StorageResource {
+	// both fields are mandatory
+	requestedQty := b.pvc.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	capacityQty := b.pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
+	return &StorageResource{
+		Requested: requestedQty.Value(),
+		Capacity:  capacityQty.Value(),
+	}
+}
+
 // PodVolumes holds pod's volumes information used in volume scheduling.
 type PodVolumes struct {
 	// StaticBindings are binding decisions for PVCs which can be bound to

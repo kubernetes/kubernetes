@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
@@ -124,13 +125,13 @@ func TestBrokenLinearFunction(t *testing.T) {
 		expected int64
 	}
 	type Test struct {
-		points     []functionShapePoint
+		points     []helper.FunctionShapePoint
 		assertions []Assertion
 	}
 
 	tests := []Test{
 		{
-			points: []functionShapePoint{{10, 1}, {90, 9}},
+			points: []helper.FunctionShapePoint{{Utilization: 10, Score: 1}, {Utilization: 90, Score: 9}},
 			assertions: []Assertion{
 				{p: -10, expected: 1},
 				{p: 0, expected: 1},
@@ -147,7 +148,7 @@ func TestBrokenLinearFunction(t *testing.T) {
 			},
 		},
 		{
-			points: []functionShapePoint{{0, 2}, {40, 10}, {100, 0}},
+			points: []helper.FunctionShapePoint{{Utilization: 0, Score: 2}, {Utilization: 40, Score: 10}, {Utilization: 100, Score: 0}},
 			assertions: []Assertion{
 				{p: -10, expected: 2},
 				{p: 0, expected: 2},
@@ -160,7 +161,7 @@ func TestBrokenLinearFunction(t *testing.T) {
 			},
 		},
 		{
-			points: []functionShapePoint{{0, 2}, {40, 2}, {100, 2}},
+			points: []helper.FunctionShapePoint{{Utilization: 0, Score: 2}, {Utilization: 40, Score: 2}, {Utilization: 100, Score: 2}},
 			assertions: []Assertion{
 				{p: -10, expected: 2},
 				{p: 0, expected: 2},
@@ -176,7 +177,7 @@ func TestBrokenLinearFunction(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			function := buildBrokenLinearFunction(test.points)
+			function := helper.BuildBrokenLinearFunction(test.points)
 			for _, assertion := range test.assertions {
 				assert.InDelta(t, assertion.expected, function(assertion.p), 0.1, "points=%v, p=%f", test.points, assertion.p)
 			}
