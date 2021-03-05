@@ -19,12 +19,14 @@ package apps
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
@@ -65,6 +67,37 @@ var _ = SIGDescribe("Job", func() {
 			}
 		}
 		framework.ExpectEqual(successes, completions, "epected %d successful job pods, but got  %d", completions, successes)
+	})
+
+	/*
+		Testcase: Ensure Pods of an Indexed Job get a unique index.
+		Description: Create an Indexed Job, wait for completion, capture the output of the pods and verify that they contain the completion index.
+	*/
+	ginkgo.It("[Feature:IndexedJob] should create pods for an Indexed job with completion indexes", func() {
+		ginkgo.By("Creating Indexed job")
+		job := e2ejob.NewTestJob("succeed", "indexed-job", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.CompletionMode = batchv1.IndexedCompletion
+		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create indexed job in namespace %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring job reaches completions")
+		err = e2ejob.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring pods with index for job exist")
+		pods, err := e2ejob.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get pod list for job in namespace: %s", f.Namespace.Name)
+		succeededIndexes := sets.NewInt()
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == v1.PodSucceeded && pod.Annotations != nil {
+				ix, err := strconv.Atoi(pod.Annotations[batchv1.JobCompletionIndexAnnotationAlpha])
+				framework.ExpectNoError(err, "failed obtaining completion index from pod in namespace: %s", f.Namespace.Name)
+				succeededIndexes.Insert(ix)
+			}
+		}
+		gotIndexes := succeededIndexes.List()
+		wantIndexes := []int{0, 1, 2, 3}
+		framework.ExpectEqual(gotIndexes, wantIndexes, "expected completed indexes %s, but got %s", gotIndexes, wantIndexes)
 	})
 
 	/*

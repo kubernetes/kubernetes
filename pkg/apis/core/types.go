@@ -2553,8 +2553,10 @@ type PodAffinityTerm struct {
 	// A label query over a set of resources, in this case pods.
 	// +optional
 	LabelSelector *metav1.LabelSelector
-	// namespaces specifies which namespaces the labelSelector applies to (matches against);
-	// null or empty list means "this pod's namespace"
+	// namespaces specifies a static list of namespace names that the term applies to.
+	// The term is applied to the union of the namespaces listed in this field
+	// and the ones selected by namespaceSelector.
+	// null or empty namespaces list and null namespaceSelector means "this pod's namespace"
 	// +optional
 	Namespaces []string
 	// This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
@@ -2563,6 +2565,14 @@ type PodAffinityTerm struct {
 	// selected pods is running.
 	// Empty topologyKey is not allowed.
 	TopologyKey string
+	// A label query over the set of namespaces that the term applies to.
+	// The term is applied to the union of the namespaces selected by this field
+	// and the ones listed in the namespaces field.
+	// null selector and null or empty namespaces list means "this pod's namespace".
+	// An empty selector ({}) matches all namespaces.
+	// This field is alpha-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector
 }
 
 // NodeAffinity is a group of node affinity scheduling rules.
@@ -4842,6 +4852,9 @@ const (
 	ResourceQuotaScopeNotBestEffort ResourceQuotaScope = "NotBestEffort"
 	// Match all pod objects that have priority class mentioned
 	ResourceQuotaScopePriorityClass ResourceQuotaScope = "PriorityClass"
+	// Match all pod objects that have cross-namespace pod (anti)affinity mentioned
+	// This is an alpha feature enabled by the PodAffinityNamespaceSelector feature flag.
+	ResourceQuotaScopeCrossNamespacePodAffinity ResourceQuotaScope = "CrossNamespacePodAffinity"
 )
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota

@@ -147,7 +147,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	o.builder = f.NewBuilder()
 	o.scaleKindResolver = scale.NewDiscoveryScaleKindResolver(discoveryClient)

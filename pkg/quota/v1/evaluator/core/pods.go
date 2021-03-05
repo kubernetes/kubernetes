@@ -26,16 +26,17 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // the name used for object count quota
@@ -308,6 +309,8 @@ func podMatchesScopeFunc(selector corev1.ScopedResourceSelectorRequirement, obje
 		return !isBestEffort(pod), nil
 	case corev1.ResourceQuotaScopePriorityClass:
 		return podMatchesSelector(pod, selector)
+	case corev1.ResourceQuotaScopeCrossNamespacePodAffinity:
+		return usesCrossNamespacePodAffinity(pod), nil
 	}
 	return false, nil
 }
@@ -379,6 +382,59 @@ func podMatchesSelector(pod *corev1.Pod, selector corev1.ScopedResourceSelectorR
 		return true, nil
 	}
 	return false, nil
+}
+
+func crossNamespacePodAffinityTerm(term *corev1.PodAffinityTerm) bool {
+	return len(term.Namespaces) != 0 || term.NamespaceSelector != nil
+}
+
+func crossNamespacePodAffinityTerms(terms []corev1.PodAffinityTerm) bool {
+	for _, t := range terms {
+		if crossNamespacePodAffinityTerm(&t) {
+			return true
+		}
+	}
+	return false
+}
+
+func crossNamespaceWeightedPodAffinityTerms(terms []corev1.WeightedPodAffinityTerm) bool {
+	for _, t := range terms {
+		if crossNamespacePodAffinityTerm(&t.PodAffinityTerm) {
+			return true
+		}
+	}
+	return false
+}
+
+func usesCrossNamespacePodAffinity(pod *corev1.Pod) bool {
+	if !feature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector) {
+		return false
+	}
+	if pod == nil || pod.Spec.Affinity == nil {
+		return false
+	}
+
+	affinity := pod.Spec.Affinity.PodAffinity
+	if affinity != nil {
+		if crossNamespacePodAffinityTerms(affinity.RequiredDuringSchedulingIgnoredDuringExecution) {
+			return true
+		}
+		if crossNamespaceWeightedPodAffinityTerms(affinity.PreferredDuringSchedulingIgnoredDuringExecution) {
+			return true
+		}
+	}
+
+	antiAffinity := pod.Spec.Affinity.PodAntiAffinity
+	if antiAffinity != nil {
+		if crossNamespacePodAffinityTerms(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) {
+			return true
+		}
+		if crossNamespaceWeightedPodAffinityTerms(antiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // QuotaV1Pod returns true if the pod is eligible to track against a quota

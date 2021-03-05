@@ -53,17 +53,22 @@ const PostStartHookName = "priority-and-fairness-config-producer"
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(flowcontrol.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 
-	// Flow control storage is shared across different versions.
-	flowControlStorage, err := p.storage(apiResourceConfigSource, restOptionsGetter)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, false, err
-	}
 	if apiResourceConfigSource.VersionEnabled(flowcontrolapisv1alpha1.SchemeGroupVersion) {
+		flowControlStorage, err := p.storage(apiResourceConfigSource, restOptionsGetter)
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		}
 		apiGroupInfo.VersionedResourcesStorageMap[flowcontrolapisv1alpha1.SchemeGroupVersion.Version] = flowControlStorage
 	}
+
 	if apiResourceConfigSource.VersionEnabled(flowcontrolapisv1beta1.SchemeGroupVersion) {
+		flowControlStorage, err := p.storage(apiResourceConfigSource, restOptionsGetter)
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		}
 		apiGroupInfo.VersionedResourcesStorageMap[flowcontrolapisv1beta1.SchemeGroupVersion.Version] = flowControlStorage
 	}
+
 	return apiGroupInfo, true, nil
 }
 

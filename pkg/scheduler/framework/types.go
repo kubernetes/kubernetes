@@ -25,7 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,6 +39,52 @@ import (
 )
 
 var generation int64
+
+// ActionType is an integer to represent one type of resource change.
+// Different ActionTypes can be bit-wised to compose new semantics.
+type ActionType int64
+
+// Constants for ActionTypes.
+const (
+	Add    ActionType = 1 << iota // 1
+	Delete                        // 10
+	// UpdateNodeXYZ is only applicable for Node events.
+	UpdateNodeAllocatable // 100
+	UpdateNodeLabel       // 1000
+	UpdateNodeTaint       // 10000
+	UpdateNodeCondition   // 100000
+
+	All ActionType = 1<<iota - 1 // 111111
+
+	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition
+)
+
+// GVK is short for group/version/kind, which can uniquely represent a particular API resource.
+type GVK string
+
+// Constants for GVKs.
+const (
+	Pod                   GVK = "Pod"
+	Node                  GVK = "Node"
+	PersistentVolume      GVK = "PersistentVolume"
+	PersistentVolumeClaim GVK = "PersistentVolumeClaim"
+	Service               GVK = "Service"
+	StorageClass          GVK = "storage.k8s.io/StorageClass"
+	CSINode               GVK = "storage.k8s.io/CSINode"
+	WildCard              GVK = "*"
+)
+
+// WildCardEvent semantically matches all resources on all actions.
+var WildCardEvent = ClusterEvent{Resource: WildCard, ActionType: All}
+
+// ClusterEvent abstracts how a system resource's state gets changed.
+// Resource represents the standard API resources such as Pod, Node, etc.
+// ActionType denotes the specific change such as Add, Update or Delete.
+type ClusterEvent struct {
+	Resource   GVK
+	ActionType ActionType
+}
 
 // QueuedPodInfo is a Pod wrapper with additional information related to
 // the pod's status in the scheduling queue, such as the timestamp when
@@ -55,6 +101,8 @@ type QueuedPodInfo struct {
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
 	// latency for a pod.
 	InitialAttemptTimestamp time.Time
+	// If a Pod failed in a scheduling cycle, record the plugin names it failed by.
+	UnschedulablePlugins sets.String
 }
 
 // DeepCopy returns a deep copy of the QueuedPodInfo object.
@@ -113,12 +161,12 @@ func (pi *PodInfo) Update(pod *v1.Pod) {
 
 	// Attempt to parse the affinity terms
 	var parseErrs []error
-	requiredAffinityTerms, err := getAffinityTerms(pod, schedutil.GetPodAffinityTerms(pod.Spec.Affinity))
+	requiredAffinityTerms, err := getAffinityTerms(pod, getPodAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		parseErrs = append(parseErrs, fmt.Errorf("requiredAffinityTerms: %w", err))
 	}
 	requiredAntiAffinityTerms, err := getAffinityTerms(pod,
-		schedutil.GetPodAntiAffinityTerms(pod.Spec.Affinity))
+		getPodAntiAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		parseErrs = append(parseErrs, fmt.Errorf("requiredAntiAffinityTerms: %w", err))
 	}
@@ -141,9 +189,18 @@ func (pi *PodInfo) Update(pod *v1.Pod) {
 
 // AffinityTerm is a processed version of v1.PodAffinityTerm.
 type AffinityTerm struct {
-	Namespaces  sets.String
-	Selector    labels.Selector
-	TopologyKey string
+	Namespaces        sets.String
+	Selector          labels.Selector
+	TopologyKey       string
+	NamespaceSelector labels.Selector
+}
+
+// Matches returns true if the pod matches the label selector and namespaces or namespace selector.
+func (at *AffinityTerm) Matches(pod *v1.Pod, nsLabels labels.Set, nsSelectorEnabled bool) bool {
+	if at.Namespaces.Has(pod.Namespace) || (nsSelectorEnabled && at.NamespaceSelector.Matches(nsLabels)) {
+		return at.Selector.Matches(labels.Set(pod.Labels))
+	}
+	return false
 }
 
 // WeightedAffinityTerm is a "processed" representation of v1.WeightedAffinityTerm.
@@ -192,12 +249,18 @@ func (f *FitError) Error() string {
 }
 
 func newAffinityTerm(pod *v1.Pod, term *v1.PodAffinityTerm) (*AffinityTerm, error) {
-	namespaces := schedutil.GetNamespacesFromPodAffinityTerm(pod, term)
 	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 	if err != nil {
 		return nil, err
 	}
-	return &AffinityTerm{Namespaces: namespaces, Selector: selector, TopologyKey: term.TopologyKey}, nil
+
+	namespaces := getNamespacesFromPodAffinityTerm(pod, term)
+	nsSelector, err := metav1.LabelSelectorAsSelector(term.NamespaceSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AffinityTerm{Namespaces: namespaces, Selector: selector, TopologyKey: term.TopologyKey, NamespaceSelector: nsSelector}, nil
 }
 
 // getAffinityTerms receives a Pod and affinity terms and returns the namespaces and
@@ -242,6 +305,44 @@ func NewPodInfo(pod *v1.Pod) *PodInfo {
 	pInfo := &PodInfo{}
 	pInfo.Update(pod)
 	return pInfo
+}
+
+func getPodAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
+	if affinity != nil && affinity.PodAffinity != nil {
+		if len(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+			terms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		}
+		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
+		//if len(affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		//	terms = append(terms, affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
+		//}
+	}
+	return terms
+}
+
+func getPodAntiAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
+	if affinity != nil && affinity.PodAntiAffinity != nil {
+		if len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+			terms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		}
+		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
+		//if len(affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		//	terms = append(terms, affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
+		//}
+	}
+	return terms
+}
+
+// returns a set of names according to the namespaces indicated in podAffinityTerm.
+// If namespaces is empty it considers the given pod's namespace.
+func getNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.String {
+	names := sets.String{}
+	if len(podAffinityTerm.Namespaces) == 0 && podAffinityTerm.NamespaceSelector == nil {
+		names.Insert(pod.Namespace)
+	} else {
+		names.Insert(podAffinityTerm.Namespaces...)
+	}
+	return names
 }
 
 // ImageStateSummary provides summarized information about the state of an image.

@@ -201,7 +201,7 @@ func TestParallelPuller(t *testing.T) {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
 				_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
-				assert.NoError(t, fakeRuntime.AssertCalls(expected.calls))
+				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 			}
 		})
@@ -229,7 +229,7 @@ func TestSerializedPuller(t *testing.T) {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
 				_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
-				assert.NoError(t, fakeRuntime.AssertCalls(expected.calls))
+				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 			}
 		})
@@ -287,7 +287,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 
 	t.Run(c.testName, func(t *testing.T) {
 		_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
-		assert.NoError(t, fakeRuntime.AssertCalls(c.expected[0].calls), "tick=%d", 0)
+		fakeRuntime.AssertCalls(c.expected[0].calls)
 		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
 
 		images, _ := fakeRuntime.ListImages()

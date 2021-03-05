@@ -4479,7 +4479,7 @@ func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.
 		Spec: spec,
 	}
 
-	if errs := ValidateResourceQuota(resourceQuota); len(errs) != 0 {
+	if errs := ValidateResourceQuota(resourceQuota, ResourceQuotaValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 }
@@ -7405,6 +7405,15 @@ func TestValidatePod(t *testing.T) {
 							},
 							TopologyKey: "zone",
 							Namespaces:  []string{"ns"},
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "key",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"value1", "value2"},
+									},
+								},
+							},
 						},
 					},
 					PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
@@ -8138,7 +8147,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"invalid labelSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, values should be empty if the operator is Exists": {
-			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.matchExpressions.matchExpressions[0].values",
+			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchExpressions[0].values",
 			spec: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "123",
@@ -8168,7 +8177,68 @@ func TestValidatePod(t *testing.T) {
 				}),
 			},
 		},
-		"invalid name space in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, name space shouldbe valid": {
+		"invalid namespaceSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity, In operator must include Values": {
+			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.namespaceSelector.matchExpressions[0].values",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: core.PodAffinityTerm{
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key2",
+												Operator: metav1.LabelSelectorOpIn,
+											},
+										},
+									},
+									Namespaces:  []string{"ns"},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid namespaceSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity, Exists operator can not have values": {
+			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.namespaceSelector.matchExpressions[0].values",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: core.PodAffinityTerm{
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key2",
+												Operator: metav1.LabelSelectorOpExists,
+												Values:   []string{"value1", "value2"},
+											},
+										},
+									},
+									Namespaces:  []string{"ns"},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid name space in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, namespace should be valid": {
 			expectedError: "spec.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.namespace",
 			spec: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -14128,6 +14198,14 @@ func TestValidateResourceQuota(t *testing.T) {
 		Scopes: []core.ResourceQuotaScope{core.ResourceQuotaScopeNotBestEffort},
 	}
 
+	crossNamespaceAffinitySpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			core.ResourceCPU:       resource.MustParse("100"),
+			core.ResourceLimitsCPU: resource.MustParse("200"),
+		},
+		Scopes: []core.ResourceQuotaScope{core.ResourceQuotaScopeCrossNamespacePodAffinity},
+	}
+
 	scopeSelectorSpec := core.ResourceQuotaSpec{
 		ScopeSelector: &core.ScopeSelector{
 			MatchExpressions: []core.ScopedResourceSelectorRequirement{
@@ -14189,6 +14267,18 @@ func TestValidateResourceQuota(t *testing.T) {
 		Scopes: []core.ResourceQuotaScope{core.ResourceQuotaScopeBestEffort, core.ResourceQuotaScopeNotBestEffort},
 	}
 
+	invalidCrossNamespaceAffinitySpec := core.ResourceQuotaSpec{
+		ScopeSelector: &core.ScopeSelector{
+			MatchExpressions: []core.ScopedResourceSelectorRequirement{
+				{
+					ScopeName: core.ResourceQuotaScopeCrossNamespacePodAffinity,
+					Operator:  core.ScopeSelectorOpIn,
+					Values:    []string{"cluster-services"},
+				},
+			},
+		},
+	}
+
 	invalidScopeNameSpec := core.ResourceQuotaSpec{
 		Hard: core.ResourceList{
 			core.ResourceCPU: resource.MustParse("100"),
@@ -14196,118 +14286,151 @@ func TestValidateResourceQuota(t *testing.T) {
 		Scopes: []core.ResourceQuotaScope{core.ResourceQuotaScope("foo")},
 	}
 
-	successCases := []core.ResourceQuota{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc",
-				Namespace: "foo",
-			},
-			Spec: spec,
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc",
-				Namespace: "foo",
-			},
-			Spec: fractionalComputeSpec,
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc",
-				Namespace: "foo",
-			},
-			Spec: terminatingSpec,
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc",
-				Namespace: "foo",
-			},
-			Spec: nonTerminatingSpec,
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc",
-				Namespace: "foo",
-			},
-			Spec: bestEffortSpec,
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc",
-				Namespace: "foo",
-			},
-			Spec: scopeSelectorSpec,
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc",
-				Namespace: "foo",
-			},
-			Spec: nonBestEffortSpec,
-		},
-	}
-	for _, successCase := range successCases {
-		if errs := ValidateResourceQuota(&successCase); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-
-	errorCases := map[string]struct {
-		R core.ResourceQuota
-		D string
+	testCases := map[string]struct {
+		rq                       core.ResourceQuota
+		errDetail                string
+		errField                 string
+		disableNamespaceSelector bool
 	}{
+		"no-scope": {
+			rq: core.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: "foo",
+				},
+				Spec: spec,
+			},
+		},
+		"fractional-compute-spec": {
+			rq: core.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: "foo",
+				},
+				Spec: fractionalComputeSpec,
+			},
+		},
+		"terminating-spec": {
+			rq: core.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: "foo",
+				},
+				Spec: terminatingSpec,
+			},
+		},
+		"non-terminating-spec": {
+			rq: core.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: "foo",
+				},
+				Spec: nonTerminatingSpec,
+			},
+		},
+		"best-effort-spec": {
+			rq: core.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: "foo",
+				},
+				Spec: bestEffortSpec,
+			},
+		},
+		"cross-namespace-affinity-spec": {
+			rq: core.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: "foo",
+				},
+				Spec: crossNamespaceAffinitySpec,
+			},
+		},
+		"scope-selector-spec": {
+			rq: core.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: "foo",
+				},
+				Spec: scopeSelectorSpec,
+			},
+		},
+		"non-best-effort-spec": {
+			rq: core.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: "foo",
+				},
+				Spec: nonBestEffortSpec,
+			},
+		},
 		"zero-length Name": {
-			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: "foo"}, Spec: spec},
-			"name or generateName is required",
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: "foo"}, Spec: spec},
+			errDetail: "name or generateName is required",
 		},
 		"zero-length Namespace": {
-			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: ""}, Spec: spec},
-			"",
+			rq:       core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: ""}, Spec: spec},
+			errField: "metadata.namespace",
 		},
 		"invalid Name": {
-			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: spec},
-			dnsSubdomainLabelErrMsg,
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: spec},
+			errDetail: dnsSubdomainLabelErrMsg,
 		},
 		"invalid Namespace": {
-			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: spec},
-			dnsLabelErrMsg,
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: spec},
+			errDetail: dnsLabelErrMsg,
 		},
 		"negative-limits": {
-			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: negativeSpec},
-			isNegativeErrorMsg,
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: negativeSpec},
+			errDetail: isNegativeErrorMsg,
 		},
 		"fractional-api-resource": {
-			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: fractionalPodSpec},
-			isNotIntegerErrorMsg,
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: fractionalPodSpec},
+			errDetail: isNotIntegerErrorMsg,
 		},
 		"invalid-quota-resource": {
-			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidQuotaResourceSpec},
-			isInvalidQuotaResource,
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidQuotaResourceSpec},
+			errDetail: isInvalidQuotaResource,
 		},
 		"invalid-quota-terminating-pair": {
-			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidTerminatingScopePairsSpec},
-			"conflicting scopes",
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidTerminatingScopePairsSpec},
+			errDetail: "conflicting scopes",
 		},
 		"invalid-quota-besteffort-pair": {
-			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidBestEffortScopePairsSpec},
-			"conflicting scopes",
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidBestEffortScopePairsSpec},
+			errDetail: "conflicting scopes",
 		},
 		"invalid-quota-scope-name": {
-			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidScopeNameSpec},
-			"unsupported scope",
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidScopeNameSpec},
+			errDetail: "unsupported scope",
+		},
+		"invalid-cross-namespace-affinity": {
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidCrossNamespaceAffinitySpec},
+			errDetail: "must be 'Exist' when scope is any of ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeBestEffort, ResourceQuotaScopeNotBestEffort or ResourceQuotaScopeCrossNamespacePodAffinity",
+		},
+		"cross-namespace-affinity-disabled": {
+			rq:                       core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: crossNamespaceAffinitySpec},
+			errDetail:                "unsupported scope",
+			disableNamespaceSelector: true,
 		},
 	}
-	for k, v := range errorCases {
-		errs := ValidateResourceQuota(&v.R)
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
-		}
-		for i := range errs {
-			if !strings.Contains(errs[i].Detail, v.D) {
-				t.Errorf("[%s]: expected error detail either empty or %s, got %s", k, v.D, errs[i].Detail)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateResourceQuota(&tc.rq, ResourceQuotaValidationOptions{
+				AllowPodAffinityNamespaceSelector: !tc.disableNamespaceSelector,
+			})
+			if len(tc.errDetail) == 0 && len(tc.errField) == 0 && len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			} else if (len(tc.errDetail) != 0 || len(tc.errField) != 0) && len(errs) == 0 {
+				t.Errorf("expected failure")
+			} else {
+				for i := range errs {
+					if !strings.Contains(errs[i].Detail, tc.errDetail) {
+						t.Errorf("expected error detail either empty or %s, got %s", tc.errDetail, errs[i].Detail)
+					}
+				}
 			}
-		}
+		})
 	}
 }
 

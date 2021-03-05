@@ -232,6 +232,10 @@ const (
 	// LabelNodeRoleControlPlane specifies that a node hosts control-plane components
 	LabelNodeRoleControlPlane = "node-role.kubernetes.io/control-plane"
 
+	// LabelExcludeFromExternalLB can be set on a node to exclude it from external load balancers.
+	// This is added to control plane nodes to preserve backwards compatibility with a legacy behavior.
+	LabelExcludeFromExternalLB = "node.kubernetes.io/exclude-from-external-load-balancers"
+
 	// AnnotationKubeadmCRISocket specifies the annotation kubeadm uses to preserve the crisocket information given to kubeadm at
 	// init/join time for use later. kubeadm annotates the node object with this information
 	AnnotationKubeadmCRISocket = "kubeadm.alpha.kubernetes.io/cri-socket"
@@ -302,8 +306,6 @@ const (
 	HyperKube = "hyperkube"
 	// CoreDNS defines variable used internally when referring to the CoreDNS component
 	CoreDNS = "CoreDNS"
-	// KubeDNS defines variable used internally when referring to the KubeDNS component
-	KubeDNS = "kube-dns"
 	// Kubelet defines variable used internally when referring to the Kubelet
 	Kubelet = "kubelet"
 
@@ -327,24 +329,6 @@ const (
 
 	// CoreDNSImageName specifies the name of the image for CoreDNS add-on
 	CoreDNSImageName = "coredns/coredns"
-
-	// KubeDNSConfigMap specifies in what ConfigMap in the kube-system namespace the kube-dns config should be stored
-	KubeDNSConfigMap = "kube-dns"
-
-	// KubeDNSDeploymentName specifies the name of the Deployment for kube-dns add-on
-	KubeDNSDeploymentName = "kube-dns"
-
-	// KubeDNSKubeDNSImageName specifies the name of the image for the kubedns container in the kube-dns add-on
-	KubeDNSKubeDNSImageName = "k8s-dns-kube-dns"
-
-	// KubeDNSSidecarImageName specifies the name of the image for the sidecar container in the kube-dns add-on
-	KubeDNSSidecarImageName = "k8s-dns-sidecar"
-
-	// KubeDNSDnsMasqNannyImageName specifies the name of the image for the dnsmasq container in the kube-dns add-on
-	KubeDNSDnsMasqNannyImageName = "k8s-dns-dnsmasq-nanny"
-
-	// KubeDNSVersion is the version of kube-dns to be deployed if it is used
-	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
 	CoreDNSVersion = "v1.8.0"
@@ -654,12 +638,10 @@ func GetAPIServerVirtualIP(svcSubnetList string, isDualStack bool) (net.IP, erro
 
 // GetDNSVersion is a handy function that returns the DNS version by DNS type
 func GetDNSVersion(dnsType kubeadmapi.DNSAddOnType) string {
-	switch dnsType {
-	case kubeadmapi.KubeDNS:
-		return KubeDNSVersion
-	default:
+	if dnsType == kubeadmapi.CoreDNS {
 		return CoreDNSVersion
 	}
+	return ""
 }
 
 // GetKubeletConfigMapName returns the right ConfigMap name for the right branch of k8s

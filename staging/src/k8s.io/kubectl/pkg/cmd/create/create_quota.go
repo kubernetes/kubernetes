@@ -136,11 +136,7 @@ func (o *QuotaOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []strin
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resourcecli.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resourcecli.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {

@@ -72,6 +72,7 @@ var map_JobSpec = map[string]string{
 	"manualSelector":          "manualSelector controls generation of pod labels and pod selectors. Leave `manualSelector` unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see `manualSelector=true` in jobs that were created with the old `extensions/v1beta1` API. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/#specifying-your-own-pod-selector",
 	"template":                "Describes the pod that will be created when executing a job. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
 	"ttlSecondsAfterFinished": "ttlSecondsAfterFinished limits the lifetime of a Job that has finished execution (either Complete or Failed). If this field is set, ttlSecondsAfterFinished after the Job finishes, it is eligible to be automatically deleted. When the Job is being deleted, its lifecycle guarantees (e.g. finalizers) will be honored. If this field is unset, the Job won't be automatically deleted. If this field is set to zero, the Job becomes eligible to be deleted immediately after it finishes. This field is alpha-level and is only honored by servers that enable the TTLAfterFinished feature.",
+	"completionMode":          "CompletionMode specifies how Pod completions are tracked. It can be `NonIndexed` (default) or `Indexed`.\n\n`NonIndexed` means that the Job is considered complete when there have been .spec.completions successfully completed Pods. Each Pod completion is homologous to each other.\n\n`Indexed` means that the Pods of a Job get an associated completion index from 0 to (.spec.completions - 1), available in the annotation batch.alpha.kubernetes.io/job-completion-index. The Job is considered complete when there is one successfully completed Pod for each index. When value is `Indexed`, .spec.completions must be specified and `.spec.parallelism` must be less than or equal to 10^5.\n\nThis field is alpha-level and is only honored by servers that enable the IndexedJob feature gate. More completion modes can be added in the future. If the Job controller observes a mode that it doesn't recognize, the controller skips updates for the Job.",
 }
 
 func (JobSpec) SwaggerDoc() map[string]string {
@@ -79,13 +80,14 @@ func (JobSpec) SwaggerDoc() map[string]string {
 }
 
 var map_JobStatus = map[string]string{
-	"":               "JobStatus represents the current state of a Job.",
-	"conditions":     "The latest available observations of an object's current state. When a job fails, one of the conditions will have type == \"Failed\". More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
-	"startTime":      "Represents time when the job was acknowledged by the job controller. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-	"completionTime": "Represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC. The completion time is only set when the job finishes successfully.",
-	"active":         "The number of actively running pods.",
-	"succeeded":      "The number of pods which reached phase Succeeded.",
-	"failed":         "The number of pods which reached phase Failed.",
+	"":                 "JobStatus represents the current state of a Job.",
+	"conditions":       "The latest available observations of an object's current state. When a job fails, one of the conditions will have type == \"Failed\". More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
+	"startTime":        "Represents time when the job was acknowledged by the job controller. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
+	"completionTime":   "Represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC. The completion time is only set when the job finishes successfully.",
+	"active":           "The number of actively running pods.",
+	"succeeded":        "The number of pods which reached phase Succeeded.",
+	"failed":           "The number of pods which reached phase Failed.",
+	"completedIndexes": "CompletedIndexes holds the completed indexes when .spec.completionMode = \"Indexed\" in a text format. The indexes are represented as decimal integers separated by commas. The numbers are listed in increasing order. Three or more consecutive numbers are compressed and represented by the first and last element of the series, separated by a hyphen. For example, if the completed indexes are 1, 3, 4, 5 and 7, they are represented as \"1,3-5,7\".",
 }
 
 func (JobStatus) SwaggerDoc() map[string]string {

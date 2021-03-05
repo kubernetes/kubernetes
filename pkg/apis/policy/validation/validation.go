@@ -23,8 +23,10 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
@@ -40,7 +42,6 @@ import (
 // with any errors.
 func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget) field.ErrorList {
 	allErrs := ValidatePodDisruptionBudgetSpec(pdb.Spec, field.NewPath("spec"))
-	allErrs = append(allErrs, ValidatePodDisruptionBudgetStatus(pdb.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
@@ -68,10 +69,16 @@ func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, fldPat
 	return allErrs
 }
 
-// ValidatePodDisruptionBudgetStatus validates a PodDisruptionBudgetStatus and returns an ErrorList
+// ValidatePodDisruptionBudgetStatusUpdate validates a PodDisruptionBudgetStatus and returns an ErrorList
 // with any errors.
-func ValidatePodDisruptionBudgetStatus(status policy.PodDisruptionBudgetStatus, fldPath *field.Path) field.ErrorList {
+func ValidatePodDisruptionBudgetStatusUpdate(status, oldStatus policy.PodDisruptionBudgetStatus, fldPath *field.Path, apiVersion schema.GroupVersion) field.ErrorList {
 	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, unversionedvalidation.ValidateConditions(status.Conditions, fldPath.Child("conditions"))...)
+	// Don't run other validations for v1beta1 since we don't want to introduce
+	// new validations retroactively.
+	if apiVersion == policyapiv1beta1.SchemeGroupVersion {
+		return allErrs
+	}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DisruptionsAllowed), fldPath.Child("disruptionsAllowed"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentHealthy), fldPath.Child("currentHealthy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredHealthy), fldPath.Child("desiredHealthy"))...)

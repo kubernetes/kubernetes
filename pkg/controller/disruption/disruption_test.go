@@ -32,6 +32,7 @@ import (
 	policy "k8s.io/api/policy/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -73,6 +74,8 @@ func (ps *pdbStates) Get(key string) policy.PodDisruptionBudget {
 func (ps *pdbStates) VerifyPdbStatus(t *testing.T, key string, disruptionsAllowed, currentHealthy, desiredHealthy, expectedPods int32,
 	disruptedPodMap map[string]metav1.Time) {
 	actualPDB := ps.Get(key)
+	actualConditions := actualPDB.Status.Conditions
+	actualPDB.Status.Conditions = nil
 	expectedStatus := policy.PodDisruptionBudgetStatus{
 		DisruptionsAllowed: disruptionsAllowed,
 		CurrentHealthy:     currentHealthy,
@@ -85,6 +88,22 @@ func (ps *pdbStates) VerifyPdbStatus(t *testing.T, key string, disruptionsAllowe
 	if !apiequality.Semantic.DeepEqual(actualStatus, expectedStatus) {
 		debug.PrintStack()
 		t.Fatalf("PDB %q status mismatch.  Expected %+v but got %+v.", key, expectedStatus, actualStatus)
+	}
+
+	cond := apimeta.FindStatusCondition(actualConditions, policy.DisruptionAllowedCondition)
+	if cond == nil {
+		t.Fatalf("Expected condition %q, but didn't find it", policy.DisruptionAllowedCondition)
+	}
+	if disruptionsAllowed > 0 {
+		if cond.Status != metav1.ConditionTrue {
+			t.Fatalf("Expected condition %q to have status %q, but was %q",
+				policy.DisruptionAllowedCondition, metav1.ConditionTrue, cond.Status)
+		}
+	} else {
+		if cond.Status != metav1.ConditionFalse {
+			t.Fatalf("Expected condition %q to have status %q, but was %q",
+				policy.DisruptionAllowedCondition, metav1.ConditionFalse, cond.Status)
+		}
 	}
 }
 

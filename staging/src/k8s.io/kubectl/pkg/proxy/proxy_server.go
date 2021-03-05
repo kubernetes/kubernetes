@@ -61,6 +61,9 @@ type FilterServer struct {
 
 // MakeRegexpArray splits a comma separated list of regexps into an array of Regexp objects.
 func MakeRegexpArray(str string) ([]*regexp.Regexp, error) {
+	if str == "" {
+		return []*regexp.Regexp{}, nil
+	}
 	parts := strings.Split(str, ",")
 	result := make([]*regexp.Regexp, len(parts))
 	for ix := range parts {

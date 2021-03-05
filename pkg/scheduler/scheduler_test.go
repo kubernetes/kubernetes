@@ -448,7 +448,9 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 	// Set up scheduler for the 3 nodes.
 	// We use a fake filter that only allows one particular node. We create two
 	// profiles, each with a different node in the filter configuration.
-	client := clientsetfake.NewSimpleClientset(nodes...)
+	objs := append([]runtime.Object{
+		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}, nodes...)
+	client := clientsetfake.NewSimpleClientset(objs...)
 	broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

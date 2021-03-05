@@ -94,13 +94,20 @@ type GaugeVec struct {
 func NewGaugeVec(opts *GaugeOpts, labels []string) *GaugeVec {
 	opts.StabilityLevel.setDefaults()
 
+	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
+	allowListLock.RLock()
+	if allowList, ok := labelValueAllowLists[fqName]; ok {
+		opts.LabelValueAllowLists = allowList
+	}
+	allowListLock.RUnlock()
+
 	cv := &GaugeVec{
 		GaugeVec:       noopGaugeVec,
 		GaugeOpts:      opts,
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	cv.lazyInit(cv, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
+	cv.lazyInit(cv, fqName)
 	return cv
 }
 
@@ -139,6 +146,9 @@ func (v *GaugeVec) WithLabelValues(lvs ...string) GaugeMetric {
 	if !v.IsCreated() {
 		return noop // return no-op gauge
 	}
+	if v.LabelValueAllowLists != nil {
+		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
+	}
 	return v.GaugeVec.WithLabelValues(lvs...)
 }
 
@@ -149,6 +159,9 @@ func (v *GaugeVec) WithLabelValues(lvs ...string) GaugeMetric {
 func (v *GaugeVec) With(labels map[string]string) GaugeMetric {
 	if !v.IsCreated() {
 		return noop // return no-op gauge
+	}
+	if v.LabelValueAllowLists != nil {
+		v.LabelValueAllowLists.ConstrainLabelMap(labels)
 	}
 	return v.GaugeVec.With(labels)
 }

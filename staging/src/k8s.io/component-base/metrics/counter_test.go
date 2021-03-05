@@ -211,12 +211,12 @@ func TestCounterVec(t *testing.T) {
 
 func TestCounterWithLabelValueAllowList(t *testing.T) {
 	labelAllowValues := map[string]string{
-		"namespace_subsystem_metric_test_name,label_a": "allowed",
+		"namespace_subsystem_metric_allowlist_test,label_a": "allowed",
 	}
 	labels := []string{"label_a", "label_b"}
 	opts := &CounterOpts{
 		Namespace: "namespace",
-		Name:      "metric_test_name",
+		Name:      "metric_allowlist_test",
 		Subsystem: "subsystem",
 	}
 	var tests = []struct {

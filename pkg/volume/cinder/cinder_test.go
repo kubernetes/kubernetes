@@ -123,7 +123,7 @@ func (fake *fakePDManager) DetachDisk(c *cinderVolumeUnmounter) error {
 
 func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)
-	labels[v1.LabelFailureDomainBetaZone] = "nova"
+	labels[v1.LabelTopologyZone] = "nova"
 	return "test-volume-name", 1, labels, "", nil
 }
 
@@ -241,7 +241,7 @@ func TestPlugin(t *testing.T) {
 
 	req := persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0]
 
-	if req.Key != v1.LabelFailureDomainBetaZone {
+	if req.Key != v1.LabelTopologyZone {
 		t.Errorf("Provision() returned unexpected requirement key in NodeAffinity %v", req.Key)
 	}
 

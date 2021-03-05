@@ -43,7 +43,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/cert"
-	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -111,10 +111,10 @@ func TestAggregatedAPIServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = aggregatorClient.ApiregistrationV1beta1().APIServices().Create(context.TODO(), &apiregistrationv1beta1.APIService{
+	_, err = aggregatorClient.ApiregistrationV1().APIServices().Create(context.TODO(), &apiregistrationv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.example.com"},
-		Spec: apiregistrationv1beta1.APIServiceSpec{
-			Service: &apiregistrationv1beta1.ServiceReference{
+		Spec: apiregistrationv1.APIServiceSpec{
+			Service: &apiregistrationv1.ServiceReference{
 				Namespace: "kube-wardle",
 				Name:      "api",
 			},

@@ -2062,6 +2062,88 @@ func TestDescribeDeployment(t *testing.T) {
 	}
 }
 
+func TestDescribeJob(t *testing.T) {
+	cases := map[string]struct {
+		job                  *batchv1.Job
+		wantCompletedIndexes string
+	}{
+		"not indexed": {
+			job: &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: batchv1.JobSpec{
+					CompletionMode: batchv1.NonIndexedCompletion,
+				},
+			},
+		},
+		"no indexes": {
+			job: &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: batchv1.JobSpec{
+					CompletionMode: batchv1.IndexedCompletion,
+				},
+			},
+			wantCompletedIndexes: "<none>",
+		},
+		"few completed indexes": {
+			job: &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: batchv1.JobSpec{
+					CompletionMode: batchv1.IndexedCompletion,
+				},
+				Status: batchv1.JobStatus{
+					CompletedIndexes: "0-5,7,9,10,12,13,15,16,18,20,21,23,24,26,27,29,30,32",
+				},
+			},
+			wantCompletedIndexes: "0-5,7,9,10,12,13,15,16,18,20,21,23,24,26,27,29,30,32",
+		},
+		"too many completed indexes": {
+			job: &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: batchv1.JobSpec{
+					CompletionMode: batchv1.IndexedCompletion,
+				},
+				Status: batchv1.JobStatus{
+					CompletedIndexes: "0-5,7,9,10,12,13,15,16,18,20,21,23,24,26,27,29,30,32-34,36,37",
+				},
+			},
+			wantCompletedIndexes: "0-5,7,9,10,12,13,15,16,18,20,21,23,24,26,27,29,30,32-34,...",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			client := &describeClient{
+				T:         t,
+				Namespace: tc.job.Namespace,
+				Interface: fake.NewSimpleClientset(tc.job),
+			}
+			describer := JobDescriber{Interface: client}
+			out, err := describer.Describe(tc.job.Namespace, tc.job.Name, DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Fatalf("Unexpected error describing object: %v", err)
+			}
+			if tc.wantCompletedIndexes != "" {
+				if !strings.Contains(out, fmt.Sprintf("Completed Indexes:  %s\n", tc.wantCompletedIndexes)) {
+					t.Errorf("Output didn't contain wanted Completed Indexes:\n%s", out)
+				}
+			} else if strings.Contains(out, fmt.Sprintf("Completed Indexes:")) {
+				t.Errorf("Output contains unexpected completed indexes:\n%s", out)
+			}
+		})
+	}
+}
+
 func TestDescribeIngress(t *testing.T) {
 	backendV1beta1 := networkingv1beta1.IngressBackend{
 		ServiceName: "default-backend",

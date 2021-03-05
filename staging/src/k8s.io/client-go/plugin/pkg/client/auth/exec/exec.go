@@ -198,7 +198,7 @@ func newAuthenticator(c *cache, config *api.ExecConfig, cluster *clientauthentic
 
 		stdin:       os.Stdin,
 		stderr:      os.Stderr,
-		interactive: term.IsTerminal(int(os.Stdout.Fd())),
+		interactive: term.IsTerminal(int(os.Stdin.Fd())),
 		now:         time.Now,
 		environ:     os.Environ,
 
@@ -401,7 +401,9 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 		cmd.Stdin = a.stdin
 	}
 
-	if err := cmd.Run(); err != nil {
+	err = cmd.Run()
+	incrementCallsMetric(err)
+	if err != nil {
 		return a.wrapCmdRunErrorLocked(err)
 	}
 

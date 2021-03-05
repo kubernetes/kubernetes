@@ -208,6 +208,7 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *v1.JobSpec, out *batch.JobSpec,
 		return err
 	}
 	out.TTLSecondsAfterFinished = (*int32)(unsafe.Pointer(in.TTLSecondsAfterFinished))
+	out.CompletionMode = batch.CompletionMode(in.CompletionMode)
 	return nil
 }
 
@@ -222,6 +223,7 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *v1.JobSpec,
 		return err
 	}
 	out.TTLSecondsAfterFinished = (*int32)(unsafe.Pointer(in.TTLSecondsAfterFinished))
+	out.CompletionMode = v1.CompletionMode(in.CompletionMode)
 	return nil
 }
 
@@ -232,6 +234,7 @@ func autoConvert_v1_JobStatus_To_batch_JobStatus(in *v1.JobStatus, out *batch.Jo
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
+	out.CompletedIndexes = in.CompletedIndexes
 	return nil
 }
 
@@ -247,6 +250,7 @@ func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *v1.Jo
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
+	out.CompletedIndexes = in.CompletedIndexes
 	return nil
 }
 

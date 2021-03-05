@@ -3892,7 +3892,7 @@ func TestDefaultingValidation(t *testing.T) {
 				},
 			},
 			expectedIPFamilyPolicy: &preferDualStack,
-			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol},
+			expectedIPFamilies:     []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 			expectError:            false,
 		},
 		// tests incorrect setting for IPFamilyPolicy
@@ -4173,7 +4173,7 @@ func TestDefaultingValidation(t *testing.T) {
 				},
 			},
 			expectedIPFamilyPolicy: &preferDualStack,
-			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol},
+			expectedIPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 			expectError:            false,
 		},
 		// tests incorrect setting for IPFamilyPolicy

@@ -452,7 +452,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 			// Need to add/update/delete testPod to the store.
 			podInformer.Informer().GetStore().Add(testPod)
 
-			queue := internalqueue.NewPriorityQueue(nil, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
 			schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 			queue.Add(testPod)
@@ -526,7 +526,7 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 			// Need to add testPod to the store.
 			podInformer.Informer().GetStore().Add(testPod)
 
-			queue := internalqueue.NewPriorityQueue(nil, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
 			schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 			for i := range tt.nodes {
@@ -567,7 +567,7 @@ func TestDefaultErrorFunc_PodAlreadyBound(t *testing.T) {
 	// Need to add testPod to the store.
 	podInformer.Informer().GetStore().Add(testPod)
 
-	queue := internalqueue.NewPriorityQueue(nil, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
 	schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 	// Add node to schedulerCache no matter it's deleted in API server or not.

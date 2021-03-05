@@ -146,6 +146,28 @@ message JobSpec {
   // TTLAfterFinished feature.
   // +optional
   optional int32 ttlSecondsAfterFinished = 8;
+
+  // CompletionMode specifies how Pod completions are tracked. It can be
+  // `NonIndexed` (default) or `Indexed`.
+  //
+  // `NonIndexed` means that the Job is considered complete when there have
+  // been .spec.completions successfully completed Pods. Each Pod completion is
+  // homologous to each other.
+  //
+  // `Indexed` means that the Pods of a
+  // Job get an associated completion index from 0 to (.spec.completions - 1),
+  // available in the annotation batch.alpha.kubernetes.io/job-completion-index.
+  // The Job is considered complete when there is one successfully completed Pod
+  // for each index.
+  // When value is `Indexed`, .spec.completions must be specified and
+  // `.spec.parallelism` must be less than or equal to 10^5.
+  //
+  // This field is alpha-level and is only honored by servers that enable the
+  // IndexedJob feature gate. More completion modes can be added in the future.
+  // If the Job controller observes a mode that it doesn't recognize, the
+  // controller skips updates for the Job.
+  // +optional
+  optional string completionMode = 9;
 }
 
 // JobStatus represents the current state of a Job.
@@ -182,5 +204,15 @@ message JobStatus {
   // The number of pods which reached phase Failed.
   // +optional
   optional int32 failed = 6;
+
+  // CompletedIndexes holds the completed indexes when .spec.completionMode =
+  // "Indexed" in a text format. The indexes are represented as decimal integers
+  // separated by commas. The numbers are listed in increasing order. Three or
+  // more consecutive numbers are compressed and represented by the first and
+  // last element of the series, separated by a hyphen.
+  // For example, if the completed indexes are 1, 3, 4, 5 and 7, they are
+  // represented as "1,3-5,7".
+  // +optional
+  optional string completedIndexes = 7;
 }
 

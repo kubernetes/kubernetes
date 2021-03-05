@@ -131,6 +131,7 @@ func TestReconcile1Pod(t *testing.T) {
 							"topology.kubernetes.io/zone":   "us-central1-a",
 							"topology.kubernetes.io/region": "us-central1",
 						},
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -156,6 +157,7 @@ func TestReconcile1Pod(t *testing.T) {
 							"topology.kubernetes.io/zone":   "us-central1-a",
 							"topology.kubernetes.io/region": "us-central1",
 						},
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -186,6 +188,7 @@ func TestReconcile1Pod(t *testing.T) {
 							"topology.kubernetes.io/zone":   "us-central1-a",
 							"topology.kubernetes.io/region": "us-central1",
 						},
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -213,6 +216,7 @@ func TestReconcile1Pod(t *testing.T) {
 							"topology.kubernetes.io/zone":   "us-central1-a",
 							"topology.kubernetes.io/region": "us-central1",
 						},
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -230,6 +234,7 @@ func TestReconcile1Pod(t *testing.T) {
 					"topology.kubernetes.io/zone":   "us-central1-a",
 					"topology.kubernetes.io/region": "us-central1",
 				},
+				NodeName: utilpointer.StringPtr("node-1"),
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: namespace,
@@ -253,6 +258,7 @@ func TestReconcile1Pod(t *testing.T) {
 							"topology.kubernetes.io/zone":   "us-central1-a",
 							"topology.kubernetes.io/region": "us-central1",
 						},
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -270,6 +276,7 @@ func TestReconcile1Pod(t *testing.T) {
 					"topology.kubernetes.io/zone":   "us-central1-a",
 					"topology.kubernetes.io/region": "us-central1",
 				},
+				NodeName: utilpointer.StringPtr("node-1"),
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: namespace,
@@ -295,6 +302,7 @@ func TestReconcile1Pod(t *testing.T) {
 							"topology.kubernetes.io/zone":   "us-central1-a",
 							"topology.kubernetes.io/region": "us-central1",
 						},
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -312,6 +320,7 @@ func TestReconcile1Pod(t *testing.T) {
 					"topology.kubernetes.io/zone":   "us-central1-a",
 					"topology.kubernetes.io/region": "us-central1",
 				},
+				NodeName: utilpointer.StringPtr("node-1"),
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: namespace,
@@ -337,6 +346,7 @@ func TestReconcile1Pod(t *testing.T) {
 							"topology.kubernetes.io/zone":   "us-central1-a",
 							"topology.kubernetes.io/region": "us-central1",
 						},
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -364,6 +374,7 @@ func TestReconcile1Pod(t *testing.T) {
 							"topology.kubernetes.io/zone":   "us-central1-a",
 							"topology.kubernetes.io/region": "us-central1",
 						},
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -390,6 +401,7 @@ func TestReconcile1Pod(t *testing.T) {
 							"topology.kubernetes.io/zone":   "us-central1-a",
 							"topology.kubernetes.io/region": "us-central1",
 						},
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -406,6 +418,7 @@ func TestReconcile1Pod(t *testing.T) {
 							"topology.kubernetes.io/zone":   "us-central1-a",
 							"topology.kubernetes.io/region": "us-central1",
 						},
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,

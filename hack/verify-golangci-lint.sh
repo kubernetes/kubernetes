@@ -49,4 +49,5 @@ golangci-lint run \
   --disable-all \
   -E deadcode \
   -E unused \
-  -E varcheck
+  -E varcheck \
+  -E ineffassign

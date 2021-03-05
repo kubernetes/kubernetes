@@ -22,10 +22,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestNewResource(t *testing.T) {
@@ -1299,6 +1301,48 @@ func TestHostPortInfo_Check(t *testing.T) {
 			}
 			if hp.CheckConflict(test.check.ip, test.check.protocol, test.check.port) != test.expect {
 				t.Errorf("expected %t; got %t", test.expect, !test.expect)
+			}
+		})
+	}
+}
+
+func TestGetNamespacesFromPodAffinityTerm(t *testing.T) {
+	tests := []struct {
+		name string
+		term *v1.PodAffinityTerm
+		want sets.String
+	}{
+		{
+			name: "podAffinityTerm_namespace_empty",
+			term: &v1.PodAffinityTerm{},
+			want: sets.String{metav1.NamespaceDefault: sets.Empty{}},
+		},
+		{
+			name: "podAffinityTerm_namespace_not_empty",
+			term: &v1.PodAffinityTerm{
+				Namespaces: []string{metav1.NamespacePublic, metav1.NamespaceSystem},
+			},
+			want: sets.NewString(metav1.NamespacePublic, metav1.NamespaceSystem),
+		},
+		{
+			name: "podAffinityTerm_namespace_selector_not_nil",
+			term: &v1.PodAffinityTerm{
+				NamespaceSelector: &metav1.LabelSelector{},
+			},
+			want: sets.String{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := getNamespacesFromPodAffinityTerm(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "topologies_pod",
+					Namespace: metav1.NamespaceDefault,
+				},
+			}, test.term)
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("unexpected diff (-want, +got):\n%s", diff)
 			}
 		})
 	}

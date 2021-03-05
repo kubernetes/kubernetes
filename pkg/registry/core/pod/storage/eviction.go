@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	"k8s.io/client-go/util/retry"
+	pdbhelper "k8s.io/component-helpers/apps/poddisruptionbudget"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -331,6 +332,10 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 	}
 
 	pdb.Status.DisruptionsAllowed--
+	if pdb.Status.DisruptionsAllowed == 0 {
+		pdbhelper.UpdateDisruptionAllowedCondition(&pdb)
+	}
+
 	// If this is a dry-run, we don't need to go any further than that.
 	if dryRun == true {
 		return nil
