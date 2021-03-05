@@ -124,6 +124,18 @@ func (sw *StreamWatcher) receive() {
 					klog.V(5).Infof("Unable to decode an event from the watch stream: %v", err)
 				} else {
 					select {
+					// TODO: figure out how to test that sending the error after an externally stopped watcher
+					//       cannot block anymore because of the introduced done channel.
+					// The function receive checks under a lock whether the watch has been stopped,
+					// before an error from the watch stream is reported to the result channel.
+					// The problem here is, that in between the watcher might be stopped by
+					// calling the Stop method. In the actual code this is done by the
+					// cache.Reflector using the streamwatcher by a defer (method watchHandler)
+					// which is executed after the caller already stopped reading from the result channel.
+					// As a result the stopping flag might be set after the check
+					// and trying to send the error event blocks this send operation forever,
+					// because there will never be a receiver again.
+					// This results in dead go routines trying to send on the result channel, forever.
 					case <-sw.done:
 						return
 					case sw.result <- Event{
