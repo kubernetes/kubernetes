@@ -32,7 +32,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	internalapi "k8s.io/cri-api/pkg/apis"
-	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -217,8 +216,12 @@ func (cm *containerManagerImpl) GetPodCgroupRoot() string {
 	return ""
 }
 
-func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices {
+func (cm *containerManagerImpl) GetDevices(podUID, containerName string) devicemanager.ResourceDeviceInstances {
 	return cm.deviceManager.GetDevices(podUID, containerName)
+}
+
+func (cm *containerManagerImpl) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
+	return nil
 }
 
 func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
@@ -239,8 +242,4 @@ func (cm *containerManagerImpl) GetCPUs(_, _ string) cpuset.CPUSet {
 
 func (cm *containerManagerImpl) GetAllocatableCPUs() cpuset.CPUSet {
 	return cpuset.CPUSet{}
-}
-
-func (cm *containerManagerImpl) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
-	return nil
 }

@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
-	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -324,7 +323,7 @@ func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *Devi
 }
 
 // getContainerDevices returns the devices assigned to the provided container for all ResourceNames
-func (pdev *podDevices) getContainerDevices(podUID, contName string) []*podresourcesapi.ContainerDevices {
+func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDeviceInstances {
 	pdev.RLock()
 	defer pdev.RUnlock()
 
@@ -334,21 +333,39 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) []*podresou
 	if _, contExists := pdev.devs[podUID][contName]; !contExists {
 		return nil
 	}
-	cDev := []*podresourcesapi.ContainerDevices{}
+	resDev := NewResourceDeviceInstances()
 	for resource, allocateInfo := range pdev.devs[podUID][contName] {
-		for numaid, devlist := range allocateInfo.deviceIds {
-			cDev = append(cDev, &podresourcesapi.ContainerDevices{
-				ResourceName: resource,
-				DeviceIds:    devlist,
-				Topology:     &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaid}}},
-			})
+		if len(allocateInfo.deviceIds) == 0 {
+			continue
 		}
+		devicePluginMap := make(map[string]pluginapi.Device)
+		for numaid, devlist := range allocateInfo.deviceIds {
+			for _, devId := range devlist {
+				NUMANodes := []*pluginapi.NUMANode{{ID: numaid}}
+				if pDev, ok := devicePluginMap[devId]; ok && pDev.Topology != nil {
+					if nodes := pDev.Topology.GetNodes(); nodes != nil {
+						NUMANodes = append(NUMANodes, nodes...)
+					}
+				}
+
+				devicePluginMap[devId] = pluginapi.Device{
+					// ID and Healthy are not relevant here.
+					Topology: &pluginapi.TopologyInfo{
+						Nodes: NUMANodes,
+					},
+				}
+			}
+		}
+		resDev[resource] = devicePluginMap
 	}
-	return cDev
+	return resDev
 }
 
-// ResourceDeviceInstances is a map ping resource name -> device name -> device data
-type ResourceDeviceInstances map[string]map[string]pluginapi.Device
+// DeviceInstances is a mapping device name -> plugin device data
+type DeviceInstances map[string]pluginapi.Device
+
+// ResourceDeviceInstances is a mapping resource name -> DeviceInstances
+type ResourceDeviceInstances map[string]DeviceInstances
 
 func NewResourceDeviceInstances() ResourceDeviceInstances {
 	return make(ResourceDeviceInstances)

@@ -18,7 +18,6 @@ package podresources
 
 import (
 	"k8s.io/api/core/v1"
-	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 )
@@ -28,7 +27,7 @@ type DevicesProvider interface {
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()
 	// GetDevices returns information about the devices assigned to pods and containers
-	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
+	GetDevices(podUID, containerName string) devicemanager.ResourceDeviceInstances
 	// GetAllocatableDevices returns information about all the devices known to the manager
 	GetAllocatableDevices() devicemanager.ResourceDeviceInstances
 }

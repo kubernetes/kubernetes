@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	internalapi "k8s.io/cri-api/pkg/apis"
-	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
@@ -112,7 +111,11 @@ func (cm *containerManagerStub) GetPodCgroupRoot() string {
 	return ""
 }
 
-func (cm *containerManagerStub) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
+func (cm *containerManagerStub) GetDevices(_, _ string) devicemanager.ResourceDeviceInstances {
+	return nil
+}
+
+func (cm *containerManagerStub) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
 	return nil
 }
 
@@ -130,10 +133,6 @@ func (cm *containerManagerStub) UpdateAllocatedDevices() {
 
 func (cm *containerManagerStub) GetCPUs(_, _ string) cpuset.CPUSet {
 	return cpuset.CPUSet{}
-}
-
-func (cm *containerManagerStub) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
-	return nil
 }
 
 func (cm *containerManagerStub) GetAllocatableCPUs() cpuset.CPUSet {

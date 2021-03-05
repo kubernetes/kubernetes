@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	internalapi "k8s.io/cri-api/pkg/apis"
-	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
@@ -169,10 +168,17 @@ func (cm *FakeContainerManager) GetPodCgroupRoot() string {
 	return ""
 }
 
-func (cm *FakeContainerManager) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
+func (cm *FakeContainerManager) GetDevices(_, _ string) devicemanager.ResourceDeviceInstances {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetDevices")
+	return nil
+}
+
+func (cm *FakeContainerManager) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocatableDevices")
 	return nil
 }
 
@@ -202,13 +208,6 @@ func (cm *FakeContainerManager) GetCPUs(_, _ string) cpuset.CPUSet {
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetCPUs")
 	return cpuset.CPUSet{}
-}
-
-func (cm *FakeContainerManager) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
-	cm.Lock()
-	defer cm.Unlock()
-	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocatableDevices")
-	return nil
 }
 
 func (cm *FakeContainerManager) GetAllocatableCPUs() cpuset.CPUSet {

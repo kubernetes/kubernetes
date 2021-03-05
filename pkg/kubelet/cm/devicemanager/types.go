@@ -20,7 +20,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -60,7 +59,10 @@ type Manager interface {
 	GetWatcherHandler() cache.PluginHandler
 
 	// GetDevices returns information about the devices assigned to pods and containers
-	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
+	GetDevices(podUID, containerName string) ResourceDeviceInstances
+
+	// GetAllocatableDevices returns information about all the devices known to the manager
+	GetAllocatableDevices() ResourceDeviceInstances
 
 	// ShouldResetExtendedResourceCapacity returns whether the extended resources should be reset or not,
 	// depending on the checkpoint file availability. Absence of the checkpoint file strongly indicates
@@ -77,9 +79,6 @@ type Manager interface {
 
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()
-
-	// GetAllocatableDevices returns information about all the devices known to the manager
-	GetAllocatableDevices() ResourceDeviceInstances
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.

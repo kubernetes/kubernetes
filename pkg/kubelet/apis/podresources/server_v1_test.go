@@ -38,11 +38,18 @@ func TestListPodResourcesV1(t *testing.T) {
 	containerName := "container-name"
 	numaID := int64(1)
 
-	devs := []*podresourcesapi.ContainerDevices{
-		{
-			ResourceName: "resource",
-			DeviceIds:    []string{"dev0", "dev1"},
-			Topology:     &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaID}}},
+	devs := devicemanager.ResourceDeviceInstances{
+		"resource": devicemanager.DeviceInstances{
+			"dev0": pluginapi.Device{
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{{ID: numaID}},
+				},
+			},
+			"dev1": pluginapi.Device{
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{{ID: numaID}},
+				},
+			},
 		},
 	}
 
@@ -51,14 +58,14 @@ func TestListPodResourcesV1(t *testing.T) {
 	for _, tc := range []struct {
 		desc             string
 		pods             []*v1.Pod
-		devices          []*podresourcesapi.ContainerDevices
+		devices          devicemanager.ResourceDeviceInstances
 		cpus             cpuset.CPUSet
 		expectedResponse *podresourcesapi.ListPodResourcesResponse
 	}{
 		{
 			desc:             "no pods",
 			pods:             []*v1.Pod{},
-			devices:          []*podresourcesapi.ContainerDevices{},
+			devices:          devicemanager.NewResourceDeviceInstances(),
 			cpus:             cpuset.CPUSet{},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{},
 		},
@@ -80,7 +87,7 @@ func TestListPodResourcesV1(t *testing.T) {
 					},
 				},
 			},
-			devices: []*podresourcesapi.ContainerDevices{},
+			devices: devicemanager.NewResourceDeviceInstances(),
 			cpus:    cpuset.CPUSet{},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
 				PodResources: []*podresourcesapi.PodResources{
@@ -125,7 +132,7 @@ func TestListPodResourcesV1(t *testing.T) {
 						Containers: []*podresourcesapi.ContainerResources{
 							{
 								Name:    containerName,
-								Devices: devs,
+								Devices: containerDevicesFromResourceDeviceInstances(devs),
 								CpuIds:  cpus.ToSliceNoSortInt64(),
 							},
 						},
