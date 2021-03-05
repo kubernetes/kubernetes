@@ -356,6 +356,7 @@ type CSIDriverSpec struct {
 	// feature is enabled. The default is false.
 	//
 	// +optional
+	// +featureGate=CSIStorageCapacity
 	StorageCapacity *bool `json:"storageCapacity,omitempty" protobuf:"bytes,4,opt,name=storageCapacity"`
 
 	// Defines if the underlying volume supports changing ownership and

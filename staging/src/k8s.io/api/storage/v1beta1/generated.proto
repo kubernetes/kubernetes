@@ -139,6 +139,7 @@ message CSIDriverSpec {
   // feature is enabled. The default is false.
   //
   // +optional
+  // +featureGate=CSIStorageCapacity
   optional bool storageCapacity = 4;
 
   // Defines if the underlying volume supports changing ownership and
