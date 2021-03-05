@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	discoveryinformers "k8s.io/client-go/informers/discovery/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -42,7 +43,9 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointslicemetrics "k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
+	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -142,13 +145,6 @@ func NewController(podInformer coreinformers.PodInformer,
 
 	c.maxEndpointsPerSlice = maxEndpointsPerSlice
 
-	c.reconciler = &reconciler{
-		client:               c.client,
-		nodeLister:           c.nodeLister,
-		maxEndpointsPerSlice: c.maxEndpointsPerSlice,
-		endpointSliceTracker: c.endpointSliceTracker,
-		metricsCache:         endpointslicemetrics.NewCache(maxEndpointsPerSlice),
-	}
 	c.triggerTimeTracker = endpointutil.NewTriggerTimeTracker()
 
 	c.eventBroadcaster = broadcaster
@@ -156,6 +152,25 @@ func NewController(podInformer coreinformers.PodInformer,
 
 	c.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
 	c.serviceSelectorCache = endpointutil.NewServiceSelectorCache()
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
+		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    c.addNode,
+			UpdateFunc: c.updateNode,
+			DeleteFunc: c.deleteNode,
+		})
+
+		c.topologyCache = topologycache.NewTopologyCache()
+	}
+
+	c.reconciler = &reconciler{
+		client:               c.client,
+		nodeLister:           c.nodeLister,
+		maxEndpointsPerSlice: c.maxEndpointsPerSlice,
+		endpointSliceTracker: c.endpointSliceTracker,
+		metricsCache:         endpointslicemetrics.NewCache(maxEndpointsPerSlice),
+		topologyCache:        c.topologyCache,
+	}
 
 	return c
 }
@@ -227,6 +242,10 @@ type Controller struct {
 	// serviceSelectorCache is a cache of service selectors to avoid high CPU consumption caused by frequent calls
 	// to AsSelectorPreValidated (see #73527)
 	serviceSelectorCache *endpointutil.ServiceSelectorCache
+
+	// topologyCache tracks the distribution of Nodes and endpoints across zones
+	// to enable TopologyAwareHints.
+	topologyCache *topologycache.TopologyCache
 }
 
 // Run will not return until stopCh is closed.
@@ -275,6 +294,8 @@ func (c *Controller) processNextWorkItem() bool {
 }
 
 func (c *Controller) handleErr(err error, key interface{}) {
+	trackSync(err)
+
 	if err == nil {
 		c.queue.Forget(key)
 		return
@@ -489,4 +510,51 @@ func (c *Controller) deletePod(obj interface{}) {
 	if pod != nil {
 		c.addPod(pod)
 	}
+}
+
+func (c *Controller) addNode(obj interface{}) {
+	c.checkNodeTopologyDistribution()
+}
+
+func (c *Controller) updateNode(old, cur interface{}) {
+	oldNode := old.(*v1.Node)
+	curNode := cur.(*v1.Node)
+
+	if topologycache.NodeReady(oldNode.Status) != topologycache.NodeReady(curNode.Status) {
+		c.checkNodeTopologyDistribution()
+	}
+}
+
+func (c *Controller) deleteNode(obj interface{}) {
+	c.checkNodeTopologyDistribution()
+}
+
+// checkNodeTopologyDistribution updates Nodes in the topology cache and then
+// queues any Services that are past the threshold.
+func (c *Controller) checkNodeTopologyDistribution() {
+	if c.topologyCache == nil {
+		return
+	}
+	nodes, err := c.nodeLister.List(labels.Everything())
+	if err != nil {
+		klog.Errorf("Error listing Nodes: %v", err)
+	}
+	c.topologyCache.SetNodes(nodes)
+	serviceKeys := c.topologyCache.GetOverloadedServices()
+	for _, serviceKey := range serviceKeys {
+		c.queue.Add(serviceKey)
+	}
+}
+
+// trackSync increments the EndpointSliceSyncs metric with the result of a sync.
+func trackSync(err error) {
+	metricLabel := "success"
+	if err != nil {
+		if isStaleInformerCacheErr(err) {
+			metricLabel = "stale"
+		} else {
+			metricLabel = "error"
+		}
+	}
+	endpointslicemetrics.EndpointSliceSyncs.WithLabelValues(metricLabel).Inc()
 }
