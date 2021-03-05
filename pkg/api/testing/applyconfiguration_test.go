@@ -52,7 +52,7 @@ func TestUnstructuredRoundTripApplyConfigurations(t *testing.T) {
 		}
 
 		t.Run(gvk.String(), func(t *testing.T) {
-			for i := 0; i < 50; i++ {
+			for i := 0; i < 3; i++ {
 				item := fuzzObject(t, gvk)
 				builder := applyconfigurations.ForKind(gvk)
 				unstructuredRoundTripApplyConfiguration(t, item, builder)
@@ -80,7 +80,7 @@ func TestJsonRoundTripApplyConfigurations(t *testing.T) {
 		}
 
 		t.Run(gvk.String(), func(t *testing.T) {
-			for i := 0; i < 50; i++ {
+			for i := 0; i < 3; i++ {
 				item := fuzzObject(t, gvk)
 				builder := applyconfigurations.ForKind(gvk)
 				jsonRoundTripApplyConfiguration(t, item, builder)
