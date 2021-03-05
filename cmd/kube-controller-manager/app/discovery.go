@@ -23,7 +23,7 @@ package app
 import (
 	"net/http"
 
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	endpointslicecontroller "k8s.io/kubernetes/pkg/controller/endpointslice"
@@ -37,8 +37,8 @@ func startEndpointSliceController(ctx ControllerContext) (http.Handler, bool, er
 		return nil, false, nil
 	}
 
-	if !ctx.AvailableResources[discoveryv1beta1.SchemeGroupVersion.WithResource("endpointslices")] {
-		klog.Warningf("Not starting endpointslice-controller since discovery.k8s.io/v1beta1 resources are not available")
+	if !ctx.AvailableResources[discoveryv1.SchemeGroupVersion.WithResource("endpointslices")] {
+		klog.Warningf("Not starting endpointslice-controller since discovery.k8s.io/v1 resources are not available")
 		return nil, false, nil
 	}
 
@@ -46,7 +46,7 @@ func startEndpointSliceController(ctx ControllerContext) (http.Handler, bool, er
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Services(),
 		ctx.InformerFactory.Core().V1().Nodes(),
-		ctx.InformerFactory.Discovery().V1beta1().EndpointSlices(),
+		ctx.InformerFactory.Discovery().V1().EndpointSlices(),
 		ctx.ComponentConfig.EndpointSliceController.MaxEndpointsPerSlice,
 		ctx.ClientBuilder.ClientOrDie("endpointslice-controller"),
 		ctx.ComponentConfig.EndpointSliceController.EndpointUpdatesBatchPeriod.Duration,
@@ -60,14 +60,14 @@ func startEndpointSliceMirroringController(ctx ControllerContext) (http.Handler,
 		return nil, false, nil
 	}
 
-	if !ctx.AvailableResources[discoveryv1beta1.SchemeGroupVersion.WithResource("endpointslices")] {
-		klog.Warningf("Not starting endpointslicemirroring-controller since discovery.k8s.io/v1beta1 resources are not available")
+	if !ctx.AvailableResources[discoveryv1.SchemeGroupVersion.WithResource("endpointslices")] {
+		klog.Warningf("Not starting endpointslicemirroring-controller since discovery.k8s.io/v1 resources are not available")
 		return nil, false, nil
 	}
 
 	go endpointslicemirroringcontroller.NewController(
 		ctx.InformerFactory.Core().V1().Endpoints(),
-		ctx.InformerFactory.Discovery().V1beta1().EndpointSlices(),
+		ctx.InformerFactory.Discovery().V1().EndpointSlices(),
 		ctx.InformerFactory.Core().V1().Services(),
 		ctx.ComponentConfig.EndpointSliceMirroringController.MirroringMaxEndpointsPerSubset,
 		ctx.ClientBuilder.ClientOrDie("endpointslicemirroring-controller"),
