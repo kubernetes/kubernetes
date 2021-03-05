@@ -420,6 +420,67 @@ var _ = SIGDescribe("Probing container", func() {
 			framework.Failf("Pod became ready in %v, more than 5s after startupProbe succeeded. It means that the delay readiness probes were not initiated immediately after startup finished.", readyIn)
 		}
 	})
+
+	/*
+		Release: v1.21
+		Testname: Set terminationGracePeriodSeconds for livenessProbe
+		Description: A pod with a long terminationGracePeriod is created with a shorter livenessProbe-level terminationGracePeriodSeconds. We confirm the shorter termination period is used.
+	*/
+	ginkgo.It("should override timeoutGracePeriodSeconds when LivenessProbe field is set [Feature:ProbeTerminationGracePeriod]", func() {
+		pod := e2epod.NewAgnhostPod(f.Namespace.Name, "liveness-override-"+string(uuid.NewUUID()), nil, nil, nil, "/bin/sh", "-c", "sleep 1000")
+		longGracePeriod := int64(500)
+		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
+
+		// probe will fail since pod has no http endpoints
+		shortGracePeriod := int64(5)
+		pod.Spec.Containers[0].LivenessProbe = &v1.Probe{
+			Handler: v1.Handler{
+				HTTPGet: &v1.HTTPGetAction{
+					Path: "/healthz",
+					Port: intstr.FromInt(8080),
+				},
+			},
+			InitialDelaySeconds:           10,
+			FailureThreshold:              1,
+			TerminationGracePeriodSeconds: &shortGracePeriod,
+		}
+
+		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
+		RunLivenessTest(f, pod, 1, time.Second*30)
+	})
+
+	/*
+		Release: v1.21
+		Testname: Set terminationGracePeriodSeconds for startupProbe
+		Description: A pod with a long terminationGracePeriod is created with a shorter startupProbe-level terminationGracePeriodSeconds. We confirm the shorter termination period is used.
+	*/
+	ginkgo.It("should override timeoutGracePeriodSeconds when StartupProbe field is set [Feature:ProbeTerminationGracePeriod]", func() {
+		pod := e2epod.NewAgnhostPod(f.Namespace.Name, "startup-override-"+string(uuid.NewUUID()), nil, nil, nil, "/bin/sh", "-c", "sleep 1000")
+		longGracePeriod := int64(500)
+		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
+
+		// startup probe will fail since pod will sleep for 1000s before becoming ready
+		shortGracePeriod := int64(5)
+		pod.Spec.Containers[0].StartupProbe = &v1.Probe{
+			Handler:                       execHandler([]string{"/bin/cat", "/tmp/startup"}),
+			InitialDelaySeconds:           10,
+			FailureThreshold:              1,
+			TerminationGracePeriodSeconds: &shortGracePeriod,
+		}
+		// liveness probe always succeeds
+		pod.Spec.Containers[0].LivenessProbe = &v1.Probe{
+			Handler: v1.Handler{
+				Exec: &v1.ExecAction{
+					Command: []string{"/bin/true"},
+				},
+			},
+			InitialDelaySeconds: 15,
+			FailureThreshold:    1,
+		}
+
+		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
+		RunLivenessTest(f, pod, 1, time.Second*30)
+	})
 })
 
 // GetContainerStartedTime returns the time when the given container started and error if any
