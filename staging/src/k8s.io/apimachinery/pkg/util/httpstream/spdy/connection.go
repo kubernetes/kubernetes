@@ -31,7 +31,7 @@ import (
 // streams.
 type connection struct {
 	conn             *spdystream.Connection
-	streams          []httpstream.Stream
+	streams          map[uint32]httpstream.Stream
 	streamLock       sync.Mutex
 	newStreamHandler httpstream.NewStreamHandler
 }
@@ -64,7 +64,11 @@ func NewServerConnection(conn net.Conn, newStreamHandler httpstream.NewStreamHan
 // will be invoked when the server receives a newly created stream from the
 // client.
 func newConnection(conn *spdystream.Connection, newStreamHandler httpstream.NewStreamHandler) httpstream.Connection {
-	c := &connection{conn: conn, newStreamHandler: newStreamHandler}
+	c := &connection{
+		conn:             conn,
+		newStreamHandler: newStreamHandler,
+		streams:          make(map[uint32]httpstream.Stream),
+	}
 	go conn.Serve(c.newSpdyStream)
 	return c
 }
@@ -81,13 +85,22 @@ func (c *connection) Close() error {
 		// calling Reset instead of Close ensures that all streams are fully torn down
 		s.Reset()
 	}
-	c.streams = make([]httpstream.Stream, 0)
+	c.streams = make(map[uint32]httpstream.Stream, 0)
 	c.streamLock.Unlock()
 
 	// now that all streams are fully torn down, it's safe to call close on the underlying connection,
 	// which should be able to terminate immediately at this point, instead of waiting for any
 	// remaining graceful stream termination.
 	return c.conn.Close()
+}
+
+// RemoveStreams can be used to removes a set of streams from the Connection.
+func (c *connection) RemoveStreams(streams ...httpstream.Stream) {
+	c.streamLock.Lock()
+	for _, stream := range streams {
+		delete(c.streams, stream.Identifier())
+	}
+	c.streamLock.Unlock()
 }
 
 // CreateStream creates a new stream with the specified headers and registers
@@ -109,7 +122,7 @@ func (c *connection) CreateStream(headers http.Header) (httpstream.Stream, error
 // it owns.
 func (c *connection) registerStream(s httpstream.Stream) {
 	c.streamLock.Lock()
-	c.streams = append(c.streams, s)
+	c.streams[s.Identifier()] = s
 	c.streamLock.Unlock()
 }
 

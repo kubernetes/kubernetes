@@ -68,6 +68,9 @@ func (c *fakeConnection) CloseChan() <-chan bool {
 	return c.closeChan
 }
 
+func (c *fakeConnection) RemoveStreams(_ ...httpstream.Stream) {
+}
+
 func (c *fakeConnection) SetIdleTimeout(timeout time.Duration) {
 	// no-op
 }
