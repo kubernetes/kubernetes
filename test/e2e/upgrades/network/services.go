@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package upgrades
+package network
 
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
 )
@@ -85,11 +86,11 @@ func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 }
 
 // Test runs a connectivity check to the service.
-func (t *ServiceUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *ServiceUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	switch upgrade {
-	case MasterUpgrade, ClusterUpgrade:
+	case upgrades.MasterUpgrade, upgrades.ClusterUpgrade:
 		t.test(f, done, true, true)
-	case NodeUpgrade:
+	case upgrades.NodeUpgrade:
 		// Node upgrades should test during disruption only on GCE/GKE for now.
 		t.test(f, done, shouldTestPDBs(), false)
 	default:

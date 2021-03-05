@@ -40,7 +40,11 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/upgrades"
-	apps "k8s.io/kubernetes/test/e2e/upgrades/apps"
+	"k8s.io/kubernetes/test/e2e/upgrades/apps"
+	"k8s.io/kubernetes/test/e2e/upgrades/auth"
+	"k8s.io/kubernetes/test/e2e/upgrades/autoscaling"
+	"k8s.io/kubernetes/test/e2e/upgrades/network"
+	"k8s.io/kubernetes/test/e2e/upgrades/node"
 	"k8s.io/kubernetes/test/e2e/upgrades/storage"
 	"k8s.io/kubernetes/test/utils/junit"
 
@@ -55,42 +59,42 @@ var (
 const etcdImage = "3.4.9-1"
 
 var upgradeTests = []upgrades.Test{
-	&upgrades.ServiceUpgradeTest{},
-	&upgrades.SecretUpgradeTest{},
+	&network.ServiceUpgradeTest{},
+	&node.SecretUpgradeTest{},
 	&apps.ReplicaSetUpgradeTest{},
 	&apps.StatefulSetUpgradeTest{},
 	&apps.DeploymentUpgradeTest{},
 	&apps.JobUpgradeTest{},
-	&upgrades.ConfigMapUpgradeTest{},
-	&upgrades.HPAUpgradeTest{},
+	&node.ConfigMapUpgradeTest{},
+	&autoscaling.HPAUpgradeTest{},
 	&storage.PersistentVolumeUpgradeTest{},
 	&apps.DaemonSetUpgradeTest{},
-	&upgrades.AppArmorUpgradeTest{},
+	&node.AppArmorUpgradeTest{},
 	&storage.VolumeModeDowngradeTest{},
 }
 
 var gpuUpgradeTests = []upgrades.Test{
-	&upgrades.NvidiaGPUUpgradeTest{},
+	&node.NvidiaGPUUpgradeTest{},
 }
 
 var statefulsetUpgradeTests = []upgrades.Test{
-	&upgrades.MySQLUpgradeTest{},
-	&upgrades.EtcdUpgradeTest{},
-	&upgrades.CassandraUpgradeTest{},
+	&apps.MySQLUpgradeTest{},
+	&apps.EtcdUpgradeTest{},
+	&apps.CassandraUpgradeTest{},
 }
 
 var kubeProxyUpgradeTests = []upgrades.Test{
-	&upgrades.KubeProxyUpgradeTest{},
-	&upgrades.ServiceUpgradeTest{},
+	&network.KubeProxyUpgradeTest{},
+	&network.ServiceUpgradeTest{},
 }
 
 var kubeProxyDowngradeTests = []upgrades.Test{
-	&upgrades.KubeProxyDowngradeTest{},
-	&upgrades.ServiceUpgradeTest{},
+	&network.KubeProxyDowngradeTest{},
+	&network.ServiceUpgradeTest{},
 }
 
 var serviceaccountAdmissionControllerMigrationTests = []upgrades.Test{
-	&upgrades.ServiceAccountAdmissionControllerMigrationTest{},
+	&auth.ServiceAccountAdmissionControllerMigrationTest{},
 }
 
 // masterUpgrade upgrades master node on GCE/GKE.

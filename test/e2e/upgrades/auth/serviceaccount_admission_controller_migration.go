@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package upgrades
+package auth
 
 import (
 	"context"
@@ -28,6 +28,7 @@ import (
 	e2eauth "k8s.io/kubernetes/test/e2e/auth"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -55,7 +56,7 @@ func (t *ServiceAccountAdmissionControllerMigrationTest) Setup(f *framework.Fram
 
 // Test waits for the upgrade to complete, and then verifies pod-before-migration
 // and pod-after-migration are able to make requests using in cluster config.
-func (t *ServiceAccountAdmissionControllerMigrationTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *ServiceAccountAdmissionControllerMigrationTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	ginkgo.By("Waiting for upgrade to finish")
 	<-done
 

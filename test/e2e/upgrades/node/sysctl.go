@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package upgrades
+package node
 
 import (
 	"context"
@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -49,10 +50,10 @@ func (t *SysctlUpgradeTest) Setup(f *framework.Framework) {
 
 // Test waits for the upgrade to complete, and then verifies that a
 // pod can still consume the ConfigMap.
-func (t *SysctlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *SysctlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
 	switch upgrade {
-	case MasterUpgrade, ClusterUpgrade:
+	case upgrades.MasterUpgrade, upgrades.ClusterUpgrade:
 		ginkgo.By("Checking the safe sysctl pod keeps running on master upgrade")
 		pod, err := f.ClientSet.CoreV1().Pods(t.validPod.Namespace).Get(context.TODO(), t.validPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)

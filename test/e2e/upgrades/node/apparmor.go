@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package upgrades
+package node
 
 import (
 	"context"
@@ -24,6 +24,7 @@ import (
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2esecurity "k8s.io/kubernetes/test/e2e/framework/security"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -39,7 +40,7 @@ type AppArmorUpgradeTest struct {
 func (AppArmorUpgradeTest) Name() string { return "apparmor-upgrade" }
 
 // Skip returns true when this test can be skipped.
-func (AppArmorUpgradeTest) Skip(upgCtx UpgradeContext) bool {
+func (AppArmorUpgradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
 	supportedImages := make(map[string]bool)
 	for _, d := range e2eskipper.AppArmorDistros {
 		supportedImages[d] = true
@@ -69,9 +70,9 @@ func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
 
 // Test waits for the upgrade to complete, and then verifies that a
 // pod can still consume the secret.
-func (t *AppArmorUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *AppArmorUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
-	if upgrade == MasterUpgrade {
+	if upgrade == upgrades.MasterUpgrade {
 		t.verifyPodStillUp(f)
 	}
 	t.verifyNodesAppArmorEnabled(f)

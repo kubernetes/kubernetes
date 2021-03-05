@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package upgrades
+package apps
 
 import (
 	"context"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 )
 
 const manifestPath = "test/e2e/testing-manifests/statefulset/etcd"
@@ -48,7 +49,7 @@ type EtcdUpgradeTest struct {
 func (EtcdUpgradeTest) Name() string { return "etcd-upgrade" }
 
 // Skip returns true when this test can be skipped.
-func (EtcdUpgradeTest) Skip(upgCtx UpgradeContext) bool {
+func (EtcdUpgradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
 	minVersion := version.MustParseSemantic("1.6.0")
 	for _, vCtx := range upgCtx.Versions {
 		if vCtx.Version.LessThan(minVersion) {
@@ -157,7 +158,7 @@ func (t *EtcdUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName strin
 }
 
 // Test waits for upgrade to complete and verifies if etcd is writable.
-func (t *EtcdUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *EtcdUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	ginkgo.By("Continuously polling the database during upgrade.")
 	var (
 		success, failures, writeAttempts, lastUserCount int
