@@ -743,7 +743,7 @@ func makeCSIDriver(name string, storageCapacity bool) *storagev1.CSIDriver {
 	}
 }
 
-func makeCapacity(name, storageClassName string, node *v1.Node, capacityStr string) *storagev1beta1.CSIStorageCapacity {
+func makeCapacity(name, storageClassName string, node *v1.Node, capacityStr, maximumVolumeSizeStr string) *storagev1beta1.CSIStorageCapacity {
 	c := &storagev1beta1.CSIStorageCapacity{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -757,6 +757,10 @@ func makeCapacity(name, storageClassName string, node *v1.Node, capacityStr stri
 	if capacityStr != "" {
 		capacityQuantity := resource.MustParse(capacityStr)
 		c.Capacity = &capacityQuantity
+	}
+	if maximumVolumeSizeStr != "" {
+		maximumVolumeSizeQuantity := resource.MustParse(maximumVolumeSizeStr)
+		c.MaximumVolumeSize = &maximumVolumeSizeQuantity
 	}
 	return c
 }
@@ -2212,21 +2216,21 @@ func TestCapacity(t *testing.T) {
 		"network-attached": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1beta1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, nil, "1Gi"),
+				makeCapacity("net", waitClassWithProvisioner, nil, "1Gi", ""),
 			},
 		},
 		"local-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1beta1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi"),
+				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi", ""),
 			},
 		},
 		"multiple": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1beta1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, nil, "1Gi"),
-				makeCapacity("net", waitClassWithProvisioner, node2, "1Gi"),
-				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi"),
+				makeCapacity("net", waitClassWithProvisioner, nil, "1Gi", ""),
+				makeCapacity("net", waitClassWithProvisioner, node2, "1Gi", ""),
+				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi", ""),
 			},
 		},
 		"no-storage": {
@@ -2236,35 +2240,49 @@ func TestCapacity(t *testing.T) {
 		"wrong-node": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1beta1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node2, "1Gi"),
+				makeCapacity("net", waitClassWithProvisioner, node2, "1Gi", ""),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
 		"wrong-storage-class": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1beta1.CSIStorageCapacity{
-				makeCapacity("net", waitClass, node1, "1Gi"),
+				makeCapacity("net", waitClass, node1, "1Gi", ""),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
 		"insufficient-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1beta1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node1, "1Mi"),
+				makeCapacity("net", waitClassWithProvisioner, node1, "1Mi", ""),
+			},
+			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+		},
+		"insufficient-volume-size": {
+			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi", "1Mi"),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
 		"zero-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1beta1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node1, "0Mi"),
+				makeCapacity("net", waitClassWithProvisioner, node1, "0Mi", ""),
+			},
+			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+		},
+		"zero-volume-size": {
+			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "", "0Mi"),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
 		"nil-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1beta1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node1, ""),
+				makeCapacity("net", waitClassWithProvisioner, node1, "", ""),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},

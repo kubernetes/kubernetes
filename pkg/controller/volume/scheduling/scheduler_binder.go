@@ -974,8 +974,7 @@ func (b *volumeBinder) hasEnoughCapacity(provisioner string, claim *v1.Persisten
 	sizeInBytes := quantity.Value()
 	for _, capacity := range capacities {
 		if capacity.StorageClassName == storageClass.Name &&
-			capacity.Capacity != nil &&
-			capacity.Capacity.Value() >= sizeInBytes &&
+			capacitySufficient(capacity, sizeInBytes) &&
 			b.nodeHasAccess(node, capacity) {
 			// Enough capacity found.
 			return true, nil
@@ -987,6 +986,15 @@ func (b *volumeBinder) hasEnoughCapacity(provisioner string, claim *v1.Persisten
 	klog.V(4).Infof("Node %q has no accessible CSIStorageCapacity with enough capacity for PVC %s/%s of size %d and storage class %q",
 		node.Name, claim.Namespace, claim.Name, sizeInBytes, storageClass.Name)
 	return false, nil
+}
+
+func capacitySufficient(capacity *storagev1beta1.CSIStorageCapacity, sizeInBytes int64) bool {
+	limit := capacity.Capacity
+	if capacity.MaximumVolumeSize != nil {
+		// Prefer MaximumVolumeSize if available, it is more precise.
+		limit = capacity.MaximumVolumeSize
+	}
+	return limit != nil && limit.Value() >= sizeInBytes
 }
 
 func (b *volumeBinder) nodeHasAccess(node *v1.Node, capacity *storagev1beta1.CSIStorageCapacity) bool {
