@@ -639,7 +639,7 @@ const (
 	//
 	// Ensure kubelet respects exec probe timeouts. Feature gate exists in-case existing workloads
 	// may depend on old behavior where exec probe timeouts were ignored.
-	// Lock to default in v1.21 and remove in v1.22.
+	// TODO lock and remove in a future release, see https://github.com/kubernetes/kubernetes/issues/99854
 	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
 
 	// owner: @andrewsykim
@@ -781,7 +781,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HPAContainerMetrics:                            {Default: false, PreRelease: featuregate.Alpha},
 	RootCAConfigMap:                                {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	SizeMemoryBackedVolumes:                        {Default: false, PreRelease: featuregate.Alpha},
-	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default in v1.21 and remove in v1.22
+	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // TODO lock and remove in a future release, see https://github.com/kubernetes/kubernetes/issues/99854
 	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
 	GracefulNodeShutdown:                           {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLBNodePortControl:                       {Default: false, PreRelease: featuregate.Alpha},
