@@ -24,9 +24,9 @@ import (
 	"time"
 
 	"github.com/robfig/cron"
+
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -62,7 +62,7 @@ func Test_syncCronJob(t *testing.T) {
 
 	testCases := map[string]struct {
 		// cj spec
-		concurrencyPolicy batchv1beta1.ConcurrencyPolicy
+		concurrencyPolicy batchv1.ConcurrencyPolicy
 		suspend           bool
 		schedule          string
 		deadline          int64
@@ -241,7 +241,7 @@ func Test_syncCronJob(t *testing.T) {
 				if controllerRef == nil {
 					t.Errorf("%s: expected job to have ControllerRef: %#v", name, job)
 				} else {
-					if got, want := controllerRef.APIVersion, "batch/v1beta1"; got != want {
+					if got, want := controllerRef.APIVersion, "batch/v1"; got != want {
 						t.Errorf("%s: controllerRef.APIVersion = %q, want %q", name, got, want)
 					}
 					if got, want := controllerRef.Kind, "CronJob"; got != want {
@@ -332,8 +332,8 @@ func TestController2_updateCronJob(t *testing.T) {
 		cronJobControl cjControlInterface
 	}
 	type args struct {
-		oldJobTemplate *batchv1beta1.JobTemplateSpec
-		newJobTemplate *batchv1beta1.JobTemplateSpec
+		oldJobTemplate *batchv1.JobTemplateSpec
+		newJobTemplate *batchv1.JobTemplateSpec
 		oldJobSchedule string
 		newJobSchedule string
 	}
@@ -352,14 +352,14 @@ func TestController2_updateCronJob(t *testing.T) {
 				cronJobControl: cjc,
 			},
 			args: args{
-				oldJobTemplate: &batchv1beta1.JobTemplateSpec{
+				oldJobTemplate: &batchv1.JobTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels:      map[string]string{"a": "b"},
 						Annotations: map[string]string{"x": "y"},
 					},
 					Spec: jobSpec(),
 				},
-				newJobTemplate: &batchv1beta1.JobTemplateSpec{
+				newJobTemplate: &batchv1.JobTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels:      map[string]string{"a": "foo"},
 						Annotations: map[string]string{"x": "y"},
@@ -459,7 +459,7 @@ func TestControllerV2_getJobList(t *testing.T) {
 		jobLister batchv1listers.JobLister
 	}
 	type args struct {
-		cronJob *batchv1beta1.CronJob
+		cronJob *batchv1.CronJob
 	}
 	tests := []struct {
 		name    string
@@ -482,7 +482,7 @@ func TestControllerV2_getJobList(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns"},
 					},
 				}}},
-			args: args{cronJob: &batchv1beta1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
+			args: args{cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
 			want: []*batchv1.Job{},
 		},
 		{
@@ -505,7 +505,7 @@ func TestControllerV2_getJobList(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns"},
 					},
 				}}},
-			args: args{cronJob: &batchv1beta1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
+			args: args{cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
 			want: []*batchv1.Job{{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
 					OwnerReferences: []metav1.OwnerReference{
@@ -530,7 +530,7 @@ func TestControllerV2_getJobList(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "bar-ns"},
 					},
 				}}},
-			args: args{cronJob: &batchv1beta1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
+			args: args{cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
 			want: []*batchv1.Job{},
 		},
 	}

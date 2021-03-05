@@ -24,7 +24,6 @@ import (
 	"k8s.io/klog/v2"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,7 +32,7 @@ import (
 
 // Utilities for dealing with Jobs and CronJobs and time.
 
-func inActiveList(cj batchv1beta1.CronJob, uid types.UID) bool {
+func inActiveList(cj batchv1.CronJob, uid types.UID) bool {
 	for _, j := range cj.Status.Active {
 		if j.UID == uid {
 			return true
@@ -42,7 +41,7 @@ func inActiveList(cj batchv1beta1.CronJob, uid types.UID) bool {
 	return false
 }
 
-func deleteFromActiveList(cj *batchv1beta1.CronJob, uid types.UID) {
+func deleteFromActiveList(cj *batchv1.CronJob, uid types.UID) {
 	if cj == nil {
 		return
 	}
@@ -92,7 +91,7 @@ func groupJobsByParent(js []batchv1.Job) map[types.UID][]batchv1.Job {
 //
 // If there are too many (>100) unstarted times, just give up and return an empty slice.
 // If there were missed times prior to the last known start time, then those are not returned.
-func getRecentUnmetScheduleTimes(cj batchv1beta1.CronJob, now time.Time) ([]time.Time, error) {
+func getRecentUnmetScheduleTimes(cj batchv1.CronJob, now time.Time) ([]time.Time, error) {
 	starts := []time.Time{}
 	sched, err := cron.ParseStandard(cj.Spec.Schedule)
 	if err != nil {
@@ -154,7 +153,7 @@ func getRecentUnmetScheduleTimes(cj batchv1beta1.CronJob, now time.Time) ([]time
 //  it returns nil if no unmet schedule times.
 // If there are too many (>100) unstarted times, it will raise a warning and but still return
 // the list of missed times.
-func getNextScheduleTime(cj batchv1beta1.CronJob, now time.Time, schedule cron.Schedule, recorder record.EventRecorder) (*time.Time, error) {
+func getNextScheduleTime(cj batchv1.CronJob, now time.Time, schedule cron.Schedule, recorder record.EventRecorder) (*time.Time, error) {
 	starts := []time.Time{}
 
 	var earliestTime time.Time
@@ -234,7 +233,7 @@ func getMostRecentScheduleTime(earliestTime time.Time, now time.Time, schedule c
 }
 
 // getJobFromTemplate makes a Job from a CronJob
-func getJobFromTemplate(cj *batchv1beta1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
+func getJobFromTemplate(cj *batchv1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
 	labels := copyLabels(&cj.Spec.JobTemplate)
 	annotations := copyAnnotations(&cj.Spec.JobTemplate)
 	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
@@ -260,7 +259,7 @@ func getTimeHash(scheduledTime time.Time) int64 {
 // getJobFromTemplate2 makes a Job from a CronJob. It converts the unix time into minutes from
 // epoch time and concatenates that to the job name, because the cronjob_controller v2 has the lowest
 // granularity of 1 minute for scheduling job.
-func getJobFromTemplate2(cj *batchv1beta1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
+func getJobFromTemplate2(cj *batchv1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
 	labels := copyLabels(&cj.Spec.JobTemplate)
 	annotations := copyAnnotations(&cj.Spec.JobTemplate)
 	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice

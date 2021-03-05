@@ -23,7 +23,6 @@ import (
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchV1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -106,19 +105,18 @@ func startTimeStringToTime(startTime string) time.Time {
 }
 
 // returns a cronJob with some fields filled in.
-func cronJob() batchV1beta1.CronJob {
-	return batchV1beta1.CronJob{
+func cronJob() batchv1.CronJob {
+	return batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "mycronjob",
 			Namespace:         "snazzycats",
 			UID:               types.UID("1a2b3c"),
-			SelfLink:          "/apis/batch/v1beta1/namespaces/snazzycats/cronjobs/mycronjob",
 			CreationTimestamp: metav1.Time{Time: justBeforeTheHour()},
 		},
-		Spec: batchV1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule:          "* * * * ?",
-			ConcurrencyPolicy: batchV1beta1.AllowConcurrent,
-			JobTemplate: batchV1beta1.JobTemplateSpec{
+			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      map[string]string{"a": "b"},
 					Annotations: map[string]string{"x": "y"},
@@ -155,7 +153,6 @@ func newJob(UID string) batchv1.Job {
 			UID:       types.UID(UID),
 			Name:      "foobar",
 			Namespace: metav1.NamespaceDefault,
-			SelfLink:  "/apis/batch/v1/namespaces/snazzycats/jobs/myjob",
 		},
 		Spec: jobSpec(),
 	}
@@ -166,9 +163,9 @@ var (
 	mediumDead int64 = 2 * 60 * 60
 	longDead   int64 = 1000000
 	noDead     int64 = -12345
-	A                = batchV1beta1.AllowConcurrent
-	f                = batchV1beta1.ForbidConcurrent
-	R                = batchV1beta1.ReplaceConcurrent
+	A                = batchv1.AllowConcurrent
+	f                = batchv1.ForbidConcurrent
+	R                = batchv1.ReplaceConcurrent
 	T                = true
 	F                = false
 )
@@ -189,7 +186,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 
 	testCases := map[string]struct {
 		// cj spec
-		concurrencyPolicy batchV1beta1.ConcurrencyPolicy
+		concurrencyPolicy batchv1.ConcurrencyPolicy
 		suspend           bool
 		schedule          string
 		deadline          int64
@@ -314,7 +311,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 				if controllerRef == nil {
 					t.Errorf("%s: expected job to have ControllerRef: %#v", name, job)
 				} else {
-					if got, want := controllerRef.APIVersion, "batch/v1beta1"; got != want {
+					if got, want := controllerRef.APIVersion, "batch/v1"; got != want {
 						t.Errorf("%s: controllerRef.APIVersion = %q, want %q", name, got, want)
 					}
 					if got, want := controllerRef.Kind, "CronJob"; got != want {
@@ -617,7 +614,7 @@ func TestSyncOne_Status(t *testing.T) {
 
 	testCases := map[string]struct {
 		// cj spec
-		concurrencyPolicy batchV1beta1.ConcurrencyPolicy
+		concurrencyPolicy batchv1.ConcurrencyPolicy
 		suspend           bool
 		schedule          string
 		deadline          int64

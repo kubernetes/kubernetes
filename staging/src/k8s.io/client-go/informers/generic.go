@@ -146,6 +146,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V2beta2().HorizontalPodAutoscalers().Informer()}, nil
 
 		// Group=batch, Version=v1
+	case batchv1.SchemeGroupVersion.WithResource("cronjobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V1().CronJobs().Informer()}, nil
 	case batchv1.SchemeGroupVersion.WithResource("jobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V1().Jobs().Informer()}, nil
 

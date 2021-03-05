@@ -61,6 +61,7 @@ var GVRToStorageVersionHash = map[string]string{
 	"autoscaling/v2beta1/horizontalpodautoscalers": "oQlkt7f5j/A=",
 	"autoscaling/v2beta2/horizontalpodautoscalers": "oQlkt7f5j/A=",
 	"batch/v1/jobs":          "mudhfqk/qZY=",
+	"batch/v1/cronjobs":      "h/JlFAZkyyY=",
 	"batch/v1beta1/cronjobs": "h/JlFAZkyyY=",
 	"certificates.k8s.io/v1/certificatesigningrequests":                    "95fRKMXA+00=",
 	"certificates.k8s.io/v1beta1/certificatesigningrequests":               "95fRKMXA+00=",

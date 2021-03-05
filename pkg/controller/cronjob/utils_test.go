@@ -25,7 +25,6 @@ import (
 
 	cron "github.com/robfig/cron"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,17 +39,17 @@ func TestGetJobFromTemplate(t *testing.T) {
 	var one int64 = 1
 	var no bool
 
-	cj := batchv1beta1.CronJob{
+	cj := batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
 			Namespace: "snazzycats",
 			UID:       types.UID("1a2b3c"),
 			SelfLink:  "/apis/batch/v1/namespaces/snazzycats/jobs/mycronjob",
 		},
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule:          "* * * * ?",
-			ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
-			JobTemplate: batchv1beta1.JobTemplateSpec{
+			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      map[string]string{"a": "b"},
 					Annotations: map[string]string{"x": "y"},
@@ -98,17 +97,17 @@ func TestGetJobFromTemplate2(t *testing.T) {
 	var one int64 = 1
 	var no bool
 
-	cj := batchv1beta1.CronJob{
+	cj := batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
 			Namespace: "snazzycats",
 			UID:       types.UID("1a2b3c"),
 			SelfLink:  "/apis/batch/v1/namespaces/snazzycats/jobs/mycronjob",
 		},
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule:          "* * * * ?",
-			ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
-			JobTemplate: batchv1beta1.JobTemplateSpec{
+			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      map[string]string{"a": "b"},
 					Annotations: map[string]string{"x": "y"},
@@ -326,16 +325,16 @@ func TestGetNextScheduleTime(t *testing.T) {
 		t.Errorf("test setup error: %v", err)
 	}
 
-	cj := batchv1beta1.CronJob{
+	cj := batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
 			Namespace: metav1.NamespaceDefault,
 			UID:       types.UID("1a2b3c"),
 		},
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule:          schedule,
-			ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
-			JobTemplate:       batchv1beta1.JobTemplateSpec{},
+			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			JobTemplate:       batchv1.JobTemplateSpec{},
 		},
 	}
 	{
@@ -442,16 +441,16 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		t.Errorf("test setup error: %v", err)
 	}
 
-	cj := batchv1beta1.CronJob{
+	cj := batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
 			Namespace: metav1.NamespaceDefault,
 			UID:       types.UID("1a2b3c"),
 		},
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule:          schedule,
-			ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
-			JobTemplate:       batchv1beta1.JobTemplateSpec{},
+			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			JobTemplate:       batchv1.JobTemplateSpec{},
 		},
 	}
 	{

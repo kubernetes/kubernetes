@@ -44,12 +44,12 @@ func startJobController(ctx ControllerContext) (http.Handler, bool, error) {
 }
 
 func startCronJobController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}] {
+	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "cronjobs"}] {
 		return nil, false, nil
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CronJobControllerV2) {
 		cj2c, err := cronjob.NewControllerV2(ctx.InformerFactory.Batch().V1().Jobs(),
-			ctx.InformerFactory.Batch().V1beta1().CronJobs(),
+			ctx.InformerFactory.Batch().V1().CronJobs(),
 			ctx.ClientBuilder.ClientOrDie("cronjob-controller"),
 		)
 		if err != nil {
