@@ -34,12 +34,13 @@ const (
 	unknownCompletionIndex = -1
 )
 
-// calculateCompletedIndexesStr returns a string representation of the list
-// of completed indexes in compressed format.
-func calculateCompletedIndexesStr(pods []*v1.Pod) string {
+// calculateSucceededIndexes returns a string representation of the list of
+// succeeded indexes in compressed format and the number of succeeded indexes.
+func calculateSucceededIndexes(pods []*v1.Pod) (string, int32) {
 	sort.Sort(byCompletionIndex(pods))
 	var result strings.Builder
 	var lastSucceeded int
+	var count int32
 	firstSucceeded := math.MinInt32
 	for _, p := range pods {
 		ix := getCompletionIndex(p.Annotations)
@@ -51,6 +52,7 @@ func calculateCompletedIndexesStr(pods []*v1.Pod) string {
 				firstSucceeded = ix
 			} else if ix > lastSucceeded+1 {
 				addSingleOrRangeStr(&result, firstSucceeded, lastSucceeded)
+				count += int32(lastSucceeded - firstSucceeded + 1)
 				firstSucceeded = ix
 			}
 			lastSucceeded = ix
@@ -58,8 +60,9 @@ func calculateCompletedIndexesStr(pods []*v1.Pod) string {
 	}
 	if firstSucceeded != math.MinInt32 {
 		addSingleOrRangeStr(&result, firstSucceeded, lastSucceeded)
+		count += int32(lastSucceeded - firstSucceeded + 1)
 	}
-	return result.String()
+	return result.String(), count
 }
 
 func addSingleOrRangeStr(builder *strings.Builder, first, last int) {
