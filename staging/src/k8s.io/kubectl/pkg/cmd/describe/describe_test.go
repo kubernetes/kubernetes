@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -321,6 +322,13 @@ func TestDescribeNoResourcesFound(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCompletionDescribeOneArg(t *testing.T) {
+	tf, streams := cmdtesting.PreparePodsForCompletion(t)
+	cmd := NewCmdDescribe("kubectl", tf, streams)
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{"pods"}, "b")
+	cmdtesting.CheckCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
 type testDescriber struct {

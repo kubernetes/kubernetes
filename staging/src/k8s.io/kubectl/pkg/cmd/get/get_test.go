@@ -29,6 +29,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -2731,6 +2732,13 @@ foo    0/0              0          <unknown>
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
+}
+
+func TestCompletionGetOneArg(t *testing.T) {
+	tf, streams := cmdtesting.PreparePodsForCompletion(t)
+	cmd := NewCmdGet("kubectl", tf, streams)
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{"pods"}, "b")
+	cmdtesting.CheckCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
 func watchBody(codec runtime.Codec, events []watch.Event) io.ReadCloser {

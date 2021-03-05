@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/spf13/cobra"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -70,6 +71,20 @@ func TestRolloutPause(t *testing.T) {
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}
+}
+
+func TestCompletionRolloutPauseNoArg(t *testing.T) {
+	tf, streams := cmdtesting.PreparePodsForCompletion(t)
+	cmd := NewCmdRolloutPause(tf, streams)
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "")
+	cmdtesting.CheckCompletion(t, comps, []string{"deployment"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestCompletionRolloutPauseOneArg(t *testing.T) {
+	tf, streams := cmdtesting.PreparePodsForCompletion(t)
+	cmd := NewCmdRolloutPause(tf, streams)
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{"pods"}, "b")
+	cmdtesting.CheckCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
 type RolloutPauseRESTClient struct {

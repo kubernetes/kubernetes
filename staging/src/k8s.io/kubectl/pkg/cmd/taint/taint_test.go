@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -386,6 +387,20 @@ func TestValidateFlags(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestCompletionTaintNoArg(t *testing.T) {
+	tf, streams := cmdtesting.PreparePodsForCompletion(t)
+	cmd := NewCmdTaint(tf, streams)
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "")
+	cmdtesting.CheckCompletion(t, comps, []string{"node"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestCompletionTaintOneArg(t *testing.T) {
+	tf, streams := cmdtesting.PreparePodsForCompletion(t)
+	cmd := NewCmdTaint(tf, streams)
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{"pods"}, "b")
+	cmdtesting.CheckCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
 type MyReq struct {

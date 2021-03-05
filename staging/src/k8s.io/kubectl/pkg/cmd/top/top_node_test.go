@@ -25,6 +25,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -423,4 +424,11 @@ func TestTopNodeWithSortByMemoryMetricsFrom(t *testing.T) {
 		t.Errorf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", expectedNodesNames, resultNodes)
 	}
 
+}
+
+func TestCompletionTopNodeNoArg(t *testing.T) {
+	tf, streams := cmdtesting.PrepareNodesForCompletion(t)
+	cmd := NewCmdTopNode(tf, nil, streams)
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "f")
+	cmdtesting.CheckCompletion(t, comps, []string{"firstnode"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }

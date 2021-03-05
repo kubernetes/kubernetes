@@ -24,8 +24,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 type deleteClusterTest struct {
@@ -94,4 +96,19 @@ func (test deleteClusterTest) run(t *testing.T) {
 	if !reflect.DeepEqual(test.expectedClusters, clusters) {
 		t.Errorf("expected clusters %v, but found %v in kubeconfig", test.expectedClusters, clusters)
 	}
+}
+
+func TestCompletionDeleteClusterNoArg(t *testing.T) {
+	// FIXME
+	t.Skip("Should not be skipeed")
+
+	pathOptions, streams, factory := cmdtesting.PrepareConfigForCompletion(t)
+	configCmd := NewCmdConfig(factory, pathOptions, streams)
+	cmd, _, err := configCmd.Find([]string{"delete-cluster"})
+	if err != nil {
+		t.Fatalf("unexpected error finding delete-cluster command: %v", err)
+	}
+
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "my")
+	cmdtesting.CheckCompletion(t, comps, []string{"my-cluster"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
