@@ -1650,7 +1650,6 @@ func podRunning(ctx context.Context, c clientset.Interface, podName, namespace s
 }
 
 const (
-	podStartTimeout                = 5 * time.Minute
 	poll                           = 2 * time.Second
 	pvcAsSourceProtectionFinalizer = "snapshot.storage.kubernetes.io/pvc-as-source-protection"
 	volumeSnapshotContentFinalizer = "snapshot.storage.kubernetes.io/volumesnapshotcontent-bound-protection"
