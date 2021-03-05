@@ -116,4 +116,9 @@ const (
 	//
 	// This annotation is alpha-level and is only honored when PodDeletionCost feature is enabled.
 	PodDeletionCost = "controller.kubernetes.io/pod-deletion-cost"
+
+	// AnnotationTopologyAwareHints can be used to enable or disable Topology
+	// Aware Hints for a Service. This may be set to "auto" or "disabled". Any
+	// other value is treated as "disabled".
+	AnnotationTopologyAwareHints = "service.kubernetes.io/topology-aware-hints"
 )

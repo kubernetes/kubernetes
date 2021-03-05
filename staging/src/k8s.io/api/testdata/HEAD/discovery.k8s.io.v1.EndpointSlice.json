@@ -65,15 +65,22 @@
         "27": "28"
       },
       "nodeName": "29",
-      "zone": "30"
+      "zone": "30",
+      "hints": {
+        "forZones": [
+          {
+            "name": "31"
+          }
+        ]
+      }
     }
   ],
   "ports": [
     {
-      "name": "31",
-      "protocol": "脽ěĂ凗蓏Ŋ蛊ĉy緅縕",
+      "name": "32",
+      "protocol": "ěĂ凗蓏Ŋ蛊ĉy緅縕",
       "port": -591435092,
-      "appProtocol": "32"
+      "appProtocol": "33"
     }
   ]
 }

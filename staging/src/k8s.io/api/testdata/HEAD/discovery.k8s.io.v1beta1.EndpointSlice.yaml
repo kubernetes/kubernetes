@@ -7,6 +7,9 @@ endpoints:
     ready: false
     serving: false
     terminating: false
+  hints:
+    forZones:
+    - name: "30"
   hostname: "20"
   nodeName: "29"
   targetRef:
@@ -50,7 +53,7 @@ metadata:
   selfLink: "5"
   uid: "7"
 ports:
-- appProtocol: "31"
-  name: "30"
+- appProtocol: "32"
+  name: "31"
   port: -591435092
-  protocol: 脽ěĂ凗蓏Ŋ蛊ĉy緅縕
+  protocol: ěĂ凗蓏Ŋ蛊ĉy緅縕

@@ -777,20 +777,28 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsdiscoveryv1.EndpointApplyConfiguration{}
 	case discoveryv1.SchemeGroupVersion.WithKind("EndpointConditions"):
 		return &applyconfigurationsdiscoveryv1.EndpointConditionsApplyConfiguration{}
+	case discoveryv1.SchemeGroupVersion.WithKind("EndpointHints"):
+		return &applyconfigurationsdiscoveryv1.EndpointHintsApplyConfiguration{}
 	case discoveryv1.SchemeGroupVersion.WithKind("EndpointPort"):
 		return &applyconfigurationsdiscoveryv1.EndpointPortApplyConfiguration{}
 	case discoveryv1.SchemeGroupVersion.WithKind("EndpointSlice"):
 		return &applyconfigurationsdiscoveryv1.EndpointSliceApplyConfiguration{}
+	case discoveryv1.SchemeGroupVersion.WithKind("ForZone"):
+		return &applyconfigurationsdiscoveryv1.ForZoneApplyConfiguration{}
 
 		// Group=discovery.k8s.io, Version=v1beta1
 	case discoveryv1beta1.SchemeGroupVersion.WithKind("Endpoint"):
 		return &applyconfigurationsdiscoveryv1beta1.EndpointApplyConfiguration{}
 	case discoveryv1beta1.SchemeGroupVersion.WithKind("EndpointConditions"):
 		return &applyconfigurationsdiscoveryv1beta1.EndpointConditionsApplyConfiguration{}
+	case discoveryv1beta1.SchemeGroupVersion.WithKind("EndpointHints"):
+		return &applyconfigurationsdiscoveryv1beta1.EndpointHintsApplyConfiguration{}
 	case discoveryv1beta1.SchemeGroupVersion.WithKind("EndpointPort"):
 		return &applyconfigurationsdiscoveryv1beta1.EndpointPortApplyConfiguration{}
 	case discoveryv1beta1.SchemeGroupVersion.WithKind("EndpointSlice"):
 		return &applyconfigurationsdiscoveryv1beta1.EndpointSliceApplyConfiguration{}
+	case discoveryv1beta1.SchemeGroupVersion.WithKind("ForZone"):
+		return &applyconfigurationsdiscoveryv1beta1.ForZoneApplyConfiguration{}
 
 		// Group=events.k8s.io, Version=v1
 	case eventsv1.SchemeGroupVersion.WithKind("Event"):

@@ -35,6 +35,7 @@ func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 	testcases := []struct {
 		name                   string
 		terminatingGateEnabled bool
+		hintsGateEnabled       bool
 		eps                    *discovery.EndpointSlice
 		expectedEPS            *discovery.EndpointSlice
 	}{
@@ -162,6 +163,7 @@ func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTerminatingCondition, testcase.terminatingGateEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, testcase.hintsGateEnabled)()
 
 			dropDisabledFieldsOnCreate(testcase.eps)
 			if !apiequality.Semantic.DeepEqual(testcase.eps, testcase.expectedEPS) {
@@ -177,6 +179,7 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 	testcases := []struct {
 		name                   string
 		terminatingGateEnabled bool
+		hintsGateEnabled       bool
 		oldEPS                 *discovery.EndpointSlice
 		newEPS                 *discovery.EndpointSlice
 		expectedEPS            *discovery.EndpointSlice
@@ -524,11 +527,138 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:             "hints gate enabled, set on new EPS",
+			hintsGateEnabled: true,
+			oldEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: nil,
+					},
+					{
+						Hints: nil,
+					},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-b"}},
+						},
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-b"}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:             "hints gate disabled, set on new EPS",
+			hintsGateEnabled: false,
+			oldEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: nil,
+					},
+					{
+						Hints: nil,
+					},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-b"}},
+						},
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: nil,
+					},
+					{
+						Hints: nil,
+					},
+				},
+			},
+		},
+		{
+			name:             "hints gate disabled, set on new and old EPS",
+			hintsGateEnabled: false,
+			oldEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a-old"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-b-old"}},
+						},
+					},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-b"}},
+						},
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-b"}},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTerminatingCondition, testcase.terminatingGateEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, testcase.hintsGateEnabled)()
 
 			dropDisabledFieldsOnUpdate(testcase.oldEPS, testcase.newEPS)
 			if !apiequality.Semantic.DeepEqual(testcase.newEPS, testcase.expectedEPS) {

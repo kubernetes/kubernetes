@@ -32,6 +32,7 @@ type EndpointApplyConfiguration struct {
 	DeprecatedTopology map[string]string                         `json:"deprecatedTopology,omitempty"`
 	NodeName           *string                                   `json:"nodeName,omitempty"`
 	Zone               *string                                   `json:"zone,omitempty"`
+	Hints              *EndpointHintsApplyConfiguration          `json:"hints,omitempty"`
 }
 
 // EndpointApplyConfiguration constructs an declarative configuration of the Endpoint type for use with
@@ -101,5 +102,13 @@ func (b *EndpointApplyConfiguration) WithNodeName(value string) *EndpointApplyCo
 // If called multiple times, the Zone field is set to the value of the last call.
 func (b *EndpointApplyConfiguration) WithZone(value string) *EndpointApplyConfiguration {
 	b.Zone = &value
+	return b
+}
+
+// WithHints sets the Hints field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Hints field is set to the value of the last call.
+func (b *EndpointApplyConfiguration) WithHints(value *EndpointHintsApplyConfiguration) *EndpointApplyConfiguration {
+	b.Hints = value
 	return b
 }

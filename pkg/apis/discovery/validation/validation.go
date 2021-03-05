@@ -45,6 +45,7 @@ var (
 	maxAddresses      = 100
 	maxPorts          = 20000
 	maxEndpoints      = 1000
+	maxZoneHints      = 8
 )
 
 // ValidateEndpointSliceName can be used to check whether the given endpoint
@@ -125,6 +126,10 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 		if endpoint.Hostname != nil {
 			allErrs = append(allErrs, apivalidation.ValidateDNS1123Label(*endpoint.Hostname, idxPath.Child("hostname"))...)
 		}
+
+		if endpoint.Hints != nil {
+			allErrs = append(allErrs, validateHints(endpoint.Hints, idxPath.Child("hints"))...)
+		}
 	}
 
 	return allErrs
@@ -175,6 +180,32 @@ func validateAddressType(addressType discovery.AddressType) field.ErrorList {
 		allErrs = append(allErrs, field.Required(field.NewPath("addressType"), ""))
 	} else if !supportedAddressTypes.Has(string(addressType)) {
 		allErrs = append(allErrs, field.NotSupported(field.NewPath("addressType"), addressType, supportedAddressTypes.List()))
+	}
+
+	return allErrs
+}
+
+func validateHints(endpointHints *discovery.EndpointHints, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	fzPath := fldPath.Child("forZones")
+	if len(endpointHints.ForZones) > maxZoneHints {
+		allErrs = append(allErrs, field.TooMany(fzPath, len(endpointHints.ForZones), maxZoneHints))
+		return allErrs
+	}
+
+	zoneNames := sets.String{}
+	for i, forZone := range endpointHints.ForZones {
+		zonePath := fzPath.Index(i).Child("name")
+		if zoneNames.Has(forZone.Name) {
+			allErrs = append(allErrs, field.Duplicate(zonePath, forZone.Name))
+		} else {
+			zoneNames.Insert(forZone.Name)
+		}
+
+		for _, msg := range validation.IsValidLabelValue(forZone.Name) {
+			allErrs = append(allErrs, field.Invalid(zonePath, forZone.Name, msg))
+		}
 	}
 
 	return allErrs

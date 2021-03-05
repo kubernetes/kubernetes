@@ -9,6 +9,9 @@ endpoints:
     terminating: false
   deprecatedTopology:
     "27": "28"
+  hints:
+    forZones:
+    - name: "31"
   hostname: "20"
   nodeName: "29"
   targetRef:
@@ -51,7 +54,7 @@ metadata:
   selfLink: "5"
   uid: "7"
 ports:
-- appProtocol: "32"
-  name: "31"
+- appProtocol: "33"
+  name: "32"
   port: -591435092
-  protocol: 脽ěĂ凗蓏Ŋ蛊ĉy緅縕
+  protocol: ěĂ凗蓏Ŋ蛊ĉy緅縕
