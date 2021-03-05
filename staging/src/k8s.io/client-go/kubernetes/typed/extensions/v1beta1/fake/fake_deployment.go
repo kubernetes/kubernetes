@@ -210,3 +210,22 @@ func (c *FakeDeployments) UpdateScale(ctx context.Context, deploymentName string
 	}
 	return obj.(*v1beta1.Scale), err
 }
+
+// ApplyScale takes top resource name and the apply declarative configuration for scale,
+// applies it and returns the applied scale, and an error, if there is any.
+func (c *FakeDeployments) ApplyScale(ctx context.Context, deploymentName string, scale *extensionsv1beta1.ScaleApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Scale, err error) {
+	if scale == nil {
+		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
+	}
+	data, err := json.Marshal(scale)
+	if err != nil {
+		return nil, err
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, deploymentName, types.ApplyPatchType, data, "status"), &v1beta1.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.Scale), err
+}

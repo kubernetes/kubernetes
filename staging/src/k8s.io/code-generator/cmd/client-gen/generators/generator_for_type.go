@@ -174,7 +174,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	if generateApply {
 		// Generated apply configuration type references required for generated Apply function
 		_, gvString := util.ParsePathGroupVersion(g.inputPackage)
-		m["applyConfig"] = types.Ref(path.Join(g.applyConfigurationPackage, gvString), t.Name.Name+"ApplyConfiguration")
+		m["inputApplyConfig"] = types.Ref(path.Join(g.applyConfigurationPackage, gvString), t.Name.Name+"ApplyConfiguration")
 	}
 
 	sw.Do(getterComment, m)
@@ -385,8 +385,8 @@ func buildDefaultVerbTemplates(generateApply bool) map[string]string {
 		"patch":            `Patch(ctx context.Context, name string, pt $.PatchType|raw$, data []byte, opts $.PatchOptions|raw$, subresources ...string) (result *$.resultType|raw$, err error)`,
 	}
 	if generateApply {
-		m["apply"] = `Apply(ctx context.Context, $.inputType|private$ *$.applyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error)`
-		m["applyStatus"] = `ApplyStatus(ctx context.Context, $.inputType|private$ *$.applyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error)`
+		m["apply"] = `Apply(ctx context.Context, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error)`
+		m["applyStatus"] = `ApplyStatus(ctx context.Context, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error)`
 	}
 	return m
 }
@@ -674,7 +674,7 @@ func (c *$.type|privatePlural$) Patch(ctx context.Context, name string, pt $.Pat
 
 var applyTemplate = `
 // Apply takes the given apply declarative configuration, applies it and returns the applied $.resultType|private$.
-func (c *$.type|privatePlural$) Apply(ctx context.Context, $.inputType|private$ *$.applyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
+func (c *$.type|privatePlural$) Apply(ctx context.Context, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
 	if $.inputType|private$ == nil {
 		return nil, fmt.Errorf("$.inputType|private$ provided to Apply must not be nil")
 	}
@@ -703,7 +703,7 @@ func (c *$.type|privatePlural$) Apply(ctx context.Context, $.inputType|private$ 
 var applyStatusTemplate = `
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *$.type|privatePlural$) ApplyStatus(ctx context.Context, $.inputType|private$ *$.applyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
+func (c *$.type|privatePlural$) ApplyStatus(ctx context.Context, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
 	if $.inputType|private$ == nil {
 		return nil, fmt.Errorf("$.inputType|private$ provided to Apply must not be nil")
 	}
