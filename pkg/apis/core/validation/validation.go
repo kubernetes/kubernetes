@@ -5656,11 +5656,6 @@ func ValidateNamespace(namespace *core.Namespace) field.ErrorList {
 	for i := range namespace.Spec.Finalizers {
 		allErrs = append(allErrs, validateFinalizerName(string(namespace.Spec.Finalizers[i]), field.NewPath("spec", "finalizers"))...)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
-		if len(namespace.Name) > 0 && namespace.Labels[v1.LabelMetadataName] != namespace.Name {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "labels").Key(v1.LabelMetadataName), namespace.Labels[v1.LabelMetadataName], fmt.Sprintf("must be %s", namespace.Name)))
-		}
-	}
 	return allErrs
 }
 
@@ -5687,6 +5682,11 @@ func validateKubeFinalizerName(stringValue string, fldPath *field.Path) field.Er
 // newNamespace is updated with fields that cannot be changed
 func ValidateNamespaceUpdate(newNamespace *core.Namespace, oldNamespace *core.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta, field.NewPath("metadata"))
+	if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
+		if len(newNamespace.Name) > 0 && newNamespace.Labels[v1.LabelMetadataName] != newNamespace.Name {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "labels").Key(v1.LabelMetadataName), newNamespace.Labels[v1.LabelMetadataName], fmt.Sprintf("must be %s", newNamespace.Name)))
+		}
+	}
 	newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
 	newNamespace.Status = oldNamespace.Status
 	return allErrs

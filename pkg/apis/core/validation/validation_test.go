@@ -14617,13 +14617,14 @@ func TestValidateResourceQuota(t *testing.T) {
 }
 
 func TestValidateNamespace(t *testing.T) {
+	validLabels := map[string]string{"a": "b"}
 	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	successCases := []core.Namespace{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Labels: map[string]string{"a": "b", v1.LabelMetadataName: "abc"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Labels: validLabels},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Labels: map[string]string{v1.LabelMetadataName: "abc-123"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123"},
 			Spec: core.NamespaceSpec{
 				Finalizers: []core.FinalizerName{"example.com/something", "example.com/other"},
 			},
@@ -14656,42 +14657,6 @@ func TestValidateNamespace(t *testing.T) {
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
-	}
-	labelsTestCases := map[string]struct {
-		ns          *core.Namespace
-		expectError bool
-	}{
-		"Valid: namespace name label exists": {
-			ns: &core.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-xyz", Labels: map[string]string{"kubernetes.io/metadata.name": "abc-xyz"}},
-			},
-			expectError: false,
-		},
-		/* Removing this, validation should probably just check if the label exists and is different from the expected
-		"Invalid: namespace name label does not exist": {
-			ns: &core.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-xyz"},
-			},
-			expectError: true,
-		},*/
-		"Invalid: incorrect namespace name label exists": {
-			ns: &core.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-xyz", Labels: map[string]string{"kubernetes.io/metadata.name": "i-be-wrong"}},
-			},
-			expectError: true,
-		},
-	}
-	for tcName, tc := range labelsTestCases {
-		t.Run(tcName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NamespaceDefaultLabelName, true)()
-			errs := ValidateNamespace(tc.ns)
-			if tc.expectError && len(errs) == 0 {
-				t.Errorf("Unexpected success")
-			}
-			if !tc.expectError && len(errs) != 0 {
-				t.Errorf("Unexpected error(s): %v", errs)
-			}
-		})
 	}
 }
 
@@ -14850,7 +14815,7 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 		}, core.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo2",
-				Labels: map[string]string{"foo": "baz"},
+				Labels: map[string]string{"foo": "baz", v1.LabelMetadataName: "foo2"},
 			},
 		}, true},
 		{core.Namespace{
@@ -14860,7 +14825,7 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 		}, core.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo3",
-				Labels: map[string]string{"foo": "baz"},
+				Labels: map[string]string{"foo": "baz", v1.LabelMetadataName: "foo3"},
 			},
 		}, true},
 		{core.Namespace{
@@ -14871,7 +14836,7 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 		}, core.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo4",
-				Labels: map[string]string{"foo": "baz"},
+				Labels: map[string]string{"foo": "baz", v1.LabelMetadataName: "foo4"},
 			},
 		}, true},
 		{core.Namespace{
@@ -14882,7 +14847,7 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 		}, core.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo5",
-				Labels: map[string]string{"Foo": "baz"},
+				Labels: map[string]string{"Foo": "baz", v1.LabelMetadataName: "foo5"},
 			},
 		}, true},
 		{core.Namespace{
@@ -14893,7 +14858,7 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 		}, core.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo6",
-				Labels: map[string]string{"Foo": "baz"},
+				Labels: map[string]string{"Foo": "baz", v1.LabelMetadataName: "foo6"},
 			},
 			Spec: core.NamespaceSpec{
 				Finalizers: []core.FinalizerName{"kubernetes"},
@@ -14902,7 +14867,44 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 				Phase: core.NamespaceTerminating,
 			},
 		}, true},
+		// The below tests validates the existence of v1.LabelMetadataName
+		{core.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "youshallnotremovelabel",
+				Labels: map[string]string{"foo": "baz", v1.LabelMetadataName: "youshallnotremovelabel"},
+			},
+		}, core.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "youshallnotremovelabel",
+				Labels: map[string]string{"Foo": "baz"},
+			},
+		}, false},
+		{core.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "youshallnotchangelabel",
+				Labels: map[string]string{"foo": "baz", v1.LabelMetadataName: "youshallnotchangelabel"},
+			},
+		}, core.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "youshallnotremovelabel",
+				Labels: map[string]string{"Foo": "baz", v1.LabelMetadataName: "youshallnotchangelabel"},
+			},
+		}, false},
+		{core.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "youshalladdrequiredlabel",
+				Labels: map[string]string{"foo": "baz"},
+			},
+		}, core.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "youshalladdrequiredlabel",
+				Labels: map[string]string{"Foo": "baz"},
+			},
+		}, false},
 	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NamespaceDefaultLabelName, true)()
+
 	for i, test := range tests {
 		test.namespace.ObjectMeta.ResourceVersion = "1"
 		test.oldNamespace.ObjectMeta.ResourceVersion = "1"
