@@ -118,6 +118,10 @@ func (e *resourceExpirationEvaluator) shouldServe(gv schema.GroupVersion, versio
 }
 
 func (e *resourceExpirationEvaluator) ShouldServeForVersion(majorRemoved, minorRemoved int) bool {
+	// TODO remove sometime after 1.22 hits beta.  This allows us to latch all progress and stop serving while we're still alpha
+	if e.currentMinor == 22 && minorRemoved == 22 {
+		return false
+	}
 	if e.currentMajor < majorRemoved {
 		return true
 	}
