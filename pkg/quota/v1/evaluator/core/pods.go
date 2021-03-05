@@ -354,6 +354,10 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 		limits = quota.Max(limits, pod.Spec.InitContainers[i].Resources.Limits)
 	}
 
+	if feature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		requests = quota.Add(requests, pod.Spec.Overhead)
+		limits = quota.Add(limits, pod.Spec.Overhead)
+	}
 	result = quota.Add(result, podComputeUsageHelper(requests, limits))
 	return result, nil
 }

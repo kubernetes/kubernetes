@@ -95,8 +95,9 @@ func TestPodEvaluatorUsage(t *testing.T) {
 	deletionTimestampNotPastGracePeriod := metav1.NewTime(fakeClock.Now())
 
 	testCases := map[string]struct {
-		pod   *api.Pod
-		usage corev1.ResourceList
+		pod                *api.Pod
+		usage              corev1.ResourceList
+		podOverheadEnabled bool
 	}{
 		"init container CPU": {
 			pod: &api.Pod{
@@ -438,9 +439,68 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
+		"count pod overhead as usage": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Overhead: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("1"),
+					},
+					Containers: []api.Container{
+						{
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("1"),
+								},
+								Limits: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("2"),
+				corev1.ResourceLimitsCPU:   resource.MustParse("3"),
+				corev1.ResourcePods:        resource.MustParse("1"),
+				corev1.ResourceCPU:         resource.MustParse("2"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+			podOverheadEnabled: true,
+		},
+		"do not count pod overhead as usage with pod overhead disabled": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Overhead: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("1"),
+					},
+					Containers: []api.Container{
+						{
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("1"),
+								},
+								Limits: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("1"),
+				corev1.ResourceLimitsCPU:   resource.MustParse("2"),
+				corev1.ResourcePods:        resource.MustParse("1"),
+				corev1.ResourceCPU:         resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+			podOverheadEnabled: false,
+		},
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodOverhead, testCase.podOverheadEnabled)()
 			actual, err := evaluator.Usage(testCase.pod)
 			if err != nil {
 				t.Error(err)
