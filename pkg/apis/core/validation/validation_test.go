@@ -11295,6 +11295,30 @@ func TestValidateServiceCreate(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		{
+			name: "valid LoadBalancerClass when type is LoadBalancer",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid LoadBalancerClass",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.LoadBalancerClass = utilpointer.StringPtr("Bad/LoadBalancerClass")
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid: set LoadBalancerClass when type is not LoadBalancer",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Type = core.ServiceTypeClusterIP
+				s.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -13671,6 +13695,143 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 1,
+		},
+		{
+			name: "update LoadBalancer type of service without change LoadBalancerClass",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-old")
+
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-old")
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid: change LoadBalancerClass when update service",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-old")
+
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-new")
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid: unset LoadBalancerClass when update service",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-old")
+
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.LoadBalancerClass = nil
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid: set LoadBalancerClass when update service",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.LoadBalancerClass = nil
+
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-new")
+			},
+			numErrs: 1,
+		},
+		{
+			name: "update to LoadBalancer type of service with valid LoadBalancerClass",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
+			},
+			numErrs: 0,
+		},
+		{
+			name: "update to LoadBalancer type of service without LoadBalancerClass",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.LoadBalancerClass = nil
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid: set invalid LoadBalancerClass when update service to LoadBalancer",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("Bad/LoadBalancerclass")
+			},
+			numErrs: 2,
+		},
+		{
+			name: "invalid: set LoadBalancerClass when update service to non LoadBalancer type of service",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
+			},
+			numErrs: 2,
+		},
+		{
+			name: "invalid: set LoadBalancerClass when update service to non LoadBalancer type of service",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeExternalName
+
+				newSvc.Spec.Type = core.ServiceTypeExternalName
+				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
+			},
+			numErrs: 3,
+		},
+		{
+			name: "invalid: set LoadBalancerClass when update service to non LoadBalancer type of service",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeNodePort
+
+				newSvc.Spec.Type = core.ServiceTypeNodePort
+				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
+			},
+			numErrs: 2,
+		},
+		{
+			name: "invalid: set LoadBalancerClass when update from LoadBalancer service to non LoadBalancer type of service",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
+			},
+			numErrs: 2,
+		},
+		{
+			name: "invalid: set LoadBalancerClass when update from LoadBalancer service to non LoadBalancer type of service",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
+
+				newSvc.Spec.Type = core.ServiceTypeExternalName
+				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
+			},
+			numErrs: 3,
+		},
+		{
+			name: "invalid: set LoadBalancerClass when update from LoadBalancer service to non LoadBalancer type of service",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
+
+				newSvc.Spec.Type = core.ServiceTypeNodePort
+				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
+			},
+			numErrs: 2,
 		},
 	}
 

@@ -122,6 +122,15 @@ func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidateQualifiedName validates if name is what Kubernetes calls a "qualified name".
+func ValidateQualifiedName(value string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range validation.IsQualifiedName(value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+	}
+	return allErrs
+}
+
 // ValidateDNS1123Subdomain validates that a name is a proper DNS subdomain.
 func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -4362,6 +4371,9 @@ func ValidateService(service *core.Service) field.ErrorList {
 		}
 	}
 
+	// validate LoadBalancerClass field
+	allErrs = append(allErrs, validateLoadBalancerClassField(nil, service)...)
+
 	// external traffic fields
 	allErrs = append(allErrs, validateServiceExternalTrafficFieldsValue(service)...)
 	return allErrs
@@ -4474,6 +4486,9 @@ func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 
 	upgradeDowngradeIPFamiliesErrs := validateUpgradeDowngradeIPFamilies(oldService, service)
 	allErrs = append(allErrs, upgradeDowngradeIPFamiliesErrs...)
+
+	upgradeDowngradeLoadBalancerClassErrs := validateLoadBalancerClassField(oldService, service)
+	allErrs = append(allErrs, upgradeDowngradeLoadBalancerClassErrs...)
 
 	return append(allErrs, ValidateService(service)...)
 }
@@ -6345,4 +6360,48 @@ func isHeadlessService(service *core.Service) bool {
 	return service != nil &&
 		len(service.Spec.ClusterIPs) == 1 &&
 		service.Spec.ClusterIPs[0] == core.ClusterIPNone
+}
+
+// validateLoadBalancerClassField validation for loadBalancerClass
+func validateLoadBalancerClassField(oldService, service *core.Service) field.ErrorList {
+	allErrs := make(field.ErrorList, 0)
+	if oldService != nil {
+		// validate update op
+		if isTypeLoadBalancer(oldService) && isTypeLoadBalancer(service) {
+			// old and new are both LoadBalancer
+			if !sameLoadBalancerClass(oldService, service) {
+				// can't change loadBalancerClass
+				allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "loadBalancerClass"), service.Spec.LoadBalancerClass, "may not change once set"))
+			}
+		}
+	}
+
+	if isTypeLoadBalancer(service) {
+		// check LoadBalancerClass format
+		if service.Spec.LoadBalancerClass != nil {
+			allErrs = append(allErrs, ValidateQualifiedName(*service.Spec.LoadBalancerClass, field.NewPath("spec", "loadBalancerClass"))...)
+		}
+	} else {
+		// check if LoadBalancerClass set for non LoadBalancer type of service
+		if service.Spec.LoadBalancerClass != nil {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "loadBalancerClass"), "may only be used when `type` is 'LoadBalancer'"))
+		}
+	}
+	return allErrs
+}
+
+// isTypeLoadBalancer tests service type is loadBalancer or not
+func isTypeLoadBalancer(service *core.Service) bool {
+	return service.Spec.Type == core.ServiceTypeLoadBalancer
+}
+
+// sameLoadBalancerClass check two services have the same loadBalancerClass or not
+func sameLoadBalancerClass(oldService, service *core.Service) bool {
+	if oldService.Spec.LoadBalancerClass == nil && service.Spec.LoadBalancerClass == nil {
+		return true
+	}
+	if oldService.Spec.LoadBalancerClass == nil || service.Spec.LoadBalancerClass == nil {
+		return false
+	}
+	return *oldService.Spec.LoadBalancerClass == *service.Spec.LoadBalancerClass
 }

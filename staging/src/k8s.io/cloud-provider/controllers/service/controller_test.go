@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 const region = "us-central"
@@ -216,6 +217,44 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 						Protocol: v1.ProtocolSCTP,
 					}},
 					Type: v1.ServiceTypeLoadBalancer,
+				},
+			},
+			expectOp:             ensureLoadBalancer,
+			expectCreateAttempt:  true,
+			expectPatchStatus:    true,
+			expectPatchFinalizer: true,
+		},
+		{
+			desc: "service specifies loadBalancerClass",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "with-external-balancer",
+					Namespace: "default",
+				},
+				Spec: v1.ServiceSpec{
+					Type:              v1.ServiceTypeLoadBalancer,
+					LoadBalancerClass: utilpointer.StringPtr("custom-loadbalancer"),
+				},
+			},
+			expectOp:             deleteLoadBalancer,
+			expectCreateAttempt:  false,
+			expectPatchStatus:    false,
+			expectPatchFinalizer: false,
+		},
+		{
+			desc: "service doesn't specify loadBalancerClass",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "with-external-balancer",
+					Namespace: "default",
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Port:     80,
+						Protocol: v1.ProtocolSCTP,
+					}},
+					Type:              v1.ServiceTypeLoadBalancer,
+					LoadBalancerClass: nil,
 				},
 			},
 			expectOp:             ensureLoadBalancer,

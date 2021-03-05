@@ -43,6 +43,7 @@ type ServiceSpecApplyConfiguration struct {
 	IPFamilies                    []corev1.IPFamily                        `json:"ipFamilies,omitempty"`
 	IPFamilyPolicy                *corev1.IPFamilyPolicyType               `json:"ipFamilyPolicy,omitempty"`
 	AllocateLoadBalancerNodePorts *bool                                    `json:"allocateLoadBalancerNodePorts,omitempty"`
+	LoadBalancerClass             *string                                  `json:"loadBalancerClass,omitempty"`
 }
 
 // ServiceSpecApplyConfiguration constructs an declarative configuration of the ServiceSpec type for use with
@@ -213,5 +214,13 @@ func (b *ServiceSpecApplyConfiguration) WithIPFamilyPolicy(value corev1.IPFamily
 // If called multiple times, the AllocateLoadBalancerNodePorts field is set to the value of the last call.
 func (b *ServiceSpecApplyConfiguration) WithAllocateLoadBalancerNodePorts(value bool) *ServiceSpecApplyConfiguration {
 	b.AllocateLoadBalancerNodePorts = &value
+	return b
+}
+
+// WithLoadBalancerClass sets the LoadBalancerClass field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LoadBalancerClass field is set to the value of the last call.
+func (b *ServiceSpecApplyConfiguration) WithLoadBalancerClass(value string) *ServiceSpecApplyConfiguration {
+	b.LoadBalancerClass = &value
 	return b
 }

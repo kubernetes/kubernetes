@@ -249,18 +249,27 @@ func makeServiceWithPorts(ports []api.PortStatus) *api.Service {
 	}
 }
 
+func makeServiceWithLoadBalancerClass(loadBalancerClass *string) *api.Service {
+	return &api.Service{
+		Spec: api.ServiceSpec{
+			LoadBalancerClass: loadBalancerClass,
+		},
+	}
+}
+
 func TestDropDisabledField(t *testing.T) {
 	requireDualStack := api.IPFamilyPolicyRequireDualStack
 	preferDualStack := api.IPFamilyPolicyPreferDualStack
 	singleStack := api.IPFamilyPolicySingleStack
 
 	testCases := []struct {
-		name                string
-		enableDualStack     bool
-		enableMixedProtocol bool
-		svc                 *api.Service
-		oldSvc              *api.Service
-		compareSvc          *api.Service
+		name                    string
+		enableDualStack         bool
+		enableMixedProtocol     bool
+		enableLoadBalancerClass bool
+		svc                     *api.Service
+		oldSvc                  *api.Service
+		compareSvc              *api.Service
 	}{
 		{
 			name:            "not dual stack, field not used",
@@ -434,12 +443,70 @@ func TestDropDisabledField(t *testing.T) {
 			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
 			compareSvc:          makeServiceWithPorts(nil),
 		},
+		/* svc.Spec.LoadBalancerClass */
+		{
+			name:                    "loadBalancerClass not enabled, field not used in old, not used in new",
+			enableLoadBalancerClass: false,
+			svc:                     makeServiceWithLoadBalancerClass(nil),
+			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
+			compareSvc:              makeServiceWithLoadBalancerClass(nil),
+		},
+		{
+			name:                    "loadBalancerClass not enabled, field used in old and in new",
+			enableLoadBalancerClass: false,
+			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+		},
+		{
+			name:                    "loadBalancerClass not enabled, field not used in old, used in new",
+			enableLoadBalancerClass: false,
+			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
+			compareSvc:              makeServiceWithLoadBalancerClass(nil),
+		},
+		{
+			name:                    "loadBalancerClass not enabled, field used in old, not used in new",
+			enableLoadBalancerClass: false,
+			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+		},
+		{
+			name:                    "loadBalancerClass enabled, field not used in old, not used in new",
+			enableLoadBalancerClass: true,
+			svc:                     makeServiceWithLoadBalancerClass(nil),
+			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
+			compareSvc:              makeServiceWithLoadBalancerClass(nil),
+		},
+		{
+			name:                    "loadBalancerClass enabled, field used in old and in new",
+			enableLoadBalancerClass: true,
+			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+		},
+		{
+			name:                    "loadBalancerClass enabled, field not used in old, used in new",
+			enableLoadBalancerClass: true,
+			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
+			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+		},
+		{
+			name:                    "loadBalancerClass enabled, field used in old, not used in new",
+			enableLoadBalancerClass: true,
+			svc:                     makeServiceWithLoadBalancerClass(nil),
+			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			compareSvc:              makeServiceWithLoadBalancerClass(nil),
+		},
 		/* add more tests for other dropped fields as needed */
 	}
 	for _, tc := range testCases {
 		func() {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MixedProtocolLBService, tc.enableMixedProtocol)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLoadBalancerClass, tc.enableLoadBalancerClass)()
 			old := tc.oldSvc.DeepCopy()
 
 			// to test against user using IPFamily not set on cluster
@@ -685,6 +752,15 @@ func TestDropTypeDependentFields(t *testing.T) {
 	clearAllocateLoadBalancerNodePorts := func(svc *api.Service) {
 		svc.Spec.AllocateLoadBalancerNodePorts = nil
 	}
+	setLoadBalancerClass := func(svc *api.Service) {
+		svc.Spec.LoadBalancerClass = utilpointer.StringPtr("test-load-balancer-class")
+	}
+	clearLoadBalancerClass := func(svc *api.Service) {
+		svc.Spec.LoadBalancerClass = nil
+	}
+	changeLoadBalancerClass := func(svc *api.Service) {
+		svc.Spec.LoadBalancerClass = utilpointer.StringPtr("test-load-balancer-class-changed")
+	}
 
 	testCases := []struct {
 		name   string
@@ -812,6 +888,36 @@ func TestDropTypeDependentFields(t *testing.T) {
 			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsFalse),
 			patch:  patches(setTypeNodePort, setAllocateLoadBalancerNodePortsTrue),
 			expect: makeValidServiceCustom(setTypeNodePort, setAllocateLoadBalancerNodePortsTrue),
+		}, { // loadBalancerClass cases
+			name:   "clear loadBalancerClass when set Service type LoadBalancer -> non LoadBalancer",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
+			patch:  setTypeClusterIP,
+			expect: makeValidServiceCustom(setTypeClusterIP, clearLoadBalancerClass),
+		}, {
+			name:   "update loadBalancerClass load balancer class name",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
+			patch:  changeLoadBalancerClass,
+			expect: makeValidServiceCustom(setTypeLoadBalancer, changeLoadBalancerClass),
+		}, {
+			name:   "clear load balancer class name",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
+			patch:  clearLoadBalancerClass,
+			expect: makeValidServiceCustom(setTypeLoadBalancer, clearLoadBalancerClass),
+		}, {
+			name:   "change service type and load balancer class",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
+			patch:  patches(setTypeClusterIP, changeLoadBalancerClass),
+			expect: makeValidServiceCustom(setTypeClusterIP, changeLoadBalancerClass),
+		}, {
+			name:   "change service type to load balancer and set load balancer class",
+			svc:    makeValidServiceCustom(setTypeClusterIP),
+			patch:  patches(setTypeLoadBalancer, setLoadBalancerClass),
+			expect: makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
+		}, {
+			name:   "don't clear load balancer class for Type=LoadBalancer",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
+			patch:  nil,
+			expect: makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
 		}}
 
 	for _, tc := range testCases {
@@ -845,6 +951,9 @@ func TestDropTypeDependentFields(t *testing.T) {
 			}
 			if !reflect.DeepEqual(result.Spec.AllocateLoadBalancerNodePorts, tc.expect.Spec.AllocateLoadBalancerNodePorts) {
 				t.Errorf("failed %q: expected AllocateLoadBalancerNodePorts %v, got %v", tc.name, tc.expect.Spec.AllocateLoadBalancerNodePorts, result.Spec.AllocateLoadBalancerNodePorts)
+			}
+			if !reflect.DeepEqual(result.Spec.LoadBalancerClass, tc.expect.Spec.LoadBalancerClass) {
+				t.Errorf("failed %q: expected LoadBalancerClass %v, got %v", tc.name, tc.expect.Spec.LoadBalancerClass, result.Spec.LoadBalancerClass)
 			}
 		})
 	}

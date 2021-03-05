@@ -5034,6 +5034,20 @@ message ServiceSpec {
   // This field is alpha-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
   // +optional
   optional bool allocateLoadBalancerNodePorts = 20;
+
+  // loadBalancerClass is the class of the load balancer implementation this Service belongs to.
+  // If specified, the value of this field must be a label-style identifier, with an optional prefix,
+  // e.g. "internal-vip" or "example.com/internal-vip". Unprefixed names are reserved for end-users.
+  // This field can only be set when the Service type is 'LoadBalancer'. If not set, the default load
+  // balancer implementation is used, today this is typically done through the cloud provider integration,
+  // but should apply for any default implementation. If set, it is assumed that a load balancer
+  // implementation is watching for Services with a matching class. Any default load balancer
+  // implementation (e.g. cloud providers) should ignore Services that set this field.
+  // This field can only be set when creating or updating a Service to type 'LoadBalancer'.
+  // Once set, it can not be changed. This field will be wiped when a service is updated to a non 'LoadBalancer' type.
+  // featureGate=LoadBalancerClass
+  // +optional
+  optional string loadBalancerClass = 21;
 }
 
 // ServiceStatus represents the current status of a service.
