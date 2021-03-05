@@ -279,6 +279,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsautoscalingv1.HorizontalPodAutoscalerSpecApplyConfiguration{}
 	case autoscalingv1.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerStatus"):
 		return &applyconfigurationsautoscalingv1.HorizontalPodAutoscalerStatusApplyConfiguration{}
+	case autoscalingv1.SchemeGroupVersion.WithKind("Scale"):
+		return &applyconfigurationsautoscalingv1.ScaleApplyConfiguration{}
+	case autoscalingv1.SchemeGroupVersion.WithKind("ScaleSpec"):
+		return &applyconfigurationsautoscalingv1.ScaleSpecApplyConfiguration{}
+	case autoscalingv1.SchemeGroupVersion.WithKind("ScaleStatus"):
+		return &applyconfigurationsautoscalingv1.ScaleStatusApplyConfiguration{}
 
 		// Group=autoscaling, Version=v2beta1
 	case v2beta1.SchemeGroupVersion.WithKind("ContainerResourceMetricSource"):
