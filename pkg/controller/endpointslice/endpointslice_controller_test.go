@@ -26,7 +26,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -71,7 +71,7 @@ func newController(nodeNames []string, batchPeriod time.Duration) (*fake.Clients
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Services(),
 		nodeInformer,
-		informerFactory.Discovery().V1beta1().EndpointSlices(),
+		informerFactory.Discovery().V1().EndpointSlices(),
 		int32(100),
 		client,
 		batchPeriod)
@@ -83,7 +83,7 @@ func newController(nodeNames []string, batchPeriod time.Duration) (*fake.Clients
 
 	return client, &endpointSliceController{
 		esController,
-		informerFactory.Discovery().V1beta1().EndpointSlices().Informer().GetStore(),
+		informerFactory.Discovery().V1().EndpointSlices().Informer().GetStore(),
 		informerFactory.Core().V1().Nodes().Informer().GetStore(),
 		informerFactory.Core().V1().Pods().Informer().GetStore(),
 		informerFactory.Core().V1().Services().Informer().GetStore(),
@@ -134,7 +134,7 @@ func TestSyncServiceWithSelector(t *testing.T) {
 	standardSyncService(t, esController, ns, serviceName)
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
-	sliceList, err := client.DiscoveryV1beta1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{})
+	sliceList, err := client.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{})
 	assert.Nil(t, err, "Expected no error fetching endpoint slices")
 	assert.Len(t, sliceList.Items, 1, "Expected 1 endpoint slices")
 	slice := sliceList.Items[0]
@@ -201,7 +201,7 @@ func TestSyncServicePodSelection(t *testing.T) {
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
 	// an endpoint slice should be created, it should only reference pod1 (not pod2)
-	slices, err := client.DiscoveryV1beta1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{})
+	slices, err := client.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{})
 	assert.Nil(t, err, "Expected no error fetching endpoint slices")
 	assert.Len(t, slices.Items, 1, "Expected 1 endpoint slices")
 	slice := slices.Items[0]
@@ -283,7 +283,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error adding EndpointSlice: %v", err)
 		}
-		_, err = client.DiscoveryV1beta1().EndpointSlices(ns).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
+		_, err = client.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Expected no error creating EndpointSlice: %v", err)
 		}
@@ -451,7 +451,6 @@ func TestSyncService(t *testing.T) {
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
 					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 				{
@@ -460,7 +459,6 @@ func TestSyncService(t *testing.T) {
 					},
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
 					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 			},
@@ -566,7 +564,6 @@ func TestSyncService(t *testing.T) {
 					},
 					Addresses: []string{"fd08::5678:0000:0000:9abc:def0"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
 					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 			},
@@ -672,7 +669,6 @@ func TestSyncService(t *testing.T) {
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
 					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 				{
@@ -683,7 +679,6 @@ func TestSyncService(t *testing.T) {
 					},
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
 					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 			},
@@ -788,7 +783,6 @@ func TestSyncService(t *testing.T) {
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
 					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 			},
@@ -895,7 +889,6 @@ func TestSyncService(t *testing.T) {
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
 					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 				{
@@ -906,7 +899,6 @@ func TestSyncService(t *testing.T) {
 					},
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
 					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 			},
@@ -1011,7 +1003,6 @@ func TestSyncService(t *testing.T) {
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					Topology:  map[string]string{"kubernetes.io/hostname": "node-1"},
 					NodeName:  utilpointer.StringPtr("node-1"),
 				},
 			},
@@ -1038,14 +1029,14 @@ func TestSyncService(t *testing.T) {
 
 			// last action should be to create endpoint slice
 			expectActions(t, client.Actions(), 1, "create", "endpointslices")
-			sliceList, err := client.DiscoveryV1beta1().EndpointSlices(testcase.service.Namespace).List(context.TODO(), metav1.ListOptions{})
+			sliceList, err := client.DiscoveryV1().EndpointSlices(testcase.service.Namespace).List(context.TODO(), metav1.ListOptions{})
 			assert.Nil(t, err, "Expected no error fetching endpoint slices")
 			assert.Len(t, sliceList.Items, 1, "Expected 1 endpoint slices")
 
 			// ensure all attributes of endpoint slice match expected state
 			slice := sliceList.Items[0]
 			assert.Equal(t, slice.Annotations["endpoints.kubernetes.io/last-change-trigger-time"], creationTimestamp.Format(time.RFC3339Nano))
-			assert.EqualValues(t, testcase.expectedEndpointPorts, slice.Ports)
+			assert.ElementsMatch(t, testcase.expectedEndpointPorts, slice.Ports)
 			assert.ElementsMatch(t, testcase.expectedEndpoints, slice.Endpoints)
 		})
 	}

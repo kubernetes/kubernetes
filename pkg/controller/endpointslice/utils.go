@@ -22,7 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,23 +41,6 @@ import (
 
 // podToEndpoint returns an Endpoint object generated from a Pod, a Node, and a Service for a particular addressType.
 func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service, addressType discovery.AddressType) discovery.Endpoint {
-	// Build out topology information. This is currently limited to hostname,
-	// zone, and region, but this will be expanded in the future.
-	topology := map[string]string{}
-
-	if node != nil {
-		topologyLabels := []string{
-			"topology.kubernetes.io/zone",
-			"topology.kubernetes.io/region",
-		}
-
-		for _, topologyLabel := range topologyLabels {
-			if node.Labels[topologyLabel] != "" {
-				topology[topologyLabel] = node.Labels[topologyLabel]
-			}
-		}
-	}
-
 	serving := podutil.IsPodReady(pod)
 	terminating := pod.DeletionTimestamp != nil
 	// For compatibility reasons, "ready" should never be "true" if a pod is terminatng, unless
@@ -83,10 +66,12 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service, 
 	}
 
 	if pod.Spec.NodeName != "" {
-		topology["kubernetes.io/hostname"] = pod.Spec.NodeName
-		ep.Topology = topology
-
 		ep.NodeName = &pod.Spec.NodeName
+	}
+
+	if node != nil && node.Labels[corev1.LabelTopologyZone] != "" {
+		zone := node.Labels[corev1.LabelTopologyZone]
+		ep.Zone = &zone
 	}
 
 	if endpointutil.ShouldSetHostname(pod, service) {
@@ -147,25 +132,6 @@ func getEndpointAddresses(podStatus corev1.PodStatus, service *corev1.Service, a
 	return addresses
 }
 
-// endpointsEqualBeyondHash returns true if endpoints have equal attributes
-// but excludes equality checks that would have already been covered with
-// endpoint hashing (see hashEndpoint func for more info).
-func endpointsEqualBeyondHash(ep1, ep2 *discovery.Endpoint) bool {
-	if !apiequality.Semantic.DeepEqual(ep1.Topology, ep2.Topology) {
-		return false
-	}
-
-	if boolPtrChanged(ep1.Conditions.Ready, ep2.Conditions.Ready) {
-		return false
-	}
-
-	if objectRefPtrChanged(ep1.TargetRef, ep2.TargetRef) {
-		return false
-	}
-
-	return true
-}
-
 // newEndpointSlice returns an EndpointSlice generated from a service and
 // endpointMeta.
 func newEndpointSlice(service *corev1.Service, endpointMeta *endpointMeta) *discovery.EndpointSlice {
@@ -196,29 +162,6 @@ func getEndpointSlicePrefix(serviceName string) string {
 		prefix = serviceName
 	}
 	return prefix
-}
-
-// boolPtrChanged returns true if a set of bool pointers have different values.
-func boolPtrChanged(ptr1, ptr2 *bool) bool {
-	if (ptr1 == nil) != (ptr2 == nil) {
-		return true
-	}
-	if ptr1 != nil && ptr2 != nil && *ptr1 != *ptr2 {
-		return true
-	}
-	return false
-}
-
-// objectRefPtrChanged returns true if a set of object ref pointers have
-// different values.
-func objectRefPtrChanged(ref1, ref2 *corev1.ObjectReference) bool {
-	if (ref1 == nil) != (ref2 == nil) {
-		return true
-	}
-	if ref1 != nil && ref2 != nil && !apiequality.Semantic.DeepEqual(*ref1, *ref2) {
-		return true
-	}
-	return false
 }
 
 // ownedBy returns true if the provided EndpointSlice is owned by the provided

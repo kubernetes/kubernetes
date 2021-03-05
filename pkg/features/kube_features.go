@@ -466,6 +466,8 @@ const (
 
 	// owner: @robscott @freehan
 	// alpha: v1.16
+	// beta: v1.18
+	// ga: v1.21
 	//
 	// Enable Endpoint Slices for more scalable Service endpoints.
 	EndpointSlice featuregate.Feature = "EndpointSlice"

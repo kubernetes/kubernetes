@@ -23,7 +23,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -97,7 +97,7 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	// delete those which are of addressType that is no longer supported
 	// by the service
 	for _, sliceToDelete := range slicesToDelete {
-		err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Delete(context.TODO(), sliceToDelete.Name, metav1.DeleteOptions{})
+		err := r.client.DiscoveryV1().EndpointSlices(service.Namespace).Delete(context.TODO(), sliceToDelete.Name, metav1.DeleteOptions{})
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Error deleting %s EndpointSlice for Service %s/%s: %v", sliceToDelete.Name, service.Namespace, service.Name, err))
 		} else {
@@ -265,7 +265,7 @@ func (r *reconciler) finalize(
 	if service.DeletionTimestamp == nil {
 		for _, endpointSlice := range slicesToCreate {
 			addTriggerTimeAnnotation(endpointSlice, triggerTime)
-			createdSlice, err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
+			createdSlice, err := r.client.DiscoveryV1().EndpointSlices(service.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
 			if err != nil {
 				// If the namespace is terminating, creates will continue to fail. Simply drop the item.
 				if errors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
@@ -280,7 +280,7 @@ func (r *reconciler) finalize(
 
 	for _, endpointSlice := range slicesToUpdate {
 		addTriggerTimeAnnotation(endpointSlice, triggerTime)
-		updatedSlice, err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
+		updatedSlice, err := r.client.DiscoveryV1().EndpointSlices(service.Namespace).Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to update %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err)
 		}
@@ -289,7 +289,7 @@ func (r *reconciler) finalize(
 	}
 
 	for _, endpointSlice := range slicesToDelete {
-		err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
+		err := r.client.DiscoveryV1().EndpointSlices(service.Namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to delete %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err)
 		}
@@ -336,7 +336,7 @@ func (r *reconciler) reconcileByPortMapping(
 				newEndpoints = append(newEndpoints, *got)
 				// If existing version of endpoint doesn't match desired version
 				// set endpointUpdated to ensure endpoint changes are persisted.
-				if !endpointsEqualBeyondHash(got, &endpoint) {
+				if !endpointutil.EndpointsEqualBeyondHash(got, &endpoint) {
 					endpointUpdated = true
 				}
 				// once an endpoint has been placed/found in a slice, it no
