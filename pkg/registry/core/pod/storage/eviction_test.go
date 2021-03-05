@@ -23,6 +23,7 @@ import (
 
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -500,6 +501,103 @@ func TestEvictionDryRun(t *testing.T) {
 			_, err := evictionRest.Create(testContext, pod.Name, eviction, nil, tc.requestOptions)
 			if err != nil {
 				t.Fatalf("Failed to run eviction: %v", err)
+			}
+		})
+	}
+}
+
+func TestEvictionPDBStatus(t *testing.T) {
+	testcases := []struct {
+		name                       string
+		pdb                        *policyv1beta1.PodDisruptionBudget
+		expectedDisruptionsAllowed int32
+		expectedReason             string
+	}{
+		{
+			name: "pdb status is updated after eviction",
+			pdb: &policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1beta1.PodDisruptionBudgetStatus{
+					DisruptionsAllowed: 1,
+					Conditions: []metav1.Condition{
+						{
+							Type:   policyv1beta1.DisruptionAllowedCondition,
+							Reason: policyv1beta1.SufficientPodsReason,
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			expectedDisruptionsAllowed: 0,
+			expectedReason:             policyv1beta1.InsufficientPodsReason,
+		},
+		{
+			name: "condition reason is only updated if AllowedDisruptions becomes 0",
+			pdb: &policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1beta1.PodDisruptionBudgetStatus{
+					DisruptionsAllowed: 3,
+					Conditions: []metav1.Condition{
+						{
+							Type:   policyv1beta1.DisruptionAllowedCondition,
+							Reason: policyv1beta1.SufficientPodsReason,
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			expectedDisruptionsAllowed: 2,
+			expectedReason:             policyv1beta1.SufficientPodsReason,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+			storage, _, statusStorage, server := newStorage(t)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			client := fake.NewSimpleClientset(tc.pdb)
+			for _, podName := range []string{"foo-1", "foo-2"} {
+				pod := validNewPod()
+				pod.Labels = map[string]string{"a": "true"}
+				pod.ObjectMeta.Name = podName
+				pod.Spec.NodeName = "foo"
+				newPod, err := storage.Create(testContext, pod, nil, &metav1.CreateOptions{})
+				if err != nil {
+					t.Error(err)
+				}
+				(newPod.(*api.Pod)).Status.Phase = api.PodRunning
+				_, _, err = statusStorage.Update(testContext, pod.Name, rest.DefaultUpdatedObjectInfo(newPod),
+					nil, nil, false, &metav1.UpdateOptions{})
+				if err != nil {
+					t.Error(err)
+				}
+			}
+
+			evictionRest := newEvictionStorage(storage.Store, client.PolicyV1beta1())
+			eviction := &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo-1", Namespace: "default"}, DeleteOptions: &metav1.DeleteOptions{}}
+			_, err := evictionRest.Create(testContext, "foo-1", eviction, nil, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to run eviction: %v", err)
+			}
+
+			existingPDB, err := client.PolicyV1beta1().PodDisruptionBudgets(metav1.NamespaceDefault).Get(context.TODO(), tc.pdb.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("%#v", err)
+				return
+			}
+
+			if want, got := tc.expectedDisruptionsAllowed, existingPDB.Status.DisruptionsAllowed; got != want {
+				t.Errorf("expected DisruptionsAllowed to be %d, but got %d", want, got)
+			}
+
+			cond := apimeta.FindStatusCondition(existingPDB.Status.Conditions, policyv1beta1.DisruptionAllowedCondition)
+			if want, got := tc.expectedReason, cond.Reason; want != got {
+				t.Errorf("expected Reason to be %q, but got %q", want, got)
 			}
 		})
 	}

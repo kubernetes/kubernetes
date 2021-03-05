@@ -468,6 +468,7 @@ func autoConvert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudget
 	out.CurrentHealthy = in.CurrentHealthy
 	out.DesiredHealthy = in.DesiredHealthy
 	out.ExpectedPods = in.ExpectedPods
+	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
@@ -483,6 +484,7 @@ func autoConvert_policy_PodDisruptionBudgetStatus_To_v1beta1_PodDisruptionBudget
 	out.CurrentHealthy = in.CurrentHealthy
 	out.DesiredHealthy = in.DesiredHealthy
 	out.ExpectedPods = in.ExpectedPods
+	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
