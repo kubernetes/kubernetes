@@ -19,6 +19,7 @@ package cp
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -267,9 +268,9 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 
 	// TODO: Improve error messages by first testing if 'tar' is present in the container?
 	if o.NoPreserve {
-		cmdArr = []string{"tar", "--no-same-permissions", "--no-same-owner", "-xmf", "-"}
+		cmdArr = []string{"tar", "--no-same-permissions", "--no-same-owner", "-xzmf", "-"}
 	} else {
-		cmdArr = []string{"tar", "-xmf", "-"}
+		cmdArr = []string{"tar", "-xzmf", "-"}
 	}
 	destDir := path.Dir(dest.File)
 	if len(destDir) > 0 {
@@ -312,7 +313,7 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 		},
 
 		// TODO: Improve error messages by first testing if 'tar' is present in the container?
-		Command:  []string{"tar", "cf", "-", src.File},
+		Command:  []string{"tar", "czf", "-", src.File},
 		Executor: &exec.DefaultRemoteExecutor{},
 	}
 
@@ -352,8 +353,9 @@ func stripPathShortcuts(p string) string {
 }
 
 func makeTar(srcPath, destPath string, writer io.Writer) error {
-	// TODO: use compression here?
-	tarWriter := tar.NewWriter(writer)
+	gzWriter := gzip.NewWriter(writer)
+	defer gzWriter.Close()
+	tarWriter := tar.NewWriter(gzWriter)
 	defer tarWriter.Close()
 
 	srcPath = path.Clean(srcPath)
@@ -433,8 +435,12 @@ func recursiveTar(srcBase, srcFile, destBase, destFile string, tw *tar.Writer) e
 
 func (o *CopyOptions) untarAll(src fileSpec, reader io.Reader, destDir, prefix string) error {
 	symlinkWarningPrinted := false
-	// TODO: use compression here?
-	tarReader := tar.NewReader(reader)
+	gzReader, err := gzip.NewReader(reader)
+	if err != nil {
+		return err
+	}
+	defer gzReader.Close()
+	tarReader := tar.NewReader(gzReader)
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
