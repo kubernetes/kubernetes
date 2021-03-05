@@ -41,7 +41,8 @@ import (
 
 var (
 	attachExample = templates.Examples(i18n.T(`
-		# Get output from running pod mypod, using the first container by default
+		# Get output from running pod mypod, use the kubectl.kubernetes.io/default-container annotation 
+		# for selecting the container to be attached or the first container in the pod will be chosen
 		kubectl attach mypod
 
 		# Get output from ruby-container from pod mypod
@@ -110,7 +111,7 @@ func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		},
 	}
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
-	cmd.Flags().StringVarP(&o.ContainerName, "container", "c", o.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
+	cmdutil.AddContainerVarFlags(cmd, &o.ContainerName, o.ContainerName)
 	cmd.Flags().BoolVarP(&o.Stdin, "stdin", "i", o.Stdin, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, "Stdin is a TTY")
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, "Only print output from the remote session")
@@ -299,8 +300,9 @@ func (o *AttachOptions) findAttachablePod(obj runtime.Object) (*corev1.Pod, erro
 	return attachablePod, nil
 }
 
-// containerToAttach returns a reference to the container to attach to, given
-// by name or the first container if name is empty.
+// containerToAttach returns a reference to the container to attach to, given by name.
+// use the kubectl.kubernetes.io/default-container annotation for selecting the container to be attached
+// or the first container in the pod will be chosen If name is empty.
 func (o *AttachOptions) containerToAttachTo(pod *corev1.Pod) (*corev1.Container, error) {
 	return podcmd.FindOrDefaultContainerByName(pod, o.ContainerName, o.Quiet, o.ErrOut)
 }
