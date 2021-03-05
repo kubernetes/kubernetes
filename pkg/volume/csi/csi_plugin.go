@@ -912,12 +912,10 @@ func (p *csiPlugin) getFSGroupPolicy(driver string) (storage.FSGroupPolicy, erro
 	}
 
 	// If the csiDriver isn't defined, return the default behavior
-	if csiDriver == nil {
+	// This also allows drivers that were created before the feature existed
+	// to use the default policy instead of throwing an error.
+	if csiDriver == nil || csiDriver.Spec.FSGroupPolicy == nil || *csiDriver.Spec.FSGroupPolicy == "" {
 		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, nil
-	}
-	// If the csiDriver exists but the fsGroupPolicy isn't defined, return an error
-	if csiDriver.Spec.FSGroupPolicy == nil || *csiDriver.Spec.FSGroupPolicy == "" {
-		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, errors.New(log("expected valid fsGroupPolicy, received nil value or empty string"))
 	}
 	return *csiDriver.Spec.FSGroupPolicy, nil
 }
