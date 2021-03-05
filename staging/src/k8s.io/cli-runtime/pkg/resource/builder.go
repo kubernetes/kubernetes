@@ -839,7 +839,7 @@ func (b *Builder) visitorResult() *Result {
 				return &Result{err: err}
 			}
 		}
-		return &Result{err: fmt.Errorf("resource(s) were provided, but no name, label selector, or --all flag specified")}
+		return &Result{err: fmt.Errorf("resource(s) were provided, but no name was specified")}
 	}
 	return &Result{err: missingResourceError}
 }
