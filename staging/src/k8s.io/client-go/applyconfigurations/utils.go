@@ -1033,6 +1033,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnetworkingv1.IngressBackendApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("IngressClass"):
 		return &applyconfigurationsnetworkingv1.IngressClassApplyConfiguration{}
+	case networkingv1.SchemeGroupVersion.WithKind("IngressClassParametersReference"):
+		return &applyconfigurationsnetworkingv1.IngressClassParametersReferenceApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("IngressClassSpec"):
 		return &applyconfigurationsnetworkingv1.IngressClassSpecApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("IngressRule"):
@@ -1075,6 +1077,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnetworkingv1beta1.IngressBackendApplyConfiguration{}
 	case networkingv1beta1.SchemeGroupVersion.WithKind("IngressClass"):
 		return &applyconfigurationsnetworkingv1beta1.IngressClassApplyConfiguration{}
+	case networkingv1beta1.SchemeGroupVersion.WithKind("IngressClassParametersReference"):
+		return &applyconfigurationsnetworkingv1beta1.IngressClassParametersReferenceApplyConfiguration{}
 	case networkingv1beta1.SchemeGroupVersion.WithKind("IngressClassSpec"):
 		return &applyconfigurationsnetworkingv1beta1.IngressClassSpecApplyConfiguration{}
 	case networkingv1beta1.SchemeGroupVersion.WithKind("IngressRule"):
