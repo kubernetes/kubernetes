@@ -20,6 +20,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -848,6 +849,9 @@ var _ genericapiserver.EventSink = eventRegistrySink{}
 
 func (s eventRegistrySink) Create(v1event *corev1.Event) (*corev1.Event, error) {
 	ctx := request.WithNamespace(request.WithRequestInfo(request.NewContext(), &request.RequestInfo{APIVersion: "v1"}), v1event.Namespace)
+	// since we are bypassing the API set a hard timeout for the storage layer
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
 
 	var event core.Event
 	if err := v1.Convert_v1_Event_To_core_Event(v1event, &event, nil); err != nil {
