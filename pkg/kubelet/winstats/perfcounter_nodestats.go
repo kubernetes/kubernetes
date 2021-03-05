@@ -168,25 +168,25 @@ func (p *perfCounterNodeStatsClient) collectMetricsData(cpuCounter, memWorkingSe
 	cpuValue, err := cpuCounter.getData()
 	cpuCores := runtime.NumCPU()
 	if err != nil {
-		klog.Errorf("Unable to get cpu perf counter data; err: %v", err)
+		klog.ErrorS(err, "Unable to get cpu perf counter data")
 		return
 	}
 
 	memWorkingSetValue, err := memWorkingSetCounter.getData()
 	if err != nil {
-		klog.Errorf("Unable to get memWorkingSet perf counter data; err: %v", err)
+		klog.ErrorS(err, "Unable to get memWorkingSet perf counter data")
 		return
 	}
 
 	memCommittedBytesValue, err := memCommittedBytesCounter.getData()
 	if err != nil {
-		klog.Errorf("Unable to get memCommittedBytes perf counter data; err: %v", err)
+		klog.ErrorS(err, "Unable to get memCommittedBytes perf counter data")
 		return
 	}
 
 	networkAdapterStats, err := networkAdapterCounter.getData()
 	if err != nil {
-		klog.Errorf("Unable to get network adapter perf counter data; err: %v", err)
+		klog.ErrorS(err, "Unable to get network adapter perf counter data")
 		return
 	}
 
