@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 const message = "Preempted in order to admit critical pod"
@@ -95,7 +94,8 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 	if err != nil {
 		return fmt.Errorf("preemption: error finding a set of pods to preempt: %v", err)
 	}
-	klog.Infof("preemption: attempting to evict pods %v, in order to free up resources: %s", podsToPreempt, insufficientResources.toString())
+	klog.InfoS("Attempting to evict pods in order to free up resources", "pods", podsToPreempt,
+		"insufficientResources", insufficientResources.toString())
 	for _, pod := range podsToPreempt {
 		status := v1.PodStatus{
 			Phase:   v1.PodFailed,
@@ -107,7 +107,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 		// this is a blocking call and should only return when the pod and its containers are killed.
 		err := c.killPodFunc(pod, status, nil)
 		if err != nil {
-			klog.Warningf("preemption: pod %s failed to evict %v", format.Pod(pod), err)
+			klog.ErrorS(err, "Failed to evict pod", "pod", klog.KObj(pod))
 			// In future syncPod loops, the kubelet will retry the pod deletion steps that it was stuck on.
 			continue
 		}
@@ -116,7 +116,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 		} else {
 			metrics.Preemptions.WithLabelValues("").Inc()
 		}
-		klog.Infof("preemption: pod %s evicted successfully", format.Pod(pod))
+		klog.InfoS("Pod evicted successfully", "pod", klog.KObj(pod))
 	}
 	return nil
 }
