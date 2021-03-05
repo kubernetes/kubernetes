@@ -66,6 +66,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -1576,16 +1577,36 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 // alter the kubelet state at all.
 func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *v1.PodStatus {
 	var apiPodStatus v1.PodStatus
-	apiPodStatus.PodIPs = make([]v1.PodIP, 0, len(podStatus.IPs))
+
+	// The runtime pod status may have an arbitrary number of IPs, in an arbitrary
+	// order. Pick out the first returned IP of the same IP family as the node IP
+	// first, followed by the first IP of the opposite IP family (if any).
+	podIPs := make([]v1.PodIP, 0, len(podStatus.IPs))
+	var validPrimaryIP, validSecondaryIP func(ip string) bool
+	if len(kl.nodeIPs) == 0 || utilnet.IsIPv4(kl.nodeIPs[0]) {
+		validPrimaryIP = utilnet.IsIPv4String
+		validSecondaryIP = utilnet.IsIPv6String
+	} else {
+		validPrimaryIP = utilnet.IsIPv6String
+		validSecondaryIP = utilnet.IsIPv4String
+	}
 	for _, ip := range podStatus.IPs {
-		apiPodStatus.PodIPs = append(apiPodStatus.PodIPs, v1.PodIP{
-			IP: ip,
-		})
+		if validPrimaryIP(ip) {
+			podIPs = append(podIPs, v1.PodIP{IP: ip})
+			break
+		}
+	}
+	for _, ip := range podStatus.IPs {
+		if validSecondaryIP(ip) {
+			podIPs = append(podIPs, v1.PodIP{IP: ip})
+			break
+		}
+	}
+	apiPodStatus.PodIPs = podIPs
+	if len(podIPs) > 0 {
+		apiPodStatus.PodIP = podIPs[0].IP
 	}
 
-	if len(apiPodStatus.PodIPs) > 0 {
-		apiPodStatus.PodIP = apiPodStatus.PodIPs[0].IP
-	}
 	// set status for Pods created on versions of kube older than 1.6
 	apiPodStatus.QOSClass = v1qos.GetPodQOS(pod)
 
