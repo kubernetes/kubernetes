@@ -687,6 +687,12 @@ const (
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
 
+	// owner: @robscott
+	// alpha: v1.21
+	//
+	// Enables topology aware hints for EndpointSlices
+	TopologyAwareHints featuregate.Feature = "TopologyAwareHints"
+
 	// owner: @ahg-g
 	// alpha: v1.21
 	//
@@ -819,6 +825,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PreferNominatedNode:                            {Default: false, PreRelease: featuregate.Alpha},
 	RunAsGroup:                                     {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	PodDeletionCost:                                {Default: false, PreRelease: featuregate.Alpha},
+	TopologyAwareHints:                             {Default: false, PreRelease: featuregate.Alpha},
 	PodAffinityNamespaceSelector:                   {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLoadBalancerClass:                       {Default: false, PreRelease: featuregate.Alpha},
 	LogarithmicScaleDown:                           {Default: false, PreRelease: featuregate.Alpha},
