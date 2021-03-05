@@ -980,3 +980,10 @@ func TestCheckUDPPort(t *testing.T) {
 		}
 	}
 }
+
+func TestCompletionPortForwardNoArg(t *testing.T) {
+	tf, streams := cmdtesting.PreparePodsForCompletion(t)
+	cmd := NewCmdPortForward(tf, streams)
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "b")
+	cmdtesting.CheckCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}

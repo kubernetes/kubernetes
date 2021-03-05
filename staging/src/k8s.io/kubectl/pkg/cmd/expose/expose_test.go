@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -675,4 +676,19 @@ func TestRunExposeService(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCompletionExposeNoArg(t *testing.T) {
+	tf, streams := cmdtesting.PreparePodsForCompletion(t)
+	cmd := NewCmdExposeService(tf, streams)
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "")
+	expectedComps := []string{"deployment", "pod", "replicaset", "replicationcontroller", "service"}
+	cmdtesting.CheckCompletion(t, comps, expectedComps, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestCompletionExposeOneArg(t *testing.T) {
+	tf, streams := cmdtesting.PreparePodsForCompletion(t)
+	cmd := NewCmdExposeService(tf, streams)
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{"pods"}, "b")
+	cmdtesting.CheckCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }

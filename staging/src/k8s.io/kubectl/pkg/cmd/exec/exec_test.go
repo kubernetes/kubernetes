@@ -27,6 +27,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -407,4 +408,11 @@ func TestSetupTTY(t *testing.T) {
 	if tty.Out != o.Out {
 		t.Errorf("attach stdin, TTY, is a terminal: tty.Out should equal o.Out")
 	}
+}
+
+func TestCompletionExecNoArg(t *testing.T) {
+	tf, streams := cmdtesting.PreparePodsForCompletion(t)
+	cmd := NewCmdExec(tf, streams)
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "b")
+	cmdtesting.CheckCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }

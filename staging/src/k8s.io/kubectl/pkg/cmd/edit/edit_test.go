@@ -283,6 +283,13 @@ func TestEdit(t *testing.T) {
 	}
 }
 
+func TestCompletionEditOneArg(t *testing.T) {
+	tf, streams := cmdtesting.PreparePodsForCompletion(t)
+	cmd := NewCmdEdit(tf, streams)
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{"pods"}, "b")
+	cmdtesting.CheckCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
 func tryIndent(data []byte) []byte {
 	indented := &bytes.Buffer{}
 	if err := json.Indent(indented, data, "", "\t"); err == nil {

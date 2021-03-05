@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -391,6 +392,13 @@ func TestTopPodNoResourcesFound(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCompletionTopPodNoArg(t *testing.T) {
+	tf, streams := cmdtesting.PreparePodsForCompletion(t)
+	cmd := NewCmdTopPod(tf, nil, streams)
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "b")
+	cmdtesting.CheckCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
 func testV1beta1PodMetricsData() []metricsv1beta1api.PodMetrics {

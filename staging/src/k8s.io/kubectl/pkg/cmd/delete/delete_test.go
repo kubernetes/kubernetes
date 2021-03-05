@@ -832,3 +832,18 @@ func TestResourceErrors(t *testing.T) {
 		})
 	}
 }
+
+// TODO
+// func TestCompletionDeleteNoArg(t *testing.T) {
+// 	tf, streams := cmdtesting.PreparePodsForCompletion(t)
+// 	cmd := NewCmdDelete(tf, streams)
+// 	comps, directive := cmd.ValidArgsFunction(cmd, []string{""}, "po")
+// 	cmdtesting.CheckCompletionOfResources(t, comps, directive)
+// }
+
+func TestCompletionDeleteOneArg(t *testing.T) {
+	tf, streams := cmdtesting.PreparePodsForCompletion(t)
+	cmd := NewCmdDelete(tf, streams)
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{"pods"}, "b")
+	cmdtesting.CheckCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
