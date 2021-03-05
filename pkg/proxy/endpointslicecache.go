@@ -26,8 +26,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/utils/net"
 )
@@ -78,6 +81,7 @@ type endpointInfo struct {
 	Addresses []string
 	NodeName  *string
 	Topology  map[string]string
+	ZoneHints sets.String
 
 	Ready       bool
 	Serving     bool
@@ -135,6 +139,15 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 			}
 
 			epInfo.NodeName = endpoint.NodeName
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
+				if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
+					epInfo.ZoneHints = sets.String{}
+					for _, zone := range endpoint.Hints.ForZones {
+						epInfo.ZoneHints.Insert(zone.Name)
+					}
+				}
+			}
 
 			esInfo.Endpoints = append(esInfo.Endpoints, epInfo)
 		}
@@ -275,7 +288,7 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 		}
 
 		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology,
-			endpoint.Ready, endpoint.Serving, endpoint.Terminating)
+			endpoint.Ready, endpoint.Serving, endpoint.Terminating, endpoint.ZoneHints)
 
 		// This logic ensures we're deduping potential overlapping endpoints
 		// isLocal should not vary between matching IPs, but if it does, we

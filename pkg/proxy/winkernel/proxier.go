@@ -37,6 +37,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -199,6 +200,11 @@ func (info *endpointsInfo) IsTerminating() bool {
 // GetTopology returns the topology information of the endpoint.
 func (info *endpointsInfo) GetTopology() map[string]string {
 	return nil
+}
+
+// GetZoneHint returns the zone hint for the endpoint.
+func (info *endpointsInfo) GetZoneHints() sets.String {
+	return sets.String{}
 }
 
 // IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.

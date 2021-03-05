@@ -2057,21 +2057,15 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 
 	endpoints := proxier.endpointsMap[svcPortName]
 
-	// Service Topology will not be enabled in the following cases:
-	// 1. externalTrafficPolicy=Local (mutually exclusive with service topology).
-	// 2. ServiceTopology is not enabled.
-	// 3. EndpointSlice is not enabled (service topology depends on endpoint slice
-	// to get topology information).
-	if !onlyNodeLocalEndpoints && utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
-		endpoints = proxy.FilterTopologyEndpoint(proxier.nodeLabels, proxier.serviceMap[svcPortName].TopologyKeys(), endpoints)
-	}
-
-	// Service InternalTrafficPolicy is only enabled when all of the
-	// following are true:
-	// 1. InternalTrafficPolicy is PreferLocal or Local
-	// 2. ServiceInternalTrafficPolicy feature gate is on
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && onlyNodeLocalEndpointsForInternal {
-		endpoints = proxy.FilterLocalEndpoint(proxier.serviceMap[svcPortName].InternalTrafficPolicy(), endpoints)
+	// Filtering for topology aware endpoints. This function will only
+	// filter endpoints if appropriate feature gates are enabled and the
+	// Service does not have conflicting configuration such as
+	// externalTrafficPolicy=Local.
+	svcInfo, ok := proxier.serviceMap[svcPortName]
+	if !ok {
+		klog.Warningf("Unable to filter endpoints due to missing Service info for %s", svcPortName)
+	} else {
+		endpoints = proxy.FilterEndpoints(endpoints, svcInfo, proxier.nodeLabels)
 	}
 
 	for _, epInfo := range endpoints {
