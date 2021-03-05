@@ -21,7 +21,6 @@ package gce
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -34,7 +33,6 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	utilnet "k8s.io/utils/net"
 )
@@ -683,20 +681,11 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
 	svc := fakeLoadbalancerService("")
-	svc.Spec.Ports = []v1.ServicePort{
-		{Name: "port1", Protocol: v1.ProtocolTCP, Port: int32(80), TargetPort: intstr.FromInt(80)},
-		{Name: "port2", Protocol: v1.ProtocolTCP, Port: int32(81), TargetPort: intstr.FromInt(81)},
-		{Name: "port3", Protocol: v1.ProtocolTCP, Port: int32(82), TargetPort: intstr.FromInt(82)},
-		{Name: "port4", Protocol: v1.ProtocolTCP, Port: int32(84), TargetPort: intstr.FromInt(84)},
-		{Name: "port5", Protocol: v1.ProtocolTCP, Port: int32(85), TargetPort: intstr.FromInt(85)},
-		{Name: "port6", Protocol: v1.ProtocolTCP, Port: int32(86), TargetPort: intstr.FromInt(86)},
-		{Name: "port7", Protocol: v1.ProtocolTCP, Port: int32(88), TargetPort: intstr.FromInt(87)},
-	}
-
 	status, err := createExternalLoadBalancer(gce, svc, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	require.NotNil(t, status)
 	require.NoError(t, err)
 	svcName := "/" + svc.ObjectMeta.Name
+	region := vals.Region
 
 	ipAddr := status.Ingress[0].IP
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
@@ -806,69 +795,6 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 			needsUpdate:  false,
 			hasErr:       false,
 		},
-		"Backward compatible with previous firewall setup with enumerated ports": {
-			lbName:       lbName,
-			ipAddr:       ipAddr,
-			ports:        svc.Spec.Ports,
-			ipnet:        ipnet,
-			fwIPProtocol: "tcp",
-			getHook: func(ctx context.Context, key *meta.Key, m *cloud.MockFirewalls) (bool, *compute.Firewall, error) {
-				obj, ok := m.Objects[*key]
-				if !ok {
-					return false, nil, nil
-				}
-				fw := obj.Obj.(*compute.Firewall)
-				// enumerate the service ports in the firewall rule
-				fw.Allowed[0].Ports = []string{"80", "81", "82", "84", "85", "86", "88"}
-				return true, fw, nil
-			},
-			sourceRange: fw.SourceRanges[0],
-			exists:      true,
-			needsUpdate: false,
-			hasErr:      false,
-		},
-		"need to update previous firewall setup with enumerated ports ": {
-			lbName:       lbName,
-			ipAddr:       ipAddr,
-			ports:        svc.Spec.Ports,
-			ipnet:        ipnet,
-			fwIPProtocol: "tcp",
-			getHook: func(ctx context.Context, key *meta.Key, m *cloud.MockFirewalls) (bool, *compute.Firewall, error) {
-				obj, ok := m.Objects[*key]
-				if !ok {
-					return false, nil, nil
-				}
-				fw := obj.Obj.(*compute.Firewall)
-				// enumerate the service ports in the firewall rule
-				fw.Allowed[0].Ports = []string{"80", "81", "82", "84", "85", "86"}
-				return true, fw, nil
-			},
-			sourceRange: fw.SourceRanges[0],
-			exists:      true,
-			needsUpdate: true,
-			hasErr:      false,
-		},
-		"need to update port-ranges ": {
-			lbName:       lbName,
-			ipAddr:       ipAddr,
-			ports:        svc.Spec.Ports,
-			ipnet:        ipnet,
-			fwIPProtocol: "tcp",
-			getHook: func(ctx context.Context, key *meta.Key, m *cloud.MockFirewalls) (bool, *compute.Firewall, error) {
-				obj, ok := m.Objects[*key]
-				if !ok {
-					return false, nil, nil
-				}
-				fw := obj.Obj.(*compute.Firewall)
-				// enumerate the service ports in the firewall rule
-				fw.Allowed[0].Ports = []string{"80-82", "86"}
-				return true, fw, nil
-			},
-			sourceRange: fw.SourceRanges[0],
-			exists:      true,
-			needsUpdate: true,
-			hasErr:      false,
-		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			fw, err = gce.GetFirewall(MakeFirewallName(tc.lbName))
@@ -887,6 +813,7 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 			exists, needsUpdate, err := gce.firewallNeedsUpdate(
 				tc.lbName,
 				svcName,
+				region,
 				tc.ipAddr,
 				tc.ports,
 				tc.ipnet)
@@ -1020,6 +947,7 @@ func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
 	gce.createFirewall(
 		svc,
 		gce.GetLoadBalancerName(context.TODO(), "", svc),
+		gce.region,
 		"A sad little firewall",
 		ipnet,
 		svc.Spec.Ports,
@@ -1032,6 +960,7 @@ func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
 	gce.updateFirewall(
 		svc,
 		gce.GetLoadBalancerName(context.TODO(), "", svc),
+		gce.region,
 		"A sad little firewall",
 		ipnet,
 		svc.Spec.Ports,
@@ -1329,111 +1258,6 @@ func TestNeedToUpdateHttpHealthChecks(t *testing.T) {
 			}
 			if gotChanged := needToUpdateHTTPHealthChecks(hc, wantHC); gotChanged != tc.wantChanged {
 				t.Errorf("needToUpdateHTTPHealthChecks(%#v, %#v) = %t; want changed = %t", hc, wantHC, gotChanged, tc.wantChanged)
-			}
-		})
-	}
-}
-
-func TestFirewallObject(t *testing.T) {
-	t.Parallel()
-	vals := DefaultTestClusterValues()
-	gce, err := fakeGCECloud(vals)
-	gce.nodeTags = []string{"node-tags"}
-	require.NoError(t, err)
-	srcRanges := []string{"10.10.0.0/24", "10.20.0.0/24"}
-	sourceRanges, _ := utilnet.ParseIPNets(srcRanges...)
-	fwName := "test-fw"
-	fwDesc := "test-desc"
-	baseFw := compute.Firewall{
-		Name:         fwName,
-		Description:  fwDesc,
-		Network:      gce.networkURL,
-		SourceRanges: []string{},
-		TargetTags:   gce.nodeTags,
-		Allowed: []*compute.FirewallAllowed{
-			{
-				IPProtocol: "tcp",
-				Ports:      []string{"80"},
-			},
-		},
-	}
-
-	for _, tc := range []struct {
-		desc             string
-		sourceRanges     utilnet.IPNetSet
-		svcPorts         []v1.ServicePort
-		expectedFirewall func(fw compute.Firewall) compute.Firewall
-	}{
-		{
-			desc:         "empty source ranges",
-			sourceRanges: utilnet.IPNetSet{},
-			svcPorts: []v1.ServicePort{
-				{Name: "port1", Protocol: v1.ProtocolTCP, Port: int32(80), TargetPort: intstr.FromInt(80)},
-			},
-			expectedFirewall: func(fw compute.Firewall) compute.Firewall {
-				return fw
-			},
-		},
-		{
-			desc:         "has source ranges",
-			sourceRanges: sourceRanges,
-			svcPorts: []v1.ServicePort{
-				{Name: "port1", Protocol: v1.ProtocolTCP, Port: int32(80), TargetPort: intstr.FromInt(80)},
-			},
-			expectedFirewall: func(fw compute.Firewall) compute.Firewall {
-				fw.SourceRanges = srcRanges
-				return fw
-			},
-		},
-		{
-			desc:         "has multiple ports",
-			sourceRanges: sourceRanges,
-			svcPorts: []v1.ServicePort{
-				{Name: "port1", Protocol: v1.ProtocolTCP, Port: int32(80), TargetPort: intstr.FromInt(80)},
-				{Name: "port2", Protocol: v1.ProtocolTCP, Port: int32(82), TargetPort: intstr.FromInt(82)},
-				{Name: "port3", Protocol: v1.ProtocolTCP, Port: int32(84), TargetPort: intstr.FromInt(84)},
-			},
-			expectedFirewall: func(fw compute.Firewall) compute.Firewall {
-				fw.Allowed = []*compute.FirewallAllowed{
-					{
-						IPProtocol: "tcp",
-						Ports:      []string{"80", "82", "84"},
-					},
-				}
-				fw.SourceRanges = srcRanges
-				return fw
-			},
-		},
-		{
-			desc:         "has multiple ports",
-			sourceRanges: sourceRanges,
-			svcPorts: []v1.ServicePort{
-				{Name: "port1", Protocol: v1.ProtocolTCP, Port: int32(80), TargetPort: intstr.FromInt(80)},
-				{Name: "port2", Protocol: v1.ProtocolTCP, Port: int32(81), TargetPort: intstr.FromInt(81)},
-				{Name: "port3", Protocol: v1.ProtocolTCP, Port: int32(82), TargetPort: intstr.FromInt(82)},
-				{Name: "port4", Protocol: v1.ProtocolTCP, Port: int32(84), TargetPort: intstr.FromInt(84)},
-				{Name: "port5", Protocol: v1.ProtocolTCP, Port: int32(85), TargetPort: intstr.FromInt(85)},
-				{Name: "port6", Protocol: v1.ProtocolTCP, Port: int32(86), TargetPort: intstr.FromInt(86)},
-				{Name: "port7", Protocol: v1.ProtocolTCP, Port: int32(88), TargetPort: intstr.FromInt(87)},
-			},
-			expectedFirewall: func(fw compute.Firewall) compute.Firewall {
-				fw.Allowed = []*compute.FirewallAllowed{
-					{
-						IPProtocol: "tcp",
-						Ports:      []string{"80-82", "84-86", "88"},
-					},
-				}
-				fw.SourceRanges = srcRanges
-				return fw
-			},
-		},
-	} {
-		t.Run(tc.desc, func(t *testing.T) {
-			ret, err := gce.firewallObject(fwName, fwDesc, tc.sourceRanges, tc.svcPorts, nil)
-			require.NoError(t, err)
-			expectedFirewall := tc.expectedFirewall(baseFw)
-			if !reflect.DeepEqual(*ret, expectedFirewall) {
-				t.Errorf("expect firewall to be %+v, but got %+v", expectedFirewall, ret)
 			}
 		})
 	}
