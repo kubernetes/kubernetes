@@ -3363,7 +3363,7 @@ function check-cluster() {
   get-kubeconfig-basicauth
 
   if [[ ${GCE_UPLOAD_KUBCONFIG_TO_MASTER_METADATA:-} == "true" ]]; then
-    gcloud compute instances add-metadata "${MASTER_NAME}" --zone="${ZONE}"  --metadata-from-file="kubeconfig=${KUBECONFIG}" || true
+    gcloud compute instances add-metadata "${MASTER_NAME}" --project="${PROJECT}" --zone="${ZONE}"  --metadata-from-file="kubeconfig=${KUBECONFIG}" || true
   fi
 
   echo

@@ -37,6 +37,7 @@ import (
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -335,6 +336,12 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 	if err != nil {
 		return nil, err
 	}
+
+	// For new clusters we want to set the kubelet cgroup driver to "systemd" unless the user is explicit about it.
+	// Currently this cannot be as part of the kubelet defaulting (Default()) because the function is called for
+	// upgrades too, which can break existing nodes after a kubelet restart.
+	// TODO: https://github.com/kubernetes/kubeadm/issues/2376
+	componentconfigs.MutateCgroupDriver(&cfg.ClusterConfiguration)
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
 	if err != nil {

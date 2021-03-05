@@ -159,7 +159,13 @@ func (w *Watcher) traversePluginDir(dir string) error {
 func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 	klog.V(6).Infof("Handling create event: %v", event)
 
-	fi, err := os.Lstat(event.Name)
+	fi, err := os.Stat(event.Name)
+	// TODO: This is a workaround for Windows 20H2 issue for os.Stat(). Please see
+	// microsoft/Windows-Containers#97 for details.
+	// Once the issue is resvolved, the following os.Lstat() is not needed.
+	if err != nil && runtime.GOOS == "windows" {
+		fi, err = os.Lstat(event.Name)
+	}
 	if err != nil {
 		return fmt.Errorf("stat file %s failed: %v", event.Name, err)
 	}

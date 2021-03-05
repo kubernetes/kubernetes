@@ -148,16 +148,17 @@ func (o *GaugeOpts) toPromGaugeOpts() prometheus.GaugeOpts {
 // and can safely be left at their zero value, although it is strongly
 // encouraged to set a Help string.
 type HistogramOpts struct {
-	Namespace         string
-	Subsystem         string
-	Name              string
-	Help              string
-	ConstLabels       map[string]string
-	Buckets           []float64
-	DeprecatedVersion string
-	deprecateOnce     sync.Once
-	annotateOnce      sync.Once
-	StabilityLevel    StabilityLevel
+	Namespace            string
+	Subsystem            string
+	Name                 string
+	Help                 string
+	ConstLabels          map[string]string
+	Buckets              []float64
+	DeprecatedVersion    string
+	deprecateOnce        sync.Once
+	annotateOnce         sync.Once
+	StabilityLevel       StabilityLevel
+	LabelValueAllowLists *MetricLabelAllowList
 }
 
 // Modify help description on the metric description.
@@ -194,19 +195,20 @@ func (o *HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
 // a help string and to explicitly set the Objectives field to the desired value
 // as the default value will change in the upcoming v0.10 of the library.
 type SummaryOpts struct {
-	Namespace         string
-	Subsystem         string
-	Name              string
-	Help              string
-	ConstLabels       map[string]string
-	Objectives        map[float64]float64
-	MaxAge            time.Duration
-	AgeBuckets        uint32
-	BufCap            uint32
-	DeprecatedVersion string
-	deprecateOnce     sync.Once
-	annotateOnce      sync.Once
-	StabilityLevel    StabilityLevel
+	Namespace            string
+	Subsystem            string
+	Name                 string
+	Help                 string
+	ConstLabels          map[string]string
+	Objectives           map[float64]float64
+	MaxAge               time.Duration
+	AgeBuckets           uint32
+	BufCap               uint32
+	DeprecatedVersion    string
+	deprecateOnce        sync.Once
+	annotateOnce         sync.Once
+	StabilityLevel       StabilityLevel
+	LabelValueAllowLists *MetricLabelAllowList
 }
 
 // Modify help description on the metric description.

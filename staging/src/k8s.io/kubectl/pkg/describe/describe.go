@@ -2160,6 +2160,9 @@ func describeJob(job *batchv1.Job, events *corev1.EventList) (string, error) {
 		} else {
 			w.Write(LEVEL_0, "Completions:\t<unset>\n")
 		}
+		if job.Spec.CompletionMode != "" {
+			w.Write(LEVEL_0, "Completion Mode:\t%s\n", job.Spec.CompletionMode)
+		}
 		if job.Status.StartTime != nil {
 			w.Write(LEVEL_0, "Start Time:\t%s\n", job.Status.StartTime.Time.Format(time.RFC1123Z))
 		}
@@ -2173,12 +2176,31 @@ func describeJob(job *batchv1.Job, events *corev1.EventList) (string, error) {
 			w.Write(LEVEL_0, "Active Deadline Seconds:\t%ds\n", *job.Spec.ActiveDeadlineSeconds)
 		}
 		w.Write(LEVEL_0, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
+		if job.Spec.CompletionMode == batchv1.IndexedCompletion {
+			w.Write(LEVEL_0, "Completed Indexes:\t%s\n", capIndexesListOrNone(job.Status.CompletedIndexes, 50))
+		}
 		DescribePodTemplate(&job.Spec.Template, w)
 		if events != nil {
 			DescribeEvents(events, w)
 		}
 		return nil
 	})
+}
+
+func capIndexesListOrNone(indexes string, softLimit int) string {
+	if len(indexes) == 0 {
+		return "<none>"
+	}
+	ix := softLimit
+	for ; ix < len(indexes); ix++ {
+		if indexes[ix] == ',' {
+			break
+		}
+	}
+	if ix >= len(indexes) {
+		return indexes
+	}
+	return indexes[:ix+1] + "..."
 }
 
 // CronJobDescriber generates information about a cron job and the jobs it has created.

@@ -107,7 +107,7 @@ spec:
             - name: USE_POD_CIDR
               value: "true"
             - name: IP
-              value: ""
+              value: "autodetect"
             - name: NO_DEFAULT_POOLS
               value: "true"
             - name: NODENAME

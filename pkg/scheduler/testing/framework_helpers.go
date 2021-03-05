@@ -26,16 +26,15 @@ import (
 func NewFramework(fns []RegisterPluginFunc, opts ...runtime.Option) (framework.Framework, error) {
 	registry := runtime.Registry{}
 	plugins := &schedulerapi.Plugins{}
-	var pluginConfigs []schedulerapi.PluginConfig
 	for _, f := range fns {
-		f(&registry, plugins, pluginConfigs)
+		f(&registry, plugins)
 	}
-	return runtime.NewFramework(registry, plugins, pluginConfigs, opts...)
+	return runtime.NewFramework(registry, plugins, nil, opts...)
 }
 
 // RegisterPluginFunc is a function signature used in method RegisterFilterPlugin()
 // to register a Filter Plugin to a given registry.
-type RegisterPluginFunc func(reg *runtime.Registry, plugins *schedulerapi.Plugins, pluginConfigs []schedulerapi.PluginConfig)
+type RegisterPluginFunc func(reg *runtime.Registry, plugins *schedulerapi.Plugins)
 
 // RegisterQueueSortPlugin returns a function to register a QueueSort Plugin to a given registry.
 func RegisterQueueSortPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
@@ -89,7 +88,7 @@ func RegisterPluginAsExtensions(pluginName string, pluginNewFunc runtime.PluginF
 
 // RegisterPluginAsExtensionsWithWeight returns a function to register a Plugin as given extensionPoints with weight to a given registry.
 func RegisterPluginAsExtensionsWithWeight(pluginName string, weight int32, pluginNewFunc runtime.PluginFactory, extensions ...string) RegisterPluginFunc {
-	return func(reg *runtime.Registry, plugins *schedulerapi.Plugins, pluginConfigs []schedulerapi.PluginConfig) {
+	return func(reg *runtime.Registry, plugins *schedulerapi.Plugins) {
 		reg.Register(pluginName, pluginNewFunc)
 		for _, extension := range extensions {
 			ps := getPluginSetByExtension(plugins, extension)
@@ -98,9 +97,6 @@ func RegisterPluginAsExtensionsWithWeight(pluginName string, weight int32, plugi
 			}
 			ps.Enabled = append(ps.Enabled, schedulerapi.Plugin{Name: pluginName, Weight: weight})
 		}
-		//lint:ignore SA4006 this value of pluginConfigs is never used.
-		//lint:ignore SA4010 this result of append is never used.
-		pluginConfigs = append(pluginConfigs, schedulerapi.PluginConfig{Name: pluginName})
 	}
 }
 

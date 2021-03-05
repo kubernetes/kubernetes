@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -634,6 +635,166 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.wantCfg, result); diff != "" {
 				t.Errorf("unexpected plugin args (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// fakeNoopPlugin doesn't implement interface framework.EnqueueExtensions.
+type fakeNoopPlugin struct{}
+
+func (*fakeNoopPlugin) Name() string { return "fakeNoop" }
+
+func (*fakeNoopPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+	return nil
+}
+
+type fakeNodePlugin struct{}
+
+func (*fakeNodePlugin) Name() string { return "fakeNode" }
+
+func (*fakeNodePlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+	return nil
+}
+
+func (*fakeNodePlugin) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		{Resource: framework.Pod, ActionType: framework.All},
+		{Resource: framework.Node, ActionType: framework.Delete},
+		{Resource: framework.CSINode, ActionType: framework.Update | framework.Delete},
+	}
+}
+
+type fakePodPlugin struct{}
+
+func (*fakePodPlugin) Name() string { return "fakePod" }
+
+func (*fakePodPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+	return nil
+}
+
+func (*fakePodPlugin) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		{Resource: framework.Pod, ActionType: framework.All},
+		{Resource: framework.Node, ActionType: framework.Add | framework.Delete},
+		{Resource: framework.Service, ActionType: framework.Delete},
+	}
+}
+
+// fakeNoopRuntimePlugin implement interface framework.EnqueueExtensions, but returns nil
+// at runtime. This can simulate a plugin registered at scheduler setup, but does nothing
+// due to some disabled feature gate.
+type fakeNoopRuntimePlugin struct{}
+
+func (*fakeNoopRuntimePlugin) Name() string { return "fakeNoopRuntime" }
+
+func (*fakeNoopRuntimePlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+	return nil
+}
+
+func (*fakeNoopRuntimePlugin) EventsToRegister() []framework.ClusterEvent { return nil }
+
+func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
+	tests := []struct {
+		name    string
+		plugins []framework.Plugin
+		want    map[framework.ClusterEvent]sets.String
+	}{
+		{
+			name:    "no-op plugin",
+			plugins: []framework.Plugin{&fakeNoopPlugin{}},
+			want: map[framework.ClusterEvent]sets.String{
+				{Resource: framework.Pod, ActionType: framework.All}:                   sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
+				{Resource: framework.Node, ActionType: framework.All}:                  sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
+				{Resource: framework.CSINode, ActionType: framework.All}:               sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
+				{Resource: framework.PersistentVolume, ActionType: framework.All}:      sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}: sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
+				{Resource: framework.Service, ActionType: framework.All}:               sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
+				{Resource: framework.StorageClass, ActionType: framework.All}:          sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
+			},
+		},
+		{
+			name:    "node plugin",
+			plugins: []framework.Plugin{&fakeNodePlugin{}},
+			want: map[framework.ClusterEvent]sets.String{
+				{Resource: framework.Pod, ActionType: framework.All}:                           sets.NewString("fakeNode", bindPlugin, queueSortPlugin),
+				{Resource: framework.Node, ActionType: framework.Delete}:                       sets.NewString("fakeNode"),
+				{Resource: framework.Node, ActionType: framework.All}:                          sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.CSINode, ActionType: framework.Update | framework.Delete}: sets.NewString("fakeNode"),
+				{Resource: framework.CSINode, ActionType: framework.All}:                       sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.PersistentVolume, ActionType: framework.All}:              sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}:         sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.Service, ActionType: framework.All}:                       sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.StorageClass, ActionType: framework.All}:                  sets.NewString(bindPlugin, queueSortPlugin),
+			},
+		},
+		{
+			name:    "pod plugin",
+			plugins: []framework.Plugin{&fakePodPlugin{}},
+			want: map[framework.ClusterEvent]sets.String{
+				{Resource: framework.Pod, ActionType: framework.All}:                     sets.NewString("fakePod", bindPlugin, queueSortPlugin),
+				{Resource: framework.Node, ActionType: framework.Add | framework.Delete}: sets.NewString("fakePod"),
+				{Resource: framework.Node, ActionType: framework.All}:                    sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.Service, ActionType: framework.Delete}:              sets.NewString("fakePod"),
+				{Resource: framework.Service, ActionType: framework.All}:                 sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.CSINode, ActionType: framework.All}:                 sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.PersistentVolume, ActionType: framework.All}:        sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}:   sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.StorageClass, ActionType: framework.All}:            sets.NewString(bindPlugin, queueSortPlugin),
+			},
+		},
+		{
+			name:    "node and pod plugin",
+			plugins: []framework.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}},
+			want: map[framework.ClusterEvent]sets.String{
+				{Resource: framework.Node, ActionType: framework.Delete}:                       sets.NewString("fakeNode"),
+				{Resource: framework.Node, ActionType: framework.Add | framework.Delete}:       sets.NewString("fakePod"),
+				{Resource: framework.Pod, ActionType: framework.All}:                           sets.NewString("fakeNode", "fakePod", bindPlugin, queueSortPlugin),
+				{Resource: framework.CSINode, ActionType: framework.Update | framework.Delete}: sets.NewString("fakeNode"),
+				{Resource: framework.Service, ActionType: framework.Delete}:                    sets.NewString("fakePod"),
+				{Resource: framework.Node, ActionType: framework.All}:                          sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.Service, ActionType: framework.All}:                       sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.CSINode, ActionType: framework.All}:                       sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.PersistentVolume, ActionType: framework.All}:              sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}:         sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.StorageClass, ActionType: framework.All}:                  sets.NewString(bindPlugin, queueSortPlugin),
+			},
+		},
+		{
+			name:    "no-op runtime plugin",
+			plugins: []framework.Plugin{&fakeNoopRuntimePlugin{}},
+			want: map[framework.ClusterEvent]sets.String{
+				{Resource: framework.Pod, ActionType: framework.All}:                   sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.Node, ActionType: framework.All}:                  sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.Service, ActionType: framework.All}:               sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.CSINode, ActionType: framework.All}:               sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.PersistentVolume, ActionType: framework.All}:      sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}: sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.StorageClass, ActionType: framework.All}:          sets.NewString(bindPlugin, queueSortPlugin),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry := Registry{}
+			cfgPls := &config.Plugins{}
+			for _, pl := range tt.plugins {
+				tmpPl := pl
+				if err := registry.Register(pl.Name(), func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+					return tmpPl, nil
+				}); err != nil {
+					t.Fatalf("fail to register filter plugin (%s)", pl.Name())
+				}
+				cfgPls.Filter.Enabled = append(cfgPls.Filter.Enabled, config.Plugin{Name: pl.Name()})
+			}
+
+			got := make(map[framework.ClusterEvent]sets.String)
+			_, err := newFrameworkWithQueueSortAndBind(registry, cfgPls, emptyArgs, WithClusterEventMap(got))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("Unexpected eventToPlugin map (-want,+got):%s", diff)
 			}
 		})
 	}

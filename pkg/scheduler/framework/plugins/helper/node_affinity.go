@@ -65,7 +65,6 @@ func NodeMatchesNodeAffinity(affinity *v1.NodeAffinity, node *v1.Node) bool {
 // nodeMatchesNodeSelector checks if a node's labels satisfy a list of node selector terms,
 // terms are ORed, and an empty list of terms will match nothing.
 func nodeMatchesNodeSelector(node *v1.Node, nodeSelector *v1.NodeSelector) bool {
-	// TODO(#96164): parse this error earlier in the plugin so we only need to do it once per Pod.
 	matches, _ := corev1.MatchNodeSelectorTerms(node, nodeSelector)
 	return matches
 }

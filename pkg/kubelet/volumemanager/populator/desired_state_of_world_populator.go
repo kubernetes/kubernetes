@@ -512,8 +512,18 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 	pvcSource := podVolume.VolumeSource.PersistentVolumeClaim
 	ephemeral := false
 	if pvcSource == nil &&
-		podVolume.VolumeSource.Ephemeral != nil &&
-		utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+		podVolume.VolumeSource.Ephemeral != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+			// Provide an unambiguous error message that
+			// explains why the volume cannot be
+			// processed. If we just ignore the volume
+			// source, the error is just a vague "unknown
+			// volume source".
+			return nil, nil, "", fmt.Errorf(
+				"volume %s is a generic ephemeral volume, but that feature is disabled in kubelet",
+				podVolume.Name,
+			)
+		}
 		// Generic ephemeral inline volumes are handled the
 		// same way as a PVC reference. The only additional
 		// constraint (checked below) is that the PVC must be

@@ -29,10 +29,12 @@ kube::golang::setup_env
 go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/client-gen
 go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/lister-gen
 go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/informer-gen
+go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/applyconfiguration-gen
 
 clientgen=$(kube::util::find-binary "client-gen")
 listergen=$(kube::util::find-binary "lister-gen")
 informergen=$(kube::util::find-binary "informer-gen")
+applyconfigurationgen=$(kube::util::find-binary "applyconfiguration-gen")
 
 IFS=" " read -r -a GROUP_VERSIONS <<< "${KUBE_AVAILABLE_GROUP_VERSIONS}"
 GV_DIRS=()
@@ -53,6 +55,22 @@ for gv in "${GROUP_VERSIONS[@]}"; do
 done
 # delimit by commas for the command
 GV_DIRS_CSV=$(IFS=',';echo "${GV_DIRS[*]// /,}";IFS=$)
+
+applyconfigurationgen_external_apis=()
+# because client-gen doesn't do policy/v1alpha1, we have to skip it too
+kube::util::read-array applyconfigurationgen_external_apis < <(
+  cd "${KUBE_ROOT}/staging/src"
+  find k8s.io/api -name types.go -print0 | xargs -0 -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
+)
+applyconfigurationgen_external_apis+=("k8s.io/apimachinery/pkg/apis/meta/v1")
+applyconfigurationgen_external_apis_csv=$(IFS=,; echo "${applyconfigurationgen_external_apis[*]}")
+applyconfigurations_package="k8s.io/client-go/applyconfigurations"
+${applyconfigurationgen} \
+  --output-base "${KUBE_ROOT}/vendor" \
+  --output-package "${applyconfigurations_package}" \
+  --input-dirs "${applyconfigurationgen_external_apis_csv}" \
+  --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt" \
+  "$@"
 
 # This can be called with one flag, --verify-only, so it works for both the
 # update- and verify- scripts.

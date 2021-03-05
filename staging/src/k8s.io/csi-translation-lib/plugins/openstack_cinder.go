@@ -144,6 +144,12 @@ func (t *osCinderCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume) 
 		ReadOnly: csiSource.ReadOnly,
 	}
 
+	// translate CSI topology to In-tree topology for rollback compatibility.
+	// It is not possible to guess Cinder Region from the Zone, therefore leave it empty.
+	if err := translateTopologyFromCSIToInTree(pv, CinderTopologyKey, nil); err != nil {
+		return nil, fmt.Errorf("failed to translate topology. PV:%+v. Error:%v", *pv, err)
+	}
+
 	pv.Spec.CSI = nil
 	pv.Spec.Cinder = cinderSource
 	return pv, nil

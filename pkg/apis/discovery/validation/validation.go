@@ -40,7 +40,7 @@ var (
 	)
 	maxTopologyLabels = 16
 	maxAddresses      = 100
-	maxPorts          = 100
+	maxPorts          = 20000
 	maxEndpoints      = 1000
 )
 

@@ -547,6 +547,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
 		// Needed for volume limits
 		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csinodes").RuleOrDie(),
+		// Needed for namespaceSelector feature in pod affinity
+		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
 		kubeSchedulerRules = append(kubeSchedulerRules,

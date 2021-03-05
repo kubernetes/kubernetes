@@ -79,11 +79,15 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 			// container. This gives users ability to preselect the most interesting container in pod.
 			if annotations := t.GetAnnotations(); annotations != nil && len(opts.Container) == 0 {
 				var containerName string
-				if len(annotations[defaultLogsContainerAnnotationName]) > 0 {
+				if len(annotations[podutils.DefaultContainerAnnotationName]) > 0 {
+					containerName = annotations[podutils.DefaultContainerAnnotationName]
+				} else if len(annotations[defaultLogsContainerAnnotationName]) > 0 {
+					// Only log deprecation if we have only the old annotation. This allows users to
+					// set both to support multiple versions of kubectl; if they are setting both
+					// they must already know it is deprecated, so we don't need to add noisy
+					// warnings.
 					containerName = annotations[defaultLogsContainerAnnotationName]
 					fmt.Fprintf(os.Stderr, "Using deprecated annotation `kubectl.kubernetes.io/default-logs-container` in pod/%v. Please use `kubectl.kubernetes.io/default-container` instead\n", t.Name)
-				} else if len(annotations[podutils.DefaultContainerAnnotationName]) > 0 {
-					containerName = annotations[podutils.DefaultContainerAnnotationName]
 				}
 				if len(containerName) > 0 {
 					if exists, _ := podutils.FindContainerByName(t, containerName); exists != nil {

@@ -23,16 +23,17 @@ import (
 	"reflect"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	batchinformers "k8s.io/client-go/informers/batch/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/integer"
 )
 
@@ -453,7 +455,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 	}
 	sharedJob, err := jm.jobLister.Jobs(ns).Get(name)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			klog.V(4).Infof("Job has been deleted: %v", key)
 			jm.expectations.DeleteExpectations(key)
 			return true, nil
@@ -467,6 +469,12 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 		return true, nil
 	}
 
+	// Cannot create Pods if this is an Indexed Job and the feature is disabled.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) && job.Spec.CompletionMode == batch.IndexedCompletion {
+		jm.recorder.Event(&job, v1.EventTypeWarning, "IndexedJobDisabled", "Skipped Indexed Job sync because feature is disabled.")
+		return false, nil
+	}
+
 	// Check the expectations of the job before counting active pods, otherwise a new pod can sneak in
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
 	// the store after we've checked the expectation, the job sync is just deferred till the next relist.
@@ -476,10 +484,9 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
 	activePods := controller.FilterActivePods(pods)
 	active := int32(len(activePods))
-	succeeded, failed := getStatus(pods)
+	succeeded, failed := getStatus(&job, pods)
 	conditions := len(job.Status.Conditions)
 	// job first start
 	if job.Status.StartTime == nil {
@@ -518,15 +525,9 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 	}
 
 	if jobFailed {
-		errCh := make(chan error, active)
-		jm.deleteJobPods(&job, activePods, errCh)
-		select {
-		case manageJobErr = <-errCh:
-			if manageJobErr != nil {
-				break
-			}
-		default:
-		}
+		// TODO(#28486): Account for pod failures in status once we can track
+		// completions without lingering pods.
+		_, manageJobErr = jm.deleteJobPods(&job, "", activePods)
 
 		// update status values accordingly
 		failed += active
@@ -535,7 +536,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 		jm.recorder.Event(&job, v1.EventTypeWarning, failureReason, failureMessage)
 	} else {
 		if jobNeedsSync && job.DeletionTimestamp == nil {
-			active, manageJobErr = jm.manageJob(activePods, succeeded, &job)
+			active, manageJobErr = jm.manageJob(&job, activePods, succeeded, pods)
 		}
 		completions := succeeded
 		complete := false
@@ -586,6 +587,9 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 		job.Status.Active = active
 		job.Status.Succeeded = succeeded
 		job.Status.Failed = failed
+		if job.Spec.CompletionMode == batch.IndexedCompletion {
+			job.Status.CompletedIndexes = calculateCompletedIndexesStr(pods)
+		}
 
 		if err := jm.updateHandler(&job); err != nil {
 			return forget, err
@@ -602,27 +606,32 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 	return forget, manageJobErr
 }
 
-func (jm *Controller) deleteJobPods(job *batch.Job, pods []*v1.Pod, errCh chan<- error) {
-	// TODO: below code should be replaced with pod termination resulting in
-	// pod failures, rather than killing pods. Unfortunately none such solution
-	// exists ATM. There's an open discussion in the topic in
-	// https://github.com/kubernetes/kubernetes/issues/14602 which might give
-	// some sort of solution to above problem.
-	// kill remaining active pods
-	wait := sync.WaitGroup{}
-	nbPods := len(pods)
-	wait.Add(nbPods)
-	for i := int32(0); i < int32(nbPods); i++ {
-		go func(ix int32) {
-			defer wait.Done()
-			if err := jm.podControl.DeletePod(job.Namespace, pods[ix].Name, job); err != nil && !apierrors.IsNotFound(err) {
-				defer utilruntime.HandleError(err)
-				klog.V(2).Infof("Failed to delete %v, job %q/%q deadline exceeded", pods[ix].Name, job.Namespace, job.Name)
-				errCh <- err
+// deleteJobPods deletes the pods, returns the number of successful removals
+// and any error.
+func (jm *Controller) deleteJobPods(job *batch.Job, jobKey string, pods []*v1.Pod) (int32, error) {
+	errCh := make(chan error, len(pods))
+	successfulDeletes := int32(len(pods))
+	wg := sync.WaitGroup{}
+	wg.Add(len(pods))
+	for i := range pods {
+		go func(pod *v1.Pod) {
+			defer wg.Done()
+			if err := jm.podControl.DeletePod(job.Namespace, pod.Name, job); err != nil {
+				// Decrement the expected number of deletes because the informer won't observe this deletion
+				if jobKey != "" {
+					jm.expectations.DeletionObserved(jobKey)
+				}
+				if !apierrors.IsNotFound(err) {
+					klog.V(2).Infof("Failed to delete Pod", "job", klog.KObj(job), "pod", klog.KObj(pod), "err", err)
+					atomic.AddInt32(&successfulDeletes, -1)
+					errCh <- err
+					utilruntime.HandleError(err)
+				}
 			}
-		}(i)
+		}(pods[i])
 	}
-	wait.Wait()
+	wg.Wait()
+	return successfulDeletes, errorFromChannel(errCh)
 }
 
 // pastBackoffLimitOnFailure checks if container restartCounts sum exceeds BackoffLimit
@@ -675,17 +684,16 @@ func newCondition(conditionType batch.JobConditionType, reason, message string) 
 }
 
 // getStatus returns no of succeeded and failed pods running a job
-func getStatus(pods []*v1.Pod) (succeeded, failed int32) {
-	succeeded = int32(filterPods(pods, v1.PodSucceeded))
-	failed = int32(filterPods(pods, v1.PodFailed))
+func getStatus(job *batch.Job, pods []*v1.Pod) (succeeded, failed int32) {
+	succeeded = int32(countPodsByPhase(job, pods, v1.PodSucceeded))
+	failed = int32(countPodsByPhase(job, pods, v1.PodFailed))
 	return
 }
 
 // manageJob is the core method responsible for managing the number of running
 // pods according to what is specified in the job.Spec.
 // Does NOT modify <activePods>.
-func (jm *Controller) manageJob(activePods []*v1.Pod, succeeded int32, job *batch.Job) (int32, error) {
-	var activeLock sync.Mutex
+func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded int32, allPods []*v1.Pod) (int32, error) {
 	active := int32(len(activePods))
 	parallelism := *job.Spec.Parallelism
 	jobKey, err := controller.KeyFunc(job)
@@ -694,41 +702,22 @@ func (jm *Controller) manageJob(activePods []*v1.Pod, succeeded int32, job *batc
 		return 0, nil
 	}
 
-	var errCh chan error
-	if active > parallelism {
-		diff := active - parallelism
-		errCh = make(chan error, diff)
-		jm.expectations.ExpectDeletions(jobKey, int(diff))
-		klog.V(4).Infof("Too many pods running job %q, need %d, deleting %d", jobKey, parallelism, diff)
-		// Sort the pods in the order such that not-ready < ready, unscheduled
-		// < scheduled, and pending < running. This ensures that we delete pods
-		// in the earlier stages whenever possible.
-		sort.Sort(controller.ActivePods(activePods))
-
-		active -= diff
-		wait := sync.WaitGroup{}
-		wait.Add(int(diff))
-		for i := int32(0); i < diff; i++ {
-			go func(ix int32) {
-				defer wait.Done()
-				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, job); err != nil {
-					// Decrement the expected number of deletes because the informer won't observe this deletion
-					jm.expectations.DeletionObserved(jobKey)
-					if !apierrors.IsNotFound(err) {
-						klog.V(2).Infof("Failed to delete %v, decremented expectations for job %q/%q", activePods[ix].Name, job.Namespace, job.Name)
-						activeLock.Lock()
-						active++
-						activeLock.Unlock()
-						errCh <- err
-						utilruntime.HandleError(err)
-					}
-
-				}
-			}(i)
+	rmAtLeast := active - parallelism
+	if rmAtLeast < 0 {
+		rmAtLeast = 0
+	}
+	podsToDelete := activePodsForRemoval(job, activePods, int(rmAtLeast))
+	if len(podsToDelete) > 0 {
+		jm.expectations.ExpectDeletions(jobKey, len(podsToDelete))
+		klog.V(4).InfoS("Too many pods running for job", "job", klog.KObj(job), "deleted", len(podsToDelete), "target", parallelism)
+		removed, err := jm.deleteJobPods(job, jobKey, podsToDelete)
+		active -= removed
+		if err != nil {
+			return active, err
 		}
-		wait.Wait()
+	}
 
-	} else if active < parallelism {
+	if active < parallelism {
 		wantActive := int32(0)
 		if job.Spec.Completions == nil {
 			// Job does not specify a number of completions.  Therefore, number active
@@ -755,12 +744,24 @@ func (jm *Controller) manageJob(activePods []*v1.Pod, succeeded int32, job *batc
 		if diff == 0 {
 			return active, nil
 		}
+
 		jm.expectations.ExpectCreations(jobKey, int(diff))
-		errCh = make(chan error, diff)
+		errCh := make(chan error, diff)
 		klog.V(4).Infof("Too few pods running job %q, need %d, creating %d", jobKey, wantActive, diff)
 
-		active += diff
 		wait := sync.WaitGroup{}
+
+		var indexesToAdd []int
+		if job.Spec.Completions != nil && job.Spec.CompletionMode == batch.IndexedCompletion {
+			indexesToAdd = firstPendingIndexes(allPods, int(diff), int(*job.Spec.Completions))
+			diff = int32(len(indexesToAdd))
+		}
+		active += diff
+
+		podTemplate := job.Spec.Template.DeepCopy()
+		if job.Spec.CompletionMode == batch.IndexedCompletion {
+			addCompletionIndexEnvVariables(podTemplate)
+		}
 
 		// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
 		// and double with each successful iteration in a kind of "slow start".
@@ -774,11 +775,21 @@ func (jm *Controller) manageJob(activePods []*v1.Pod, succeeded int32, job *batc
 			errorCount := len(errCh)
 			wait.Add(int(batchSize))
 			for i := int32(0); i < batchSize; i++ {
+				completionIndex := unknownCompletionIndex
+				if indexesToAdd != nil {
+					completionIndex = indexesToAdd[0]
+					indexesToAdd = indexesToAdd[1:]
+				}
 				go func() {
+					template := podTemplate
+					if completionIndex != unknownCompletionIndex {
+						template = podTemplate.DeepCopy()
+						addCompletionIndexAnnotation(template, completionIndex)
+					}
 					defer wait.Done()
-					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, metav1.NewControllerRef(job, controllerKind))
+					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, template, job, metav1.NewControllerRef(job, controllerKind))
 					if err != nil {
-						if errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+						if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 							// If the namespace is being torn down, we can safely ignore
 							// this error since all subsequent creations will fail.
 							return
@@ -789,9 +800,7 @@ func (jm *Controller) manageJob(activePods []*v1.Pod, succeeded int32, job *batc
 						// Decrement the expected number of creates because the informer won't observe this pod
 						klog.V(2).Infof("Failed creation, decrementing expectations for job %q/%q", job.Namespace, job.Name)
 						jm.expectations.CreationObserved(jobKey)
-						activeLock.Lock()
-						active--
-						activeLock.Unlock()
+						atomic.AddInt32(&active, -1)
 						errCh <- err
 					}
 				}()
@@ -812,18 +821,36 @@ func (jm *Controller) manageJob(activePods []*v1.Pod, succeeded int32, job *batc
 			}
 			diff -= batchSize
 		}
-	}
-
-	select {
-	case err := <-errCh:
-		// all errors have been reported before, we only need to inform the controller that there was an error and it should re-try this job once more next time.
-		if err != nil {
+		if err := errorFromChannel(errCh); err != nil {
 			return active, err
 		}
-	default:
 	}
 
 	return active, nil
+}
+
+// activePodsForRemoval returns Pods that should be removed because there
+// are too many pods running or, if this is an indexed job, there are repeated
+// indexes or some pods don't have indexes.
+// Sorts candidate pods in the order such that not-ready < ready, unscheduled
+// < scheduled, and pending < running. This ensures that we delete pods
+// in the earlier stages whenever possible.
+func activePodsForRemoval(job *batch.Job, pods []*v1.Pod, rmAtLeast int) []*v1.Pod {
+	var rm, left []*v1.Pod
+
+	if job.Spec.CompletionMode == batch.IndexedCompletion {
+		rm = make([]*v1.Pod, 0, rmAtLeast)
+		left = make([]*v1.Pod, 0, len(pods)-rmAtLeast)
+		rm, left = appendDuplicatedIndexPodsForRemoval(rm, left, pods)
+	} else {
+		left = pods
+	}
+
+	if len(rm) < rmAtLeast {
+		sort.Sort(controller.ActivePods(left))
+		rm = append(rm, left[:rmAtLeast-len(rm)]...)
+	}
+	return rm
 }
 
 func (jm *Controller) updateJobStatus(job *batch.Job) error {
@@ -864,13 +891,22 @@ func getBackoff(queue workqueue.RateLimitingInterface, key interface{}) time.Dur
 	return calculated
 }
 
-// filterPods returns pods based on their phase.
-func filterPods(pods []*v1.Pod, phase v1.PodPhase) int {
+// countPodsByPhase returns pods based on their phase.
+func countPodsByPhase(job *batch.Job, pods []*v1.Pod, phase v1.PodPhase) int {
 	result := 0
-	for i := range pods {
-		if phase == pods[i].Status.Phase {
+	for _, p := range pods {
+		if phase == p.Status.Phase && (job.Spec.CompletionMode != batch.IndexedCompletion || getCompletionIndex(p.Annotations) != unknownCompletionIndex) {
 			result++
 		}
 	}
 	return result
+}
+
+func errorFromChannel(errCh <-chan error) error {
+	select {
+	case err := <-errCh:
+		return err
+	default:
+	}
+	return nil
 }

@@ -45,10 +45,6 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service, 
 	// zone, and region, but this will be expanded in the future.
 	topology := map[string]string{}
 
-	if pod.Spec.NodeName != "" {
-		topology["kubernetes.io/hostname"] = pod.Spec.NodeName
-	}
-
 	if node != nil {
 		topologyLabels := []string{
 			"topology.kubernetes.io/zone",
@@ -72,7 +68,6 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service, 
 		Conditions: discovery.EndpointConditions{
 			Ready: &ready,
 		},
-		Topology: topology,
 		TargetRef: &corev1.ObjectReference{
 			Kind:            "Pod",
 			Namespace:       pod.ObjectMeta.Namespace,
@@ -87,7 +82,10 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service, 
 		ep.Conditions.Terminating = &terminating
 	}
 
-	if pod.Spec.NodeName != "" && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName) {
+	if pod.Spec.NodeName != "" {
+		topology["kubernetes.io/hostname"] = pod.Spec.NodeName
+		ep.Topology = topology
+
 		ep.NodeName = &pod.Spec.NodeName
 	}
 

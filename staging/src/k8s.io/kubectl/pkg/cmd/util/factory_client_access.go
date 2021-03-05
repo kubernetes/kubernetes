@@ -19,6 +19,7 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
@@ -38,20 +39,17 @@ import (
 type factoryImpl struct {
 	clientGetter genericclioptions.RESTClientGetter
 
-	// openAPIGetter loads and caches openapi specs
-	openAPIGetter openAPIGetter
-}
-
-type openAPIGetter struct {
-	once   sync.Once
-	getter openapi.Getter
+	// Caches OpenAPI document and parsed resources
+	openAPIParser *openapi.CachedOpenAPIParser
+	openAPIGetter *openapi.CachedOpenAPIGetter
+	parser        sync.Once
+	getter        sync.Once
 }
 
 func NewFactory(clientGetter genericclioptions.RESTClientGetter) Factory {
 	if clientGetter == nil {
 		panic("attempt to instantiate client_access_factory with nil clientGetter")
 	}
-
 	f := &factoryImpl{
 		clientGetter: clientGetter,
 	}
@@ -159,19 +157,32 @@ func (f *factoryImpl) Validator(validate bool) (validation.Schema, error) {
 	}, nil
 }
 
-// OpenAPISchema returns metadata and structural information about Kubernetes object definitions.
+// OpenAPISchema returns metadata and structural information about
+// Kubernetes object definitions.
 func (f *factoryImpl) OpenAPISchema() (openapi.Resources, error) {
-	discovery, err := f.clientGetter.ToDiscoveryClient()
-	if err != nil {
-		return nil, err
+	openAPIGetter := f.OpenAPIGetter()
+	if openAPIGetter == nil {
+		return nil, errors.New("no openapi getter")
 	}
 
-	// Lazily initialize the OpenAPIGetter once
-	f.openAPIGetter.once.Do(func() {
-		// Create the caching OpenAPIGetter
-		f.openAPIGetter.getter = openapi.NewOpenAPIGetter(discovery)
+	// Lazily initialize the OpenAPIParser once
+	f.parser.Do(func() {
+		// Create the caching OpenAPIParser
+		f.openAPIParser = openapi.NewOpenAPIParser(f.OpenAPIGetter())
 	})
 
-	// Delegate to the OpenAPIGetter
-	return f.openAPIGetter.getter.Get()
+	// Delegate to the OpenAPIPArser
+	return f.openAPIParser.Parse()
+}
+
+func (f *factoryImpl) OpenAPIGetter() discovery.OpenAPISchemaInterface {
+	discovery, err := f.clientGetter.ToDiscoveryClient()
+	if err != nil {
+		return nil
+	}
+	f.getter.Do(func() {
+		f.openAPIGetter = openapi.NewOpenAPIGetter(discovery)
+	})
+
+	return f.openAPIGetter
 }
