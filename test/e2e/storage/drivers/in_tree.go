@@ -1299,7 +1299,7 @@ func (g *gcePdDriver) GetDriverInfo() *storageframework.DriverInfo {
 
 func (g *gcePdDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 	e2eskipper.SkipUnlessProviderIs("gce", "gke")
-	if pattern.FeatureTag == "[sig-windows]" {
+	if pattern.FeatureTag == "[Feature:Windows]" {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	}
 }
