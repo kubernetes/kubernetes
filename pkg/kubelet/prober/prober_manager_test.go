@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
@@ -119,7 +118,7 @@ func TestAddRemovePods(t *testing.T) {
 
 	// Removing probed pod.
 	m.RemovePod(&probePod)
-	if err := waitForWorkerExit(m, probePaths); err != nil {
+	if err := waitForWorkerExit(t, m, probePaths); err != nil {
 		t.Fatal(err)
 	}
 	if err := expectProbes(m, nil); err != nil {
@@ -187,7 +186,7 @@ func TestCleanupPods(t *testing.T) {
 		{"pod_keep", "prober2", liveness},
 		{"pod_keep", "prober3", startup},
 	}
-	if err := waitForWorkerExit(m, removedProbes); err != nil {
+	if err := waitForWorkerExit(t, m, removedProbes); err != nil {
 		t.Fatal(err)
 	}
 	if err := expectProbes(m, expectedProbes); err != nil {
@@ -347,7 +346,7 @@ func TestUpdateReadiness(t *testing.T) {
 	}
 
 	// Wait for ready status.
-	if err := waitForReadyStatus(m, true); err != nil {
+	if err := waitForReadyStatus(t, m, true); err != nil {
 		t.Error(err)
 	}
 
@@ -355,7 +354,7 @@ func TestUpdateReadiness(t *testing.T) {
 	exec.set(probe.Failure, nil)
 
 	// Wait for failed status.
-	if err := waitForReadyStatus(m, false); err != nil {
+	if err := waitForReadyStatus(t, m, false); err != nil {
 		t.Error(err)
 	}
 }
@@ -389,7 +388,7 @@ outer:
 const interval = 1 * time.Second
 
 // Wait for the given workers to exit & clean up.
-func waitForWorkerExit(m *manager, workerPaths []probeKey) error {
+func waitForWorkerExit(t *testing.T, m *manager, workerPaths []probeKey) error {
 	for _, w := range workerPaths {
 		condition := func() (bool, error) {
 			_, exists := m.getWorker(w.podUID, w.containerName, w.probeType)
@@ -398,7 +397,7 @@ func waitForWorkerExit(m *manager, workerPaths []probeKey) error {
 		if exited, _ := condition(); exited {
 			continue // Already exited, no need to poll.
 		}
-		klog.Infof("Polling %v", w)
+		t.Logf("Polling %v", w)
 		if err := wait.Poll(interval, wait.ForeverTestTimeout, condition); err != nil {
 			return err
 		}
@@ -408,7 +407,7 @@ func waitForWorkerExit(m *manager, workerPaths []probeKey) error {
 }
 
 // Wait for the given workers to exit & clean up.
-func waitForReadyStatus(m *manager, ready bool) error {
+func waitForReadyStatus(t *testing.T, m *manager, ready bool) error {
 	condition := func() (bool, error) {
 		status, ok := m.statusManager.GetPodStatus(testPodUID)
 		if !ok {
@@ -423,7 +422,7 @@ func waitForReadyStatus(m *manager, ready bool) error {
 		}
 		return status.ContainerStatuses[0].Ready == ready, nil
 	}
-	klog.Infof("Polling for ready state %v", ready)
+	t.Logf("Polling for ready state %v", ready)
 	if err := wait.Poll(interval, wait.ForeverTestTimeout, condition); err != nil {
 		return err
 	}
@@ -438,7 +437,7 @@ func cleanup(t *testing.T, m *manager) {
 	condition := func() (bool, error) {
 		workerCount := m.workerCount()
 		if workerCount > 0 {
-			klog.Infof("Waiting for %d workers to exit...", workerCount)
+			t.Logf("Waiting for %d workers to exit...", workerCount)
 		}
 		return workerCount == 0, nil
 	}

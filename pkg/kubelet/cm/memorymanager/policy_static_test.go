@@ -25,7 +25,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
@@ -68,39 +67,41 @@ var (
 )
 
 type fakeTopologyManagerWithHint struct {
+	t    *testing.T
 	hint *topologymanager.TopologyHint
 }
 
 // NewFakeTopologyManagerWithHint returns an instance of fake topology manager with specified topology hints
-func NewFakeTopologyManagerWithHint(hint *topologymanager.TopologyHint) topologymanager.Manager {
+func NewFakeTopologyManagerWithHint(t *testing.T, hint *topologymanager.TopologyHint) topologymanager.Manager {
 	return &fakeTopologyManagerWithHint{
+		t:    t,
 		hint: hint,
 	}
 }
 
 func (m *fakeTopologyManagerWithHint) AddHintProvider(h topologymanager.HintProvider) {
-	klog.Infof("[fake topologymanager] AddHintProvider HintProvider:  %v", h)
+	m.t.Logf("[fake topologymanager] AddHintProvider HintProvider:  %v", h)
 }
 
 func (m *fakeTopologyManagerWithHint) AddContainer(pod *v1.Pod, containerID string) error {
-	klog.Infof("[fake topologymanager] AddContainer  pod: %v container id:  %v", format.Pod(pod), containerID)
+	m.t.Logf("[fake topologymanager] AddContainer  pod: %v container id:  %v", format.Pod(pod), containerID)
 	return nil
 }
 
 func (m *fakeTopologyManagerWithHint) RemoveContainer(containerID string) error {
-	klog.Infof("[fake topologymanager] RemoveContainer container id:  %v", containerID)
+	m.t.Logf("[fake topologymanager] RemoveContainer container id:  %v", containerID)
 	return nil
 }
 
 func (m *fakeTopologyManagerWithHint) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	klog.Infof("[fake topologymanager] Topology Admit Handler")
+	m.t.Logf("[fake topologymanager] Topology Admit Handler")
 	return lifecycle.PodAdmitResult{
 		Admit: true,
 	}
 }
 
 func (m *fakeTopologyManagerWithHint) GetAffinity(podUID string, containerName string) topologymanager.TopologyHint {
-	klog.Infof("[fake topologymanager] GetAffinity podUID: %v container name:  %v", podUID, containerName)
+	m.t.Logf("[fake topologymanager] GetAffinity podUID: %v container name:  %v", podUID, containerName)
 	return *m.hint
 }
 
@@ -128,25 +129,25 @@ func areMemoryBlocksEqual(mb1, mb2 []state.Block) bool {
 	return len(copyMemoryBlocks) == 0
 }
 
-func areContainerMemoryAssignmentsEqual(cma1, cma2 state.ContainerMemoryAssignments) bool {
+func areContainerMemoryAssignmentsEqual(t *testing.T, cma1, cma2 state.ContainerMemoryAssignments) bool {
 	if len(cma1) != len(cma2) {
 		return false
 	}
 
 	for podUID, container := range cma1 {
 		if _, ok := cma2[podUID]; !ok {
-			klog.Errorf("[memorymanager_tests] the assignment does not have pod UID %s", podUID)
+			t.Logf("[memorymanager_tests] the assignment does not have pod UID %s", podUID)
 			return false
 		}
 
 		for containerName, memoryBlocks := range container {
 			if _, ok := cma2[podUID][containerName]; !ok {
-				klog.Errorf("[memorymanager_tests] the assignment does not have container name %s", containerName)
+				t.Logf("[memorymanager_tests] the assignment does not have container name %s", containerName)
 				return false
 			}
 
 			if !areMemoryBlocksEqual(memoryBlocks, cma2[podUID][containerName]) {
-				klog.Errorf("[memorymanager_tests] assignments memory blocks are different: %v != %v", memoryBlocks, cma2[podUID][containerName])
+				t.Logf("[memorymanager_tests] assignments memory blocks are different: %v != %v", memoryBlocks, cma2[podUID][containerName])
 				return false
 			}
 		}
@@ -168,10 +169,10 @@ type testStaticPolicy struct {
 	expectedTopologyHints map[string][]topologymanager.TopologyHint
 }
 
-func initTests(testCase *testStaticPolicy, hint *topologymanager.TopologyHint) (Policy, state.State, error) {
+func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint) (Policy, state.State, error) {
 	manager := topologymanager.NewFakeManager()
 	if hint != nil {
-		manager = NewFakeTopologyManagerWithHint(hint)
+		manager = NewFakeTopologyManagerWithHint(t, hint)
 	}
 
 	p, err := NewPolicyStatic(testCase.machineInfo, testCase.systemReserved, manager)
@@ -211,7 +212,7 @@ func TestStaticPolicyNew(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			_, _, err := initTests(&testCase, nil)
+			_, _, err := initTests(t, &testCase, nil)
 			if !reflect.DeepEqual(err, testCase.expectedError) {
 				t.Fatalf("The actual error: %v is different from the expected one: %v", err, testCase.expectedError)
 			}
@@ -232,7 +233,7 @@ func TestStaticPolicyName(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, _, err := initTests(&testCase, nil)
+			p, _, err := initTests(t, &testCase, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -1059,8 +1060,8 @@ func TestStaticPolicyStart(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			klog.Infof("[Start] %s", testCase.description)
-			p, s, err := initTests(&testCase, nil)
+			t.Logf("[Start] %s", testCase.description)
+			p, s, err := initTests(t, &testCase, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -1075,7 +1076,7 @@ func TestStaticPolicyStart(t *testing.T) {
 			}
 
 			assignments := s.GetMemoryAssignments()
-			if !areContainerMemoryAssignmentsEqual(assignments, testCase.expectedAssignments) {
+			if !areContainerMemoryAssignmentsEqual(t, assignments, testCase.expectedAssignments) {
 				t.Fatalf("Actual assignments: %v is different from the expected one: %v", assignments, testCase.expectedAssignments)
 			}
 
@@ -1800,8 +1801,8 @@ func TestStaticPolicyAllocate(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			klog.Infof("TestStaticPolicyAllocate %s", testCase.description)
-			p, s, err := initTests(&testCase, testCase.topologyHint)
+			t.Logf("TestStaticPolicyAllocate %s", testCase.description)
+			p, s, err := initTests(t, &testCase, testCase.topologyHint)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -1816,7 +1817,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 			}
 
 			assignments := s.GetMemoryAssignments()
-			if !areContainerMemoryAssignmentsEqual(assignments, testCase.expectedAssignments) {
+			if !areContainerMemoryAssignmentsEqual(t, assignments, testCase.expectedAssignments) {
 				t.Fatalf("Actual assignments %v are different from the expected %v", assignments, testCase.expectedAssignments)
 			}
 
@@ -2066,7 +2067,7 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, s, err := initTests(&testCase, nil)
+			p, s, err := initTests(t, &testCase, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -2081,7 +2082,7 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 			}
 
 			assignments := s.GetMemoryAssignments()
-			if !areContainerMemoryAssignmentsEqual(assignments, testCase.expectedAssignments) {
+			if !areContainerMemoryAssignmentsEqual(t, assignments, testCase.expectedAssignments) {
 				t.Fatalf("Actual assignments %v are different from the expected %v", assignments, testCase.expectedAssignments)
 			}
 
@@ -2367,7 +2368,7 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, s, err := initTests(&testCase, nil)
+			p, s, err := initTests(t, &testCase, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}

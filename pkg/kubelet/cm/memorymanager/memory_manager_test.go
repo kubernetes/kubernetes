@@ -892,7 +892,7 @@ func TestRemoveStaleState(t *testing.T) {
 
 			mgr.removeStaleState()
 
-			if !areContainerMemoryAssignmentsEqual(mgr.state.GetMemoryAssignments(), testCase.expectedAssignments) {
+			if !areContainerMemoryAssignmentsEqual(t, mgr.state.GetMemoryAssignments(), testCase.expectedAssignments) {
 				t.Errorf("Memory Manager removeStaleState() error, expected assignments %v, but got: %v",
 					testCase.expectedAssignments, mgr.state.GetMemoryAssignments())
 			}
@@ -2012,7 +2012,7 @@ func TestRemoveContainer(t *testing.T) {
 					testCase.description, testCase.expectedError, err)
 			}
 
-			if !areContainerMemoryAssignmentsEqual(mgr.state.GetMemoryAssignments(), testCase.expectedAssignments) {
+			if !areContainerMemoryAssignmentsEqual(t, mgr.state.GetMemoryAssignments(), testCase.expectedAssignments) {
 				t.Fatalf("Memory Manager RemoveContainer() inconsistent assignment, expected: %+v, but got: %+v, start %+v",
 					testCase.expectedAssignments, mgr.state.GetMemoryAssignments(), testCase.expectedAssignments)
 			}
