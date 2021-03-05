@@ -35,3 +35,5 @@ spec:
     apiGroup: "20"
     kind: "21"
     name: "22"
+    namespace: "24"
+    scope: "23"

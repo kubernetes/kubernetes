@@ -4024,7 +4024,7 @@ Parameters:
 				},
 				Spec: networkingv1beta1.IngressClassSpec{
 					Controller: "example.com/controller",
-					Parameters: &corev1.TypedLocalObjectReference{
+					Parameters: &networkingv1beta1.IngressClassParametersReference{
 						APIGroup: utilpointer.StringPtr("v1"),
 						Kind:     "ConfigMap",
 						Name:     "example-parameters",
@@ -4040,7 +4040,7 @@ Parameters:
 				},
 				Spec: networkingv1.IngressClassSpec{
 					Controller: "example.com/controller",
-					Parameters: &corev1.TypedLocalObjectReference{
+					Parameters: &networkingv1.IngressClassParametersReference{
 						APIGroup: utilpointer.StringPtr("v1"),
 						Kind:     "ConfigMap",
 						Name:     "example-parameters",

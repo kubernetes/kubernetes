@@ -682,11 +682,13 @@ const (
 	//
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
+
 	// owner: @ahg-g
 	// alpha: v1.21
 	//
 	// Allow specifying NamespaceSelector in PodAffinityTerm.
 	PodAffinityNamespaceSelector featuregate.Feature = "PodAffinityNamespaceSelector"
+
 	// owner: @andrewsykim @xudongliuharold
 	// alpha: v1.21
 	//
@@ -698,6 +700,12 @@ const (
 	//
 	// Enables scaling down replicas via logarithmic comparison of creation/ready timestamps
 	LogarithmicScaleDown featuregate.Feature = "LogarithmicScaleDown"
+
+	// owner: @hbagdi
+	// alpha: v1.21
+	//
+	// Enable Scope and Namespace fields on IngressClassParametersReference.
+	IngressClassNamespacedParams featuregate.Feature = "IngressClassNamespacedParams"
 )
 
 func init() {
@@ -804,6 +812,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodAffinityNamespaceSelector:                   {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLoadBalancerClass:                       {Default: false, PreRelease: featuregate.Alpha},
 	LogarithmicScaleDown:                           {Default: false, PreRelease: featuregate.Alpha},
+	IngressClassNamespacedParams:                   {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

@@ -1012,7 +1012,7 @@ func TestPrintIngressClass(t *testing.T) {
 			},
 			Spec: networking.IngressClassSpec{
 				Controller: "example.com/controller",
-				Parameters: &api.TypedLocalObjectReference{Kind: "customgroup", Name: "example"},
+				Parameters: &networking.IngressClassParametersReference{Kind: "customgroup", Name: "example"},
 			},
 		},
 		expected: []metav1.TableRow{{Cells: []interface{}{"test1", "example.com/controller", "customgroup/example", "10y"}}},
@@ -1025,7 +1025,7 @@ func TestPrintIngressClass(t *testing.T) {
 			},
 			Spec: networking.IngressClassSpec{
 				Controller: "example.com/controller",
-				Parameters: &api.TypedLocalObjectReference{
+				Parameters: &networking.IngressClassParametersReference{
 					APIGroup: utilpointer.StringPtr("example.com"),
 					Kind:     "customgroup",
 					Name:     "example",

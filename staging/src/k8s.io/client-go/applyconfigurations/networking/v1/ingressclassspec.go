@@ -18,15 +18,11 @@ limitations under the License.
 
 package v1
 
-import (
-	v1 "k8s.io/client-go/applyconfigurations/core/v1"
-)
-
 // IngressClassSpecApplyConfiguration represents an declarative configuration of the IngressClassSpec type for use
 // with apply.
 type IngressClassSpecApplyConfiguration struct {
-	Controller *string                                         `json:"controller,omitempty"`
-	Parameters *v1.TypedLocalObjectReferenceApplyConfiguration `json:"parameters,omitempty"`
+	Controller *string                                            `json:"controller,omitempty"`
+	Parameters *IngressClassParametersReferenceApplyConfiguration `json:"parameters,omitempty"`
 }
 
 // IngressClassSpecApplyConfiguration constructs an declarative configuration of the IngressClassSpec type for use with
@@ -46,7 +42,7 @@ func (b *IngressClassSpecApplyConfiguration) WithController(value string) *Ingre
 // WithParameters sets the Parameters field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Parameters field is set to the value of the last call.
-func (b *IngressClassSpecApplyConfiguration) WithParameters(value *v1.TypedLocalObjectReferenceApplyConfiguration) *IngressClassSpecApplyConfiguration {
+func (b *IngressClassSpecApplyConfiguration) WithParameters(value *IngressClassParametersReferenceApplyConfiguration) *IngressClassSpecApplyConfiguration {
 	b.Parameters = value
 	return b
 }
