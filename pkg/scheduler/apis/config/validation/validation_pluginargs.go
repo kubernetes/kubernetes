@@ -298,3 +298,15 @@ func ValidateNodeAffinityArgs(args *config.NodeAffinityArgs) error {
 	}
 	return errors.Flatten(errors.NewAggregate(errs))
 }
+
+// ValidateVolumeBindingArgs validates that VolumeBindingArgs are set correctly.
+func ValidateVolumeBindingArgs(args *config.VolumeBindingArgs) error {
+	var path *field.Path
+	var err error
+
+	if args.BindTimeoutSeconds < 0 {
+		err = field.Invalid(path.Child("bindTimeoutSeconds"), args.BindTimeoutSeconds, "invalid BindTimeoutSeconds, should not be a negative value")
+	}
+
+	return err
+}
