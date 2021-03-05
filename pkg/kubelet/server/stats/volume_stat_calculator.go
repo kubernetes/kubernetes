@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 
 	"k8s.io/klog/v2"
 )
@@ -122,7 +123,7 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 			}
 		}
 		volumeStats := s.parsePodVolumeStats(name, pvcRef, metric, volSpec)
-		if isVolumeEphemeral(volSpec) {
+		if util.IsLocalEphemeralVolume(volSpec) {
 			ephemeralStats = append(ephemeralStats, volumeStats)
 		} else {
 			persistentStats = append(persistentStats, volumeStats)
@@ -164,12 +165,4 @@ func (s *volumeStatCalculator) parsePodVolumeStats(podName string, pvcRef *stats
 		FsStats: stats.FsStats{Time: metric.Time, AvailableBytes: &available, CapacityBytes: &capacity,
 			UsedBytes: &used, Inodes: &inodes, InodesFree: &inodesFree, InodesUsed: &inodesUsed},
 	}
-}
-
-func isVolumeEphemeral(volume v1.Volume) bool {
-	if (volume.EmptyDir != nil && volume.EmptyDir.Medium == v1.StorageMediumDefault) ||
-		volume.ConfigMap != nil || volume.GitRepo != nil {
-		return true
-	}
-	return false
 }

@@ -583,10 +583,12 @@ func GetPluginMountDir(host volume.VolumeHost, name string) string {
 
 // IsLocalEphemeralVolume determines whether the argument is a local ephemeral
 // volume vs. some other type
+// Local means the volume is using storage from the local disk that is managed by kubelet.
+// Ephemeral means the lifecycle of the volume is the same as the Pod.
 func IsLocalEphemeralVolume(volume v1.Volume) bool {
 	return volume.GitRepo != nil ||
-		(volume.EmptyDir != nil && volume.EmptyDir.Medium != v1.StorageMediumMemory) ||
-		volume.ConfigMap != nil || volume.DownwardAPI != nil
+		(volume.EmptyDir != nil && volume.EmptyDir.Medium == v1.StorageMediumDefault) ||
+		volume.ConfigMap != nil
 }
 
 // GetPodVolumeNames returns names of volumes that are used in a pod,

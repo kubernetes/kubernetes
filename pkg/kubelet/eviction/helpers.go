@@ -31,6 +31,7 @@ import (
 	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	volumeutils "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -343,9 +344,7 @@ func localVolumeNames(pod *v1.Pod) []string {
 	result := []string{}
 	for _, volume := range pod.Spec.Volumes {
 		if volume.HostPath != nil ||
-			(volume.EmptyDir != nil && volume.EmptyDir.Medium != v1.StorageMediumMemory) ||
-			volume.ConfigMap != nil ||
-			volume.GitRepo != nil {
+			volumeutils.IsLocalEphemeralVolume(volume) {
 			result = append(result, volume.Name)
 		}
 	}
