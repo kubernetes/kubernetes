@@ -22,7 +22,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -216,8 +215,6 @@ var (
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope"},
 	)
-
-	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 
 	metrics = []resettableCollector{
 		deprecatedRequestGauge,
