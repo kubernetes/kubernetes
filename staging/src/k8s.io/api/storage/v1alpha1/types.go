@@ -210,6 +210,20 @@ type CSIStorageCapacity struct {
 	//
 	// +optional
 	Capacity *resource.Quantity `json:"capacity,omitempty" protobuf:"bytes,4,opt,name=capacity"`
+
+	// MaximumVolumeSize is the value reported by the CSI driver in its GetCapacityResponse
+	// for a GetCapacityRequest with topology and parameters that match the
+	// previous fields.
+	//
+	// This is defined since CSI spec 1.4.0 as the largest size
+	// that may be used in a
+	// CreateVolumeRequest.capacity_range.required_bytes field to
+	// create a volume with the same parameters as those in
+	// GetCapacityRequest. The corresponding value in the Kubernetes
+	// API is ResourceRequirements.Requests in a volume claim.
+	//
+	// +optional
+	MaximumVolumeSize *resource.Quantity `json:"maximumVolumeSize,omitempty" protobuf:"bytes,5,opt,name=maximumVolumeSize"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
