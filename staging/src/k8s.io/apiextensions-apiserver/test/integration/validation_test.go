@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -467,6 +469,174 @@ func TestCustomResourceUpdateValidation(t *testing.T) {
 		if err := fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestZeroValueValidation(t *testing.T) {
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	crdManifest := `
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: zeros.tests.example.com
+spec:
+  group: tests.example.com
+  names:
+    plural: zeros
+    singular: zero
+    kind: Zero
+    listKind: Zerolist
+  scope: Cluster
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          string:
+            type: string
+          string_default:
+            type: string
+            default: ""
+          string_null:
+            type: string
+            nullable: true
+
+          boolean:
+            type: boolean
+          boolean_default:
+            type: boolean
+            default: false
+          boolean_null:
+            type: boolean
+            nullable: true
+
+          number:
+            type: number
+          number_default:
+            type: number
+            default: 0.0
+          number_null:
+            type: number
+            nullable: true
+
+          integer:
+            type: integer
+          integer_default:
+            type: integer
+            default: 0
+          integer_null:
+            type: integer
+            nullable: true
+
+          array:
+            type: array
+            items:
+              type: string
+          array_default:
+            type: array
+            items:
+              type: string
+            default: []
+          array_null:
+            type: array
+            nullable: true
+            items:
+              type: string
+
+          object:
+            type: object
+            properties:
+              a:
+                type: string
+          object_default:
+            type: object
+            properties:
+              a:
+                type: string
+            default: {}
+          object_null:
+            type: object
+            nullable: true
+            properties:
+              a:
+                type: string
+`
+
+	// decode CRD crdManifest
+	crdObj, _, err := clientschema.Codecs.UniversalDeserializer().Decode([]byte(crdManifest), nil, nil)
+	if err != nil {
+		t.Fatalf("failed decoding of: %v\n\n%s", err, crdManifest)
+	}
+	crd := crdObj.(*apiextensionsv1.CustomResourceDefinition)
+	_, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	crObj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "tests.example.com/v1",
+			"kind":       "Zero",
+			"metadata":   map[string]interface{}{"name": "myzero"},
+
+			"string":       "",
+			"string_null":  nil,
+			"boolean":      false,
+			"boolean_null": nil,
+			"number":       0,
+			"number_null":  nil,
+			"integer":      0,
+			"integer_null": nil,
+			"array":        []interface{}{},
+			"array_null":   nil,
+			"object":       map[string]interface{}{},
+			"object_null":  nil,
+		},
+	}
+	zerosClient := dynamicClient.Resource(schema.GroupVersionResource{Group: "tests.example.com", Version: "v1", Resource: "zeros"})
+	createdCR, err := zerosClient.Create(context.TODO(), crObj, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedCR := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "tests.example.com/v1",
+			"kind":       "Zero",
+			"metadata":   createdCR.Object["metadata"],
+
+			"string":       "",
+			"string_null":  nil,
+			"boolean":      false,
+			"boolean_null": nil,
+			"number":       int64(0),
+			"number_null":  nil,
+			"integer":      int64(0),
+			"integer_null": nil,
+			"array":        []interface{}{},
+			"array_null":   nil,
+			"object":       map[string]interface{}{},
+			"object_null":  nil,
+
+			"string_default":  "",
+			"boolean_default": false,
+			"number_default":  int64(0),
+			"integer_default": int64(0),
+			"array_default":   []interface{}{},
+			"object_default":  map[string]interface{}{},
+		},
+	}
+
+	if diff := cmp.Diff(createdCR, expectedCR); len(diff) > 0 {
+		t.Error(diff)
 	}
 }
 
