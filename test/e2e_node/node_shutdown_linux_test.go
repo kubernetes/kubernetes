@@ -28,13 +28,15 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/e2e/framework"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNodeShutdown]", func() {
@@ -86,18 +88,18 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNod
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
 
+			ginkgo.By("Verifying batch pods are running")
 			for _, pod := range list.Items {
-				framework.ExpectEqual(
-					pod.Status.Phase,
-					v1.PodRunning,
-					"pod is not ready",
-				)
+				if podReady, err := testutils.PodRunningReady(&pod); err != nil || !podReady {
+					framework.Failf("Failed to start batch pod: %v", pod.Name)
+				}
 			}
 
 			ginkgo.By("Emitting shutdown signal")
 			err = emitSignalPrepareForShutdown(true)
 			framework.ExpectNoError(err)
 
+			ginkgo.By("Verifying that non-critical pods are shutdown")
 			// Not critical pod should be shutdown
 			gomega.Eventually(func() error {
 				list, err = f.PodClient().List(context.TODO(), metav1.ListOptions{
@@ -111,10 +113,12 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNod
 				for _, pod := range list.Items {
 					if kubelettypes.IsCriticalPod(&pod) {
 						if pod.Status.Phase != v1.PodRunning {
+							framework.Logf("Expecting critcal pod to be running, but it's not currently. Pod: %q, Pod Status Phase: %q, Pod Status Reason: %q", pod.Name, pod.Status.Phase, pod.Status.Reason)
 							return fmt.Errorf("critical pod should not be shutdown, phase: %s", pod.Status.Phase)
 						}
 					} else {
 						if pod.Status.Phase != v1.PodFailed || pod.Status.Reason != "Shutdown" {
+							framework.Logf("Expecting non-critcal pod to be shutdown, but it's not currently. Pod: %q, Pod Status Phase: %q, Pod Status Reason: %q", pod.Name, pod.Status.Phase, pod.Status.Reason)
 							return fmt.Errorf("pod should be shutdown, phase: %s", pod.Status.Phase)
 						}
 					}
@@ -122,6 +126,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNod
 				return nil
 			}, podStatusUpdateTimeout, pollInterval).Should(gomega.BeNil())
 
+			ginkgo.By("Verifying that all pods are shutdown")
 			// All pod should be shutdown
 			gomega.Eventually(func() error {
 				list, err = f.PodClient().List(context.TODO(), metav1.ListOptions{
@@ -134,6 +139,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNod
 
 				for _, pod := range list.Items {
 					if pod.Status.Phase != v1.PodFailed || pod.Status.Reason != "Shutdown" {
+						framework.Logf("Expecting pod to be shutdown, but it's not currently: Pod: %q, Pod Status Phase: %q, Pod Status Reason: %q", pod.Name, pod.Status.Phase, pod.Status.Reason)
 						return fmt.Errorf("pod should be shutdown, phase: %s", pod.Status.Phase)
 					}
 				}
@@ -188,10 +194,10 @@ func getGracePeriodOverrideTestPod(name string, node string, gracePeriod int64, 
 					Args: []string{`
 _term() {
 	echo "Caught SIGTERM signal!"
-	sleep infinity
+	while true; do sleep 5; done
 }
-trap _term SIGTERM 
-sleep infinity
+trap _term SIGTERM
+while true; do sleep 5; done
 `},
 				},
 			},
@@ -214,7 +220,7 @@ sleep infinity
 
 // Emits a fake PrepareForShutdown dbus message on system dbus. Will cause kubelet to react to an active shutdown event.
 func emitSignalPrepareForShutdown(b bool) error {
-	cmd := "gdbus emit --system --object-path /org/freedesktop/login1 --signal org.freedesktop.login1.Manager.PrepareForShutdown " + strconv.FormatBool(b)
+	cmd := "dbus-send --system /org/freedesktop/login1 org.freedesktop.login1.Manager.PrepareForShutdown boolean:" + strconv.FormatBool(b)
 	_, err := runCommand("sh", "-c", cmd)
 	return err
 }
