@@ -20,17 +20,19 @@ package v1beta1
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // PodDisruptionBudgetStatusApplyConfiguration represents an declarative configuration of the PodDisruptionBudgetStatus type for use
 // with apply.
 type PodDisruptionBudgetStatusApplyConfiguration struct {
-	ObservedGeneration *int64             `json:"observedGeneration,omitempty"`
-	DisruptedPods      map[string]v1.Time `json:"disruptedPods,omitempty"`
-	DisruptionsAllowed *int32             `json:"disruptionsAllowed,omitempty"`
-	CurrentHealthy     *int32             `json:"currentHealthy,omitempty"`
-	DesiredHealthy     *int32             `json:"desiredHealthy,omitempty"`
-	ExpectedPods       *int32             `json:"expectedPods,omitempty"`
+	ObservedGeneration *int64                               `json:"observedGeneration,omitempty"`
+	DisruptedPods      map[string]v1.Time                   `json:"disruptedPods,omitempty"`
+	DisruptionsAllowed *int32                               `json:"disruptionsAllowed,omitempty"`
+	CurrentHealthy     *int32                               `json:"currentHealthy,omitempty"`
+	DesiredHealthy     *int32                               `json:"desiredHealthy,omitempty"`
+	ExpectedPods       *int32                               `json:"expectedPods,omitempty"`
+	Conditions         []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
 // PodDisruptionBudgetStatusApplyConfiguration constructs an declarative configuration of the PodDisruptionBudgetStatus type for use with
@@ -90,5 +92,18 @@ func (b *PodDisruptionBudgetStatusApplyConfiguration) WithDesiredHealthy(value i
 // If called multiple times, the ExpectedPods field is set to the value of the last call.
 func (b *PodDisruptionBudgetStatusApplyConfiguration) WithExpectedPods(value int32) *PodDisruptionBudgetStatusApplyConfiguration {
 	b.ExpectedPods = &value
+	return b
+}
+
+// WithConditions adds the given value to the Conditions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Conditions field.
+func (b *PodDisruptionBudgetStatusApplyConfiguration) WithConditions(values ...*metav1.ConditionApplyConfiguration) *PodDisruptionBudgetStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithConditions")
+		}
+		b.Conditions = append(b.Conditions, *values[i])
+	}
 	return b
 }

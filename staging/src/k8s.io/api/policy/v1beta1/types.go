@@ -96,7 +96,7 @@ type PodDisruptionBudgetStatus struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type", protobuf:"bytes,7,rep,name=conditions"`
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,7,rep,name=conditions"`
 }
 
 const (
@@ -106,10 +106,10 @@ const (
 
 	// SyncFailedReason is set on the DisruptionAllowed condition if reconcile
 	// of the PDB failed and therefore disruption of pods are not allowed.
-	SyncFailedReason       = "SyncFailed"
+	SyncFailedReason = "SyncFailed"
 	// SufficientPodsReason is set on the DisruptionAllowed condition if there are
 	// more pods covered by the PDB than required and at least one can be disrupted.
-	SufficientPodsReason   = "SufficientPods"
+	SufficientPodsReason = "SufficientPods"
 	// InsufficientPodsReason is set on the DisruptionAllowed condition if the number
 	// of pods are equal to or fewer than required by the PDB.
 	InsufficientPodsReason = "InsufficientPods"
