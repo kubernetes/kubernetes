@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"net/url"
+	"os"
 	"reflect"
 	goruntime "runtime"
 	"strconv"
@@ -159,9 +160,13 @@ func ListenAndServeKubeletServer(
 		// Passing empty strings as the cert and key files means no
 		// cert/keys are specified and GetCertificate in the TLSConfig
 		// should be called instead.
-		klog.Fatal(s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile))
-	} else {
-		klog.Fatal(s.ListenAndServe())
+		if err := s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile); err != nil {
+			klog.ErrorS(err, "Failed to listen and serve")
+			os.Exit(1)
+		}
+	} else if err := s.ListenAndServe(); err != nil {
+		klog.ErrorS(err, "Failed to listen and serve")
+		os.Exit(1)
 	}
 }
 
@@ -175,7 +180,11 @@ func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer st
 		Handler:        &s,
 		MaxHeaderBytes: 1 << 20,
 	}
-	klog.Fatal(server.ListenAndServe())
+
+	if err := server.ListenAndServe(); err != nil {
+		klog.ErrorS(err, "Failed to listen and serve")
+		os.Exit(1)
+	}
 }
 
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
@@ -185,9 +194,14 @@ func ListenAndServePodResources(socket string, podsProvider podresources.PodsPro
 	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewV1PodResourcesServer(podsProvider, devicesProvider, cpusProvider))
 	l, err := util.CreateListener(socket)
 	if err != nil {
-		klog.Fatalf("Failed to create listener for podResources endpoint: %v", err)
+		klog.ErrorS(err, "Failed to create listener for podResources endpoint")
+		os.Exit(1)
 	}
-	klog.Fatal(server.Serve(l))
+
+	if err := server.Serve(l); err != nil {
+		klog.ErrorS(err, "Failed to serve")
+		os.Exit(1)
+	}
 }
 
 // AuthInterface contains all methods required by the auth filters
