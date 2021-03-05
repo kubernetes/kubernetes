@@ -2407,6 +2407,7 @@ k8s.io/kubectl/pkg/cmd/top
 k8s.io/kubectl/pkg/cmd/util
 k8s.io/kubectl/pkg/cmd/util/editor
 k8s.io/kubectl/pkg/cmd/util/editor/crlf
+k8s.io/kubectl/pkg/cmd/util/podcmd
 k8s.io/kubectl/pkg/cmd/util/sanity
 k8s.io/kubectl/pkg/cmd/version
 k8s.io/kubectl/pkg/cmd/wait

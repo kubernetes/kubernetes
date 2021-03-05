@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -100,6 +101,7 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", options.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", options.TTY, "Stdin is a TTY")
+	cmd.Flags().BoolVarP(&options.Quiet, "quiet", "q", options.Quiet, "Only print output from the remote session")
 	return cmd
 }
 
@@ -152,9 +154,6 @@ type ExecOptions struct {
 	Command          []string
 	EnforceNamespace bool
 
-	ParentCommandName       string
-	EnableSuggestedCmdUsage bool
-
 	Builder          func() *resource.Builder
 	ExecutablePodFn  polymorphichelpers.AttachablePodForObjectFunc
 	restClientGetter genericclioptions.RESTClientGetter
@@ -174,10 +173,14 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 	if argsLenAtDash > -1 {
 		p.Command = argsIn[argsLenAtDash:]
 	} else if len(argsIn) > 1 {
-		fmt.Fprint(p.ErrOut, "kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.\n")
+		if !p.Quiet {
+			fmt.Fprint(p.ErrOut, "kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.\n")
+		}
 		p.Command = argsIn[1:]
 	} else if len(argsIn) > 0 && len(p.FilenameOptions.Filenames) != 0 {
-		fmt.Fprint(p.ErrOut, "kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.\n")
+		if !p.Quiet {
+			fmt.Fprint(p.ErrOut, "kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.\n")
+		}
 		p.Command = argsIn[0:]
 		p.ResourceName = ""
 	}
@@ -197,14 +200,6 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 
 	p.Builder = f.NewBuilder
 	p.restClientGetter = f
-
-	cmdParent := cmd.Parent()
-	if cmdParent != nil {
-		p.ParentCommandName = cmdParent.CommandPath()
-	}
-	if len(p.ParentCommandName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
-		p.EnableSuggestedCmdUsage = true
-	}
 
 	p.Config, err = f.ToRESTConfig()
 	if err != nil {
@@ -260,7 +255,7 @@ func (o *StreamOptions) SetupTTY() term.TTY {
 	if !o.isTerminalIn(t) {
 		o.TTY = false
 
-		if o.ErrOut != nil {
+		if !o.Quiet && o.ErrOut != nil {
 			fmt.Fprintln(o.ErrOut, "Unable to use a TTY - input is not a terminal or the right kind of file")
 		}
 
@@ -323,7 +318,14 @@ func (p *ExecOptions) Run() error {
 		return fmt.Errorf("cannot exec into a container in a completed pod; current phase is %s", pod.Status.Phase)
 	}
 
-	containerName := getDefaultContainerName(p, pod)
+	containerName := p.ContainerName
+	if len(containerName) == 0 {
+		container, err := podcmd.FindOrDefaultContainerByName(pod, containerName, p.Quiet, p.ErrOut)
+		if err != nil {
+			return err
+		}
+		containerName = container.Name
+	}
 
 	// ensure we can recover the terminal while attached
 	t := p.SetupTTY()
@@ -367,13 +369,4 @@ func (p *ExecOptions) Run() error {
 	}
 
 	return nil
-}
-
-func getDefaultContainerName(p *ExecOptions, pod *corev1.Pod) string {
-	containerName := p.ContainerName
-	if len(containerName) != 0 {
-		return containerName
-	}
-
-	return cmdutil.GetDefaultContainerName(pod, p.EnableSuggestedCmdUsage, p.ErrOut)
 }
