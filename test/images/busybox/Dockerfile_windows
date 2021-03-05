@@ -57,7 +57,7 @@ RUN mkdir /curl-full /curl-dir && \
 
 # Windows Stage
 FROM --platform=linux/amd64 $REGISTRY/windows-servercore-cache:1.0-linux-amd64-$OS_VERSION as servercore-helper
-FROM e2eteam/powershell-helper:6.2.7 as ps-helper
+FROM e2eteam/powershell-helper:6.2.7-linux-cache as ps-helper
 FROM $BASEIMAGE
 
 COPY --from=prep /tmp-dir /tmp
