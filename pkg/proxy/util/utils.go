@@ -494,3 +494,8 @@ func RevertPorts(replacementPortsMap, originalPortsMap map[utilnet.LocalPort]uti
 		}
 	}
 }
+
+// CountBytesLines counts the number of lines in a bytes slice
+func CountBytesLines(b []byte) int {
+	return bytes.Count(b, []byte{'\n'})
+}

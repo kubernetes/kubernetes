@@ -32,8 +32,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
+
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
@@ -2929,6 +2932,126 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 	actualCommand = strings.Join(fcmd.CombinedOutputLog[1], " ")
 	if actualCommand != expectCommand {
 		t.Errorf("Expected command: %s, but executed %s", expectCommand, actualCommand)
+	}
+}
+
+func TestProxierMetricsIptablesTotalRules(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt, false)
+
+	metrics.RegisterMetrics()
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	nodePort := 31201
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(nodePort),
+			}}
+		}),
+	)
+	makeEndpointsMap(fp)
+
+	fp.syncProxyRules()
+
+	nFilterRules, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
+	}
+	// -A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m udp -p udp -d 10.20.30.41/32 --dport 80 -j REJECT
+	// -A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m addrtype --dst-type LOCAL -m udp -p udp --dport 31201 -j REJECT
+	// -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+	// -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+	// -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+	// -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+	// COMMIT
+
+	if nFilterRules != 7.0 {
+		t.Fatalf("Wrong number of filter rule: expected 7 received %f", nFilterRules)
+	}
+
+	nNatRules, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
+	}
+
+	// rules -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+	// -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+	// -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+	// -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+	// -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+	// COMMIT
+	if nNatRules != 6.0 {
+		t.Fatalf("Wrong number of nat rules: expected 6 received %f", nNatRules)
+	}
+
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{
+					{
+						IP: "10.0.0.2",
+					},
+					{
+						IP: "10.0.0.5",
+					},
+				},
+				Ports: []v1.EndpointPort{{
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolTCP,
+				}},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	nFilterRules, err = testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
+	}
+	// -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+	// -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+	// -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+	// -A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+	// COMMIT
+	if nFilterRules != 5.0 {
+		t.Fatalf("Wrong number of filter rule: expected 5 received %f", nFilterRules)
+	}
+	nNatRules, err = testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
+	}
+	// -A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+	// -A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+	// -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+	// -A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+	// -A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m udp -p udp -d 10.20.30.41/32 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+	// -A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m udp -p udp -d 10.20.30.41/32 --dport 80 -j KUBE-SVC-OJWW7NSBVZTDHXNW
+	// -A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m udp -p udp --dport 31201 -j KUBE-MARK-MASQ
+	// -A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m udp -p udp --dport 31201 -j KUBE-SVC-OJWW7NSBVZTDHXNW
+	// -A KUBE-SVC-OJWW7NSBVZTDHXNW -m comment --comment ns1/svc1:p80 -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-AMT2SNW3YUNHJFJG
+	// -A KUBE-SEP-AMT2SNW3YUNHJFJG -m comment --comment ns1/svc1:p80 -s 10.0.0.2/32 -j KUBE-MARK-MASQ
+	// -A KUBE-SEP-AMT2SNW3YUNHJFJG -m comment --comment ns1/svc1:p80 -m udp -p udp -j DNAT --to-destination 10.0.0.2:80
+	// -A KUBE-SVC-OJWW7NSBVZTDHXNW -m comment --comment ns1/svc1:p80 -j KUBE-SEP-OUFLBLJVR33W4FIZ
+	// -A KUBE-SEP-OUFLBLJVR33W4FIZ -m comment --comment ns1/svc1:p80 -s 10.0.0.5/32 -j KUBE-MARK-MASQ
+	// -A KUBE-SEP-OUFLBLJVR33W4FIZ -m comment --comment ns1/svc1:p80 -m udp -p udp -j DNAT --to-destination 10.0.0.5:80
+	// -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+	// COMMIT
+	if nNatRules != 16.0 {
+		t.Fatalf("Wrong number of nat rules: expected 16 received %f", nNatRules)
 	}
 }
 
