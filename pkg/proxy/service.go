@@ -41,20 +41,20 @@ import (
 // or can be used for constructing a more specific ServiceInfo struct
 // defined by the proxier if needed.
 type BaseServiceInfo struct {
-	clusterIP                         net.IP
-	port                              int
-	protocol                          v1.Protocol
-	nodePort                          int
-	loadBalancerStatus                v1.LoadBalancerStatus
-	sessionAffinityType               v1.ServiceAffinity
-	stickyMaxAgeSeconds               int
-	externalIPs                       []string
-	loadBalancerSourceRanges          []string
-	healthCheckNodePort               int
-	onlyNodeLocalEndpoints            bool
-	onlyNodeLocalEndpointsForInternal bool
-	internalTrafficPolicy             *v1.ServiceInternalTrafficPolicyType
-	topologyKeys                      []string
+	clusterIP                net.IP
+	port                     int
+	protocol                 v1.Protocol
+	nodePort                 int
+	loadBalancerStatus       v1.LoadBalancerStatus
+	sessionAffinityType      v1.ServiceAffinity
+	stickyMaxAgeSeconds      int
+	externalIPs              []string
+	loadBalancerSourceRanges []string
+	healthCheckNodePort      int
+	nodeLocalExternal        bool
+	nodeLocalInternal        bool
+	internalTrafficPolicy    *v1.ServiceInternalTrafficPolicyType
+	topologyKeys             []string
 }
 
 var _ ServicePort = &BaseServiceInfo{}
@@ -118,14 +118,14 @@ func (info *BaseServiceInfo) LoadBalancerIPStrings() []string {
 	return ips
 }
 
-// OnlyNodeLocalEndpoints is part of ServicePort interface.
-func (info *BaseServiceInfo) OnlyNodeLocalEndpoints() bool {
-	return info.onlyNodeLocalEndpoints
+// NodeLocalExternal is part of ServicePort interface.
+func (info *BaseServiceInfo) NodeLocalExternal() bool {
+	return info.nodeLocalExternal
 }
 
-// OnlyNodeLocalEndpointsForInternal is part of ServicePort interface
-func (info *BaseServiceInfo) OnlyNodeLocalEndpointsForInternal() bool {
-	return info.onlyNodeLocalEndpointsForInternal
+// NodeLocalInternal is part of ServicePort interface
+func (info *BaseServiceInfo) NodeLocalInternal() bool {
+	return info.nodeLocalInternal
 }
 
 // InternalTrafficPolicy is part of ServicePort interface
@@ -139,13 +139,13 @@ func (info *BaseServiceInfo) TopologyKeys() []string {
 }
 
 func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
-	onlyNodeLocalEndpoints := false
+	nodeLocalExternal := false
 	if apiservice.RequestsOnlyLocalTraffic(service) {
-		onlyNodeLocalEndpoints = true
+		nodeLocalExternal = true
 	}
-	onlyNodeLocalEndpointsForInternal := false
+	nodeLocalInternal := false
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
-		onlyNodeLocalEndpointsForInternal = apiservice.RequestsOnlyLocalTrafficForInternal(service)
+		nodeLocalInternal = apiservice.RequestsOnlyLocalTrafficForInternal(service)
 	}
 	var stickyMaxAgeSeconds int
 	if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
@@ -155,16 +155,16 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 
 	clusterIP := utilproxy.GetClusterIPByFamily(sct.ipFamily, service)
 	info := &BaseServiceInfo{
-		clusterIP:                         net.ParseIP(clusterIP),
-		port:                              int(port.Port),
-		protocol:                          port.Protocol,
-		nodePort:                          int(port.NodePort),
-		sessionAffinityType:               service.Spec.SessionAffinity,
-		stickyMaxAgeSeconds:               stickyMaxAgeSeconds,
-		onlyNodeLocalEndpoints:            onlyNodeLocalEndpoints,
-		onlyNodeLocalEndpointsForInternal: onlyNodeLocalEndpointsForInternal,
-		internalTrafficPolicy:             service.Spec.InternalTrafficPolicy,
-		topologyKeys:                      service.Spec.TopologyKeys,
+		clusterIP:             net.ParseIP(clusterIP),
+		port:                  int(port.Port),
+		protocol:              port.Protocol,
+		nodePort:              int(port.NodePort),
+		sessionAffinityType:   service.Spec.SessionAffinity,
+		stickyMaxAgeSeconds:   stickyMaxAgeSeconds,
+		nodeLocalExternal:     nodeLocalExternal,
+		nodeLocalInternal:     nodeLocalInternal,
+		internalTrafficPolicy: service.Spec.InternalTrafficPolicy,
+		topologyKeys:          service.Spec.TopologyKeys,
 	}
 
 	loadBalancerSourceRanges := make([]string, len(service.Spec.LoadBalancerSourceRanges))

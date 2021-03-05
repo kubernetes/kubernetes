@@ -1025,7 +1025,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// 2. ServiceTopology is not enabled.
 		// 3. EndpointSlice is not enabled (service topology depends on endpoint slice
 		// to get topology information).
-		if !svcInfo.OnlyNodeLocalEndpoints() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
+		if !svcInfo.NodeLocalExternal() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
 			allEndpoints = proxy.FilterTopologyEndpoint(proxier.nodeLabels, svcInfo.TopologyKeys(), allEndpoints)
 		}
 
@@ -1033,7 +1033,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// following are true:
 		// 1. InternalTrafficPolicy is Local
 		// 2. ServiceInternalTrafficPolicy feature gate is on
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && svcInfo.OnlyNodeLocalEndpointsForInternal() {
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && svcInfo.NodeLocalInternal() {
 			allEndpoints = proxy.FilterLocalEndpoint(svcInfo.InternalTrafficPolicy(), allEndpoints)
 		}
 		readyEndpoints := make([]proxy.Endpoint, 0, len(allEndpoints))
@@ -1058,7 +1058,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		svcXlbChain := svcInfo.serviceLBChainName
-		if svcInfo.OnlyNodeLocalEndpoints() {
+		if svcInfo.NodeLocalExternal() {
 			// Only for services request OnlyLocal traffic
 			// create the per-service LB chain, retaining counters if possible.
 			if lbChain, ok := existingNATChains[svcXlbChain]; ok {
@@ -1151,7 +1151,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// and the traffic is NOT Local. Local traffic coming from Pods and Nodes will
 				// be always forwarded to the corresponding Service, so no need to SNAT
 				// If we can't differentiate the local traffic we always SNAT.
-				if !svcInfo.OnlyNodeLocalEndpoints() {
+				if !svcInfo.NodeLocalExternal() {
 					destChain = svcChain
 					// This masquerades off-cluster traffic to a External IP.
 					if proxier.localDetector.IsImplemented() {
@@ -1211,7 +1211,7 @@ func (proxier *Proxier) syncProxyRules() {
 					chosenChain := svcXlbChain
 					// If we are proxying globally, we need to masquerade in case we cross nodes.
 					// If we are proxying only locally, we can retain the source IP.
-					if !svcInfo.OnlyNodeLocalEndpoints() {
+					if !svcInfo.NodeLocalExternal() {
 						utilproxy.WriteLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 						chosenChain = svcChain
 					}
@@ -1308,7 +1308,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"-m", protocol, "-p", protocol,
 					"--dport", strconv.Itoa(svcInfo.NodePort()),
 				)
-				if !svcInfo.OnlyNodeLocalEndpoints() {
+				if !svcInfo.NodeLocalExternal() {
 					// Nodeports need SNAT, unless they're local.
 					utilproxy.WriteLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 					// Jump to the service chain.
@@ -1402,7 +1402,7 @@ func (proxier *Proxier) syncProxyRules() {
 		localEndpointChains := make([]utiliptables.Chain, 0)
 		for i, endpointChain := range endpointChains {
 			// Write ingress loadbalancing & DNAT rules only for services that request OnlyLocal traffic.
-			if svcInfo.OnlyNodeLocalEndpoints() && endpoints[i].IsLocal {
+			if svcInfo.NodeLocalExternal() && endpoints[i].IsLocal {
 				localEndpointChains = append(localEndpointChains, endpointChains[i])
 			}
 
@@ -1443,7 +1443,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// The logic below this applies only if this service is marked as OnlyLocal
-		if !svcInfo.OnlyNodeLocalEndpoints() {
+		if !svcInfo.NodeLocalExternal() {
 			continue
 		}
 
