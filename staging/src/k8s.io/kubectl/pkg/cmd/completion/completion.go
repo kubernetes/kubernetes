@@ -106,8 +106,7 @@ func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 		Long:                  completionLong,
 		Example:               completionExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunCompletion(out, boilerPlate, cmd, args)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(RunCompletion(out, boilerPlate, cmd, args))
 		},
 		ValidArgs: shells,
 	}

@@ -67,12 +67,8 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 		Long:                  applyEditLastAppliedLong,
 		Example:               applyEditLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := o.Complete(f, args, cmd); err != nil {
-				cmdutil.CheckErr(err)
-			}
-			if err := o.Run(); err != nil {
-				cmdutil.CheckErr(err)
-			}
+			cmdutil.CheckErr(o.Complete(f, args, cmd))
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
