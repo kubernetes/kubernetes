@@ -39,6 +39,21 @@ func IsHugePageResourceName(name core.ResourceName) bool {
 	return strings.HasPrefix(string(name), core.ResourceHugePagesPrefix)
 }
 
+// IsHugePageResourceValueDivisible returns true if the resource value of storage is
+// integer multiple of page size.
+func IsHugePageResourceValueDivisible(name core.ResourceName, quantity resource.Quantity) bool {
+	pageSize, err := HugePageSizeFromResourceName(name)
+	if err != nil {
+		return false
+	}
+
+	if pageSize.Sign() <= 0 || pageSize.MilliValue()%int64(1000) != int64(0) {
+		return false
+	}
+
+	return quantity.Value()%pageSize.Value() == 0
+}
+
 // IsQuotaHugePageResourceName returns true if the resource name has the quota
 // related huge page resource prefix.
 func IsQuotaHugePageResourceName(name core.ResourceName) bool {

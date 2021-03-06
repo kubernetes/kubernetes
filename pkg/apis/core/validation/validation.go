@@ -301,9 +301,9 @@ func ValidateRuntimeClassName(name string, fldPath *field.Path) field.ErrorList 
 }
 
 // validateOverhead can be used to check whether the given Overhead is valid.
-func validateOverhead(overhead core.ResourceList, fldPath *field.Path) field.ErrorList {
+func validateOverhead(overhead core.ResourceList, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	// reuse the ResourceRequirements validation logic
-	return ValidateResourceRequirements(&core.ResourceRequirements{Limits: overhead}, fldPath)
+	return ValidateResourceRequirements(&core.ResourceRequirements{Limits: overhead}, fldPath, opts)
 }
 
 // Validates that given value is not negative.
@@ -2889,7 +2889,7 @@ func validateContainers(containers []core.Container, isInitContainers bool, volu
 		allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volDevices, volumes, &ctr, idxPath.Child("volumeMounts"))...)
 		allErrs = append(allErrs, ValidateVolumeDevices(ctr.VolumeDevices, volMounts, volumes, idxPath.Child("volumeDevices"))...)
 		allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, idxPath.Child("imagePullPolicy"))...)
-		allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"))...)
+		allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"), opts)...)
 		allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, idxPath.Child("securityContext"))...)
 	}
 
@@ -3202,6 +3202,8 @@ type PodValidationOptions struct {
 	AllowDownwardAPIHugePages bool
 	// Allow invalid pod-deletion-cost annotation value for backward compatibility.
 	AllowInvalidPodDeletionCost bool
+	// Allow pod spec to use non-integer multiple of huge page unit size
+	AllowIndivisibleHugePagesValues bool
 }
 
 // ValidatePodSingleHugePageResources checks if there are multiple huge
@@ -3375,7 +3377,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	}
 
 	if spec.Overhead != nil {
-		allErrs = append(allErrs, validateOverhead(spec.Overhead, fldPath.Child("overhead"))...)
+		allErrs = append(allErrs, validateOverhead(spec.Overhead, fldPath.Child("overhead"), opts)...)
 	}
 
 	return allErrs
@@ -5336,7 +5338,7 @@ func validateBasicResource(quantity resource.Quantity, fldPath *field.Path) fiel
 }
 
 // Validates resource requirement spec.
-func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPath *field.Path) field.ErrorList {
+func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	limPath := fldPath.Child("limits")
 	reqPath := fldPath.Child("requests")
@@ -5356,6 +5358,9 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 
 		if helper.IsHugePageResourceName(resourceName) {
 			limContainsHugePages = true
+			if err := validateResourceQuantityHugePageValue(resourceName, quantity, opts); err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath, quantity.String(), err.Error()))
+			}
 		}
 
 		if supportedQoSComputeResources.Has(string(resourceName)) {
@@ -5383,6 +5388,9 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 		}
 		if helper.IsHugePageResourceName(resourceName) {
 			reqContainsHugePages = true
+			if err := validateResourceQuantityHugePageValue(resourceName, quantity, opts); err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath, quantity.String(), err.Error()))
+			}
 		}
 		if supportedQoSComputeResources.Has(string(resourceName)) {
 			reqContainsCPUOrMemory = true
@@ -5394,6 +5402,18 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 	}
 
 	return allErrs
+}
+
+func validateResourceQuantityHugePageValue(name core.ResourceName, quantity resource.Quantity, opts PodValidationOptions) error {
+	if !helper.IsHugePageResourceName(name) {
+		return nil
+	}
+
+	if !opts.AllowIndivisibleHugePagesValues && !helper.IsHugePageResourceValueDivisible(name, quantity) {
+		return fmt.Errorf("%s is not positive integer multiple of %s", quantity.String(), name)
+	}
+
+	return nil
 }
 
 // validateResourceQuotaScopes ensures that each enumerated hard resource constraint is valid for set of scopes
