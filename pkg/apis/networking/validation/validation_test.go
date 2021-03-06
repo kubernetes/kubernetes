@@ -234,39 +234,22 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	successCases := []*networking.NetworkPolicy{
-		// Success Test Number 1
 		makeNetworkPolicyCustom(setIngressEmptyFirstElement),
-		// Success Test Number 2
-		makeNetworkPolicyCustom(setIngressEmptyPorts),
-		// Success Test Number 3
+		makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressEmptyPorts),
 		makeNetworkPolicyCustom(setIngressPorts(makePort(nil, intstr.FromInt(80), 0), makePort(&protocolTCP, intstr.FromInt(0), 0), makePort(&protocolTCP, intstr.FromInt(443), 0), makePort(&protocolUDP, intstr.FromString("dns"), 0), makePort(&protocolSCTP, intstr.FromInt(7777), 0))),
-		// Success Test Number 4
 		makeNetworkPolicyCustom(setIngressFromPodSelector("c", "d")),
-		// Success Test Number 5
 		makeNetworkPolicyCustom(setIngressFromNamespaceSelector),
-		// Success Test Number 6
 		makeNetworkPolicyCustom(setIngressFromPodSelector("e", "f"), setIngressFromNamespaceSelector),
-		// Success Test Number 7
 		makeNetworkPolicyCustom(setEgressToNamespaceSelector, setIngressFromIPBlock),
-		// Success Test Number 8
 		makeNetworkPolicyCustom(setIngressFromIPBlock),
-		// Success Test Number 9
 		makeNetworkPolicyCustom(setEgressToIPBlock, setPolicyTypesEgress),
-		// Success Test Number 10
 		makeNetworkPolicyCustom(setEgressToIPBlock, setPolicyTypesIngressEgress),
-		// Success Test Number 11
 		makeNetworkPolicyCustom(setEgressPorts(makePort(nil, intstr.FromInt(80), 0), makePort(&protocolTCP, intstr.FromInt(0), 0), makePort(&protocolTCP, intstr.FromInt(443), 0), makePort(&protocolUDP, intstr.FromString("dns"), 0), makePort(&protocolSCTP, intstr.FromInt(7777), 0))),
-		// Success Test Number 12
 		makeNetworkPolicyCustom(setEgressToNamespaceSelector, setIngressFromIPBlockIPV6),
-		// Success Test Number 13
 		makeNetworkPolicyCustom(setIngressFromIPBlockIPV6),
-		// Success Test Number 14
 		makeNetworkPolicyCustom(setEgressToIPBlockIPV6, setPolicyTypesEgress),
-		// Success Test Number 15
 		makeNetworkPolicyCustom(setEgressToIPBlockIPV6, setPolicyTypesIngressEgress),
-		// Success Test Number 16
 		makeNetworkPolicyCustom(setEgressPorts(makePort(nil, intstr.FromInt(32000), 32768), makePort(&protocolUDP, intstr.FromString("dns"), 0))),
-		// Success Test Number 17
 		makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(nil, intstr.FromInt(30000), 32768), makePort(nil, intstr.FromInt(32000), 32768)), setIngressFromPodSelector("e", "f"), setIngressPorts(makePort(&protocolTCP, intstr.FromInt(32768), 32768))),
 	}
 
@@ -274,7 +257,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	for k, v := range successCases {
 		if errs := ValidateNetworkPolicy(v); len(errs) != 0 {
-			t.Errorf("Expected success for the success validation test number %d, got %v", (k + 1), errs)
+			t.Errorf("Expected success for the success validation test number %d, got %v", k, errs)
 		}
 	}
 
@@ -291,8 +274,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				},
 			}
 		}),
-		"invalid ingress.ports.protocol": makeNetworkPolicyCustom(setIngressEmptyPorts,
-			setIngressPorts(makePort(&protocolICMP, intstr.FromInt(80), 0))),
+		"invalid ingress.ports.protocol":   makeNetworkPolicyCustom(setIngressPorts(makePort(&protocolICMP, intstr.FromInt(80), 0))),
 		"invalid ingress.ports.port (int)": makeNetworkPolicyCustom(setIngressPorts(makePort(&protocolTCP, intstr.FromInt(123456789), 0))),
 		"invalid ingress.ports.port (str)": makeNetworkPolicyCustom(
 			setIngressPorts(makePort(&protocolTCP, intstr.FromString("!@#$"), 0))),
