@@ -270,6 +270,7 @@ message MetricSpec {
   // to normal per-pod metrics using the "pods" source.
   // This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.
   // +optional
+  // +featureGate=HPAContainerMetrics
   optional ContainerResourceMetricSource containerResource = 7;
 
   // external refers to a global metric that is not associated

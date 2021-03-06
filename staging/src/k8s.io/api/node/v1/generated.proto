@@ -67,6 +67,7 @@ message RuntimeClass {
   // This field is in beta starting v1.18
   // and is only honored by servers that enable the PodOverhead feature.
   // +optional
+  // +featureGate=PodOverhead
   optional Overhead overhead = 3;
 
   // Scheduling holds the scheduling constraints to ensure that pods running

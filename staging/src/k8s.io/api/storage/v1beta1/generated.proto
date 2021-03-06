@@ -138,6 +138,7 @@ message CSIDriverSpec {
   // feature is enabled. The default is false.
   //
   // +optional
+  // +featureGate=CSIStorageCapacity
   optional bool storageCapacity = 4;
 
   // Defines if the underlying volume supports changing ownership and
@@ -146,6 +147,7 @@ message CSIDriverSpec {
   // This field is alpha-level, and is only honored by servers
   // that enable the CSIVolumeFSGroupPolicy feature gate.
   // +optional
+  // +featureGate=CSIVolumeFSGroupPolicy
   optional string fsGroupPolicy = 5;
 
   // TokenRequests indicates the CSI driver needs pods' service account
@@ -169,6 +171,7 @@ message CSIDriverSpec {
   //
   // +optional
   // +listType=atomic
+  // +featureGate=CSIServiceAccountToken
   repeated TokenRequest tokenRequests = 6;
 
   // RequiresRepublish indicates the CSI driver wants `NodePublishVolume`
@@ -183,6 +186,7 @@ message CSIDriverSpec {
   // CSIServiceAccountToken feature is enabled.
   //
   // +optional
+  // +featureGate=CSIServiceAccountToken
   optional bool requiresRepublish = 7;
 }
 
@@ -381,6 +385,7 @@ message VolumeAttachmentSource {
   // PersistentVolumeSpec. This field is beta-level and is only
   // honored by servers that enabled the CSIMigration feature.
   // +optional
+  // +featureGate=CSIMigration
   optional k8s.io.api.core.v1.PersistentVolumeSpec inlineVolumeSpec = 2;
 }
 

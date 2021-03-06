@@ -588,6 +588,7 @@ type RollingUpdateDaemonSet struct {
 	// cause evictions during disruption.
 	// This is an alpha field and requires enabling DaemonSetUpdateSurge feature gate.
 	// +optional
+	// +featureGate=DaemonSetUpdateSurge
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty" protobuf:"bytes,2,opt,name=maxSurge"`
 }
 

@@ -266,6 +266,7 @@ type PodSecurityPolicySpec struct {
 	// An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
 	// This is a beta field, and is only honored if the API server enables the CSIInlineVolume feature gate.
 	// +optional
+	// +featureGate=CSIInlineVolume
 	AllowedCSIDrivers []AllowedCSIDriver `json:"allowedCSIDrivers,omitempty" protobuf:"bytes,23,rep,name=allowedCSIDrivers"`
 	// allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
 	// Each entry is either a plain sysctl name or ends in "*" in which case it is considered
@@ -290,6 +291,7 @@ type PodSecurityPolicySpec struct {
 	// Empty or nil indicates that only the DefaultProcMountType may be used.
 	// This requires the ProcMountType feature flag to be enabled.
 	// +optional
+	// +featureGate=ProcMountType
 	AllowedProcMountTypes []v1.ProcMountType `json:"allowedProcMountTypes,omitempty" protobuf:"bytes,21,opt,name=allowedProcMountTypes"`
 	// runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod.
 	// If this field is omitted, the pod's runtimeClassName field is unrestricted.

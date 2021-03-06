@@ -759,6 +759,7 @@ message NetworkPolicyPort {
   // This feature is in Alpha state and should be enabled using the Feature Gate
   // "NetworkPolicyEndPort".
   // +optional
+  // +featureGate=NetworkPolicyEndPort
   optional int32 endPort = 3;
 }
 
@@ -954,6 +955,7 @@ message PodSecurityPolicySpec {
   // Empty or nil indicates that only the DefaultProcMountType may be used.
   // This requires the ProcMountType feature flag to be enabled.
   // +optional
+  // +featureGate=ProcMountType
   repeated string allowedProcMountTypes = 21;
 
   // runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod.
@@ -1124,6 +1126,7 @@ message RollingUpdateDaemonSet {
   // cause evictions during disruption.
   // This is an alpha field and requires enabling DaemonSetUpdateSurge feature gate.
   // +optional
+  // +featureGate=DaemonSetUpdateSurge
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
 

@@ -53,6 +53,7 @@ type RuntimeClass struct {
 	// This field is alpha-level as of Kubernetes v1.16, and is only honored by servers
 	// that enable the PodOverhead feature.
 	// +optional
+	// +featureGate=PodOverhead
 	Overhead *Overhead
 
 	// Scheduling holds the scheduling constraints to ensure that pods running

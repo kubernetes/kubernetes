@@ -124,6 +124,7 @@ type EndpointConditions struct {
 	// the ready condition. This field can be enabled with the
 	// EndpointSliceTerminatingCondition feature gate.
 	// +optional
+	// +featureGate=EndpointSliceTerminatingCondition
 	Serving *bool
 
 	// terminating indicates that this endpoint is terminating. A nil value
@@ -131,6 +132,7 @@ type EndpointConditions struct {
 	// to mean that the endpoint is not terminating. This field can be enabled
 	// with the EndpointSliceTerminatingCondition feature gate.
 	// +optional
+	// +featureGate=EndpointSliceTerminatingCondition
 	Terminating *bool
 }
 

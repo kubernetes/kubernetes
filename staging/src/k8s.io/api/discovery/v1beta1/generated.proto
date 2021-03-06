@@ -94,6 +94,7 @@ message EndpointConditions {
   // the ready condition. This field can be enabled with the
   // EndpointSliceTerminatingCondition feature gate.
   // +optional
+  // +featureGate=EndpointSliceTerminatingCondition
   optional bool serving = 2;
 
   // terminating indicates that this endpoint is terminating. A nil value
@@ -101,6 +102,7 @@ message EndpointConditions {
   // to mean that the endpoint is not terminating. This field can be enabled
   // with the EndpointSliceTerminatingCondition feature gate.
   // +optional
+  // +featureGate=EndpointSliceTerminatingCondition
   optional bool terminating = 3;
 }
 

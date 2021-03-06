@@ -92,6 +92,7 @@ type VolumeAttachmentSource struct {
 	// PersistentVolumeSpec. This field is alpha-level and is only
 	// honored by servers that enabled the CSIMigration feature.
 	// +optional
+	// +featureGate=CSIMigration
 	InlineVolumeSpec *v1.PersistentVolumeSpec `json:"inlineVolumeSpec,omitempty" protobuf:"bytes,2,opt,name=inlineVolumeSpec"`
 }
 

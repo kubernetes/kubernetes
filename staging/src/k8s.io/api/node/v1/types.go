@@ -56,6 +56,7 @@ type RuntimeClass struct {
 	// This field is in beta starting v1.18
 	// and is only honored by servers that enable the PodOverhead feature.
 	// +optional
+	// +featureGate=PodOverhead
 	Overhead *Overhead `json:"overhead,omitempty" protobuf:"bytes,3,opt,name=overhead"`
 
 	// Scheduling holds the scheduling constraints to ensure that pods running

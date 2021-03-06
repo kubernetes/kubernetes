@@ -161,6 +161,7 @@ type VolumeAttachmentSource struct {
 	// PersistentVolumeSpec. This field is beta-level and is only
 	// honored by servers that enabled the CSIMigration feature.
 	// +optional
+	// +featureGate=CSIMigration
 	InlineVolumeSpec *api.PersistentVolumeSpec
 }
 
@@ -283,6 +284,7 @@ type CSIDriverSpec struct {
 	// This field is alpha-level, and is only honored by servers
 	// that enable the CSIVolumeFSGroupPolicy feature gate.
 	// +optional
+	// +featureGate=CSIVolumeFSGroupPolicy
 	FSGroupPolicy *FSGroupPolicy
 
 	// If set to true, podInfoOnMount indicates this CSI volume driver
@@ -368,6 +370,7 @@ type CSIDriverSpec struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +featureGate=CSIServiceAccountToken
 	TokenRequests []TokenRequest
 
 	// RequiresRepublish indicates the CSI driver wants `NodePublishVolume`
@@ -382,6 +385,7 @@ type CSIDriverSpec struct {
 	// CSIServiceAccountToken feature is enabled.
 	//
 	// +optional
+	// +featureGate=CSIServiceAccountToken
 	RequiresRepublish *bool
 }
 

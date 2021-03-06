@@ -128,6 +128,7 @@ type EndpointConditions struct {
 	// the ready condition. This field can be enabled with the
 	// EndpointSliceTerminatingCondition feature gate.
 	// +optional
+	// +featureGate=EndpointSliceTerminatingCondition
 	Serving *bool `json:"serving,omitempty" protobuf:"bytes,2,name=serving"`
 
 	// terminating indicates that this endpoint is terminating. A nil value
@@ -135,6 +136,7 @@ type EndpointConditions struct {
 	// to mean that the endpoint is not terminating. This field can be enabled
 	// with the EndpointSliceTerminatingCondition feature gate.
 	// +optional
+	// +featureGate=EndpointSliceTerminatingCondition
 	Terminating *bool `json:"terminating,omitempty" protobuf:"bytes,3,name=terminating"`
 }
 

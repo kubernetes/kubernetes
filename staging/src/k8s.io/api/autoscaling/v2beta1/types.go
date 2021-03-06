@@ -122,6 +122,7 @@ type MetricSpec struct {
 	// available to normal per-pod metrics using the "pods" source.
 	// This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.
 	// +optional
+	// +featureGate=HPAContainerMetrics
 	ContainerResource *ContainerResourceMetricSource `json:"containerResource,omitempty" protobuf:"bytes,7,opt,name=containerResource"`
 	// external refers to a global metric that is not associated
 	// with any Kubernetes object. It allows autoscaling based on information

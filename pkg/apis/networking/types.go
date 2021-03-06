@@ -152,6 +152,7 @@ type NetworkPolicyPort struct {
 	// This feature is in Alpha state and should be enabled using the Feature Gate
 	// "NetworkPolicyEndPort".
 	// +optional
+	// +featureGate=NetworkPolicyEndPort
 	EndPort *int32
 }
 

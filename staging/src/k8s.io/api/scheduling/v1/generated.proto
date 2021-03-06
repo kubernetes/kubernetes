@@ -59,6 +59,7 @@ message PriorityClass {
   // Defaults to PreemptLowerPriority if unset.
   // This field is beta-level, gated by the NonPreemptingPriority feature-gate.
   // +optional
+  // +featureGate=NonPreemptingPriority
   optional string preemptionPolicy = 5;
 }
 

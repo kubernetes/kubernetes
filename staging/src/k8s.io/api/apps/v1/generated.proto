@@ -513,6 +513,7 @@ message RollingUpdateDaemonSet {
   // cause evictions during disruption.
   // This is an alpha field and requires enabling DaemonSetUpdateSurge feature gate.
   // +optional
+  // +featureGate=DaemonSetUpdateSurge
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
 

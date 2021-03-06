@@ -185,6 +185,7 @@ type VolumeAttachmentSource struct {
 	// PersistentVolumeSpec. This field is beta-level and is only
 	// honored by servers that enabled the CSIMigration feature.
 	// +optional
+	// +featureGate=CSIMigration
 	InlineVolumeSpec *v1.PersistentVolumeSpec `json:"inlineVolumeSpec,omitempty" protobuf:"bytes,2,opt,name=inlineVolumeSpec"`
 }
 
@@ -355,6 +356,7 @@ type CSIDriverSpec struct {
 	// feature is enabled. The default is false.
 	//
 	// +optional
+	// +featureGate=CSIStorageCapacity
 	StorageCapacity *bool `json:"storageCapacity,omitempty" protobuf:"bytes,4,opt,name=storageCapacity"`
 
 	// Defines if the underlying volume supports changing ownership and
@@ -363,6 +365,7 @@ type CSIDriverSpec struct {
 	// This field is alpha-level, and is only honored by servers
 	// that enable the CSIVolumeFSGroupPolicy feature gate.
 	// +optional
+	// +featureGate=CSIVolumeFSGroupPolicy
 	FSGroupPolicy *FSGroupPolicy `json:"fsGroupPolicy,omitempty" protobuf:"bytes,5,opt,name=fsGroupPolicy"`
 
 	// TokenRequests indicates the CSI driver needs pods' service account
@@ -386,6 +389,7 @@ type CSIDriverSpec struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +featureGate=CSIServiceAccountToken
 	TokenRequests []TokenRequest `json:"tokenRequests,omitempty" protobuf:"bytes,6,opt,name=tokenRequests"`
 
 	// RequiresRepublish indicates the CSI driver wants `NodePublishVolume`
@@ -400,6 +404,7 @@ type CSIDriverSpec struct {
 	// CSIServiceAccountToken feature is enabled.
 	//
 	// +optional
+	// +featureGate=CSIServiceAccountToken
 	RequiresRepublish *bool `json:"requiresRepublish,omitempty" protobuf:"varint,7,opt,name=requiresRepublish"`
 }
 

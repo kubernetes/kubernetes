@@ -453,6 +453,7 @@ type PersistentVolumeClaimSpec struct {
 	// If the provisioner or an external controller can support the specified data source,
 	// it will create a new volume based on the contents of the specified data source.
 	// +optional
+	// +featureGate=AnyVolumeDataSource
 	DataSource *TypedLocalObjectReference
 }
 
@@ -1658,6 +1659,7 @@ type CSIPersistentVolumeSource struct {
 	// This field is optional, and may be empty if no secret is required. If the
 	// secret object contains more than one secret, all secrets are passed.
 	// +optional
+	// +featureGate=ExpandCSIVolumes
 	ControllerExpandSecretRef *SecretReference
 }
 
@@ -2572,6 +2574,7 @@ type PodAffinityTerm struct {
 	// An empty selector ({}) matches all namespaces.
 	// This field is alpha-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
 	// +optional
+	// +featureGate=PodAffinityNamespaceSelector
 	NamespaceSelector *metav1.LabelSelector
 }
 
@@ -2717,6 +2720,7 @@ type PodSpec struct {
 	// ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource.
 	// This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
 	// +optional
+	// +featureGate=EphemeralContainers
 	EphemeralContainers []EphemeralContainer
 	// +optional
 	RestartPolicy RestartPolicy
@@ -2778,6 +2782,7 @@ type PodSpec struct {
 	// In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN.
 	// If a pod does not have FQDN, this has no effect.
 	// +optional
+	// +featureGate=SetHostnameAsFQDN
 	SetHostnameAsFQDN *bool
 	// If specified, the pod's scheduling constraints
 	// +optional
@@ -2813,6 +2818,7 @@ type PodSpec struct {
 	// Defaults to PreemptLowerPriority if unset.
 	// This field is beta-level, gated by the NonPreemptingPriority feature-gate.
 	// +optional
+	// +featureGate=NonPreemptingPriority
 	PreemptionPolicy *PreemptionPolicy
 	// Specifies the DNS parameters of a pod.
 	// Parameters specified here will be merged to the generated DNS
@@ -2841,6 +2847,7 @@ type PodSpec struct {
 	// More info: https://git.k8s.io/enhancements/keps/sig-node/20190226-pod-overhead.md
 	// This field is alpha-level as of Kubernetes v1.16, and is only honored by servers that enable the PodOverhead feature.
 	// +optional
+	// +featureGate=PodOverhead
 	Overhead ResourceList
 	// EnableServiceLinks indicates whether information about services should be injected into pod's
 	// environment variables, matching the syntax of Docker links.
@@ -3217,6 +3224,7 @@ type PodStatus struct {
 	// Status for any ephemeral containers that have run in this pod.
 	// This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
 	// +optional
+	// +featureGate=EphemeralContainers
 	EphemeralContainerStatuses []ContainerStatus
 }
 
@@ -3718,6 +3726,7 @@ type ServiceSpec struct {
 	// This field is alpha-level and is only honored by servers that enable the ServiceTopology feature.
 	// This field is deprecated and will be removed in a future version.
 	// +optional
+	// +featureGate=ServiceTopology
 	TopologyKeys []string
 
 	// allocateLoadBalancerNodePorts defines if NodePorts will be automatically
@@ -3727,6 +3736,7 @@ type ServiceSpec struct {
 	// and will be cleared if the type is changed to any other type.
 	// This field is alpha-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
 	// +optional
+	// +featureGate=ServiceLBNodePortControl
 	AllocateLoadBalancerNodePorts *bool
 
 	// loadBalancerClass is the class of the load balancer implementation this Service belongs to.
@@ -3950,6 +3960,7 @@ type NodeSpec struct {
 	// If specified, the source to get node configuration from
 	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
 	// +optional
+	// +featureGate=DynamicKubeletConfig
 	ConfigSource *NodeConfigSource
 
 	// Deprecated. Not all kubelets will set this field. Remove field after 1.13.

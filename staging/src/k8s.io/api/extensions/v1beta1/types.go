@@ -391,6 +391,7 @@ type RollingUpdateDaemonSet struct {
 	// cause evictions during disruption.
 	// This is an alpha field and requires enabling DaemonSetUpdateSurge feature gate.
 	// +optional
+	// +featureGate=DaemonSetUpdateSurge
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty" protobuf:"bytes,2,opt,name=maxSurge"`
 }
 
@@ -1087,6 +1088,7 @@ type PodSecurityPolicySpec struct {
 	// Empty or nil indicates that only the DefaultProcMountType may be used.
 	// This requires the ProcMountType feature flag to be enabled.
 	// +optional
+	// +featureGate=ProcMountType
 	AllowedProcMountTypes []v1.ProcMountType `json:"allowedProcMountTypes,omitempty" protobuf:"bytes,21,opt,name=allowedProcMountTypes"`
 	// runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod.
 	// If this field is omitted, the pod's runtimeClassName field is unrestricted.
@@ -1485,6 +1487,7 @@ type NetworkPolicyPort struct {
 	// This feature is in Alpha state and should be enabled using the Feature Gate
 	// "NetworkPolicyEndPort".
 	// +optional
+	// +featureGate=NetworkPolicyEndPort
 	EndPort *int32 `json:"endPort,omitempty" protobuf:"bytes,3,opt,name=endPort"`
 }
 

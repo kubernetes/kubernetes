@@ -65,6 +65,7 @@ type RuntimeClassSpec struct {
 	// https://git.k8s.io/enhancements/keps/sig-node/20190226-pod-overhead.md
 	// This field is alpha-level as of Kubernetes v1.15, and is only honored by servers that enable the PodOverhead feature.
 	// +optional
+	// +featureGate=PodOverhead
 	Overhead *Overhead `json:"overhead,omitempty" protobuf:"bytes,2,opt,name=overhead"`
 
 	// Scheduling holds the scheduling constraints to ensure that pods running

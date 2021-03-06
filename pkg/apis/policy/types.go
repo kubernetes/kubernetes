@@ -216,6 +216,7 @@ type PodSecurityPolicySpec struct {
 	// An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
 	// This is a beta field, and is only honored if the API server enables the CSIInlineVolume feature gate.
 	// +optional
+	// +featureGate=CSIInlineVolume
 	AllowedCSIDrivers []AllowedCSIDriver
 	// AllowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
 	// Each entry is either a plain sysctl name or ends in "*" in which case it is considered

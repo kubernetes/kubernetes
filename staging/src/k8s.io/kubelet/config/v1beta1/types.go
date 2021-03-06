@@ -209,6 +209,7 @@ type KubeletConfiguration struct {
 	// due to certificate expiration.
 	// Default: false
 	// +optional
+	// +featureGate=RotateKubeletServerCertificate
 	ServerTLSBootstrap bool `json:"serverTLSBootstrap,omitempty"`
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
@@ -432,6 +433,7 @@ type KubeletConfiguration struct {
 	// reboot. It is safest to keep this value the same as the local config.
 	// Default: "None"
 	// +optional
+	// +featureGate=CPUManager
 	CPUManagerPolicy string `json:"cpuManagerPolicy,omitempty"`
 	// CPU Manager reconciliation period.
 	// Requires the CPUManager feature gate to be enabled.
@@ -439,6 +441,7 @@ type KubeletConfiguration struct {
 	// shortening the period may carry a performance impact.
 	// Default: "10s"
 	// +optional
+	// +featureGate=CPUManager
 	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod,omitempty"`
 	// MemoryManagerPolicy is the name of the policy to use by memory manager.
 	// Requires the MemoryManager feature gate to be enabled.
@@ -446,6 +449,7 @@ type KubeletConfiguration struct {
 	// reboot. It is safest to keep this value the same as the local config.
 	// Default: "none"
 	// +optional
+	// +featureGate=MemoryManager
 	MemoryManagerPolicy string `json:"memoryManagerPolicy,omitempty"`
 	// TopologyManagerPolicy is the name of the policy to use.
 	// Policies other than "none" require the TopologyManager feature gate to be enabled.
@@ -469,6 +473,7 @@ type KubeletConfiguration struct {
 	// reboot. It is safest to keep this value the same as the local config.
 	// Default: nil
 	// +optional
+	// +featureGate=QOSReserved
 	QOSReserved map[string]string `json:"qosReserved,omitempty"`
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.

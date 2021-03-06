@@ -164,6 +164,7 @@ type JobSpec struct {
 	// This field is alpha-level and is only honored by servers that enable the
 	// TTLAfterFinished feature.
 	// +optional
+	// +featureGate=TTLAfterFinished
 	TTLSecondsAfterFinished *int32
 
 	// CompletionMode specifies how Pod completions are tracked. It can be
@@ -186,6 +187,7 @@ type JobSpec struct {
 	// If the Job controller observes a mode that it doesn't recognize, the
 	// controller skips updates for the Job.
 	// +optional
+	// +featureGate=IndexedJob
 	CompletionMode CompletionMode
 }
 

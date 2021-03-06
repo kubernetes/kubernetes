@@ -226,6 +226,7 @@ message CSIPersistentVolumeSource {
   // This field is optional, and may be empty if no secret is required. If the
   // secret object contains more than one secret, all secrets are passed.
   // +optional
+  // +featureGate=ExpandCSIVolumes
   optional SecretReference controllerExpandSecretRef = 9;
 }
 
@@ -2401,6 +2402,7 @@ message NodeSpec {
   // If specified, the source to get node configuration from
   // The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
   // +optional
+  // +featureGate=DynamicKubeletConfig
   optional NodeConfigSource configSource = 6;
 
   // Deprecated. Not all kubelets will set this field. Remove field after 1.13.
@@ -2695,6 +2697,7 @@ message PersistentVolumeClaimSpec {
   // If the provisioner or an external controller can support the specified data source,
   // it will create a new volume based on the contents of the specified data source.
   // +optional
+  // +featureGate=AnyVolumeDataSource
   optional TypedLocalObjectReference dataSource = 7;
 }
 
@@ -3031,6 +3034,7 @@ message PodAffinityTerm {
   // An empty selector ({}) matches all namespaces.
   // This field is alpha-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
   // +optional
+  // +featureGate=PodAffinityNamespaceSelector
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 4;
 }
 
@@ -3416,6 +3420,7 @@ message PodSpec {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +featureGate=EphemeralContainers
   repeated EphemeralContainer ephemeralContainers = 34;
 
   // Restart policy for all containers within the pod.
@@ -3599,6 +3604,7 @@ message PodSpec {
   // Defaults to PreemptLowerPriority if unset.
   // This field is beta-level, gated by the NonPreemptingPriority feature-gate.
   // +optional
+  // +featureGate=NonPreemptingPriority
   optional string preemptionPolicy = 31;
 
   // Overhead represents the resource overhead associated with running a pod for a given RuntimeClass.
@@ -3610,6 +3616,7 @@ message PodSpec {
   // More info: https://git.k8s.io/enhancements/keps/sig-node/20190226-pod-overhead.md
   // This field is alpha-level as of Kubernetes v1.16, and is only honored by servers that enable the PodOverhead feature.
   // +optional
+  // +featureGate=PodOverhead
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> overhead = 32;
 
   // TopologySpreadConstraints describes how a group of pods ought to spread across topology
@@ -3629,6 +3636,7 @@ message PodSpec {
   // If a pod does not have FQDN, this has no effect.
   // Default to false.
   // +optional
+  // +featureGate=SetHostnameAsFQDN
   optional bool setHostnameAsFQDN = 35;
 }
 
@@ -3726,6 +3734,7 @@ message PodStatus {
   // Status for any ephemeral containers that have run in this pod.
   // This field is alpha-level and is only populated by servers that enable the EphemeralContainers feature.
   // +optional
+  // +featureGate=EphemeralContainers
   repeated ContainerStatus ephemeralContainerStatuses = 13;
 }
 
@@ -4633,6 +4642,7 @@ message SecurityContext {
   // readonly paths and masked paths.
   // This requires the ProcMountType feature flag to be enabled.
   // +optional
+  // +featureGate=ProcMountType
   optional string procMount = 9;
 
   // The seccomp options to use by this container. If seccomp options are
@@ -4991,6 +5001,7 @@ message ServiceSpec {
   // This field is alpha-level and is only honored by servers that enable the ServiceTopology feature.
   // This field is deprecated and will be removed in a future version.
   // +optional
+  // +featureGate=ServiceTopology
   repeated string topologyKeys = 16;
 
   // IPFamilies is a list of IP families (e.g. IPv4, IPv6) assigned to this
@@ -5012,6 +5023,7 @@ message ServiceSpec {
   // governed by the ipFamilyPolicy field.
   // +listType=atomic
   // +optional
+  // +featureGate=IPv6DualStack
   repeated string ipFamilies = 19;
 
   // IPFamilyPolicy represents the dual-stack-ness requested or required by
@@ -5024,6 +5036,7 @@ message ServiceSpec {
   // clusterIPs fields depend on the value of this field.  This field will be
   // wiped when updating a service to type ExternalName.
   // +optional
+  // +featureGate=IPv6DualStack
   optional string ipFamilyPolicy = 17;
 
   // allocateLoadBalancerNodePorts defines if NodePorts will be automatically
@@ -5033,6 +5046,7 @@ message ServiceSpec {
   // and will be cleared if the type is changed to any other type.
   // This field is alpha-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
   // +optional
+  // +featureGate=ServiceLBNodePortControl
   optional bool allocateLoadBalancerNodePorts = 20;
 
   // loadBalancerClass is the class of the load balancer implementation this Service belongs to.
