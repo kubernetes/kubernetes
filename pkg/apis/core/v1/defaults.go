@@ -331,8 +331,11 @@ func SetDefaults_Namespace(obj *v1.Namespace) {
 	// we don't need to overwrite the pre-existing labelMetadataName
 	// This code needs to be kept in sync with the implementation that exists
 	// in Namespace Canonicalize strategy (pkg/registry/core/namespace)
-	if len(obj.Name) > 0 && obj.Labels[v1.LabelMetadataName] != obj.Name {
-		if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
+
+	// note that this can result in many calls to feature enablement in some cases, but
+	// we assume that theres no real cost there.
+	if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
+		if len(obj.Name) > 0 && obj.Labels[v1.LabelMetadataName] != obj.Name {
 			if obj.Labels == nil {
 				obj.Labels = map[string]string{}
 			}

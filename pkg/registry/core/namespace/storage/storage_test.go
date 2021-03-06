@@ -59,7 +59,6 @@ func TestCreate(t *testing.T) {
 	test := genericregistrytest.New(t, storage.store).ClusterScope()
 	namespace := validNewNamespace()
 	namespace.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo"}
-	test.TestCreate(
 		// valid
 		namespace,
 		// invalid
@@ -109,7 +108,10 @@ func TestGet(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.store).ClusterScope()
-	test.TestGet(validNewNamespace())
+
+	test.TestGet(validNewNamespace()) 	// --> *api.Namespace object
+	// resttest.TestGet
+	//	testGetFound
 }
 
 func TestList(t *testing.T) {
