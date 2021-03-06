@@ -591,6 +591,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	imageBackOff := flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 
 	klet.livenessManager = proberesults.NewManager()
+	klet.readinessManager = proberesults.NewManager()
 	klet.startupManager = proberesults.NewManager()
 	klet.podCache = kubecontainer.NewCache()
 
@@ -628,6 +629,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 		klet.livenessManager,
+		klet.readinessManager,
 		klet.startupManager,
 		seccompProfileRoot,
 		machineInfo,
@@ -726,6 +728,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.probeManager = prober.NewManager(
 		klet.statusManager,
 		klet.livenessManager,
+		klet.readinessManager,
 		klet.startupManager,
 		klet.runner,
 		kubeDeps.Recorder)
@@ -934,8 +937,9 @@ type Kubelet struct {
 	// Handles container probing.
 	probeManager prober.Manager
 	// Manages container health check results.
-	livenessManager proberesults.Manager
-	startupManager  proberesults.Manager
+	livenessManager  proberesults.Manager
+	readinessManager proberesults.Manager
+	startupManager   proberesults.Manager
 
 	// How long to keep idle streaming command execution/port forwarding
 	// connections open before terminating them
@@ -1448,7 +1452,6 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	// Start component sync loops.
 	kl.statusManager.Start()
-	kl.probeManager.Start()
 
 	// Start syncing RuntimeClasses if enabled.
 	if kl.runtimeClassManager != nil {
@@ -1912,8 +1915,8 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 // * plegCh: update the runtime cache; sync pod
 // * syncCh: sync all pods waiting for sync
 // * housekeepingCh: trigger cleanup of pods
-// * liveness manager: sync pods that have failed or in which one or more
-//                     containers have failed liveness checks
+// * health manager: sync pods that have failed or in which one or more
+//                     containers have failed health checks
 func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handler SyncHandler,
 	syncCh <-chan time.Time, housekeepingCh <-chan time.Time, plegCh <-chan *pleg.PodLifecycleEvent) bool {
 	select {
@@ -1988,19 +1991,16 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		handler.HandlePodSyncs(podsToSync)
 	case update := <-kl.livenessManager.Updates():
 		if update.Result == proberesults.Failure {
-			// The liveness manager detected a failure; sync the pod.
-
-			// We should not use the pod from livenessManager, because it is never updated after
-			// initialization.
-			pod, ok := kl.podManager.GetPodByUID(update.PodUID)
-			if !ok {
-				// If the pod no longer exists, ignore the update.
-				klog.V(4).Infof("SyncLoop (container unhealthy): ignore irrelevant update: %#v", update)
-				break
-			}
-			klog.V(1).Infof("SyncLoop (container unhealthy): %q", format.Pod(pod))
-			handler.HandlePodSyncs([]*v1.Pod{pod})
+			handleProbeSync(kl, update, handler, "liveness", "unhealthy")
 		}
+	case update := <-kl.readinessManager.Updates():
+		ready := update.Result == proberesults.Success
+		kl.statusManager.SetContainerReadiness(update.PodUID, update.ContainerID, ready)
+		handleProbeSync(kl, update, handler, "readiness", map[bool]string{true: "ready", false: ""}[ready])
+	case update := <-kl.startupManager.Updates():
+		started := update.Result == proberesults.Success
+		kl.statusManager.SetContainerStartup(update.PodUID, update.ContainerID, started)
+		handleProbeSync(kl, update, handler, "startup", map[bool]string{true: "started", false: "unhealthy"}[started])
 	case <-housekeepingCh:
 		if !kl.sourcesReady.AllReady() {
 			// If the sources aren't ready or volume manager has not yet synced the states,
@@ -2014,6 +2014,22 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		}
 	}
 	return true
+}
+
+func handleProbeSync(kl *Kubelet, update proberesults.Update, handler SyncHandler, probe, status string) {
+	probeAndStatus := probe
+	if len(status) > 0 {
+		probeAndStatus = fmt.Sprintf("%s (container %s)", probe, status)
+	}
+	// We should not use the pod from manager, because it is never updated after initialization.
+	pod, ok := kl.podManager.GetPodByUID(update.PodUID)
+	if !ok {
+		// If the pod no longer exists, ignore the update.
+		klog.V(4).Infof("SyncLoop %s: ignore irrelevant update: %#v", probeAndStatus, update)
+		return
+	}
+	klog.V(1).Infof("SyncLoop %s: %q", probeAndStatus, format.Pod(pod))
+	handler.HandlePodSyncs([]*v1.Pod{pod})
 }
 
 // dispatchWork starts the asynchronous sync of the pod in a pod worker.
