@@ -17,6 +17,9 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -110,11 +113,14 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 			}
 		}
 
-		topologyPath := idxPath.Child("topology")
-		if len(endpoint.Topology) > maxTopologyLabels {
-			allErrs = append(allErrs, field.TooMany(topologyPath, len(endpoint.Topology), maxTopologyLabels))
+		topologyPath := idxPath.Child("deprecatedTopology")
+		if len(endpoint.DeprecatedTopology) > maxTopologyLabels {
+			allErrs = append(allErrs, field.TooMany(topologyPath, len(endpoint.DeprecatedTopology), maxTopologyLabels))
 		}
-		allErrs = append(allErrs, metavalidation.ValidateLabels(endpoint.Topology, topologyPath)...)
+		allErrs = append(allErrs, metavalidation.ValidateLabels(endpoint.DeprecatedTopology, topologyPath)...)
+		if _, found := endpoint.DeprecatedTopology[corev1.LabelTopologyZone]; found {
+			allErrs = append(allErrs, field.InternalError(topologyPath.Key(corev1.LabelTopologyZone), fmt.Errorf("reserved key was not removed in conversion")))
+		}
 
 		if endpoint.Hostname != nil {
 			allErrs = append(allErrs, apivalidation.ValidateDNS1123Label(*endpoint.Hostname, idxPath.Child("hostname"))...)
