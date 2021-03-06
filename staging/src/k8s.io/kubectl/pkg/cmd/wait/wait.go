@@ -120,8 +120,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(args)
 			cmdutil.CheckErr(err)
-			err = o.RunWait()
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.RunWait())
 		},
 		SuggestFor: []string{"list", "ps"},
 	}
