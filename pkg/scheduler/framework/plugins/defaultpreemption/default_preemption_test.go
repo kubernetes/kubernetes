@@ -277,7 +277,7 @@ func TestPostFilter(t *testing.T) {
 			if tt.extender != nil {
 				extenders = append(extenders, tt.extender)
 			}
-			f, err := st.NewFramework(registeredPlugins,
+			f, err := st.NewFramework(registeredPlugins, "",
 				frameworkruntime.WithClientSet(cs),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithInformerFactory(informerFactory),
@@ -997,7 +997,7 @@ func TestDryRunPreemption(t *testing.T) {
 			objs := []runtime.Object{&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}
 			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(objs...), 0)
 			fwk, err := st.NewFramework(
-				registeredPlugins,
+				registeredPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
@@ -1244,6 +1244,7 @@ func TestSelectBestCandidate(t *testing.T) {
 					st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
+				"",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 			)
@@ -1644,13 +1645,13 @@ func TestPreempt(t *testing.T) {
 				extender.CachedNodeNameToInfo = cachedNodeInfoMap
 				extenders = append(extenders, extender)
 			}
-
 			fwk, err := st.NewFramework(
 				[]st.RegisterPluginFunc{
 					test.registerPlugin,
 					st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
+				"",
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithExtenders(extenders),

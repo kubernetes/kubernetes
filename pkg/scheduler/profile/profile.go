@@ -37,8 +37,8 @@ type RecorderFactory func(string) events.EventRecorder
 func newProfile(cfg config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
 	opts ...frameworkruntime.Option) (framework.Framework, error) {
 	recorder := recorderFact(cfg.SchedulerName)
-	opts = append(opts, frameworkruntime.WithEventRecorder(recorder), frameworkruntime.WithProfileName(cfg.SchedulerName))
-	fwk, err := frameworkruntime.NewFramework(r, cfg.Plugins, cfg.PluginConfig, opts...)
+	opts = append(opts, frameworkruntime.WithEventRecorder(recorder))
+	fwk, err := frameworkruntime.NewFramework(r, &cfg, opts...)
 	if err != nil {
 		return nil, err
 	}

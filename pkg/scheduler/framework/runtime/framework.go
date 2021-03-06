@@ -144,7 +144,6 @@ type frameworkOptions struct {
 	informerFactory      informers.SharedInformerFactory
 	snapshotSharedLister framework.SharedLister
 	metricsRecorder      *metricsRecorder
-	profileName          string
 	podNominator         framework.PodNominator
 	extenders            []framework.Extender
 	runAllFilters        bool
@@ -188,13 +187,6 @@ func WithSnapshotSharedLister(snapshotSharedLister framework.SharedLister) Optio
 func WithRunAllFilters(runAllFilters bool) Option {
 	return func(o *frameworkOptions) {
 		o.runAllFilters = runAllFilters
-	}
-}
-
-// WithProfileName sets the profile name.
-func WithProfileName(name string) Option {
-	return func(o *frameworkOptions) {
-		o.profileName = name
 	}
 }
 
@@ -246,7 +238,7 @@ func WithClusterEventMap(m map[framework.ClusterEvent]sets.String) Option {
 var _ framework.Framework = &frameworkImpl{}
 
 // NewFramework initializes plugins given the configuration and the registry.
-func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig, opts ...Option) (framework.Framework, error) {
+func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Option) (framework.Framework, error) {
 	options := defaultFrameworkOptions()
 	for _, opt := range opts {
 		opt(&options)
@@ -261,29 +253,34 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		eventRecorder:         options.eventRecorder,
 		informerFactory:       options.informerFactory,
 		metricsRecorder:       options.metricsRecorder,
-		profileName:           options.profileName,
 		runAllFilters:         options.runAllFilters,
 		extenders:             options.extenders,
 		PodNominator:          options.podNominator,
 	}
-	if plugins == nil {
+
+	if profile == nil {
+		return f, nil
+	}
+
+	f.profileName = profile.SchedulerName
+	if profile.Plugins == nil {
 		return f, nil
 	}
 
 	// get needed plugins from config
-	pg := f.pluginsNeeded(plugins)
+	pg := f.pluginsNeeded(profile.Plugins)
 
-	pluginConfig := make(map[string]runtime.Object, len(args))
-	for i := range args {
-		name := args[i].Name
+	pluginConfig := make(map[string]runtime.Object, len(profile.PluginConfig))
+	for i := range profile.PluginConfig {
+		name := profile.PluginConfig[i].Name
 		if _, ok := pluginConfig[name]; ok {
 			return nil, fmt.Errorf("repeated config for plugin %s", name)
 		}
-		pluginConfig[name] = args[i].Args
+		pluginConfig[name] = profile.PluginConfig[i].Args
 	}
 	outputProfile := config.KubeSchedulerProfile{
 		SchedulerName: f.profileName,
-		Plugins:       plugins,
+		Plugins:       profile.Plugins,
 		PluginConfig:  make([]config.PluginConfig, 0, len(pg)),
 	}
 
@@ -327,7 +324,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		totalPriority += int64(f.pluginNameToWeightMap[name]) * framework.MaxNodeScore
 	}
 
-	for _, e := range f.getExtensionPoints(plugins) {
+	for _, e := range f.getExtensionPoints(profile.Plugins) {
 		if err := updatePluginList(e.slicePtr, e.plugins, pluginsMap); err != nil {
 			return nil, err
 		}
