@@ -389,17 +389,17 @@ func runVolumeTesterPod(client clientset.Interface, timeouts *framework.TimeoutC
 			Containers: []v1.Container{
 				{
 					Name:       config.Prefix + "-" + podSuffix,
-					Image:      GetDefaultTestImage(),
+					Image:      e2epod.GetDefaultTestImage(),
 					WorkingDir: "/opt",
 					// An imperative and easily debuggable container which reads/writes vol contents for
 					// us to scan in the tests or by eye.
 					// We expect that /opt is empty in the minimal containers which we use in this test.
-					Command:      GenerateScriptCmd(command),
+					Command:      e2epod.GenerateScriptCmd(command),
 					VolumeMounts: []v1.VolumeMount{},
 				},
 			},
 			TerminationGracePeriodSeconds: &gracePeriod,
-			SecurityContext:               GeneratePodSecurityContext(fsGroup, seLinuxOptions),
+			SecurityContext:               e2epod.GeneratePodSecurityContext(fsGroup, seLinuxOptions),
 			Volumes:                       []v1.Volume{},
 		},
 	}
@@ -416,7 +416,7 @@ func runVolumeTesterPod(client clientset.Interface, timeouts *framework.TimeoutC
 		if privileged && test.Mode == v1.PersistentVolumeBlock {
 			privileged = false
 		}
-		clientPod.Spec.Containers[0].SecurityContext = GenerateSecurityContext(privileged)
+		clientPod.Spec.Containers[0].SecurityContext = e2epod.GenerateContainerSecurityContext(privileged)
 
 		if test.Mode == v1.PersistentVolumeBlock {
 			clientPod.Spec.Containers[0].VolumeDevices = append(clientPod.Spec.Containers[0].VolumeDevices, v1.VolumeDevice{
@@ -569,18 +569,6 @@ func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fs
 	testVolumeContent(f, injectorPod, fsGroup, fsType, tests)
 }
 
-// GenerateScriptCmd generates the corresponding command lines to execute a command.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func GenerateScriptCmd(command string) []string {
-	var commands []string
-	if !framework.NodeOSDistroIs("windows") {
-		commands = []string{"/bin/sh", "-c", command}
-	} else {
-		commands = []string{"powershell", "/c", command}
-	}
-	return commands
-}
-
 // generateWriteCmd is used by generateWriteBlockCmd and generateWriteFileCmd
 func generateWriteCmd(content, path string) []string {
 	var commands []string
@@ -629,77 +617,6 @@ func generateWriteFileCmd(content, fullPath string) []string {
 	return generateWriteCmd(content, fullPath)
 }
 
-// GenerateSecurityContext generates the corresponding container security context with the given inputs
-// If the Node OS is windows, currently we will ignore the inputs and return nil.
-// TODO: Will modify it after windows has its own security context
-func GenerateSecurityContext(privileged bool) *v1.SecurityContext {
-	if framework.NodeOSDistroIs("windows") {
-		return nil
-	}
-	return &v1.SecurityContext{
-		Privileged: &privileged,
-	}
-}
-
-// GeneratePodSecurityContext generates the corresponding pod security context with the given inputs
-// If the Node OS is windows, currently we will ignore the inputs and return nil.
-// TODO: Will modify it after windows has its own security context
-func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOptions) *v1.PodSecurityContext {
-	if framework.NodeOSDistroIs("windows") {
-		return nil
-	}
-	return &v1.PodSecurityContext{
-		SELinuxOptions: seLinuxOptions,
-		FSGroup:        fsGroup,
-	}
-}
-
-// GetTestImage returns the image name with the given input
-// If the Node OS is windows, currently we return Agnhost image for Windows node
-// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-func GetTestImage(id int) string {
-	if framework.NodeOSDistroIs("windows") {
-		return imageutils.GetE2EImage(imageutils.Agnhost)
-	}
-	return imageutils.GetE2EImage(id)
-}
-
-// GetTestImageID returns the image id with the given input
-// If the Node OS is windows, currently we return Agnhost image for Windows node
-// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-func GetTestImageID(id int) int {
-	if framework.NodeOSDistroIs("windows") {
-		return imageutils.Agnhost
-	}
-	return id
-}
-
-// GetDefaultTestImage returns the default test image based on OS.
-// If the node OS is windows, currently we return Agnhost image for Windows node
-// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-// If the node OS is linux, return busybox image
-func GetDefaultTestImage() string {
-	return imageutils.GetE2EImage(GetDefaultTestImageID())
-}
-
-// GetDefaultTestImageID returns the default test image id based on OS.
-// If the node OS is windows, currently we return Agnhost image for Windows node
-// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-// If the node OS is linux, return busybox image
-func GetDefaultTestImageID() int {
-	return GetTestImageID(imageutils.BusyBox)
-}
-
-// GetLinuxLabel returns the default SELinuxLabel based on OS.
-// If the node OS is windows, it will return nil
-func GetLinuxLabel() *v1.SELinuxOptions {
-	if framework.NodeOSDistroIs("windows") {
-		return nil
-	}
-	return &v1.SELinuxOptions{
-		Level: "s0:c0,c1"}
-}
-
 // CheckVolumeModeOfPath check mode of volume
 func CheckVolumeModeOfPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
 	if volMode == v1.PersistentVolumeBlock {
@@ -725,7 +642,6 @@ func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, string
 		return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "powershell", "/c", shExec)
 	}
 	return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
-
 }
 
 // VerifyExecInPodSucceed verifies shell cmd in target pod succeed

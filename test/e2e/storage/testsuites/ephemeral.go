@@ -347,8 +347,8 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			Containers: []v1.Container{
 				{
 					Name:    "csi-volume-tester",
-					Image:   e2evolume.GetDefaultTestImage(),
-					Command: e2evolume.GenerateScriptCmd(command),
+					Image:   e2epod.GetDefaultTestImage(),
+					Command: e2epod.GenerateScriptCmd(command),
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,

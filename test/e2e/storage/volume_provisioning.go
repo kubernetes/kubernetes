@@ -359,17 +359,17 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				ginkgo.By("Testing " + test.Name)
 				suffix := fmt.Sprintf("%d", i)
 				test.Client = c
-				test.Class = newStorageClass(test, ns, suffix)
+
+				// overwrite StorageClass spec with provisioned StorageClass
+				storageClass, clearStorageClass := testsuites.SetupStorageClass(test.Client, newStorageClass(test, ns, suffix))
+				defer clearStorageClass()
+
+				test.Class = storageClass
 				test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 					ClaimSize:        test.ClaimSize,
 					StorageClassName: &test.Class.Name,
 					VolumeMode:       &test.VolumeMode,
 				}, ns)
-
-				// overwrite StorageClass spec with provisioned StorageClass
-				class, clearStorageClass := testsuites.SetupStorageClass(test.Client, test.Class)
-				test.Class = class
-				defer clearStorageClass()
 
 				test.TestDynamicProvisioning()
 			}
@@ -425,13 +425,15 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			test.Class = newStorageClass(test, ns, "reclaimpolicy")
 			retain := v1.PersistentVolumeReclaimRetain
 			test.Class.ReclaimPolicy = &retain
+			storageClass, clearStorageClass := testsuites.SetupStorageClass(test.Client, test.Class)
+			defer clearStorageClass()
+			test.Class = storageClass
+
 			test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:        test.ClaimSize,
 				StorageClassName: &test.Class.Name,
 				VolumeMode:       &test.VolumeMode,
 			}, ns)
-			_, clearStorageClass := testsuites.SetupStorageClass(test.Client, test.Class)
-			defer clearStorageClass()
 
 			pv := test.TestDynamicProvisioning()
 
@@ -448,7 +450,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 		ginkgo.It("should not provision a volume in an unmanaged GCE zone.", func() {
 			e2eskipper.SkipUnlessProviderIs("gce", "gke")
-			var suffix string = "unmananged"
 
 			ginkgo.By("Discovering an unmanaged zone")
 			allZones := sets.NewString() // all zones in the project
@@ -484,7 +485,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				Parameters:  map[string]string{"zone": unmanagedZone},
 				ClaimSize:   "1Gi",
 			}
-			sc := newStorageClass(test, ns, suffix)
+			sc := newStorageClass(test, ns, "unmanaged")
 			sc, err = c.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			defer deleteStorageClass(c, sc.Name)
@@ -670,17 +671,16 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				ClaimSize:    "1500Mi",
 				ExpectedSize: "1500Mi",
 			}
-			test.Class = newStorageClass(test, ns, "external")
+
+			storageClass, clearStorageClass := testsuites.SetupStorageClass(test.Client, newStorageClass(test, ns, "external"))
+			defer clearStorageClass()
+			test.Class = storageClass
+
 			test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:        test.ClaimSize,
 				StorageClassName: &test.Class.Name,
 				VolumeMode:       &test.VolumeMode,
 			}, ns)
-
-			// rewrite the storageClass with the computed storageClass
-			storageClass, clearStorageClass := testsuites.SetupStorageClass(test.Client, test.Class)
-			defer clearStorageClass()
-			test.Class = storageClass
 
 			ginkgo.By("creating a claim with a external provisioning annotation")
 
@@ -806,8 +806,9 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				ExpectedSize: "2Gi",
 				Parameters:   map[string]string{"resturl": serverURL},
 			}
-			suffix := fmt.Sprintf("glusterdptest")
-			test.Class = newStorageClass(test, ns, suffix)
+			storageClass, clearStorageClass := testsuites.SetupStorageClass(test.Client, newStorageClass(test, ns, "glusterdptest"))
+			defer clearStorageClass()
+			test.Class = storageClass
 
 			ginkgo.By("creating a claim object with a suffix for gluster dynamic provisioner")
 			test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
@@ -816,8 +817,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				VolumeMode:       &test.VolumeMode,
 			}, ns)
 
-			_, clearStorageClass := testsuites.SetupStorageClass(test.Client, test.Class)
-			defer clearStorageClass()
 			test.TestDynamicProvisioning()
 		})
 	})
@@ -834,22 +833,17 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}
 
 			ginkgo.By("creating a StorageClass")
-			suffix := fmt.Sprintf("invalid-aws")
-			class := newStorageClass(test, ns, suffix)
-			class, err := c.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			defer func() {
-				framework.Logf("deleting storage class %s", class.Name)
-				framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, metav1.DeleteOptions{}))
-			}()
+			storageClass, clearStorageClass := testsuites.SetupStorageClass(test.Client, newStorageClass(test, ns, "invalid-aws"))
+			defer clearStorageClass()
+			test.Class = storageClass
 
 			ginkgo.By("creating a claim object with a suffix for gluster dynamic provisioner")
 			claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:        test.ClaimSize,
-				StorageClassName: &class.Name,
+				StorageClassName: &test.Class.Name,
 				VolumeMode:       &test.VolumeMode,
 			}, ns)
-			claim, err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(context.TODO(), claim, metav1.CreateOptions{})
+			claim, err := c.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(context.TODO(), claim, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			defer func() {
 				framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
@@ -941,19 +935,31 @@ func getDefaultPluginName() string {
 	return ""
 }
 
-func newStorageClass(t testsuites.StorageClassTest, ns string, suffix string) *storagev1.StorageClass {
+func newStorageClass(t testsuites.StorageClassTest, ns string, prefix string) *storagev1.StorageClass {
 	pluginName := t.Provisioner
 	if pluginName == "" {
 		pluginName = getDefaultPluginName()
 	}
-	if suffix == "" {
-		suffix = "sc"
+	if prefix == "" {
+		prefix = "sc"
 	}
 	bindingMode := storagev1.VolumeBindingImmediate
 	if t.DelayBinding {
 		bindingMode = storagev1.VolumeBindingWaitForFirstConsumer
 	}
-	sc := getStorageClass(pluginName, t.Parameters, &bindingMode, ns, suffix)
+	if t.Parameters == nil {
+		t.Parameters = make(map[string]string)
+	}
+
+	if framework.NodeOSDistroIs("windows") {
+		// fstype might be forced from outside, in that case skip setting a default
+		if _, exists := t.Parameters["fstype"]; !exists {
+			t.Parameters["fstype"] = e2epv.GetDefaultFSType()
+			framework.Logf("settings a default fsType=%s in the storage class", t.Parameters["fstype"])
+		}
+	}
+
+	sc := getStorageClass(pluginName, t.Parameters, &bindingMode, ns, prefix)
 	if t.AllowVolumeExpansion {
 		sc.AllowVolumeExpansion = &t.AllowVolumeExpansion
 	}
@@ -965,7 +971,7 @@ func getStorageClass(
 	parameters map[string]string,
 	bindingMode *storagev1.VolumeBindingMode,
 	ns string,
-	suffix string,
+	prefix string,
 ) *storagev1.StorageClass {
 	if bindingMode == nil {
 		defaultBindingMode := storagev1.VolumeBindingImmediate
@@ -976,8 +982,8 @@ func getStorageClass(
 			Kind: "StorageClass",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			// Name must be unique, so let's base it on namespace name
-			Name: ns + "-" + suffix,
+			// Name must be unique, so let's base it on namespace name and the prefix (the prefix is test specific)
+			GenerateName: ns + "-" + prefix,
 		},
 		Provisioner:       provisioner,
 		Parameters:        parameters,

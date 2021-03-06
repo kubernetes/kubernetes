@@ -139,7 +139,7 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 			sc = volumeResource.Sc
 			claimSize = pvc.Spec.Resources.Requests.Storage().String()
 
-			ginkgo.By("starting a pod to use the claim")
+			ginkgo.By("[init] starting a pod to use the claim")
 			originalMntTestData = fmt.Sprintf("hello from %s namespace", pvc.GetNamespace())
 			command := fmt.Sprintf("echo '%s' > %s", originalMntTestData, datapath)
 
@@ -147,13 +147,14 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 
 			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, f.Timeouts.ClaimProvision)
 			framework.ExpectNoError(err)
-			ginkgo.By("checking the claim")
+
 			// Get new copy of the claim
+			ginkgo.By("[init] checking the claim")
 			pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			// Get the bound PV
-			ginkgo.By("checking the PV")
+			ginkgo.By("[init] checking the PV")
 			_, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 		}

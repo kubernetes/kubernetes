@@ -330,8 +330,8 @@ func SetupStorageClass(
 			// skip storageclass creation if it already exists
 			ginkgo.By("Storage class " + computedStorageClass.Name + " is already created, skipping creation.")
 		} else {
-			ginkgo.By("Creating a StorageClass " + class.Name)
-			_, err = client.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
+			ginkgo.By("Creating a StorageClass")
+			class, err = client.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			computedStorageClass, err = client.StorageV1().StorageClasses().Get(context.TODO(), class.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -698,8 +698,8 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
-					Image:   e2evolume.GetDefaultTestImage(),
-					Command: e2evolume.GenerateScriptCmd(command),
+					Image:   e2epod.GetDefaultTestImage(),
+					Command: e2epod.GenerateScriptCmd(command),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "my-volume",

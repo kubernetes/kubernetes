@@ -408,9 +408,9 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 	podConfig := e2epod.Config{
 		NS:            ns,
 		PVCs:          pvcs,
-		SeLinuxLabel:  e2evolume.GetLinuxLabel(),
+		SeLinuxLabel:  e2epod.GetLinuxLabel(),
 		NodeSelection: node,
-		ImageID:       e2evolume.GetDefaultTestImageID(),
+		ImageID:       e2epod.GetDefaultTestImageID(),
 	}
 	pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, f.Timeouts.PodStart)
 	defer func() {
@@ -487,10 +487,10 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		podConfig := e2epod.Config{
 			NS:            ns,
 			PVCs:          []*v1.PersistentVolumeClaim{pvc},
-			SeLinuxLabel:  e2evolume.GetLinuxLabel(),
+			SeLinuxLabel:  e2epod.GetLinuxLabel(),
 			NodeSelection: node,
 			PVCsReadOnly:  readOnly,
-			ImageID:       e2evolume.GetTestImageID(imageutils.DebianIptables),
+			ImageID:       e2epod.GetTestImageID(imageutils.DebianIptables),
 		}
 		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, f.Timeouts.PodStart)
 		defer func() {
@@ -653,9 +653,9 @@ func initializeVolume(cs clientset.Interface, t *framework.TimeoutContext, ns st
 	podConfig := e2epod.Config{
 		NS:            ns,
 		PVCs:          []*v1.PersistentVolumeClaim{pvc},
-		SeLinuxLabel:  e2evolume.GetLinuxLabel(),
+		SeLinuxLabel:  e2epod.GetLinuxLabel(),
 		NodeSelection: node,
-		ImageID:       e2evolume.GetDefaultTestImageID(),
+		ImageID:       e2epod.GetDefaultTestImageID(),
 	}
 	pod, err := e2epod.CreateSecPod(cs, &podConfig, t.PodStart)
 	defer func() {

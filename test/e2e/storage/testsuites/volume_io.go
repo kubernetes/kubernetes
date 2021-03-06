@@ -199,7 +199,7 @@ func makePodSpec(config e2evolume.TestConfig, initCmd string, volsrc v1.VolumeSo
 			InitContainers: []v1.Container{
 				{
 					Name:  config.Prefix + "-io-init",
-					Image: e2evolume.GetDefaultTestImage(),
+					Image: e2epod.GetDefaultTestImage(),
 					Command: []string{
 						"/bin/sh",
 						"-c",
@@ -216,7 +216,7 @@ func makePodSpec(config e2evolume.TestConfig, initCmd string, volsrc v1.VolumeSo
 			Containers: []v1.Container{
 				{
 					Name:  config.Prefix + "-io-client",
-					Image: e2evolume.GetDefaultTestImage(),
+					Image: e2epod.GetDefaultTestImage(),
 					Command: []string{
 						"/bin/sh",
 						"-c",

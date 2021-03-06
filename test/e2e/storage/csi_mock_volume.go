@@ -1876,7 +1876,7 @@ func startBusyBoxPodWithVolumeSource(cs clientset.Interface, volumeSource v1.Vol
 							MountPath: "/mnt/test",
 						},
 					},
-					Command: e2evolume.GenerateScriptCmd("while true ; do sleep 2; done"),
+					Command: e2epod.GenerateScriptCmd("while true ; do sleep 2; done"),
 				},
 			},
 			SecurityContext: &v1.PodSecurityContext{
