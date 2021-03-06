@@ -113,7 +113,7 @@ fi
 
 # print a message based on the result
 if [ $res -eq 0 ]; then
-  echo 'Congratulations! All shell files are passing lint (excluding those in hack/.shellcheck_failures).'
+  echo 'Congratulations! All shell files are passing lint :-)'
 else
   {
     echo
@@ -121,7 +121,7 @@ else
     echo 'If the above warnings do not make sense, you can exempt this warning with a comment'
     echo ' (if your reviewer is okay with it).'
     echo 'In general please prefer to fix the error, we have already disabled specific lints'
-    echo ' that the project chooses to ignire.'
+    echo ' that the project chooses to ignore.'
     echo 'See: https://github.com/koalaman/shellcheck/wiki/Ignore#ignoring-one-specific-instance-in-a-file'
     echo
   } >&2
