@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -58,7 +58,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		}
 
 		endpointSubset := endpoints.Subsets[0]
-		endpointSlice, err := cs.DiscoveryV1beta1().EndpointSlices(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		endpointSlice, err := cs.DiscoveryV1().EndpointSlices(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "error creating EndpointSlice resource")
 		if len(endpointSlice.Ports) != len(endpointSubset.Ports) {
 			framework.Failf("Expected EndpointSlice to have %d ports, got %d: %#v", len(endpointSubset.Ports), len(endpointSlice.Ports), endpointSlice.Ports)
@@ -99,9 +99,9 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		}
 
 		// Expect EndpointSlice resource to be created.
-		var endpointSlice discoveryv1beta1.EndpointSlice
+		var endpointSlice discoveryv1.EndpointSlice
 		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-			endpointSliceList, err := cs.DiscoveryV1beta1().EndpointSlices(svc.Namespace).List(context.TODO(), metav1.ListOptions{
+			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(svc.Namespace).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
 			})
 			if err != nil {
@@ -117,12 +117,12 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		}
 
 		// Ensure EndpointSlice has expected values.
-		managedBy, ok := endpointSlice.Labels[discoveryv1beta1.LabelManagedBy]
+		managedBy, ok := endpointSlice.Labels[discoveryv1.LabelManagedBy]
 		expectedManagedBy := "endpointslice-controller.k8s.io"
 		if !ok {
-			framework.Failf("Expected EndpointSlice to have %s label, got %#v", discoveryv1beta1.LabelManagedBy, endpointSlice.Labels)
+			framework.Failf("Expected EndpointSlice to have %s label, got %#v", discoveryv1.LabelManagedBy, endpointSlice.Labels)
 		} else if managedBy != expectedManagedBy {
-			framework.Failf("Expected EndpointSlice to have %s label with %s value, got %s", discoveryv1beta1.LabelManagedBy, expectedManagedBy, managedBy)
+			framework.Failf("Expected EndpointSlice to have %s label with %s value, got %s", discoveryv1.LabelManagedBy, expectedManagedBy, managedBy)
 		}
 		if len(endpointSlice.Endpoints) != 0 {
 			framework.Failf("Expected EndpointSlice to have 0 endpoints, got %d: %#v", len(endpointSlice.Endpoints), endpointSlice.Endpoints)
@@ -150,7 +150,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		// and may need to retry informer resync at some point during an e2e
 		// run.
 		if err := wait.PollImmediate(2*time.Second, 90*time.Second, func() (bool, error) {
-			endpointSliceList, err := cs.DiscoveryV1beta1().EndpointSlices(svc.Namespace).List(context.TODO(), metav1.ListOptions{
+			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(svc.Namespace).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
 			})
 			if err != nil {
@@ -313,7 +313,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 // and takes some shortcuts with the assumption that those test cases will be
 // the only caller of this function.
 func expectEndpointsAndSlices(cs clientset.Interface, ns string, svc *v1.Service, pods []*v1.Pod, numSubsets, numSlices int, namedPort bool) {
-	endpointSlices := []discoveryv1beta1.EndpointSlice{}
+	endpointSlices := []discoveryv1.EndpointSlice{}
 	if err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
 		endpointSlicesFound, hasMatchingSlices := hasMatchingEndpointSlices(cs, ns, svc.Name, len(pods), numSlices)
 		if !hasMatchingSlices {
@@ -479,12 +479,12 @@ func expectEndpointsAndSlices(cs clientset.Interface, ns string, svc *v1.Service
 
 // deleteEndpointSlices deletes EndpointSlices for the specified Service.
 func deleteEndpointSlices(cs clientset.Interface, ns string, svc *v1.Service) {
-	listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1beta1.LabelServiceName, svc.Name)}
-	esList, err := cs.DiscoveryV1beta1().EndpointSlices(ns).List(context.TODO(), listOptions)
+	listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, svc.Name)}
+	esList, err := cs.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), listOptions)
 	framework.ExpectNoError(err, "Error fetching EndpointSlices for %s/%s Service", ns, svc.Name)
 
 	for _, endpointSlice := range esList.Items {
-		err := cs.DiscoveryV1beta1().EndpointSlices(ns).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
+		err := cs.DiscoveryV1().EndpointSlices(ns).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "Error deleting %s/%s EndpointSlice", ns, endpointSlice.Name)
 	}
 }
@@ -492,14 +492,14 @@ func deleteEndpointSlices(cs clientset.Interface, ns string, svc *v1.Service) {
 // hasMatchingEndpointSlices returns any EndpointSlices that match the
 // conditions along with a boolean indicating if all the conditions have been
 // met.
-func hasMatchingEndpointSlices(cs clientset.Interface, ns, svcName string, numEndpoints, numSlices int) ([]discoveryv1beta1.EndpointSlice, bool) {
-	listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1beta1.LabelServiceName, svcName)}
-	esList, err := cs.DiscoveryV1beta1().EndpointSlices(ns).List(context.TODO(), listOptions)
+func hasMatchingEndpointSlices(cs clientset.Interface, ns, svcName string, numEndpoints, numSlices int) ([]discoveryv1.EndpointSlice, bool) {
+	listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, svcName)}
+	esList, err := cs.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), listOptions)
 	framework.ExpectNoError(err, "Error fetching EndpointSlice for Service %s/%s", ns, svcName)
 
 	if len(esList.Items) == 0 {
 		framework.Logf("EndpointSlice for Service %s/%s not found", ns, svcName)
-		return []discoveryv1beta1.EndpointSlice{}, false
+		return []discoveryv1.EndpointSlice{}, false
 	}
 	// In some cases the EndpointSlice controller will create more
 	// EndpointSlices than necessary resulting in some duplication. This is
