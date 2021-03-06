@@ -28,6 +28,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -65,6 +66,10 @@ type EventsOptions struct {
 	AllNamespaces bool
 	Namespace     string
 	Watch         bool
+	ForObject     string
+
+	forResource string // decoded version of ForObject
+	forName     string
 
 	ctx    context.Context
 	client *kubernetes.Clientset
@@ -102,6 +107,7 @@ func NewCmdEvents(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 func (o *EventsOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing the requested events, watch for more events.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().StringVar(&o.ForObject, "for", o.ForObject, "Filter events to only those pertaining to the specified resource.")
 }
 
 func (o *EventsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
@@ -109,6 +115,17 @@ func (o *EventsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
+	}
+
+	if o.ForObject != "" {
+		tuple, found, err := splitResourceTypeName(o.ForObject)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return fmt.Errorf("--watch-for must be in resource/name form")
+		}
+		o.forName, o.forResource = tuple.Name, tuple.Resource
 	}
 
 	o.ctx = cmd.Context()
@@ -132,6 +149,11 @@ func (o EventsOptions) Run() error {
 		namespace = ""
 	}
 	listOptions := metav1.ListOptions{}
+	if o.forName != "" {
+		listOptions.FieldSelector = fields.AndSelectors(
+			fields.OneTermEqualSelector("involvedObject.kind", o.forResource),
+			fields.OneTermEqualSelector("involvedObject.name", o.forName)).String()
+	}
 	el, err := o.client.CoreV1().Events(namespace).List(o.ctx, listOptions)
 
 	if err != nil {
