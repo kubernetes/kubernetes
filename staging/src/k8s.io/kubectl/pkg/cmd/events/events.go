@@ -131,7 +131,8 @@ func (o EventsOptions) Run() error {
 	if o.AllNamespaces {
 		namespace = ""
 	}
-	el, err := o.client.CoreV1().Events(namespace).List(o.ctx, metav1.ListOptions{})
+	listOptions := metav1.ListOptions{}
+	el, err := o.client.CoreV1().Events(namespace).List(o.ctx, listOptions)
 
 	if err != nil {
 		return err
@@ -147,12 +148,11 @@ func (o EventsOptions) Run() error {
 	}
 	w.Flush()
 	if o.Watch {
-		var rv string
 		if len(el.Items) > 0 {
 			// start watch from after the most recent item in the list
-			rv = el.Items[len(el.Items)-1].ResourceVersion
+			listOptions.ResourceVersion = el.Items[len(el.Items)-1].ResourceVersion
 		}
-		eventWatch, err := o.client.CoreV1().Events(namespace).Watch(o.ctx, metav1.ListOptions{ResourceVersion: rv})
+		eventWatch, err := o.client.CoreV1().Events(namespace).Watch(o.ctx, listOptions)
 		if err != nil {
 			return err
 		}
