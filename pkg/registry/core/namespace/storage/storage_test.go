@@ -109,9 +109,8 @@ func TestGet(t *testing.T) {
 	defer storage.store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.store).ClusterScope()
 
-	test.TestGet(validNewNamespace()) 	// --> *api.Namespace object
-	// resttest.TestGet
-	//	testGetFound
+	// note that this ultimately may call validation
+	test.TestGet(validNewNamespace())
 }
 
 func TestList(t *testing.T) {
