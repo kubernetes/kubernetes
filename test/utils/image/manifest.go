@@ -188,6 +188,8 @@ const (
 	NFSProvisioner
 	// Nginx image
 	Nginx
+	// NginxCopy image
+	NginxCopy
 	// NginxNew image
 	NginxNew
 	// NodePerfNpbEp image
@@ -252,6 +254,7 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[Nautilus] = Config{list.PromoterE2eRegistry, "nautilus", "1.7"}
 	configs[NFSProvisioner] = Config{list.SigStorageRegistry, "nfs-provisioner", "v3.0.1"}
 	configs[Nginx] = Config{list.PromoterE2eRegistry, "nginx", "1.14-4"}
+	configs[NginxCopy] = Config{list.PromoterE2eRegistry, "nginx", "1.14-4-copy"}
 	configs[NginxNew] = Config{list.PromoterE2eRegistry, "nginx", "1.15-4"}
 	configs[NodePerfNpbEp] = Config{list.PromoterE2eRegistry, "node-perf/npb-ep", "1.2"}
 	configs[NodePerfNpbIs] = Config{list.PromoterE2eRegistry, "node-perf/npb-is", "1.2"}

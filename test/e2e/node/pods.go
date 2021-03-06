@@ -40,6 +40,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -220,6 +221,62 @@ var _ = SIGDescribe("Pods Extended", func() {
 				podFastDeleteScenario{client: podClient.PodInterface, delayMs: 2000, initContainer: true},
 				podClient.PodInterface,
 			)
+		})
+
+		ginkgo.It("should be consistent between pod spec and status for container image", func(ctx context.Context) {
+			ginkgo.By("creating the pod")
+			name := "pod-inplace-update-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+					Labels: map[string]string{
+						"name": name,
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "busybox",
+							Image: imageutils.GetE2EImage(imageutils.Nginx),
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("5m"),
+									v1.ResourceMemory: resource.MustParse("10Mi"),
+								},
+							},
+						},
+					},
+				},
+			}
+
+			ginkgo.By("submitting the pod to kubernetes")
+			podClient.Create(ctx, pod)
+
+			ginkgo.By("waiting for pod running")
+			err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("updating container image")
+			podClient.Update(ctx, name, func(pod *v1.Pod) {
+				pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.NginxCopy)
+			})
+
+			ginkgo.By("waiting for pod restart and running")
+			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "inplace-updated", e2ejob.JobTimeout,
+				func(pod *v1.Pod) (bool, error) {
+					if pod.Status.ContainerStatuses[0].RestartCount < 1 {
+						return false, nil
+					}
+					if pod.Status.ContainerStatuses[0].Image != pod.Spec.Containers[0].Image {
+						return false, nil
+					}
+					if pod.Status.Phase != v1.PodRunning {
+						return false, nil
+					}
+					return true, nil
+				},
+			)
+			framework.ExpectNoError(err)
 		})
 	})
 
