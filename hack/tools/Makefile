@@ -20,6 +20,7 @@ DEP_PROGS=\
 	$(GOBIN)/misspell\
 	$(GOBIN)/prettybench\
 	$(GOBIN)/staticcheck\
+	$(GOBIN)/logcheck\
 
 .PHONY: all
 all: clean build
@@ -47,3 +48,6 @@ $(GOBIN)/prettybench: deps
 
 $(GOBIN)/staticcheck: deps
 	go install honnef.co/go/tools/cmd/staticcheck
+
+$(GOBIN)/logcheck: deps
+	go install k8s.io/klog/hack/tools/logcheck
