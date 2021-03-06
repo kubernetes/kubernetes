@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -281,6 +282,109 @@ var _ = SIGDescribe("Downward API", func() {
 
 		testDownwardAPI(f, podName, env, expectations)
 	})
+})
+
+var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature:DownwardAPIHugePages]", func() {
+	f := framework.NewDefaultFramework("downward-api")
+
+	ginkgo.Context("Downward API tests for hugepages", func() {
+		ginkgo.BeforeEach(func() {
+			e2eskipper.SkipUnlessDownwardAPIHugePagesEnabled()
+		})
+
+		ginkgo.It("should provide container's limits.hugepages-<pagesize> and requests.hugepages-<pagesize> as env vars", func() {
+			podName := "downward-api-" + string(uuid.NewUUID())
+			env := []v1.EnvVar{
+				{
+					Name: "HUGEPAGES_LIMIT",
+					ValueFrom: &v1.EnvVarSource{
+						ResourceFieldRef: &v1.ResourceFieldSelector{
+							Resource: "limits.hugepages-2Mi",
+						},
+					},
+				},
+				{
+					Name: "HUGEPAGES_REQUEST",
+					ValueFrom: &v1.EnvVarSource{
+						ResourceFieldRef: &v1.ResourceFieldSelector{
+							Resource: "requests.hugepages-2Mi",
+						},
+					},
+				},
+			}
+
+			// Important: we explicitly request no hugepages so the test can run where none are present.
+			expectations := []string{
+				fmt.Sprintf("HUGEPAGES_LIMIT=%d", 0),
+				fmt.Sprintf("HUGEPAGES_REQUEST=%d", 0),
+			}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   podName,
+					Labels: map[string]string{"name": podName},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:    "dapi-container",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"sh", "-c", "env"},
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									"cpu":           resource.MustParse("10m"),
+									"hugepages-2Mi": resource.MustParse("0Mi"),
+								},
+								Limits: v1.ResourceList{
+									"hugepages-2Mi": resource.MustParse("0Mi"),
+								},
+							},
+							Env: env,
+						},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			}
+			testDownwardAPIUsingPod(f, pod, env, expectations)
+		})
+
+		ginkgo.It("should provide default limits.hugepages-<pagesize> from node allocatable", func() {
+			podName := "downward-api-" + string(uuid.NewUUID())
+			env := []v1.EnvVar{
+				{
+					Name: "HUGEPAGES_LIMIT",
+					ValueFrom: &v1.EnvVarSource{
+						ResourceFieldRef: &v1.ResourceFieldSelector{
+							Resource: "limits.hugepages-2Mi",
+						},
+					},
+				},
+			}
+			// Important: we allow for 0 so the test passes in environments where no hugepages are allocated.
+			expectations := []string{
+				"HUGEPAGES_LIMIT=((0)|([1-9][0-9]*))\n",
+			}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   podName,
+					Labels: map[string]string{"name": podName},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:    "dapi-container",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"sh", "-c", "env"},
+							Env:     env,
+						},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			}
+
+			testDownwardAPIUsingPod(f, pod, env, expectations)
+		})
+	})
+
 })
 
 func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, expectations []string) {
