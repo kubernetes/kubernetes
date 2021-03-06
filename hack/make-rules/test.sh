@@ -72,7 +72,7 @@ KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
 # The idiomatic way to disable test caching explicitly is to use -count=1
 # Run each test and benchmark n times
 # xref: https://golang.org/pkg/cmd/go/internal/test/
-KUBE_TESTCOUNT=${KUBE_TESTCOUNT:-1}
+KUBE_TESTCOUNT=${KUBE_TESTCOUNT:-10}
 # Set to the goveralls binary path to report coverage results to Coveralls.io.
 KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # once we have multiple group supports
