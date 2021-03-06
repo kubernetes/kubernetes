@@ -1,0 +1,15 @@
+- name: apiserver_request_total
+  help: Counter of apiserver requests broken out for each verb, dry run value, group,
+    version, resource, scope, component, and HTTP response code.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - code
+  - component
+  - dry_run
+  - group
+  - resource
+  - scope
+  - subresource
+  - verb
+  - version
