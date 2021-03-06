@@ -69,6 +69,10 @@ KUBE_COVER_REPORT_DIR="${KUBE_COVER_REPORT_DIR:-}"
 # coverage mode.
 KUBE_COVERPROCS=${KUBE_COVERPROCS:-4}
 KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
+# The idiomatic way to disable test caching explicitly is to use -count=1
+# Run each test and benchmark n times
+# xref: https://golang.org/pkg/cmd/go/internal/test/
+KUBE_TESTCOUNT=${KUBE_TESTCOUNT:-1}
 # Set to the goveralls binary path to report coverage results to Coveralls.io.
 KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # once we have multiple group supports
@@ -164,6 +168,10 @@ set -- "${testcases[@]+${testcases[@]}}"
 
 if [[ -n "${KUBE_RACE}" ]] ; then
   goflags+=("${KUBE_RACE}")
+fi
+
+if [[ -n "${KUBE_TESTCOUNT}" ]] ; then
+  goflags+=("-count=${KUBE_TESTCOUNT}")
 fi
 
 junitFilenamePrefix() {
