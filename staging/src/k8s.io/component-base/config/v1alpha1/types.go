@@ -51,7 +51,7 @@ type LeaderElectionConfiguration struct {
 	// resourceName indicates the name of resource object that will be used to lock
 	// during leader election cycles.
 	ResourceName string `json:"resourceName"`
-	// resourceName indicates the namespace of resource object that will be used to lock
+	// resourceNamespace indicates the namespace of resource object that will be used to lock
 	// during leader election cycles.
 	ResourceNamespace string `json:"resourceNamespace"`
 }
