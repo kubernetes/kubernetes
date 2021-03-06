@@ -76,7 +76,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	// Tweaks used below.
 	setIngressEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{{}}
+		networkPolicy.Spec.Ingress = make([]networking.NetworkPolicyIngressRule, 1)
 	}
 
 	setIngressFromEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
@@ -87,6 +87,14 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		}
 	}
 
+	setIngressFromIfEmpty := func(networkPolicy *networking.NetworkPolicy) {
+		if networkPolicy.Spec.Ingress == nil {
+			setIngressEmptyFirstElement(networkPolicy)
+		}
+		if networkPolicy.Spec.Ingress[0].From == nil {
+			setIngressFromEmptyFirstElement(networkPolicy)
+		}
+	}
 	setIngressEmptyPorts := func(networkPolicy *networking.NetworkPolicy) {
 		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{
 			{
@@ -97,6 +105,9 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	setIngressPorts := func(ports ...networking.NetworkPolicyPort) netpolTweak {
 		return func(np *networking.NetworkPolicy) {
+			if np.Spec.Ingress == nil {
+				setIngressEmptyFirstElement(np)
+			}
 			np.Spec.Ingress[0].Ports = make([]networking.NetworkPolicyPort, len(ports))
 			for i, p := range ports {
 				np.Spec.Ingress[0].Ports[i] = p
@@ -106,18 +117,30 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	setIngressFromPodSelector := func(k, v string) func(*networking.NetworkPolicy) {
 		return func(networkPolicy *networking.NetworkPolicy) {
-			networkPolicy.Spec.Ingress[0].From[0].PodSelector = &metav1.LabelSelector{
-				MatchLabels: map[string]string{k: v},
+			setIngressFromIfEmpty(networkPolicy)
+			networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{
+				{
+					From: []networking.NetworkPolicyPeer{
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{k: v},
+							},
+						},
+					},
+				},
 			}
 		}
+
 	}
 	setIngressFromNamespaceSelector := func(networkPolicy *networking.NetworkPolicy) {
+		setIngressFromIfEmpty(networkPolicy)
 		networkPolicy.Spec.Ingress[0].From[0].NamespaceSelector = &metav1.LabelSelector{
 			MatchLabels: map[string]string{"c": "d"},
 		}
 	}
 
 	setIngressFromIPBlock := func(networkPolicy *networking.NetworkPolicy) {
+		setIngressFromIfEmpty(networkPolicy)
 		networkPolicy.Spec.Ingress[0].From[0].IPBlock = &networking.IPBlock{
 			CIDR:   "192.168.0.0/16",
 			Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
@@ -125,6 +148,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	setIngressFromIPBlockIPV6 := func(networkPolicy *networking.NetworkPolicy) {
+		setIngressFromIfEmpty(networkPolicy)
 		networkPolicy.Spec.Ingress[0].From[0].IPBlock = &networking.IPBlock{
 			CIDR:   "fd00:192:168::/48",
 			Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
@@ -132,26 +156,41 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	setEgressEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Egress = []networking.NetworkPolicyEgressRule{{}}
+		networkPolicy.Spec.Egress = make([]networking.NetworkPolicyEgressRule, 1)
 	}
 
 	setEgressToEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Egress[0].To = []networking.NetworkPolicyPeer{{}}
+		networkPolicy.Spec.Egress = []networking.NetworkPolicyEgressRule{
+			{
+				To: []networking.NetworkPolicyPeer{{}},
+			},
+		}
 	}
 
+	setEgressToIfEmpty := func(networkPolicy *networking.NetworkPolicy) {
+		if networkPolicy.Spec.Egress == nil {
+			setEgressEmptyFirstElement(networkPolicy)
+		}
+		if networkPolicy.Spec.Egress[0].To == nil {
+			setEgressToEmptyFirstElement(networkPolicy)
+		}
+	}
 	setEgressToNamespaceSelector := func(networkPolicy *networking.NetworkPolicy) {
+		setEgressToIfEmpty(networkPolicy)
 		networkPolicy.Spec.Egress[0].To[0].NamespaceSelector = &metav1.LabelSelector{
 			MatchLabels: map[string]string{"c": "d"},
 		}
 	}
 
 	setEgressToPodSelector := func(networkPolicy *networking.NetworkPolicy) {
+		setEgressToIfEmpty(networkPolicy)
 		networkPolicy.Spec.Egress[0].To[0].PodSelector = &metav1.LabelSelector{
 			MatchLabels: map[string]string{"c": "d"},
 		}
 	}
 
 	setEgressToIPBlock := func(networkPolicy *networking.NetworkPolicy) {
+		setEgressToIfEmpty(networkPolicy)
 		networkPolicy.Spec.Egress[0].To[0].IPBlock = &networking.IPBlock{
 			CIDR:   "192.168.0.0/16",
 			Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
@@ -159,6 +198,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	setEgressToIPBlockIPV6 := func(networkPolicy *networking.NetworkPolicy) {
+		setEgressToIfEmpty(networkPolicy)
 		networkPolicy.Spec.Egress[0].To[0].IPBlock = &networking.IPBlock{
 			CIDR:   "fd00:192:168::/48",
 			Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
@@ -175,6 +215,9 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	setEgressPorts := func(ports ...networking.NetworkPolicyPort) netpolTweak {
 		return func(np *networking.NetworkPolicy) {
+			if np.Spec.Egress == nil {
+				setEgressEmptyFirstElement(np)
+			}
 			np.Spec.Egress[0].Ports = make([]networking.NetworkPolicyPort, len(ports))
 			for i, p := range ports {
 				np.Spec.Egress[0].Ports[i] = p
@@ -194,37 +237,37 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		// Success Test Number 1
 		makeNetworkPolicyCustom(setIngressEmptyFirstElement),
 		// Success Test Number 2
-		makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressEmptyPorts),
+		makeNetworkPolicyCustom(setIngressEmptyPorts),
 		// Success Test Number 3
-		makeNetworkPolicyCustom(setIngressEmptyFirstElement, setIngressPorts(makePort(nil, intstr.FromInt(80), 0), makePort(&protocolTCP, intstr.FromInt(0), 0), makePort(&protocolTCP, intstr.FromInt(443), 0), makePort(&protocolUDP, intstr.FromString("dns"), 0), makePort(&protocolSCTP, intstr.FromInt(7777), 0))),
+		makeNetworkPolicyCustom(setIngressPorts(makePort(nil, intstr.FromInt(80), 0), makePort(&protocolTCP, intstr.FromInt(0), 0), makePort(&protocolTCP, intstr.FromInt(443), 0), makePort(&protocolUDP, intstr.FromString("dns"), 0), makePort(&protocolSCTP, intstr.FromInt(7777), 0))),
 		// Success Test Number 4
-		makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressFromPodSelector("c", "d")),
+		makeNetworkPolicyCustom(setIngressFromPodSelector("c", "d")),
 		// Success Test Number 5
-		makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressFromNamespaceSelector),
+		makeNetworkPolicyCustom(setIngressFromNamespaceSelector),
 		// Success Test Number 6
-		makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressFromNamespaceSelector, setIngressFromPodSelector("e", "f")),
+		makeNetworkPolicyCustom(setIngressFromPodSelector("e", "f"), setIngressFromNamespaceSelector),
 		// Success Test Number 7
-		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setIngressFromEmptyFirstElement, setIngressFromIPBlock),
+		makeNetworkPolicyCustom(setEgressToNamespaceSelector, setIngressFromIPBlock),
 		// Success Test Number 8
-		makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressFromIPBlock),
+		makeNetworkPolicyCustom(setIngressFromIPBlock),
 		// Success Test Number 9
-		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, setPolicyTypesEgress),
+		makeNetworkPolicyCustom(setEgressToIPBlock, setPolicyTypesEgress),
 		// Success Test Number 10
-		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, setPolicyTypesIngressEgress),
+		makeNetworkPolicyCustom(setEgressToIPBlock, setPolicyTypesIngressEgress),
 		// Success Test Number 11
-		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressPorts(makePort(nil, intstr.FromInt(80), 0), makePort(&protocolTCP, intstr.FromInt(0), 0), makePort(&protocolTCP, intstr.FromInt(443), 0), makePort(&protocolUDP, intstr.FromString("dns"), 0), makePort(&protocolSCTP, intstr.FromInt(7777), 0))),
+		makeNetworkPolicyCustom(setEgressPorts(makePort(nil, intstr.FromInt(80), 0), makePort(&protocolTCP, intstr.FromInt(0), 0), makePort(&protocolTCP, intstr.FromInt(443), 0), makePort(&protocolUDP, intstr.FromString("dns"), 0), makePort(&protocolSCTP, intstr.FromInt(7777), 0))),
 		// Success Test Number 12
-		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setIngressFromEmptyFirstElement, setIngressFromIPBlockIPV6),
+		makeNetworkPolicyCustom(setEgressToNamespaceSelector, setIngressFromIPBlockIPV6),
 		// Success Test Number 13
-		makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressFromIPBlockIPV6),
+		makeNetworkPolicyCustom(setIngressFromIPBlockIPV6),
 		// Success Test Number 14
-		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlockIPV6, setPolicyTypesEgress),
+		makeNetworkPolicyCustom(setEgressToIPBlockIPV6, setPolicyTypesEgress),
 		// Success Test Number 15
-		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlockIPV6, setPolicyTypesIngressEgress),
+		makeNetworkPolicyCustom(setEgressToIPBlockIPV6, setPolicyTypesIngressEgress),
 		// Success Test Number 16
-		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressPorts(makePort(nil, intstr.FromInt(32000), 32768), makePort(&protocolUDP, intstr.FromString("dns"), 0))),
+		makeNetworkPolicyCustom(setEgressPorts(makePort(nil, intstr.FromInt(32000), 32768), makePort(&protocolUDP, intstr.FromString("dns"), 0))),
 		// Success Test Number 17
-		makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setEgressPorts(makePort(nil, intstr.FromInt(30000), 32768), makePort(nil, intstr.FromInt(32000), 32768)), setIngressFromEmptyFirstElement, setIngressFromPodSelector("e", "f"), setIngressPorts(makePort(&protocolTCP, intstr.FromInt(32768), 32768))),
+		makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(nil, intstr.FromInt(30000), 32768), makePort(nil, intstr.FromInt(32000), 32768)), setIngressFromPodSelector("e", "f"), setIngressPorts(makePort(&protocolTCP, intstr.FromInt(32768), 32768))),
 	}
 
 	// Success cases are expected to pass validation.
@@ -238,57 +281,55 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 
 	errorCases := map[string]*networking.NetworkPolicy{
-		"namespaceSelector and ipBlock": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressFromNamespaceSelector, setIngressFromIPBlock),
-		"podSelector and ipBlock":       makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToPodSelector, setEgressToIPBlock),
-		"missing from and to type":      makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setEgressEmptyFirstElement, setEgressToEmptyFirstElement),
-		"invalid spec.podSelector": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressFromNamespaceSelector, func(networkPolicy *networking.NetworkPolicy) {
+		"namespaceSelector and ipBlock": makeNetworkPolicyCustom(setIngressFromNamespaceSelector, setIngressFromIPBlock),
+		"podSelector and ipBlock":       makeNetworkPolicyCustom(setEgressToPodSelector, setEgressToIPBlock),
+		"missing from and to type":      makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setEgressToEmptyFirstElement),
+		"invalid spec.podSelector": makeNetworkPolicyCustom(setIngressFromNamespaceSelector, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec = networking.NetworkPolicySpec{
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: invalidSelector,
 				},
 			}
 		}),
-		"invalid ingress.ports.protocol": makeNetworkPolicyCustom(setIngressEmptyPorts, func(networkPolicy *networking.NetworkPolicy) {
-			networkPolicy.Spec.Ingress[0].Ports[0].Protocol = &protocolICMP
-		}),
-		"invalid ingress.ports.port (int)": makeNetworkPolicyCustom(setIngressEmptyPorts, setIngressPorts(makePort(&protocolTCP, intstr.FromInt(123456789), 0))),
-		"invalid ingress.ports.port (str)": makeNetworkPolicyCustom(setIngressEmptyPorts,
+		"invalid ingress.ports.protocol": makeNetworkPolicyCustom(setIngressEmptyPorts,
+			setIngressPorts(makePort(&protocolICMP, intstr.FromInt(80), 0))),
+		"invalid ingress.ports.port (int)": makeNetworkPolicyCustom(setIngressPorts(makePort(&protocolTCP, intstr.FromInt(123456789), 0))),
+		"invalid ingress.ports.port (str)": makeNetworkPolicyCustom(
 			setIngressPorts(makePort(&protocolTCP, intstr.FromString("!@#$"), 0))),
 		"invalid ingress.from.podSelector": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].PodSelector = &metav1.LabelSelector{
 				MatchLabels: invalidSelector,
 			}
 		}),
-		"invalid egress.to.podSelector": makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, func(networkPolicy *networking.NetworkPolicy) {
+		"invalid egress.to.podSelector": makeNetworkPolicyCustom(setEgressToEmptyFirstElement, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Egress[0].To[0].PodSelector = &metav1.LabelSelector{
 				MatchLabels: invalidSelector,
 			}
 		}),
-		"invalid egress.ports.protocol": makeNetworkPolicyCustom(setEgressEmptyPorts, setEgressPorts(makePort(&protocolICMP, intstr.FromInt(80), 0))),
-
-		"invalid egress.ports.port (int)": makeNetworkPolicyCustom(setEgressEmptyPorts, setEgressPorts(makePort(&protocolTCP, intstr.FromInt(123456789), 0))),
-		"invalid egress.ports.port (str)": makeNetworkPolicyCustom(setEgressEmptyPorts, setEgressPorts(makePort(&protocolTCP, intstr.FromString("!@#$"), 0))),
+		"invalid egress.ports.protocol":   makeNetworkPolicyCustom(setEgressEmptyPorts, setEgressPorts(makePort(&protocolICMP, intstr.FromInt(80), 0))),
+		"invalid egress.ports.port (int)": makeNetworkPolicyCustom(setEgressPorts(makePort(&protocolTCP, intstr.FromInt(123456789), 0))),
+		"invalid egress.ports.port (str)": makeNetworkPolicyCustom(setEgressPorts(makePort(&protocolTCP, intstr.FromString("!@#$"), 0))),
 		"invalid ingress.from.namespaceSelector": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: invalidSelector,
 			}
 		}),
-		"missing cidr field": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
+		"missing cidr field": makeNetworkPolicyCustom(setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = ""
 		}),
-		"invalid cidr format": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
+		"invalid cidr format": makeNetworkPolicyCustom(setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = "192.168.5.6"
 		}),
-		"invalid ipv6 cidr format": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressFromIPBlockIPV6, func(networkPolicy *networking.NetworkPolicy) {
+		"invalid ipv6 cidr format": makeNetworkPolicyCustom(setIngressFromIPBlockIPV6, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = "fd00:192:168::"
 		}),
-		"except field is an empty string": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
+		"except field is an empty string": makeNetworkPolicyCustom(setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.Except = []string{""}
 		}),
-		"except field is an space string": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
+		"except field is an space string": makeNetworkPolicyCustom(setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.Except = []string{" "}
 		}),
-		"except field is an invalid ip": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
+		"except field is an invalid ip": makeNetworkPolicyCustom(setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.Except = []string{"300.300.300.300"}
 		}),
 		"except IP is outside of CIDR range": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, func(networkPolicy *networking.NetworkPolicy) {
@@ -309,19 +350,19 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				Except: []string{"fd00:192:168:2::/64"},
 			}
 		}),
-		"invalid policyTypes": makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, func(networkPolicy *networking.NetworkPolicy) {
+		"invalid policyTypes": makeNetworkPolicyCustom(setEgressToIPBlock, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.PolicyTypes = []networking.PolicyType{"foo", "bar"}
 		}),
-		"too many policyTypes": makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToIPBlock, func(networkPolicy *networking.NetworkPolicy) {
+		"too many policyTypes": makeNetworkPolicyCustom(setEgressToIPBlock, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.PolicyTypes = []networking.PolicyType{"foo", "bar", "baz"}
 		}),
-		"multiple ports defined, one port range is invalid": makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolUDP, intstr.FromInt(35000), 32768), makePort(nil, intstr.FromInt(32000), 32768))),
-		"endPort defined with named/string port":            makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolUDP, intstr.FromString("dns"), 32768), makePort(nil, intstr.FromInt(32000), 32768))),
-		"endPort defined without port defined":              makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolTCP, intstr.FromInt(0), 32768))),
-		"port is greater than endPort":                      makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolSCTP, intstr.FromInt(35000), 32768))),
-		"multiple invalid port ranges defined":              makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolUDP, intstr.FromInt(35000), 32768), makePort(&protocolTCP, intstr.FromInt(0), 32768), makePort(&protocolTCP, intstr.FromString("https"), 32768))),
+		"multiple ports defined, one port range is invalid": makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolUDP, intstr.FromInt(35000), 32768), makePort(nil, intstr.FromInt(32000), 32768))),
+		"endPort defined with named/string port":            makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolUDP, intstr.FromString("dns"), 32768), makePort(nil, intstr.FromInt(32000), 32768))),
+		"endPort defined without port defined":              makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolTCP, intstr.FromInt(0), 32768))),
+		"port is greater than endPort":                      makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolSCTP, intstr.FromInt(35000), 32768))),
+		"multiple invalid port ranges defined":              makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolUDP, intstr.FromInt(35000), 32768), makePort(&protocolTCP, intstr.FromInt(0), 32768), makePort(&protocolTCP, intstr.FromString("https"), 32768))),
 
-		"invalid endport range defined": makeNetworkPolicyCustom(setEgressEmptyFirstElement, setEgressToEmptyFirstElement, setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolTCP, intstr.FromInt(30000), 65537))),
+		"invalid endport range defined": makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolTCP, intstr.FromInt(30000), 65537))),
 	}
 
 	// Error cases are not expected to pass validation.
