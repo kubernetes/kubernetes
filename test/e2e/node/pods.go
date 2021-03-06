@@ -206,7 +206,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		ginkgo.It("should never report success for a pending container", func() {
 			ginkgo.By("creating pods that should always exit 1 and terminating the pod after a random delay")
 
-			var reBug88766 = regexp.MustCompile(`rootfs_linux.*kubernetes\.io~secret.*no such file or directory`)
+			var reBug88766 = regexp.MustCompile(`rootfs_linux.*kubernetes\.io~(secret|projected).*no such file or directory`)
 
 			var (
 				lock sync.Mutex
