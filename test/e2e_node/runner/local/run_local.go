@@ -41,7 +41,7 @@ func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
 
-	// Build dependencies - ginkgo, kubelet and apiserver.
+	// Build dependencies - ginkgo, kubelet, e2e_node.test, and mounter.
 	if *buildDependencies {
 		if err := builder.BuildGo(); err != nil {
 			klog.Fatalf("Failed to build the dependencies: %v", err)
