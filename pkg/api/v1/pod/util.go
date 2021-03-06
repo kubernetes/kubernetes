@@ -290,7 +290,7 @@ func IsPodAvailable(pod *v1.Pod, minReadySeconds int32, now metav1.Time) bool {
 
 	c := GetPodReadyCondition(pod.Status)
 	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
-	if minReadySeconds == 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(now.Time) {
+	if minReadySeconds == 0 || (!c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(now.Time)) {
 		return true
 	}
 	return false
