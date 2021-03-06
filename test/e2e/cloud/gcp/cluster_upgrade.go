@@ -159,7 +159,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, upgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 
@@ -181,7 +181,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, upgradeTests, testSuite, upgrades.NodeUpgrade, upgradeFunc)
+			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.NodeUpgrade, upgradeFunc)
 		})
 	})
 
@@ -202,7 +202,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -230,7 +230,7 @@ var _ = ginkgo.Describe("Downgrade [Feature:Downgrade]", func() {
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -240,6 +240,9 @@ var _ = ginkgo.Describe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 
 	ginkgo.Describe("etcd upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			framework.ExpectNoError(err)
+
 			testSuite := &junit.TestSuite{Name: "Etcd upgrade"}
 			etcdTest := &junit.TestCase{Name: "[sig-cloud-provider-gcp] etcd-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, etcdTest)
@@ -249,7 +252,7 @@ var _ = ginkgo.Describe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 				defer finalizeUpgradeTest(start, etcdTest)
 				framework.ExpectNoError(framework.EtcdUpgrade(framework.TestContext.EtcdUpgradeStorage, framework.TestContext.EtcdUpgradeVersion))
 			}
-			runUpgradeSuite(f, upgradeTests, testSuite, upgrades.EtcdUpgrade, upgradeFunc)
+			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.EtcdUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -273,7 +276,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, gpuUpgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+			runUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 	ginkgo.Describe("cluster upgrade", func() {
@@ -293,7 +296,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 	ginkgo.Describe("cluster downgrade", func() {
@@ -313,7 +316,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -339,7 +342,7 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, statefulsetUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(upgCtx, statefulsetUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -373,7 +376,7 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 				framework.ExpectNoError(nodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, true))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, kubeProxyUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(upgCtx, kubeProxyUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 
@@ -399,7 +402,7 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 				framework.ExpectNoError(masterUpgradeGCEWithKubeProxyDaemonSet(target, false))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, kubeProxyDowngradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(upgCtx, kubeProxyDowngradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -426,7 +429,7 @@ var _ = ginkgo.Describe("[sig-auth] ServiceAccount admission controller migratio
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(masterUpgrade(f, target, []string{"KUBE_FEATURE_GATES=BoundServiceAccountTokenVolume=true"}))
 			}
-			runUpgradeSuite(f, serviceaccountAdmissionControllerMigrationTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+			runUpgradeSuite(upgCtx, serviceaccountAdmissionControllerMigrationTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -502,15 +505,12 @@ func createUpgradeFrameworks(tests []upgrades.Test) map[string]*framework.Framew
 }
 
 func runUpgradeSuite(
-	f *framework.Framework,
+	upgCtx *upgrades.UpgradeContext,
 	tests []upgrades.Test,
 	testSuite *junit.TestSuite,
 	upgradeType upgrades.UpgradeType,
 	upgradeFunc func(),
 ) {
-	upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
-	framework.ExpectNoError(err)
-
 	testFrameworks := createUpgradeFrameworks(tests)
 
 	cm := chaosmonkey.New(upgradeFunc)
