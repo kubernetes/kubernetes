@@ -28,7 +28,11 @@
     "image": "{{pillar['kube_docker_registry']}}/kube-apiserver-amd64:{{pillar['kube-apiserver_docker_tag']}}",
     "resources": {
       "requests": {
+        "memory": "0",
         "cpu": "250m"
+      },
+      "limits": {
+        "memory": "{{kube_apiserver_memory_limit}}"
       }
     },
     "command": [
