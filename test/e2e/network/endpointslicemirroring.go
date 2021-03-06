@@ -40,7 +40,15 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 		cs = f.ClientSet
 	})
 
-	ginkgo.It("should mirror a custom Endpoints resource through create update and delete", func() {
+	/*
+		Release: v1.21
+		Testname: EndpointSlice Mirroring
+		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
+		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
+		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
+		The endpointslices mirrorowing must mirror endpoint create, update, and delete actions.
+	*/
+	framework.ConformanceIt("should mirror a custom Endpoints resource through create update and delete", func() {
 		svc := createServiceReportErr(cs, f.Namespace.Name, &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-custom-endpoints",
