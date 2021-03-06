@@ -100,7 +100,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 0},
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
-			"GracefulNodeShutdown":    true,
 		},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase2); allErrors != nil {
@@ -133,7 +132,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		NodeLeaseDurationSeconds:        -1,
 		CPUCFSQuotaPeriod:               metav1.Duration{Duration: 100 * time.Millisecond},
 		ShutdownGracePeriod:             metav1.Duration{Duration: 30 * time.Second},
-		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 10 * time.Second},
+		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 60 * time.Second},
 	}
 	const numErrsErrorCase1 = 28
 	if allErrors := ValidateKubeletConfiguration(errorCase1); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase1 {

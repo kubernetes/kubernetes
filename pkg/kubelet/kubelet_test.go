@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
+	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -307,6 +308,12 @@ func newTestKubeletWithImageList(
 
 	kubelet.evictionManager = evictionManager
 	kubelet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
+
+	// setup shutdown manager
+	shutdownManager, shutdownAdmitHandler := nodeshutdown.NewManager(kubelet.podManager.GetPods, killPodNow(kubelet.podWorkers, fakeRecorder), func() {}, 0 /* shutdownGracePeriodRequested*/, 0 /*shutdownGracePeriodCriticalPods */)
+	kubelet.shutdownManager = shutdownManager
+	kubelet.admitHandlers.AddPodAdmitHandler(shutdownAdmitHandler)
+
 	// Add this as cleanup predicate pod admitter
 	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))
 
