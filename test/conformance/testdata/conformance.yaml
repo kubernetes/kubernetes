@@ -598,6 +598,36 @@
     and minor versions MUST only be an integer.
   release: v1.19
   file: test/e2e/apimachinery/server_version.go
+- testname: CronJob Suspend
+  codename: '[sig-apps] CronJob should not schedule jobs when suspended [Slow] [Conformance]'
+  description: CronJob MUST support suspension, which suppresses creation of new jobs.
+  release: v1.21
+  file: test/e2e/apps/cronjob.go
+- testname: CronJob FrobidConcurrent
+  codename: '[sig-apps] CronJob should not schedule new jobs when ForbidConcurrent
+    [Slow] [Conformance]'
+  description: CronJob MUST support ForbidConcurrent policy, allowing to run single,
+    previous job at the time.
+  release: v1.21
+  file: test/e2e/apps/cronjob.go
+- testname: CronJob ReplaceConcurrent
+  codename: '[sig-apps] CronJob should replace jobs when ReplaceConcurrent [Conformance]'
+  description: CronJob MUST support ReplaceConcurrent policy, allowing to run single,
+    newer job at the time.
+  release: v1.21
+  file: test/e2e/apps/cronjob.go
+- testname: CronJob AllowConcurrent
+  codename: '[sig-apps] CronJob should schedule multiple jobs concurrently [Conformance]'
+  description: CronJob MUST support AllowConcurrent policy, allowing to run multiple
+    jobs at the same time.
+  release: v1.21
+  file: test/e2e/apps/cronjob.go
+- testname: CronJob API Operations
+  codename: '[sig-apps] CronJob should support CronJob API operations [Conformance]'
+  description: ' CronJob MUST support create, get, list, watch, update, patch, delete,
+    and deletecollection. CronJob/status MUST support get, update and patch.'
+  release: v1.21
+  file: test/e2e/apps/cronjob.go
 - testname: DaemonSet-FailedPodCreation
   codename: '[sig-apps] Daemon set [Serial] should retry creating failed daemon pods
     [Conformance]'
