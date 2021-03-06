@@ -1142,15 +1142,15 @@ __EOF__
   # Pre-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   # Dry-run command
-  kubectl run testmetadata --image=nginx --port=80 --expose --dry-run=client --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
-  kubectl run testmetadata --image=nginx --port=80 --expose --dry-run=server --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
+  kubectl run testmetadata --image=nginx --port=80 --expose --dry-run=client
+  kubectl run testmetadata --image=nginx --port=80 --expose --dry-run=server
   # Check only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   # Command
-  kubectl run testmetadata --image=nginx --port=80 --expose --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
+  kubectl run testmetadata --image=nginx --port=80 --expose
   # Check result
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'testmetadata:'
-  kube::test::get_object_assert 'service testmetadata' "{{.metadata.annotations}}" "map\[zone-context:home\]"
+  kube::test::get_object_assert 'service testmetadata' "{{${port_field:?}}}" '80'
   # pod has field for kubectl run field manager
   output_message=$(kubectl get pod testmetadata -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl-run'
