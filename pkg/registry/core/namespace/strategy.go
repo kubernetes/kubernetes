@@ -96,8 +96,8 @@ func (namespaceStrategy) Canonicalize(obj runtime.Object) {
 	// This code needs to be kept in sync with the implementation that exists
 	// in Namespace defaulting (pkg/apis/core/v1)
 	ns := obj.(*api.Namespace)
-	if len(ns.Name) > 0 && ns.Labels[v1.LabelMetadataName] != ns.Name {
-		if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
+		if len(ns.Name) > 0 && ns.Labels[v1.LabelMetadataName] != ns.Name {
 			if ns.Labels == nil {
 				ns.Labels = map[string]string{}
 			}
