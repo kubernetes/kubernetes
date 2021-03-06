@@ -1131,7 +1131,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	})
 
 	// These tests *only* work on a cluster which has the CSIStorageCapacity feature enabled.
-	ginkgo.Context("CSIStorageCapacity [Feature:CSIStorageCapacity]", func() {
+	ginkgo.Context("CSIStorageCapacity", func() {
 		var (
 			err error
 			yes = true
