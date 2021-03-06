@@ -692,6 +692,12 @@ const (
 	//
 	// Enable support multiple Service "type: LoadBalancer" implementations in a cluster by specifying LoadBalancerClass
 	ServiceLoadBalancerClass featuregate.Feature = "ServiceLoadBalancerClass"
+
+	// owner: @damemi
+	// aplpha: v1.21
+	//
+	// Enables scaling down replicas via logarithmic comparison of creation/ready timestamps
+	LogarithmicScaleDown featuregate.Feature = "LogarithmicScaleDown"
 )
 
 func init() {
@@ -797,6 +803,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodDeletionCost:                                {Default: false, PreRelease: featuregate.Alpha},
 	PodAffinityNamespaceSelector:                   {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLoadBalancerClass:                       {Default: false, PreRelease: featuregate.Alpha},
+	LogarithmicScaleDown:                           {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
