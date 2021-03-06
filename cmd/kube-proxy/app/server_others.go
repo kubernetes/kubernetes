@@ -25,9 +25,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	goruntime "runtime"
 	"strings"
 	"time"
 
+	"github.com/google/cadvisor/machine"
+	"github.com/google/cadvisor/utils/sysfs"
 	"k8s.io/apimachinery/pkg/watch"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -434,6 +437,15 @@ func detectNodeIP(client clientset.Interface, hostname, bindAddress string) net.
 		nodeIP = net.ParseIP("127.0.0.1")
 	}
 	return nodeIP
+}
+
+func detectNumCPU() int {
+	// try get numCPU from /sys firstly due to a known issue (https://github.com/kubernetes/kubernetes/issues/99225)
+	_, numCPU, err := machine.GetTopology(sysfs.NewRealSysFs())
+	if err != nil || numCPU < 1 {
+		return goruntime.NumCPU()
+	}
+	return numCPU
 }
 
 func getDetectLocalMode(config *proxyconfigapi.KubeProxyConfiguration) (proxyconfigapi.LocalMode, error) {

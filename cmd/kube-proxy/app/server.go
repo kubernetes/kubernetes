@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	goruntime "runtime"
 	"strings"
 	"time"
 
@@ -784,7 +783,7 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 		if config.Min != nil {
 			floor = int(*config.Min)
 		}
-		scaled := int(*config.MaxPerCore) * goruntime.NumCPU()
+		scaled := int(*config.MaxPerCore) * detectNumCPU()
 		if scaled > floor {
 			klog.V(3).Infof("getConntrackMax: using scaled conntrack-max-per-core")
 			return scaled, nil
