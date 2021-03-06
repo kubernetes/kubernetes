@@ -537,3 +537,15 @@ func WaitForNRestartablePods(ps *testutils.PodStore, expect int, timeout time.Du
 	}
 	return podNames, nil
 }
+
+// WaitForPodContainerToFail waits for the given Pod container to fail with the given reason, specifically due to
+// invalid container configuration. In this case, the container will remain in a waiting state with a specific
+// reason set, which should match the given reason.
+func WaitForPodContainerToFail(c clientset.Interface, namespace, podName string, containerIndex int, reason string, timeout time.Duration) error {
+	return wait.PollImmediate(poll, timeout, podContainerFailed(c, namespace, podName, containerIndex, reason))
+}
+
+// WaitForPodContainerStarted waits for the given Pod container to start, after a successful run of the startupProbe.
+func WaitForPodContainerStarted(c clientset.Interface, namespace, podName string, containerIndex int, timeout time.Duration) error {
+	return wait.PollImmediate(poll, timeout, podContainerStarted(c, namespace, podName, containerIndex))
+}
