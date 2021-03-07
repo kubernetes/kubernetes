@@ -19,8 +19,11 @@ limitations under the License.
 package v1beta1
 
 import (
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -41,6 +44,31 @@ func Role(name, namespace string) *RoleApplyConfiguration {
 	b.WithKind("Role")
 	b.WithAPIVersion("rbac.authorization.k8s.io/v1beta1")
 	return b
+}
+
+// ExtractRole extracts the applied configuration owned by fieldManager from
+// role. If no managedFields are found in role for fieldManager, a
+// RoleApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// role must be a unmodified Role API object that was retrieved from the Kubernetes API.
+// ExtractRole provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractRole(role *rbacv1beta1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
+	b := &RoleApplyConfiguration{}
+	err := managedfields.ExtractInto(role, internal.Parser().Type("io.k8s.api.rbac.v1beta1.Role"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(role.Name)
+	b.WithNamespace(role.Namespace)
+
+	b.WithKind("Role")
+	b.WithAPIVersion("rbac.authorization.k8s.io/v1beta1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

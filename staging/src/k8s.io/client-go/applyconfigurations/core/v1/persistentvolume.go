@@ -19,8 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -41,6 +44,30 @@ func PersistentVolume(name string) *PersistentVolumeApplyConfiguration {
 	b.WithKind("PersistentVolume")
 	b.WithAPIVersion("v1")
 	return b
+}
+
+// ExtractPersistentVolume extracts the applied configuration owned by fieldManager from
+// persistentVolume. If no managedFields are found in persistentVolume for fieldManager, a
+// PersistentVolumeApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// persistentVolume must be a unmodified PersistentVolume API object that was retrieved from the Kubernetes API.
+// ExtractPersistentVolume provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractPersistentVolume(persistentVolume *apicorev1.PersistentVolume, fieldManager string) (*PersistentVolumeApplyConfiguration, error) {
+	b := &PersistentVolumeApplyConfiguration{}
+	err := managedfields.ExtractInto(persistentVolume, internal.Parser().Type("io.k8s.api.core.v1.PersistentVolume"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(persistentVolume.Name)
+
+	b.WithKind("PersistentVolume")
+	b.WithAPIVersion("v1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

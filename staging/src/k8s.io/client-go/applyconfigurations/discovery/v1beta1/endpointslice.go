@@ -22,6 +22,8 @@ import (
 	v1beta1 "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -44,6 +46,31 @@ func EndpointSlice(name, namespace string) *EndpointSliceApplyConfiguration {
 	b.WithKind("EndpointSlice")
 	b.WithAPIVersion("discovery.k8s.io/v1beta1")
 	return b
+}
+
+// ExtractEndpointSlice extracts the applied configuration owned by fieldManager from
+// endpointSlice. If no managedFields are found in endpointSlice for fieldManager, a
+// EndpointSliceApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// endpointSlice must be a unmodified EndpointSlice API object that was retrieved from the Kubernetes API.
+// ExtractEndpointSlice provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractEndpointSlice(endpointSlice *v1beta1.EndpointSlice, fieldManager string) (*EndpointSliceApplyConfiguration, error) {
+	b := &EndpointSliceApplyConfiguration{}
+	err := managedfields.ExtractInto(endpointSlice, internal.Parser().Type("io.k8s.api.discovery.v1beta1.EndpointSlice"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(endpointSlice.Name)
+	b.WithNamespace(endpointSlice.Namespace)
+
+	b.WithKind("EndpointSlice")
+	b.WithAPIVersion("discovery.k8s.io/v1beta1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

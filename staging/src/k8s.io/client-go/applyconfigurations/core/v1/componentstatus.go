@@ -19,8 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -40,6 +43,30 @@ func ComponentStatus(name string) *ComponentStatusApplyConfiguration {
 	b.WithKind("ComponentStatus")
 	b.WithAPIVersion("v1")
 	return b
+}
+
+// ExtractComponentStatus extracts the applied configuration owned by fieldManager from
+// componentStatus. If no managedFields are found in componentStatus for fieldManager, a
+// ComponentStatusApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// componentStatus must be a unmodified ComponentStatus API object that was retrieved from the Kubernetes API.
+// ExtractComponentStatus provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractComponentStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
+	b := &ComponentStatusApplyConfiguration{}
+	err := managedfields.ExtractInto(componentStatus, internal.Parser().Type("io.k8s.api.core.v1.ComponentStatus"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(componentStatus.Name)
+
+	b.WithKind("ComponentStatus")
+	b.WithAPIVersion("v1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

@@ -19,9 +19,12 @@ limitations under the License.
 package v1beta1
 
 import (
+	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -55,6 +58,31 @@ func Event(name, namespace string) *EventApplyConfiguration {
 	b.WithKind("Event")
 	b.WithAPIVersion("events.k8s.io/v1beta1")
 	return b
+}
+
+// ExtractEvent extracts the applied configuration owned by fieldManager from
+// event. If no managedFields are found in event for fieldManager, a
+// EventApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// event must be a unmodified Event API object that was retrieved from the Kubernetes API.
+// ExtractEvent provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractEvent(event *eventsv1beta1.Event, fieldManager string) (*EventApplyConfiguration, error) {
+	b := &EventApplyConfiguration{}
+	err := managedfields.ExtractInto(event, internal.Parser().Type("io.k8s.api.events.v1beta1.Event"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(event.Name)
+	b.WithNamespace(event.Namespace)
+
+	b.WithKind("Event")
+	b.WithAPIVersion("events.k8s.io/v1beta1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

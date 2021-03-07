@@ -19,8 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -43,6 +46,31 @@ func ServiceAccount(name, namespace string) *ServiceAccountApplyConfiguration {
 	b.WithKind("ServiceAccount")
 	b.WithAPIVersion("v1")
 	return b
+}
+
+// ExtractServiceAccount extracts the applied configuration owned by fieldManager from
+// serviceAccount. If no managedFields are found in serviceAccount for fieldManager, a
+// ServiceAccountApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// serviceAccount must be a unmodified ServiceAccount API object that was retrieved from the Kubernetes API.
+// ExtractServiceAccount provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractServiceAccount(serviceAccount *apicorev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
+	b := &ServiceAccountApplyConfiguration{}
+	err := managedfields.ExtractInto(serviceAccount, internal.Parser().Type("io.k8s.api.core.v1.ServiceAccount"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(serviceAccount.Name)
+	b.WithNamespace(serviceAccount.Namespace)
+
+	b.WithKind("ServiceAccount")
+	b.WithAPIVersion("v1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value
