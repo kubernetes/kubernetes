@@ -129,7 +129,7 @@ func TestRejectsMirrorPodWithSecretVolumes(t *testing.T) {
 		},
 		Spec: api.PodSpec{
 			Volumes: []api.Volume{
-				{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{}}},
+				{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "mysecret"}}},
 			},
 		},
 	}
