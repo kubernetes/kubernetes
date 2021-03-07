@@ -1,4 +1,7 @@
 recursive-delete-patterns:
+# TODO: remove bazel related files after we stop publishing branches with
+# bazel files
+# See: https://github.com/kubernetes/enhancements/issues/2420
 - BUILD
 - "*/BUILD"
 - BUILD.bazel
