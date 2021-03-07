@@ -76,15 +76,14 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	// Tweaks used below.
 	setIngressEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Ingress = make([]networking.NetworkPolicyIngressRule, 1)
+		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{{}}
 	}
 
 	setIngressFromEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{
-			{
-				From: []networking.NetworkPolicyPeer{{}},
-			},
+		if networkPolicy.Spec.Ingress == nil {
+			setIngressEmptyFirstElement(networkPolicy)
 		}
+		networkPolicy.Spec.Ingress[0].From = []networking.NetworkPolicyPeer{{}}
 	}
 
 	setIngressFromIfEmpty := func(networkPolicy *networking.NetworkPolicy) {
@@ -95,6 +94,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 			setIngressFromEmptyFirstElement(networkPolicy)
 		}
 	}
+
 	setIngressEmptyPorts := func(networkPolicy *networking.NetworkPolicy) {
 		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{
 			{
@@ -130,8 +130,8 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				},
 			}
 		}
-
 	}
+
 	setIngressFromNamespaceSelector := func(networkPolicy *networking.NetworkPolicy) {
 		setIngressFromIfEmpty(networkPolicy)
 		networkPolicy.Spec.Ingress[0].From[0].NamespaceSelector = &metav1.LabelSelector{
@@ -156,15 +156,14 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	setEgressEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Egress = make([]networking.NetworkPolicyEgressRule, 1)
+		networkPolicy.Spec.Egress = []networking.NetworkPolicyEgressRule{{}}
 	}
 
 	setEgressToEmptyFirstElement := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Egress = []networking.NetworkPolicyEgressRule{
-			{
-				To: []networking.NetworkPolicyPeer{{}},
-			},
+		if networkPolicy.Spec.Egress == nil {
+			setEgressEmptyFirstElement(networkPolicy)
 		}
+		networkPolicy.Spec.Egress[0].To = []networking.NetworkPolicyPeer{{}}
 	}
 
 	setEgressToIfEmpty := func(networkPolicy *networking.NetworkPolicy) {
@@ -175,6 +174,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 			setEgressToEmptyFirstElement(networkPolicy)
 		}
 	}
+
 	setEgressToNamespaceSelector := func(networkPolicy *networking.NetworkPolicy) {
 		setEgressToIfEmpty(networkPolicy)
 		networkPolicy.Spec.Egress[0].To[0].NamespaceSelector = &metav1.LabelSelector{
