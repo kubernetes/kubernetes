@@ -49,8 +49,9 @@ func TestMutationDetector(t *testing.T) {
 
 	informer := NewSharedInformer(lw, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
 	detector := &defaultCacheMutationDetector{
-		name:   "name",
-		period: 1 * time.Second,
+		name:           "name",
+		period:         1 * time.Second,
+		retainDuration: 2 * time.Minute,
 		failureFunc: func(message string) {
 			mutationFound <- true
 		},
@@ -72,6 +73,8 @@ func TestMutationDetector(t *testing.T) {
 
 	select {
 	case <-mutationFound:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("failed waiting for mutating detector")
 	}
 
 }
