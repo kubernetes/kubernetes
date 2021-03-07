@@ -486,9 +486,9 @@ func (o *CopyOptions) untarAll(src fileSpec, reader io.Reader, destDir, prefix s
 		if err != nil {
 			return err
 		}
-		defer outFile.Close()
 		if _, err := io.Copy(outFile, tarReader); err != nil {
 			return err
+			outFile.Close()
 		}
 		if err := outFile.Close(); err != nil {
 			return err
