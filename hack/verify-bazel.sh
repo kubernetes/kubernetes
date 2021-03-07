@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script checks whether updating of the bazel compilation files is needed
-# or not. We should run `hack/update-bazel.sh` if actually updates them.
+# This script checks whether removal of bazel related files is still needed.
+# If so: run `hack/update-bazel.sh` to actually remove them.
+#
 # Usage: `hack/verify-bazel.sh`.
 
 set -o errexit
