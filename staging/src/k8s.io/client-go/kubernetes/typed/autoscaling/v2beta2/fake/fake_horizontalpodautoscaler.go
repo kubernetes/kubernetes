@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v2beta2 "k8s.io/api/autoscaling/v2beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	autoscalingv2beta2 "k8s.io/client-go/applyconfigurations/autoscaling/v2beta2"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -134,6 +137,51 @@ func (c *FakeHorizontalPodAutoscalers) DeleteCollection(ctx context.Context, opt
 func (c *FakeHorizontalPodAutoscalers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2beta2.HorizontalPodAutoscaler, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, name, pt, data, subresources...), &v2beta2.HorizontalPodAutoscaler{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v2beta2.HorizontalPodAutoscaler), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied horizontalPodAutoscaler.
+func (c *FakeHorizontalPodAutoscalers) Apply(ctx context.Context, horizontalPodAutoscaler *autoscalingv2beta2.HorizontalPodAutoscalerApplyConfiguration, opts v1.ApplyOptions) (result *v2beta2.HorizontalPodAutoscaler, err error) {
+	if horizontalPodAutoscaler == nil {
+		return nil, fmt.Errorf("horizontalPodAutoscaler provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(horizontalPodAutoscaler)
+	if err != nil {
+		return nil, err
+	}
+	name := horizontalPodAutoscaler.Name
+	if name == nil {
+		return nil, fmt.Errorf("horizontalPodAutoscaler.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, *name, types.ApplyPatchType, data), &v2beta2.HorizontalPodAutoscaler{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v2beta2.HorizontalPodAutoscaler), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeHorizontalPodAutoscalers) ApplyStatus(ctx context.Context, horizontalPodAutoscaler *autoscalingv2beta2.HorizontalPodAutoscalerApplyConfiguration, opts v1.ApplyOptions) (result *v2beta2.HorizontalPodAutoscaler, err error) {
+	if horizontalPodAutoscaler == nil {
+		return nil, fmt.Errorf("horizontalPodAutoscaler provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(horizontalPodAutoscaler)
+	if err != nil {
+		return nil, err
+	}
+	name := horizontalPodAutoscaler.Name
+	if name == nil {
+		return nil, fmt.Errorf("horizontalPodAutoscaler.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v2beta2.HorizontalPodAutoscaler{})
 
 	if obj == nil {
 		return nil, err

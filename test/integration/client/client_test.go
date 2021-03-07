@@ -26,8 +26,10 @@ import (
 	"testing"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,6 +40,9 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	appsv1ac "k8s.io/client-go/applyconfigurations/apps/v1"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
@@ -801,4 +806,79 @@ func TestSelfLinkOnNamespace(t *testing.T) {
 	c := clientset.NewForConfigOrDie(result.ClientConfig)
 
 	runSelfLinkTestOnNamespace(t, c, "default")
+}
+
+func TestApplyWithApplyConfiguration(t *testing.T) {
+	deployment := appsv1ac.Deployment("nginx-deployment-3", "default").
+		WithSpec(appsv1ac.DeploymentSpec().
+			WithSelector(metav1ac.LabelSelector().
+				WithMatchLabels(map[string]string{"app": "nginx"}),
+			).
+			WithTemplate(corev1ac.PodTemplateSpec().
+				WithLabels(map[string]string{"app": "nginx"}).
+				WithSpec(corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().
+						WithName("nginx").
+						WithImage("nginx:1.14.2").
+						WithStdin(true).
+						WithPorts(corev1ac.ContainerPort().
+							WithContainerPort(8080).
+							WithProtocol(v1.ProtocolTCP),
+						).
+						WithResources(corev1ac.ResourceRequirements().
+							WithLimits(v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("4"),
+								v1.ResourceMemory: resource.MustParse("32Gi"),
+							}),
+						),
+					),
+				),
+			),
+		)
+	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	defer testServer.TearDownFn()
+
+	c := clientset.NewForConfigOrDie(testServer.ClientConfig)
+
+	// Test apply to spec
+	obj, err := c.AppsV1().Deployments("default").Apply(context.TODO(), deployment, metav1.ApplyOptions{FieldManager: "test-mgr", Force: true})
+	if err != nil {
+		t.Fatalf("unexpected error when applying manifest for Deployment: %v", err)
+	}
+	if obj.Spec.Template.Spec.Containers[0].Image != "nginx:1.14.2" {
+		t.Errorf("expected image %s but got %s", "nginx:1.14.2", obj.Spec.Template.Spec.Containers[0].Image)
+	}
+	cpu := obj.Spec.Template.Spec.Containers[0].Resources.Limits[v1.ResourceCPU]
+	if cpu.Value() != int64(4) {
+		t.Errorf("expected resourceCPU limit %d but got %d", 4, cpu.Value())
+	}
+
+	// Test apply to status
+	statusApply := appsv1ac.Deployment("nginx-deployment-3", "default").
+		WithStatus(appsv1ac.DeploymentStatus().
+			WithConditions(
+				appsv1ac.DeploymentCondition().
+					WithType(appsv1.DeploymentReplicaFailure).
+					WithStatus(v1.ConditionUnknown).
+					WithLastTransitionTime(metav1.Now()).
+					WithLastUpdateTime(metav1.Now()).
+					WithMessage("apply status test").
+					WithReason("TestApplyWithApplyConfiguration"),
+			),
+		)
+	obj, err = c.AppsV1().Deployments("default").ApplyStatus(context.TODO(), statusApply, metav1.ApplyOptions{FieldManager: "test-mgr", Force: true})
+	if err != nil {
+		t.Fatalf("unexpected error when applying manifest for Deployment: %v", err)
+	}
+	var found bool
+	for _, c := range obj.Status.Conditions {
+		if c.Type == appsv1.DeploymentReplicaFailure && c.Status == v1.ConditionUnknown &&
+			c.Message == "apply status test" && c.Reason == "TestApplyWithApplyConfiguration" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected status to contain DeploymentReplicaFailure condition set by apply")
+	}
 }

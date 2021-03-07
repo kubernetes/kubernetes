@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
+	v1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -347,6 +348,36 @@ func (m *FakeNodeHandler) Patch(_ context.Context, name string, pt types.PatchTy
 	}
 
 	return &updatedNode, nil
+}
+
+// Apply applies a NodeApplyConfiguration to a Node in the fake store.
+func (m *FakeNodeHandler) Apply(ctx context.Context, node *v1apply.NodeApplyConfiguration, opts metav1.ApplyOptions) (*v1.Node, error) {
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(node)
+	if err != nil {
+		return nil, err
+	}
+	name := node.Name
+	if name == nil {
+		return nil, fmt.Errorf("deployment.Name must be provided to Apply")
+	}
+
+	return m.Patch(ctx, *name, types.ApplyPatchType, data, patchOpts)
+}
+
+// ApplyStatus applies a status of a Node in the fake store.
+func (m *FakeNodeHandler) ApplyStatus(ctx context.Context, node *v1apply.NodeApplyConfiguration, opts metav1.ApplyOptions) (*v1.Node, error) {
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(node)
+	if err != nil {
+		return nil, err
+	}
+	name := node.Name
+	if name == nil {
+		return nil, fmt.Errorf("deployment.Name must be provided to Apply")
+	}
+
+	return m.Patch(ctx, *name, types.ApplyPatchType, data, patchOpts, "status")
 }
 
 // FakeRecorder is used as a fake during testing.
