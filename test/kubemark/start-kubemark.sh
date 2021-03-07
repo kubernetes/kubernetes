@@ -48,28 +48,21 @@ KUBEMARK_IMAGE_TAG=$(head /dev/urandom | tr -dc 'a-z0-9' | fold -w 6 | head -n 1
 function create-and-upload-hollow-node-image {
   authenticate-docker
   KUBEMARK_IMAGE_REGISTRY="${KUBEMARK_IMAGE_REGISTRY:-${CONTAINER_REGISTRY}/${PROJECT}}"
-  if [[ "${KUBEMARK_BAZEL_BUILD:-}" =~ ^[yY]$ ]]; then
-    # Build+push the image through bazel.
-    touch WORKSPACE # Needed for bazel.
-    build_cmd=("bazel" "run" "//cluster/images/kubemark:push" "--define" "REGISTRY=${KUBEMARK_IMAGE_REGISTRY}" "--define" "IMAGE_TAG=${KUBEMARK_IMAGE_TAG}")
-    run-cmd-with-retries "${build_cmd[@]}"
-  else
-    # Build+push the image through makefile.
-    build_cmd=("make" "${KUBEMARK_IMAGE_MAKE_TARGET}")
-    MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
-    KUBEMARK_BIN="$(kube::util::find-binary-for-platform kubemark linux/amd64)"
-    if [[ -z "${KUBEMARK_BIN}" ]]; then
-      echo 'Cannot find cmd/kubemark binary'
-      exit 1
-    fi
-    echo "Copying kubemark binary to ${MAKE_DIR}"
-    cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
-    CURR_DIR=$(pwd)
-    cd "${MAKE_DIR}"
-    REGISTRY=${KUBEMARK_IMAGE_REGISTRY} IMAGE_TAG=${KUBEMARK_IMAGE_TAG} run-cmd-with-retries "${build_cmd[@]}"
-    rm kubemark
-    cd "$CURR_DIR"
+  # Build+push the image through makefile.
+  build_cmd=("make" "${KUBEMARK_IMAGE_MAKE_TARGET}")
+  MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
+  KUBEMARK_BIN="$(kube::util::find-binary-for-platform kubemark linux/amd64)"
+  if [[ -z "${KUBEMARK_BIN}" ]]; then
+    echo 'Cannot find cmd/kubemark binary'
+    exit 1
   fi
+  echo "Copying kubemark binary to ${MAKE_DIR}"
+  cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
+  CURR_DIR=$(pwd)
+  cd "${MAKE_DIR}"
+  REGISTRY=${KUBEMARK_IMAGE_REGISTRY} IMAGE_TAG=${KUBEMARK_IMAGE_TAG} run-cmd-with-retries "${build_cmd[@]}"
+  rm kubemark
+  cd "$CURR_DIR"
   echo "Created and uploaded the kubemark hollow-node image to docker registry."
   # Cleanup the kubemark image after the script exits.
   if [[ "${CLEANUP_KUBEMARK_IMAGE:-}" == "true" ]]; then
