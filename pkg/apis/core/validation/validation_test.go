@@ -14669,40 +14669,78 @@ func TestValidateNamespaceFinalizeUpdate(t *testing.T) {
 		{core.Namespace{}, core.Namespace{}, true},
 		{core.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo"}},
+				Name: "foo",
+				Labels: map[string]string{
+					v1.LabelMetadataName: "foo",
+				}}},
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo"},
+					Name: "foo",
+					Labels: map[string]string{
+						v1.LabelMetadataName: "foo",
+					}},
 				Spec: core.NamespaceSpec{
 					Finalizers: []core.FinalizerName{"Foo"},
 				},
 			}, false},
 		{core.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo"},
+				Name: "foo",
+				Labels: map[string]string{
+					v1.LabelMetadataName: "foo",
+				}},
 			Spec: core.NamespaceSpec{
 				Finalizers: []core.FinalizerName{"foo.com/bar"},
 			},
 		},
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo"},
+					Name: "foo",
+					Labels: map[string]string{
+						v1.LabelMetadataName: "foo",
+					}},
 				Spec: core.NamespaceSpec{
 					Finalizers: []core.FinalizerName{"foo.com/bar", "what.com/bar"},
 				},
 			}, true},
 		{core.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "fooemptyfinalizer"},
+				Name: "fooemptyfinalizer",
+				Labels: map[string]string{
+					v1.LabelMetadataName: "fooemptyfinalizer",
+				}},
 			Spec: core.NamespaceSpec{
 				Finalizers: []core.FinalizerName{"foo.com/bar"},
 			},
 		},
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "fooemptyfinalizer"},
+					Name: "fooemptyfinalizer",
+					Labels: map[string]string{
+						v1.LabelMetadataName: "fooemptyfinalizer",
+					}},
 				Spec: core.NamespaceSpec{
 					Finalizers: []core.FinalizerName{"", "foo.com/bar", "what.com/bar"},
+				},
+			}, false},
+		{core.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foowronglabel",
+				Labels: map[string]string{
+					v1.LabelMetadataName: "foowronglabel",
+				}},
+			Spec: core.NamespaceSpec{
+				Finalizers: []core.FinalizerName{"foo.com/bar"},
+			},
+		},
+			core.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foowronglabel",
+					Labels: map[string]string{
+						v1.LabelMetadataName: "thisisreallywrong",
+					}},
+				Spec: core.NamespaceSpec{
+					Finalizers: []core.FinalizerName{"foo.com/bar", "what.com/bar"},
 				},
 			}, false},
 	}
@@ -14736,10 +14774,16 @@ func TestValidateNamespaceStatusUpdate(t *testing.T) {
 		// Cannot set deletionTimestamp via status update
 		{core.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo"}},
+				Name: "foo",
+				Labels: map[string]string{
+					v1.LabelMetadataName: "foo",
+				}}},
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:              "foo",
+					Name: "foo",
+					Labels: map[string]string{
+						v1.LabelMetadataName: "foo",
+					},
 					DeletionTimestamp: &now},
 				Status: core.NamespaceStatus{
 					Phase: core.NamespaceTerminating,
@@ -14748,11 +14792,17 @@ func TestValidateNamespaceStatusUpdate(t *testing.T) {
 		// Can update phase via status update
 		{core.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:              "foo",
+				Name: "foo",
+				Labels: map[string]string{
+					v1.LabelMetadataName: "foo",
+				},
 				DeletionTimestamp: &now}},
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:              "foo",
+					Name: "foo",
+					Labels: map[string]string{
+						v1.LabelMetadataName: "foo",
+					},
 					DeletionTimestamp: &now},
 				Status: core.NamespaceStatus{
 					Phase: core.NamespaceTerminating,
@@ -14760,20 +14810,50 @@ func TestValidateNamespaceStatusUpdate(t *testing.T) {
 			}, true},
 		{core.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo"}},
+				Name: "foo",
+				Labels: map[string]string{
+					v1.LabelMetadataName: "foo",
+				}}},
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo"},
+					Name: "foo",
+					Labels: map[string]string{
+						v1.LabelMetadataName: "foo",
+					}},
 				Status: core.NamespaceStatus{
 					Phase: core.NamespaceTerminating,
 				},
 			}, false},
 		{core.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo"}},
+				Name: "foo",
+				Labels: map[string]string{
+					v1.LabelMetadataName: "foo",
+				}}},
 			core.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "bar"},
+					Name: "bar",
+					Labels: map[string]string{
+						v1.LabelMetadataName: "bar",
+					}},
+				Status: core.NamespaceStatus{
+					Phase: core.NamespaceTerminating,
+				},
+			}, false},
+		{core.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+				Labels: map[string]string{
+					v1.LabelMetadataName: "foo",
+				},
+				DeletionTimestamp: &now}},
+			core.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+					Labels: map[string]string{
+						v1.LabelMetadataName: "foo123",
+					},
+					DeletionTimestamp: &now},
 				Status: core.NamespaceStatus{
 					Phase: core.NamespaceTerminating,
 				},
