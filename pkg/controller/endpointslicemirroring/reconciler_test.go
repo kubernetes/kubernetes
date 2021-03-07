@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -375,12 +375,12 @@ func TestReconcile(t *testing.T) {
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.0.0.1"},
 				Hostname:   utilpointer.StringPtr("pod-1"),
-				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
+				NodeName:   utilpointer.StringPtr("node-1"),
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 			}, {
 				Addresses:  []string{"10.0.0.2"},
 				Hostname:   utilpointer.StringPtr("pod-2"),
-				Topology:   map[string]string{"kubernetes.io/hostname": "node-2"},
+				NodeName:   utilpointer.StringPtr("node-2"),
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 			}},
 		}},
@@ -656,7 +656,7 @@ func TestReconcile(t *testing.T) {
 					discovery.LabelServiceName: endpoints.Name,
 					discovery.LabelManagedBy:   controllerName,
 				}
-				_, err := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), epSlice, metav1.CreateOptions{})
+				_, err := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), epSlice, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Expected no error creating EndpointSlice, got %v", err)
 				}
@@ -846,11 +846,11 @@ func expectMatchingAddresses(t *testing.T, epSubset corev1.EndpointSubset, esEnd
 		}
 
 		if expectedEndpoint.epAddress.NodeName != nil {
-			topologyHostname, ok := endpoint.Topology["kubernetes.io/hostname"]
-			if !ok {
-				t.Errorf("Expected topology[kubernetes.io/hostname] to be set")
-			} else if *expectedEndpoint.epAddress.NodeName != topologyHostname {
-				t.Errorf("Expected topology[kubernetes.io/hostname] to be %s, got %s", *expectedEndpoint.epAddress.NodeName, topologyHostname)
+			if endpoint.NodeName == nil {
+				t.Errorf("Expected nodeName to be set")
+			}
+			if *expectedEndpoint.epAddress.NodeName != *endpoint.NodeName {
+				t.Errorf("Expected nodeName to be %s, got %s", *expectedEndpoint.epAddress.NodeName, *endpoint.NodeName)
 			}
 		}
 	}
@@ -858,7 +858,7 @@ func expectMatchingAddresses(t *testing.T, epSubset corev1.EndpointSubset, esEnd
 
 func fetchEndpointSlices(t *testing.T, client *fake.Clientset, namespace string) []discovery.EndpointSlice {
 	t.Helper()
-	fetchedSlices, err := client.DiscoveryV1beta1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{
+	fetchedSlices, err := client.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: discovery.LabelManagedBy + "=" + controllerName,
 	})
 	if err != nil {

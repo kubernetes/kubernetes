@@ -115,7 +115,7 @@ func TestDualStackEndpoints(t *testing.T) {
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Nodes(),
-		informers.Discovery().V1beta1().EndpointSlices(),
+		informers.Discovery().V1().EndpointSlices(),
 		int32(100),
 		client,
 		1*time.Second)

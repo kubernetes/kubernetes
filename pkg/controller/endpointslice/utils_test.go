@@ -24,7 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -260,7 +260,6 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
 				NodeName:   utilpointer.StringPtr("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
@@ -278,7 +277,6 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
 				NodeName:   utilpointer.StringPtr("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
@@ -296,7 +294,6 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
-				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
 				NodeName:   utilpointer.StringPtr("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
@@ -314,7 +311,6 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
 				NodeName:   utilpointer.StringPtr("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
@@ -333,12 +329,8 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Topology: map[string]string{
-					"kubernetes.io/hostname":        "node-1",
-					"topology.kubernetes.io/zone":   "us-central1-a",
-					"topology.kubernetes.io/region": "us-central1",
-				},
-				NodeName: utilpointer.StringPtr("node-1"),
+				Zone:       utilpointer.StringPtr("us-central1-a"),
+				NodeName:   utilpointer.StringPtr("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
 					Namespace:       ns,
@@ -356,12 +348,8 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.4"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Topology: map[string]string{
-					"kubernetes.io/hostname":        "node-1",
-					"topology.kubernetes.io/zone":   "us-central1-a",
-					"topology.kubernetes.io/region": "us-central1",
-				},
-				NodeName: utilpointer.StringPtr("node-1"),
+				Zone:       utilpointer.StringPtr("us-central1-a"),
+				NodeName:   utilpointer.StringPtr("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
 					Namespace:       ns,
@@ -380,12 +368,8 @@ func TestPodToEndpoint(t *testing.T) {
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 				Hostname:   &readyPodHostname.Spec.Hostname,
-				Topology: map[string]string{
-					"kubernetes.io/hostname":        "node-1",
-					"topology.kubernetes.io/zone":   "us-central1-a",
-					"topology.kubernetes.io/region": "us-central1",
-				},
-				NodeName: utilpointer.StringPtr("node-1"),
+				Zone:       utilpointer.StringPtr("us-central1-a"),
+				NodeName:   utilpointer.StringPtr("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
 					Namespace:       ns,
@@ -406,7 +390,6 @@ func TestPodToEndpoint(t *testing.T) {
 					Serving:     utilpointer.BoolPtr(true),
 					Terminating: utilpointer.BoolPtr(false),
 				},
-				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
 				NodeName: utilpointer.StringPtr("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
@@ -427,7 +410,6 @@ func TestPodToEndpoint(t *testing.T) {
 				Conditions: discovery.EndpointConditions{
 					Ready: utilpointer.BoolPtr(false),
 				},
-				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
 				NodeName: utilpointer.StringPtr("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
@@ -450,7 +432,6 @@ func TestPodToEndpoint(t *testing.T) {
 					Serving:     utilpointer.BoolPtr(true),
 					Terminating: utilpointer.BoolPtr(true),
 				},
-				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
 				NodeName: utilpointer.StringPtr("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
@@ -471,7 +452,6 @@ func TestPodToEndpoint(t *testing.T) {
 				Conditions: discovery.EndpointConditions{
 					Ready: utilpointer.BoolPtr(false),
 				},
-				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
 				NodeName: utilpointer.StringPtr("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
@@ -494,7 +474,6 @@ func TestPodToEndpoint(t *testing.T) {
 					Serving:     utilpointer.BoolPtr(false),
 					Terminating: utilpointer.BoolPtr(true),
 				},
-				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
 				NodeName: utilpointer.StringPtr("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",

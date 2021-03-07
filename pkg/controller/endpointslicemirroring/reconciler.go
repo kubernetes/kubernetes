@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -230,7 +230,7 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 	// be deleted.
 	recycleSlices(&slices)
 
-	epsClient := r.client.DiscoveryV1beta1().EndpointSlices(endpoints.Namespace)
+	epsClient := r.client.DiscoveryV1().EndpointSlices(endpoints.Namespace)
 
 	// Don't create more EndpointSlices if corresponding Endpoints resource is
 	// being deleted.
@@ -276,7 +276,7 @@ func (r *reconciler) deleteEndpoints(namespace, name string, endpointSlices []*d
 	r.metricsCache.DeleteEndpoints(types.NamespacedName{Namespace: namespace, Name: name})
 	var errs []error
 	for _, endpointSlice := range endpointSlices {
-		err := r.client.DiscoveryV1beta1().EndpointSlices(namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
+		err := r.client.DiscoveryV1().EndpointSlices(namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -314,7 +314,7 @@ func totalChanges(existingSlice *discovery.EndpointSlice, desiredSet endpointSet
 
 			// If existing version of endpoint doesn't match desired version
 			// increment number of endpoints to be updated.
-			if !endpointsEqualBeyondHash(got, &endpoint) {
+			if !endpointutil.EndpointsEqualBeyondHash(got, &endpoint) {
 				totals.updated++
 			}
 		}

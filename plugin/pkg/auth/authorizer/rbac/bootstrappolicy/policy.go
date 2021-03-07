@@ -512,9 +512,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 		eventsRule(),
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
-		nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie())
-	}
+	nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie())
 	roles = append(roles, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: "system:node-proxier"},
 		Rules:      nodeProxierRules,
