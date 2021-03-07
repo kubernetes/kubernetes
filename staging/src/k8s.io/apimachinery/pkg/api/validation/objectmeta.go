@@ -180,9 +180,7 @@ func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, name
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("clusterName"), meta.GetClusterName(), msg))
 		}
 	}
-	for _, entry := range meta.GetManagedFields() {
-		allErrs = append(allErrs, v1validation.ValidateFieldManager(entry.Manager, fldPath.Child("fieldManager"))...)
-	}
+
 	allErrs = append(allErrs, ValidateNonnegativeField(meta.GetGeneration(), fldPath.Child("generation"))...)
 	allErrs = append(allErrs, v1validation.ValidateLabels(meta.GetLabels(), fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.GetAnnotations(), fldPath.Child("annotations"))...)
@@ -248,9 +246,6 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), newMeta.GetGeneration(), "must not be decremented"))
 	}
 
-	for _, entry := range newMeta.GetManagedFields() {
-		allErrs = append(allErrs, v1validation.ValidateFieldManager(entry.Manager, fldPath.Child("fieldManager"))...)
-	}
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetName(), oldMeta.GetName(), fldPath.Child("name"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetNamespace(), oldMeta.GetNamespace(), fldPath.Child("namespace"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetUID(), oldMeta.GetUID(), fldPath.Child("uid"))...)
