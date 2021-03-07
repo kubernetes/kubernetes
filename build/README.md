@@ -62,7 +62,7 @@ In addition, there are some other tar files that are created:
 When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
 
 ## Reproducibility
-`make release`, its variant `make quick-release`, and Bazel all provide a
+`make release` and its variant `make quick-release` provide a
 hermetic build environment which should provide some level of reproducibility
 for builds. `make` itself is **not** hermetic.
 
