@@ -60,9 +60,9 @@ const (
 	daemonsetColorLabel  = daemonsetLabelPrefix + "color"
 )
 
-// NamespaceNodeSelectors the annotation key scheduler.alpha.kubernetes.io/node-selector is for assigning
+// NamespaceNodeSelectors the annotation key scheduler.kubernetes.io/node-selector is for assigning
 // node selectors labels to namespaces
-var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-selector"}
+var NamespaceNodeSelectors = []string{"scheduler.kubernetes.io/node-selector"}
 
 type updateDSFunc func(*appsv1.DaemonSet)
 

@@ -39,8 +39,13 @@ import (
 
 // NamespaceNodeSelectors is for assigning node selectors labels to
 // namespaces. Default value is the annotation key
-// scheduler.alpha.kubernetes.io/node-selector
-var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-selector"}
+// scheduler.kubernetes.io/node-selector
+// ("scheduler.alpha.kubernetes.io/node-selector" is deprecated and will be
+// removed in a future release)
+var NamespaceNodeSelectors = []string{
+	"scheduler.alpha.kubernetes.io/node-selector",
+	"scheduler.kubernetes.io/node-selector",
+}
 
 // PluginName is a string with the name of the plugin
 const PluginName = "PodNodeSelector"
