@@ -590,7 +590,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		errs := ValidatePodSecurityPolicy(v.psp)
+		errs := ValidatePodSecurityPolicy(v.psp, PodSecurityPolicyValidationOptions{})
 		if len(errs) == 0 {
 			t.Errorf("%s expected errors but got none", k)
 			continue
@@ -613,7 +613,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	// Should not be able to update to an invalid policy.
 	for k, v := range errorCases {
 		v.psp.ResourceVersion = "444" // Required for updates.
-		errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp)
+		errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp, PodSecurityPolicyValidationOptions{})
 		if len(errs) == 0 {
 			t.Errorf("[%s] expected update errors but got none", k)
 			continue
@@ -743,13 +743,13 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	}
 
 	for k, v := range successCases {
-		if errs := ValidatePodSecurityPolicy(v.psp); len(errs) != 0 {
+		if errs := ValidatePodSecurityPolicy(v.psp, PodSecurityPolicyValidationOptions{}); len(errs) != 0 {
 			t.Errorf("Expected success for %s, got %v", k, errs)
 		}
 
 		// Should be able to update to a valid PSP.
 		v.psp.ResourceVersion = "444" // Required for updates.
-		if errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp); len(errs) != 0 {
+		if errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp, PodSecurityPolicyValidationOptions{}); len(errs) != 0 {
 			t.Errorf("Expected success for %s update, got %v", k, errs)
 		}
 	}
@@ -786,7 +786,7 @@ func TestValidatePSPVolumes(t *testing.T) {
 	for _, strVolume := range volumes.List() {
 		psp := validPSP()
 		psp.Spec.Volumes = []policy.FSType{policy.FSType(strVolume)}
-		errs := ValidatePodSecurityPolicy(psp)
+		errs := ValidatePodSecurityPolicy(psp, PodSecurityPolicyValidationOptions{AllowEphemeralVolumeType: true})
 		if len(errs) != 0 {
 			t.Errorf("%s validation expected no errors but received %v", strVolume, errs)
 		}
@@ -1061,5 +1061,91 @@ func TestValidateRuntimeClassStrategy(t *testing.T) {
 				assert.Empty(t, errs)
 			}
 		})
+	}
+}
+
+func TestAllowEphemeralVolumeType(t *testing.T) {
+	pspWithoutGenericVolume := func() *policy.PodSecurityPolicy {
+		return &policy.PodSecurityPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "psp",
+				ResourceVersion: "1",
+			},
+			Spec: policy.PodSecurityPolicySpec{
+				RunAsUser: policy.RunAsUserStrategyOptions{
+					Rule: policy.RunAsUserStrategyMustRunAs,
+				},
+				SupplementalGroups: policy.SupplementalGroupsStrategyOptions{
+					Rule: policy.SupplementalGroupsStrategyMustRunAs,
+				},
+				SELinux: policy.SELinuxStrategyOptions{
+					Rule: policy.SELinuxStrategyMustRunAs,
+				},
+				FSGroup: policy.FSGroupStrategyOptions{
+					Rule: policy.FSGroupStrategyMustRunAs,
+				},
+			},
+		}
+	}
+	pspWithGenericVolume := func() *policy.PodSecurityPolicy {
+		psp := pspWithoutGenericVolume()
+		psp.Spec.Volumes = append(psp.Spec.Volumes, policy.Ephemeral)
+		return psp
+	}
+	pspNil := func() *policy.PodSecurityPolicy {
+		return nil
+	}
+
+	pspInfo := []struct {
+		description      string
+		hasGenericVolume bool
+		psp              func() *policy.PodSecurityPolicy
+	}{
+		{
+			description:      "PodSecurityPolicySpec Without GenericVolume",
+			hasGenericVolume: false,
+			psp:              pspWithoutGenericVolume,
+		},
+		{
+			description:      "PodSecurityPolicySpec With GenericVolume",
+			hasGenericVolume: true,
+			psp:              pspWithGenericVolume,
+		},
+		{
+			description:      "is nil",
+			hasGenericVolume: false,
+			psp:              pspNil,
+		},
+	}
+
+	for _, allowed := range []bool{true, false} {
+		for _, oldPSPInfo := range pspInfo {
+			for _, newPSPInfo := range pspInfo {
+				oldPSP := oldPSPInfo.psp()
+				newPSP := newPSPInfo.psp()
+				if newPSP == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old PodSecurityPolicySpec %v, new PodSecurityPolicySpec %v", allowed, oldPSPInfo.description, newPSPInfo.description), func(t *testing.T) {
+					opts := PodSecurityPolicyValidationOptions{
+						AllowEphemeralVolumeType: allowed,
+					}
+					var errs field.ErrorList
+					expectErrors := newPSPInfo.hasGenericVolume && !allowed
+					if oldPSP == nil {
+						errs = ValidatePodSecurityPolicy(newPSP, opts)
+					} else {
+						errs = ValidatePodSecurityPolicyUpdate(oldPSP, newPSP, opts)
+					}
+					if expectErrors && len(errs) == 0 {
+						t.Error("expected errors, got none")
+					}
+					if !expectErrors && len(errs) > 0 {
+						t.Errorf("expected no errors, got: %v", errs)
+					}
+				})
+			}
+		}
 	}
 }
