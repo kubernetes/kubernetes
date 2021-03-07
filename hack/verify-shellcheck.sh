@@ -25,11 +25,14 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
+# allow overriding docker cli, which should work fine for this script
+DOCKER="${DOCKER:-docker}"
+
 # required version for this script, if not installed on the host we will
 # use the official docker image instead. keep this in sync with SHELLCHECK_IMAGE
-SHELLCHECK_VERSION="0.7.0"
+SHELLCHECK_VERSION="0.7.1"
 # upstream shellcheck latest stable image as of October 23rd, 2019
-SHELLCHECK_IMAGE="koalaman/shellcheck-alpine:v0.7.0@sha256:24bbf52aae6eaa27accc9f61de32d30a1498555e6ef452966d0702ff06f38ecb"
+SHELLCHECK_IMAGE="docker.io/koalaman/shellcheck-alpine:v0.7.1@sha256:d6147f30864ddb7c9cf983fc277d345bc315e798e309ddf70062b194843ee252"
 
 # disabled lints
 disabled=(
@@ -105,7 +108,7 @@ if ${HAVE_SHELLCHECK}; then
   shellcheck "${SHELLCHECK_OPTIONS[@]}" "${all_shell_scripts[@]}" || res=$?
 else
   echo "Using shellcheck ${SHELLCHECK_VERSION} docker image."
-  docker run \
+  "${DOCKER}" run \
     --rm -v "${KUBE_ROOT}:${KUBE_ROOT}" -w "${KUBE_ROOT}" \
     "${SHELLCHECK_IMAGE}" \
   shellcheck "${SHELLCHECK_OPTIONS[@]}" "${all_shell_scripts[@]}" || res=$?
@@ -113,7 +116,7 @@ fi
 
 # print a message based on the result
 if [ $res -eq 0 ]; then
-  echo 'Congratulations! All shell files are passing lint (excluding those in hack/.shellcheck_failures).'
+  echo 'Congratulations! All shell files are passing lint :-)'
 else
   {
     echo
@@ -121,7 +124,7 @@ else
     echo 'If the above warnings do not make sense, you can exempt this warning with a comment'
     echo ' (if your reviewer is okay with it).'
     echo 'In general please prefer to fix the error, we have already disabled specific lints'
-    echo ' that the project chooses to ignire.'
+    echo ' that the project chooses to ignore.'
     echo 'See: https://github.com/koalaman/shellcheck/wiki/Ignore#ignoring-one-specific-instance-in-a-file'
     echo
   } >&2
