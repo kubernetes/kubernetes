@@ -19,12 +19,17 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
-# delete all bazel related files
-find "${KUBE_ROOT}" \( \
-  -name BUILD \
-  -o -name BUILD.bazel \
-  -o -name '*.bzl' \
-\) \
+# delete all bazel related files not in vendor/
+find "${KUBE_ROOT}" \
+  \( \
+    -name BUILD \
+    -o -name BUILD.bazel \
+    -o -name '*.bzl' \
+  \) \
+  -not \
+  \( \
+    -path "${KUBE_ROOT}"'/vendor*' \
+  \) \
   -delete
 
 # remove additional one-off bazel related files
