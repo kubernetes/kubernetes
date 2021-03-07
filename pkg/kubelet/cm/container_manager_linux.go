@@ -47,11 +47,11 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -1068,20 +1068,20 @@ func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (v1.ResourceLi
 	return cm.deviceManager.GetCapacity()
 }
 
-func (cm *containerManagerImpl) GetDevices(podUID, containerName string) devicemanager.ResourceDeviceInstances {
-	return cm.deviceManager.GetDevices(podUID, containerName)
+func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices {
+	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetDevices(podUID, containerName))
 }
 
-func (cm *containerManagerImpl) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
-	return cm.deviceManager.GetAllocatableDevices()
+func (cm *containerManagerImpl) GetAllocatableDevices() []*podresourcesapi.ContainerDevices {
+	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetAllocatableDevices())
 }
 
-func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) cpuset.CPUSet {
-	return cm.cpuManager.GetCPUs(podUID, containerName).Clone()
+func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
+	return cm.cpuManager.GetCPUs(podUID, containerName).ToSliceNoSortInt64()
 }
 
-func (cm *containerManagerImpl) GetAllocatableCPUs() cpuset.CPUSet {
-	return cm.cpuManager.GetAllocatableCPUs()
+func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
+	return cm.cpuManager.GetAllocatableCPUs().ToSliceNoSortInt64()
 }
 
 func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {

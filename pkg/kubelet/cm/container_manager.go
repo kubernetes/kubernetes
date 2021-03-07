@@ -26,9 +26,11 @@ import (
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	v1 "k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -185,4 +187,29 @@ func ParseQOSReserved(m map[string]string) (*map[v1.ResourceName]int64, error) {
 		}
 	}
 	return &reservations, nil
+}
+
+func containerDevicesFromResourceDeviceInstances(devs devicemanager.ResourceDeviceInstances) []*podresourcesapi.ContainerDevices {
+	var respDevs []*podresourcesapi.ContainerDevices
+
+	for resourceName, resourceDevs := range devs {
+		for devID, dev := range resourceDevs {
+			for _, node := range dev.GetTopology().GetNodes() {
+				numaNode := node.GetID()
+				respDevs = append(respDevs, &podresourcesapi.ContainerDevices{
+					ResourceName: resourceName,
+					DeviceIds:    []string{devID},
+					Topology: &podresourcesapi.TopologyInfo{
+						Nodes: []*podresourcesapi.NUMANode{
+							{
+								ID: numaNode,
+							},
+						},
+					},
+				})
+			}
+		}
+	}
+
+	return respDevs
 }

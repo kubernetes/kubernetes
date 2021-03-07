@@ -25,10 +25,8 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	podresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 )
 
 type mockProvider struct {
@@ -40,28 +38,28 @@ func (m *mockProvider) GetPods() []*v1.Pod {
 	return args.Get(0).([]*v1.Pod)
 }
 
-func (m *mockProvider) GetDevices(podUID, containerName string) devicemanager.ResourceDeviceInstances {
+func (m *mockProvider) GetDevices(podUID, containerName string) []*podresourcesv1.ContainerDevices {
 	args := m.Called(podUID, containerName)
-	return args.Get(0).(devicemanager.ResourceDeviceInstances)
+	return args.Get(0).([]*podresourcesv1.ContainerDevices)
 }
 
-func (m *mockProvider) GetCPUs(podUID, containerName string) cpuset.CPUSet {
+func (m *mockProvider) GetCPUs(podUID, containerName string) []int64 {
 	args := m.Called(podUID, containerName)
-	return args.Get(0).(cpuset.CPUSet)
+	return args.Get(0).([]int64)
 }
 
 func (m *mockProvider) UpdateAllocatedDevices() {
 	m.Called()
 }
 
-func (m *mockProvider) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
+func (m *mockProvider) GetAllocatableDevices() []*podresourcesv1.ContainerDevices {
 	args := m.Called()
-	return args.Get(0).(devicemanager.ResourceDeviceInstances)
+	return args.Get(0).([]*podresourcesv1.ContainerDevices)
 }
 
-func (m *mockProvider) GetAllocatableCPUs() cpuset.CPUSet {
+func (m *mockProvider) GetAllocatableCPUs() []int64 {
 	args := m.Called()
-	return args.Get(0).(cpuset.CPUSet)
+	return args.Get(0).([]int64)
 }
 
 func TestListPodResourcesV1alpha1(t *testing.T) {
@@ -70,23 +68,23 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 	podUID := types.UID("pod-uid")
 	containerName := "container-name"
 
-	devs := devicemanager.ResourceDeviceInstances{
-		"resource": devicemanager.DeviceInstances{
-			"dev0": pluginapi.Device{},
-			"dev1": pluginapi.Device{},
+	devs := []*podresourcesv1.ContainerDevices{
+		{
+			ResourceName: "resource",
+			DeviceIds:    []string{"dev0", "dev1"},
 		},
 	}
 
 	for _, tc := range []struct {
 		desc             string
 		pods             []*v1.Pod
-		devices          devicemanager.ResourceDeviceInstances
+		devices          []*podresourcesv1.ContainerDevices
 		expectedResponse *v1alpha1.ListPodResourcesResponse
 	}{
 		{
 			desc:             "no pods",
 			pods:             []*v1.Pod{},
-			devices:          devicemanager.NewResourceDeviceInstances(),
+			devices:          []*podresourcesv1.ContainerDevices{},
 			expectedResponse: &v1alpha1.ListPodResourcesResponse{},
 		},
 		{
@@ -107,7 +105,7 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 					},
 				},
 			},
-			devices: devicemanager.NewResourceDeviceInstances(),
+			devices: []*podresourcesv1.ContainerDevices{},
 			expectedResponse: &v1alpha1.ListPodResourcesResponse{
 				PodResources: []*v1alpha1.PodResources{
 					{
@@ -150,7 +148,7 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 						Containers: []*v1alpha1.ContainerResources{
 							{
 								Name:    containerName,
-								Devices: v1DevicesToAlphaV1(containerDevicesFromResourceDeviceInstances(devs)),
+								Devices: v1DevicesToAlphaV1(devs),
 							},
 						},
 					},

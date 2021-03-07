@@ -19,7 +19,6 @@ package podresources
 import (
 	"context"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 
 	"k8s.io/kubelet/pkg/apis/podresources/v1"
@@ -60,8 +59,8 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *v1.ListPodResource
 		for j, container := range pod.Spec.Containers {
 			pRes.Containers[j] = &v1.ContainerResources{
 				Name:    container.Name,
-				Devices: containerDevicesFromResourceDeviceInstances(p.devicesProvider.GetDevices(string(pod.UID), container.Name)),
-				CpuIds:  p.cpusProvider.GetCPUs(string(pod.UID), container.Name).ToSliceNoSortInt64(),
+				Devices: p.devicesProvider.GetDevices(string(pod.UID), container.Name),
+				CpuIds:  p.cpusProvider.GetCPUs(string(pod.UID), container.Name),
 			}
 		}
 		podResources[i] = &pRes
@@ -77,32 +76,7 @@ func (p *v1PodResourcesServer) GetAllocatableResources(ctx context.Context, req 
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
 
 	return &v1.AllocatableResourcesResponse{
-		Devices: containerDevicesFromResourceDeviceInstances(p.devicesProvider.GetAllocatableDevices()),
-		CpuIds:  p.cpusProvider.GetAllocatableCPUs().ToSliceNoSortInt64(),
+		Devices: p.devicesProvider.GetAllocatableDevices(),
+		CpuIds:  p.cpusProvider.GetAllocatableCPUs(),
 	}, nil
-}
-
-func containerDevicesFromResourceDeviceInstances(devs devicemanager.ResourceDeviceInstances) []*v1.ContainerDevices {
-	var respDevs []*v1.ContainerDevices
-
-	for resourceName, resourceDevs := range devs {
-		for devID, dev := range resourceDevs {
-			for _, node := range dev.GetTopology().GetNodes() {
-				numaNode := node.GetID()
-				respDevs = append(respDevs, &v1.ContainerDevices{
-					ResourceName: resourceName,
-					DeviceIds:    []string{devID},
-					Topology: &v1.TopologyInfo{
-						Nodes: []*v1.NUMANode{
-							{
-								ID: numaNode,
-							},
-						},
-					},
-				})
-			}
-		}
-	}
-
-	return respDevs
 }

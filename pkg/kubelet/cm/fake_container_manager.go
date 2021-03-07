@@ -23,9 +23,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -168,14 +167,14 @@ func (cm *FakeContainerManager) GetPodCgroupRoot() string {
 	return ""
 }
 
-func (cm *FakeContainerManager) GetDevices(_, _ string) devicemanager.ResourceDeviceInstances {
+func (cm *FakeContainerManager) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetDevices")
 	return nil
 }
 
-func (cm *FakeContainerManager) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
+func (cm *FakeContainerManager) GetAllocatableDevices() []*podresourcesapi.ContainerDevices {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocatableDevices")
@@ -203,16 +202,15 @@ func (cm *FakeContainerManager) UpdateAllocatedDevices() {
 	return
 }
 
-func (cm *FakeContainerManager) GetCPUs(_, _ string) cpuset.CPUSet {
+func (cm *FakeContainerManager) GetCPUs(_, _ string) []int64 {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetCPUs")
-	return cpuset.CPUSet{}
+	return nil
 }
 
-func (cm *FakeContainerManager) GetAllocatableCPUs() cpuset.CPUSet {
+func (cm *FakeContainerManager) GetAllocatableCPUs() []int64 {
 	cm.Lock()
 	defer cm.Unlock()
-	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocatableCPUs")
-	return cpuset.CPUSet{}
+	return nil
 }

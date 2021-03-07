@@ -25,7 +25,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
@@ -38,35 +37,28 @@ func TestListPodResourcesV1(t *testing.T) {
 	containerName := "container-name"
 	numaID := int64(1)
 
-	devs := devicemanager.ResourceDeviceInstances{
-		"resource": devicemanager.DeviceInstances{
-			"dev0": pluginapi.Device{
-				Topology: &pluginapi.TopologyInfo{
-					Nodes: []*pluginapi.NUMANode{{ID: numaID}},
-				},
-			},
-			"dev1": pluginapi.Device{
-				Topology: &pluginapi.TopologyInfo{
-					Nodes: []*pluginapi.NUMANode{{ID: numaID}},
-				},
-			},
+	devs := []*podresourcesapi.ContainerDevices{
+		{
+			ResourceName: "resource",
+			DeviceIds:    []string{"dev0", "dev1"},
+			Topology:     &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaID}}},
 		},
 	}
 
-	cpus := cpuset.NewCPUSet(12, 23, 30)
+	cpus := []int64{12, 23, 30}
 
 	for _, tc := range []struct {
 		desc             string
 		pods             []*v1.Pod
-		devices          devicemanager.ResourceDeviceInstances
-		cpus             cpuset.CPUSet
+		devices          []*podresourcesapi.ContainerDevices
+		cpus             []int64
 		expectedResponse *podresourcesapi.ListPodResourcesResponse
 	}{
 		{
 			desc:             "no pods",
 			pods:             []*v1.Pod{},
-			devices:          devicemanager.NewResourceDeviceInstances(),
-			cpus:             cpuset.CPUSet{},
+			devices:          []*podresourcesapi.ContainerDevices{},
+			cpus:             []int64{},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{},
 		},
 		{
@@ -87,8 +79,8 @@ func TestListPodResourcesV1(t *testing.T) {
 					},
 				},
 			},
-			devices: devicemanager.NewResourceDeviceInstances(),
-			cpus:    cpuset.CPUSet{},
+			devices: []*podresourcesapi.ContainerDevices{},
+			cpus:    []int64{},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
 				PodResources: []*podresourcesapi.PodResources{
 					{
@@ -132,8 +124,8 @@ func TestListPodResourcesV1(t *testing.T) {
 						Containers: []*podresourcesapi.ContainerResources{
 							{
 								Name:    containerName,
-								Devices: containerDevicesFromResourceDeviceInstances(devs),
-								CpuIds:  cpus.ToSliceNoSortInt64(),
+								Devices: devs,
+								CpuIds:  cpus,
 							},
 						},
 					},
@@ -162,52 +154,51 @@ func TestListPodResourcesV1(t *testing.T) {
 }
 
 func TestAllocatableResources(t *testing.T) {
-	allDevs := devicemanager.ResourceDeviceInstances{
-		"resource": {
-			"dev0": {
-				ID:     "GPU-fef8089b-4820-abfc-e83e-94318197576e",
-				Health: "Healthy",
-				Topology: &pluginapi.TopologyInfo{
-					Nodes: []*pluginapi.NUMANode{
-						{
-							ID: 0,
-						},
+	allDevs := []*podresourcesapi.ContainerDevices{
+		{
+			ResourceName: "resource",
+			DeviceIds:    []string{"dev0"},
+			Topology: &podresourcesapi.TopologyInfo{
+				Nodes: []*podresourcesapi.NUMANode{
+					{
+						ID: 0,
 					},
 				},
 			},
-			"dev1": {
-				ID:     "VF-8536e1e8-9dc6-4645-9aea-882db92e31e7",
-				Health: "Healthy",
-				Topology: &pluginapi.TopologyInfo{
-					Nodes: []*pluginapi.NUMANode{
-						{
-							ID: 1,
-						},
+		},
+		{
+			ResourceName: "resource",
+			DeviceIds:    []string{"dev1"},
+			Topology: &podresourcesapi.TopologyInfo{
+				Nodes: []*podresourcesapi.NUMANode{
+					{
+						ID: 1,
 					},
 				},
 			},
 		},
 	}
-	allCPUs := cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
+
+	allCPUs := []int64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 
 	for _, tc := range []struct {
 		desc                                 string
-		allCPUs                              cpuset.CPUSet
-		allDevices                           devicemanager.ResourceDeviceInstances
+		allCPUs                              []int64
+		allDevices                           []*podresourcesapi.ContainerDevices
 		expectedAllocatableResourcesResponse *podresourcesapi.AllocatableResourcesResponse
 	}{
 		{
 			desc:                                 "no devices, no CPUs",
-			allCPUs:                              cpuset.CPUSet{},
-			allDevices:                           devicemanager.NewResourceDeviceInstances(),
+			allCPUs:                              []int64{},
+			allDevices:                           []*podresourcesapi.ContainerDevices{},
 			expectedAllocatableResourcesResponse: &podresourcesapi.AllocatableResourcesResponse{},
 		},
 		{
 			desc:       "no devices, all CPUs",
 			allCPUs:    allCPUs,
-			allDevices: devicemanager.NewResourceDeviceInstances(),
+			allDevices: []*podresourcesapi.ContainerDevices{},
 			expectedAllocatableResourcesResponse: &podresourcesapi.AllocatableResourcesResponse{
-				CpuIds: allCPUs.ToSliceNoSortInt64(),
+				CpuIds: allCPUs,
 			},
 		},
 		{
@@ -215,7 +206,7 @@ func TestAllocatableResources(t *testing.T) {
 			allCPUs:    allCPUs,
 			allDevices: allDevs,
 			expectedAllocatableResourcesResponse: &podresourcesapi.AllocatableResourcesResponse{
-				CpuIds: allCPUs.ToSliceNoSortInt64(),
+				CpuIds: allCPUs,
 				Devices: []*podresourcesapi.ContainerDevices{
 					{
 						ResourceName: "resource",
@@ -244,7 +235,7 @@ func TestAllocatableResources(t *testing.T) {
 		},
 		{
 			desc:       "with devices, no CPUs",
-			allCPUs:    cpuset.CPUSet{},
+			allCPUs:    []int64{},
 			allDevices: allDevs,
 			expectedAllocatableResourcesResponse: &podresourcesapi.AllocatableResourcesResponse{
 				Devices: []*podresourcesapi.ContainerDevices{
@@ -277,7 +268,7 @@ func TestAllocatableResources(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			m := new(mockProvider)
 			m.On("GetDevices", "", "").Return([]*podresourcesapi.ContainerDevices{})
-			m.On("GetCPUs", "", "").Return(cpuset.CPUSet{})
+			m.On("GetCPUs", "", "").Return([]int64{})
 			m.On("UpdateAllocatedDevices").Return()
 			m.On("GetAllocatableDevices").Return(tc.allDevices)
 			m.On("GetAllocatableCPUs").Return(tc.allCPUs)
@@ -335,36 +326,21 @@ func equalContainerDevices(devA, devB []*podresourcesapi.ContainerDevices) bool 
 		return false
 	}
 
-	// the ordering of container devices in the response is not defined,
-	// so we need to do a full scan, failing at first mismatch
 	for idx := 0; idx < len(devA); idx++ {
-		if !containsContainerDevice(devA[idx], devB) {
+		cntDevA := devA[idx]
+		cntDevB := devB[idx]
+
+		if cntDevA.ResourceName != cntDevB.ResourceName {
+			return false
+		}
+		if !equalTopology(cntDevA.Topology, cntDevB.Topology) {
+			return false
+		}
+		if !equalStrings(cntDevA.DeviceIds, cntDevB.DeviceIds) {
 			return false
 		}
 	}
 
-	return true
-}
-
-func containsContainerDevice(cntDev *podresourcesapi.ContainerDevices, devs []*podresourcesapi.ContainerDevices) bool {
-	for idx := 0; idx < len(devs); idx++ {
-		if equalContainerDevice(cntDev, devs[idx]) {
-			return true
-		}
-	}
-	return false
-}
-
-func equalContainerDevice(cntDevA, cntDevB *podresourcesapi.ContainerDevices) bool {
-	if cntDevA.ResourceName != cntDevB.ResourceName {
-		return false
-	}
-	if !equalTopology(cntDevA.Topology, cntDevB.Topology) {
-		return false
-	}
-	if !equalStrings(cntDevA.DeviceIds, cntDevB.DeviceIds) {
-		return false
-	}
 	return true
 }
 

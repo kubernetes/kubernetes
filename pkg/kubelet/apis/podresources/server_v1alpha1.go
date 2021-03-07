@@ -68,10 +68,9 @@ func (p *v1alpha1PodResourcesServer) List(ctx context.Context, req *v1alpha1.Lis
 		}
 
 		for j, container := range pod.Spec.Containers {
-			v1devices := containerDevicesFromResourceDeviceInstances(p.devicesProvider.GetDevices(string(pod.UID), container.Name))
 			pRes.Containers[j] = &v1alpha1.ContainerResources{
 				Name:    container.Name,
-				Devices: v1DevicesToAlphaV1(v1devices),
+				Devices: v1DevicesToAlphaV1(p.devicesProvider.GetDevices(string(pod.UID), container.Name)),
 			}
 		}
 		podResources[i] = &pRes

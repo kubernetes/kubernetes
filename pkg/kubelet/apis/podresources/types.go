@@ -18,8 +18,7 @@ package podresources
 
 import (
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
 
 // DevicesProvider knows how to provide the devices used by the given container
@@ -27,9 +26,9 @@ type DevicesProvider interface {
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()
 	// GetDevices returns information about the devices assigned to pods and containers
-	GetDevices(podUID, containerName string) devicemanager.ResourceDeviceInstances
+	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
 	// GetAllocatableDevices returns information about all the devices known to the manager
-	GetAllocatableDevices() devicemanager.ResourceDeviceInstances
+	GetAllocatableDevices() []*podresourcesapi.ContainerDevices
 }
 
 // PodsProvider knows how to provide the pods admitted by the node
@@ -40,7 +39,7 @@ type PodsProvider interface {
 // CPUsProvider knows how to provide the cpus used by the given container
 type CPUsProvider interface {
 	// GetCPUs returns information about the cpus assigned to pods and containers
-	GetCPUs(podUID, containerName string) cpuset.CPUSet
+	GetCPUs(podUID, containerName string) []int64
 	// GetAllocatableCPUs returns the allocatable (not allocated) CPUs
-	GetAllocatableCPUs() cpuset.CPUSet
+	GetAllocatableCPUs() []int64
 }
