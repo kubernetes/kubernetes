@@ -31,16 +31,6 @@ func DropDisabledFields(pspSpec, oldPSPSpec *policy.PodSecurityPolicySpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 		pspSpec.AllowedCSIDrivers = nil
 	}
-	var volumes []policy.FSType
-	for _, volume := range pspSpec.Volumes {
-		if volume != policy.Ephemeral ||
-			utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) ||
-			volumeInUse(oldPSPSpec, volume) {
-			// Keep it.
-			volumes = append(volumes, volume)
-		}
-	}
-	pspSpec.Volumes = volumes
 }
 
 func allowedProcMountTypesInUse(oldPSPSpec *policy.PodSecurityPolicySpec) bool {
@@ -54,16 +44,4 @@ func allowedProcMountTypesInUse(oldPSPSpec *policy.PodSecurityPolicySpec) bool {
 
 	return false
 
-}
-
-func volumeInUse(oldPSPSpec *policy.PodSecurityPolicySpec, volume policy.FSType) bool {
-	if oldPSPSpec == nil {
-		return false
-	}
-	for _, v := range oldPSPSpec.Volumes {
-		if v == volume {
-			return true
-		}
-	}
-	return false
 }
