@@ -143,22 +143,6 @@ func (pl *InterPodAffinity) PreScore(
 	hasPreferredAffinityConstraints := affinity != nil && affinity.PodAffinity != nil && len(affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution) > 0
 	hasPreferredAntiAffinityConstraints := affinity != nil && affinity.PodAntiAffinity != nil && len(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) > 0
 
-	// Unless the pod being scheduled has preferred affinity terms, we only
-	// need to process nodes hosting pods with affinity.
-	var allNodes []*framework.NodeInfo
-	var err error
-	if hasPreferredAffinityConstraints || hasPreferredAntiAffinityConstraints {
-		allNodes, err = pl.sharedLister.NodeInfos().List()
-		if err != nil {
-			framework.AsStatus(fmt.Errorf("failed to get all nodes from shared lister: %w", err))
-		}
-	} else {
-		allNodes, err = pl.sharedLister.NodeInfos().HavePodsWithAffinityList()
-		if err != nil {
-			framework.AsStatus(fmt.Errorf("failed to get pods with affinity list: %w", err))
-		}
-	}
-
 	state := &preScoreState{
 		topologyScore: make(map[string]map[string]int64),
 	}
@@ -183,11 +167,12 @@ func (pl *InterPodAffinity) PreScore(
 		state.namespaceLabels = GetNamespaceLabelsSnapshot(pod.Namespace, pl.nsLister)
 	}
 
-	topoScores := make([]scoreMap, len(allNodes))
+	topoScores := make([]scoreMap, len(nodes))
 	index := int32(-1)
 	processNode := func(i int) {
-		nodeInfo := allNodes[i]
-		if nodeInfo.Node() == nil {
+		node := nodes[i]
+		nodeInfo, err := pl.sharedLister.NodeInfos().Get(node.Name)
+		if err != nil || nodeInfo.Node() == nil {
 			return
 		}
 		// Unless the pod being scheduled has preferred affinity terms, we only
@@ -198,6 +183,10 @@ func (pl *InterPodAffinity) PreScore(
 			podsToProcess = nodeInfo.Pods
 		}
 
+		if len(podsToProcess) == 0 {
+			return
+		}
+
 		topoScore := make(scoreMap)
 		for _, existingPod := range podsToProcess {
 			pl.processExistingPod(state, existingPod, nodeInfo, pod, topoScore)
@@ -206,7 +195,7 @@ func (pl *InterPodAffinity) PreScore(
 			topoScores[atomic.AddInt32(&index, 1)] = topoScore
 		}
 	}
-	parallelize.Until(context.Background(), len(allNodes), processNode)
+	parallelize.Until(context.Background(), len(nodes), processNode)
 
 	for i := 0; i <= int(index); i++ {
 		state.topologyScore.append(topoScores[i])
