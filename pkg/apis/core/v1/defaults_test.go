@@ -29,8 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 
 	// ensure types are installed
@@ -1796,5 +1799,66 @@ func TestSetDefaultEnableServiceLinks(t *testing.T) {
 	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
 	if output.Spec.EnableServiceLinks == nil || *output.Spec.EnableServiceLinks != v1.DefaultEnableServiceLinks {
 		t.Errorf("Expected enableServiceLinks value: %+v\ngot: %+v\n", v1.DefaultEnableServiceLinks, *output.Spec.EnableServiceLinks)
+	}
+}
+
+func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
+	cluster := v1.ServiceInternalTrafficPolicyCluster
+	local := v1.ServiceInternalTrafficPolicyLocal
+	testCases := []struct {
+		name                          string
+		expectedInternalTrafficPolicy v1.ServiceInternalTrafficPolicyType
+		svc                           v1.Service
+		featureGateOn                 bool
+	}{
+		{
+			name:                          "must set default internalTrafficPolicy",
+			expectedInternalTrafficPolicy: v1.ServiceInternalTrafficPolicyCluster,
+			svc:                           v1.Service{},
+			featureGateOn:                 true,
+		},
+		{
+			name:                          "must not set default internalTrafficPolicy when it's cluster",
+			expectedInternalTrafficPolicy: v1.ServiceInternalTrafficPolicyCluster,
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					InternalTrafficPolicy: &cluster,
+				},
+			},
+			featureGateOn: true,
+		},
+		{
+			name:                          "must not set default internalTrafficPolicy when it's local",
+			expectedInternalTrafficPolicy: v1.ServiceInternalTrafficPolicyLocal,
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					InternalTrafficPolicy: &local,
+				},
+			},
+			featureGateOn: true,
+		},
+		{
+			name:                          "must not set default internalTrafficPolicy when gate is disabled",
+			expectedInternalTrafficPolicy: "",
+			svc:                           v1.Service{},
+			featureGateOn:                 false,
+		},
+	}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, test.featureGateOn)()
+			obj := roundTrip(t, runtime.Object(&test.svc))
+			svc := obj.(*v1.Service)
+
+			if test.expectedInternalTrafficPolicy == "" {
+				if svc.Spec.InternalTrafficPolicy != nil {
+					t.Fatalf("expected .spec.internalTrafficPolicy: null, got %v", *svc.Spec.InternalTrafficPolicy)
+				}
+			} else {
+				if *svc.Spec.InternalTrafficPolicy != test.expectedInternalTrafficPolicy {
+					t.Fatalf("expected .spec.internalTrafficPolicy: %v got %v", test.expectedInternalTrafficPolicy, *svc.Spec.InternalTrafficPolicy)
+				}
+			}
+		})
 	}
 }

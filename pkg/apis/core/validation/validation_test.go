@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -10135,9 +10136,10 @@ func TestValidateServiceCreate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 
 	testCases := []struct {
-		name     string
-		tweakSvc func(svc *core.Service) // given a basic valid service, each test case can customize it
-		numErrs  int
+		name         string
+		tweakSvc     func(svc *core.Service) // given a basic valid service, each test case can customize it
+		numErrs      int
+		featureGates []featuregate.Feature
 	}{
 		{
 			name: "missing namespace",
@@ -10751,6 +10753,22 @@ func TestValidateServiceCreate(t *testing.T) {
 			numErrs: 1,
 		},
 		{
+			name: "nil internalTraffic field when feature gate is on",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.InternalTrafficPolicy = nil
+			},
+			featureGates: []featuregate.Feature{features.ServiceInternalTrafficPolicy},
+			numErrs:      1,
+		},
+		{
+			name: "invalid internalTraffic field",
+			tweakSvc: func(s *core.Service) {
+				invalid := core.ServiceInternalTrafficPolicyType("invalid")
+				s.Spec.InternalTrafficPolicy = &invalid
+			},
+			numErrs: 1,
+		},
+		{
 			name: "nagative healthCheckNodePort field",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
@@ -11323,6 +11341,9 @@ func TestValidateServiceCreate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			for i := range tc.featureGates {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureGates[i], true)()
+			}
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
 			errs := ValidateServiceCreate(&svc)

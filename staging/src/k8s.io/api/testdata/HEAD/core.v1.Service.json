@@ -84,7 +84,8 @@
     ],
     "ipFamilyPolicy": "9ȫŚ",
     "allocateLoadBalancerNodePorts": true,
-    "loadBalancerClass": "31"
+    "loadBalancerClass": "31",
+    "internalTrafficPolicy": ""
   },
   "status": {
     "loadBalancer": {
@@ -94,8 +95,8 @@
           "hostname": "33",
           "ports": [
             {
-              "port": -907310967,
-              "protocol": "喂ƈ斎AO6",
+              "port": 684408190,
+              "protocol": "ƈ斎AO6ĴC浔Ű",
               "error": "34"
             }
           ]
@@ -105,9 +106,9 @@
     "conditions": [
       {
         "type": "35",
-        "status": "C",
-        "observedGeneration": -2492120148461555858,
-        "lastTransitionTime": "2392-12-09T15:37:55Z",
+        "status": "ž(-譵",
+        "observedGeneration": -8651056334266075769,
+        "lastTransitionTime": "2404-01-10T11:35:42Z",
         "reason": "36",
         "message": "37"
       }
