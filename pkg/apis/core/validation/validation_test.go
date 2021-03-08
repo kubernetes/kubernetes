@@ -13914,6 +13914,48 @@ func TestValidateResourceNames(t *testing.T) {
 	}
 }
 
+func TestValidateImagePullSecrets(t *testing.T) {
+	testCases := []struct {
+		name             string
+		success          bool
+		imagePullSecrets []core.LocalObjectReference
+	}{
+		{
+			name:             "empty-list",
+			success:          true,
+			imagePullSecrets: []core.LocalObjectReference{},
+		},
+		{
+			name:    "entry-with-empty-name",
+			success: false,
+			imagePullSecrets: []core.LocalObjectReference{
+				{
+					Name: "",
+				},
+			},
+		},
+		{
+			name:    "entry-containing-just-whitespaces-in-name",
+			success: true,
+			imagePullSecrets: []core.LocalObjectReference{
+				{
+					Name: " ",
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		errs := validateImagePullSecrets(testCase.imagePullSecrets, field.NewPath("field"))
+
+		if len(errs) != 0 && testCase.success {
+			t.Errorf("Case %v, unexpected error: %v", testCase.name, errs)
+		} else if len(errs) == 0 && !testCase.success {
+			t.Errorf("Case %v, should have an error", testCase.name)
+		}
+	}
+}
+
 func getResourceList(cpu, memory string) core.ResourceList {
 	res := core.ResourceList{}
 	if cpu != "" {

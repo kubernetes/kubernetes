@@ -3054,6 +3054,9 @@ func validateImagePullSecrets(imagePullSecrets []core.LocalObjectReference, fldP
 		if !reflect.DeepEqual(strippedRef, currPullSecret) {
 			allErrors = append(allErrors, field.Invalid(idxPath, currPullSecret, "only name may be set"))
 		}
+		if len(currPullSecret.Name) == 0 {
+			allErrors = append(allErrors, field.Required(idxPath.Child("name"), "name cannot be empty"))
+		}
 	}
 	return allErrors
 }
