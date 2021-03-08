@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 )
 
 // jobStrategy implements verification logic for Replication Controllers.
@@ -84,6 +85,10 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 		job.Spec.CompletionMode = batch.NonIndexedCompletion
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) {
+		job.Spec.Suspend = pointer.BoolPtr(false)
+	}
+
 	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
 }
 
@@ -99,6 +104,16 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) && oldJob.Spec.CompletionMode == batch.NonIndexedCompletion {
 		newJob.Spec.CompletionMode = batch.NonIndexedCompletion
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) {
+		// There are 3 possible values (nil, true, false) for each flag, so 9
+		// combinations. We want to disallow everything except true->false and
+		// true->nil when the feature gate is disabled. Or, basically allow this
+		// only when oldJob is true.
+		if oldJob.Spec.Suspend == nil || !*oldJob.Spec.Suspend {
+			newJob.Spec.Suspend = oldJob.Spec.Suspend
+		}
 	}
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)

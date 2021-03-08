@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 )
 
 var alwaysReady = func() bool { return true }
@@ -156,6 +157,7 @@ func setPodsStatusesWithIndexes(podIndexer cache.Indexer, job *batch.Job, status
 func TestControllerSyncJob(t *testing.T) {
 	jobConditionComplete := batch.JobComplete
 	jobConditionFailed := batch.JobFailed
+	jobConditionSuspended := batch.JobSuspended
 
 	testCases := map[string]struct {
 		// job setup
@@ -165,15 +167,18 @@ func TestControllerSyncJob(t *testing.T) {
 		deleting       bool
 		podLimit       int
 		completionMode batch.CompletionMode
+		wasSuspended   bool
+		suspend        bool
 
 		// pod setup
-		podControllerError error
-		jobKeyForget       bool
-		pendingPods        int32
-		activePods         int32
-		succeededPods      int32
-		failedPods         int32
-		podsWithIndexes    []indexPhase
+		podControllerError        error
+		jobKeyForget              bool
+		pendingPods               int32
+		activePods                int32
+		succeededPods             int32
+		failedPods                int32
+		podsWithIndexes           []indexPhase
+		fakeExpectationAtCreation int32 // negative: ExpectDeletions, positive: ExpectCreations
 
 		// expectations
 		expectedCreations       int32
@@ -183,11 +188,13 @@ func TestControllerSyncJob(t *testing.T) {
 		expectedCompletedIdxs   string
 		expectedFailed          int32
 		expectedCondition       *batch.JobConditionType
+		expectedConditionStatus v1.ConditionStatus
 		expectedConditionReason string
 		expectedCreatedIndexes  sets.Int
 
 		// features
 		indexedJobEnabled bool
+		suspendJobEnabled bool
 	}{
 		"job start": {
 			parallelism:       2,
@@ -334,24 +341,26 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedSucceeded: 1,
 		},
 		"WQ job all finished": {
-			parallelism:       2,
-			completions:       -1,
-			backoffLimit:      6,
-			jobKeyForget:      true,
-			succeededPods:     2,
-			expectedSucceeded: 2,
-			expectedCondition: &jobConditionComplete,
+			parallelism:             2,
+			completions:             -1,
+			backoffLimit:            6,
+			jobKeyForget:            true,
+			succeededPods:           2,
+			expectedSucceeded:       2,
+			expectedCondition:       &jobConditionComplete,
+			expectedConditionStatus: v1.ConditionTrue,
 		},
 		"WQ job all finished despite one failure": {
-			parallelism:       2,
-			completions:       -1,
-			backoffLimit:      6,
-			jobKeyForget:      true,
-			succeededPods:     1,
-			failedPods:        1,
-			expectedSucceeded: 1,
-			expectedFailed:    1,
-			expectedCondition: &jobConditionComplete,
+			parallelism:             2,
+			completions:             -1,
+			backoffLimit:            6,
+			jobKeyForget:            true,
+			succeededPods:           1,
+			failedPods:              1,
+			expectedSucceeded:       1,
+			expectedFailed:          1,
+			expectedCondition:       &jobConditionComplete,
+			expectedConditionStatus: v1.ConditionTrue,
 		},
 		"more active pods than completions": {
 			parallelism:       2,
@@ -401,6 +410,7 @@ func TestControllerSyncJob(t *testing.T) {
 			failedPods:              1,
 			expectedFailed:          1,
 			expectedCondition:       &jobConditionFailed,
+			expectedConditionStatus: v1.ConditionTrue,
 			expectedConditionReason: "BackoffLimitExceeded",
 		},
 		"indexed job start": {
@@ -510,11 +520,78 @@ func TestControllerSyncJob(t *testing.T) {
 			// No status updates.
 			indexedJobEnabled: false,
 		},
+		"suspending a job with satisfied expectations": {
+			// Suspended Job should delete active pods when expectations are
+			// satisfied.
+			suspendJobEnabled:       true,
+			suspend:                 true,
+			parallelism:             2,
+			activePods:              2, // parallelism == active, expectations satisfied
+			completions:             4,
+			backoffLimit:            6,
+			jobKeyForget:            true,
+			expectedCreations:       0,
+			expectedDeletions:       2,
+			expectedActive:          0,
+			expectedCondition:       &jobConditionSuspended,
+			expectedConditionStatus: v1.ConditionTrue,
+			expectedConditionReason: "JobSuspended",
+		},
+		"suspending a job with unsatisfied expectations": {
+			// Unlike the previous test, we expect the controller to NOT suspend the
+			// Job in the syncJob call because the controller will wait for
+			// expectations to be satisfied first. The next syncJob call (not tested
+			// here) will be the same as the previous test.
+			suspendJobEnabled:         true,
+			suspend:                   true,
+			parallelism:               2,
+			activePods:                3,  // active > parallelism, expectations unsatisfied
+			fakeExpectationAtCreation: -1, // the controller is expecting a deletion
+			completions:               4,
+			backoffLimit:              6,
+			jobKeyForget:              true,
+			expectedCreations:         0,
+			expectedDeletions:         0,
+			expectedActive:            3,
+		},
+		"resuming a suspended job": {
+			suspendJobEnabled:       true,
+			wasSuspended:            true,
+			suspend:                 false,
+			parallelism:             2,
+			completions:             4,
+			backoffLimit:            6,
+			jobKeyForget:            true,
+			expectedCreations:       2,
+			expectedDeletions:       0,
+			expectedActive:          2,
+			expectedCondition:       &jobConditionSuspended,
+			expectedConditionStatus: v1.ConditionFalse,
+			expectedConditionReason: "JobResumed",
+		},
+		"suspending a deleted job": {
+			// We would normally expect the active pods to be deleted (see a few test
+			// cases above), but since this job is being deleted, we don't expect
+			// anything changed here from before the job was suspended. The
+			// JobSuspended condition is also missing.
+			suspendJobEnabled: true,
+			suspend:           true,
+			deleting:          true,
+			parallelism:       2,
+			activePods:        2, // parallelism == active, expectations satisfied
+			completions:       4,
+			backoffLimit:      6,
+			jobKeyForget:      true,
+			expectedCreations: 0,
+			expectedDeletions: 0,
+			expectedActive:    2,
+		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.IndexedJob, tc.indexedJobEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SuspendJob, tc.suspendJobEnabled)()
 
 			// job manager setup
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
@@ -526,6 +603,19 @@ func TestControllerSyncJob(t *testing.T) {
 
 			// job & pods setup
 			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit, tc.completionMode)
+			job.Spec.Suspend = pointer.BoolPtr(tc.suspend)
+			key, err := controller.KeyFunc(job)
+			if err != nil {
+				t.Errorf("Unexpected error getting job key: %v", err)
+			}
+			if tc.fakeExpectationAtCreation < 0 {
+				manager.expectations.ExpectDeletions(key, int(-tc.fakeExpectationAtCreation))
+			} else if tc.fakeExpectationAtCreation > 0 {
+				manager.expectations.ExpectCreations(key, int(tc.fakeExpectationAtCreation))
+			}
+			if tc.wasSuspended {
+				job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobSuspended, v1.ConditionTrue, "JobSuspended", "Job suspended"))
+			}
 			if tc.deleting {
 				now := metav1.Now()
 				job.DeletionTimestamp = &now
@@ -608,12 +698,18 @@ func TestControllerSyncJob(t *testing.T) {
 			if actual.Status.Failed != tc.expectedFailed {
 				t.Errorf("Unexpected number of failed pods.  Expected %d, saw %d\n", tc.expectedFailed, actual.Status.Failed)
 			}
-			if actual.Status.StartTime == nil && tc.indexedJobEnabled {
+			if actual.Status.StartTime != nil && tc.suspend {
+				t.Error("Unexpected .status.startTime not nil when suspend is true")
+			}
+			if actual.Status.StartTime == nil && tc.indexedJobEnabled && !tc.suspend {
 				t.Error("Missing .status.startTime")
 			}
 			// validate conditions
-			if tc.expectedCondition != nil && !getCondition(actual, *tc.expectedCondition, tc.expectedConditionReason) {
+			if tc.expectedCondition != nil && !getCondition(actual, *tc.expectedCondition, tc.expectedConditionStatus, tc.expectedConditionReason) {
 				t.Errorf("Expected completion condition.  Got %#v", actual.Status.Conditions)
+			}
+			if tc.expectedCondition == nil && tc.suspend && len(actual.Status.Conditions) != 0 {
+				t.Errorf("Unexpected conditions %v", actual.Status.Conditions)
 			}
 			// validate slow start
 			expectedLimit := 0
@@ -652,6 +748,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		activeDeadlineSeconds int64
 		startTime             int64
 		backoffLimit          int32
+		suspend               bool
 
 		// pod setup
 		activePods    int32
@@ -664,7 +761,11 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		expectedActive          int32
 		expectedSucceeded       int32
 		expectedFailed          int32
+		expectedCondition       batch.JobConditionType
 		expectedConditionReason string
+
+		// features
+		suspendJobEnabled bool
 	}{
 		"activeDeadlineSeconds less than single pod execution": {
 			parallelism:             1,
@@ -676,6 +777,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			expectedForGetKey:       true,
 			expectedDeletions:       1,
 			expectedFailed:          1,
+			expectedCondition:       batch.JobFailed,
 			expectedConditionReason: "DeadlineExceeded",
 		},
 		"activeDeadlineSeconds bigger than single pod execution": {
@@ -690,6 +792,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			expectedDeletions:       1,
 			expectedSucceeded:       1,
 			expectedFailed:          1,
+			expectedCondition:       batch.JobFailed,
 			expectedConditionReason: "DeadlineExceeded",
 		},
 		"activeDeadlineSeconds times-out before any pod starts": {
@@ -699,6 +802,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			startTime:               10,
 			backoffLimit:            6,
 			expectedForGetKey:       true,
+			expectedCondition:       batch.JobFailed,
 			expectedConditionReason: "DeadlineExceeded",
 		},
 		"activeDeadlineSeconds with backofflimit reach": {
@@ -709,12 +813,27 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			failedPods:              1,
 			expectedForGetKey:       true,
 			expectedFailed:          1,
+			expectedCondition:       batch.JobFailed,
 			expectedConditionReason: "BackoffLimitExceeded",
+		},
+		"activeDeadlineSeconds is not triggered when Job is suspended": {
+			suspendJobEnabled:       true,
+			suspend:                 true,
+			parallelism:             1,
+			completions:             2,
+			activeDeadlineSeconds:   10,
+			startTime:               15,
+			backoffLimit:            6,
+			expectedForGetKey:       true,
+			expectedCondition:       batch.JobSuspended,
+			expectedConditionReason: "JobSuspended",
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SuspendJob, tc.suspendJobEnabled)()
+
 			// job manager setup
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			manager, sharedInformerFactory := newControllerFromClient(clientSet, controller.NoResyncPeriodFunc)
@@ -731,6 +850,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			// job & pods setup
 			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit, batch.NonIndexedCompletion)
 			job.Spec.ActiveDeadlineSeconds = &tc.activeDeadlineSeconds
+			job.Spec.Suspend = pointer.BoolPtr(tc.suspend)
 			start := metav1.Unix(metav1.Now().Time.Unix()-tc.startTime, 0)
 			job.Status.StartTime = &start
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
@@ -766,16 +886,16 @@ func TestSyncJobPastDeadline(t *testing.T) {
 				t.Error("Missing .status.startTime")
 			}
 			// validate conditions
-			if !getCondition(actual, batch.JobFailed, tc.expectedConditionReason) {
+			if !getCondition(actual, tc.expectedCondition, v1.ConditionTrue, tc.expectedConditionReason) {
 				t.Errorf("Expected fail condition.  Got %#v", actual.Status.Conditions)
 			}
 		})
 	}
 }
 
-func getCondition(job *batch.Job, condition batch.JobConditionType, reason string) bool {
+func getCondition(job *batch.Job, condition batch.JobConditionType, status v1.ConditionStatus, reason string) bool {
 	for _, v := range job.Status.Conditions {
-		if v.Type == condition && v.Status == v1.ConditionTrue && v.Reason == reason {
+		if v.Type == condition && v.Status == status && v.Reason == reason {
 			return true
 		}
 	}
@@ -800,7 +920,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
 	start := metav1.Unix(metav1.Now().Time.Unix()-15, 0)
 	job.Status.StartTime = &start
-	job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, "DeadlineExceeded", "Job was active longer than specified deadline"))
+	job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, v1.ConditionTrue, "DeadlineExceeded", "Job was active longer than specified deadline"))
 	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	forget, err := manager.syncJob(testutil.GetKey(job, t))
 	if err != nil {
@@ -829,7 +949,7 @@ func TestSyncJobComplete(t *testing.T) {
 	manager.jobStoreSynced = alwaysReady
 
 	job := newJob(1, 1, 6, batch.NonIndexedCompletion)
-	job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, "", ""))
+	job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, v1.ConditionTrue, "", ""))
 	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	forget, err := manager.syncJob(testutil.GetKey(job, t))
 	if err != nil {
@@ -1572,7 +1692,7 @@ func TestJobBackoffReset(t *testing.T) {
 		if retries != 0 {
 			t.Errorf("%s: expected exactly 0 retries, got %d", name, retries)
 		}
-		if getCondition(actual, batch.JobFailed, "BackoffLimitExceeded") {
+		if getCondition(actual, batch.JobFailed, v1.ConditionTrue, "BackoffLimitExceeded") {
 			t.Errorf("%s: unexpected job failure", name)
 		}
 	}
@@ -1760,7 +1880,7 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 				t.Errorf("unexpected number of failed pods.  Expected %d, saw %d\n", tc.expectedFailed, actual.Status.Failed)
 			}
 			// validate conditions
-			if tc.expectedCondition != nil && !getCondition(actual, *tc.expectedCondition, tc.expectedConditionReason) {
+			if tc.expectedCondition != nil && !getCondition(actual, *tc.expectedCondition, v1.ConditionTrue, tc.expectedConditionReason) {
 				t.Errorf("expected completion condition.  Got %#v", actual.Status.Conditions)
 			}
 		})
@@ -1864,8 +1984,94 @@ func TestJobBackoffOnRestartPolicyNever(t *testing.T) {
 				t.Errorf("unexpected number of failed pods. Expected %d, saw %d\n", tc.expectedFailed, actual.Status.Failed)
 			}
 			// validate conditions
-			if tc.expectedCondition != nil && !getCondition(actual, *tc.expectedCondition, tc.expectedConditionReason) {
+			if tc.expectedCondition != nil && !getCondition(actual, *tc.expectedCondition, v1.ConditionTrue, tc.expectedConditionReason) {
 				t.Errorf("expected completion condition. Got %#v", actual.Status.Conditions)
+			}
+		})
+	}
+}
+
+func TestEnsureJobConditions(t *testing.T) {
+	testCases := []struct {
+		name         string
+		haveList     []batch.JobCondition
+		wantType     batch.JobConditionType
+		wantStatus   v1.ConditionStatus
+		wantReason   string
+		expectList   []batch.JobCondition
+		expectUpdate bool
+	}{
+		{
+			name:         "append true condition",
+			haveList:     []batch.JobCondition{},
+			wantType:     batch.JobSuspended,
+			wantStatus:   v1.ConditionTrue,
+			wantReason:   "foo",
+			expectList:   []batch.JobCondition{newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "")},
+			expectUpdate: true,
+		},
+		{
+			name:         "append false condition",
+			haveList:     []batch.JobCondition{},
+			wantType:     batch.JobSuspended,
+			wantStatus:   v1.ConditionFalse,
+			wantReason:   "foo",
+			expectList:   []batch.JobCondition{},
+			expectUpdate: false,
+		},
+		{
+			name:         "update true condition reason",
+			haveList:     []batch.JobCondition{newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "")},
+			wantType:     batch.JobSuspended,
+			wantStatus:   v1.ConditionTrue,
+			wantReason:   "bar",
+			expectList:   []batch.JobCondition{newCondition(batch.JobSuspended, v1.ConditionTrue, "bar", "")},
+			expectUpdate: true,
+		},
+		{
+			name:         "update true condition status",
+			haveList:     []batch.JobCondition{newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "")},
+			wantType:     batch.JobSuspended,
+			wantStatus:   v1.ConditionFalse,
+			wantReason:   "foo",
+			expectList:   []batch.JobCondition{newCondition(batch.JobSuspended, v1.ConditionFalse, "foo", "")},
+			expectUpdate: true,
+		},
+		{
+			name:         "update false condition status",
+			haveList:     []batch.JobCondition{newCondition(batch.JobSuspended, v1.ConditionFalse, "foo", "")},
+			wantType:     batch.JobSuspended,
+			wantStatus:   v1.ConditionTrue,
+			wantReason:   "foo",
+			expectList:   []batch.JobCondition{newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "")},
+			expectUpdate: true,
+		},
+		{
+			name:         "condition already exists",
+			haveList:     []batch.JobCondition{newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "")},
+			wantType:     batch.JobSuspended,
+			wantStatus:   v1.ConditionTrue,
+			wantReason:   "foo",
+			expectList:   []batch.JobCondition{newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "")},
+			expectUpdate: false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotList, isUpdated := ensureJobConditionStatus(tc.haveList, tc.wantType, tc.wantStatus, tc.wantReason, "")
+			if isUpdated != tc.expectUpdate {
+				t.Errorf("Got isUpdated=%v, want %v", isUpdated, tc.expectUpdate)
+			}
+			if len(gotList) != len(tc.expectList) {
+				t.Errorf("got a list of length %d, want %d", len(gotList), len(tc.expectList))
+			}
+			for i := range gotList {
+				// Make timestamps the same before comparing the two lists.
+				gotList[i].LastProbeTime = tc.expectList[i].LastProbeTime
+				gotList[i].LastTransitionTime = tc.expectList[i].LastTransitionTime
+			}
+			if diff := cmp.Diff(tc.expectList, gotList); diff != "" {
+				t.Errorf("Unexpected JobCondition list: (-want,+got):\n%s", diff)
 			}
 		})
 	}

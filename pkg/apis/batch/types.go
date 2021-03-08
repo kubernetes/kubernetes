@@ -119,8 +119,11 @@ type JobSpec struct {
 	// +optional
 	Completions *int32
 
-	// Optional duration in seconds relative to the startTime that the job may be active
-	// before the system tries to terminate it; value must be positive integer
+	// Specifies the duration in seconds relative to the startTime that the job
+	// may be continuously active before the system tries to terminate it; value
+	// must be positive integer. If a Job is suspended (at creation or through an
+	// update), this timer will effectively be stopped and reset when the Job is
+	// resumed again.
 	// +optional
 	ActiveDeadlineSeconds *int64
 
@@ -187,19 +190,36 @@ type JobSpec struct {
 	// controller skips updates for the Job.
 	// +optional
 	CompletionMode CompletionMode
+
+	// Suspend specifies whether the Job controller should create Pods or not. If
+	// a Job is created with suspend set to true, no Pods are created by the Job
+	// controller. If a Job is suspended after creation (i.e. the flag goes from
+	// false to true), the Job controller will delete all active Pods associated
+	// with this Job. Users must design their workload to gracefully handle this.
+	// Suspending a Job will reset the StartTime field of the Job, effectively
+	// resetting the ActiveDeadlineSeconds timer too. This is an alpha field and
+	// requires the SuspendJob feature gate to be enabled; otherwise this field
+	// may not be set to true. Defaults to false.
+	// +optional
+	Suspend *bool
 }
 
 // JobStatus represents the current state of a Job.
 type JobStatus struct {
 
-	// The latest available observations of an object's current state.
-	// When a job fails, one of the conditions will have type == "Failed".
+	// The latest available observations of an object's current state. When a Job
+	// fails, one of the conditions will have type "Failed" and status true. When
+	// a Job is suspended, one of the conditions will have type "Suspended" and
+	// status true; when the Job is resumed, the status of this condition will
+	// become false. When a Job is completed, one of the conditions will have
+	// type "Complete" and status true.
 	// +optional
 	Conditions []JobCondition
 
-	// Represents time when the job was acknowledged by the job controller.
-	// It is not guaranteed to be set in happens-before order across separate operations.
-	// It is represented in RFC3339 form and is in UTC.
+	// Represents time when the job controller started processing a job. When a
+	// Job is created in the suspended state, this field is not set until the
+	// first time it is resumed. This field is reset every time a Job is resumed
+	// from suspension. It is represented in RFC3339 form and is in UTC.
 	// +optional
 	StartTime *metav1.Time
 
@@ -238,6 +258,8 @@ type JobConditionType string
 
 // These are valid conditions of a job.
 const (
+	// JobSuspended means the job has been suspended.
+	JobSuspended JobConditionType = "Suspended"
 	// JobComplete means the job has completed its execution.
 	JobComplete JobConditionType = "Complete"
 	// JobFailed means the job has failed its execution.
@@ -246,7 +268,7 @@ const (
 
 // JobCondition describes current state of a job.
 type JobCondition struct {
-	// Type of job condition, Complete or Failed.
+	// Type of job condition.
 	Type JobConditionType
 	// Status of the condition, one of True, False, Unknown.
 	Status api.ConditionStatus
@@ -319,7 +341,7 @@ type CronJobSpec struct {
 	ConcurrencyPolicy ConcurrencyPolicy
 
 	// This flag tells the controller to suspend subsequent executions, it does
-	// not apply to already started executions.  Defaults to false.
+	// not apply to already started executions. Defaults to false.
 	// +optional
 	Suspend *bool
 

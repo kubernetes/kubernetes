@@ -184,8 +184,11 @@ message JobSpec {
   // +optional
   optional int32 completions = 2;
 
-  // Specifies the duration in seconds relative to the startTime that the job may be active
-  // before the system tries to terminate it; value must be positive integer
+  // Specifies the duration in seconds relative to the startTime that the job
+  // may be continuously active before the system tries to terminate it; value
+  // must be positive integer. If a Job is suspended (at creation or through an
+  // update), this timer will effectively be stopped and reset when the Job is
+  // resumed again.
   // +optional
   optional int64 activeDeadlineSeconds = 3;
 
@@ -250,12 +253,28 @@ message JobSpec {
   // controller skips updates for the Job.
   // +optional
   optional string completionMode = 9;
+
+  // Suspend specifies whether the Job controller should create Pods or not. If
+  // a Job is created with suspend set to true, no Pods are created by the Job
+  // controller. If a Job is suspended after creation (i.e. the flag goes from
+  // false to true), the Job controller will delete all active Pods associated
+  // with this Job. Users must design their workload to gracefully handle this.
+  // Suspending a Job will reset the StartTime field of the Job, effectively
+  // resetting the ActiveDeadlineSeconds timer too. This is an alpha field and
+  // requires the SuspendJob feature gate to be enabled; otherwise this field
+  // may not be set to true. Defaults to false.
+  // +optional
+  optional bool suspend = 10;
 }
 
 // JobStatus represents the current state of a Job.
 message JobStatus {
-  // The latest available observations of an object's current state.
-  // When a job fails, one of the conditions will have type == "Failed".
+  // The latest available observations of an object's current state. When a Job
+  // fails, one of the conditions will have type "Failed" and status true. When
+  // a Job is suspended, one of the conditions will have type "Suspended" and
+  // status true; when the Job is resumed, the status of this condition will
+  // become false. When a Job is completed, one of the conditions will have
+  // type "Complete" and status true.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
   // +optional
   // +patchMergeKey=type
@@ -263,9 +282,10 @@ message JobStatus {
   // +listType=atomic
   repeated JobCondition conditions = 1;
 
-  // Represents time when the job was acknowledged by the job controller.
-  // It is not guaranteed to be set in happens-before order across separate operations.
-  // It is represented in RFC3339 form and is in UTC.
+  // Represents time when the job controller started processing a job. When a
+  // Job is created in the suspended state, this field is not set until the
+  // first time it is resumed. This field is reset every time a Job is resumed
+  // from suspension. It is represented in RFC3339 form and is in UTC.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time startTime = 2;
 

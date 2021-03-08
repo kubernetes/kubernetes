@@ -36,6 +36,7 @@ type JobSpecApplyConfiguration struct {
 	Template                *corev1.PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
 	TTLSecondsAfterFinished *int32                                    `json:"ttlSecondsAfterFinished,omitempty"`
 	CompletionMode          *batchv1.CompletionMode                   `json:"completionMode,omitempty"`
+	Suspend                 *bool                                     `json:"suspend,omitempty"`
 }
 
 // JobSpecApplyConfiguration constructs an declarative configuration of the JobSpec type for use with
@@ -113,5 +114,13 @@ func (b *JobSpecApplyConfiguration) WithTTLSecondsAfterFinished(value int32) *Jo
 // If called multiple times, the CompletionMode field is set to the value of the last call.
 func (b *JobSpecApplyConfiguration) WithCompletionMode(value batchv1.CompletionMode) *JobSpecApplyConfiguration {
 	b.CompletionMode = &value
+	return b
+}
+
+// WithSuspend sets the Suspend field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Suspend field is set to the value of the last call.
+func (b *JobSpecApplyConfiguration) WithSuspend(value bool) *JobSpecApplyConfiguration {
+	b.Suspend = &value
 	return b
 }

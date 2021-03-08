@@ -74,6 +74,7 @@ template:
         - Ou1.m_.5AW-_S-.3g.7_2fNc5-_.-RX8
       matchLabels:
         g5i9/l-Y._.-444: c2_kS91.e5K-_e63_-_3-n-_-__3u-.__P__.7U-Uo_4_-D7r__.am64
+    suspend: false
     template:
       metadata:
         annotations:
