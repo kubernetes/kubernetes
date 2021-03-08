@@ -5652,7 +5652,6 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *core.
 
 // ValidateNamespace tests if required fields are set.
 func ValidateNamespace(namespace *core.Namespace) field.ErrorList {
-	// skip namespace default label validation, because theres no 'definition' for a default label on a namespace with an as of yet "ungenerated" name
 	allErrs := ValidateObjectMeta(&namespace.ObjectMeta, false, ValidateNamespaceName, field.NewPath("metadata"))
 	for i := range namespace.Spec.Finalizers {
 		allErrs = append(allErrs, validateFinalizerName(string(namespace.Spec.Finalizers[i]), field.NewPath("spec", "finalizers"))...)
@@ -5683,12 +5682,6 @@ func validateKubeFinalizerName(stringValue string, fldPath *field.Path) field.Er
 // newNamespace is updated with fields that cannot be changed
 func ValidateNamespaceUpdate(newNamespace *core.Namespace, oldNamespace *core.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta, field.NewPath("metadata"))
-	if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
-		// assuming generated names are resolved before arriving here
-		if newNamespace.Labels[v1.LabelMetadataName] != newNamespace.Name {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "labels").Key(v1.LabelMetadataName), newNamespace.Labels[v1.LabelMetadataName], fmt.Sprintf("must be %s", newNamespace.Name)))
-		}
-	}
 	newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
 	newNamespace.Status = oldNamespace.Status
 	return allErrs
@@ -5699,12 +5692,6 @@ func ValidateNamespaceUpdate(newNamespace *core.Namespace, oldNamespace *core.Na
 func ValidateNamespaceStatusUpdate(newNamespace, oldNamespace *core.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta, field.NewPath("metadata"))
 	newNamespace.Spec = oldNamespace.Spec
-	if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
-		// assuming that any generate name has been called before we get here
-		if newNamespace.Labels[v1.LabelMetadataName] != newNamespace.Name {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "labels").Key(v1.LabelMetadataName), newNamespace.Labels[v1.LabelMetadataName], fmt.Sprintf("must be %s", newNamespace.Name)))
-		}
-	}
 	if newNamespace.DeletionTimestamp.IsZero() {
 		if newNamespace.Status.Phase != core.NamespaceActive {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("status", "Phase"), newNamespace.Status.Phase, "may only be 'Active' if `deletionTimestamp` is empty"))
@@ -5721,12 +5708,7 @@ func ValidateNamespaceStatusUpdate(newNamespace, oldNamespace *core.Namespace) f
 // newNamespace is updated with fields that cannot be changed.
 func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *core.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta, field.NewPath("metadata"))
-	if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
-		// assuming that any generate name has been called before we get here
-		if newNamespace.Labels[v1.LabelMetadataName] != newNamespace.Name {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "labels").Key(v1.LabelMetadataName), newNamespace.Labels[v1.LabelMetadataName], fmt.Sprintf("must be %s", newNamespace.Name)))
-		}
-	}
+
 	fldPath := field.NewPath("spec", "finalizers")
 	for i := range newNamespace.Spec.Finalizers {
 		idxPath := fldPath.Index(i)
