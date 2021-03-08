@@ -577,6 +577,16 @@ EOF
   systemctl start gcfs-snapshotter.service
 }
 
+function gke-create-gpu-config {
+  local -r gpu_config_file="/etc/nvidia/gpu_config.json"
+  mkdir -p "$(dirname "${gpu_config_file}")"
+  cat > "${gpu_config_file}" <<EOF
+{
+  "GPUPartitionSize": "${GPU_PARTITION_SIZE}"
+}
+EOF
+}
+
 # Set up the inplace agent.
 function gke-setup-inplace {
   cat <<EOF >/etc/systemd/system/inplace.service

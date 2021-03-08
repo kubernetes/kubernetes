@@ -3502,6 +3502,10 @@ function main() {
       fi
       log-wrap 'StartNodeProblemDetector' start-node-problem-detector
     fi
+
+    if [ -n "${GPU_PARTITION_SIZE:-}" ]; then
+      log-wrap 'GKECreateGPUConfig' gke-create-gpu-config
+    fi
   fi
   log-wrap 'ResetMotd' reset-motd
   log-wrap 'PrepareMounterRootfs' prepare-mounter-rootfs
