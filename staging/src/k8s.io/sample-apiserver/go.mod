@@ -5,7 +5,7 @@ module k8s.io/sample-apiserver
 go 1.16
 
 require (
-	github.com/go-openapi/spec v0.19.3
+	github.com/go-openapi/spec v0.19.5
 	github.com/google/gofuzz v1.1.0
 	github.com/spf13/cobra v1.1.1
 	k8s.io/apimachinery v0.0.0
