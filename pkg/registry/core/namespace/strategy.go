@@ -95,14 +95,25 @@ func (namespaceStrategy) Canonicalize(obj runtime.Object) {
 	// where the final name wasn't available for defaulting to make this change.
 	// This code needs to be kept in sync with the implementation that exists
 	// in Namespace defaulting (pkg/apis/core/v1)
+	// Why this hook *and* defaults.go?
+	//
+	// CREATE:
+	// Defaulting and PrepareForCreate happen before generateName is completed
+	// (i.e. the name is not yet known). Validation happens after generateName
+	// but should not modify objects. Canonicalize happens later, which makes
+	// it the best hook for setting the label.
+	//
+	// UPDATE:
+	// Defaulting and Canonicalize will both trigger with the full name.
+	//
+	// GET:
+	// Only defaulting will be applied.
 	ns := obj.(*api.Namespace)
 	if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
-		if len(ns.Name) > 0 && ns.Labels[v1.LabelMetadataName] != ns.Name {
-			if ns.Labels == nil {
-				ns.Labels = map[string]string{}
-			}
-			ns.Labels[v1.LabelMetadataName] = ns.Name
+		if ns.Labels == nil {
+			ns.Labels = map[string]string{}
 		}
+		ns.Labels[v1.LabelMetadataName] = ns.Name
 	}
 }
 
