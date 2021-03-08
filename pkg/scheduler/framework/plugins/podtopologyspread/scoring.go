@@ -24,8 +24,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 )
 
@@ -145,8 +145,9 @@ func (pl *PodTopologySpread) PreScore(
 		}
 		// (1) `node` should satisfy incoming pod's NodeSelector/NodeAffinity
 		// (2) All topologyKeys need to be present in `node`
-		if !pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, node) ||
-			!nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints) {
+		// Ignore parsing errors for backwards compatibility.
+		match, _ := nodeaffinity.GetRequiredNodeAffinity(pod).Match(node)
+		if !match || !nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints) {
 			return
 		}
 
