@@ -105,7 +105,7 @@ func TestSyncHandler(t *testing.T) {
 		allPlugins := []volume.VolumePlugin{}
 		allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
 		translator := csitrans.New()
-		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator), nil)
+		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate), nil)
 		if err != nil {
 			t.Fatalf("error creating expand controller : %v", err)
 		}
