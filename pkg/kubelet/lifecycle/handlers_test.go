@@ -25,31 +25,32 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/utils/pointer"
 )
 
 func TestResolvePort(t *testing.T) {
 	for _, testCase := range []struct {
-		container *v1.Container
-		name      string
-		expected  int
+		container  *v1.Container
+		stringPort string
+		expected   int
 	}{
 		{
-			name: "foo",
+			stringPort: "foo",
 			container: &v1.Container{
 				Ports: []v1.ContainerPort{{Name: "foo", ContainerPort: int32(80)}},
 			},
 			expected: 80,
 		},
 		{
-			container: &v1.Container{},
-			name:      "80",
-			expected:  80,
+			container:  &v1.Container{},
+			stringPort: "80",
+			expected:   80,
 		},
 		{
 			container: &v1.Container{
@@ -57,11 +58,11 @@ func TestResolvePort(t *testing.T) {
 					{Name: "bar", ContainerPort: int32(80)},
 				},
 			},
-			name:     "foo",
-			expected: -1,
+			stringPort: "foo",
+			expected:   -1,
 		},
 	} {
-		port, err := resolvePort(intstr.FromString(testCase.name), testCase.container)
+		port, err := resolvePort(intstr.FromString(testCase.stringPort), testCase.container)
 		if testCase.expected != -1 && err != nil {
 			t.Fatalf("unexpected error while resolving port: %s", err)
 		}
@@ -255,5 +256,455 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 	}
 	if fakeHTTPGetter.url != "http://foo:8080/bar" {
 		t.Errorf("unexpected url: %s", fakeHTTPGetter.url)
+	}
+}
+
+func TestNoNewPrivsRequired(t *testing.T) {
+	for _, testCase := range []struct {
+		input    *v1.Pod
+		expected bool
+	}{
+		{
+			input: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								AllowPrivilegeEscalation: pointer.BoolPtr(false),
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			input:    &v1.Pod{},
+			expected: false,
+		},
+	} {
+		res := noNewPrivsRequired(testCase.input)
+		if res != testCase.expected {
+			t.Errorf("expected admission result for pod to be %t, got %t", res, testCase.expected)
+		}
+	}
+}
+
+func TestNoNewPrivsAdmitHandler(t *testing.T) {
+	for _, testCase := range []struct {
+		name         string
+		runtime      *containertesting.FakeRuntime
+		podAdmitAttr *PodAdmitAttributes
+		expected     PodAdmitResult
+	}{
+		{
+			name:    "Pod with status different than 'Pending'",
+			runtime: &containertesting.FakeRuntime{},
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{Phase: v1.PodRunning},
+				},
+			},
+			expected: PodAdmitResult{Admit: true},
+		},
+		{
+			name:    "'Pending' status and AllowPrivilegeEscalation: true",
+			runtime: &containertesting.FakeRuntime{},
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								SecurityContext: &v1.SecurityContext{
+									AllowPrivilegeEscalation: pointer.BoolPtr(true),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: PodAdmitResult{Admit: true},
+		},
+		{
+			name: "Docker runtime version => 1.23.0",
+			runtime: &containertesting.FakeRuntime{
+				RuntimeType:    kubetypes.DockerContainerRuntime,
+				APIVersionInfo: "1.23.0",
+			},
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								SecurityContext: &v1.SecurityContext{
+									AllowPrivilegeEscalation: pointer.BoolPtr(false),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: PodAdmitResult{Admit: true},
+		},
+		{
+			name: "Docker runtime version < 1.23.0",
+			runtime: &containertesting.FakeRuntime{
+				RuntimeType:    kubetypes.DockerContainerRuntime,
+				APIVersionInfo: "1.20.0",
+			},
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								SecurityContext: &v1.SecurityContext{
+									AllowPrivilegeEscalation: pointer.BoolPtr(false),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: PodAdmitResult{
+				Admit:  false,
+				Reason: "NoNewPrivs",
+			},
+		},
+		{
+			name: "Docker runtime with invalid api version",
+			runtime: &containertesting.FakeRuntime{
+				RuntimeType: kubetypes.DockerContainerRuntime,
+				Err:         fmt.Errorf("failed to parse docker runtime version"),
+			},
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								SecurityContext: &v1.SecurityContext{
+									AllowPrivilegeEscalation: pointer.BoolPtr(false),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: PodAdmitResult{
+				Admit:   false,
+				Reason:  "NoNewPrivs",
+				Message: "Cannot enforce NoNewPrivs: failed to parse docker runtime version",
+			},
+		},
+		{
+			name:    "Remote runtime",
+			runtime: &containertesting.FakeRuntime{RuntimeType: kubetypes.RemoteContainerRuntime},
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								SecurityContext: &v1.SecurityContext{
+									AllowPrivilegeEscalation: pointer.BoolPtr(false),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: PodAdmitResult{Admit: true},
+		},
+	} {
+		noNewPrivsAdminHandler := NewNoNewPrivsAdmitHandler(testCase.runtime)
+		res := noNewPrivsAdminHandler.Admit(testCase.podAdmitAttr)
+		if testCase.expected.Admit != res.Admit {
+			t.Errorf("[%s] expected pod admission to be %t, got %t", testCase.name, testCase.expected.Admit, res.Admit)
+		}
+		if testCase.expected.Reason != res.Reason {
+			t.Errorf("[%s]: expected pod admission failure reason to be %s, got %s", testCase.name, testCase.expected.Reason, res.Reason)
+		}
+		if testCase.expected.Message != "" && testCase.expected.Message != res.Message {
+			t.Errorf("[%s]: expected admission failure message to be %s, got: %s", testCase.name, testCase.expected.Message, res.Message)
+		}
+	}
+}
+
+type fakeAppArmorValidator struct {
+	err error
+}
+
+func (f *fakeAppArmorValidator) Validate(pod *v1.Pod) error {
+	if f.err != nil {
+		return f.err
+	}
+	return nil
+}
+
+func (f *fakeAppArmorValidator) ValidateHost() error { return nil }
+
+func TestAppArmorAdmitHandler(t *testing.T) {
+	for _, testCase := range []struct {
+		name          string
+		podAdmitAttr  *PodAdmitAttributes
+		expected      *PodAdmitResult
+		fakeValidator *fakeAppArmorValidator
+	}{
+		{
+			name: "Pod with status different than 'Pending'",
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+					},
+				},
+			},
+			fakeValidator: &fakeAppArmorValidator{},
+			expected:      &PodAdmitResult{Admit: true},
+		},
+		{
+			name: "Pod with status 'Pending'",
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+					},
+				},
+			},
+			fakeValidator: &fakeAppArmorValidator{},
+			expected:      &PodAdmitResult{Admit: true},
+		},
+		{
+			name: "Pod that fails validation",
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+					},
+				},
+			},
+			fakeValidator: &fakeAppArmorValidator{err: fmt.Errorf("failed validation")},
+			expected:      &PodAdmitResult{Admit: false},
+		},
+	} {
+		noNewPrivsAdminHandler := NewAppArmorAdmitHandler(testCase.fakeValidator)
+		res := noNewPrivsAdminHandler.Admit(testCase.podAdmitAttr)
+		if testCase.expected.Admit != res.Admit {
+			t.Errorf("[%s] expected pod admission to be %t but got %t", testCase.name, testCase.expected.Admit, res.Admit)
+		}
+
+	}
+
+}
+
+var (
+	defaultProcMount  = v1.DefaultProcMount
+	unmaskedProcMount = v1.UnmaskedProcMount
+)
+
+func TestProcMountAdmitHandler(t *testing.T) {
+	for _, testCase := range []struct {
+		name         string
+		runtime      *containertesting.FakeRuntime
+		podAdmitAttr *PodAdmitAttributes
+		expected     PodAdmitResult
+	}{
+		{
+			name:    "Pod with status different than 'Pending'",
+			runtime: &containertesting.FakeRuntime{},
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{Phase: v1.PodRunning},
+				},
+			},
+			expected: PodAdmitResult{Admit: true},
+		},
+		{
+			name:    "'Pending' status and DefaultProcMount",
+			runtime: &containertesting.FakeRuntime{},
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								SecurityContext: &v1.SecurityContext{
+									ProcMount: &defaultProcMount,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: PodAdmitResult{Admit: true},
+		},
+		{
+			name: "Docker runtime version => 1.38.0",
+			runtime: &containertesting.FakeRuntime{
+				RuntimeType:    kubetypes.DockerContainerRuntime,
+				APIVersionInfo: "1.38.0",
+			},
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								SecurityContext: &v1.SecurityContext{
+									ProcMount: &unmaskedProcMount,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: PodAdmitResult{Admit: true},
+		},
+		{
+			name: "Docker runtime version < 1.38.0",
+			runtime: &containertesting.FakeRuntime{
+				RuntimeType:    kubetypes.DockerContainerRuntime,
+				APIVersionInfo: "1.20.0",
+			},
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								SecurityContext: &v1.SecurityContext{
+									ProcMount: &unmaskedProcMount,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: PodAdmitResult{
+				Admit:  false,
+				Reason: "ProcMount",
+			},
+		},
+		{
+			name: "Docker runtime with invalid api version",
+			runtime: &containertesting.FakeRuntime{
+				RuntimeType: kubetypes.DockerContainerRuntime,
+				Err:         fmt.Errorf("failed to parse docker runtime version"),
+			},
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								SecurityContext: &v1.SecurityContext{
+									ProcMount: &unmaskedProcMount,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: PodAdmitResult{
+				Admit:   false,
+				Reason:  "ProcMount",
+				Message: "Cannot enforce ProcMount: failed to parse docker runtime version",
+			},
+		},
+		{
+			name:    "Remote runtime",
+			runtime: &containertesting.FakeRuntime{RuntimeType: kubetypes.RemoteContainerRuntime},
+			podAdmitAttr: &PodAdmitAttributes{
+				Pod: &v1.Pod{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								SecurityContext: &v1.SecurityContext{
+									ProcMount: &unmaskedProcMount,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: PodAdmitResult{Admit: true},
+		},
+	} {
+		procMountAdmitHandler := NewProcMountAdmitHandler(testCase.runtime)
+		res := procMountAdmitHandler.Admit(testCase.podAdmitAttr)
+		if testCase.expected.Admit != res.Admit {
+			t.Errorf("[%s] expected pod admission to be %t, got %t", testCase.name, testCase.expected.Admit, res.Admit)
+		}
+		if testCase.expected.Reason != res.Reason {
+			t.Errorf("[%s]: expected pod admission failure reason to be %s, got %s", testCase.name, testCase.expected.Reason, res.Reason)
+		}
+		if testCase.expected.Message != "" && testCase.expected.Message != res.Message {
+			t.Errorf("[%s]: expected admission failure message to be %s, got: %s", testCase.name, testCase.expected.Message, res.Message)
+		}
+	}
+}
+
+func TestProcMountIsDefault(t *testing.T) {
+	for _, testCase := range []struct {
+		pod      *v1.Pod
+		expected bool
+	}{
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								ProcMount: &defaultProcMount,
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								ProcMount: &unmaskedProcMount,
+							},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+	} {
+		res := procMountIsDefault(testCase.pod)
+		if testCase.expected != res {
+			t.Errorf("expected result to be %t but got %t", testCase.expected, res)
+		}
 	}
 }
