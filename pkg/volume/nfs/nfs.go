@@ -304,10 +304,10 @@ func (c *nfsUnmounter) TearDownAt(dir string) error {
 	// Use extensiveMountPointCheck to consult /proc/mounts. We can't use faster
 	// IsLikelyNotMountPoint (lstat()), since there may be root_squash on the
 	// NFS server and kubelet may not be able to do lstat/stat() there.
-	forceUmounter, ok := c.mounter.(mount.MounterForceUnmounter)
+	forceUnmounter, ok := c.mounter.(mount.MounterForceUnmounter)
 	if ok {
 		klog.V(4).Infof("Using force unmounter interface")
-		return mount.CleanupMountWithForce(dir, forceUmounter, true /* extensiveMountPointCheck */, unMountTimeout)
+		return mount.CleanupMountWithForce(dir, forceUnmounter, true /* extensiveMountPointCheck */, unMountTimeout)
 	}
 	return mount.CleanupMountPoint(dir, c.mounter, true /* extensiveMountPointCheck */)
 }
