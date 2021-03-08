@@ -945,3 +945,42 @@ func TestValidateNodeAffinityArgs(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateVolumeBindingArgs(t *testing.T) {
+	cases := []struct {
+		name    string
+		args    config.VolumeBindingArgs
+		wantErr error
+	}{
+		{
+			name: "zero is a valid config",
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 0,
+			},
+		},
+		{
+			name: "positive value is valid config",
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+			},
+		},
+		{
+			name: "negative value is invalid config ",
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: -10,
+			},
+			wantErr: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "bindTimeoutSeconds",
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateVolumeBindingArgs(&tc.args)
+			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
+				t.Errorf("ValidateVolumeBindingArgs returned err (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}

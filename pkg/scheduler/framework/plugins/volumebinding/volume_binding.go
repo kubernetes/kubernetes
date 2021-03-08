@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
@@ -340,7 +341,7 @@ func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type VolumeBindingArgs, got %T", plArgs)
 	}
-	if err := validateArgs(args); err != nil {
+	if err := validation.ValidateVolumeBindingArgs(args); err != nil {
 		return nil, err
 	}
 	podInformer := fh.SharedInformerFactory().Core().V1().Pods()
@@ -376,11 +377,4 @@ func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 		GenericEphemeralVolumeFeatureEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume),
 		scorer:                               scorer,
 	}, nil
-}
-
-func validateArgs(args *config.VolumeBindingArgs) error {
-	if args.BindTimeoutSeconds <= 0 {
-		return fmt.Errorf("invalid BindTimeoutSeconds: %d, must be positive integer", args.BindTimeoutSeconds)
-	}
-	return nil
 }
