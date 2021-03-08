@@ -21,9 +21,9 @@ import (
 	"sync"
 )
 
-const (
-	// NotFound is the not found error message.
-	NotFound = "not found"
+var (
+	// ErrNotFound is the not found error message.
+	ErrNotFound = errors.New("not found")
 )
 
 // StateData is a generic type for arbitrary data stored in CycleState.
@@ -92,7 +92,7 @@ func (c *CycleState) Read(key StateKey) (StateData, error) {
 	if v, ok := c.storage[key]; ok {
 		return v, nil
 	}
-	return nil, errors.New(NotFound)
+	return nil, ErrNotFound
 }
 
 // Write stores the given "val" in CycleState with the given "key".

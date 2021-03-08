@@ -62,12 +62,12 @@ func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, fi
 	if len(pod.Spec.TopologySpreadConstraints) > 0 {
 		s.Constraints, err = filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.ScheduleAnyway)
 		if err != nil {
-			return fmt.Errorf("obtaining pod's soft topology spread constraints: %v", err)
+			return fmt.Errorf("obtaining pod's soft topology spread constraints: %w", err)
 		}
 	} else {
 		s.Constraints, err = pl.buildDefaultConstraints(pod, v1.ScheduleAnyway)
 		if err != nil {
-			return fmt.Errorf("setting default soft topology spread constraints: %v", err)
+			return fmt.Errorf("setting default soft topology spread constraints: %w", err)
 		}
 	}
 	if len(s.Constraints) == 0 {
@@ -257,7 +257,7 @@ func (pl *PodTopologySpread) ScoreExtensions() framework.ScoreExtensions {
 func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
 	c, err := cycleState.Read(preScoreStateKey)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %q from cycleState: %v", preScoreStateKey, err)
+		return nil, fmt.Errorf("error reading %q from cycleState: %w", preScoreStateKey, err)
 	}
 
 	s, ok := c.(*preScoreState)
