@@ -674,10 +674,14 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 
 // RunInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
 // It starts, checks, collects output and stops it.
-func RunInPodWithVolume(c clientset.Interface, t *framework.TimeoutContext, ns, claimName, podName, command string, node e2epod.NodeSelection) {
+func RunInPodWithVolume(c clientset.Interface, t *framework.TimeoutContext, ns, claimName, podName, command string, node e2epod.NodeSelection) *v1.Pod {
 	pod := StartInPodWithVolume(c, ns, claimName, podName, command, node)
 	defer StopPod(c, pod)
 	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, pod.Namespace, t.PodStartSlow))
+	// get the latest status of the pod
+	pod, err := c.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	return pod
 }
 
 // StartInPodWithVolume starts a command in a pod with given claim mounted to /mnt directory
