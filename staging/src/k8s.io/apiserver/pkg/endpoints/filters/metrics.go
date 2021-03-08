@@ -76,7 +76,7 @@ func init() {
 	legacyregistry.MustRegister(authenticationLatency)
 }
 
-func recordAuthMetrics(ctx context.Context, resp *authenticator.Response, ok bool, err error, apiAudiences authenticator.Audiences, authStart time.Time) {
+func recordAuthMetrics(ctx context.Context, resp *authenticator.Response, ok bool, err error, apiAudiences authenticator.Audiences, authStart time.Time, authFinish time.Time) {
 	var resultLabel string
 
 	switch {
@@ -90,7 +90,7 @@ func recordAuthMetrics(ctx context.Context, resp *authenticator.Response, ok boo
 	}
 
 	authenticatedAttemptsCounter.WithContext(ctx).WithLabelValues(resultLabel).Inc()
-	authenticationLatency.WithContext(ctx).WithLabelValues(resultLabel).Observe(time.Since(authStart).Seconds())
+	authenticationLatency.WithContext(ctx).WithLabelValues(resultLabel).Observe(authFinish.Sub(authStart).Seconds())
 }
 
 // compressUsername maps all possible usernames onto a small set of categories
