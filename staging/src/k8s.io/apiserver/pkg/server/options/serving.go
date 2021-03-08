@@ -25,7 +25,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/armon/go-proxyproto"
+	"github.com/pires/go-proxyproto"
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
