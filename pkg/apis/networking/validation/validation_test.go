@@ -205,14 +205,6 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		}
 	}
 
-	setEgressEmptyPorts := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Egress = []networking.NetworkPolicyEgressRule{
-			{
-				Ports: []networking.NetworkPolicyPort{{}},
-			},
-		}
-	}
-
 	setEgressPorts := func(ports ...networking.NetworkPolicyPort) netpolTweak {
 		return func(np *networking.NetworkPolicy) {
 			if np.Spec.Egress == nil {
@@ -288,7 +280,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				MatchLabels: invalidSelector,
 			}
 		}),
-		"invalid egress.ports.protocol":   makeNetworkPolicyCustom(setEgressEmptyPorts, setEgressPorts(makePort(&protocolICMP, intstr.FromInt(80), 0))),
+		"invalid egress.ports.protocol":   makeNetworkPolicyCustom(setEgressPorts(makePort(&protocolICMP, intstr.FromInt(80), 0))),
 		"invalid egress.ports.port (int)": makeNetworkPolicyCustom(setEgressPorts(makePort(&protocolTCP, intstr.FromInt(123456789), 0))),
 		"invalid egress.ports.port (str)": makeNetworkPolicyCustom(setEgressPorts(makePort(&protocolTCP, intstr.FromString("!@#$"), 0))),
 		"invalid ingress.from.namespaceSelector": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, func(networkPolicy *networking.NetworkPolicy) {
