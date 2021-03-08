@@ -226,7 +226,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	if err != nil {
 		t.Fatalf("error creating extension clientset: %v", err)
 	}
-	// CreateNewCustomResourceDefinition wants to use this namespace for verifying
+	// CreateCRDUsingRemovedAPI wants to use this namespace for verifying
 	// namespace-scoped CRD creation.
 	createNamespaceOrDie("aval", clientSet, t)
 

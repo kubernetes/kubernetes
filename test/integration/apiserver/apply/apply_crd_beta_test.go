@@ -58,15 +58,15 @@ func TestApplyCRDNoSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noxuDefinition := nearlyRemovedBetaMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
+	noxuBetaDefinition := nearlyRemovedBetaMultipleVersionNoxuCRD(apiextensionsv1beta1.ClusterScoped)
 
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err := fixtures.CreateCRDUsingRemovedAPI(server.EtcdClient, server.EtcdStoragePrefix, noxuBetaDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	kind := noxuDefinition.Spec.Names.Kind
-	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Version
+	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
 	name := "mytest"
 
 	rest := apiExtensionClient.Discovery().RESTClient()
@@ -78,7 +78,7 @@ metadata:
 spec:
   replicas: 1`, apiVersion, kind, name))
 	result, err := rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test").
 		Body(yamlBody).
@@ -90,7 +90,7 @@ spec:
 
 	// Patch object to change the number of replicas
 	result, err = rest.Patch(types.MergePatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Body([]byte(`{"spec":{"replicas": 5}}`)).
 		DoRaw(context.TODO())
@@ -101,7 +101,7 @@ spec:
 
 	// Re-apply, we should get conflicts now, since the number of replicas was changed.
 	result, err = rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test").
 		Body(yamlBody).
@@ -119,7 +119,7 @@ spec:
 
 	// Re-apply with force, should work fine.
 	result, err = rest.Patch(types.ApplyPatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("force", "true").
 		Param("fieldManager", "apply_test").
@@ -157,7 +157,7 @@ spec:
 		}
 	}`)
 	result, err = rest.Patch(types.MergePatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		SubResource("status").
 		Name(name).
 		Param("fieldManager", "subresource_test").
@@ -176,7 +176,7 @@ spec:
 
 	// However, it is possible to modify managed fields using the main resource
 	result, err = rest.Patch(types.MergePatchType).
-		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "subresource_test").
 		Body([]byte(`{"metadata":{"managedFields":[{}]}}`)).

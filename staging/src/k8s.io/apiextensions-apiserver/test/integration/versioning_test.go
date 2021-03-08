@@ -62,7 +62,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// update validation via update because the cache priming in CreateNewCustomResourceDefinition will fail otherwise
+	// update validation via update because the cache priming in CreateCRDUsingRemovedAPI will fail otherwise
 	t.Logf("Updating CRD to validate apiVersion")
 	noxuDefinition, err = UpdateCustomResourceDefinitionWithRetry(apiExtensionClient, noxuDefinition.Name, func(crd *apiextensionsv1.CustomResourceDefinition) {
 		for i := range crd.Spec.Versions {

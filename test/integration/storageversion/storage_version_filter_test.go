@@ -88,7 +88,7 @@ func testBuiltinResourceWrite(t *testing.T, cfg *rest.Config, shouldBlock bool) 
 
 func testCRDWrite(t *testing.T, cfg *rest.Config, shouldBlock bool) {
 	crdClient := apiextensionsclientset.NewForConfigOrDie(cfg)
-	_, err := crdClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), etcd.GetCustomResourceDefinitionData()[1], metav1.CreateOptions{})
+	_, err := crdClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), etcd.GetCustomResourceDefinitionData()[1], metav1.CreateOptions{})
 	assertBlocking("writes to CRD", t, err, shouldBlock)
 }
 

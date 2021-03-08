@@ -99,7 +99,7 @@ func TestApiserverMetrics(t *testing.T) {
 	}
 
 	// Make a request to a deprecated API to ensure there's at least one data point
-	if _, err := client.RbacV1beta1().Roles(metav1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{}); err != nil {
+	if _, err := client.PolicyV1beta1().PodSecurityPolicies().List(context.TODO(), metav1.ListOptions{}); err != nil {
 		t.Fatalf("unexpected error getting rbac roles: %v", err)
 	}
 

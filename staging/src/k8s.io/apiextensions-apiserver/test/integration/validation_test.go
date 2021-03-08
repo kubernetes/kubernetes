@@ -19,7 +19,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"path"
 	"strings"
 	"testing"
 	"time"
@@ -30,10 +29,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -871,7 +868,7 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 }
 
 func TestNonStructuralSchemaConditionUpdate(t *testing.T) {
-	tearDown, apiExtensionClient, _, etcdclient, etcdStoragePrefix, err := fixtures.StartDefaultServerWithClientsAndEtcd(t)
+	tearDown, apiExtensionClient, dynamicClient, etcdclient, etcdStoragePrefix, err := fixtures.StartDefaultServerWithClientsAndEtcd(t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -922,11 +919,8 @@ spec:
 
 	// create CRDs.  We cannot create these in v1, but they can exist in upgraded clusters
 	t.Logf("Creating CRD %s", betaCRD.Name)
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
-	key := path.Join("/", etcdStoragePrefix, "apiextensions.k8s.io", "customresourcedefinitions/foos.tests.example.com")
-	val, _ := json.Marshal(betaCRD)
-	if _, err := etcdclient.Put(ctx, key, string(val)); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if _, err := fixtures.CreateCRDUsingRemovedAPI(etcdclient, etcdStoragePrefix, betaCRD, apiExtensionClient, dynamicClient); err != nil {
+		t.Fatal(err)
 	}
 
 	// wait for condition with violations
