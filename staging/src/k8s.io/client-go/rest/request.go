@@ -1283,8 +1283,8 @@ func (r Result) Get() (runtime.Object, error) {
 	return out, nil
 }
 
-// StatusCode returns the HTTP status code of the request. (Only valid if no
-// error was returned.)
+// StatusCode updates the provided int pointer to the HTTP status code of the
+// result. (Only valid if no error was returned.)
 func (r Result) StatusCode(statusCode *int) Result {
 	*statusCode = r.statusCode
 	return r
