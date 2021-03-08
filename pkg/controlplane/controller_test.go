@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
@@ -36,7 +36,7 @@ func TestReconcileEndpoints(t *testing.T) {
 		o := metav1.ObjectMeta{Namespace: ns, Name: name}
 		if skipMirrorLabel {
 			o.Labels = map[string]string{
-				discoveryv1beta1.LabelSkipMirror: "true",
+				discoveryv1.LabelSkipMirror: "true",
 			}
 		}
 		return o
