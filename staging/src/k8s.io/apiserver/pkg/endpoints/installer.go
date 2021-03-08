@@ -513,6 +513,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return nil, nil, err
 		}
+		decodableVersions := []schema.GroupVersion{}
+		if a.group.ConvertabilityChecker != nil {
+			decodableVersions = a.group.ConvertabilityChecker.VersionsForGroupKind(fqKindToRegister.GroupKind())
+		}
 		resourceInfo = &storageversion.ResourceInfo{
 			GroupResource: schema.GroupResource{
 				Group:    a.group.GroupVersion.Group,
@@ -523,6 +527,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			// DecodableVersions immediately because API installation must
 			// be completed first for us to know equivalent APIs
 			EquivalentResourceMapper: a.group.EquivalentResourceRegistry,
+
+			DirectlyDecodableVersions: decodableVersions,
 		}
 	}
 
