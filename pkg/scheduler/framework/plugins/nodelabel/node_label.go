@@ -69,6 +69,7 @@ type NodeLabel struct {
 
 var _ framework.FilterPlugin = &NodeLabel{}
 var _ framework.ScorePlugin = &NodeLabel{}
+var _ framework.EnqueueExtensions = &NodeLabel{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeLabel) Name() string {
@@ -134,4 +135,12 @@ func (pl *NodeLabel) Score(ctx context.Context, state *framework.CycleState, pod
 // ScoreExtensions of the Score plugin.
 func (pl *NodeLabel) ScoreExtensions() framework.ScoreExtensions {
 	return nil
+}
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *NodeLabel) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
+	}
 }
