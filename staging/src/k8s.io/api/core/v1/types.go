@@ -516,7 +516,7 @@ type PersistentVolumeClaimSpec struct {
 	// * While DataSource ignores disallowed values (dropping them), DataSourceRef
 	//   preserves all values, and generates an error if a disallowed value is
 	//   specified.
-	// (Alpha) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
+	// (Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
 	// +optional
 	DataSourceRef *TypedLocalObjectReference `json:"dataSourceRef,omitempty" protobuf:"bytes,8,opt,name=dataSourceRef"`
 }
