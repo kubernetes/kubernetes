@@ -192,6 +192,38 @@ func NewRequirement(key string, op selection.Operator, vals []string, opts ...fi
 	return &Requirement{key: key, operator: op, strValues: vals}, allErrs.ToAggregate()
 }
 
+func NewValidatedRequirement(key string, op selection.Operator, vals []string) (*Requirement, error) {
+	if key == "" {
+		return nil, fmt.Errorf("key can't be empty")
+	}
+	switch op {
+	case selection.In, selection.NotIn:
+		if len(vals) == 0 {
+			return nil, fmt.Errorf("for 'in', 'notin' operators, values set can't be empty")
+		}
+	case selection.Equals, selection.DoubleEquals, selection.NotEquals:
+		if len(vals) != 1 {
+			return nil, fmt.Errorf("exact-match compatibility requires one single value")
+		}
+	case selection.Exists, selection.DoesNotExist:
+		if len(vals) != 0 {
+			return nil, fmt.Errorf("values set must be empty for exists and does not exist")
+		}
+	case selection.GreaterThan, selection.LessThan:
+		if len(vals) != 1 {
+			return nil, fmt.Errorf("for 'Gt', 'Lt' operators, exactly one value is required")
+		}
+		for i := range vals {
+			if _, err := strconv.ParseInt(vals[i], 10, 64); err != nil {
+				return nil, fmt.Errorf("for 'Gt', 'Lt' operators, the value must be an integer")
+			}
+		}
+	default:
+		return nil, fmt.Errorf("operator '%v' is not recognized", op)
+	}
+	return &Requirement{key: key, operator: op, strValues: vals}, nil
+}
+
 func (r *Requirement) hasValue(value string) bool {
 	for i := range r.strValues {
 		if r.strValues[i] == value {

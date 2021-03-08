@@ -1000,3 +1000,15 @@ func TestRequirementEqual(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkLabelMatch(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		NewRequirement("environment", selection.NotIn, []string{"dev", "pro"})
+	}
+}
+
+func BenchmarkValidatedLabelMatch(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		NewValidatedRequirement("environment", selection.NotIn, []string{"dev", "pro"})
+	}
+}
