@@ -157,6 +157,7 @@ func TestServerSidePrint(t *testing.T) {
 			{Group: "rbac.authorization.k8s.io", Version: "v1alpha1"},
 			{Group: "scheduling.k8s.io", Version: "v1"},
 			{Group: "storage.k8s.io", Version: "v1alpha1"},
+			{Group: "storage.k8s.io", Version: "v1beta1"},
 			{Group: "extensions", Version: "v1beta1"},
 			{Group: "node.k8s.io", Version: "v1"},
 			{Group: "node.k8s.io", Version: "v1alpha1"},

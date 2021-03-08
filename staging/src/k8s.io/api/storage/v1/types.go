@@ -331,10 +331,11 @@ type CSIDriverSpec struct {
 	// unset or false and it can be flipped later when storage
 	// capacity information has been published.
 	//
-	// This is an alpha field and only available when the CSIStorageCapacity
+	// This is a beta field and only available when the CSIStorageCapacity
 	// feature is enabled. The default is false.
 	//
 	// +optional
+	// +featureGate=CSIStorageCapacity
 	StorageCapacity *bool `json:"storageCapacity,omitempty" protobuf:"bytes,4,opt,name=storageCapacity"`
 
 	// Defines if the underlying volume supports changing ownership and

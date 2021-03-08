@@ -26,7 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
-	storageinformersv1alpha1 "k8s.io/client-go/informers/storage/v1alpha1"
+	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -140,7 +140,7 @@ type testEnv struct {
 
 	// For CSIStorageCapacity feature testing:
 	internalCSIDriverInformer          storageinformers.CSIDriverInformer
-	internalCSIStorageCapacityInformer storageinformersv1alpha1.CSIStorageCapacityInformer
+	internalCSIStorageCapacityInformer storageinformersv1beta1.CSIStorageCapacityInformer
 }
 
 func newTestBinder(t *testing.T, stopCh <-chan struct{}, csiStorageCapacity ...bool) *testEnv {
@@ -164,7 +164,7 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}, csiStorageCapacity ...b
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 	classInformer := informerFactory.Storage().V1().StorageClasses()
 	csiDriverInformer := informerFactory.Storage().V1().CSIDrivers()
-	csiStorageCapacityInformer := informerFactory.Storage().V1alpha1().CSIStorageCapacities()
+	csiStorageCapacityInformer := informerFactory.Storage().V1beta1().CSIStorageCapacities()
 	var capacityCheck *CapacityCheck
 	if len(csiStorageCapacity) > 0 && csiStorageCapacity[0] {
 		capacityCheck = &CapacityCheck{
@@ -302,7 +302,7 @@ func (env *testEnv) addCSIDriver(csiDriver *storagev1.CSIDriver) {
 	csiDriverInformer.GetIndexer().Add(csiDriver)
 }
 
-func (env *testEnv) addCSIStorageCapacities(capacities []*storagev1alpha1.CSIStorageCapacity) {
+func (env *testEnv) addCSIStorageCapacities(capacities []*storagev1beta1.CSIStorageCapacity) {
 	csiStorageCapacityInformer := env.internalCSIStorageCapacityInformer.Informer()
 	for _, capacity := range capacities {
 		csiStorageCapacityInformer.GetIndexer().Add(capacity)
@@ -743,8 +743,8 @@ func makeCSIDriver(name string, storageCapacity bool) *storagev1.CSIDriver {
 	}
 }
 
-func makeCapacity(name, storageClassName string, node *v1.Node, capacityStr string) *storagev1alpha1.CSIStorageCapacity {
-	c := &storagev1alpha1.CSIStorageCapacity{
+func makeCapacity(name, storageClassName string, node *v1.Node, capacityStr, maximumVolumeSizeStr string) *storagev1beta1.CSIStorageCapacity {
+	c := &storagev1beta1.CSIStorageCapacity{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -757,6 +757,10 @@ func makeCapacity(name, storageClassName string, node *v1.Node, capacityStr stri
 	if capacityStr != "" {
 		capacityQuantity := resource.MustParse(capacityStr)
 		c.Capacity = &capacityQuantity
+	}
+	if maximumVolumeSizeStr != "" {
+		maximumVolumeSizeQuantity := resource.MustParse(maximumVolumeSizeStr)
+		c.MaximumVolumeSize = &maximumVolumeSizeQuantity
 	}
 	return c
 }
@@ -2202,7 +2206,7 @@ func TestCapacity(t *testing.T) {
 	type scenarioType struct {
 		// Inputs
 		pvcs       []*v1.PersistentVolumeClaim
-		capacities []*storagev1alpha1.CSIStorageCapacity
+		capacities []*storagev1beta1.CSIStorageCapacity
 
 		// Expected return values
 		reasons    ConflictReasons
@@ -2211,22 +2215,22 @@ func TestCapacity(t *testing.T) {
 	scenarios := map[string]scenarioType{
 		"network-attached": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, nil, "1Gi"),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, nil, "1Gi", ""),
 			},
 		},
 		"local-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi"),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi", ""),
 			},
 		},
 		"multiple": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, nil, "1Gi"),
-				makeCapacity("net", waitClassWithProvisioner, node2, "1Gi"),
-				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi"),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, nil, "1Gi", ""),
+				makeCapacity("net", waitClassWithProvisioner, node2, "1Gi", ""),
+				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi", ""),
 			},
 		},
 		"no-storage": {
@@ -2235,36 +2239,50 @@ func TestCapacity(t *testing.T) {
 		},
 		"wrong-node": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node2, "1Gi"),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node2, "1Gi", ""),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
 		"wrong-storage-class": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClass, node1, "1Gi"),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClass, node1, "1Gi", ""),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
 		"insufficient-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node1, "1Mi"),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "1Mi", ""),
+			},
+			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+		},
+		"insufficient-volume-size": {
+			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi", "1Mi"),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
 		"zero-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node1, "0Mi"),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "0Mi", ""),
+			},
+			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+		},
+		"zero-volume-size": {
+			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "", "0Mi"),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
 		"nil-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node1, ""),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "", ""),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},

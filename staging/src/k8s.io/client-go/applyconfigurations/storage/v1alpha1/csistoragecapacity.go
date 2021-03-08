@@ -33,6 +33,7 @@ type CSIStorageCapacityApplyConfiguration struct {
 	NodeTopology                     *v1.LabelSelectorApplyConfiguration `json:"nodeTopology,omitempty"`
 	StorageClassName                 *string                             `json:"storageClassName,omitempty"`
 	Capacity                         *resource.Quantity                  `json:"capacity,omitempty"`
+	MaximumVolumeSize                *resource.Quantity                  `json:"maximumVolumeSize,omitempty"`
 }
 
 // CSIStorageCapacity constructs an declarative configuration of the CSIStorageCapacity type for use with
@@ -243,5 +244,13 @@ func (b *CSIStorageCapacityApplyConfiguration) WithStorageClassName(value string
 // If called multiple times, the Capacity field is set to the value of the last call.
 func (b *CSIStorageCapacityApplyConfiguration) WithCapacity(value resource.Quantity) *CSIStorageCapacityApplyConfiguration {
 	b.Capacity = &value
+	return b
+}
+
+// WithMaximumVolumeSize sets the MaximumVolumeSize field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MaximumVolumeSize field is set to the value of the last call.
+func (b *CSIStorageCapacityApplyConfiguration) WithMaximumVolumeSize(value resource.Quantity) *CSIStorageCapacityApplyConfiguration {
+	b.MaximumVolumeSize = &value
 	return b
 }
