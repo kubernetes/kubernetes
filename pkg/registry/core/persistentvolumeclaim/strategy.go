@@ -29,7 +29,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	pvcutil "k8s.io/kubernetes/pkg/api/persistentvolumeclaim"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
@@ -66,8 +65,6 @@ func (persistentvolumeclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*
 func (persistentvolumeclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pvc := obj.(*api.PersistentVolumeClaim)
 	pvc.Status = api.PersistentVolumeClaimStatus{}
-
-	pvcutil.DropDisabledFields(&pvc.Spec, nil)
 }
 
 func (persistentvolumeclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -88,8 +85,6 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx context.Context, obj, 
 	newPvc := obj.(*api.PersistentVolumeClaim)
 	oldPvc := old.(*api.PersistentVolumeClaim)
 	newPvc.Status = oldPvc.Status
-
-	pvcutil.DropDisabledFields(&newPvc.Spec, &oldPvc.Spec)
 }
 
 func (persistentvolumeclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
