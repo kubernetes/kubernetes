@@ -62,7 +62,7 @@ const metricsCreationDelay = 2 * time.Minute
 
 var (
 	topPodLong = templates.LongDesc(i18n.T(`
-		Display Resource (CPU/Memory/Storage) usage of pods.
+		Display Resource (CPU/Memory) usage of pods.
 
 		The 'top pod' command allows you to see the resource consumption of pods.
 
@@ -93,7 +93,7 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 	cmd := &cobra.Command{
 		Use:                   "pod [NAME | -l label]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Display Resource (CPU/Memory/Storage) usage of pods"),
+		Short:                 i18n.T("Display Resource (CPU/Memory) usage of pods"),
 		Long:                  topPodLong,
 		Example:               topPodExample,
 		Run: func(cmd *cobra.Command, args []string) {
