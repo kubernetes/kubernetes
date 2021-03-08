@@ -117,7 +117,7 @@ define VERIFY_HELP_INFO
 # Example:
 #   make verify
 #   make verify BRANCH=branch_x
-#   make verify WHAT="bazel typecheck"
+#   make verify WHAT="gofmt typecheck"
 endef
 .PHONY: verify
 ifeq ($(PRINT_HELP),y)
@@ -562,72 +562,4 @@ help:
 else
 help:
 	hack/make-rules/make-help.sh
-endif
-
-# Non-dockerized bazel rules.
-.PHONY: bazel-build bazel-test bazel-release
-
-ifeq ($(PRINT_HELP),y)
-define BAZEL_BUILD_HELP_INFO
-# Build with bazel
-#
-# Example:
-# make bazel-build
-endef
-bazel-build:
-	@echo "$$BAZEL_BUILD_HELP_INFO"
-else
-# Some things in vendor don't build due to empty target lists for cross-platform rules.
-bazel-build:
-	bazel build -- //... -//vendor/...
-endif
-
-
-ifeq ($(PRINT_HELP),y)
-define BAZEL_TEST_HELP_INFO
-# Test with bazel
-#
-# Example:
-# make bazel-test
-endef
-bazel-test:
-	@echo "$$BAZEL_TEST_HELP_INFO"
-else
-# //hack:verify-all is a manual target.
-# Some things in vendor don't build due to empty target lists for cross-platform rules.
-bazel-test:
-	bazel test --config=unit -- \
-	  //... \
-	  //hack:verify-all \
-	  -//vendor/...
-endif
-
-ifeq ($(PRINT_HELP),y)
-define BAZEL_TEST_INTEGRATION_HELP_INFO
-# Integration test with bazel
-#
-# Example:
-# make bazel-test-integration
-endef
-bazel-test-integration:
-	@echo "$$BAZEL_TEST_INTEGRATION_HELP_INFO"
-else
-bazel-test-integration:
-	bazel test --config integration //test/integration/...
-endif
-
-ifeq ($(PRINT_HELP),y)
-define BAZEL_RELEASE_HELP_INFO
-# Build release tars with bazel
-#
-# Example:
-# make bazel-release
-endef
-bazel-release:
-	@echo "$$BAZEL_RELEASE_HELP_INFO"
-else
-bazel-release:
-	bazel build //build/release-tars
-	bazel shutdown || true
-	pkill ^bazel || true
 endif

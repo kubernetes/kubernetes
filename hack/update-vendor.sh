@@ -378,15 +378,6 @@ for repo in $(kube::util::list_staging_repos); do
   ln -s "../../staging/src/k8s.io/${repo}" "${KUBE_ROOT}/vendor/k8s.io/${repo}"
 done
 
-kube::log::status "vendor: updating BUILD files"
-# Assume that anything imported through vendor doesn't need Bazel to build.
-# Prune out any Bazel build files, since these can break the build due to
-# missing dependencies that aren't included by go mod vendor.
-find vendor/ -type f \
-    \( -name BUILD -o -name BUILD.bazel -o -name WORKSPACE \) \
-    -exec rm -f {} \;
-hack/update-bazel.sh >>"${LOG_FILE}" 2>&1
-
 kube::log::status "vendor: updating vendor/LICENSES"
 hack/update-vendor-licenses.sh >>"${LOG_FILE}" 2>&1
 
