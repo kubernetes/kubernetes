@@ -563,11 +563,8 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 			// success by having that number of successes.  Since we do not
 			// start more pods than there are remaining completions, there should
 			// not be any remaining active pods once this count is reached.
-			if completions >= *job.Spec.Completions {
+			if completions >= *job.Spec.Completions && active == 0 {
 				complete = true
-				if active > 0 {
-					jm.recorder.Event(&job, v1.EventTypeWarning, "TooManyActivePods", "Too many active pods running after completion count reached")
-				}
 				if completions > *job.Spec.Completions {
 					jm.recorder.Event(&job, v1.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
 				}
@@ -757,14 +754,33 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 		return active, err
 	}
 
-	rmAtLeast := active - parallelism
+	wantActive := int32(0)
+	if job.Spec.Completions == nil {
+		// Job does not specify a number of completions.  Therefore, number active
+		// should be equal to parallelism, unless the job has seen at least
+		// once success, in which leave whatever is running, running.
+		if succeeded > 0 {
+			wantActive = active
+		} else {
+			wantActive = parallelism
+		}
+	} else {
+		// Job specifies a specific number of completions.  Therefore, number
+		// active should not ever exceed number of remaining completions.
+		wantActive = *job.Spec.Completions - succeeded
+		if wantActive > parallelism {
+			wantActive = parallelism
+		}
+	}
+
+	rmAtLeast := active - wantActive
 	if rmAtLeast < 0 {
 		rmAtLeast = 0
 	}
 	podsToDelete := activePodsForRemoval(job, activePods, int(rmAtLeast))
 	if len(podsToDelete) > 0 {
 		jm.expectations.ExpectDeletions(jobKey, len(podsToDelete))
-		klog.V(4).InfoS("Too many pods running for job", "job", klog.KObj(job), "deleted", rmAtLeast, "target", parallelism)
+		klog.V(4).InfoS("Too many pods running for job", "job", klog.KObj(job), "deleted", len(podsToDelete), "target", parallelism)
 		removed, err := jm.deleteJobPods(job, jobKey, podsToDelete)
 		active -= removed
 		if err != nil {
@@ -772,25 +788,7 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 		}
 	}
 
-	if active < parallelism {
-		wantActive := int32(0)
-		if job.Spec.Completions == nil {
-			// Job does not specify a number of completions.  Therefore, number active
-			// should be equal to parallelism, unless the job has seen at least
-			// once success, in which leave whatever is running, running.
-			if succeeded > 0 {
-				wantActive = active
-			} else {
-				wantActive = parallelism
-			}
-		} else {
-			// Job specifies a specific number of completions.  Therefore, number
-			// active should not ever exceed number of remaining completions.
-			wantActive = *job.Spec.Completions - succeeded
-			if wantActive > parallelism {
-				wantActive = parallelism
-			}
-		}
+	if active < wantActive {
 		diff := wantActive - active
 		if diff < 0 {
 			utilruntime.HandleError(fmt.Errorf("More active than wanted: job %q, want %d, have %d", jobKey, wantActive, active))
