@@ -18,6 +18,8 @@ package cm
 
 import (
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
@@ -43,4 +45,21 @@ func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.Res
 		}
 	}
 	return ret
+}
+
+// GetAllocatableMemory returns memory capacity with out hugePage capacity.
+func GetAllocatableMemory(capacity v1.ResourceList) resource.Quantity {
+	allocatableMemory := capacity[v1.ResourceMemory].DeepCopy()
+	// for every huge page reservation, we need to remove it from allocatable memory
+	for k, v := range capacity {
+		if v1helper.IsHugePageResourceName(k) {
+			value := v.DeepCopy()
+			allocatableMemory.Sub(value)
+			if allocatableMemory.Sign() < 0 {
+				// Negative Allocatable resources don't make sense.
+				allocatableMemory.Set(0)
+			}
+		}
+	}
+	return allocatableMemory
 }
