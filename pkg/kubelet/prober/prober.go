@@ -154,7 +154,7 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 			headers := p.HTTPGet.HTTPHeaders
 			klogV4.InfoS("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "headers", headers)
 		}
-		return pb.http.Probe(req, timeout)
+		return pb.maybeProbeForBody(pb.http, req, timeout, pod, container, probeType)
 
 	case p.TCPSocket != nil:
 		port, err := probe.ResolveContainerPort(p.TCPSocket.Port, &container)
