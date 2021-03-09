@@ -22,8 +22,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const logFmt = "kubelet config controller: %s"
-
 // Errorf shim that inserts "kubelet config controller" at the beginning of the log message,
 // while still reporting the call site of the logging function.
 func Errorf(format string, args ...interface{}) {
@@ -33,7 +31,7 @@ func Errorf(format string, args ...interface{}) {
 	} else {
 		s = format
 	}
-	klog.ErrorDepth(1, fmt.Sprintf(logFmt, s))
+	klog.ErrorS(nil, "Kubelet config controller", "message", s)
 }
 
 // Infof shim that inserts "kubelet config controller" at the beginning of the log message,
@@ -45,5 +43,5 @@ func Infof(format string, args ...interface{}) {
 	} else {
 		s = format
 	}
-	klog.InfoDepth(1, fmt.Sprintf(logFmt, s))
+	klog.InfoS("Kubelet config controller", "message", s)
 }
