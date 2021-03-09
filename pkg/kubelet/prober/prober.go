@@ -172,7 +172,7 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		url := formatURL(scheme, host, port, path)
 		headers := buildHeader(p.HTTPGet.HTTPHeaders)
 		klog.V(4).InfoS("HTTP-Probe Headers", "headers", headers)
-		return pb.http.Probe(url, headers, timeout)
+		return pb.maybeProbeForBody(pb.http, url, headers, timeout, pod, container, probeType)
 	}
 	if p.TCPSocket != nil {
 		port, err := extractPort(p.TCPSocket.Port, container)
