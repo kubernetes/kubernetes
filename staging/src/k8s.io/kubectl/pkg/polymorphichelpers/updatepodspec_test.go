@@ -103,6 +103,10 @@ func TestUpdatePodSpecForObject(t *testing.T) {
 			expect: true,
 		},
 		{
+			object: &batchv1.CronJob{},
+			expect: true,
+		},
+		{
 			object:    &v1.Node{},
 			expect:    false,
 			expectErr: true,
