@@ -17,15 +17,22 @@ limitations under the License.
 package stats
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
+	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubestats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -43,9 +50,10 @@ const (
 	pvcClaimName = "pvc-fake"
 )
 
-func TestPVCRef(t *testing.T) {
+var (
+	ErrorWatchTimeout = errors.New("watch event timeout")
 	// Create pod spec to test against
-	podVolumes := []k8sv1.Volume{
+	podVolumes = []k8sv1.Volume{
 		{
 			Name: vol0,
 			VolumeSource: k8sv1.VolumeSource{
@@ -64,7 +72,7 @@ func TestPVCRef(t *testing.T) {
 		},
 	}
 
-	fakePod := &k8sv1.Pod{
+	fakePod = &k8sv1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pName0,
 			Namespace: namespace0,
@@ -75,13 +83,22 @@ func TestPVCRef(t *testing.T) {
 		},
 	}
 
+	volumeCondition = &csipbv1.VolumeCondition{}
+)
+
+func TestPVCRef(t *testing.T) {
 	// Setup mock stats provider
 	mockStats := new(statstest.StatsProvider)
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}}
 	mockStats.On("ListVolumesForPod", fakePod.UID).Return(volumes, true)
 
+	eventStore := make(chan string, 1)
+	fakeEventRecorder := record.FakeRecorder{
+		Events: eventStore,
+	}
+
 	// Calculate stats for pod
-	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod)
+	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
 	statsCalculator.calcAndStoreStats()
 	vs, _ := statsCalculator.GetLatest()
 
@@ -100,6 +117,57 @@ func TestPVCRef(t *testing.T) {
 		},
 		FsStats: expectedFSStats(),
 	})
+}
+
+func TestNormalVolumeEvent(t *testing.T) {
+	mockStats := new(statstest.StatsProvider)
+	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}}
+	mockStats.On("ListVolumesForPod", fakePod.UID).Return(volumes, true)
+
+	eventStore := make(chan string, 2)
+	fakeEventRecorder := record.FakeRecorder{
+		Events: eventStore,
+	}
+
+	// Calculate stats for pod
+	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
+	statsCalculator.calcAndStoreStats()
+
+	event, err := WatchEvent(eventStore)
+	assert.NotNil(t, err)
+	assert.Equal(t, "", event)
+}
+
+func TestAbnormalVolumeEvent(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)()
+	// Setup mock stats provider
+	mockStats := new(statstest.StatsProvider)
+	volumes := map[string]volume.Volume{vol0: &fakeVolume{}}
+	mockStats.On("ListVolumesForPod", fakePod.UID).Return(volumes, true)
+
+	eventStore := make(chan string, 2)
+	fakeEventRecorder := record.FakeRecorder{
+		Events: eventStore,
+	}
+
+	// Calculate stats for pod
+	volumeCondition.Message = "The target path of the volume doesn't exist"
+	volumeCondition.Abnormal = true
+	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
+	statsCalculator.calcAndStoreStats()
+
+	event, err := WatchEvent(eventStore)
+	assert.Nil(t, err)
+	assert.Equal(t, fmt.Sprintf("Warning VolumeConditionAbnormal Volume %s: The target path of the volume doesn't exist", "vol0"), event)
+}
+
+func WatchEvent(eventChan <-chan string) (string, error) {
+	select {
+	case event := <-eventChan:
+		return event, nil
+	case <-time.After(5 * time.Second):
+		return "", ErrorWatchTimeout
+	}
 }
 
 // Fake volume/metrics provider
@@ -121,6 +189,8 @@ func expectedMetrics() *volume.Metrics {
 		Inodes:     resource.NewQuantity(inodesTotal, resource.BinarySI),
 		InodesFree: resource.NewQuantity(inodesFree, resource.BinarySI),
 		InodesUsed: resource.NewQuantity(inodesTotal-inodesFree, resource.BinarySI),
+		Message:    &volumeCondition.Message,
+		Abnormal:   &volumeCondition.Abnormal,
 	}
 }
 

@@ -30,7 +30,9 @@ import (
 	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -624,6 +626,19 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 		Inodes:     resource.NewQuantity(int64(0), resource.BinarySI),
 		InodesFree: resource.NewQuantity(int64(0), resource.BinarySI),
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
+		isSupportNodeVolumeCondition, err := supportNodeGetVolumeCondition(ctx, nodeClient)
+		if err != nil {
+			return nil, err
+		}
+
+		if isSupportNodeVolumeCondition {
+			abnormal, message := resp.VolumeCondition.GetAbnormal(), resp.VolumeCondition.GetMessage()
+			metrics.Abnormal, metrics.Message = &abnormal, &message
+		}
+	}
+
 	for _, usage := range usages {
 		if usage == nil {
 			continue
@@ -644,6 +659,30 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 
 	}
 	return metrics, nil
+}
+
+func supportNodeGetVolumeCondition(ctx context.Context, nodeClient csipbv1.NodeClient) (supportNodeGetVolumeCondition bool, err error) {
+	req := csipbv1.NodeGetCapabilitiesRequest{}
+	rsp, err := nodeClient.NodeGetCapabilities(ctx, &req)
+	if err != nil {
+		return false, err
+	}
+
+	for _, cap := range rsp.GetCapabilities() {
+		if cap == nil {
+			continue
+		}
+		rpc := cap.GetRpc()
+		if rpc == nil {
+			continue
+		}
+		t := rpc.GetType()
+		if t == csipbv1.NodeServiceCapability_RPC_VOLUME_CONDITION {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func isFinalError(err error) bool {
