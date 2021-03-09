@@ -40,6 +40,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
+	sutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
@@ -359,8 +360,19 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 					return err
 				}
 				return nil
+			case storagehelpers.GetPersistentVolumeClaimClass(claim) == "":
+				if storageClasses, err := ctrl.kubeClient.StorageV1().StorageClasses().List(context.TODO(), metav1.ListOptions{}); err != nil {
+					for _, sc := range storageClasses.Items {
+						if sutil.IsDefaultAnnotation(sc.ObjectMeta) {
+							claim.Spec.StorageClassName = &sc.Name
+							ctrl.updateClaim(claim)
+							return nil
+						}
+					}
+				}
+				fallthrough
 			default:
-				ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.FailedBinding, "no persistent volumes available for this claim and no storage class is set")
+				ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.FailedBinding, "no persistent volumes available for this claim and no default storage class is available")
 			}
 
 			// Mark the claim as Pending and try to find a match in the next
