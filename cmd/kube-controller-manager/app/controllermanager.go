@@ -212,12 +212,13 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 	saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
-	run := func(ctx context.Context, startSATokenController InitFunc, filterFunc leadermigration.FilterFunc, requiredResult leadermigration.FilterResult) {
+	run := func(ctx context.Context, startSATokenController InitFunc, initializersFunc ControllerInitializersFunc) {
+
 		controllerContext, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, ctx.Done())
 		if err != nil {
 			klog.Fatalf("error building controller context: %v", err)
 		}
-		controllerInitializers := filterInitializers(NewControllerInitializers(controllerContext.LoopMode), filterFunc, requiredResult)
+		controllerInitializers := initializersFunc(controllerContext.LoopMode)
 		if err := StartControllers(controllerContext, startSATokenController, controllerInitializers, unsecuredMux); err != nil {
 			klog.Fatalf("error starting controllers: %v", err)
 		}
@@ -231,7 +232,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 	// No leader election, run directly
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		run(context.TODO(), saTokenControllerInitFunc, nil, leadermigration.ControllerNonMigrated)
+		run(context.TODO(), saTokenControllerInitFunc, NewControllerInitializers)
 		panic("unreachable")
 	}
 
@@ -270,14 +271,14 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
-				var filterFunc leadermigration.FilterFunc = nil
+				initializersFunc := NewControllerInitializers
 				if leaderMigrator != nil {
 					// If leader migration is enabled, we should start only non-migrated controllers
 					//  for the main lock.
-					filterFunc = leaderMigrator.FilterFunc
+					initializersFunc = createInitializersFunc(leaderMigrator.FilterFunc, leadermigration.ControllerNonMigrated)
 					klog.Info("leader migration: starting main controllers.")
 				}
-				run(ctx, startSATokenController, filterFunc, leadermigration.ControllerNonMigrated)
+				run(ctx, startSATokenController, initializersFunc)
 			},
 			OnStoppedLeading: func() {
 				klog.Fatalf("leaderelection lost")
@@ -299,8 +300,8 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 			leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) {
 					klog.Info("leader migration: starting migrated controllers.")
-					// DO NOT start saTokenController under migration lock (passing nil)
-					run(ctx, nil, leaderMigrator.FilterFunc, leadermigration.ControllerMigrated)
+					// DO NOT start saTokenController under migration lock
+					run(ctx, nil, createInitializersFunc(leaderMigrator.FilterFunc, leadermigration.ControllerMigrated))
 				},
 				OnStoppedLeading: func() {
 					klog.Fatalf("migration leaderelection lost")
@@ -367,6 +368,12 @@ func (c ControllerContext) IsControllerEnabled(name string) bool {
 // Any error returned will cause the controller process to `Fatal`
 // The bool indicates whether the controller was enabled.
 type InitFunc func(ctx ControllerContext) (debuggingHandler http.Handler, enabled bool, err error)
+
+// ControllerInitializersFunc is used to create a collection of initializers
+//  given the loopMode.
+type ControllerInitializersFunc func(loopMode ControllerLoopMode) (initializers map[string]InitFunc)
+
+var _ ControllerInitializersFunc = NewControllerInitializers
 
 // KnownControllers returns all known controllers's name
 func KnownControllers() []string {
@@ -688,18 +695,16 @@ func leaderElectAndRun(c *config.CompletedConfig, lockIdentity string, electionC
 	panic("unreachable")
 }
 
-// filterInitializers returns initializers that has filterFunc(name) == expected.
-// filterFunc can be nil, in which case the original initializers will be returned directly.
-// InitFunc is local to kube-controller-manager, and thus filterInitializers has to be local too.
-func filterInitializers(allInitializers map[string]InitFunc, filterFunc leadermigration.FilterFunc, expected leadermigration.FilterResult) map[string]InitFunc {
-	if filterFunc == nil {
-		return allInitializers
-	}
-	initializers := make(map[string]InitFunc)
-	for name, initFunc := range allInitializers {
-		if filterFunc(name) == expected {
-			initializers[name] = initFunc
+// createInitializersFunc creates a initializersFunc that returns all initializer
+//  with expected as the result after filtering through filterFunc.
+func createInitializersFunc(filterFunc leadermigration.FilterFunc, expected leadermigration.FilterResult) ControllerInitializersFunc {
+	return func(loopMode ControllerLoopMode) map[string]InitFunc {
+		initializers := make(map[string]InitFunc)
+		for name, initializer := range NewControllerInitializers(loopMode) {
+			if filterFunc(name) == expected {
+				initializers[name] = initializer
+			}
 		}
+		return initializers
 	}
-	return initializers
 }
