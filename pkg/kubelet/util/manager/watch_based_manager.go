@@ -313,7 +313,7 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 		if c.isImmutable(object) {
 			item.setImmutable()
 			if item.stop() {
-				klog.V(4).Infof("Stopped watching for changes of %q/%q - object is immutable", namespace, name)
+				klog.V(4).InfoS("Stopped watching for changes - object is immutable", "obj", klog.KRef(namespace, name))
 			}
 		}
 		return object, nil
