@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package upgrades
+package network
 
 import (
 	"context"
@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
 )
@@ -55,7 +56,7 @@ func (t *KubeProxyUpgradeTest) Setup(f *framework.Framework) {
 }
 
 // Test validates if kube-proxy is migrated from static pods to DaemonSet.
-func (t *KubeProxyUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *KubeProxyUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	c := f.ClientSet
 
 	// Block until upgrade is done.
@@ -90,7 +91,7 @@ func (t *KubeProxyDowngradeTest) Setup(f *framework.Framework) {
 }
 
 // Test validates if kube-proxy is migrated from DaemonSet to static pods.
-func (t *KubeProxyDowngradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *KubeProxyDowngradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	c := f.ClientSet
 
 	// Block until upgrade is done.

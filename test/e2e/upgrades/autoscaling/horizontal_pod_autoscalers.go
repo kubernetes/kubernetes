@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package upgrades
+package autoscaling
 
 import (
 	"fmt"
@@ -23,6 +23,7 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
 )
@@ -61,7 +62,7 @@ func (t *HPAUpgradeTest) Setup(f *framework.Framework) {
 }
 
 // Test waits for upgrade to complete and verifies if HPA works correctly.
-func (t *HPAUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *HPAUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	// Block until upgrade is done
 	ginkgo.By(fmt.Sprintf("Waiting for upgrade to finish before checking HPA"))
 	<-done

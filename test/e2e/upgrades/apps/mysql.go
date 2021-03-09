@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package upgrades
+package apps
 
 import (
 	"context"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 )
 
 const mysqlManifestPath = "test/e2e/testing-manifests/statefulset/mysql-upgrade"
@@ -49,7 +50,7 @@ type MySQLUpgradeTest struct {
 func (MySQLUpgradeTest) Name() string { return "mysql-upgrade" }
 
 // Skip returns true when this test can be skipped.
-func (MySQLUpgradeTest) Skip(upgCtx UpgradeContext) bool {
+func (MySQLUpgradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
 	minVersion := version.MustParseSemantic("1.5.0")
 
 	for _, vCtx := range upgCtx.Versions {
@@ -125,7 +126,7 @@ func (t *MySQLUpgradeTest) Setup(f *framework.Framework) {
 
 // Test continually polls the db using the read and write connections, inserting data, and checking
 // that all the data is readable.
-func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	var writeSuccess, readSuccess, writeFailure, readFailure int
 	ginkgo.By("Continuously polling the database during upgrade.")
 	go wait.Until(func() {

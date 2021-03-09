@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package upgrades
+package apps
 
 import (
 	"context"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 )
 
 const cassandraManifestPath = "test/e2e/testing-manifests/statefulset/cassandra"
@@ -49,7 +50,7 @@ type CassandraUpgradeTest struct {
 func (CassandraUpgradeTest) Name() string { return "cassandra-upgrade" }
 
 // Skip returns true when this test can be skipped.
-func (CassandraUpgradeTest) Skip(upgCtx UpgradeContext) bool {
+func (CassandraUpgradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
 	minVersion := version.MustParseSemantic("1.6.0")
 	for _, vCtx := range upgCtx.Versions {
 		if vCtx.Version.LessThan(minVersion) {
@@ -169,7 +170,7 @@ func (t *CassandraUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName 
 // from the db. Each attempt is tallied and at the end we verify if the success
 // ratio is over a certain threshold (0.75). We also verify that we get
 // at least the same number of rows back as we successfully wrote.
-func (t *CassandraUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *CassandraUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	ginkgo.By("Continuously polling the database during upgrade.")
 	var (
 		success, failures, writeAttempts, lastUserCount int

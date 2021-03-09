@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package upgrades
+package node
 
 import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	"k8s.io/kubernetes/test/e2e/scheduling"
+	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
 )
@@ -45,11 +46,11 @@ func (t *NvidiaGPUUpgradeTest) Setup(f *framework.Framework) {
 
 // Test waits for the upgrade to complete, and then verifies that the
 // cuda pod started by the gpu job can successfully finish.
-func (t *NvidiaGPUUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *NvidiaGPUUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
 	ginkgo.By("Verifying gpu job success")
 	scheduling.VerifyJobNCompletions(f, completions)
-	if upgrade == MasterUpgrade || upgrade == ClusterUpgrade {
+	if upgrade == upgrades.MasterUpgrade || upgrade == upgrades.ClusterUpgrade {
 		// MasterUpgrade should be totally hitless.
 		job, err := e2ejob.GetJob(f.ClientSet, f.Namespace.Name, "cuda-add")
 		framework.ExpectNoError(err)
