@@ -1157,6 +1157,46 @@
     DNS configuration MUST be configured in the Pod.
   release: v1.17
   file: test/e2e/network/dns.go
+- testname: EndpointSlice API
+  codename: '[sig-network] EndpointSlice should create Endpoints and EndpointSlices
+    for Pods matching a Service [Conformance]'
+  description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
+    The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
+    discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
+    discovery document. The endpointslice controller must create EndpointSlices for
+    Pods mataching a Service.
+  release: v1.21
+  file: test/e2e/network/endpointslice.go
+- testname: EndpointSlice API
+  codename: '[sig-network] EndpointSlice should create and delete Endpoints and EndpointSlices
+    for a Service with a selector specified [Conformance]'
+  description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
+    The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
+    discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
+    discovery document. The endpointslice controller should create and delete EndpointSlices
+    for Pods matching a Service.
+  release: v1.21
+  file: test/e2e/network/endpointslice.go
+- testname: EndpointSlice API
+  codename: '[sig-network] EndpointSlice should have Endpoints and EndpointSlices
+    pointing to API Server [Conformance]'
+  description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
+    The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
+    discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
+    discovery document. API Server should create self referential Endpoints and EndpointSlices
+    named "kubernetes" in the default namespace.
+  release: v1.21
+  file: test/e2e/network/endpointslice.go
+- testname: EndpointSlice Mirroring
+  codename: '[sig-network] EndpointSliceMirroring should mirror a custom Endpoints
+    resource through create update and delete [Conformance]'
+  description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
+    The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io
+    discovery document. The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1
+    discovery document. The endpointslices mirrorowing must mirror endpoint create,
+    update, and delete actions.
+  release: v1.21
+  file: test/e2e/network/endpointslicemirroring.go
 - testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
   codename: '[sig-network] HostPort validates that there is no conflict between pods
     with same hostPort but different hostIP and protocol [LinuxOnly] [Conformance]'
