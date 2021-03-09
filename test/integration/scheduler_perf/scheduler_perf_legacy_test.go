@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -162,7 +162,7 @@ func BenchmarkSchedulingMigratedInTreePVs(b *testing.B) {
 		v1.ResourceName(driverKey): fmt.Sprintf("%d", util.DefaultMaxEBSVolumes),
 	}
 	var count int32 = util.DefaultMaxEBSVolumes
-	csiAllocatable := map[string]*storagev1beta1.VolumeNodeResources{
+	csiAllocatable := map[string]*storagev1.VolumeNodeResources{
 		testCSIDriver: {
 			Count: &count,
 		},
@@ -193,7 +193,7 @@ func BenchmarkSchedulingCSIPVs(b *testing.B) {
 		v1.ResourceName(driverKey): fmt.Sprintf("%d", util.DefaultMaxEBSVolumes),
 	}
 	var count int32 = util.DefaultMaxEBSVolumes
-	csiAllocatable := map[string]*storagev1beta1.VolumeNodeResources{
+	csiAllocatable := map[string]*storagev1.VolumeNodeResources{
 		testCSIDriver: {
 			Count: &count,
 		},
