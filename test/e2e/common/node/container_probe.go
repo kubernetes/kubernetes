@@ -213,7 +213,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe, container exec timeout, restart
 		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call does not return within the timeout specified, liveness probe MUST restart the Pod.
 	*/
-	framework.ConformanceIt("should be restarted with an exec liveness probe with timeout [NodeConformance]", func() {
+	ginkgo.It("should be restarted with an exec liveness probe with timeout [NodeConformance]", func() {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		livenessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
@@ -230,7 +230,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod readiness probe, container exec timeout, not ready
 		Description: A Pod is created with readiness probe with a Exec action on the Pod. If the readiness probe call does not return within the timeout specified, readiness probe MUST not be Ready.
 	*/
-	framework.ConformanceIt("should not be ready with an exec readiness probe timeout [NodeConformance]", func() {
+	ginkgo.It("should not be ready with an exec readiness probe timeout [NodeConformance]", func() {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		readinessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
