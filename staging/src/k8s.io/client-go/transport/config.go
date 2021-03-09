@@ -131,9 +131,9 @@ type TLSConfig struct {
 	Insecure   bool   // Server should be accessed without verifying the certificate. For testing only.
 	ServerName string // Override for the server name passed to the server for SNI and used to verify certificates.
 
-	CAData   []byte // Bytes of the PEM-encoded server trusted root certificates. Supercedes CAFile.
-	CertData []byte // Bytes of the PEM-encoded client certificate. Supercedes CertFile.
-	KeyData  []byte // Bytes of the PEM-encoded client key. Supercedes KeyFile.
+	CAData   []byte // Bytes of the PEM-encoded server trusted root certificates. Supersedes CAFile.
+	CertData []byte // Bytes of the PEM-encoded client certificate. Supersedes CertFile.
+	KeyData  []byte // Bytes of the PEM-encoded client key. Supersedes KeyFile.
 
 	// NextProtos is a list of supported application level protocols, in order of preference.
 	// Used to populate tls.Config.NextProtos.
@@ -141,5 +141,5 @@ type TLSConfig struct {
 	// To use only http/1.1, set to ["http/1.1"].
 	NextProtos []string
 
-	GetCert func() (*tls.Certificate, error) // Callback that returns a TLS client certificate. CertData, CertFile, KeyData and KeyFile supercede this field.
+	GetCert func() (*tls.Certificate, error) // Callback that returns a TLS client certificate. CertData, CertFile, KeyData and KeyFile supersede this field.
 }
