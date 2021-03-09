@@ -333,7 +333,7 @@ func (g *genericScheduler) findNodesThatPassFilters(
 
 	// Stops searching for more nodes once the configured number of feasible nodes
 	// are found.
-	parallelize.Until(ctx, len(nodes), checkNode)
+	fwk.Parallelizer().Until(ctx, len(nodes), checkNode)
 	processedNodes := int(feasibleNodesLen) + len(diagnosis.NodeToStatusMap)
 	g.nextStartNodeIndex = (g.nextStartNodeIndex + processedNodes) % len(nodes)
 

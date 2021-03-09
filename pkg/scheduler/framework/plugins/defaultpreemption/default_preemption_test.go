@@ -996,11 +996,19 @@ func TestDryRunPreemption(t *testing.T) {
 			registeredPlugins = append(registeredPlugins, tt.registerPlugins...)
 			objs := []runtime.Object{&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}
 			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(objs...), 0)
+			parallelism := parallelize.DefaultParallelism
+			if tt.disableParallelism {
+				// We need disableParallelism because of the non-deterministic nature
+				// of the results of tests that set custom minCandidateNodesPercentage
+				// or minCandidateNodesAbsolute. This is only done in a handful of tests.
+				parallelism = 1
+			}
 			fwk, err := st.NewFramework(
 				registeredPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithParallelism(parallelism),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1018,17 +1026,6 @@ func TestDryRunPreemption(t *testing.T) {
 			sort.Slice(nodeInfos, func(i, j int) bool {
 				return nodeInfos[i].Node().Name < nodeInfos[j].Node().Name
 			})
-
-			if tt.disableParallelism {
-				// We need disableParallelism because of the non-deterministic nature
-				// of the results of tests that set custom minCandidateNodesPercentage
-				// or minCandidateNodesAbsolute. This is only done in a handful of tests.
-				oldParallelism := parallelize.GetParallelism()
-				parallelize.SetParallelism(1)
-				t.Cleanup(func() {
-					parallelize.SetParallelism(oldParallelism)
-				})
-			}
 
 			if tt.args == nil {
 				tt.args = getDefaultDefaultPreemptionArgs()

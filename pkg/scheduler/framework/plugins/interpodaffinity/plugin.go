@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 )
 
 const (
@@ -41,6 +42,7 @@ var _ framework.ScorePlugin = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
+	parallelizer            parallelize.Parallelizer
 	args                    config.InterPodAffinityArgs
 	sharedLister            framework.SharedLister
 	nsLister                listersv1.NamespaceLister
@@ -65,6 +67,7 @@ func New(plArgs runtime.Object, h framework.Handle, fts feature.Features) (frame
 		return nil, err
 	}
 	pl := &InterPodAffinity{
+		parallelizer:            h.Parallelizer(),
 		args:                    args,
 		sharedLister:            h.SnapshotSharedLister(),
 		enableNamespaceSelector: fts.EnablePodAffinityNamespaceSelector,
