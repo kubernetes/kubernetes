@@ -96,8 +96,7 @@ var PluginHandler = &RegistrationHandler{}
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by CSI Driver registrar side car.
 func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
-	klog.Infof(log("Trying to validate a new CSI Driver with name: %s endpoint: %s versions: %s",
-		pluginName, endpoint, strings.Join(versions, ",")))
+	klog.InfoS(log("Trying to validate a new CSI Driver"), "name", pluginName, "endpoint", endpoint, "versions", strings.Join(versions, ","))
 
 	_, err := h.validateVersions("ValidatePlugin", pluginName, endpoint, versions)
 	if err != nil {
@@ -109,7 +108,7 @@ func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string,
 
 // RegisterPlugin is called when a plugin can be registered
 func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
-	klog.Infof(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
+	klog.InfoS(log("Register new plugin"), "name", pluginName, "endpoint", endpoint)
 
 	highestSupportedVersion, err := h.validateVersions("RegisterPlugin", pluginName, endpoint, versions)
 	if err != nil {
@@ -135,7 +134,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx)
 	if err != nil {
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
-			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
+			klog.ErrorS(unregErr, log("registrationHandler.RegisterPlugin failed to unregister plugin"))
 		}
 		return err
 	}
@@ -143,7 +142,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	err = nim.InstallCSIDriver(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
 	if err != nil {
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
-			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
+			klog.ErrorS(unregErr, log("registrationHandler.RegisterPlugin failed to unregister plugin"))
 		}
 		return err
 	}
@@ -175,9 +174,9 @@ func (h *RegistrationHandler) validateVersions(callerName, pluginName string, en
 // DeRegisterPlugin is called when a plugin removed its socket, signaling
 // it is no longer available
 func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
-	klog.Info(log("registrationHandler.DeRegisterPlugin request for plugin %s", pluginName))
+	klog.InfoS(log("registrationHandler.DeRegisterPlugin request for plugin"), "name", pluginName)
 	if err := unregisterDriver(pluginName); err != nil {
-		klog.Error(log("registrationHandler.DeRegisterPlugin failed: %v", err))
+		klog.ErrorS(err, log("registrationHandler.DeRegisterPlugin failed"))
 	}
 }
 
@@ -186,29 +185,29 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 
 	csiClient := host.GetKubeClient()
 	if csiClient == nil {
-		klog.Warning(log("kubeclient not set, assuming standalone kubelet"))
+		klog.InfoS(log("kubeclient not set, assuming standalone kubelet"))
 	} else {
 		// set CSIDriverLister and volumeAttachmentLister
 		adcHost, ok := host.(volume.AttachDetachVolumeHost)
 		if ok {
 			p.csiDriverLister = adcHost.CSIDriverLister()
 			if p.csiDriverLister == nil {
-				klog.Error(log("CSIDriverLister not found on AttachDetachVolumeHost"))
+				klog.ErrorS(nil, log("CSIDriverLister not found on AttachDetachVolumeHost"))
 			}
 			p.volumeAttachmentLister = adcHost.VolumeAttachmentLister()
 			if p.volumeAttachmentLister == nil {
-				klog.Error(log("VolumeAttachmentLister not found on AttachDetachVolumeHost"))
+				klog.ErrorS(nil, log("VolumeAttachmentLister not found on AttachDetachVolumeHost"))
 			}
 		}
 		kletHost, ok := host.(volume.KubeletVolumeHost)
 		if ok {
 			p.csiDriverLister = kletHost.CSIDriverLister()
 			if p.csiDriverLister == nil {
-				klog.Error(log("CSIDriverLister not found on KubeletVolumeHost"))
+				klog.ErrorS(nil, log("CSIDriverLister not found on KubeletVolumeHost"))
 			}
 			p.serviceAccountTokenGetter = host.GetServiceAccountTokenFunc()
 			if p.serviceAccountTokenGetter == nil {
-				klog.Error(log("ServiceAccountTokenGetter not found on KubeletVolumeHost"))
+				klog.ErrorS(nil, log("ServiceAccountTokenGetter not found on KubeletVolumeHost"))
 			}
 			// We don't run the volumeAttachmentLister in the kubelet context
 			p.volumeAttachmentLister = nil
@@ -253,13 +252,13 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 func initializeCSINode(host volume.VolumeHost) error {
 	kvh, ok := host.(volume.KubeletVolumeHost)
 	if !ok {
-		klog.V(4).Info("Cast from VolumeHost to KubeletVolumeHost failed. Skipping CSINode initialization, not running on kubelet")
+		klog.V(4).InfoS("Cast from VolumeHost to KubeletVolumeHost failed. Skipping CSINode initialization, not running on kubelet")
 		return nil
 	}
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
 		// Kubelet running in standalone mode. Skip CSINode initialization
-		klog.Warning("Skipping CSINode initialization, kubelet running in standalone mode")
+		klog.InfoS("Skipping CSINode initialization, kubelet running in standalone mode")
 		return nil
 	}
 
@@ -272,7 +271,8 @@ func initializeCSINode(host volume.VolumeHost) error {
 		nodeName := host.GetNodeName()
 		err := waitForAPIServerForever(kubeClient, nodeName)
 		if err != nil {
-			klog.Fatalf("Failed to initialize CSINode while waiting for API server to report ok: %v", err)
+			klog.ErrorS(err, "Failed to initialize CSINode while waiting for API server to report ok")
+			os.Exit(1)
 		}
 
 		// Backoff parameters tuned to retry over 140 seconds. Will fail and restart the Kubelet
@@ -284,11 +284,11 @@ func initializeCSINode(host volume.VolumeHost) error {
 			Jitter:   0.1,
 		}
 		err = wait.ExponentialBackoff(initBackoff, func() (bool, error) {
-			klog.V(4).Infof("Initializing migrated drivers on CSINode")
+			klog.V(4).InfoS("Initializing migrated drivers on CSINode")
 			err := nim.InitializeCSINodeWithAnnotation()
 			if err != nil {
-				kvh.SetKubeletError(fmt.Errorf("failed to initialize CSINode: %v", err))
-				klog.Errorf("Failed to initialize CSINode: %v", err)
+				kvh.SetKubeletError(fmt.Errorf("Failed to initialize CSINode: %v", err))
+				klog.ErrorS(err, "Failed to initialize CSINode")
 				return false, nil
 			}
 
@@ -302,7 +302,8 @@ func initializeCSINode(host volume.VolumeHost) error {
 			// using CSI for all Migrated volume plugins. Then all the CSINode initialization
 			// code can be dropped from Kubelet.
 			// Kill the Kubelet process and allow it to restart to retry initialization
-			klog.Fatalf("Failed to initialize CSINode after retrying: %v", err)
+			klog.ErrorS(err, "Failed to initialize CSINode after retrying")
+			os.Exit(1)
 		}
 	}()
 	return nil
@@ -347,12 +348,12 @@ func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
 	}
 	driverName, err := GetCSIDriverName(spec)
 	if err != nil {
-		klog.V(5).Info(log("Failed to mark %q as republish required, err: %v", spec.Name(), err))
+		klog.V(5).InfoS(log("Failed to mark spec as republish required"), "name", spec.Name(), "err", err)
 		return false
 	}
 	csiDriver, err := p.csiDriverLister.Get(driverName)
 	if err != nil {
-		klog.V(5).Info(log("Failed to mark %q as republish required, err: %v", spec.Name(), err))
+		klog.V(5).InfoS(log("Failed to mark spec as republish required"), "name", spec.Name(), "err", err)
 		return false
 	}
 	return *csiDriver.Spec.RequiresRepublish
@@ -438,7 +439,7 @@ func (p *csiPlugin) NewMounter(
 	if err := os.MkdirAll(dataDir, 0750); err != nil {
 		return nil, errors.New(log("failed to create dir %#v:  %v", dataDir, err))
 	}
-	klog.V(4).Info(log("created path successfully [%s]", dataDir))
+	klog.V(4).InfoS(log("created path successfully"), "path", dataDir)
 
 	mounter.MetricsProvider = NewMetricsCsi(volumeHandle, dir, csiDriverName(driverName))
 
@@ -462,25 +463,25 @@ func (p *csiPlugin) NewMounter(
 		if err != nil && volumetypes.IsOperationFinishedError(err) {
 			// attempt to cleanup volume mount dir.
 			if err = removeMountDir(p, dir); err != nil {
-				klog.Error(log("attacher.MountDevice failed to remove mount dir after error [%s]: %v", dir, err))
+				klog.ErrorS(err, log("attacher.MountDevice failed to remove mount dir"), "path", dir)
 			}
 		}
 	}()
 
 	if err != nil {
 		errorMsg := log("csi.NewMounter failed to save volume info data: %v", err)
-		klog.Error(errorMsg)
+		klog.ErrorS(nil, errorMsg)
 
 		return nil, errors.New(errorMsg)
 	}
 
-	klog.V(4).Info(log("mounter created successfully"))
+	klog.V(4).InfoS(log("mounter created successfully"))
 
 	return mounter, nil
 }
 
 func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
-	klog.V(4).Infof(log("setting up unmounter for [name=%v, podUID=%v]", specName, podUID))
+	klog.V(4).InfoS(log("setting up unmounter for spec and pod"), "specName", specName, "pod", podUID)
 
 	kvh, ok := p.host.(volume.KubeletVolumeHost)
 	if !ok {
@@ -509,14 +510,14 @@ func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmo
 }
 
 func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	klog.V(4).Info(log("plugin.ConstructVolumeSpec [pv.Name=%v, path=%v]", volumeName, mountPath))
+	klog.V(4).InfoS(log("plugin.ConstructVolumeSpec"), "volume", volumeName, "path", mountPath)
 
 	volData, err := loadVolumeData(mountPath, volDataFileName)
 	if err != nil {
 		return nil, errors.New(log("plugin.ConstructVolumeSpec failed loading volume data using [%s]: %v", mountPath, err))
 	}
 
-	klog.V(4).Info(log("plugin.ConstructVolumeSpec extracted [%#v]", volData))
+	klog.V(4).InfoS(log("plugin.ConstructVolumeSpec extracted"), "volData", volData)
 
 	var spec *volume.Spec
 	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume)
@@ -606,7 +607,7 @@ func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
 		}
 
 		if volumeLifecycleMode == storage.VolumeLifecycleEphemeral {
-			klog.V(5).Info(log("plugin.CanAttach = false, ephemeral mode detected for spec %v", spec.Name()))
+			klog.V(5).InfoS(log("plugin.CanAttach = false, ephemeral mode detected for spec"), "name", spec.Name())
 			return false, nil
 		}
 	}
@@ -640,7 +641,7 @@ func (p *csiPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
 	}
 
 	if volumeLifecycleMode == storage.VolumeLifecycleEphemeral {
-		klog.V(5).Info(log("plugin.CanDeviceMount skipped ephemeral mode detected for spec %v", spec.Name()))
+		klog.V(5).InfoS(log("plugin.CanDeviceMount skipped ephemeral mode detected for spec"), "name", spec.Name())
 		return false, nil
 	}
 
@@ -670,7 +671,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 		return nil, err
 	}
 
-	klog.V(4).Info(log("setting up block mapper for [volume=%v,driver=%v]", pvSource.VolumeHandle, pvSource.Driver))
+	klog.V(4).InfoS(log("setting up block mapper for volume and driver"), "volume", pvSource.VolumeHandle, "driver", pvSource.Driver)
 
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
@@ -696,7 +697,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 	if err := os.MkdirAll(dataDir, 0750); err != nil {
 		return nil, errors.New(log("failed to create data dir %s:  %v", dataDir, err))
 	}
-	klog.V(4).Info(log("created path successfully [%s]", dataDir))
+	klog.V(4).InfoS(log("created path successfully"), "path", dataDir)
 
 	blockPath, err := mapper.GetGlobalMapPath(spec)
 	if err != nil {
@@ -723,13 +724,13 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 		if err != nil && volumetypes.IsOperationFinishedError(err) {
 			// attempt to cleanup volume mount dir.
 			if err = removeMountDir(p, dataDir); err != nil {
-				klog.Error(log("attacher.MountDevice failed to remove mount dir after error [%s]: %v", dataDir, err))
+				klog.ErrorS(err, log("attacher.MountDevice failed to remove mount dir"), "path", dataDir)
 			}
 		}
 	}()
 	if err != nil {
 		errorMsg := log("csi.NewBlockVolumeMapper failed to save volume info data: %v", err)
-		klog.Error(errorMsg)
+		klog.ErrorS(nil, errorMsg)
 		return nil, errors.New(errorMsg)
 	}
 
@@ -737,7 +738,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 }
 
 func (p *csiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
-	klog.V(4).Infof(log("setting up block unmapper for [Spec=%v, podUID=%v]", volName, podUID))
+	klog.V(4).InfoS(log("setting up block unmapper for volume and pod"), "volume", volName, "pod", podUID)
 	unmapper := &csiBlockMapper{
 		plugin:   p,
 		podUID:   podUID,
@@ -758,7 +759,7 @@ func (p *csiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (vo
 }
 
 func (p *csiPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapPath string) (*volume.Spec, error) {
-	klog.V(4).Infof("plugin.ConstructBlockVolumeSpec [podUID=%s, specVolName=%s, path=%s]", string(podUID), specVolName, mapPath)
+	klog.V(4).InfoS("plugin.ConstructBlockVolumeSpec", "pod", string(podUID), "specVol", specVolName, "path", mapPath)
 
 	dataDir := getVolumeDeviceDataDir(specVolName, p.host)
 	volData, err := loadVolumeData(dataDir, volDataFileName)
@@ -766,7 +767,7 @@ func (p *csiPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapP
 		return nil, errors.New(log("plugin.ConstructBlockVolumeSpec failed loading volume data using [%s]: %v", mapPath, err))
 	}
 
-	klog.V(4).Info(log("plugin.ConstructBlockVolumeSpec extracted [%#v]", volData))
+	klog.V(4).InfoS(log("plugin.ConstructBlockVolumeSpec extracted"), "volData", volData)
 
 	blockMode := api.PersistentVolumeBlock
 	pv := &api.PersistentVolume{
@@ -1057,7 +1058,7 @@ func waitForAPIServerForever(client clientset.Interface, nodeName types.NodeName
 			// API server contacted
 			return true, nil
 		}
-		klog.V(2).Infof("Failed to contact API server when waiting for CSINode publishing: %s", lastErr)
+		klog.V(2).InfoS("Failed to contact API server when waiting for CSINode publishing", "err", lastErr)
 		return false, nil
 	})
 	if err != nil {
