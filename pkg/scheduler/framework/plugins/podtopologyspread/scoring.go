@@ -74,8 +74,10 @@ func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, fi
 		return nil
 	}
 	topoSize := make([]int, len(s.Constraints))
+	requiredSchedulingTerm := nodeaffinity.GetRequiredNodeAffinity(pod)
 	for _, node := range filteredNodes {
-		if !nodeLabelsMatchSpreadConstraints(node.Labels, s.Constraints) {
+		// Ignore parsing errors for backwards compatibility.
+		if match, _ := requiredSchedulingTerm.Match(node); !match {
 			// Nodes which don't have all required topologyKeys present are ignored
 			// when scoring later.
 			s.IgnoredNodes.Insert(node.Name)
