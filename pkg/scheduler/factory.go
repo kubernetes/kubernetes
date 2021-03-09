@@ -200,7 +200,7 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 		prof := &c.profiles[i]
 		plugins := &schedulerapi.Plugins{}
 		plugins.Append(defaultPlugins)
-		plugins.Apply(prof.Plugins)
+		plugins.Append(prof.Plugins)
 		prof.Plugins = plugins
 	}
 	return c.create()
