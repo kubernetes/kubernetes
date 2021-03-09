@@ -21,12 +21,15 @@ FROM ${BASEIMAGE}
 # This is a dependency for `kubectl diff` tests
 COPY --from=base /usr/bin/diff /usr/local/bin/
 
+COPY cluster /kubernetes/cluster
 COPY ginkgo /usr/local/bin/
 COPY e2e.test /usr/local/bin/
 COPY kubectl /usr/local/bin/
-COPY gorunner /usr/local/bin/
+COPY gorunner /usr/local/bin/kubeconformance
+
+# Legacy executables -- deprecated
+COPY gorunner /run_e2e.sh
 COPY gorunner /gorunner
-COPY cluster /kubernetes/cluster
 
 ENV E2E_FOCUS="\[Conformance\]"
 ENV E2E_SKIP=""
@@ -36,4 +39,4 @@ ENV E2E_VERBOSITY="4"
 ENV RESULTS_DIR="/tmp/results"
 ENV KUBECONFIG=""
 
-ENTRYPOINT [ "/gorunner" ]
+ENTRYPOINT [ "kubeconformance" ]
