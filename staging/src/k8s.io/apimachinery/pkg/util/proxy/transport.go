@@ -32,6 +32,7 @@ import (
 	"golang.org/x/net/html/atom"
 	"k8s.io/klog/v2"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -101,7 +102,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := rt.RoundTrip(req)
 
 	if err != nil {
-		return nil, fmt.Errorf("error trying to reach service: %w", err)
+		return nil, errors.NewServiceUnavailable(fmt.Sprintf("error trying to reach service: %v", err))
 	}
 
 	if redirect := resp.Header.Get("Location"); redirect != "" {
