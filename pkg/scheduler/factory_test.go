@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -99,6 +100,7 @@ func TestCreateFromConfig(t *testing.T) {
 		configData       []byte
 		wantPluginConfig []schedulerapi.PluginConfig
 		wantPlugins      *schedulerapi.Plugins
+		wantErr          string
 	}{
 
 		{
@@ -374,6 +376,22 @@ func TestCreateFromConfig(t *testing.T) {
 				Bind: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
 			},
 		},
+		{
+			name: "policy with invalid arguments",
+			configData: []byte(`{
+				"kind" : "Policy",
+				"apiVersion" : "v1",
+				"predicates" : [
+					{"name" : "TestZoneAffinity", "argument" : {"serviceAffinity" : {"labels" : ["zone"]}}}
+				],
+				"priorities" : [
+					{"name": "RequestedToCapacityRatioPriority", "weight": 2},
+					{"name" : "NodeAffinityPriority", "weight" : 10},
+					{"name" : "InterPodAffinityPriority", "weight" : 100}
+				]
+			}`),
+			wantErr: `couldn't create scheduler from policy: priority type not found for "RequestedToCapacityRatioPriority"`,
+		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -402,9 +420,10 @@ func TestCreateFromConfig(t *testing.T) {
 					}
 				}),
 			)
-
 			if err != nil {
-				t.Fatalf("Error constructing: %v", err)
+				if !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
+				}
 			}
 		})
 	}
