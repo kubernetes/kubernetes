@@ -627,7 +627,6 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 		}
 		return bmods, nil
 	}
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file /proc/modules with error %w", err)
 	}
@@ -640,7 +639,6 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 
 	bmods, nfconntrack, err = utilipvs.BuiltinIPVSModules(false, kernelVersionStr)
 	if err != nil {
-<<<<<<< HEAD
 		klog.ErrorS(err, "Failed to read builtin modules file, you can ignore this message when kube-proxy is running inside container without mounting /lib/modules", "filePath", builtinModsFilePath)
 	}
 
@@ -657,26 +655,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 				lmods = append(lmods, module)
 			}
 		}
-||||||| parent of 5b88c3962f3 (Validate nfconntrack regardless of kernel version)
-		klog.Warningf("Failed to read file %s with error %v. You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", builtinModsFilePath, err)
-	}
-
-	for _, module := range ipvsModules {
-		if match, _ := regexp.Match(module+".ko", b); match {
-			bmods = append(bmods, module)
-		} else {
-			// Try to load the required IPVS kernel modules if not built in
-			err := handle.executor.Command("modprobe", "--", module).Run()
-			if err != nil {
-				klog.Warningf("Failed to load kernel module %v with modprobe. "+
-					"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", module)
-			} else {
-				lmods = append(lmods, module)
-			}
-		}
-=======
 		return nil, fmt.Errorf("Failed to get kernel built-in modules")
->>>>>>> 5b88c3962f3 (Validate nfconntrack regardless of kernel version)
 	}
 
 	mods = append(mods, bmods...)

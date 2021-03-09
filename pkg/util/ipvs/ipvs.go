@@ -131,8 +131,13 @@ func (rs *RealServer) Equal(other *RealServer) bool {
 func GetRequiredIPVSModules() []string {
 	// "nf_conntrack_ipv4" has been removed since v4.19
 	// see https://github.com/torvalds/linux/commit/a0ae2562c6c4b2721d9fddba63b7286c13517d9f
-	return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrack, KernelModuleNfConntrackIPV4}
-
+	return []string{
+		KernelModuleIPVS,
+		KernelModuleIPVSRR,
+		KernelModuleIPVSWRR,
+		KernelModuleIPVSSH,
+		KernelModuleNfConntrack,
+		KernelModuleNfConntrackIPV4}
 }
 
 // BuiltinIPVSModules checks modules that are already built-in into the kernel
