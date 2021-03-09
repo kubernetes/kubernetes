@@ -95,7 +95,13 @@ var _ = SIGDescribe("DisruptionController", func() {
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromString("1%"), defaultLabels)
 	})
 
-	ginkgo.It("should observe PodDisruptionBudget status updated", func() {
+	/*
+	   Release : v1.21
+	   Testname: PodDisruptionBudget: Status updates
+	   Description: Disruption controller MUST update the PDB status with
+	   how many disruptions are allowed.
+	*/
+	framework.ConformanceIt("should observe PodDisruptionBudget status updated", func() {
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(1), defaultLabels)
 
 		createPodsOrDie(cs, ns, 3)
