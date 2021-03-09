@@ -384,7 +384,7 @@ var _ = SIGDescribe("kubelet", func() {
 	})
 
 	// Test host cleanup when disrupting the volume environment.
-	ginkgo.Describe("host cleanup with volume mounts [sig-storage][HostCleanup][Flaky]", func() {
+	ginkgo.Describe("host cleanup with volume mounts [HostCleanup][Flaky]", func() {
 
 		type hostCleanupTest struct {
 			itDescr string

@@ -2068,28 +2068,28 @@
   file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath expansion
   codename: '[sig-node] Variable Expansion should allow substituting values in a volume
-    subpath [sig-storage] [Conformance]'
+    subpath [Conformance]'
   description: Make sure a container's subpath can be set using an expansion of environment
     variables.
   release: v1.19
   file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath with absolute path
   codename: '[sig-node] Variable Expansion should fail substituting values in a volume
-    subpath with absolute path [sig-storage][Slow] [Conformance]'
+    subpath with absolute path [Slow] [Conformance]'
   description: Make sure a container's subpath can not be set using an expansion of
     environment variables when absolute path is supplied.
   release: v1.19
   file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath with backticks
   codename: '[sig-node] Variable Expansion should fail substituting values in a volume
-    subpath with backticks [sig-storage][Slow] [Conformance]'
+    subpath with backticks [Slow] [Conformance]'
   description: Make sure a container's subpath can not be set using an expansion of
     environment variables when backticks are supplied.
   release: v1.19
   file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath test writes
   codename: '[sig-node] Variable Expansion should succeed in writing subpaths in container
-    [sig-storage][Slow] [Conformance]'
+    [Slow] [Conformance]'
   description: "Verify that a subpath expansion can be used to write files into subpaths.
     1.\tvalid subpathexpr starts a container running 2.\ttest for valid subpath writes
     3.\tsuccessful expansion of the subpathexpr isn't required for volume cleanup"
@@ -2097,7 +2097,7 @@
   file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath ready from failed state
   codename: '[sig-node] Variable Expansion should verify that a failing subpath expansion
-    can be modified during the lifecycle of a container [sig-storage][Slow] [Conformance]'
+    can be modified during the lifecycle of a container [Slow] [Conformance]'
   description: Verify that a failing subpath expansion can be modified during the
     lifecycle of a container.
   release: v1.19
