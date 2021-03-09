@@ -717,6 +717,12 @@ const (
 	//
 	// Enables node-local routing for Service internal traffic
 	ServiceInternalTrafficPolicy featuregate.Feature = "ServiceInternalTrafficPolicy"
+
+	// owner: @adtac
+	// alpha: v1.21
+	//
+	// Allows jobs to be created in the suspended state.
+	SuspendJob featuregate.Feature = "SuspendJob"
 )
 
 func init() {
@@ -825,6 +831,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	LogarithmicScaleDown:                           {Default: false, PreRelease: featuregate.Alpha},
 	IngressClassNamespacedParams:                   {Default: false, PreRelease: featuregate.Alpha},
 	ServiceInternalTrafficPolicy:                   {Default: false, PreRelease: featuregate.Alpha},
+	SuspendJob:                                     {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

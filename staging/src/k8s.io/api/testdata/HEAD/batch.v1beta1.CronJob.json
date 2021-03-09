@@ -1569,11 +1569,12 @@
             "setHostnameAsFQDN": false
           }
         },
-        "ttlSecondsAfterFinished": -1285029915
+        "ttlSecondsAfterFinished": -1285029915,
+        "suspend": true
       }
     },
-    "successfulJobsHistoryLimit": -1887637570,
-    "failedJobsHistoryLimit": 1755548633
+    "successfulJobsHistoryLimit": 1729066291,
+    "failedJobsHistoryLimit": -908823020
   },
   "status": {
     "active": [
@@ -1581,7 +1582,7 @@
         "kind": "503",
         "namespace": "504",
         "name": "505",
-        "uid": "犓`ɜɅco\\穜T睭憲Ħ焵i,ŋŨN",
+        "uid": "`",
         "apiVersion": "506",
         "resourceVersion": "507",
         "fieldPath": "508"

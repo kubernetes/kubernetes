@@ -35,6 +35,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
+	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -67,6 +68,85 @@ var _ = SIGDescribe("Job", func() {
 			}
 		}
 		framework.ExpectEqual(successes, completions, "epected %d successful job pods, but got  %d", completions, successes)
+	})
+
+	// Requires the alpha level feature gate SuspendJob. This e2e test will not
+	// pass without the following flag being passed to kubetest:
+	//   --test_args="--feature-gates=SuspendJob=true"
+	ginkgo.It("[Feature:SuspendJob] should not create pods when created in suspend state", func() {
+		ginkgo.By("Creating a job with suspend=true")
+		job := e2ejob.NewTestJob("succeed", "suspend-true-to-false", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.Suspend = pointer.BoolPtr(true)
+		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring pods aren't created for job")
+		framework.ExpectEqual(wait.Poll(framework.Poll, wait.ForeverTestTimeout, func() (bool, error) {
+			pods, err := e2ejob.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
+			if err != nil {
+				return false, err
+			}
+			return len(pods.Items) > 0, nil
+		}), wait.ErrWaitTimeout)
+
+		ginkgo.By("Checking Job status to observe Suspended state")
+		job, err = e2ejob.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to retrieve latest job object")
+		exists := false
+		for _, c := range job.Status.Conditions {
+			if c.Type == batchv1.JobSuspended {
+				exists = true
+				break
+			}
+		}
+		framework.ExpectEqual(exists, true)
+
+		ginkgo.By("Updating the job with suspend=false")
+		job.Spec.Suspend = pointer.BoolPtr(false)
+		job, err = e2ejob.UpdateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to update job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Waiting for job to complete")
+		err = e2ejob.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+	})
+
+	// Requires the alpha level feature gate SuspendJob. This e2e test will not
+	// pass without the following flag being passed to kubetest:
+	//   --test_args="--feature-gates=SuspendJob=true"
+	ginkgo.It("[Feature:SuspendJob] should delete pods when suspended", func() {
+		ginkgo.By("Creating a job with suspend=false")
+		job := e2ejob.NewTestJob("notTerminate", "suspend-false-to-true", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.Suspend = pointer.BoolPtr(false)
+		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensure pods equal to paralellism count is attached to the job")
+		err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
+		framework.ExpectNoError(err, "failed to ensure number of pods associated with job %s is equal to parallelism count in namespace: %s", job.Name, f.Namespace.Name)
+
+		ginkgo.By("Updating the job with suspend=true")
+		job, err = e2ejob.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to retrieve latest job object")
+		job.Spec.Suspend = pointer.BoolPtr(true)
+		job, err = e2ejob.UpdateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to update job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring pods are deleted")
+		err = e2ejob.WaitForAllJobPodsGone(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to ensure pods are deleted after suspend=true")
+
+		ginkgo.By("Checking Job status to observe Suspended state")
+		job, err = e2ejob.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to retrieve latest job object")
+		exists := false
+		for _, c := range job.Status.Conditions {
+			if c.Type == batchv1.JobSuspended {
+				exists = true
+				break
+			}
+		}
+		framework.ExpectEqual(exists, true)
 	})
 
 	/*

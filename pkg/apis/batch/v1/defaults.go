@@ -46,6 +46,9 @@ func SetDefaults_Job(obj *batchv1.Job) {
 	if len(obj.Spec.CompletionMode) == 0 {
 		obj.Spec.CompletionMode = batchv1.NonIndexedCompletion
 	}
+	if obj.Spec.Suspend == nil {
+		obj.Spec.Suspend = utilpointer.BoolPtr(false)
+	}
 }
 
 func SetDefaults_CronJob(obj *batchv1.CronJob) {
