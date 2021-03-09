@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -783,7 +784,20 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(claim *v1.PersistentVo
 				return nil, fmt.Errorf("PersistentVolume %q is without a storage capacity", volume.Name)
 			}
 			claimCap, ok := claim.Status.Capacity[v1.ResourceStorage]
-			if !ok || volumeCap.Cmp(claimCap) != 0 {
+			// If PV has a resize annotation, set the claim's request capacity
+			if metav1.HasAnnotation(volume.ObjectMeta, util.AnnPreResizeCapacity) {
+				klog.V(2).Infof("volume %q requires filesystem resize: setting pvc %s status capacity to %s", volume.Name, claimToClaimKey(claim), volume.ObjectMeta.Annotations[util.AnnPreResizeCapacity])
+				preQty, err := resource.ParseQuantity(volume.ObjectMeta.Annotations[util.AnnPreResizeCapacity])
+				if err != nil {
+					klog.Warningf("Parsing pre-resize-capacity from PV(%q) failed", volume.Name, err)
+					preQty = volume.Spec.Capacity[v1.ResourceStorage]
+				}
+				if claimClone.Status.Capacity == nil {
+					claimClone.Status.Capacity = make(map[v1.ResourceName]resource.Quantity)
+				}
+				claimClone.Status.Capacity[v1.ResourceStorage] = preQty
+				dirty = true
+			} else if !ok || volumeCap.Cmp(claimCap) != 0 {
 				claimClone.Status.Capacity = volume.Spec.Capacity
 				dirty = true
 			}
