@@ -101,6 +101,14 @@ const (
 	// https://github.com/kubernetes/community/blob/master/sig-scalability/slos/network_programming_latency.md
 	EndpointsLastChangeTriggerTime = "endpoints.kubernetes.io/last-change-trigger-time"
 
+	// EndpointsOverCapacity will be set on an Endpoints resource when it
+	// exceeds the maximum capacity of 1000 addresses. Inititially the Endpoints
+	// controller will set this annotation with a value of "warning". In a
+	// future release, the controller may set this annotation with a value of
+	// "truncated" to indicate that any addresses exceeding the limit of 1000
+	// have been truncated from the Endpoints resource.
+	EndpointsOverCapacity = "endpoints.kubernetes.io/over-capacity"
+
 	// MigratedPluginsAnnotationKey is the annotation key, set for CSINode objects, that is a comma-separated
 	// list of in-tree plugins that will be serviced by the CSI backend on the Node represented by CSINode.
 	// This annotation is used by the Attach Detach Controller to determine whether to use the in-tree or

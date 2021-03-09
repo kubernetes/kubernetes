@@ -17,6 +17,7 @@ limitations under the License.
 package endpoint
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -35,6 +36,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -219,6 +221,29 @@ func newController(url string, batchPeriod time.Duration) *endpointController {
 	endpoints.endpointsSynced = alwaysReady
 	return &endpointController{
 		endpoints,
+		informerFactory.Core().V1().Pods().Informer().GetStore(),
+		informerFactory.Core().V1().Services().Informer().GetStore(),
+		informerFactory.Core().V1().Endpoints().Informer().GetStore(),
+	}
+}
+
+func newFakeController(batchPeriod time.Duration) (*fake.Clientset, *endpointController) {
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controllerpkg.NoResyncPeriodFunc())
+
+	eController := NewEndpointController(
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Core().V1().Services(),
+		informerFactory.Core().V1().Endpoints(),
+		client,
+		batchPeriod)
+
+	eController.podsSynced = alwaysReady
+	eController.servicesSynced = alwaysReady
+	eController.endpointsSynced = alwaysReady
+
+	return client, &endpointController{
+		eController,
 		informerFactory.Core().V1().Pods().Informer().GetStore(),
 		informerFactory.Core().V1().Services().Informer().GetStore(),
 		informerFactory.Core().V1().Endpoints().Informer().GetStore(),
@@ -1979,6 +2004,106 @@ func TestSyncEndpointsServiceNotFound(t *testing.T) {
 	endpoints.syncService(ns + "/foo")
 	endpointsHandler.ValidateRequestCount(t, 1)
 	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "DELETE", nil)
+}
+
+func TestSyncServiceOverCapacity(t *testing.T) {
+	testCases := []struct {
+		name               string
+		startingAnnotation *string
+		numExisting        int
+		numDesired         int
+		expectedAnnotation bool
+	}{{
+		name:               "empty",
+		startingAnnotation: nil,
+		numExisting:        0,
+		numDesired:         0,
+		expectedAnnotation: false,
+	}, {
+		name:               "annotation added past capacity",
+		startingAnnotation: nil,
+		numExisting:        maxCapacity - 1,
+		numDesired:         maxCapacity + 1,
+		expectedAnnotation: true,
+	}, {
+		name:               "annotation removed below capacity",
+		startingAnnotation: utilpointer.StringPtr("warning"),
+		numExisting:        maxCapacity - 1,
+		numDesired:         maxCapacity - 1,
+		expectedAnnotation: false,
+	}, {
+		name:               "annotation removed at capacity",
+		startingAnnotation: utilpointer.StringPtr("warning"),
+		numExisting:        maxCapacity,
+		numDesired:         maxCapacity,
+		expectedAnnotation: false,
+	}, {
+		name:               "no endpoints change, annotation value corrected",
+		startingAnnotation: utilpointer.StringPtr("invalid"),
+		numExisting:        maxCapacity + 1,
+		numDesired:         maxCapacity + 1,
+		expectedAnnotation: true,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ns := "test"
+			client, c := newFakeController(0 * time.Second)
+
+			addPods(c.podStore, ns, tc.numDesired, 1, 0, ipv4only)
+			pods := c.podStore.List()
+
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+				Spec: v1.ServiceSpec{
+					Selector: map[string]string{"foo": "bar"},
+					Ports:    []v1.ServicePort{{Port: 80}},
+				},
+			}
+			c.serviceStore.Add(svc)
+
+			subset := v1.EndpointSubset{}
+			for i := 0; i < tc.numExisting; i++ {
+				pod := pods[i].(*v1.Pod)
+				epa, _ := podToEndpointAddressForService(svc, pod)
+				subset.Addresses = append(subset.Addresses, *epa)
+			}
+			endpoints := &v1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            svc.Name,
+					Namespace:       ns,
+					ResourceVersion: "1",
+					Annotations:     map[string]string{},
+				},
+				Subsets: []v1.EndpointSubset{subset},
+			}
+			if tc.startingAnnotation != nil {
+				endpoints.Annotations[v1.EndpointsOverCapacity] = *tc.startingAnnotation
+			}
+			c.endpointsStore.Add(endpoints)
+			client.CoreV1().Endpoints(ns).Create(context.TODO(), endpoints, metav1.CreateOptions{})
+
+			c.syncService(fmt.Sprintf("%s/%s", ns, svc.Name))
+
+			actualEndpoints, err := client.CoreV1().Endpoints(ns).Get(context.TODO(), endpoints.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error getting endpoints: %v", err)
+			}
+
+			actualAnnotation, ok := actualEndpoints.Annotations[v1.EndpointsOverCapacity]
+			if tc.expectedAnnotation {
+				if !ok {
+					t.Errorf("Expected EndpointsOverCapacity annotation to be set")
+				} else if actualAnnotation != "warning" {
+					t.Errorf("Expected EndpointsOverCapacity annotation to be 'warning', got %s", actualAnnotation)
+				}
+			} else {
+				if ok {
+					t.Errorf("Expected EndpointsOverCapacity annotation not to be set, got %s", actualAnnotation)
+				}
+			}
+		})
+	}
 }
 
 func TestEndpointPortFromServicePort(t *testing.T) {
