@@ -131,7 +131,14 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		testRSScaleSubresources(f)
 	})
 
-	ginkgo.It("ReplicaSet Replace and Patch tests", func() {
+	/*
+		Release: v1.21
+		Testname: ReplicaSet, is created, Replaced and Patched
+		Description: Create a ReplicaSet (RS) with a single Pod. The Pod MUST be verified
+		that it is running. The RS MUST scale to two replicas and verify the scale count
+		The RS MUST be patched and verify that patch succeeded.
+	*/
+	framework.ConformanceIt("Replace and Patch tests", func() {
 		testRSLifeCycle(f)
 	})
 })
