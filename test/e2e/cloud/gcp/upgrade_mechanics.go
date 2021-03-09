@@ -32,30 +32,33 @@ import (
 	"k8s.io/kubernetes/test/utils/junit"
 )
 
-func masterUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, masterExtraEnvs []string) func() {
+// ControlPlaneUpgradeFunc returns a function that performs control plane upgrade.
+func ControlPlaneUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs []string) func() {
 	return func() {
 		start := time.Now()
 		defer finalizeUpgradeTest(start, testCase)
 		target := upgCtx.Versions[1].Version.String()
-		framework.ExpectNoError(masterUpgrade(f, target, masterExtraEnvs))
-		framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+		framework.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
+		framework.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
 	}
 }
 
-func clusterUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, masterExtraEnvs, nodeExtraEnvs []string) func() {
+// ClusterUpgradeFunc returns a function that performs full cluster upgrade (both control plane and nodes).
+func ClusterUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs, nodeExtraEnvs []string) func() {
 	return func() {
 		start := time.Now()
 		defer finalizeUpgradeTest(start, testCase)
 		target := upgCtx.Versions[1].Version.String()
 		image := upgCtx.Versions[1].NodeImage
-		framework.ExpectNoError(masterUpgrade(f, target, masterExtraEnvs))
-		framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+		framework.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
+		framework.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
 		framework.ExpectNoError(nodeUpgrade(f, target, image, nodeExtraEnvs))
 		framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 	}
 }
 
-func clusterDowngradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, masterExtraEnvs, nodeExtraEnvs []string) func() {
+// ClusterDowngradeFunc returns a function that performs full cluster downgrade (both nodes and control plane).
+func ClusterDowngradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs, nodeExtraEnvs []string) func() {
 	return func() {
 		start := time.Now()
 		defer finalizeUpgradeTest(start, testCase)
@@ -64,24 +67,24 @@ func clusterDowngradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContex
 		// Yes this really is a downgrade. And nodes must downgrade first.
 		framework.ExpectNoError(nodeUpgrade(f, target, image, nodeExtraEnvs))
 		framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-		framework.ExpectNoError(masterUpgrade(f, target, masterExtraEnvs))
-		framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+		framework.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
+		framework.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
 	}
 }
 
-// masterUpgrade upgrades master node on GCE/GKE.
-func masterUpgrade(f *framework.Framework, v string, extraEnvs []string) error {
+// controlPlaneUpgrade upgrades control plane node on GCE/GKE.
+func controlPlaneUpgrade(f *framework.Framework, v string, extraEnvs []string) error {
 	switch framework.TestContext.Provider {
 	case "gce":
-		return masterUpgradeGCE(v, extraEnvs)
+		return controlPlaneUpgradeGCE(v, extraEnvs)
 	case "gke":
 		return framework.MasterUpgradeGKE(f.Namespace.Name, v)
 	default:
-		return fmt.Errorf("masterUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
+		return fmt.Errorf("controlPlaneUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
 	}
 }
 
-func masterUpgradeGCE(rawV string, extraEnvs []string) error {
+func controlPlaneUpgradeGCE(rawV string, extraEnvs []string) error {
 	env := append(os.Environ(), extraEnvs...)
 	// TODO: Remove these variables when they're no longer needed for downgrades.
 	if framework.TestContext.EtcdUpgradeVersion != "" && framework.TestContext.EtcdUpgradeStorage != "" {
@@ -100,7 +103,7 @@ func masterUpgradeGCE(rawV string, extraEnvs []string) error {
 	return err
 }
 
-func traceRouteToMaster() {
+func traceRouteToControlPlane() {
 	traceroute, err := exec.LookPath("traceroute")
 	if err != nil {
 		framework.Logf("Could not find traceroute program")
@@ -116,30 +119,30 @@ func traceRouteToMaster() {
 	}
 }
 
-// checkMasterVersion validates the master version
-func checkMasterVersion(c clientset.Interface, want string) error {
-	framework.Logf("Checking master version")
+// checkControlPlaneVersion validates the control plane version
+func checkControlPlaneVersion(c clientset.Interface, want string) error {
+	framework.Logf("Checking control plane version")
 	var err error
 	var v *version.Info
 	waitErr := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
 		v, err = c.Discovery().ServerVersion()
 		if err != nil {
-			traceRouteToMaster()
+			traceRouteToControlPlane()
 			return false, nil
 		}
 		return true, nil
 	})
 	if waitErr != nil {
-		return fmt.Errorf("CheckMasterVersion() couldn't get the master version: %v", err)
+		return fmt.Errorf("CheckControlPlane() couldn't get the control plane version: %v", err)
 	}
 	// We do prefix trimming and then matching because:
 	// want looks like:  0.19.3-815-g50e67d4
 	// got  looks like: v0.19.3-815-g50e67d4034e858-dirty
 	got := strings.TrimPrefix(v.GitVersion, "v")
 	if !strings.HasPrefix(got, want) {
-		return fmt.Errorf("master had kube-apiserver version %s which does not start with %s", got, want)
+		return fmt.Errorf("control plane had kube-apiserver version %s which does not start with %s", got, want)
 	}
-	framework.Logf("Master is at version %s", want)
+	framework.Logf("Control plane is at version %s", want)
 	return nil
 }
 
@@ -266,4 +269,3 @@ func checkNodesVersions(cs clientset.Interface, want string) error {
 	}
 	return nil
 }
-

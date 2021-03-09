@@ -114,7 +114,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 			}
 			testSuite.TestCases = append(testSuite.TestCases, masterUpgradeTest, nil)
 
-			upgradeFunc := masterUpgradeFunc(f, upgCtx, masterUpgradeTest, nil)
+			upgradeFunc := ControlPlaneUpgradeFunc(f, upgCtx, masterUpgradeTest, nil)
 			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
@@ -128,7 +128,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 			clusterUpgradeTest := &junit.TestCase{Name: "[sig-cloud-provider-gcp] cluster-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, clusterUpgradeTest)
 
-			upgradeFunc := clusterUpgradeFunc(f, upgCtx, clusterUpgradeTest, nil, nil)
+			upgradeFunc := ClusterUpgradeFunc(f, upgCtx, clusterUpgradeTest, nil, nil)
 			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -147,7 +147,7 @@ var _ = ginkgo.Describe("Downgrade [Feature:Downgrade]", func() {
 			clusterDowngradeTest := &junit.TestCase{Name: "[sig-cloud-provider-gcp] cluster-downgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, clusterDowngradeTest)
 
-			upgradeFunc := clusterDowngradeFunc(f, upgCtx, clusterDowngradeTest, nil, nil)
+			upgradeFunc := ClusterDowngradeFunc(f, upgCtx, clusterDowngradeTest, nil, nil)
 			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -188,7 +188,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 			gpuUpgradeTest := &junit.TestCase{Name: "[sig-node] gpu-master-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, gpuUpgradeTest)
 
-			upgradeFunc := masterUpgradeFunc(f, upgCtx, gpuUpgradeTest, nil)
+			upgradeFunc := ControlPlaneUpgradeFunc(f, upgCtx, gpuUpgradeTest, nil)
 			runUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
@@ -201,7 +201,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 			gpuUpgradeTest := &junit.TestCase{Name: "[sig-node] gpu-cluster-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, gpuUpgradeTest)
 
-			upgradeFunc := clusterUpgradeFunc(f, upgCtx, gpuUpgradeTest, nil, nil)
+			upgradeFunc := ClusterUpgradeFunc(f, upgCtx, gpuUpgradeTest, nil, nil)
 			runUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -214,7 +214,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 			gpuDowngradeTest := &junit.TestCase{Name: "[sig-node] gpu-cluster-downgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, gpuDowngradeTest)
 
-			upgradeFunc := clusterDowngradeFunc(f, upgCtx, gpuDowngradeTest, nil, nil)
+			upgradeFunc := ClusterDowngradeFunc(f, upgCtx, gpuDowngradeTest, nil, nil)
 			runUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -233,7 +233,7 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 			statefulUpgradeTest := &junit.TestCase{Name: "[sig-apps] stateful-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, statefulUpgradeTest)
 
-			upgradeFunc := clusterUpgradeFunc(f, upgCtx, statefulUpgradeTest, nil, nil)
+			upgradeFunc := ClusterUpgradeFunc(f, upgCtx, statefulUpgradeTest, nil, nil)
 			runUpgradeSuite(upgCtx, statefulsetUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -260,7 +260,7 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 			testSuite.TestCases = append(testSuite.TestCases, kubeProxyUpgradeTest)
 
 			extraEnvs := kubeProxyDaemonSetExtraEnvs(true)
-			upgradeFunc := clusterUpgradeFunc(f, upgCtx, kubeProxyUpgradeTest, extraEnvs, extraEnvs)
+			upgradeFunc := ClusterUpgradeFunc(f, upgCtx, kubeProxyUpgradeTest, extraEnvs, extraEnvs)
 			runUpgradeSuite(upgCtx, kubeProxyUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -278,7 +278,7 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 			testSuite.TestCases = append(testSuite.TestCases, kubeProxyDowngradeTest)
 
 			extraEnvs := kubeProxyDaemonSetExtraEnvs(false)
-			upgradeFunc := clusterDowngradeFunc(f, upgCtx, kubeProxyDowngradeTest, extraEnvs, extraEnvs)
+			upgradeFunc := ClusterDowngradeFunc(f, upgCtx, kubeProxyDowngradeTest, extraEnvs, extraEnvs)
 			runUpgradeSuite(upgCtx, kubeProxyDowngradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -301,7 +301,7 @@ var _ = ginkgo.Describe("[sig-auth] ServiceAccount admission controller migratio
 			testSuite.TestCases = append(testSuite.TestCases, serviceaccountAdmissionControllerMigrationTest)
 
 			extraEnvs := []string{"KUBE_FEATURE_GATES=BoundServiceAccountTokenVolume=true"}
-			upgradeFunc := masterUpgradeFunc(f, upgCtx, serviceaccountAdmissionControllerMigrationTest, extraEnvs)
+			upgradeFunc := ControlPlaneUpgradeFunc(f, upgCtx, serviceaccountAdmissionControllerMigrationTest, extraEnvs)
 			runUpgradeSuite(upgCtx, serviceaccountAdmissionControllerMigrationTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
