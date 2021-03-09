@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/component-base/metrics/testutil"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -1028,7 +1028,7 @@ func TestRecentlyTriedPodsGoBack(t *testing.T) {
 		t.Errorf("Error while popping the head of the queue: %v", err)
 	}
 	// Update pod condition to unschedulable.
-	podutil.UpdatePodCondition(&p1.PodInfo.Pod.Status, &v1.PodCondition{
+	corev1helpers.UpdatePodCondition(&p1.PodInfo.Pod.Status, &v1.PodCondition{
 		Type:          v1.PodScheduled,
 		Status:        v1.ConditionFalse,
 		Reason:        v1.PodReasonUnschedulable,
@@ -1079,7 +1079,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	}
 
 	// Update pod condition to unschedulable.
-	podutil.UpdatePodCondition(&unschedulablePod.Status, &v1.PodCondition{
+	corev1helpers.UpdatePodCondition(&unschedulablePod.Status, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  v1.PodReasonUnschedulable,
@@ -1122,7 +1122,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	q.Add(&newerPod)
 
 	// And then unschedulablePodInfo was determined as unschedulable AGAIN.
-	podutil.UpdatePodCondition(&unschedulablePod.Status, &v1.PodCondition{
+	corev1helpers.UpdatePodCondition(&unschedulablePod.Status, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  v1.PodReasonUnschedulable,
@@ -1190,7 +1190,7 @@ func TestHighPriorityBackoff(t *testing.T) {
 		t.Errorf("Expected to get high priority pod, got: %v", p)
 	}
 	// Update pod condition to unschedulable.
-	podutil.UpdatePodCondition(&p.Pod.Status, &v1.PodCondition{
+	corev1helpers.UpdatePodCondition(&p.Pod.Status, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  v1.PodReasonUnschedulable,
@@ -1246,7 +1246,7 @@ func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
 	}
 
 	// Update pod condition to highPod.
-	podutil.UpdatePodCondition(&highPod.Status, &v1.PodCondition{
+	corev1helpers.UpdatePodCondition(&highPod.Status, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  v1.PodReasonUnschedulable,
@@ -1254,7 +1254,7 @@ func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
 	})
 
 	// Update pod condition to midPod.
-	podutil.UpdatePodCondition(&midPod.Status, &v1.PodCondition{
+	corev1helpers.UpdatePodCondition(&midPod.Status, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  v1.PodReasonUnschedulable,
@@ -1294,7 +1294,7 @@ var (
 	}
 	addPodUnschedulableQ = func(queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		// Update pod condition to unschedulable.
-		podutil.UpdatePodCondition(&pInfo.Pod.Status, &v1.PodCondition{
+		corev1helpers.UpdatePodCondition(&pInfo.Pod.Status, &v1.PodCondition{
 			Type:    v1.PodScheduled,
 			Status:  v1.ConditionFalse,
 			Reason:  v1.PodReasonUnschedulable,

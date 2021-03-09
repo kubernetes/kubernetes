@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
@@ -112,7 +113,7 @@ func GeneratePodReadyCondition(spec *v1.PodSpec, conditions []v1.PodCondition, c
 	// Generate message if any readiness gate is not satisfied.
 	unreadyMessages := []string{}
 	for _, rg := range spec.ReadinessGates {
-		_, c := podutil.GetPodConditionFromList(conditions, rg.ConditionType)
+		_, c := corev1helpers.GetPodConditionFromList(conditions, rg.ConditionType)
 		if c == nil {
 			unreadyMessages = append(unreadyMessages, fmt.Sprintf("corresponding condition of pod readiness gate %q does not exist.", string(rg.ConditionType)))
 		} else if c.Status != v1.ConditionTrue {

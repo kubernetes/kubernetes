@@ -45,6 +45,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -1976,7 +1977,7 @@ func (om *fakeObjectManager) setPodReady(set *apps.StatefulSet, ordinal int) ([]
 	sort.Sort(ascendingOrdinal(pods))
 	pod := pods[ordinal].DeepCopy()
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
-	podutil.UpdatePodCondition(&pod.Status, &condition)
+	corev1helpers.UpdatePodCondition(&pod.Status, &condition)
 	fakeResourceVersion(pod)
 	om.podsIndexer.Update(pod)
 	return om.podsLister.Pods(set.Namespace).List(selector)
@@ -1997,7 +1998,7 @@ func (om *fakeObjectManager) setPodAvailable(set *apps.StatefulSet, ordinal int,
 	sort.Sort(ascendingOrdinal(pods))
 	pod := pods[ordinal].DeepCopy()
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: lastTransitionTime}}
-	_, existingCondition := podutil.GetPodCondition(&pod.Status, condition.Type)
+	_, existingCondition := corev1helpers.GetPodCondition(&pod.Status, condition.Type)
 	if existingCondition != nil {
 		existingCondition.Status = v1.ConditionTrue
 		existingCondition.LastTransitionTime = metav1.Time{Time: lastTransitionTime}
@@ -2009,7 +2010,7 @@ func (om *fakeObjectManager) setPodAvailable(set *apps.StatefulSet, ordinal int,
 		}
 		pod.Status.Conditions = append(pod.Status.Conditions, *existingCondition)
 	}
-	podutil.UpdatePodCondition(&pod.Status, &condition)
+	corev1helpers.UpdatePodCondition(&pod.Status, &condition)
 	fakeResourceVersion(pod)
 	om.podsIndexer.Update(pod)
 	return om.podsLister.Pods(set.Namespace).List(selector)
@@ -2023,7 +2024,7 @@ func (om *fakeObjectManager) addTerminatingPod(set *apps.StatefulSet, ordinal in
 	pod.DeletionTimestamp = &deleted
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
 	fakeResourceVersion(pod)
-	podutil.UpdatePodCondition(&pod.Status, &condition)
+	corev1helpers.UpdatePodCondition(&pod.Status, &condition)
 	om.podsIndexer.Update(pod)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {

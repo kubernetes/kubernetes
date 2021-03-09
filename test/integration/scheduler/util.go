@@ -35,8 +35,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/scale"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	"k8s.io/kube-scheduler/config/v1beta3"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
@@ -360,7 +360,7 @@ func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.
 			// This could be a connection error so we want to retry.
 			return false, nil
 		}
-		_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+		_, cond := corev1helpers.GetPodCondition(&pod.Status, v1.PodScheduled)
 		return cond != nil && cond.Status == v1.ConditionFalse &&
 			cond.Reason == v1.PodReasonUnschedulable, nil
 	}
@@ -376,7 +376,7 @@ func podSchedulingError(c clientset.Interface, podNamespace, podName string) wai
 			// This could be a connection error so we want to retry.
 			return false, nil
 		}
-		_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+		_, cond := corev1helpers.GetPodCondition(&pod.Status, v1.PodScheduled)
 		return cond != nil && cond.Status == v1.ConditionFalse &&
 			cond.Reason != v1.PodReasonUnschedulable, nil
 	}

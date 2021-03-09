@@ -1963,6 +1963,7 @@ k8s.io/component-helpers/apimachinery/lease
 k8s.io/component-helpers/apps/poddisruptionbudget
 k8s.io/component-helpers/auth/rbac/reconciliation
 k8s.io/component-helpers/auth/rbac/validation
+k8s.io/component-helpers/node/corev1
 k8s.io/component-helpers/node/topology
 k8s.io/component-helpers/node/util
 k8s.io/component-helpers/node/util/sysctl

@@ -33,7 +33,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
@@ -581,7 +581,7 @@ func TestIsRunningAndReady(t *testing.T) {
 		t.Error("isRunningAndReady does not respect Pod condition")
 	}
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
-	podutil.UpdatePodCondition(&pod.Status, &condition)
+	corev1helpers.UpdatePodCondition(&pod.Status, &condition)
 	if !isRunningAndReady(pod) {
 		t.Error("Pod should be running and ready")
 	}

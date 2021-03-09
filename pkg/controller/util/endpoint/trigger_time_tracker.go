@@ -21,7 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 )
 
 // TriggerTimeTracker is used to compute an EndpointsLastChangeTriggerTime
@@ -140,7 +140,7 @@ func (t *TriggerTimeTracker) DeleteService(namespace, name string) {
 // getPodTriggerTime returns the time of the pod change (trigger) that resulted
 // or will result in the endpoint object change.
 func getPodTriggerTime(pod *v1.Pod) (triggerTime time.Time) {
-	if readyCondition := podutil.GetPodReadyCondition(pod.Status); readyCondition != nil {
+	if readyCondition := corev1helpers.GetPodReadyCondition(pod.Status); readyCondition != nil {
 		triggerTime = readyCondition.LastTransitionTime.Time
 	}
 	return triggerTime

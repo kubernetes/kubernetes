@@ -21,6 +21,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onsi/ginkgo"
+	// ensure libs have a chance to initialize
+	_ "github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -30,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -38,11 +42,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	"github.com/onsi/ginkgo"
-
-	// ensure libs have a chance to initialize
-	_ "github.com/stretchr/testify/assert"
 )
 
 const (
@@ -1073,7 +1072,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 func GetPodsScheduled(workerNodes sets.String, pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Pod) {
 	for _, pod := range pods.Items {
 		if pod.Spec.NodeName != "" && workerNodes.Has(pod.Spec.NodeName) {
-			_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+			_, scheduledCondition := corev1helpers.GetPodCondition(&pod.Status, v1.PodScheduled)
 			framework.ExpectEqual(scheduledCondition != nil, true)
 			if scheduledCondition != nil {
 				framework.ExpectEqual(scheduledCondition.Status, v1.ConditionTrue)

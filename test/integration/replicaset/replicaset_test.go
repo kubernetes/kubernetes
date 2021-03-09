@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
@@ -309,7 +310,7 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 				continue
 			}
 			pod.Status.Phase = v1.PodRunning
-			_, condition := podutil.GetPodCondition(&pod.Status, v1.PodReady)
+			_, condition := corev1helpers.GetPodCondition(&pod.Status, v1.PodReady)
 			if condition != nil {
 				condition.Status = conditionStatus
 				condition.LastTransitionTime = metav1.Time{Time: lastTransitionTime}

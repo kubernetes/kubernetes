@@ -34,8 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	"k8s.io/klog/v2"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -137,7 +137,7 @@ func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 	oldCopy := oldStatus.DeepCopy()
 	for _, c := range status.Conditions {
 		if kubetypes.PodConditionByKubelet(c.Type) {
-			_, oc := podutil.GetPodCondition(oldCopy, c.Type)
+			_, oc := corev1helpers.GetPodCondition(oldCopy, c.Type)
 			if oc == nil || oc.Status != c.Status || oc.Message != c.Message || oc.Reason != c.Reason {
 				return false
 			}
@@ -504,13 +504,13 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 
 // updateLastTransitionTime updates the LastTransitionTime of a pod condition.
 func updateLastTransitionTime(status, oldStatus *v1.PodStatus, conditionType v1.PodConditionType) {
-	_, condition := podutil.GetPodCondition(status, conditionType)
+	_, condition := corev1helpers.GetPodCondition(status, conditionType)
 	if condition == nil {
 		return
 	}
 	// Need to set LastTransitionTime.
 	lastTransitionTime := metav1.Now()
-	_, oldCondition := podutil.GetPodCondition(oldStatus, conditionType)
+	_, oldCondition := corev1helpers.GetPodCondition(oldStatus, conditionType)
 	if oldCondition != nil && condition.Status == oldCondition.Status {
 		lastTransitionTime = oldCondition.LastTransitionTime
 	}
@@ -796,7 +796,7 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 		return false
 	}
 	podReadyCondition := GeneratePodReadyCondition(&pod.Spec, pod.Status.Conditions, pod.Status.ContainerStatuses, pod.Status.Phase)
-	i, curCondition := podutil.GetPodConditionFromList(pod.Status.Conditions, v1.PodReady)
+	i, curCondition := corev1helpers.GetPodConditionFromList(pod.Status.Conditions, v1.PodReady)
 	// Only reconcile if "Ready" condition is present and Status or Message is not expected
 	if i >= 0 && (curCondition.Status != podReadyCondition.Status || curCondition.Message != podReadyCondition.Message) {
 		return true

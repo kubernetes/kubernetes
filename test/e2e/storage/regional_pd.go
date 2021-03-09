@@ -39,7 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -227,7 +227,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	err = waitForStatefulSetReplicasReady(statefulSet.Name, ns, c, framework.Poll, statefulSetReadyTimeout)
 	if err != nil {
 		pod := getPod(c, ns, regionalPDLabels)
-		framework.ExpectEqual(podutil.IsPodReadyConditionTrue(pod.Status), true, "The statefulset pod has the following conditions: %s", pod.Status.Conditions)
+		framework.ExpectEqual(corev1helpers.IsPodReadyConditionTrue(pod.Status), true, "The statefulset pod has the following conditions: %s", pod.Status.Conditions)
 		framework.ExpectNoError(err)
 	}
 
@@ -277,7 +277,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	err = waitForStatefulSetReplicasReady(statefulSet.Name, ns, c, 3*time.Second, framework.RestartPodReadyAgainTimeout)
 	if err != nil {
 		pod := getPod(c, ns, regionalPDLabels)
-		framework.ExpectEqual(podutil.IsPodReadyConditionTrue(pod.Status), true, "The statefulset pod has the following conditions: %s", pod.Status.Conditions)
+		framework.ExpectEqual(corev1helpers.IsPodReadyConditionTrue(pod.Status), true, "The statefulset pod has the following conditions: %s", pod.Status.Conditions)
 		framework.ExpectNoError(err)
 	}
 

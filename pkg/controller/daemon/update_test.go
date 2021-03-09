@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
@@ -309,11 +310,11 @@ func setPodReadiness(t *testing.T, dsc *daemonSetsController, ready bool, count 
 		} else {
 			condition.Status = v1.ConditionFalse
 		}
-		if !podutil.UpdatePodCondition(&pod.Status, &condition) {
+		if !corev1helpers.UpdatePodCondition(&pod.Status, &condition) {
 			t.Fatal("failed to update pod")
 		}
 		// TODO: workaround UpdatePodCondition calling time.Now() directly
-		setCondition := podutil.GetPodReadyCondition(pod.Status)
+		setCondition := corev1helpers.GetPodReadyCondition(pod.Status)
 		setCondition.LastTransitionTime.Time = dsc.failedPodsBackoff.Clock.Now()
 		klog.Infof("marked pod %s ready=%t", pod.Name, ready)
 		count--

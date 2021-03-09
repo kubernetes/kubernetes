@@ -34,9 +34,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-scheduler/config/v1beta3"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -339,7 +339,7 @@ func updatePod(client clientset.Interface, pod *v1.Pod, condition *v1.PodConditi
 	// NominatedNodeName is updated only if we are trying to set it, and the value is
 	// different from the existing one.
 	nnnNeedsUpdate := nominatingInfo.Mode() == framework.ModeOverride && pod.Status.NominatedNodeName != nominatingInfo.NominatedNodeName
-	if !podutil.UpdatePodCondition(podStatusCopy, condition) && !nnnNeedsUpdate {
+	if !corev1helpers.UpdatePodCondition(podStatusCopy, condition) && !nnnNeedsUpdate {
 		return nil
 	}
 	if nnnNeedsUpdate {

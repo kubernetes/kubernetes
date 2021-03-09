@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -138,7 +138,7 @@ func initContainersInvariants(pod *v1.Pod) error {
 			}
 		}
 	}
-	_, c := podutil.GetPodCondition(&pod.Status, v1.PodInitialized)
+	_, c := corev1helpers.GetPodCondition(&pod.Status, v1.PodInitialized)
 	if c == nil {
 		return fmt.Errorf("pod does not have initialized condition")
 	}
@@ -227,7 +227,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
 		framework.ExpectEqual(endPod.Status.Phase, v1.PodSucceeded)
-		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
+		_, init := corev1helpers.GetPodCondition(&endPod.Status, v1.PodInitialized)
 		gomega.Expect(init).NotTo(gomega.BeNil())
 		framework.ExpectEqual(init.Status, v1.ConditionTrue)
 
@@ -304,7 +304,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
 		framework.ExpectEqual(endPod.Status.Phase, v1.PodRunning)
-		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
+		_, init := corev1helpers.GetPodCondition(&endPod.Status, v1.PodInitialized)
 		gomega.Expect(init).NotTo(gomega.BeNil())
 		framework.ExpectEqual(init.Status, v1.ConditionTrue)
 
@@ -434,7 +434,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
 		framework.ExpectEqual(endPod.Status.Phase, v1.PodPending)
-		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
+		_, init := corev1helpers.GetPodCondition(&endPod.Status, v1.PodInitialized)
 		gomega.Expect(init).NotTo(gomega.BeNil())
 		framework.ExpectEqual(init.Status, v1.ConditionFalse)
 		framework.ExpectEqual(init.Reason, "ContainersNotInitialized")
@@ -550,7 +550,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 		endPod := event.Object.(*v1.Pod)
 
 		framework.ExpectEqual(endPod.Status.Phase, v1.PodFailed)
-		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
+		_, init := corev1helpers.GetPodCondition(&endPod.Status, v1.PodInitialized)
 		gomega.Expect(init).NotTo(gomega.BeNil())
 		framework.ExpectEqual(init.Status, v1.ConditionFalse)
 		framework.ExpectEqual(init.Reason, "ContainersNotInitialized")

@@ -30,7 +30,7 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
-	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	nodepkg "k8s.io/kubernetes/pkg/util/node"
@@ -131,7 +131,7 @@ func MarkPodsNotReady(ctx context.Context, kubeClient clientset.Interface, recor
 		for _, cond := range pod.Status.Conditions {
 			if cond.Type == v1.PodReady {
 				cond.Status = v1.ConditionFalse
-				if !utilpod.UpdatePodCondition(&pod.Status, &cond) {
+				if !corev1helpers.UpdatePodCondition(&pod.Status, &cond) {
 					break
 				}
 

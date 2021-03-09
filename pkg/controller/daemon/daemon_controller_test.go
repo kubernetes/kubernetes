@@ -45,6 +45,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -430,7 +431,7 @@ func clearExpectations(t *testing.T, manager *daemonSetsController, ds *apps.Dae
 		var readyLast time.Time
 		ready := podutil.IsPodReady(pod)
 		if ready {
-			if c := podutil.GetPodReadyCondition(pod.Status); c != nil {
+			if c := corev1helpers.GetPodReadyCondition(pod.Status); c != nil {
 				readyLast = c.LastTransitionTime.Time.Add(time.Duration(ds.Spec.MinReadySeconds) * time.Second)
 			}
 		}
@@ -674,7 +675,7 @@ func markPodsReady(store cache.Store) {
 
 func markPodReady(pod *v1.Pod) {
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
-	podutil.UpdatePodCondition(&pod.Status, &condition)
+	corev1helpers.UpdatePodCondition(&pod.Status, &condition)
 }
 
 // DaemonSets without node selectors should launch pods on every node.

@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon"
@@ -308,7 +309,7 @@ func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.
 			// This could be a connection error so we want to retry.
 			return false, nil
 		}
-		_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+		_, cond := corev1helpers.GetPodCondition(&pod.Status, v1.PodScheduled)
 		return cond != nil && cond.Status == v1.ConditionFalse &&
 			cond.Reason == v1.PodReasonUnschedulable, nil
 	}

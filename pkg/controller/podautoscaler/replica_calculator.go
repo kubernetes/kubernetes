@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 )
@@ -398,7 +399,7 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 		// Unready pods are ignored.
 		if resource == v1.ResourceCPU {
 			var unready bool
-			_, condition := podutil.GetPodCondition(&pod.Status, v1.PodReady)
+			_, condition := corev1helpers.GetPodCondition(&pod.Status, v1.PodReady)
 			if condition == nil || pod.Status.StartTime == nil {
 				unready = true
 			} else {

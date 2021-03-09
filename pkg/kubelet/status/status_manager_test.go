@@ -36,7 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	corev1helpers "k8s.io/component-helpers/node/corev1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeconfigmap "k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -193,7 +193,7 @@ func TestNewStatusSetsReadyTransitionTime(t *testing.T) {
 	syncer.SetPodStatus(pod, podStatus)
 	verifyUpdates(t, syncer, 1)
 	status := expectPodStatus(t, syncer, pod)
-	readyCondition := podutil.GetPodReadyCondition(status)
+	readyCondition := corev1helpers.GetPodReadyCondition(status)
 	if readyCondition.LastTransitionTime.IsZero() {
 		t.Errorf("Unexpected: last transition time not set")
 	}
@@ -246,8 +246,8 @@ func TestChangedStatusUpdatesLastTransitionTime(t *testing.T) {
 	verifyUpdates(t, syncer, 1)
 	newStatus := expectPodStatus(t, syncer, pod)
 
-	oldReadyCondition := podutil.GetPodReadyCondition(oldStatus)
-	newReadyCondition := podutil.GetPodReadyCondition(newStatus)
+	oldReadyCondition := corev1helpers.GetPodReadyCondition(oldStatus)
+	newReadyCondition := corev1helpers.GetPodReadyCondition(newStatus)
 	if newReadyCondition.LastTransitionTime.IsZero() {
 		t.Errorf("Unexpected: last transition time not set")
 	}
@@ -285,8 +285,8 @@ func TestUnchangedStatusPreservesLastTransitionTime(t *testing.T) {
 	verifyUpdates(t, syncer, 0)
 	newStatus := expectPodStatus(t, syncer, pod)
 
-	oldReadyCondition := podutil.GetPodReadyCondition(oldStatus)
-	newReadyCondition := podutil.GetPodReadyCondition(newStatus)
+	oldReadyCondition := corev1helpers.GetPodReadyCondition(oldStatus)
+	newReadyCondition := corev1helpers.GetPodReadyCondition(newStatus)
 	if newReadyCondition.LastTransitionTime.IsZero() {
 		t.Errorf("Unexpected: last transition time not set")
 	}
