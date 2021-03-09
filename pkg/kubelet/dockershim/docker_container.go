@@ -387,12 +387,15 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 			// Note: Can't set SeLinuxRelabel
 		})
 	}
-	// Interpret container states.
+	// Interpret container states and convert time to unix timestamps.
 	var state runtimeapi.ContainerState
 	var reason, message string
+	ct, st, ft := createdAt.UnixNano(), int64(0), int64(0)
 	if r.State.Running {
 		// Container is running.
 		state = runtimeapi.ContainerState_CONTAINER_RUNNING
+		// If container is not in the exited state, not set finished timestamp
+		st = startedAt.UnixNano()
 	} else {
 		// Container is *not* running. We need to get more details.
 		//    * Case 1: container has run and exited with non-zero finishedAt
@@ -402,6 +405,7 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 		//    * Case 3: container has been created, but not started (yet).
 		if !finishedAt.IsZero() { // Case 1
 			state = runtimeapi.ContainerState_CONTAINER_EXITED
+			st, ft = startedAt.UnixNano(), finishedAt.UnixNano()
 			switch {
 			case r.State.OOMKilled:
 				// TODO: consider exposing OOMKilled via the runtimeAPI.
@@ -415,18 +419,15 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 			}
 		} else if r.State.ExitCode != 0 { // Case 2
 			state = runtimeapi.ContainerState_CONTAINER_EXITED
-			// Adjust finshedAt and startedAt time to createdAt time to avoid
+			// Adjust finished and started timestamp to createdAt time to avoid
 			// the confusion.
-			finishedAt, startedAt = createdAt, createdAt
+			st, ft = createdAt.UnixNano(), createdAt.UnixNano()
 			reason = "ContainerCannotRun"
 		} else { // Case 3
 			state = runtimeapi.ContainerState_CONTAINER_CREATED
 		}
 		message = r.State.Error
 	}
-
-	// Convert to unix timestamps.
-	ct, st, ft := createdAt.UnixNano(), startedAt.UnixNano(), finishedAt.UnixNano()
 	exitCode := int32(r.State.ExitCode)
 
 	metadata, err := parseContainerName(r.Name)
