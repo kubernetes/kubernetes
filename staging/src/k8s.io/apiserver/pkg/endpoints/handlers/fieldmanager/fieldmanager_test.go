@@ -759,6 +759,7 @@ func TestNoOpChanges(t *testing.T) {
 			"labels": {
 				"a": "b"
 			},
+			"creationTimestamp": null,
 		}
 	}`), &obj.Object); err != nil {
 		t.Fatalf("error decoding YAML: %v", err)
