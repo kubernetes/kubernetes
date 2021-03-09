@@ -200,34 +200,6 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
 
-	// leaderElectAndRun runs the callbacks once the leader lease is acquired.
-	leaderElectAndRun := func(resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks) {
-		// Lock required for leader election
-		rl, err := resourcelock.NewFromKubeconfig(resourceLock,
-			c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
-			leaseName,
-			resourcelock.ResourceLockConfig{
-				Identity:      id,
-				EventRecorder: c.EventRecorder,
-			},
-			c.Kubeconfig,
-			c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration)
-		if err != nil {
-			klog.Fatalf("error creating lock: %v", err)
-		}
-
-		// Try and become the leader and start cloud controller manager loops
-		leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
-			Lock:          rl,
-			LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
-			RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
-			RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
-			Callbacks:     callbacks,
-			WatchDog:      electionChecker,
-			Name:          leaseName,
-		})
-	}
-
 	// If leader migration is enabled, use the redirected initialization
 	// Check feature gate and configuration separately so that any error in configuration checking will not
 	//  affect the result if the feature is not enabled.
@@ -245,7 +217,8 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		mainLockAcquired := make(chan struct{})
 
 		// Start the main lock.
-		go leaderElectAndRun(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+		go leaderElectAndRun(c, id, electionChecker,
+			c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 			c.ComponentConfig.Generic.LeaderElection.ResourceName,
 			leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) {
@@ -263,7 +236,8 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		<-mainLockAcquired
 
 		// Start the migration lock.
-		leaderElectAndRun(c.ComponentConfig.Generic.LeaderMigration.ResourceLock,
+		leaderElectAndRun(c, id, electionChecker,
+			c.ComponentConfig.Generic.LeaderMigration.ResourceLock,
 			c.ComponentConfig.Generic.LeaderMigration.LeaderName,
 			leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) {
@@ -279,7 +253,8 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	} // end of leader migration
 
 	// Normal leader election, without leader migration
-	leaderElectAndRun(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+	leaderElectAndRun(c, id, electionChecker,
+		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
@@ -478,6 +453,35 @@ func ResyncPeriod(c *cloudcontrollerconfig.CompletedConfig) func() time.Duration
 		factor := rand.Float64() + 1
 		return time.Duration(float64(c.ComponentConfig.Generic.MinResyncPeriod.Nanoseconds()) * factor)
 	}
+}
+
+// leaderElectAndRun runs the leader election, and runs the callbacks once the leader lease is acquired.
+// TODO: extract this function into staging/controller-manager
+func leaderElectAndRun(c *cloudcontrollerconfig.CompletedConfig, lockIdentity string, electionChecker *leaderelection.HealthzAdaptor, resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks) {
+	rl, err := resourcelock.NewFromKubeconfig(resourceLock,
+		c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
+		leaseName,
+		resourcelock.ResourceLockConfig{
+			Identity:      lockIdentity,
+			EventRecorder: c.EventRecorder,
+		},
+		c.Kubeconfig,
+		c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration)
+	if err != nil {
+		klog.Fatalf("error creating lock: %v", err)
+	}
+
+	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+		Lock:          rl,
+		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
+		Callbacks:     callbacks,
+		WatchDog:      electionChecker,
+		Name:          leaseName,
+	})
+
+	panic("unreachable")
 }
 
 // devideInitializers applies filterFunc to each of the given intializiers.

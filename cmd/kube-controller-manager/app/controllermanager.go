@@ -243,32 +243,6 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
 
-	// leaderElectAndRun runs the leader election, and runs the callbacks once the leader lease is acquired.
-	leaderElectAndRun := func(resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks) {
-		rl, err := resourcelock.NewFromKubeconfig(resourceLock,
-			c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
-			leaseName,
-			resourcelock.ResourceLockConfig{
-				Identity:      id,
-				EventRecorder: c.EventRecorder,
-			},
-			c.Kubeconfig,
-			c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration)
-		if err != nil {
-			klog.Fatalf("error creating lock: %v", err)
-		}
-
-		leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
-			Lock:          rl,
-			LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
-			RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
-			RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
-			Callbacks:     callbacks,
-			WatchDog:      electionChecker,
-			Name:          leaseName,
-		})
-	}
-
 	// If leader migration is enabled, use the redirected initialization
 	// Check feature gate and configuration separately so that any error in configuration checking will not
 	//  affect the result if the feature is not enabled.
@@ -289,7 +263,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		}
 
 		// Start the main lock, using LeaderElectionConfiguration for the type and name of the lease.
-		go leaderElectAndRun(
+		go leaderElectAndRun(c, id, electionChecker,
 			c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 			c.ComponentConfig.Generic.LeaderElection.ResourceName,
 			leaderelection.LeaderCallbacks{
@@ -310,7 +284,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		<-saTokenControllerStarted
 
 		// Start the migration lock, using LeaderMigrationConfiguration for the type and name of the lease.
-		leaderElectAndRun(
+		leaderElectAndRun(c, id, electionChecker,
 			c.ComponentConfig.Generic.LeaderMigration.ResourceLock,
 			c.ComponentConfig.Generic.LeaderMigration.LeaderName,
 			leaderelection.LeaderCallbacks{
@@ -327,7 +301,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	} // end of leader migration
 
 	// Normal leader election, without leader migration
-	leaderElectAndRun(
+	leaderElectAndRun(c, id, electionChecker,
 		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		leaderelection.LeaderCallbacks{
@@ -688,6 +662,35 @@ func createClientBuilders(c *config.CompletedConfig) (clientBuilder clientbuilde
 		clientBuilder = rootClientBuilder
 	}
 	return
+}
+
+// leaderElectAndRun runs the leader election, and runs the callbacks once the leader lease is acquired.
+// TODO: extract this function into staging/controller-manager
+func leaderElectAndRun(c *config.CompletedConfig, lockIdentity string, electionChecker *leaderelection.HealthzAdaptor, resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks) {
+	rl, err := resourcelock.NewFromKubeconfig(resourceLock,
+		c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
+		leaseName,
+		resourcelock.ResourceLockConfig{
+			Identity:      lockIdentity,
+			EventRecorder: c.EventRecorder,
+		},
+		c.Kubeconfig,
+		c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration)
+	if err != nil {
+		klog.Fatalf("error creating lock: %v", err)
+	}
+
+	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+		Lock:          rl,
+		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
+		Callbacks:     callbacks,
+		WatchDog:      electionChecker,
+		Name:          leaseName,
+	})
+
+	panic("unreachable")
 }
 
 // filterInitializers returns initializers that has filterFunc(name) == true.
