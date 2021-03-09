@@ -6284,6 +6284,20 @@ func TestValidateContainers(t *testing.T) {
 				TerminationMessagePolicy: "File",
 			},
 		},
+		"invalid readiness probe, terminationGracePeriodSeconds set.": {
+			{
+				Name:  "life-123",
+				Image: "image",
+				ReadinessProbe: &core.Probe{
+					Handler: core.Handler{
+						TCPSocket: &core.TCPSocketAction{},
+					},
+					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(10),
+				},
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+			},
+		},
 		"invalid liveness probe, no tcp socket port.": {
 			{
 				Name:  "life-123",
