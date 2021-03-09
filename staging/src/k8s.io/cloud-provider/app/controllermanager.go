@@ -200,43 +200,55 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
 
+	// leaderMigrator will be non-nil if and only if Leader Migration is enabled.
+	var leaderMigrator *leadermigration.LeaderMigrator = nil
+
+	// Leader migration requires splitting initializers for the main and the migration lock
+	// If leader migration is not enabled, these two will be unused.
+	var migratedInitializers, unmigratedInitializers map[string]InitFunc
+
 	// If leader migration is enabled, use the redirected initialization
 	// Check feature gate and configuration separately so that any error in configuration checking will not
 	//  affect the result if the feature is not enabled.
-	if leadermigration.FeatureEnabled() && leadermigration.Enabled(&c.ComponentConfig.Generic) {
+	if leadermigration.Enabled(&c.ComponentConfig.Generic) {
 		klog.Info("starting leader migration")
 
-		leaderMigrator := leadermigration.NewLeaderMigrator(&c.ComponentConfig.Generic.LeaderMigration,
+		leaderMigrator = leadermigration.NewLeaderMigrator(&c.ComponentConfig.Generic.LeaderMigration,
 			"cloud-controller-manager")
 
 		// Split initializers based on which lease they require, main lease or migration lease.
-		migratedInitializers, unmigratedInitializers := devideInitializers(controllerInitializers, leaderMigrator.FilterFunc(true))
+		migratedInitializers, unmigratedInitializers = divideInitializers(controllerInitializers, leaderMigrator.FilterFunc(true))
+	}
 
-		// We need to signal acquiring the main lock before attempting to acquire the migration lock
-		//  so that no instance will hold the migration lock but not the main lock at any point.
-		mainLockAcquired := make(chan struct{})
-
-		// Start the main lock.
-		go leaderElectAndRun(c, id, electionChecker,
-			c.ComponentConfig.Generic.LeaderElection.ResourceLock,
-			c.ComponentConfig.Generic.LeaderElection.ResourceName,
-			leaderelection.LeaderCallbacks{
-				OnStartedLeading: func(ctx context.Context) {
+	// Start the main lock
+	go leaderElectAndRun(c, id, electionChecker,
+		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+		c.ComponentConfig.Generic.LeaderElection.ResourceName,
+		leaderelection.LeaderCallbacks{
+			OnStartedLeading: func(ctx context.Context) {
+				initializers := controllerInitializers
+				if leaderMigrator != nil {
+					// If leader migration is enabled, we should start only non-migrated controllers
+					//  for the main lock.
+					initializers = unmigratedInitializers
 					klog.Info("leader migration: starting main controllers.")
-					// signal acquiring the main lock
-					close(mainLockAcquired)
-					run(ctx, unmigratedInitializers)
-				},
-				OnStoppedLeading: func() {
-					klog.Fatalf("leaderelection lost")
-				},
-			})
+					// Signal the main lock is acquired, and thus migration lock is ready to attempt.
+					close(leaderMigrator.MigrationReady)
+				}
+				run(ctx, initializers)
+			},
+			OnStoppedLeading: func() {
+				klog.Fatalf("leaderelection lost")
+			},
+		})
 
-		// Wait for the main lease to be acquired before attempting the migration lease.
-		<-mainLockAcquired
+	// If Leader Migration is enabled, proceed to attempt the migration lock.
+	if leaderMigrator != nil {
+		// Wait for the signal of main lock being acquired.
+		<-leaderMigrator.MigrationReady
 
 		// Start the migration lock.
-		leaderElectAndRun(c, id, electionChecker,
+		go leaderElectAndRun(c, id, electionChecker,
 			c.ComponentConfig.Generic.LeaderMigration.ResourceLock,
 			c.ComponentConfig.Generic.LeaderMigration.LeaderName,
 			leaderelection.LeaderCallbacks{
@@ -248,24 +260,9 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 					klog.Fatalf("migration leaderelection lost")
 				},
 			})
+	}
 
-		panic("unreachable")
-	} // end of leader migration
-
-	// Normal leader election, without leader migration
-	leaderElectAndRun(c, id, electionChecker,
-		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
-		c.ComponentConfig.Generic.LeaderElection.ResourceName,
-		leaderelection.LeaderCallbacks{
-			OnStartedLeading: func(ctx context.Context) {
-				run(ctx, controllerInitializers)
-			},
-			OnStoppedLeading: func() {
-				klog.Fatalf("leaderelection lost")
-			},
-		})
-
-	panic("unreachable")
+	select {}
 }
 
 // startControllers starts the cloud specific controller loops.
@@ -484,10 +481,11 @@ func leaderElectAndRun(c *cloudcontrollerconfig.CompletedConfig, lockIdentity st
 	panic("unreachable")
 }
 
-// devideInitializers applies filterFunc to each of the given intializiers.
-// filtered contains all controllers that have filterFunc(name) == true
-// rest contains all controllers that have filterFunc(name) == false
-func devideInitializers(allInitializers map[string]InitFunc,
+// divideInitializers applies filterFunc to each of the given intializiers.
+//  filtered contains all controllers that have filterFunc(name) == true
+//  rest contains all controllers that have filterFunc(name) == false
+// InitFunc is local to cloud-controller-manager, and thus divideInitializers has to be local too.
+func divideInitializers(allInitializers map[string]InitFunc,
 	filterFunc leadermigration.FilterFunc) (filtered map[string]InitFunc, rest map[string]InitFunc) {
 	if filterFunc == nil {
 		return make(map[string]InitFunc), allInitializers

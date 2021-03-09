@@ -22,6 +22,10 @@ import (
 
 // LeaderMigrator holds information required by the leader migration process.
 type LeaderMigrator struct {
+	// MigrationReady is closed after the coontroller manager finishes preparing for the migration lock.
+	// After this point, the leader migration process will proceed to acquire the migration lock.
+	MigrationReady chan struct{}
+
 	config              *internal.LeaderMigrationConfiguration
 	migratedControllers map[string]bool
 	// component indicates the name of the control-plane component that uses leader migration,
@@ -41,6 +45,7 @@ func NewLeaderMigrator(config *internal.LeaderMigrationConfiguration, component 
 		migratedControllers[leader.Name] = leader.Component == component
 	}
 	return &LeaderMigrator{
+		MigrationReady:      make(chan struct{}),
 		config:              config,
 		migratedControllers: migratedControllers,
 		component:           component,

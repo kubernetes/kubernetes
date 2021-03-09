@@ -243,48 +243,57 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
 
-	// If leader migration is enabled, use the redirected initialization
-	// Check feature gate and configuration separately so that any error in configuration checking will not
-	//  affect the result if the feature is not enabled.
-	if leadermigration.FeatureEnabled() && leadermigration.Enabled(&c.ComponentConfig.Generic) {
+	// leaderMigrator will be non-nil if and only if Leader Migration is enabled.
+	var leaderMigrator *leadermigration.LeaderMigrator = nil
+
+	// startSATokenController will be original saTokenControllerInitFunc if leader migration is not enabled.
+	startSATokenController := saTokenControllerInitFunc
+
+	// If leader migration is enabled, create the LeaderMigrator and prepare for migration
+	if leadermigration.Enabled(&c.ComponentConfig.Generic) {
 		klog.Infof("starting leader migration")
 
-		leaderMigrator := leadermigration.NewLeaderMigrator(&c.ComponentConfig.Generic.LeaderMigration,
+		leaderMigrator = leadermigration.NewLeaderMigrator(&c.ComponentConfig.Generic.LeaderMigration,
 			"kube-controller-manager")
 
-		// We need a channel to signal the start of Service Account Token Controller
-		//  all migrated channel must start afterwards.
-		saTokenControllerStarted := make(chan struct{})
-
-		// Wrap saTokenControllerInitFunc to close the channel after returning.
-		wrappedSATokenControllerInitFunc := func(ctx ControllerContext) (http.Handler, bool, error) {
-			defer close(saTokenControllerStarted)
+		// Wrap saTokenControllerInitFunc to signal readiness for migration after starting
+		//  the controller.
+		startSATokenController = func(ctx ControllerContext) (http.Handler, bool, error) {
+			defer close(leaderMigrator.MigrationReady)
 			return saTokenControllerInitFunc(ctx)
 		}
+	}
 
-		// Start the main lock, using LeaderElectionConfiguration for the type and name of the lease.
-		go leaderElectAndRun(c, id, electionChecker,
-			c.ComponentConfig.Generic.LeaderElection.ResourceLock,
-			c.ComponentConfig.Generic.LeaderElection.ResourceName,
-			leaderelection.LeaderCallbacks{
-				OnStartedLeading: func(ctx context.Context) {
+	// Start the main lock
+	go leaderElectAndRun(c, id, electionChecker,
+		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+		c.ComponentConfig.Generic.LeaderElection.ResourceName,
+		leaderelection.LeaderCallbacks{
+			OnStartedLeading: func(ctx context.Context) {
+				var filterFunc leadermigration.FilterFunc = nil
+				if leaderMigrator != nil {
+					// If leader migration is enabled, we should start only non-migrated controllers
+					//  for the main lock.
+					filterFunc = leaderMigrator.FilterFunc(false)
 					klog.Info("leader migration: starting main controllers.")
-					// saTokenController should only run under the main lock
-					run(ctx, wrappedSATokenControllerInitFunc, leaderMigrator.FilterFunc(false))
-				},
-				OnStoppedLeading: func() {
-					klog.Fatalf("leaderelection lost")
-				},
-			})
+				}
+				run(ctx, startSATokenController, filterFunc)
+			},
+			OnStoppedLeading: func() {
+				klog.Fatalf("leaderelection lost")
+			},
+		})
 
+	// If Leader Migration is enabled, proceed to attempt the migration lock.
+	if leaderMigrator != nil {
 		// Wait for Service Account Token Controller to start before acquiring the migration lock.
 		// At this point, the main lock must have already been acquired, or the KCM process already exited.
 		// We wait for the main lock before acquiring the migration lock to prevent the situation
 		//  where KCM instance A holds the main lock while KCM instance B holds the migration lock.
-		<-saTokenControllerStarted
+		<-leaderMigrator.MigrationReady
 
-		// Start the migration lock, using LeaderMigrationConfiguration for the type and name of the lease.
-		leaderElectAndRun(c, id, electionChecker,
+		// Start the migration lock.
+		go leaderElectAndRun(c, id, electionChecker,
 			c.ComponentConfig.Generic.LeaderMigration.ResourceLock,
 			c.ComponentConfig.Generic.LeaderMigration.LeaderName,
 			leaderelection.LeaderCallbacks{
@@ -297,23 +306,9 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 					klog.Fatalf("migration leaderelection lost")
 				},
 			})
-		panic("unreachable")
-	} // end of leader migration
+	}
 
-	// Normal leader election, without leader migration
-	leaderElectAndRun(c, id, electionChecker,
-		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
-		c.ComponentConfig.Generic.LeaderElection.ResourceName,
-		leaderelection.LeaderCallbacks{
-			OnStartedLeading: func(ctx context.Context) {
-				run(ctx, saTokenControllerInitFunc, nil)
-			},
-			OnStoppedLeading: func() {
-				klog.Fatalf("leaderelection lost")
-			},
-		})
-
-	panic("unreachable")
+	select {}
 }
 
 // ControllerContext defines the context object for controller
@@ -695,6 +690,7 @@ func leaderElectAndRun(c *config.CompletedConfig, lockIdentity string, electionC
 
 // filterInitializers returns initializers that has filterFunc(name) == true.
 // filterFunc can be nil, in which case the original initializers will be returned directly.
+// InitFunc is local to kube-controller-manager, and thus filterInitializers has to be local too.
 func filterInitializers(allInitializers map[string]InitFunc, filterFunc leadermigration.FilterFunc) map[string]InitFunc {
 	if filterFunc == nil {
 		return allInitializers

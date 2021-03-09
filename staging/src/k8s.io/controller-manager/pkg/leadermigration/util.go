@@ -19,6 +19,7 @@ package leadermigration
 import config "k8s.io/controller-manager/config"
 
 // Enabled checks whether Leader Migration should be enabled, given the GenericControllerManagerConfiguration.
+// It considers the feature gate first, and will always return false if the feature gate is not enabled.
 func Enabled(genericConfig *config.GenericControllerManagerConfiguration) bool {
-	return genericConfig.LeaderElection.LeaderElect && genericConfig.LeaderMigrationEnabled
+	return FeatureEnabled() && genericConfig.LeaderElection.LeaderElect && genericConfig.LeaderMigrationEnabled
 }
