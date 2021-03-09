@@ -76,7 +76,8 @@ func (pr httpProber) Probe(url *url.URL, headers http.Header, timeout time.Durat
 		Transport:     pr.transport,
 		CheckRedirect: redirectChecker(pr.followNonLocalRedirects),
 	}
-	return DoHTTPProbe(url, headers, client)
+	result, details, _, err := DoHTTPProbe(url, headers, client)
+	return result, details, err
 }
 
 // GetHTTPInterface is an interface for making HTTP requests, that returns a response and error.
@@ -88,11 +89,11 @@ type GetHTTPInterface interface {
 // If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
 // If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
 // This is exported because some other packages may want to do direct HTTP probes.
-func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (probe.Result, string, error) {
+func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (probe.Result, string, string, error) {
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		// Convert errors into failures to catch timeouts.
-		return probe.Failure, err.Error(), nil
+		return probe.Failure, err.Error(), "", nil
 	}
 	if headers == nil {
 		headers = http.Header{}
@@ -114,7 +115,7 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (pr
 	res, err := client.Do(req)
 	if err != nil {
 		// Convert errors into failures to catch timeouts.
-		return probe.Failure, err.Error(), nil
+		return probe.Failure, err.Error(), "", nil
 	}
 	defer res.Body.Close()
 	b, err := utilio.ReadAtMost(res.Body, maxRespBodyLength)
@@ -122,20 +123,20 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (pr
 		if err == utilio.ErrLimitReached {
 			klog.V(4).Infof("Non fatal body truncation for %s, Response: %v", url.String(), *res)
 		} else {
-			return probe.Failure, "", err
+			return probe.Failure, "", "", err
 		}
 	}
 	body := string(b)
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
 		if res.StatusCode >= http.StatusMultipleChoices { // Redirect
 			klog.V(4).Infof("Probe terminated redirects for %s, Response: %v", url.String(), *res)
-			return probe.Warning, body, nil
+			return probe.Warning, body, body, nil
 		}
 		klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
-		return probe.Success, body, nil
+		return probe.Success, body, body, nil
 	}
 	klog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
-	return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode), nil
+	return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode), body, nil
 }
 
 func redirectChecker(followNonLocalRedirects bool) func(*http.Request, []*http.Request) error {
