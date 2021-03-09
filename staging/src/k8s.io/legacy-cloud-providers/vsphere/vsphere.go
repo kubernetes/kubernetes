@@ -1388,13 +1388,20 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 				if len(zonesToSearch) == 0 {
 					// If zone is not provided, get the shared datastore across all node VMs.
 					klog.V(4).Infof("Validating if datastore %s is shared across all node VMs", datastoreName)
-					sharedDsList, err = getSharedDatastoresInK8SCluster(ctx, vs.nodeManager)
+					sharedDSFinder := &sharedDatastore{
+						nodeManager:         vs.nodeManager,
+						candidateDatastores: candidateDatastoreInfos,
+					}
+					datastoreInfo, err = sharedDSFinder.getSharedDatastore(ctx)
 					if err != nil {
 						klog.Errorf("Failed to get shared datastore: %+v", err)
 						return "", err
 					}
-					// Prepare error msg to be used later, if required.
-					err = fmt.Errorf("The specified datastore %s is not a shared datastore across node VMs", datastoreName)
+					if datastoreInfo == nil {
+						err = fmt.Errorf("The specified datastore %s is not a shared datastore across node VMs", datastoreName)
+						klog.Error(err)
+						return "", err
+					}
 				} else {
 					// If zone is provided, get the shared datastores in that zone.
 					klog.V(4).Infof("Validating if datastore %s is in zone %s ", datastoreName, zonesToSearch)
@@ -1403,21 +1410,19 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 						klog.Errorf("Failed to find a shared datastore matching zone %s. err: %+v", zonesToSearch, err)
 						return "", err
 					}
-					// Prepare error msg to be used later, if required.
-					err = fmt.Errorf("The specified datastore %s does not match the provided zones : %s", datastoreName, zonesToSearch)
-				}
-				found := false
-				// Check if the selected datastore belongs to the list of shared datastores computed.
-				for _, sharedDs := range sharedDsList {
-					if datastoreInfo, found = candidateDatastores[sharedDs.Info.Url]; found {
-						klog.V(4).Infof("Datastore validation succeeded")
-						found = true
-						break
+					found := false
+					for _, sharedDs := range sharedDsList {
+						if datastoreInfo, found = candidateDatastores[sharedDs.Info.Url]; found {
+							klog.V(4).Infof("Datastore validation succeeded")
+							found = true
+							break
+						}
 					}
-				}
-				if !found {
-					klog.Error(err)
-					return "", err
+					if !found {
+						err = fmt.Errorf("The specified datastore %s does not match the provided zones : %s", datastoreName, zonesToSearch)
+						klog.Error(err)
+						return "", err
+					}
 				}
 			}
 		}
