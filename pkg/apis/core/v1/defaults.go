@@ -323,6 +323,26 @@ func SetDefaults_HTTPGetAction(obj *v1.HTTPGetAction) {
 		obj.Scheme = v1.URISchemeHTTP
 	}
 }
+
+// SetDefaults_Namespace adds a default label for all namespaces
+func SetDefaults_Namespace(obj *v1.Namespace) {
+	// TODO, remove the feature gate in 1.22
+	// we can't SetDefaults for nameless namespaces (generateName).
+	// This code needs to be kept in sync with the implementation that exists
+	// in Namespace Canonicalize strategy (pkg/registry/core/namespace)
+
+	// note that this can result in many calls to feature enablement in some cases, but
+	// we assume that there's no real cost there.
+	if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
+		if len(obj.Name) > 0 {
+			if obj.Labels == nil {
+				obj.Labels = map[string]string{}
+			}
+			obj.Labels[v1.LabelMetadataName] = obj.Name
+		}
+	}
+}
+
 func SetDefaults_NamespaceStatus(obj *v1.NamespaceStatus) {
 	if obj.Phase == "" {
 		obj.Phase = v1.NamespaceActive

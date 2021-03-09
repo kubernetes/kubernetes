@@ -158,6 +158,7 @@ func SetObjectDefaults_LimitRangeList(in *v1.LimitRangeList) {
 }
 
 func SetObjectDefaults_Namespace(in *v1.Namespace) {
+	SetDefaults_Namespace(in)
 	SetDefaults_NamespaceStatus(&in.Status)
 }
 

@@ -19,6 +19,7 @@ package namespace
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -112,6 +113,39 @@ func TestNamespaceCondition(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestNamespaceLabels tests for default labels added in https://github.com/kubernetes/kubernetes/pull/96968
+func TestNamespaceLabels(t *testing.T) {
+	closeFn, _, _, kubeClient, _ := namespaceLifecycleSetup(t)
+	defer closeFn()
+	nsName := "test-namespace-labels-generated"
+	// Create a new namespace w/ no name
+	ns, err := kubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: nsName,
+		},
+	}, metav1.CreateOptions{})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ns.Name != ns.Labels[corev1.LabelMetadataName] {
+		t.Fatal(fmt.Errorf("expected %q, got %q", ns.Name, ns.Labels[corev1.LabelMetadataName]))
+	}
+
+	nsList, err := kubeClient.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, ns := range nsList.Items {
+		if ns.Name != ns.Labels[corev1.LabelMetadataName] {
+			t.Fatal(fmt.Errorf("expected %q, got %q", ns.Name, ns.Labels[corev1.LabelMetadataName]))
+		}
 	}
 }
 

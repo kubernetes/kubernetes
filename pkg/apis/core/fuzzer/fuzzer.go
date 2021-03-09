@@ -472,6 +472,16 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(s *core.NamespaceSpec, c fuzz.Continue) {
 			s.Finalizers = []core.FinalizerName{core.FinalizerKubernetes}
 		},
+		func(s *core.Namespace, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+			// Match name --> label defaulting
+			if len(s.Name) > 0 {
+				if s.Labels == nil {
+					s.Labels = map[string]string{}
+				}
+				s.Labels["kubernetes.io/metadata.name"] = s.Name
+			}
+		},
 		func(s *core.NamespaceStatus, c fuzz.Continue) {
 			s.Phase = core.NamespaceActive
 		},
