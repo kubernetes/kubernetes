@@ -108,10 +108,6 @@ const (
 	errEndpointStopped = "endpoint %v has been stopped"
 	// errBadSocket is the error raised when the registry socket path is not absolute
 	errBadSocket = "bad socketPath, must be an absolute path:"
-	// errListenSocket is the error raised when the registry could not listen on the socket
-	errListenSocket = "failed to listen to socket while starting device plugin registry, with error"
-	// errListAndWatch is the error raised when ListAndWatch ended unsuccessfully
-	errListAndWatch = "listAndWatch ended unexpectedly for device plugin %s with error %v"
 )
 
 // endpointStopGracePeriod indicates the grace period after an endpoint is stopped
