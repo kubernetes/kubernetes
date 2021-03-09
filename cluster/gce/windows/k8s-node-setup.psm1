@@ -1635,6 +1635,8 @@ function Install-Pigz {
       # Windows path it'll use it instead of the default unzipper.
       # See: https://github.com/containerd/containerd/issues/1896
       Add-MachineEnvironmentPath -Path $PIGZ_ROOT
+      # Add process exclusion for Windows Defender to boost performance. 
+      Add-MpPreference -ExclusionProcess "$PIGZ_ROOT\unpigz.exe"
       Log-Output "Installed Pigz $PIGZ_VERSION"
     } else {
       Log-Output "Pigz already installed."
