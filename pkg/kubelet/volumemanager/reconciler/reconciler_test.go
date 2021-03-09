@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
@@ -1831,7 +1830,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	fakePlugin.UnmountDeviceHook = func(mountPath string) error {
 		// Act:
 		// 3. While a volume is being unmounted, add it back to the desired state of world
-		klog.Infof("UnmountDevice called")
+		t.Logf("UnmountDevice called")
 		generatedVolumeName, err = dsw.AddPodToVolume(
 			podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 		dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
