@@ -110,6 +110,11 @@ func TestNodeLabelFilter(t *testing.T) {
 			},
 			res: framework.UnschedulableAndUnresolvable,
 		},
+		{
+			name: "no label",
+			args: config.NodeLabelArgs{},
+			res:  framework.Success,
+		},
 	}
 
 	for _, test := range tests {
@@ -230,6 +235,11 @@ func TestNodeLabelScore(t *testing.T) {
 				AbsentLabelsPreference:  []string{"somelabel1", "somelabel2"},
 			},
 			name: "two present labels one matches, two absent labels mismatch",
+		},
+		{
+			want: 0,
+			args: config.NodeLabelArgs{},
+			name: "no label preference",
 		},
 	}
 
