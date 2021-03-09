@@ -78,7 +78,8 @@ func (pr httpProber) Probe(req *http.Request, timeout time.Duration) (probe.Resu
 		Transport:     pr.transport,
 		CheckRedirect: RedirectChecker(pr.followNonLocalRedirects),
 	}
-	return DoHTTPProbe(req, client)
+	result, details, _, err := DoHTTPProbe(req, client)
+	return result, details, err
 }
 
 // GetHTTPInterface is an interface for making HTTP requests, that returns a response and error.
@@ -90,13 +91,13 @@ type GetHTTPInterface interface {
 // If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
 // If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
 // This is exported because some other packages may want to do direct HTTP probes.
-func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, string, error) {
+func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, string, string, error) {
 	url := req.URL
 	headers := req.Header
 	res, err := client.Do(req)
 	if err != nil {
 		// Convert errors into failures to catch timeouts.
-		return probe.Failure, err.Error(), nil
+		return probe.Failure, err.Error(), "", nil
 	}
 	defer res.Body.Close()
 	b, err := utilio.ReadAtMost(res.Body, maxRespBodyLength)
@@ -104,22 +105,23 @@ func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, stri
 		if err == utilio.ErrLimitReached {
 			klog.V(4).Infof("Non fatal body truncation for %s, Response: %v", url.String(), *res)
 		} else {
-			return probe.Failure, "", err
+			return probe.Failure, "", "", err
 		}
 	}
 	body := string(b)
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
 		if res.StatusCode >= http.StatusMultipleChoices { // Redirect
 			klog.V(4).Infof("Probe terminated redirects for %s, Response: %v", url.String(), *res)
-			return probe.Warning, fmt.Sprintf("Probe terminated redirects, Response body: %v", body), nil
+			return probe.Warning, fmt.Sprintf("Probe terminated redirects, Response body: %v", body), body, nil
 		}
 		klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
-		return probe.Success, body, nil
+		return probe.Success, body, body, nil
 	}
 	klog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
 	// Note: Until https://issue.k8s.io/99425 is addressed, this user-facing failure message must not contain the response body.
+	// @deads2k recommended we return the body. Slack discussion: https://redhat-internal.slack.com/archives/C04UQLWQAP3/p1679590747021409
 	failureMsg := fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode)
-	return probe.Failure, failureMsg, nil
+	return probe.Failure, failureMsg, body, nil
 }
 
 // RedirectChecker returns a function that can be used to check HTTP redirects.
