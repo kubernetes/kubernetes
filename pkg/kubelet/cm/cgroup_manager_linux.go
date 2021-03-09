@@ -31,6 +31,7 @@ import (
 	cgroupfs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
+	libcontainerdevices "github.com/opencontainers/runc/libcontainer/devices"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
@@ -468,13 +469,13 @@ func setResourcesV2(cgroupConfig *libcontainerconfigs.Cgroup) error {
 	if err := propagateControllers(cgroupConfig.Path); err != nil {
 		return err
 	}
-	cgroupConfig.Resources.Devices = []*libcontainerconfigs.DeviceRule{
+	cgroupConfig.Resources.Devices = []*libcontainerdevices.Rule{
 		{
 			Type:        'a',
 			Permissions: "rwm",
 			Allow:       true,
-			Minor:       libcontainerconfigs.Wildcard,
-			Major:       libcontainerconfigs.Wildcard,
+			Minor:       libcontainerdevices.Wildcard,
+			Major:       libcontainerdevices.Wildcard,
 		},
 	}
 	cgroupConfig.Resources.SkipDevices = true
@@ -499,13 +500,13 @@ func setResourcesV2(cgroupConfig *libcontainerconfigs.Cgroup) error {
 
 func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcontainerconfigs.Resources {
 	resources := &libcontainerconfigs.Resources{
-		Devices: []*libcontainerconfigs.DeviceRule{
+		Devices: []*libcontainerdevices.Rule{
 			{
 				Type:        'a',
 				Permissions: "rwm",
 				Allow:       true,
-				Minor:       libcontainerconfigs.Wildcard,
-				Major:       libcontainerconfigs.Wildcard,
+				Minor:       libcontainerdevices.Wildcard,
+				Major:       libcontainerdevices.Wildcard,
 			},
 		},
 		SkipDevices: true,

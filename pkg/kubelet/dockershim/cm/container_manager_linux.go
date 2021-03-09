@@ -28,6 +28,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	libcontainerdevices "github.com/opencontainers/runc/libcontainer/devices"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -126,10 +127,10 @@ func createCgroupManager(name string) (cgroups.Manager, error) {
 			Memory:      int64(memoryLimit),
 			MemorySwap:  -1,
 			SkipDevices: true,
-			Devices: []*configs.DeviceRule{
+			Devices: []*libcontainerdevices.Rule{
 				{
-					Minor:       configs.Wildcard,
-					Major:       configs.Wildcard,
+					Minor:       libcontainerdevices.Wildcard,
+					Major:       libcontainerdevices.Wildcard,
 					Type:        'a',
 					Permissions: "rwm",
 					Allow:       true,

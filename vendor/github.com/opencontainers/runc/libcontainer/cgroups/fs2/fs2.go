@@ -3,15 +3,14 @@
 package fs2
 
 import (
-	"io/ioutil"
+	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/pkg/errors"
-	"golang.org/x/sys/unix"
 )
 
 type manager struct {
@@ -52,15 +51,14 @@ func (m *manager) getControllers() error {
 		return nil
 	}
 
-	file := filepath.Join(m.dirPath, "cgroup.controllers")
-	data, err := ioutil.ReadFile(file)
+	data, err := fscommon.ReadFile(m.dirPath, "cgroup.controllers")
 	if err != nil {
 		if m.rootless && m.config.Path == "" {
 			return nil
 		}
 		return err
 	}
-	fields := strings.Fields(string(data))
+	fields := strings.Fields(data)
 	m.controllers = make(map[string]struct{}, len(fields))
 	for _, c := range fields {
 		m.controllers[c] = struct{}{}
@@ -157,45 +155,8 @@ func (m *manager) Freeze(state configs.FreezerState) error {
 	return nil
 }
 
-func rmdir(path string) error {
-	err := unix.Rmdir(path)
-	if err == nil || err == unix.ENOENT {
-		return nil
-	}
-	return &os.PathError{Op: "rmdir", Path: path, Err: err}
-}
-
-// removeCgroupPath aims to remove cgroup path recursively
-// Because there may be subcgroups in it.
-func removeCgroupPath(path string) error {
-	// try the fast path first
-	if err := rmdir(path); err == nil {
-		return nil
-	}
-
-	infos, err := ioutil.ReadDir(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			err = nil
-		}
-		return err
-	}
-	for _, info := range infos {
-		if info.IsDir() {
-			// We should remove subcgroups dir first
-			if err = removeCgroupPath(filepath.Join(path, info.Name())); err != nil {
-				break
-			}
-		}
-	}
-	if err == nil {
-		err = rmdir(path)
-	}
-	return err
-}
-
 func (m *manager) Destroy() error {
-	return removeCgroupPath(m.dirPath)
+	return cgroups.RemovePath(m.dirPath)
 }
 
 func (m *manager) Path(_ string) string {
@@ -245,7 +206,37 @@ func (m *manager) Set(container *configs.Config) error {
 	if err := setFreezer(m.dirPath, container.Cgroups.Freezer); err != nil {
 		return err
 	}
+	if err := m.setUnified(container.Cgroups.Unified); err != nil {
+		return err
+	}
 	m.config = container.Cgroups
+	return nil
+}
+
+func (m *manager) setUnified(res map[string]string) error {
+	for k, v := range res {
+		if strings.Contains(k, "/") {
+			return fmt.Errorf("unified resource %q must be a file name (no slashes)", k)
+		}
+		if err := fscommon.WriteFile(m.dirPath, k, v); err != nil {
+			errC := errors.Cause(err)
+			// Check for both EPERM and ENOENT since O_CREAT is used by WriteFile.
+			if errors.Is(errC, os.ErrPermission) || errors.Is(errC, os.ErrNotExist) {
+				// Check if a controller is available,
+				// to give more specific error if not.
+				sk := strings.SplitN(k, ".", 2)
+				if len(sk) != 2 {
+					return fmt.Errorf("unified resource %q must be in the form CONTROLLER.PARAMETER", k)
+				}
+				c := sk[0]
+				if _, ok := m.controllers[c]; !ok && c != "cgroup" {
+					return fmt.Errorf("unified resource %q can't be set: controller %q not available", k, c)
+				}
+			}
+			return errors.Wrapf(err, "can't set unified resource %q", k)
+		}
+	}
+
 	return nil
 }
 

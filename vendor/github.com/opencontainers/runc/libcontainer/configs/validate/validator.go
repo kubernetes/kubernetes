@@ -6,10 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/intelrdt"
 	selinux "github.com/opencontainers/selinux/go-selinux"
+	"golang.org/x/sys/unix"
 )
 
 type Validator interface {
@@ -144,6 +146,12 @@ func (v *ConfigValidator) sysctl(config *configs.Config) error {
 		"kernel.shm_rmid_forced": true,
 	}
 
+	var (
+		netOnce    sync.Once
+		hostnet    bool
+		hostnetErr error
+	)
+
 	for s := range config.Sysctl {
 		if validSysctlMap[s] || strings.HasPrefix(s, "fs.mqueue.") {
 			if config.Namespaces.Contains(configs.NEWIPC) {
@@ -153,16 +161,27 @@ func (v *ConfigValidator) sysctl(config *configs.Config) error {
 			}
 		}
 		if strings.HasPrefix(s, "net.") {
-			if config.Namespaces.Contains(configs.NEWNET) {
-				if path := config.Namespaces.PathOf(configs.NEWNET); path != "" {
-					if err := checkHostNs(s, path); err != nil {
-						return err
-					}
+			// Is container using host netns?
+			// Here "host" means "current", not "initial".
+			netOnce.Do(func() {
+				if !config.Namespaces.Contains(configs.NEWNET) {
+					hostnet = true
+					return
 				}
-				continue
-			} else {
-				return fmt.Errorf("sysctl %q is not allowed in the hosts network namespace", s)
+				path := config.Namespaces.PathOf(configs.NEWNET)
+				if path == "" {
+					// own netns, so hostnet = false
+					return
+				}
+				hostnet, hostnetErr = isHostNetNS(path)
+			})
+			if hostnetErr != nil {
+				return hostnetErr
 			}
+			if hostnet {
+				return fmt.Errorf("sysctl %q not allowed in host network namespace", s)
+			}
+			continue
 		}
 		if config.Namespaces.Contains(configs.NEWUTS) {
 			switch s {
@@ -182,21 +201,21 @@ func (v *ConfigValidator) sysctl(config *configs.Config) error {
 
 func (v *ConfigValidator) intelrdt(config *configs.Config) error {
 	if config.IntelRdt != nil {
-		if !intelrdt.IsCatEnabled() && !intelrdt.IsMbaEnabled() {
+		if !intelrdt.IsCATEnabled() && !intelrdt.IsMBAEnabled() {
 			return errors.New("intelRdt is specified in config, but Intel RDT is not supported or enabled")
 		}
 
-		if !intelrdt.IsCatEnabled() && config.IntelRdt.L3CacheSchema != "" {
+		if !intelrdt.IsCATEnabled() && config.IntelRdt.L3CacheSchema != "" {
 			return errors.New("intelRdt.l3CacheSchema is specified in config, but Intel RDT/CAT is not enabled")
 		}
-		if !intelrdt.IsMbaEnabled() && config.IntelRdt.MemBwSchema != "" {
+		if !intelrdt.IsMBAEnabled() && config.IntelRdt.MemBwSchema != "" {
 			return errors.New("intelRdt.memBwSchema is specified in config, but Intel RDT/MBA is not enabled")
 		}
 
-		if intelrdt.IsCatEnabled() && config.IntelRdt.L3CacheSchema == "" {
+		if intelrdt.IsCATEnabled() && config.IntelRdt.L3CacheSchema == "" {
 			return errors.New("Intel RDT/CAT is enabled and intelRdt is specified in config, but intelRdt.l3CacheSchema is empty")
 		}
-		if intelrdt.IsMbaEnabled() && config.IntelRdt.MemBwSchema == "" {
+		if intelrdt.IsMBAEnabled() && config.IntelRdt.MemBwSchema == "" {
 			return errors.New("Intel RDT/MBA is enabled and intelRdt is specified in config, but intelRdt.memBwSchema is empty")
 		}
 	}
@@ -204,43 +223,17 @@ func (v *ConfigValidator) intelrdt(config *configs.Config) error {
 	return nil
 }
 
-func isSymbolicLink(path string) (bool, error) {
-	fi, err := os.Lstat(path)
-	if err != nil {
-		return false, err
+func isHostNetNS(path string) (bool, error) {
+	const currentProcessNetns = "/proc/self/ns/net"
+
+	var st1, st2 unix.Stat_t
+
+	if err := unix.Stat(currentProcessNetns, &st1); err != nil {
+		return false, fmt.Errorf("unable to stat %q: %s", currentProcessNetns, err)
+	}
+	if err := unix.Stat(path, &st2); err != nil {
+		return false, fmt.Errorf("unable to stat %q: %s", path, err)
 	}
 
-	return fi.Mode()&os.ModeSymlink == os.ModeSymlink, nil
-}
-
-// checkHostNs checks whether network sysctl is used in host namespace.
-func checkHostNs(sysctlConfig string, path string) error {
-	var currentProcessNetns = "/proc/self/ns/net"
-	// readlink on the current processes network namespace
-	destOfCurrentProcess, err := os.Readlink(currentProcessNetns)
-	if err != nil {
-		return fmt.Errorf("read soft link %q error", currentProcessNetns)
-	}
-
-	// First check if the provided path is a symbolic link
-	symLink, err := isSymbolicLink(path)
-	if err != nil {
-		return fmt.Errorf("could not check that %q is a symlink: %v", path, err)
-	}
-
-	if symLink == false {
-		// The provided namespace is not a symbolic link,
-		// it is not the host namespace.
-		return nil
-	}
-
-	// readlink on the path provided in the struct
-	destOfContainer, err := os.Readlink(path)
-	if err != nil {
-		return fmt.Errorf("read soft link %q error", path)
-	}
-	if destOfContainer == destOfCurrentProcess {
-		return fmt.Errorf("sysctl %q is not allowed in the hosts network namespace", sysctlConfig)
-	}
-	return nil
+	return (st1.Dev == st2.Dev) && (st1.Ino == st2.Ino), nil
 }

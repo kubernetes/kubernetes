@@ -5,7 +5,6 @@ package fs
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -83,8 +82,7 @@ func (s *CpuacctGroup) GetStats(path string, stats *cgroups.Stats) error {
 
 // Returns user and kernel usage breakdown in nanoseconds.
 func getCpuUsageBreakdown(path string) (uint64, uint64, error) {
-	userModeUsage := uint64(0)
-	kernelModeUsage := uint64(0)
+	var userModeUsage, kernelModeUsage uint64
 	const (
 		userField   = "user"
 		systemField = "system"
@@ -93,11 +91,11 @@ func getCpuUsageBreakdown(path string) (uint64, uint64, error) {
 	// Expected format:
 	// user <usage in ticks>
 	// system <usage in ticks>
-	data, err := ioutil.ReadFile(filepath.Join(path, cgroupCpuacctStat))
+	data, err := fscommon.ReadFile(path, cgroupCpuacctStat)
 	if err != nil {
 		return 0, 0, err
 	}
-	fields := strings.Fields(string(data))
+	fields := strings.Fields(data)
 	if len(fields) < 4 {
 		return 0, 0, fmt.Errorf("failure - %s is expected to have at least 4 fields", filepath.Join(path, cgroupCpuacctStat))
 	}
@@ -119,11 +117,11 @@ func getCpuUsageBreakdown(path string) (uint64, uint64, error) {
 
 func getPercpuUsage(path string) ([]uint64, error) {
 	percpuUsage := []uint64{}
-	data, err := ioutil.ReadFile(filepath.Join(path, "cpuacct.usage_percpu"))
+	data, err := fscommon.ReadFile(path, "cpuacct.usage_percpu")
 	if err != nil {
 		return percpuUsage, err
 	}
-	for _, value := range strings.Fields(string(data)) {
+	for _, value := range strings.Fields(data) {
 		value, err := strconv.ParseUint(value, 10, 64)
 		if err != nil {
 			return percpuUsage, fmt.Errorf("Unable to convert param value to uint64: %s", err)
@@ -137,7 +135,7 @@ func getPercpuUsageInModes(path string) ([]uint64, []uint64, error) {
 	usageKernelMode := []uint64{}
 	usageUserMode := []uint64{}
 
-	file, err := os.Open(filepath.Join(path, cgroupCpuacctUsageAll))
+	file, err := fscommon.OpenFile(path, cgroupCpuacctUsageAll, os.O_RDONLY)
 	if os.IsNotExist(err) {
 		return usageKernelMode, usageUserMode, nil
 	} else if err != nil {

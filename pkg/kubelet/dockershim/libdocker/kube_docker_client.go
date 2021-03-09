@@ -145,7 +145,7 @@ func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfi
 	if opts.HostConfig != nil && opts.HostConfig.ShmSize <= 0 {
 		opts.HostConfig.ShmSize = defaultShmSize
 	}
-	createResp, err := d.client.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
+	createResp, err := d.client.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, nil, opts.Name)
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return nil, ctxErr
 	}
