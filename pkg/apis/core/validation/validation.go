@@ -2859,6 +2859,11 @@ func validateContainers(containers []core.Container, isInitContainers bool, volu
 			allErrs = append(allErrs, validateLifecycle(ctr.Lifecycle, idxPath.Child("lifecycle"))...)
 		}
 		allErrs = append(allErrs, validateProbe(ctr.LivenessProbe, idxPath.Child("livenessProbe"))...)
+		// Readiness-specific validation
+		if ctr.ReadinessProbe != nil && ctr.ReadinessProbe.TerminationGracePeriodSeconds != nil {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("readinessProbe", "terminationGracePeriodSeconds"), ctr.ReadinessProbe.TerminationGracePeriodSeconds, "must not be set for readinessProbes"))
+		}
+		allErrs = append(allErrs, validateProbe(ctr.StartupProbe, idxPath.Child("startupProbe"))...)
 		// Liveness-specific validation
 		if ctr.LivenessProbe != nil && ctr.LivenessProbe.SuccessThreshold != 1 {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("livenessProbe", "successThreshold"), ctr.LivenessProbe.SuccessThreshold, "must be 1"))
