@@ -604,7 +604,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 	}
 
 	translator := csitrans.New()
-	cmpm := csimigration.NewPluginManager(translator)
+	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
