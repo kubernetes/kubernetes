@@ -227,7 +227,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		msg, handlerErr := m.runner.Run(kubeContainerID, pod, container, container.Lifecycle.PostStart)
 		if handlerErr != nil {
 			m.recordContainerEvent(pod, container, kubeContainerID.ID, v1.EventTypeWarning, events.FailedPostStartHook, msg)
-			if err := m.killContainer(pod, kubeContainerID, container.Name, "FailedPostStartHook", nil); err != nil {
+			if err := m.killContainer(pod, kubeContainerID, container.Name, "FailedPostStartHook", reasonFailedPostStartHook, nil); err != nil {
 				klog.ErrorS(fmt.Errorf("%s: %v", ErrPostStartHook, handlerErr), "Failed to kill container", "pod", klog.KObj(pod),
 					"podUID", pod.UID, "containerName", container.Name, "containerID", kubeContainerID.String())
 			}
@@ -596,7 +596,7 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID 
 // killContainer kills a container through the following steps:
 // * Run the pre-stop lifecycle hooks (if applicable).
 // * Stop the container.
-func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubecontainer.ContainerID, containerName string, message string, gracePeriodOverride *int64) error {
+func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubecontainer.ContainerID, containerName string, message string, reason containerKillReason, gracePeriodOverride *int64) error {
 	var containerSpec *v1.Container
 	if pod != nil {
 		if containerSpec = kubecontainer.GetContainerSpec(pod, containerName); containerSpec == nil {
@@ -619,6 +619,19 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 		gracePeriod = *pod.DeletionGracePeriodSeconds
 	case pod.Spec.TerminationGracePeriodSeconds != nil:
 		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.ProbeTerminationGracePeriod) {
+			switch reason {
+			case reasonStartupProbe:
+				if containerSpec.StartupProbe != nil && containerSpec.StartupProbe.TerminationGracePeriodSeconds != nil {
+					gracePeriod = *containerSpec.StartupProbe.TerminationGracePeriodSeconds
+				}
+			case reasonLivenessProbe:
+				if containerSpec.LivenessProbe != nil && containerSpec.LivenessProbe.TerminationGracePeriodSeconds != nil {
+					gracePeriod = *containerSpec.LivenessProbe.TerminationGracePeriodSeconds
+				}
+			}
+		}
 	}
 
 	if len(message) == 0 {
@@ -672,7 +685,7 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, ru
 			defer wg.Done()
 
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
-			if err := m.killContainer(pod, container.ID, container.Name, "", gracePeriodOverride); err != nil {
+			if err := m.killContainer(pod, container.ID, container.Name, "", reasonUnknown, gracePeriodOverride); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
 				klog.ErrorS(err, "Kill container failed", "pod", klog.KObj(pod), "podUID", pod.UID,
 					"containerName", container.Name, "containerID", container.ID)
