@@ -108,7 +108,7 @@ func (s *scope) RemoveContainer(containerID string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	klog.Infof("[topologymanager] RemoveContainer - Container ID: %v", containerID)
+	klog.InfoS("RemoveContainer", "containerID", containerID)
 	podUIDString := s.podMap[containerID]
 	delete(s.podMap, containerID)
 	if _, exists := s.podTopologyHints[podUIDString]; exists {
