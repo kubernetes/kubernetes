@@ -1933,6 +1933,13 @@ func TestPermitPlugins(t *testing.T) {
 	}
 }
 
+// withMetricsRecorder set metricsRecorder for the scheduling frameworkImpl.
+func withMetricsRecorder(recorder *metricsRecorder) Option {
+	return func(o *frameworkOptions) {
+		o.metricsRecorder = recorder
+	}
+}
+
 func TestRecordingMetrics(t *testing.T) {
 	state := &framework.CycleState{}
 	state.SetRecordPluginMetrics(true)
