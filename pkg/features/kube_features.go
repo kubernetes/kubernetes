@@ -668,6 +668,7 @@ const (
 
 	// owner: @andrewsykim @uablrek
 	// alpha: v1.20
+	// beta: v1.21
 	//
 	// Allows control if NodePorts shall be created for services with "type: LoadBalancer" by defining the spec.AllocateLoadBalancerNodePorts field (bool)
 	ServiceLBNodePortControl featuregate.Feature = "ServiceLBNodePortControl"
@@ -826,7 +827,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default in v1.21 and remove in v1.22
 	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
 	GracefulNodeShutdown:                           {Default: true, PreRelease: featuregate.Beta},
-	ServiceLBNodePortControl:                       {Default: false, PreRelease: featuregate.Alpha},
+	ServiceLBNodePortControl:                       {Default: true, PreRelease: featuregate.Beta},
 	MixedProtocolLBService:                         {Default: false, PreRelease: featuregate.Alpha},
 	VolumeCapacityPriority:                         {Default: false, PreRelease: featuregate.Alpha},
 	PreferNominatedNode:                            {Default: false, PreRelease: featuregate.Alpha},
