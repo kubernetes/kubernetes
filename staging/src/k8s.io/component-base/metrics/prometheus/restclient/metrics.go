@@ -17,6 +17,7 @@ limitations under the License.
 package restclient
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"net/url"
@@ -137,16 +138,16 @@ type latencyAdapter struct {
 	m *k8smetrics.HistogramVec
 }
 
-func (l *latencyAdapter) Observe(verb string, u url.URL, latency time.Duration) {
-	l.m.WithLabelValues(verb, u.String()).Observe(latency.Seconds())
+func (l *latencyAdapter) Observe(ctx context.Context, verb string, u url.URL, latency time.Duration) {
+	l.m.WithContext(ctx).WithLabelValues(verb, u.String()).Observe(latency.Seconds())
 }
 
 type resultAdapter struct {
 	m *k8smetrics.CounterVec
 }
 
-func (r *resultAdapter) Increment(code, method, host string) {
-	r.m.WithLabelValues(code, method, host).Inc()
+func (r *resultAdapter) Increment(ctx context.Context, code, method, host string) {
+	r.m.WithContext(ctx).WithLabelValues(code, method, host).Inc()
 }
 
 type expiryToTTLAdapter struct {
