@@ -148,8 +148,9 @@ func (l *zapLogger) WithName(name string) logr.Logger {
 var encoderConfig = zapcore.EncoderConfig{
 	MessageKey: "msg",
 
-	TimeKey:    "ts",
-	EncodeTime: zapcore.EpochMillisTimeEncoder,
+	TimeKey:        "ts",
+	EncodeTime:     zapcore.EpochMillisTimeEncoder,
+	EncodeDuration: zapcore.StringDurationEncoder,
 }
 
 // NewJSONLogger creates a new json logr.Logger using the given Zap Logger to log.
