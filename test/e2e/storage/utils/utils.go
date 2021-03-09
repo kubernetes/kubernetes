@@ -427,7 +427,7 @@ func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
 	}
 	roleBindingClient := client.RbacV1().RoleBindings(namespace)
 	for _, saName := range saNames {
-		ginkgo.By(fmt.Sprintf("%v priviledged Pod Security Policy to the service account %s", bindingString, saName))
+		ginkgo.By(fmt.Sprintf("%v privileged Pod Security Policy to the service account %s", bindingString, saName))
 		binding := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "psp-" + saName,
