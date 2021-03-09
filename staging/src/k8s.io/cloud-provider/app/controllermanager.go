@@ -203,10 +203,6 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	// leaderMigrator will be non-nil if and only if Leader Migration is enabled.
 	var leaderMigrator *leadermigration.LeaderMigrator = nil
 
-	// Leader migration requires splitting initializers for the main and the migration lock
-	// If leader migration is not enabled, these two will be unused.
-	var migratedInitializers, unmigratedInitializers map[string]InitFunc
-
 	// If leader migration is enabled, use the redirected initialization
 	// Check feature gate and configuration separately so that any error in configuration checking will not
 	//  affect the result if the feature is not enabled.
@@ -215,9 +211,6 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 
 		leaderMigrator = leadermigration.NewLeaderMigrator(&c.ComponentConfig.Generic.LeaderMigration,
 			"cloud-controller-manager")
-
-		// Split initializers based on which lease they require, main lease or migration lease.
-		migratedInitializers, unmigratedInitializers = divideInitializers(controllerInitializers, leaderMigrator.FilterFunc(true))
 	}
 
 	// Start the main lock
@@ -230,7 +223,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 				if leaderMigrator != nil {
 					// If leader migration is enabled, we should start only non-migrated controllers
 					//  for the main lock.
-					initializers = unmigratedInitializers
+					initializers = filterInitializers(controllerInitializers, leaderMigrator.FilterFunc, leadermigration.ControllerNonMigrated)
 					klog.Info("leader migration: starting main controllers.")
 					// Signal the main lock is acquired, and thus migration lock is ready to attempt.
 					close(leaderMigrator.MigrationReady)
@@ -254,7 +247,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 			leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) {
 					klog.Info("leader migration: starting migrated controllers.")
-					run(ctx, migratedInitializers)
+					run(ctx, filterInitializers(controllerInitializers, leaderMigrator.FilterFunc, leadermigration.ControllerMigrated))
 				},
 				OnStoppedLeading: func() {
 					klog.Fatalf("migration leaderelection lost")
@@ -481,23 +474,18 @@ func leaderElectAndRun(c *cloudcontrollerconfig.CompletedConfig, lockIdentity st
 	panic("unreachable")
 }
 
-// divideInitializers applies filterFunc to each of the given intializiers.
-//  filtered contains all controllers that have filterFunc(name) == true
-//  rest contains all controllers that have filterFunc(name) == false
-// InitFunc is local to cloud-controller-manager, and thus divideInitializers has to be local too.
-func divideInitializers(allInitializers map[string]InitFunc,
-	filterFunc leadermigration.FilterFunc) (filtered map[string]InitFunc, rest map[string]InitFunc) {
+// filterInitializers returns initializers that has filterFunc(name) == expected.
+// filterFunc can be nil, in which case the original initializers will be returned directly.
+// InitFunc is local to cloud-controller-manager, and thus filterInitializers has to be local too.
+func filterInitializers(allInitializers map[string]InitFunc, filterFunc leadermigration.FilterFunc, expected leadermigration.FilterResult) map[string]InitFunc {
 	if filterFunc == nil {
-		return make(map[string]InitFunc), allInitializers
+		return allInitializers
 	}
-	filtered = make(map[string]InitFunc)
-	rest = make(map[string]InitFunc)
+	initializers := make(map[string]InitFunc)
 	for name, initFunc := range allInitializers {
-		if filterFunc(name) {
-			filtered[name] = initFunc
-		} else {
-			rest[name] = initFunc
+		if filterFunc(name) == expected {
+			initializers[name] = initFunc
 		}
 	}
-	return
+	return initializers
 }

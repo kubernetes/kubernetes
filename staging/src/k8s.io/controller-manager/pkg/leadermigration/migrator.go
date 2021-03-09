@@ -22,21 +22,15 @@ import (
 
 // LeaderMigrator holds information required by the leader migration process.
 type LeaderMigrator struct {
-	// MigrationReady is closed after the coontroller manager finishes preparing for the migration lock.
+	// MigrationReady is closed after the controller manager finishes preparing for the migration lock.
 	// After this point, the leader migration process will proceed to acquire the migration lock.
 	MigrationReady chan struct{}
 
-	config              *internal.LeaderMigrationConfiguration
-	migratedControllers map[string]bool
-	// component indicates the name of the control-plane component that uses leader migration,
-	//  which should be a controller manager, i.e. kube-controller-manager or cloud-controller-manager
-	component string
+	// FilterFunc returns a FilterResult telling the controller manager what to do with the controller.
+	FilterFunc FilterFunc
 }
 
-// FilterFunc takes a name of controller, returning whether the controller should be started.
-type FilterFunc func(controllerName string) bool
-
-// NewLeaderMigrator creates a LeaderMigrator with given config for the given component. The component
+// NewLeaderMigrator creates a LeaderMigrator with given config for the given component. component
 //  indicates which controller manager is requesting this leader migration, and it should be consistent
 //  with the component field of ControllerLeaderConfiguration.
 func NewLeaderMigrator(config *internal.LeaderMigrationConfiguration, component string) *LeaderMigrator {
@@ -45,28 +39,23 @@ func NewLeaderMigrator(config *internal.LeaderMigrationConfiguration, component 
 		migratedControllers[leader.Name] = leader.Component == component
 	}
 	return &LeaderMigrator{
-		MigrationReady:      make(chan struct{}),
-		config:              config,
-		migratedControllers: migratedControllers,
-		component:           component,
-	}
-}
-
-// FilterFunc returns the filter function that, when migrated == true
-//  - returns true if the controller should start under the migration lock
-//  - returns false if the controller should start under the main lock
-// when migrated == false, the result is inverted.
-func (m *LeaderMigrator) FilterFunc(migrated bool) FilterFunc {
-	return func(controllerName string) bool {
-		shouldRun, ok := m.migratedControllers[controllerName]
-		if !ok {
-			// The controller is not included in the migration
-			// If the caller wants the controllers outside migration, then we should include it.
-			return !migrated
-		}
-		// The controller is included in the migration
-		// If the caller wants the controllers within migration, we should only include it
-		//  if current component should run the controller
-		return migrated && shouldRun
+		MigrationReady: make(chan struct{}),
+		FilterFunc: func(controllerName string) FilterResult {
+			shouldRun, ok := migratedControllers[controllerName]
+			if ok {
+				// The controller is included in the migration
+				if shouldRun {
+					// If the controller manager should run the controller,
+					//  start it in the migration lock.
+					return ControllerMigrated
+				}
+				// Otherwise, the controller should be started by
+				//  some other controller manager.
+				return ControllerUnowned
+			}
+			// The controller is not included in the migration,
+			//  and should be started in the main lock.
+			return ControllerNonMigrated
+		},
 	}
 }
