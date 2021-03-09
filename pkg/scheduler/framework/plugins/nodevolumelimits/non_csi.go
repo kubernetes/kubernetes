@@ -119,6 +119,7 @@ type nonCSILimits struct {
 }
 
 var _ framework.FilterPlugin = &nonCSILimits{}
+var _ framework.EnqueueExtensions = &nonCSILimits{}
 
 // newNonCSILimitsWithInformerFactory returns a plugin with filter name and informer factory.
 func newNonCSILimitsWithInformerFactory(
@@ -193,6 +194,15 @@ func newNonCSILimits(
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *nonCSILimits) Name() string {
 	return pl.name
+}
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *nonCSILimits) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		{Resource: framework.Node, ActionType: framework.Add},
+		{Resource: framework.Pod, ActionType: framework.Delete},
+	}
 }
 
 // Filter invoked at the filter extension point.
