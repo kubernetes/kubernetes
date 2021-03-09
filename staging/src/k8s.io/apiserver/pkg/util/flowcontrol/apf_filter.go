@@ -78,18 +78,43 @@ func New(
 	requestWaitLimit time.Duration,
 ) Interface {
 	grc := counter.NoOp{}
+	clk := clock.RealClock{}
 	return NewTestable(TestableConfig{
+		Name:                   "Controller",
+		Clock:                  clk,
+		AsFieldManager:         ConfigConsumerAsFieldManager,
+		FoundToDangling:        func(found bool) bool { return !found },
 		InformerFactory:        informerFactory,
 		FlowcontrolClient:      flowcontrolClient,
 		ServerConcurrencyLimit: serverConcurrencyLimit,
 		RequestWaitLimit:       requestWaitLimit,
 		ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		QueueSetFactory:        fqs.NewQueueSetFactory(&clock.RealClock{}, grc),
+		QueueSetFactory:        fqs.NewQueueSetFactory(clk, grc),
 	})
 }
 
 // TestableConfig carries the parameters to an implementation that is testable
 type TestableConfig struct {
+	// Name of the controller
+	Name string
+
+	// Clock to use in timing deliberate delays
+	Clock clock.PassiveClock
+
+	// AsFieldManager is the string to use in the metadata for
+	// server-side apply.  Normally this is
+	// `ConfigConsumerAsFieldManager`.  This is exposed as a parameter
+	// so that a test of competing controllers can supply different
+	// values.
+	AsFieldManager string
+
+	// FoundToDangling maps the boolean indicating whether a
+	// FlowSchema's referenced PLC exists to the boolean indicating
+	// that FlowSchema's status should indicate a dangling reference.
+	// This is a parameter so that we can write tests of what happens
+	// when servers disagree on that bit of Status.
+	FoundToDangling func(bool) bool
+
 	// InformerFactory to use in building the controller
 	InformerFactory kubeinformers.SharedInformerFactory
 
