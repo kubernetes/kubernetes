@@ -1070,11 +1070,19 @@ func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (v1.ResourceLi
 }
 
 func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices {
-	return cm.deviceManager.GetDevices(podUID, containerName)
+	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetDevices(podUID, containerName))
+}
+
+func (cm *containerManagerImpl) GetAllocatableDevices() []*podresourcesapi.ContainerDevices {
+	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetAllocatableDevices())
 }
 
 func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
 	return cm.cpuManager.GetCPUs(podUID, containerName).ToSliceNoSortInt64()
+}
+
+func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
+	return cm.cpuManager.GetAllocatableCPUs().ToSliceNoSortInt64()
 }
 
 func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {

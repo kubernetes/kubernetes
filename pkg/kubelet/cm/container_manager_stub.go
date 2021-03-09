@@ -114,6 +114,10 @@ func (cm *containerManagerStub) GetDevices(_, _ string) []*podresourcesapi.Conta
 	return nil
 }
 
+func (cm *containerManagerStub) GetAllocatableDevices() []*podresourcesapi.ContainerDevices {
+	return nil
+}
+
 func (cm *containerManagerStub) ShouldResetExtendedResourceCapacity() bool {
 	return cm.shouldResetExtendedResourceCapacity
 }
@@ -127,6 +131,10 @@ func (cm *containerManagerStub) UpdateAllocatedDevices() {
 }
 
 func (cm *containerManagerStub) GetCPUs(_, _ string) []int64 {
+	return nil
+}
+
+func (cm *containerManagerStub) GetAllocatableCPUs() []int64 {
 	return nil
 }
 

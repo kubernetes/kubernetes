@@ -35,13 +35,18 @@ func TestGetContainerDevices(t *testing.T) {
 		devices,
 		constructAllocResp(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"}, map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
 
-	contDevices := podDevices.getContainerDevices(podID, contID)
-	require.Equal(t, len(devices), len(contDevices), "Incorrect container devices")
-	for _, contDev := range contDevices {
-		for _, node := range contDev.Topology.Nodes {
+	resContDevices := podDevices.getContainerDevices(podID, contID)
+	contDevices, ok := resContDevices[resourceName1]
+	require.True(t, ok, "resource %q not present", resourceName1)
+
+	for devId, plugInfo := range contDevices {
+		nodes := plugInfo.GetTopology().GetNodes()
+		require.Equal(t, len(nodes), len(devices), "Incorrect container devices: %v - %v (nodes %v)", devices, contDevices, nodes)
+
+		for _, node := range plugInfo.GetTopology().GetNodes() {
 			dev, ok := devices[node.ID]
 			require.True(t, ok, "NUMA id %v doesn't exist in result", node.ID)
-			require.Equal(t, contDev.DeviceIds[0], dev[0], "Can't find device %s in result", dev[0])
+			require.Equal(t, devId, dev[0], "Can't find device %s in result", dev[0])
 		}
 	}
 }

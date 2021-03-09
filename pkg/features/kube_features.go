@@ -730,6 +730,12 @@ const (
 	// Allows jobs to be created in the suspended state.
 	SuspendJob featuregate.Feature = "SuspendJob"
 
+	// owner: @fromanirh
+	// alpha: v1.21
+	//
+	// Enable POD resources API to return allocatable resources
+	KubeletPodResourcesGetAllocatable featuregate.Feature = "KubeletPodResourcesGetAllocatable"
+
 	// owner: @jayunit100 @abhiraut @rikatz
 	// beta: v1.21
 	//
@@ -845,6 +851,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	IngressClassNamespacedParams:                   {Default: false, PreRelease: featuregate.Alpha},
 	ServiceInternalTrafficPolicy:                   {Default: false, PreRelease: featuregate.Alpha},
 	SuspendJob:                                     {Default: false, PreRelease: featuregate.Alpha},
+	KubeletPodResourcesGetAllocatable:              {Default: false, PreRelease: featuregate.Alpha},
 	NamespaceDefaultLabelName:                      {Default: true, PreRelease: featuregate.Beta}, // graduate to GA and lock to default in 1.22, remove in 1.24
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed

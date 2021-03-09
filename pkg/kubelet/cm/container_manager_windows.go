@@ -217,7 +217,11 @@ func (cm *containerManagerImpl) GetPodCgroupRoot() string {
 }
 
 func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices {
-	return cm.deviceManager.GetDevices(podUID, containerName)
+	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetDevices(podUID, containerName))
+}
+
+func (cm *containerManagerImpl) GetAllocatableDevices() []*podresourcesapi.ContainerDevices {
+	return nil
 }
 
 func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
@@ -233,5 +237,9 @@ func (cm *containerManagerImpl) UpdateAllocatedDevices() {
 }
 
 func (cm *containerManagerImpl) GetCPUs(_, _ string) []int64 {
+	return nil
+}
+
+func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 	return nil
 }

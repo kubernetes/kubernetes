@@ -622,7 +622,7 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 		activePods:            activePods,
 		sourcesReady:          &sourcesReadyStub{},
 		checkpointManager:     ckm,
-		allDevices:            make(map[string]map[string]pluginapi.Device),
+		allDevices:            NewResourceDeviceInstances(),
 	}
 
 	for _, res := range testRes {
