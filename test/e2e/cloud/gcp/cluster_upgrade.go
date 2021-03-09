@@ -17,22 +17,15 @@ limitations under the License.
 package gcp
 
 import (
-	"encoding/xml"
 	"fmt"
-	"os"
 	"path"
-	"path/filepath"
-	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/discovery"
-	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
-	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	"k8s.io/kubernetes/test/e2e/upgrades/apps"
@@ -115,7 +108,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, masterUpgradeTest, nil)
 
 			upgradeFunc := ControlPlaneUpgradeFunc(f, upgCtx, masterUpgradeTest, nil)
-			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 
@@ -129,7 +122,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, clusterUpgradeTest)
 
 			upgradeFunc := ClusterUpgradeFunc(f, upgCtx, clusterUpgradeTest, nil, nil)
-			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -148,7 +141,7 @@ var _ = ginkgo.Describe("Downgrade [Feature:Downgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, clusterDowngradeTest)
 
 			upgradeFunc := ClusterDowngradeFunc(f, upgCtx, clusterDowngradeTest, nil, nil)
-			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -167,10 +160,10 @@ var _ = ginkgo.Describe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 
 			upgradeFunc := func() {
 				start := time.Now()
-				defer finalizeUpgradeTest(start, etcdTest)
+				defer upgrades.FinalizeUpgradeTest(start, etcdTest)
 				framework.ExpectNoError(framework.EtcdUpgrade(framework.TestContext.EtcdUpgradeStorage, framework.TestContext.EtcdUpgradeVersion))
 			}
-			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.EtcdUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.EtcdUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -189,7 +182,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, gpuUpgradeTest)
 
 			upgradeFunc := ControlPlaneUpgradeFunc(f, upgCtx, gpuUpgradeTest, nil)
-			runUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 	ginkgo.Describe("cluster upgrade", func() {
@@ -202,7 +195,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, gpuUpgradeTest)
 
 			upgradeFunc := ClusterUpgradeFunc(f, upgCtx, gpuUpgradeTest, nil, nil)
-			runUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 	ginkgo.Describe("cluster downgrade", func() {
@@ -215,7 +208,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, gpuDowngradeTest)
 
 			upgradeFunc := ClusterDowngradeFunc(f, upgCtx, gpuDowngradeTest, nil, nil)
-			runUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -234,7 +227,7 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 			testSuite.TestCases = append(testSuite.TestCases, statefulUpgradeTest)
 
 			upgradeFunc := ClusterUpgradeFunc(f, upgCtx, statefulUpgradeTest, nil, nil)
-			runUpgradeSuite(upgCtx, statefulsetUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, statefulsetUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -261,7 +254,7 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 
 			extraEnvs := kubeProxyDaemonSetExtraEnvs(true)
 			upgradeFunc := ClusterUpgradeFunc(f, upgCtx, kubeProxyUpgradeTest, extraEnvs, extraEnvs)
-			runUpgradeSuite(upgCtx, kubeProxyUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, kubeProxyUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 
@@ -279,7 +272,7 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 
 			extraEnvs := kubeProxyDaemonSetExtraEnvs(false)
 			upgradeFunc := ClusterDowngradeFunc(f, upgCtx, kubeProxyDowngradeTest, extraEnvs, extraEnvs)
-			runUpgradeSuite(upgCtx, kubeProxyDowngradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, kubeProxyDowngradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -302,123 +295,10 @@ var _ = ginkgo.Describe("[sig-auth] ServiceAccount admission controller migratio
 
 			extraEnvs := []string{"KUBE_FEATURE_GATES=BoundServiceAccountTokenVolume=true"}
 			upgradeFunc := ControlPlaneUpgradeFunc(f, upgCtx, serviceaccountAdmissionControllerMigrationTest, extraEnvs)
-			runUpgradeSuite(upgCtx, serviceaccountAdmissionControllerMigrationTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, serviceaccountAdmissionControllerMigrationTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 })
-
-type chaosMonkeyAdapter struct {
-	test        upgrades.Test
-	testReport  *junit.TestCase
-	framework   *framework.Framework
-	upgradeType upgrades.UpgradeType
-	upgCtx      upgrades.UpgradeContext
-}
-
-func (cma *chaosMonkeyAdapter) Test(sem *chaosmonkey.Semaphore) {
-	start := time.Now()
-	var once sync.Once
-	ready := func() {
-		once.Do(func() {
-			sem.Ready()
-		})
-	}
-	defer finalizeUpgradeTest(start, cma.testReport)
-	defer ready()
-	if skippable, ok := cma.test.(upgrades.Skippable); ok && skippable.Skip(cma.upgCtx) {
-		ginkgo.By("skipping test " + cma.test.Name())
-		cma.testReport.Skipped = "skipping test " + cma.test.Name()
-		return
-	}
-
-	defer cma.test.Teardown(cma.framework)
-	cma.test.Setup(cma.framework)
-	ready()
-	cma.test.Test(cma.framework, sem.StopCh, cma.upgradeType)
-}
-
-func finalizeUpgradeTest(start time.Time, tc *junit.TestCase) {
-	tc.Time = time.Since(start).Seconds()
-	r := recover()
-	if r == nil {
-		return
-	}
-
-	switch r := r.(type) {
-	case e2eginkgowrapper.FailurePanic:
-		tc.Failures = []*junit.Failure{
-			{
-				Message: r.Message,
-				Type:    "Failure",
-				Value:   fmt.Sprintf("%s\n\n%s", r.Message, r.FullStackTrace),
-			},
-		}
-	case e2eskipper.SkipPanic:
-		tc.Skipped = fmt.Sprintf("%s:%d %q", r.Filename, r.Line, r.Message)
-	default:
-		tc.Errors = []*junit.Error{
-			{
-				Message: fmt.Sprintf("%v", r),
-				Type:    "Panic",
-				Value:   fmt.Sprintf("%v", r),
-			},
-		}
-	}
-}
-
-func createUpgradeFrameworks(tests []upgrades.Test) map[string]*framework.Framework {
-	nsFilter := regexp.MustCompile("[^[:word:]-]+") // match anything that's not a word character or hyphen
-	testFrameworks := map[string]*framework.Framework{}
-	for _, t := range tests {
-		ns := nsFilter.ReplaceAllString(t.Name(), "-") // and replace with a single hyphen
-		ns = strings.Trim(ns, "-")
-		testFrameworks[t.Name()] = framework.NewDefaultFramework(ns)
-	}
-	return testFrameworks
-}
-
-func runUpgradeSuite(
-	upgCtx *upgrades.UpgradeContext,
-	tests []upgrades.Test,
-	testSuite *junit.TestSuite,
-	upgradeType upgrades.UpgradeType,
-	upgradeFunc func(),
-) {
-	testFrameworks := createUpgradeFrameworks(tests)
-
-	cm := chaosmonkey.New(upgradeFunc)
-	for _, t := range tests {
-		testCase := &junit.TestCase{
-			Name:      t.Name(),
-			Classname: "upgrade_tests",
-		}
-		testSuite.TestCases = append(testSuite.TestCases, testCase)
-		cma := chaosMonkeyAdapter{
-			test:        t,
-			testReport:  testCase,
-			framework:   testFrameworks[t.Name()],
-			upgradeType: upgradeType,
-			upgCtx:      *upgCtx,
-		}
-		cm.Register(cma.Test)
-	}
-
-	start := time.Now()
-	defer func() {
-		testSuite.Update()
-		testSuite.Time = time.Since(start).Seconds()
-		if framework.TestContext.ReportDir != "" {
-			fname := filepath.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%supgrades.xml", framework.TestContext.ReportPrefix))
-			f, err := os.Create(fname)
-			if err != nil {
-				return
-			}
-			defer f.Close()
-			xml.NewEncoder(f).Encode(testSuite)
-		}
-	}()
-	cm.Do()
-}
 
 func getUpgradeContext(c discovery.DiscoveryInterface, upgradeTarget, upgradeImage string) (*upgrades.UpgradeContext, error) {
 	current, err := c.ServerVersion()
