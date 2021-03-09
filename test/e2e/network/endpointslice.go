@@ -26,10 +26,13 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -327,6 +330,169 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("recreating EndpointSlices after they've been deleted")
 		deleteEndpointSlices(cs, f.Namespace.Name, svc2)
 		expectEndpointsAndSlices(cs, f.Namespace.Name, svc2, []*v1.Pod{pod1, pod2}, 2, 2, true)
+	})
+
+	ginkgo.It("should support creating EndpointSlice API operations", func() {
+		// Setup
+		ns := f.Namespace.Name
+		epsVersion := "v1"
+		epsClient := f.ClientSet.DiscoveryV1().EndpointSlices(ns)
+
+		epsTemplate := &discoveryv1.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-example-ing",
+				Labels: map[string]string{
+					"special-label": f.UniqueName,
+				}},
+			AddressType: discoveryv1.AddressTypeIPv4,
+			Endpoints: []discoveryv1.Endpoint{
+				{Addresses: []string{"1.2.3.4", "5.6.7.8"}},
+				{Addresses: []string{"2.2.3.4", "6.6.7.8"}},
+			},
+		}
+		// Discovery
+		ginkgo.By("getting /apis")
+		{
+			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
+			framework.ExpectNoError(err)
+			found := false
+			for _, group := range discoveryGroups.Groups {
+				if group.Name == discoveryv1.GroupName {
+					for _, version := range group.Versions {
+						if version.Version == epsVersion {
+							found = true
+							break
+						}
+					}
+				}
+			}
+			framework.ExpectEqual(found, true, fmt.Sprintf("expected discovery API group/version, got %#v", discoveryGroups.Groups))
+		}
+
+		ginkgo.By("getting /apis/discovery.k8s.io")
+		{
+			group := &metav1.APIGroup{}
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/discovery.k8s.io").Do(context.TODO()).Into(group)
+			framework.ExpectNoError(err)
+			found := false
+			for _, version := range group.Versions {
+				if version.Version == epsVersion {
+					found = true
+					break
+				}
+			}
+			framework.ExpectEqual(found, true, fmt.Sprintf("expected discovery API version, got %#v", group.Versions))
+		}
+
+		ginkgo.By("getting /apis/discovery.k8s.io" + epsVersion)
+		{
+			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(discoveryv1.SchemeGroupVersion.String())
+			framework.ExpectNoError(err)
+			foundEPS := false
+			for _, resource := range resources.APIResources {
+				switch resource.Name {
+				case "endpointslices":
+					foundEPS = true
+				}
+			}
+			framework.ExpectEqual(foundEPS, true, fmt.Sprintf("expected endpointslices, got %#v", resources.APIResources))
+		}
+
+		// EndpointSlice resource create/read/update/watch verbs
+		ginkgo.By("creating")
+		_, err := epsClient.Create(context.TODO(), epsTemplate, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		_, err = epsClient.Create(context.TODO(), epsTemplate, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		createdEPS, err := epsClient.Create(context.TODO(), epsTemplate, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("getting")
+		queriedEPS, err := epsClient.Get(context.TODO(), createdEPS.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(queriedEPS.UID, createdEPS.UID)
+
+		ginkgo.By("listing")
+		epsList, err := epsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(epsList.Items), 3, "filtered list should have 3 items")
+
+		ginkgo.By("watching")
+		framework.Logf("starting watch")
+		epsWatch, err := epsClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: epsList.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+
+		// Test cluster-wide list and watch
+		clusterEPSClient := f.ClientSet.DiscoveryV1().EndpointSlices("")
+		ginkgo.By("cluster-wide listing")
+		clusterEPSList, err := clusterEPSClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(clusterEPSList.Items), 3, "filtered list should have 3 items")
+
+		ginkgo.By("cluster-wide watching")
+		framework.Logf("starting watch")
+		_, err = clusterEPSClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: epsList.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("patching")
+		patchedEPS, err := epsClient.Patch(context.TODO(), createdEPS.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(patchedEPS.Annotations["patched"], "true", "patched object should have the applied annotation")
+
+		ginkgo.By("updating")
+		var epsToUpdate, updatedEPS *discoveryv1.EndpointSlice
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			epsToUpdate, err = epsClient.Get(context.TODO(), createdEPS.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			epsToUpdate.Annotations["updated"] = "true"
+			updatedEPS, err = epsClient.Update(context.TODO(), epsToUpdate, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(updatedEPS.Annotations["updated"], "true", "updated object should have the applied annotation")
+
+		framework.Logf("waiting for watch events with expected annotations")
+		for sawAnnotations := false; !sawAnnotations; {
+			select {
+			case evt, ok := <-epsWatch.ResultChan():
+				framework.ExpectEqual(ok, true, "watch channel should not close")
+				framework.ExpectEqual(evt.Type, watch.Modified)
+				watchedEPS, isEPS := evt.Object.(*discoveryv1.EndpointSlice)
+				framework.ExpectEqual(isEPS, true, fmt.Sprintf("expected EndpointSlice, got %T", evt.Object))
+				if watchedEPS.Annotations["patched"] == "true" {
+					framework.Logf("saw patched and updated annotations")
+					sawAnnotations = true
+					epsWatch.Stop()
+				} else {
+					framework.Logf("missing expected annotations, waiting: %#v", watchedEPS.Annotations)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				framework.Fail("timed out waiting for watch event")
+			}
+		}
+
+		ginkgo.By("deleting")
+
+		err = epsClient.Delete(context.TODO(), createdEPS.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+		_, err = epsClient.Get(context.TODO(), createdEPS.Name, metav1.GetOptions{})
+		framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %v", err))
+		epsList, err = epsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(epsList.Items), 2, "filtered list should have 2 items")
+		for _, eps := range epsList.Items {
+			if eps.Namespace == createdEPS.Namespace && eps.Name == createdEPS.Name {
+				framework.Fail("listing after deleting createdEPS")
+			}
+		}
+
+		ginkgo.By("deleting a collection")
+		err = epsClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		epsList, err = epsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(epsList.Items), 0, "filtered list should have 0 items")
 	})
 })
 
