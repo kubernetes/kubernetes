@@ -142,7 +142,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 	// in a "Describe".
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:MasterUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Master upgrade"}
@@ -165,7 +165,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 
 	ginkgo.Describe("node upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:NodeUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Node upgrade"}
@@ -178,7 +178,8 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, nodeUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
+				image := upgCtx.Versions[1].NodeImage
+				framework.ExpectNoError(nodeUpgrade(f, target, image))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.NodeUpgrade, upgradeFunc)
@@ -187,7 +188,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 
 	ginkgo.Describe("cluster upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:ClusterUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Cluster upgrade"}
@@ -197,9 +198,10 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, clusterUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
+				image := upgCtx.Versions[1].NodeImage
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
+				framework.ExpectNoError(nodeUpgrade(f, target, image))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -213,7 +215,7 @@ var _ = ginkgo.Describe("Downgrade [Feature:Downgrade]", func() {
 
 	ginkgo.Describe("cluster downgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:ClusterDowngrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Cluster downgrade"}
@@ -225,7 +227,8 @@ var _ = ginkgo.Describe("Downgrade [Feature:Downgrade]", func() {
 				defer finalizeUpgradeTest(start, clusterDowngradeTest)
 				// Yes this really is a downgrade. And nodes must downgrade first.
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
+				image := upgCtx.Versions[1].NodeImage
+				framework.ExpectNoError(nodeUpgrade(f, target, image))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
@@ -240,7 +243,7 @@ var _ = ginkgo.Describe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 
 	ginkgo.Describe("etcd upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Etcd upgrade"}
@@ -263,7 +266,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should NOT disrupt gpu pod [Feature:GPUMasterUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "GPU master upgrade"}
@@ -281,7 +284,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	})
 	ginkgo.Describe("cluster upgrade", func() {
 		ginkgo.It("should be able to run gpu pod after upgrade [Feature:GPUClusterUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "GPU cluster upgrade"}
@@ -291,9 +294,10 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, gpuUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
+				image := upgCtx.Versions[1].NodeImage
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
+				framework.ExpectNoError(nodeUpgrade(f, target, image))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -301,7 +305,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	})
 	ginkgo.Describe("cluster downgrade", func() {
 		ginkgo.It("should be able to run gpu pod after downgrade [Feature:GPUClusterDowngrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "GPU cluster downgrade"}
@@ -311,7 +315,8 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, gpuDowngradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
+				image := upgCtx.Versions[1].NodeImage
+				framework.ExpectNoError(nodeUpgrade(f, target, image))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
@@ -327,7 +332,7 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 
 	ginkgo.Describe("stateful upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Stateful upgrade"}
@@ -337,9 +342,10 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 				start := time.Now()
 				defer finalizeUpgradeTest(start, statefulUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
+				image := upgCtx.Versions[1].NodeImage
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
+				framework.ExpectNoError(nodeUpgrade(f, target, image))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(upgCtx, statefulsetUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -357,7 +363,7 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 
 	ginkgo.Describe("Upgrade kube-proxy from static pods to a DaemonSet", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "kube-proxy upgrade"}
@@ -371,9 +377,10 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 				start := time.Now()
 				defer finalizeUpgradeTest(start, kubeProxyUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
+				image := upgCtx.Versions[1].NodeImage
 				framework.ExpectNoError(masterUpgradeGCEWithKubeProxyDaemonSet(target, true))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(nodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, true))
+				framework.ExpectNoError(nodeUpgradeGCEWithKubeProxyDaemonSet(f, target, image, true))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(upgCtx, kubeProxyUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -382,7 +389,7 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 
 	ginkgo.Describe("Downgrade kube-proxy from a DaemonSet to static pods", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetDowngrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "kube-proxy downgrade"}
@@ -413,7 +420,7 @@ var _ = ginkgo.Describe("[sig-auth] ServiceAccount admission controller migratio
 
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "ServiceAccount admission controller migration"}
@@ -547,7 +554,7 @@ func runUpgradeSuite(
 	cm.Do()
 }
 
-func getUpgradeContext(c discovery.DiscoveryInterface, upgradeTarget string) (*upgrades.UpgradeContext, error) {
+func getUpgradeContext(c discovery.DiscoveryInterface, upgradeTarget, upgradeImage string) (*upgrades.UpgradeContext, error) {
 	current, err := c.ServerVersion()
 	if err != nil {
 		return nil, err
@@ -583,7 +590,7 @@ func getUpgradeContext(c discovery.DiscoveryInterface, upgradeTarget string) (*u
 
 	upgCtx.Versions = append(upgCtx.Versions, upgrades.VersionContext{
 		Version:   *nextVer,
-		NodeImage: *upgradeImage,
+		NodeImage: upgradeImage,
 	})
 
 	return upgCtx, nil
