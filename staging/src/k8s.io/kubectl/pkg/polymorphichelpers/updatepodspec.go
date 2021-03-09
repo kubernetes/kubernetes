@@ -81,6 +81,8 @@ func updatePodSpecForObject(obj runtime.Object, fn func(*v1.PodSpec) error) (boo
 		// CronJob
 	case *batchv1beta1.CronJob:
 		return true, fn(&t.Spec.JobTemplate.Spec.Template.Spec)
+	case *batchv1.CronJob:
+		return true, fn(&t.Spec.JobTemplate.Spec.Template.Spec)
 
 	default:
 		return false, fmt.Errorf("the object is not a pod or does not have a pod template: %T", t)
