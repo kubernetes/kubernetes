@@ -78,8 +78,8 @@ func NewFieldManager(f Manager, ignoreManagedFieldsFromRequestObject bool) *Fiel
 
 // NewDefaultFieldManager creates a new FieldManager that merges apply requests
 // and update managed fields for other types of requests.
-func NewDefaultFieldManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, ignoreManagedFieldsFromRequestObject bool) (*FieldManager, error) {
-	f, err := NewStructuredMergeManager(typeConverter, objectConverter, objectDefaulter, kind.GroupVersion(), hub)
+func NewDefaultFieldManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, ignoreManagedFieldsFromRequestObject bool, resetFields map[fieldpath.APIVersion]*fieldpath.Set) (*FieldManager, error) {
+	f, err := NewStructuredMergeManager(typeConverter, objectConverter, objectDefaulter, kind.GroupVersion(), hub, resetFields)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field manager: %v", err)
 	}
@@ -89,8 +89,8 @@ func NewDefaultFieldManager(typeConverter TypeConverter, objectConverter runtime
 // NewDefaultCRDFieldManager creates a new FieldManager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
-func NewDefaultCRDFieldManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, ignoreManagedFieldsFromRequestObject bool) (_ *FieldManager, err error) {
-	f, err := NewCRDStructuredMergeManager(typeConverter, objectConverter, objectDefaulter, kind.GroupVersion(), hub)
+func NewDefaultCRDFieldManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, ignoreManagedFieldsFromRequestObject bool, resetFields map[fieldpath.APIVersion]*fieldpath.Set) (_ *FieldManager, err error) {
+	f, err := NewCRDStructuredMergeManager(typeConverter, objectConverter, objectDefaulter, kind.GroupVersion(), hub, resetFields)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field manager: %v", err)
 	}

@@ -41,6 +41,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // rcStrategy implements verification logic for Replication Controllers.
@@ -71,6 +72,18 @@ func (rcStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.Garba
 // NamespaceScoped returns true because all Replication Controllers need to be within a namespace.
 func (rcStrategy) NamespaceScoped() bool {
 	return true
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (rcStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
 }
 
 // PrepareForCreate clears the status of a replication controller before creation.
@@ -191,6 +204,16 @@ type rcStatusStrategy struct {
 
 // StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = rcStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (rcStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+}
 
 func (rcStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newRc := obj.(*api.ReplicationController)

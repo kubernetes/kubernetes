@@ -43,6 +43,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/apps/deployment"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // DeploymentStorage includes dummy storage for Deployments and for Scale subresource.
@@ -81,9 +82,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Rollbac
 		NewListFunc:              func() runtime.Object { return &apps.DeploymentList{} },
 		DefaultQualifiedResource: apps.Resource("deployments"),
 
-		CreateStrategy: deployment.Strategy,
-		UpdateStrategy: deployment.Strategy,
-		DeleteStrategy: deployment.Strategy,
+		CreateStrategy:      deployment.Strategy,
+		UpdateStrategy:      deployment.Strategy,
+		DeleteStrategy:      deployment.Strategy,
+		ResetFieldsStrategy: deployment.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -94,6 +96,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Rollbac
 
 	statusStore := *store
 	statusStore.UpdateStrategy = deployment.StatusStrategy
+	statusStore.ResetFieldsStrategy = deployment.StatusStrategy
 	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, &RollbackREST{store: store}, nil
 }
 
@@ -139,6 +142,11 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }
 
 // RollbackREST implements the REST endpoint for initiating the rollback of a deployment

@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -165,6 +166,11 @@ func (s *serviceStorage) ConvertToTable(ctx context.Context, object runtime.Obje
 
 func (s *serviceStorage) StorageVersion() runtime.GroupVersioner {
 	panic("not implemented")
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (s *serviceStorage) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return nil
 }
 
 func NewTestREST(t *testing.T, endpoints *api.EndpointsList, ipFamilies []api.IPFamily) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {

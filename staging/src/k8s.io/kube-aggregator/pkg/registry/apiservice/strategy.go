@@ -31,6 +31,7 @@ import (
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/validation"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 type apiServerStrategy struct {
@@ -40,14 +41,28 @@ type apiServerStrategy struct {
 
 // apiServerStrategy must implement rest.RESTCreateUpdateStrategy
 var _ rest.RESTCreateUpdateStrategy = apiServerStrategy{}
+var Strategy = apiServerStrategy{}
 
 // NewStrategy creates a new apiServerStrategy.
-func NewStrategy(typer runtime.ObjectTyper) rest.RESTCreateUpdateStrategy {
+func NewStrategy(typer runtime.ObjectTyper) rest.CreateUpdateResetFieldsStrategy {
 	return apiServerStrategy{typer, names.SimpleNameGenerator}
 }
 
 func (apiServerStrategy) NamespaceScoped() bool {
 	return false
+}
+
+func (apiServerStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"apiregistration.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"apiregistration.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
 }
 
 func (apiServerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
@@ -91,12 +106,27 @@ type apiServerStatusStrategy struct {
 }
 
 // NewStatusStrategy creates a new apiServerStatusStrategy.
-func NewStatusStrategy(typer runtime.ObjectTyper) rest.RESTUpdateStrategy {
+func NewStatusStrategy(typer runtime.ObjectTyper) rest.UpdateResetFieldsStrategy {
 	return apiServerStatusStrategy{typer, names.SimpleNameGenerator}
 }
 
 func (apiServerStatusStrategy) NamespaceScoped() bool {
 	return false
+}
+
+func (apiServerStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"apiregistration.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+			fieldpath.MakePathOrDie("metadata"),
+		),
+		"apiregistration.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+			fieldpath.MakePathOrDie("metadata"),
+		),
+	}
+
+	return fields
 }
 
 func (apiServerStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

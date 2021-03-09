@@ -32,10 +32,12 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	netutil "k8s.io/utils/net"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 type Strategy interface {
 	rest.RESTCreateUpdateStrategy
+	rest.ResetFieldsStrategy
 }
 
 // svcStrategy implements behavior for Services
@@ -88,6 +90,18 @@ func StrategyForServiceCIDRs(primaryCIDR net.IPNet, hasSecondary bool) (Strategy
 // NamespaceScoped is true for services.
 func (svcStrategy) NamespaceScoped() bool {
 	return true
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (svcStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
 }
 
 // PrepareForCreate sets contextual defaults and clears fields that are not allowed to be set by end users on creation.
@@ -261,6 +275,18 @@ type serviceStatusStrategy struct {
 // NewServiceStatusStrategy creates a status strategy for the provided base strategy.
 func NewServiceStatusStrategy(strategy Strategy) Strategy {
 	return serviceStatusStrategy{strategy}
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (serviceStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+
+	return fields
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status

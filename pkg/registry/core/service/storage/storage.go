@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service"
 	registry "k8s.io/kubernetes/pkg/registry/core/service"
 	svcreg "k8s.io/kubernetes/pkg/registry/core/service"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	netutil "k8s.io/utils/net"
 )
@@ -54,9 +55,10 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet,
 		DefaultQualifiedResource: api.Resource("services"),
 		ReturnDeletedObject:      true,
 
-		CreateStrategy: strategy,
-		UpdateStrategy: strategy,
-		DeleteStrategy: strategy,
+		CreateStrategy:      strategy,
+		UpdateStrategy:      strategy,
+		DeleteStrategy:      strategy,
+		ResetFieldsStrategy: strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -66,7 +68,9 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet,
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = service.NewServiceStatusStrategy(strategy)
+	statusStrategy := service.NewServiceStatusStrategy(strategy)
+	statusStore.UpdateStrategy = statusStrategy
+	statusStore.ResetFieldsStrategy = statusStrategy
 
 	ipv4 := api.IPv4Protocol
 	ipv6 := api.IPv6Protocol
@@ -123,6 +127,11 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }
 
 // defaultOnRead sets interlinked fields that were not previously set on read.
@@ -212,7 +221,6 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) {
 				service.Spec.IPFamilyPolicy = &singleStack
 			}
 		}
-
 	} else {
 		// headful
 		// make sure a slice exists to receive the families
