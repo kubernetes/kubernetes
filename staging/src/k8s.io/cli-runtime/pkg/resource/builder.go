@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
+	"sigs.k8s.io/kustomize/api/filesys"
 )
 
 var FileExtensions = []string{".json", ".yaml", ".yml"}
@@ -258,8 +259,14 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 		}
 	}
 	if filenameOptions.Kustomize != "" {
-		b.paths = append(b.paths, &KustomizeVisitor{filenameOptions.Kustomize,
-			NewStreamVisitor(nil, b.mapper, filenameOptions.Kustomize, b.schema)})
+		b.paths = append(
+			b.paths,
+			&KustomizeVisitor{
+				mapper:  b.mapper,
+				dirPath: filenameOptions.Kustomize,
+				schema:  b.schema,
+				fSys:    filesys.MakeFsOnDisk(),
+			})
 	}
 
 	if enforceNamespace {

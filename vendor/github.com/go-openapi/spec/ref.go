@@ -68,10 +68,12 @@ func (r *Ref) IsValidURI(basepaths ...string) bool {
 	}
 
 	if r.HasFullURL {
+		//#nosec
 		rr, err := http.Get(v)
 		if err != nil {
 			return false
 		}
+		defer rr.Body.Close()
 
 		return rr.StatusCode/100 == 2
 	}
