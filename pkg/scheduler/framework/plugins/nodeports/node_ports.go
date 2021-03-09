@@ -30,6 +30,7 @@ type NodePorts struct{}
 
 var _ framework.PreFilterPlugin = &NodePorts{}
 var _ framework.FilterPlugin = &NodePorts{}
+var _ framework.EnqueueExtensions = &NodePorts{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -95,6 +96,16 @@ func getPreFilterState(cycleState *framework.CycleState) (preFilterState, error)
 		return nil, fmt.Errorf("%+v  convert to nodeports.preFilterState error", c)
 	}
 	return s, nil
+}
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *NodePorts) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		// Due to immutable fields `spec.containers[*].ports`, pod update events are ignored.
+		{Resource: framework.Pod, ActionType: framework.Delete},
+		{Resource: framework.Node, ActionType: framework.Add},
+	}
 }
 
 // Filter invoked at the filter extension point.
