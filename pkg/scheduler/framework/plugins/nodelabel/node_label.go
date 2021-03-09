@@ -89,6 +89,12 @@ func (pl *NodeLabel) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
 	}
+
+	size := int64(len(pl.args.PresentLabels) + len(pl.args.AbsentLabels))
+	if size == 0 {
+		return nil
+	}
+
 	nodeLabels := labels.Set(node.Labels)
 	check := func(labels []string, presence bool) bool {
 		for _, label := range labels {
@@ -114,6 +120,15 @@ func (pl *NodeLabel) Score(ctx context.Context, state *framework.CycleState, pod
 	}
 
 	node := nodeInfo.Node()
+	if node == nil {
+		return 0, framework.NewStatus(framework.Error, "node not found")
+	}
+
+	size := int64(len(pl.args.PresentLabelsPreference) + len(pl.args.AbsentLabelsPreference))
+	if size == 0 {
+		return 0, nil
+	}
+
 	score := int64(0)
 	for _, label := range pl.args.PresentLabelsPreference {
 		if labels.Set(node.Labels).Has(label) {
@@ -125,8 +140,9 @@ func (pl *NodeLabel) Score(ctx context.Context, state *framework.CycleState, pod
 			score += framework.MaxNodeScore
 		}
 	}
+
 	// Take average score for each label to ensure the score doesn't exceed MaxNodeScore.
-	score /= int64(len(pl.args.PresentLabelsPreference) + len(pl.args.AbsentLabelsPreference))
+	score /= size
 
 	return score, nil
 }
