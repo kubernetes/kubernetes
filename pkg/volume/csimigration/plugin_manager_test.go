@@ -208,10 +208,10 @@ func TestCheckMigrationFeatureFlags(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginUnregsiterFeature, test.pluginUnregsiterEnabled)()
 			migrationComplete, err := CheckMigrationFeatureFlags(utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginUnregsiterFeature)
-			if err != nil && test.expectErr == false {
+			if err != nil && !test.expectErr {
 				t.Errorf("Unexpected error: %v", err)
 			}
-			if err == nil && test.expectErr == true {
+			if err == nil && test.expectErr {
 				t.Errorf("Unexpected validation pass")
 			}
 			if migrationComplete != test.expectMigrationComplete {

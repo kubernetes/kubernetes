@@ -227,7 +227,7 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, al
 
 	// these are needed that pod is spawning to same AZ
 	volumeLabels = make(map[string]string)
-	if IgnoreVolumeAZ == false {
+	if !IgnoreVolumeAZ {
 		if volumeAZ != "" {
 			volumeLabels[v1.LabelTopologyZone] = volumeAZ
 		}

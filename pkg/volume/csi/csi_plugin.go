@@ -808,7 +808,7 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 		}
 		return false, err
 	}
-	if csiDriver.Spec.AttachRequired != nil && *csiDriver.Spec.AttachRequired == false {
+	if csiDriver.Spec.AttachRequired != nil && !*csiDriver.Spec.AttachRequired {
 		return true, nil
 	}
 	return false, nil
