@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
@@ -1497,6 +1499,183 @@ func TestSyncServiceStaleInformer(t *testing.T) {
 				t.Fatalf("Expected error because informer cache is outdated")
 			}
 
+		})
+	}
+}
+
+func Test_checkNodeTopologyDistribution(t *testing.T) {
+	zoneA := "zone-a"
+	zoneB := "zone-b"
+	zoneC := "zone-c"
+
+	readyTrue := true
+	readyFalse := false
+
+	cpu100 := resource.MustParse("100m")
+	cpu1000 := resource.MustParse("1000m")
+	cpu2000 := resource.MustParse("2000m")
+
+	type nodeInfo struct {
+		zoneLabel *string
+		ready     *bool
+		cpu       *resource.Quantity
+	}
+
+	testCases := []struct {
+		name                 string
+		nodes                []nodeInfo
+		topologyCacheEnabled bool
+		endpointZoneInfo     map[string]topologycache.EndpointZoneInfo
+		expectedQueueLen     int
+	}{{
+		name:                 "empty",
+		nodes:                []nodeInfo{},
+		topologyCacheEnabled: false,
+		endpointZoneInfo:     map[string]topologycache.EndpointZoneInfo{},
+		expectedQueueLen:     0,
+	}, {
+		name: "lopsided, queue required",
+		nodes: []nodeInfo{
+			{zoneLabel: &zoneA, ready: &readyTrue, cpu: &cpu100},
+			{zoneLabel: &zoneB, ready: &readyTrue, cpu: &cpu1000},
+			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
+		},
+		topologyCacheEnabled: true,
+		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+			"ns/svc1": {zoneA: 1, zoneB: 2, zoneC: 3},
+		},
+		expectedQueueLen: 1,
+	}, {
+		name: "lopsided but 1 unready, queue required because unready node means 0 CPU in one zone",
+		nodes: []nodeInfo{
+			{zoneLabel: &zoneA, ready: &readyFalse, cpu: &cpu100},
+			{zoneLabel: &zoneB, ready: &readyTrue, cpu: &cpu1000},
+			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
+		},
+		topologyCacheEnabled: true,
+		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+			"ns/svc1": {zoneA: 1, zoneB: 2, zoneC: 3},
+		},
+		expectedQueueLen: 1,
+	}, {
+		name: "even zones, uneven endpoint distribution but within threshold, no sync required",
+		nodes: []nodeInfo{
+			{zoneLabel: &zoneB, ready: &readyTrue, cpu: &cpu2000},
+			{zoneLabel: &zoneB, ready: &readyTrue, cpu: &cpu2000},
+			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
+			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
+		},
+		topologyCacheEnabled: true,
+		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+			"ns/svc1": {zoneB: 5, zoneC: 4},
+		},
+		expectedQueueLen: 0,
+	}, {
+		name: "even zones but node missing zone, sync required",
+		nodes: []nodeInfo{
+			{zoneLabel: &zoneB, ready: &readyTrue, cpu: &cpu2000},
+			{ready: &readyTrue, cpu: &cpu2000},
+			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
+			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
+		},
+		topologyCacheEnabled: true,
+		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+			"ns/svc1": {zoneB: 5, zoneC: 4},
+		},
+		expectedQueueLen: 1,
+	}, {
+		name: "even zones but node missing cpu, sync required",
+		nodes: []nodeInfo{
+			{zoneLabel: &zoneB, ready: &readyTrue, cpu: &cpu2000},
+			{zoneLabel: &zoneB, ready: &readyTrue},
+			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
+			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
+		},
+		topologyCacheEnabled: true,
+		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+			"ns/svc1": {zoneB: 5, zoneC: 4},
+		},
+		expectedQueueLen: 1,
+	}, {
+		name: "even zones, uneven endpoint distribution beyond threshold, no sync required",
+		nodes: []nodeInfo{
+			{zoneLabel: &zoneB, ready: &readyTrue, cpu: &cpu2000},
+			{zoneLabel: &zoneB, ready: &readyTrue, cpu: &cpu2000},
+			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
+			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu2000},
+		},
+		topologyCacheEnabled: true,
+		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+			"ns/svc1": {zoneB: 6, zoneC: 4},
+		},
+		expectedQueueLen: 1,
+	}, {
+		name: "3 uneven zones, matching endpoint distribution, no sync required",
+		nodes: []nodeInfo{
+			{zoneLabel: &zoneA, ready: &readyTrue, cpu: &cpu2000},
+			{zoneLabel: &zoneB, ready: &readyTrue, cpu: &cpu1000},
+			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu100},
+		},
+		topologyCacheEnabled: true,
+		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+			"ns/svc1": {zoneA: 20, zoneB: 10, zoneC: 1},
+		},
+		expectedQueueLen: 0,
+	}, {
+		name: "3 uneven zones, endpoint distribution within threshold but below 1, sync required",
+		nodes: []nodeInfo{
+			{zoneLabel: &zoneA, ready: &readyTrue, cpu: &cpu2000},
+			{zoneLabel: &zoneB, ready: &readyTrue, cpu: &cpu1000},
+			{zoneLabel: &zoneC, ready: &readyTrue, cpu: &cpu100},
+		},
+		topologyCacheEnabled: true,
+		endpointZoneInfo: map[string]topologycache.EndpointZoneInfo{
+			"ns/svc1": {zoneA: 20, zoneB: 10, zoneC: 0},
+		},
+		expectedQueueLen: 1,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, esController := newController([]string{}, time.Duration(0))
+
+			for i, nodeInfo := range tc.nodes {
+				node := &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("node-%d", i)},
+					Status:     v1.NodeStatus{},
+				}
+				if nodeInfo.zoneLabel != nil {
+					node.Labels = map[string]string{v1.LabelTopologyZone: *nodeInfo.zoneLabel}
+				}
+				if nodeInfo.ready != nil {
+					status := v1.ConditionFalse
+					if *nodeInfo.ready {
+						status = v1.ConditionTrue
+					}
+					node.Status.Conditions = []v1.NodeCondition{{
+						Type:   v1.NodeReady,
+						Status: status,
+					}}
+				}
+				if nodeInfo.cpu != nil {
+					node.Status.Allocatable = v1.ResourceList{
+						v1.ResourceCPU: *nodeInfo.cpu,
+					}
+				}
+				esController.nodeStore.Add(node)
+				if tc.topologyCacheEnabled {
+					esController.topologyCache = topologycache.NewTopologyCache()
+					for serviceKey, endpointZoneInfo := range tc.endpointZoneInfo {
+						esController.topologyCache.SetHints(serviceKey, discovery.AddressTypeIPv4, endpointZoneInfo)
+					}
+				}
+			}
+
+			esController.checkNodeTopologyDistribution()
+
+			if esController.queue.Len() != tc.expectedQueueLen {
+				t.Errorf("Expected %d services to be queued, got %d", tc.expectedQueueLen, esController.queue.Len())
+			}
 		})
 	}
 }

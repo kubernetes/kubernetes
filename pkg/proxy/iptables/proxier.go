@@ -1020,22 +1020,12 @@ func (proxier *Proxier) syncProxyRules() {
 
 		allEndpoints := proxier.endpointsMap[svcName]
 
-		// Service Topology will not be enabled in the following cases:
-		// 1. externalTrafficPolicy=Local (mutually exclusive with service topology).
-		// 2. ServiceTopology is not enabled.
-		// 3. EndpointSlice is not enabled (service topology depends on endpoint slice
-		// to get topology information).
-		if !svcInfo.NodeLocalExternal() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
-			allEndpoints = proxy.FilterTopologyEndpoint(proxier.nodeLabels, svcInfo.TopologyKeys(), allEndpoints)
-		}
+		// Filtering for topology aware endpoints. This function will only
+		// filter endpoints if appropriate feature gates are enabled and the
+		// Service does not have conflicting configuration such as
+		// externalTrafficPolicy=Local.
+		allEndpoints = proxy.FilterEndpoints(allEndpoints, svcInfo, proxier.nodeLabels)
 
-		// Service InternalTrafficPolicy is only enabled when all of the
-		// following are true:
-		// 1. InternalTrafficPolicy is Local
-		// 2. ServiceInternalTrafficPolicy feature gate is on
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && svcInfo.NodeLocalInternal() {
-			allEndpoints = proxy.FilterLocalEndpoint(svcInfo.InternalTrafficPolicy(), allEndpoints)
-		}
 		readyEndpoints := make([]proxy.Endpoint, 0, len(allEndpoints))
 		for _, endpoint := range allEndpoints {
 			if !endpoint.IsReady() {

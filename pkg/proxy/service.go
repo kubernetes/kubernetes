@@ -55,6 +55,7 @@ type BaseServiceInfo struct {
 	nodeLocalInternal        bool
 	internalTrafficPolicy    *v1.ServiceInternalTrafficPolicyType
 	topologyKeys             []string
+	hintsAnnotation          string
 }
 
 var _ ServicePort = &BaseServiceInfo{}
@@ -138,6 +139,11 @@ func (info *BaseServiceInfo) TopologyKeys() []string {
 	return info.topologyKeys
 }
 
+// HintsAnnotation is part of ServicePort interface.
+func (info *BaseServiceInfo) HintsAnnotation() string {
+	return info.hintsAnnotation
+}
+
 func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
 	nodeLocalExternal := false
 	if apiservice.RequestsOnlyLocalTraffic(service) {
@@ -165,6 +171,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		nodeLocalInternal:     nodeLocalInternal,
 		internalTrafficPolicy: service.Spec.InternalTrafficPolicy,
 		topologyKeys:          service.Spec.TopologyKeys,
+		hintsAnnotation:       service.Annotations[v1.AnnotationTopologyAwareHints],
 	}
 
 	loadBalancerSourceRanges := make([]string, len(service.Spec.LoadBalancerSourceRanges))

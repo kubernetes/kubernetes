@@ -100,6 +100,11 @@ type Endpoint struct {
 	// zone is the name of the Zone this endpoint exists in.
 	// +optional
 	Zone *string
+	// hints contains information associated with how an endpoint should be
+	// consumed.
+	// +featureGate=TopologyAwareHints
+	// +optional
+	Hints *EndpointHints
 }
 
 // EndpointConditions represents the current condition of an endpoint.
@@ -125,6 +130,19 @@ type EndpointConditions struct {
 	// with the EndpointSliceTerminatingCondition feature gate.
 	// +optional
 	Terminating *bool
+}
+
+// EndpointHints provides hints describing how an endpoint should be consumed.
+type EndpointHints struct {
+	// forZones indicates the zone(s) this endpoint should be consumed by to
+	// enable topology aware routing. May contain a maximum of 8 entries.
+	ForZones []ForZone
+}
+
+// ForZone provides information about which zones should consume this endpoint.
+type ForZone struct {
+	// name represents the name of the zone.
+	Name string
 }
 
 // EndpointPort represents a Port used by an EndpointSlice.

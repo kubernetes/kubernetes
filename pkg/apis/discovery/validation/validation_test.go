@@ -203,6 +203,23 @@ func TestValidateEndpointSlice(t *testing.T) {
 				}},
 			},
 		},
+		"valid-hints": {
+			expectedErrors: 0,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hints: &discovery.EndpointHints{
+						ForZones: []discovery.ForZone{{Name: "zone-a"}},
+					},
+				}},
+			},
+		},
 
 		// expected failures
 		"duplicate-port-name": {
@@ -448,6 +465,71 @@ func TestValidateEndpointSlice(t *testing.T) {
 				Endpoints: []discovery.Endpoint{{
 					Addresses: generateIPAddresses(1),
 					Hostname:  utilpointer.StringPtr("valid-123"),
+				}},
+			},
+		},
+		"invalid-hints": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hints: &discovery.EndpointHints{
+						ForZones: []discovery.ForZone{{Name: "inv@lid"}},
+					},
+				}},
+			},
+		},
+		"overlapping-hints": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hints: &discovery.EndpointHints{
+						ForZones: []discovery.ForZone{
+							{Name: "zone-a"},
+							{Name: "zone-b"},
+							{Name: "zone-a"},
+						},
+					},
+				}},
+			},
+		},
+		"too-many-hints": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hints: &discovery.EndpointHints{
+						ForZones: []discovery.ForZone{
+							{Name: "zone-a"},
+							{Name: "zone-b"},
+							{Name: "zone-c"},
+							{Name: "zone-d"},
+							{Name: "zone-e"},
+							{Name: "zone-f"},
+							{Name: "zone-g"},
+							{Name: "zone-h"},
+							{Name: "zone-i"},
+						},
+					},
 				}},
 			},
 		},

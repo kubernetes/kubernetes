@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/proxy/config"
 )
 
@@ -91,6 +92,8 @@ type ServicePort interface {
 	InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicyType
 	// TopologyKeys returns service TopologyKeys as a string array.
 	TopologyKeys() []string
+	// HintsAnnotation returns the value of the v1.AnnotationTopologyAwareHints annotation.
+	HintsAnnotation() string
 }
 
 // Endpoint in an interface which abstracts information about an endpoint.
@@ -117,6 +120,9 @@ type Endpoint interface {
 	IsTerminating() bool
 	// GetTopology returns the topology information of the endpoint.
 	GetTopology() map[string]string
+	// GetZoneHint returns the zone hint for the endpoint. This is based on
+	// endpoint.hints.forZones[0].name in the EndpointSlice API.
+	GetZoneHints() sets.String
 	// IP returns IP part of the endpoint.
 	IP() string
 	// Port returns the Port part of the endpoint.

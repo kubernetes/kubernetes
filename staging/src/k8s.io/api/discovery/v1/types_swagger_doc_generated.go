@@ -36,6 +36,7 @@ var map_Endpoint = map[string]string{
 	"deprecatedTopology": "deprecatedTopology contains topology information part of the v1beta1 API. This field is deprecated, and will be removed when the v1beta1 API is removed (no sooner than kubernetes v1.24).  While this field can hold values, it is not writable through the v1 API, and any attempts to write to it will be silently ignored. Topology information can be found in the zone and nodeName fields instead.",
 	"nodeName":           "nodeName represents the name of the Node hosting this endpoint. This can be used to determine endpoints local to a Node. This field can be enabled with the EndpointSliceNodeName feature gate.",
 	"zone":               "zone is the name of the Zone this endpoint exists in.",
+	"hints":              "hints contains information associated with how an endpoint should be consumed.",
 }
 
 func (Endpoint) SwaggerDoc() map[string]string {
@@ -51,6 +52,15 @@ var map_EndpointConditions = map[string]string{
 
 func (EndpointConditions) SwaggerDoc() map[string]string {
 	return map_EndpointConditions
+}
+
+var map_EndpointHints = map[string]string{
+	"":         "EndpointHints provides hints describing how an endpoint should be consumed.",
+	"forZones": "forZones indicates the zone(s) this endpoint should be consumed by to enable topology aware routing.",
+}
+
+func (EndpointHints) SwaggerDoc() map[string]string {
+	return map_EndpointHints
 }
 
 var map_EndpointPort = map[string]string{
@@ -85,6 +95,15 @@ var map_EndpointSliceList = map[string]string{
 
 func (EndpointSliceList) SwaggerDoc() map[string]string {
 	return map_EndpointSliceList
+}
+
+var map_ForZone = map[string]string{
+	"":     "ForZone provides information about which zones should consume this endpoint.",
+	"name": "name represents the name of the zone.",
+}
+
+func (ForZone) SwaggerDoc() map[string]string {
+	return map_ForZone
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

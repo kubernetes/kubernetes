@@ -31,6 +31,7 @@ type EndpointApplyConfiguration struct {
 	TargetRef  *v1.ObjectReferenceApplyConfiguration `json:"targetRef,omitempty"`
 	Topology   map[string]string                     `json:"topology,omitempty"`
 	NodeName   *string                               `json:"nodeName,omitempty"`
+	Hints      *EndpointHintsApplyConfiguration      `json:"hints,omitempty"`
 }
 
 // EndpointApplyConfiguration constructs an declarative configuration of the Endpoint type for use with
@@ -92,5 +93,13 @@ func (b *EndpointApplyConfiguration) WithTopology(entries map[string]string) *En
 // If called multiple times, the NodeName field is set to the value of the last call.
 func (b *EndpointApplyConfiguration) WithNodeName(value string) *EndpointApplyConfiguration {
 	b.NodeName = &value
+	return b
+}
+
+// WithHints sets the Hints field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Hints field is set to the value of the last call.
+func (b *EndpointApplyConfiguration) WithHints(value *EndpointHintsApplyConfiguration) *EndpointApplyConfiguration {
+	b.Hints = value
 	return b
 }

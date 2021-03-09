@@ -110,6 +110,11 @@ type Endpoint struct {
 	// with the EndpointSliceNodeName feature gate.
 	// +optional
 	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,6,opt,name=nodeName"`
+	// hints contains information associated with how an endpoint should be
+	// consumed.
+	// +featureGate=TopologyAwareHints
+	// +optional
+	Hints *EndpointHints `json:"hints,omitempty" protobuf:"bytes,7,opt,name=hints"`
 }
 
 // EndpointConditions represents the current condition of an endpoint.
@@ -136,6 +141,20 @@ type EndpointConditions struct {
 	// with the EndpointSliceTerminatingCondition feature gate.
 	// +optional
 	Terminating *bool `json:"terminating,omitempty" protobuf:"bytes,3,name=terminating"`
+}
+
+// EndpointHints provides hints describing how an endpoint should be consumed.
+type EndpointHints struct {
+	// forZones indicates the zone(s) this endpoint should be consumed by to
+	// enable topology aware routing. May contain a maximum of 8 entries.
+	// +listType=atomic
+	ForZones []ForZone `json:"forZones,omitempty" protobuf:"bytes,1,name=forZones"`
+}
+
+// ForZone provides information about which zones should consume this endpoint.
+type ForZone struct {
+	// name represents the name of the zone.
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
 }
 
 // EndpointPort represents a Port used by an EndpointSlice

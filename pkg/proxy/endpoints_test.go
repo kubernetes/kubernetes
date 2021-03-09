@@ -194,7 +194,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 				},
 			},
 		},
@@ -218,7 +218,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "port", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 				},
 			},
 		},
@@ -241,7 +241,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 				},
 			},
 		},
@@ -278,12 +278,12 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					{Endpoint: "2.2.2.2:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+					{Endpoint: "2.2.2.2:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 				},
 				makeServicePortName("ns1", "ep1", "p2", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					{Endpoint: "2.2.2.2:22", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+					{Endpoint: "2.2.2.2:22", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 				},
 			},
 		},
@@ -307,7 +307,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 				},
 			},
 		},
@@ -331,7 +331,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p2", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 				},
 			},
 		},
@@ -355,7 +355,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 				},
 			},
 		},
@@ -385,10 +385,10 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 				},
 				makeServicePortName("ns1", "ep1", "p2", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "1.1.1.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 				},
 			},
 		},
@@ -418,10 +418,10 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1", v1.ProtocolTCP): {
-					{Endpoint: "[2001:db8:85a3:0:0:8a2e:370:7334]:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "[2001:db8:85a3:0:0:8a2e:370:7334]:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 				},
 				makeServicePortName("ns1", "ep1", "p2", v1.ProtocolTCP): {
-					{Endpoint: "[2001:db8:85a3:0:0:8a2e:370:7334]:22", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					{Endpoint: "[2001:db8:85a3:0:0:8a2e:370:7334]:22", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 				},
 			},
 		},

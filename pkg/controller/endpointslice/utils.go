@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -364,4 +365,32 @@ func getAddressTypesForService(service *corev1.Service) map[discovery.AddressTyp
 	serviceSupportedAddresses[discovery.AddressTypeIPv6] = struct{}{}
 	klog.V(2).Infof("couldn't find ipfamilies for headless service: %v/%v likely because controller manager is likely connected to an old apiserver that does not support ip families yet. The service endpoint slice will use dual stack families until api-server default it correctly", service.Namespace, service.Name)
 	return serviceSupportedAddresses
+}
+
+func unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete []*discovery.EndpointSlice) []*discovery.EndpointSlice {
+	changedSliceNames := sets.String{}
+	for _, slice := range slicesToUpdate {
+		changedSliceNames.Insert(slice.Name)
+	}
+	for _, slice := range slicesToDelete {
+		changedSliceNames.Insert(slice.Name)
+	}
+	unchangedSlices := []*discovery.EndpointSlice{}
+	for _, slice := range existingSlices {
+		if !changedSliceNames.Has(slice.Name) {
+			unchangedSlices = append(unchangedSlices, slice)
+		}
+	}
+
+	return unchangedSlices
+}
+
+// hintsEnabled returns true if the provided annotations include a
+// corev1.AnnotationTopologyAwareHints key with a value set to "auto".
+func hintsEnabled(annotations map[string]string) bool {
+	val, ok := annotations[corev1.AnnotationTopologyAwareHints]
+	if !ok {
+		return false
+	}
+	return val == "auto"
 }

@@ -64,15 +64,22 @@
       "topology": {
         "27": "28"
       },
-      "nodeName": "29"
+      "nodeName": "29",
+      "hints": {
+        "forZones": [
+          {
+            "name": "30"
+          }
+        ]
+      }
     }
   ],
   "ports": [
     {
-      "name": "30",
-      "protocol": "脽ěĂ凗蓏Ŋ蛊ĉy緅縕",
+      "name": "31",
+      "protocol": "ěĂ凗蓏Ŋ蛊ĉy緅縕",
       "port": -591435092,
-      "appProtocol": "31"
+      "appProtocol": "32"
     }
   ]
 }
