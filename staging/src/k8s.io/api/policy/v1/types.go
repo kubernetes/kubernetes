@@ -146,5 +146,5 @@ type PodDisruptionBudgetList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// Items is a list of PodDisruptionBudgets
-	Items           []PodDisruptionBudget `json:"items" protobuf:"bytes,2,rep,name=items"`
+	Items []PodDisruptionBudget `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

@@ -301,10 +301,10 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 					},
 					Spec: policyv1.PodDisruptionBudgetSpec{
 						MinAvailable: &minAvailable,
-						Selector:     &metav1.LabelSelector{
+						Selector: &metav1.LabelSelector{
 							MatchExpressions: []metav1.LabelSelectorRequirement{
 								{
-									Key: "DoesNotExist",
+									Key:      "DoesNotExist",
 									Operator: metav1.LabelSelectorOpDoesNotExist,
 								},
 							},
@@ -325,10 +325,10 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 					},
 					Spec: v1beta1.PodDisruptionBudgetSpec{
 						MinAvailable: &minAvailable,
-						Selector:     &metav1.LabelSelector{
+						Selector: &metav1.LabelSelector{
 							MatchExpressions: []metav1.LabelSelectorRequirement{
 								{
-									Key: "DoesNotExist",
+									Key:      "DoesNotExist",
 									Operator: metav1.LabelSelectorOpDoesNotExist,
 								},
 							},
@@ -365,7 +365,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 			waitPDBStable(t, clientSet, 0, nsName, pdbName)
 
 			// Create a pod and wait for it be reach the running phase.
-			createPod(t,"pod", nsName, map[string]string{}, clientSet, []metav1.OwnerReference{})
+			createPod(t, "pod", nsName, map[string]string{}, clientSet, []metav1.OwnerReference{})
 			waitToObservePods(t, informers.Core().V1().Pods().Informer(), 1, v1.PodRunning)
 
 			// Then verify that the added pod are picked up by the disruption controller.

@@ -48,6 +48,7 @@ import (
 	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -90,6 +91,7 @@ import (
 	applyconfigurationsnodev1 "k8s.io/client-go/applyconfigurations/node/v1"
 	applyconfigurationsnodev1alpha1 "k8s.io/client-go/applyconfigurations/node/v1alpha1"
 	applyconfigurationsnodev1beta1 "k8s.io/client-go/applyconfigurations/node/v1beta1"
+	applyconfigurationspolicyv1 "k8s.io/client-go/applyconfigurations/policy/v1"
 	applyconfigurationspolicyv1beta1 "k8s.io/client-go/applyconfigurations/policy/v1beta1"
 	applyconfigurationsrbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
 	applyconfigurationsrbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
@@ -1117,6 +1119,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnodev1beta1.RuntimeClassApplyConfiguration{}
 	case nodev1beta1.SchemeGroupVersion.WithKind("Scheduling"):
 		return &applyconfigurationsnodev1beta1.SchedulingApplyConfiguration{}
+
+		// Group=policy, Version=v1
+	case policyv1.SchemeGroupVersion.WithKind("PodDisruptionBudget"):
+		return &applyconfigurationspolicyv1.PodDisruptionBudgetApplyConfiguration{}
+	case policyv1.SchemeGroupVersion.WithKind("PodDisruptionBudgetSpec"):
+		return &applyconfigurationspolicyv1.PodDisruptionBudgetSpecApplyConfiguration{}
+	case policyv1.SchemeGroupVersion.WithKind("PodDisruptionBudgetStatus"):
+		return &applyconfigurationspolicyv1.PodDisruptionBudgetStatusApplyConfiguration{}
 
 		// Group=policy, Version=v1beta1
 	case policyv1beta1.SchemeGroupVersion.WithKind("AllowedCSIDriver"):

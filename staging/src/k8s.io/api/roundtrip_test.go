@@ -20,7 +20,6 @@ import (
 	"math/rand"
 	"testing"
 
-	policyv1 "k8s.io/api/policy/v1"
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	admissionregv1 "k8s.io/api/admissionregistration/v1"
@@ -56,6 +55,7 @@ import (
 	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"

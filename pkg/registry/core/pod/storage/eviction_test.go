@@ -21,7 +21,7 @@ import (
 	"errors"
 	"testing"
 
-	policyv1"k8s.io/api/policy/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"

@@ -49,6 +49,7 @@ import (
 	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -276,6 +277,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=node.k8s.io, Version=v1beta1
 	case nodev1beta1.SchemeGroupVersion.WithResource("runtimeclasses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Node().V1beta1().RuntimeClasses().Informer()}, nil
+
+		// Group=policy, Version=v1
+	case policyv1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Policy().V1().PodDisruptionBudgets().Informer()}, nil
 
 		// Group=policy, Version=v1beta1
 	case policyv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):
