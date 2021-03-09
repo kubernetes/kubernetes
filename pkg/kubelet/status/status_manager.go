@@ -54,6 +54,10 @@ type versionedPodStatus struct {
 type podStatusSyncRequest struct {
 	podUID types.UID
 	status versionedPodStatus
+	// true indicates needsUpdate() should be called in manager#syncPod().
+	// false when needsReconcile() determines that reconciliation is to be done,
+	//  therefore we don't need to call needsUpdate()
+	checkNeedsUpdate bool
 }
 
 // Updates pod statuses in apiserver. Writes only when new status has changed.
@@ -166,7 +170,7 @@ func (m *manager) Start() {
 					"podUID", syncRequest.podUID,
 					"statusVersion", syncRequest.status.version,
 					"status", syncRequest.status.status)
-				m.syncPod(syncRequest.podUID, syncRequest.status)
+				m.syncPod(syncRequest.podUID, syncRequest.status, true)
 			case <-syncTicker:
 				klog.V(5).InfoS("Status Manager: syncing batch")
 				// remove any entries in the status channel since the batch will handle them
@@ -447,7 +451,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	m.podStatuses[pod.UID] = newStatus
 
 	select {
-	case m.podStatusChannel <- podStatusSyncRequest{pod.UID, newStatus}:
+	case m.podStatusChannel <- podStatusSyncRequest{pod.UID, newStatus, true}:
 		klog.V(5).InfoS("Status Manager: adding pod with new status to podStatusChannel",
 			"pod", klog.KObj(pod),
 			"podUID", pod.UID,
@@ -527,27 +531,27 @@ func (m *manager) syncBatch() {
 				syncedUID = mirrorUID
 			}
 			if m.needsUpdate(types.UID(syncedUID), status) {
-				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
+				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status, true})
 			} else if m.needsReconcile(uid, status.status) {
 				// Delete the apiStatusVersions here to force an update on the pod status
 				// In most cases the deleted apiStatusVersions here should be filled
 				// soon after the following syncPod() [If the syncPod() sync an update
 				// successfully].
 				delete(m.apiStatusVersions, syncedUID)
-				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
+				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status, false})
 			}
 		}
 	}()
 
 	for _, update := range updatedStatuses {
 		klog.V(5).InfoS("Status Manager: syncPod in syncbatch", "podUID", update.podUID)
-		m.syncPod(update.podUID, update.status)
+		m.syncPod(update.podUID, update.status, update.checkNeedsUpdate)
 	}
 }
 
 // syncPod syncs the given status with the API server. The caller must not hold the lock.
-func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
-	if !m.needsUpdate(uid, status) {
+func (m *manager) syncPod(uid types.UID, status versionedPodStatus, checkNeedsUpdate bool) {
+	if checkNeedsUpdate && !m.needsUpdate(uid, status) {
 		klog.V(1).InfoS("Status for pod is up-to-date; skipping", "podUID", uid)
 		return
 	}

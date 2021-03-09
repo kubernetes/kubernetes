@@ -127,7 +127,7 @@ func (m *manager) consumeUpdates() int {
 	for {
 		select {
 		case syncRequest := <-m.podStatusChannel:
-			m.syncPod(syncRequest.podUID, syncRequest.status)
+			m.syncPod(syncRequest.podUID, syncRequest.status, true)
 			updates++
 		default:
 			return updates
