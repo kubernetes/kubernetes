@@ -179,7 +179,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 				defer finalizeUpgradeTest(start, nodeUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				image := upgCtx.Versions[1].NodeImage
-				framework.ExpectNoError(nodeUpgrade(f, target, image))
+				framework.ExpectNoError(nodeUpgrade(f, target, image, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.NodeUpgrade, upgradeFunc)
@@ -201,7 +201,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 				image := upgCtx.Versions[1].NodeImage
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(nodeUpgrade(f, target, image))
+				framework.ExpectNoError(nodeUpgrade(f, target, image, nil))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -228,7 +228,7 @@ var _ = ginkgo.Describe("Downgrade [Feature:Downgrade]", func() {
 				// Yes this really is a downgrade. And nodes must downgrade first.
 				target := upgCtx.Versions[1].Version.String()
 				image := upgCtx.Versions[1].NodeImage
-				framework.ExpectNoError(nodeUpgrade(f, target, image))
+				framework.ExpectNoError(nodeUpgrade(f, target, image, nil))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
@@ -297,7 +297,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				image := upgCtx.Versions[1].NodeImage
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(nodeUpgrade(f, target, image))
+				framework.ExpectNoError(nodeUpgrade(f, target, image, nil))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -316,7 +316,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				defer finalizeUpgradeTest(start, gpuDowngradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				image := upgCtx.Versions[1].NodeImage
-				framework.ExpectNoError(nodeUpgrade(f, target, image))
+				framework.ExpectNoError(nodeUpgrade(f, target, image, nil))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
@@ -345,7 +345,7 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 				image := upgCtx.Versions[1].NodeImage
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(nodeUpgrade(f, target, image))
+				framework.ExpectNoError(nodeUpgrade(f, target, image, nil))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(upgCtx, statefulsetUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -676,12 +676,12 @@ func checkNodesVersions(cs clientset.Interface, want string) error {
 }
 
 // nodeUpgrade upgrades nodes on GCE/GKE.
-func nodeUpgrade(f *framework.Framework, v string, img string) error {
+func nodeUpgrade(f *framework.Framework, v string, img string, extraEnvs []string) error {
 	// Perform the upgrade.
 	var err error
 	switch framework.TestContext.Provider {
 	case "gce":
-		err = nodeUpgradeGCE(v, img, false)
+		err = nodeUpgradeGCE(v, img, extraEnvs)
 	case "gke":
 		err = nodeUpgradeGKE(f.Namespace.Name, v, img)
 	default:
@@ -697,16 +697,16 @@ func nodeUpgrade(f *framework.Framework, v string, img string) error {
 // TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
 func nodeUpgradeGCEWithKubeProxyDaemonSet(f *framework.Framework, v string, img string, enableKubeProxyDaemonSet bool) error {
 	// Perform the upgrade.
-	if err := nodeUpgradeGCE(v, img, enableKubeProxyDaemonSet); err != nil {
+	if err := nodeUpgradeGCE(v, img, []string{fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet)}); err != nil {
 		return err
 	}
 	return waitForNodesReadyAfterUpgrade(f)
 }
 
 // TODO(mrhohn): Remove 'enableKubeProxyDaemonSet' when kube-proxy is run as a DaemonSet by default.
-func nodeUpgradeGCE(rawV, img string, enableKubeProxyDaemonSet bool) error {
+func nodeUpgradeGCE(rawV, img string, extraEnvs []string) error {
 	v := "v" + rawV
-	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
+	env := append(os.Environ(), extraEnvs...)
 	if img != "" {
 		env = append(env, "KUBE_NODE_OS_DISTRIBUTION="+img)
 		_, _, err := framework.RunCmdEnv(env, framework.GCEUpgradeScript(), "-N", "-o", v)
