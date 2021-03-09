@@ -134,12 +134,12 @@ func masterUpgradeGCE(rawV string, extraEnvs []string) error {
 	return err
 }
 
-var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
+// TODO(#98326): Split the test by SIGs, move to appropriate directories and use SIGDescribe.
+var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-upgrade")
 
 	// Create the frameworks here because we can only create them
 	// in a "Describe".
-	testFrameworks := createUpgradeFrameworks(upgradeTests)
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:MasterUpgrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
@@ -159,7 +159,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, upgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 
@@ -181,7 +181,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.NodeUpgrade, upgradeFunc)
+			runUpgradeSuite(f, upgradeTests, testSuite, upgrades.NodeUpgrade, upgradeFunc)
 		})
 	})
 
@@ -202,17 +202,14 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
 
-var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
+// TODO(#98326): Split the test by SIGs, move to appropriate directories and use SIGDescribe.
+var _ = ginkgo.Describe("Downgrade [Feature:Downgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-downgrade")
-
-	// Create the frameworks here because we can only create them
-	// in a "Describe".
-	testFrameworks := createUpgradeFrameworks(upgradeTests)
 
 	ginkgo.Describe("cluster downgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:ClusterDowngrade]", func() {
@@ -233,17 +230,14 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
 
-var _ = SIGDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
+var _ = ginkgo.Describe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 	f := framework.NewDefaultFramework("etc-upgrade")
 
-	// Create the frameworks here because we can only create them
-	// in a "Describe".
-	testFrameworks := createUpgradeFrameworks(upgradeTests)
 	ginkgo.Describe("etcd upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
 			testSuite := &junit.TestSuite{Name: "Etcd upgrade"}
@@ -255,17 +249,15 @@ var _ = SIGDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 				defer finalizeUpgradeTest(start, etcdTest)
 				framework.ExpectNoError(framework.EtcdUpgrade(framework.TestContext.EtcdUpgradeStorage, framework.TestContext.EtcdUpgradeVersion))
 			}
-			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.EtcdUpgrade, upgradeFunc)
+			runUpgradeSuite(f, upgradeTests, testSuite, upgrades.EtcdUpgrade, upgradeFunc)
 		})
 	})
 })
 
-var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
+// TODO(#98326): Split the test by SIGs, move to appropriate directories and use SIGDescribe.
+var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	f := framework.NewDefaultFramework("gpu-upgrade")
 
-	// Create the frameworks here because we can only create them
-	// in a "Describe".
-	testFrameworks := createUpgradeFrameworks(gpuUpgradeTests)
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should NOT disrupt gpu pod [Feature:GPUMasterUpgrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
@@ -281,7 +273,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, gpuUpgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 	ginkgo.Describe("cluster upgrade", func() {
@@ -301,7 +293,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 	ginkgo.Describe("cluster downgrade", func() {
@@ -321,18 +313,15 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				framework.ExpectNoError(masterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
 
-// TODO(#98326): Figure out the right SIG and use appropriate SIGDescribe.
+// TODO(#98326): Move the test to sig-aps dir and use SIGDescribe.
 var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]", func() {
 	f := framework.NewDefaultFramework("stateful-upgrade")
 
-	// Create the frameworks here because we can only create them
-	// in a "Describe".
-	testFrameworks := createUpgradeFrameworks(statefulsetUpgradeTests)
 	ginkgo.Describe("stateful upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
@@ -350,12 +339,13 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, statefulsetUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, statefulsetUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
 
-var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]", func() {
+// TODO(#98326): Move the test to sig-network dir and use SIGDescribe.
+var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]", func() {
 	f := framework.NewDefaultFramework("kube-proxy-ds-migration")
 
 	ginkgo.BeforeEach(func() {
@@ -363,8 +353,6 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 	})
 
 	ginkgo.Describe("Upgrade kube-proxy from static pods to a DaemonSet", func() {
-		testFrameworks := createUpgradeFrameworks(kubeProxyUpgradeTests)
-
 		ginkgo.It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetUpgrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 			framework.ExpectNoError(err)
@@ -385,13 +373,11 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				framework.ExpectNoError(nodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, true))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, kubeProxyUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, kubeProxyUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 
 	ginkgo.Describe("Downgrade kube-proxy from a DaemonSet to static pods", func() {
-		testFrameworks := createUpgradeFrameworks(kubeProxyDowngradeTests)
-
 		ginkgo.It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetDowngrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 			framework.ExpectNoError(err)
@@ -413,15 +399,15 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				framework.ExpectNoError(masterUpgradeGCEWithKubeProxyDaemonSet(target, false))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, kubeProxyDowngradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, kubeProxyDowngradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
 
-var _ = SIGDescribe("[sig-auth] ServiceAccount admission controller migration [Feature:BoundServiceAccountTokenVolume]", func() {
+// TODO(#98326): Move the test to sig-auth dir and use SIGDescribe.
+var _ = ginkgo.Describe("[sig-auth] ServiceAccount admission controller migration [Feature:BoundServiceAccountTokenVolume]", func() {
 	f := framework.NewDefaultFramework("serviceaccount-admission-controller-migration")
 
-	testFrameworks := createUpgradeFrameworks(serviceaccountAdmissionControllerMigrationTests)
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
@@ -440,7 +426,7 @@ var _ = SIGDescribe("[sig-auth] ServiceAccount admission controller migration [F
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(masterUpgrade(f, target, []string{"KUBE_FEATURE_GATES=BoundServiceAccountTokenVolume=true"}))
 			}
-			runUpgradeSuite(f, serviceaccountAdmissionControllerMigrationTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, serviceaccountAdmissionControllerMigrationTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -518,13 +504,14 @@ func createUpgradeFrameworks(tests []upgrades.Test) map[string]*framework.Framew
 func runUpgradeSuite(
 	f *framework.Framework,
 	tests []upgrades.Test,
-	testFrameworks map[string]*framework.Framework,
 	testSuite *junit.TestSuite,
 	upgradeType upgrades.UpgradeType,
 	upgradeFunc func(),
 ) {
 	upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 	framework.ExpectNoError(err)
+
+	testFrameworks := createUpgradeFrameworks(tests)
 
 	cm := chaosmonkey.New(upgradeFunc)
 	for _, t := range tests {
