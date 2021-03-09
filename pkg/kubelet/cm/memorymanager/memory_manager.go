@@ -153,7 +153,7 @@ func NewManager(policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAll
 
 // Start starts the memory manager under the kubelet and calls policy start
 func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
-	klog.Infof("[memorymanager] starting with %s policy", m.policy.Name())
+	klog.InfoS("Starting memorymanager", "policy", m.policy.Name())
 	m.sourcesReady = sourcesReady
 	m.activePods = activePods
 	m.podStatusProvider = podStatusProvider
@@ -162,14 +162,14 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 
 	stateImpl, err := state.NewCheckpointState(m.stateFileDirectory, memoryManagerStateFileName, m.policy.Name())
 	if err != nil {
-		klog.Errorf("[memorymanager] could not initialize checkpoint manager: %v, please drain node and remove policy state file", err)
+		klog.ErrorS(err, "Could not initialize checkpoint manager, please drain node and remove policy state file")
 		return err
 	}
 	m.state = stateImpl
 
 	err = m.policy.Start(m.state)
 	if err != nil {
-		klog.Errorf("[memorymanager] policy start error: %v", err)
+		klog.ErrorS(err, "Policy start error")
 		return err
 	}
 
@@ -196,11 +196,11 @@ func (m *manager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.
 	}
 
 	if numaNodes.Len() == 0 {
-		klog.V(5).Infof("No allocation is available for (Pod: %s, Container: %s)", pod.Name, container.Name)
+		klog.V(5).InfoS("No allocation is available", "pod", klog.KObj(pod), "containerName", container.Name)
 		return nil
 	}
 
-	klog.Infof("(Pod: %s, Container: %s) memory affinity is %v", pod.Name, container.Name, numaNodes)
+	klog.InfoS("Memory affinity", "pod", klog.KObj(pod), "containerName", container.Name, "numaNodes", numaNodes)
 	return numaNodes
 }
 
@@ -214,7 +214,7 @@ func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) error {
 
 	// Call down into the policy to assign this container memory if required.
 	if err := m.policy.Allocate(m.state, pod, container); err != nil {
-		klog.Errorf("[memorymanager] Allocate error: %v", err)
+		klog.ErrorS(err, "Allocate error")
 		return err
 	}
 	return nil
@@ -228,13 +228,13 @@ func (m *manager) RemoveContainer(containerID string) error {
 	// if error appears it means container entry already does not exist under the container map
 	podUID, containerName, err := m.containerMap.GetContainerRef(containerID)
 	if err != nil {
-		klog.Warningf("[memorymanager] Failed to get container %s from container map error: %v", containerID, err)
+		klog.InfoS("Failed to get container from container map", "containerID", containerID, "err", err)
 		return nil
 	}
 
 	err = m.policyRemoveContainerByRef(podUID, containerName)
 	if err != nil {
-		klog.Errorf("[memorymanager] RemoveContainer error: %v", err)
+		klog.ErrorS(err, "RemoveContainer error")
 		return err
 	}
 
@@ -296,10 +296,10 @@ func (m *manager) removeStaleState() {
 	for podUID := range assignments {
 		for containerName := range assignments[podUID] {
 			if _, ok := activeContainers[podUID][containerName]; !ok {
-				klog.Infof("[memorymanager] removeStaleState: removing (pod %s, container: %s)", podUID, containerName)
+				klog.InfoS("RemoveStaleState removing state", "podUID", podUID, "containerName", containerName)
 				err := m.policyRemoveContainerByRef(podUID, containerName)
 				if err != nil {
-					klog.Errorf("[memorymanager] removeStaleState: failed to remove (pod %s, container %s), error: %v)", podUID, containerName, err)
+					klog.ErrorS(err, "RemoveStaleState: failed to remove state", "podUID", podUID, "containerName", containerName)
 				}
 			}
 		}

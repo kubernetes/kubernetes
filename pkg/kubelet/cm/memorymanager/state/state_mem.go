@@ -32,7 +32,7 @@ var _ State = &stateMemory{}
 
 // NewMemoryState creates new State for keeping track of cpu/pod assignment
 func NewMemoryState() State {
-	klog.Infof("[memorymanager] initializing new in-memory state store")
+	klog.InfoS("Initializing new in-memory state store")
 	return &stateMemory{
 		assignments:  ContainerMemoryAssignments{},
 		machineState: NUMANodeMap{},
@@ -72,7 +72,7 @@ func (s *stateMemory) SetMachineState(nodeMap NUMANodeMap) {
 	defer s.Unlock()
 
 	s.machineState = nodeMap.Clone()
-	klog.Info("[memorymanager] updated machine memory state")
+	klog.InfoS("Updated machine memory state")
 }
 
 // SetMemoryBlocks stores memory assignments of container
@@ -85,7 +85,7 @@ func (s *stateMemory) SetMemoryBlocks(podUID string, containerName string, block
 	}
 
 	s.assignments[podUID][containerName] = append([]Block{}, blocks...)
-	klog.Infof("[memorymanager] updated memory state (pod: %s, container: %s)", podUID, containerName)
+	klog.InfoS("Updated memory state", "podUID", podUID, "containerName", containerName)
 }
 
 // SetMemoryAssignments sets ContainerMemoryAssignments by using the passed parameter
@@ -109,7 +109,7 @@ func (s *stateMemory) Delete(podUID string, containerName string) {
 	if len(s.assignments[podUID]) == 0 {
 		delete(s.assignments, podUID)
 	}
-	klog.V(2).Infof("[memorymanager] deleted memory assignment (pod: %s, container: %s)", podUID, containerName)
+	klog.V(2).InfoS("Deleted memory assignment", "podUID", podUID, "containerName", containerName)
 }
 
 // ClearState clears machineState and ContainerMemoryAssignments
@@ -119,5 +119,5 @@ func (s *stateMemory) ClearState() {
 
 	s.machineState = NUMANodeMap{}
 	s.assignments = make(ContainerMemoryAssignments)
-	klog.V(2).Infof("[memorymanager] cleared state")
+	klog.V(2).InfoS("Cleared state")
 }

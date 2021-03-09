@@ -77,7 +77,7 @@ func (p *staticPolicy) Name() string {
 
 func (p *staticPolicy) Start(s state.State) error {
 	if err := p.validateState(s); err != nil {
-		klog.Errorf("[memorymanager] Invalid state: %v, please drain node and remove policy state file", err)
+		klog.ErrorS(err, "Invalid state, please drain node and remove policy state file")
 		return err
 	}
 	return nil
@@ -90,15 +90,15 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		return nil
 	}
 
-	klog.Infof("[memorymanager] Allocate (pod: %s, container: %s)", pod.Name, container.Name)
+	klog.InfoS("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
 	if blocks := s.GetMemoryBlocks(string(pod.UID), container.Name); blocks != nil {
-		klog.Infof("[memorymanager] Container already present in state, skipping (pod: %s, container: %s)", pod.Name, container.Name)
+		klog.InfoS("Container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
 		return nil
 	}
 
 	// Call Topology Manager to get the aligned affinity across all hint providers.
 	hint := p.affinity.GetAffinity(string(pod.UID), container.Name)
-	klog.Infof("[memorymanager] Pod %v, Container %v Topology Affinity is: %v", pod.UID, container.Name, hint)
+	klog.InfoS("Got topology affinity", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "hint", hint)
 
 	requestedResources, err := getRequestedResources(container)
 	if err != nil {
@@ -185,7 +185,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 
 // RemoveContainer call is idempotent
 func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
-	klog.Infof("[memorymanager] RemoveContainer (pod: %s, container: %s)", podUID, containerName)
+	klog.InfoS("RemoveContainer", "podUID", podUID, "containerName", containerName)
 	blocks := s.GetMemoryBlocks(podUID, containerName)
 	if blocks == nil {
 		return nil
@@ -245,28 +245,28 @@ func regenerateHints(pod *v1.Pod, ctn *v1.Container, ctnBlocks []state.Block, re
 	}
 
 	if len(ctnBlocks) != len(reqRsrc) {
-		klog.Errorf("[memorymanager] The number of requested resources by the container %s differs from the number of memory blocks", ctn.Name)
+		klog.ErrorS(nil, "The number of requested resources by the container differs from the number of memory blocks", "containerName", ctn.Name)
 		return nil
 	}
 
 	for _, b := range ctnBlocks {
 		if _, ok := reqRsrc[b.Type]; !ok {
-			klog.Errorf("[memorymanager] Container %s requested resources do not have resource of type %s", ctn.Name, b.Type)
+			klog.ErrorS(nil, "Container requested resources do not have resource of this type", "containerName", ctn.Name, "type", b.Type)
 			return nil
 		}
 
 		if b.Size != reqRsrc[b.Type] {
-			klog.Errorf("[memorymanager] Memory %s already allocated to (pod %v, container %v) with different number than request: requested: %d, allocated: %d", b.Type, pod.UID, ctn.Name, reqRsrc[b.Type], b.Size)
+			klog.ErrorS(nil, "Memory already allocated with different numbers than requested", "podUID", pod.UID, "type", b.Type, "containerName", ctn.Name, "requestedResource", reqRsrc[b.Type], "allocatedSize", b.Size)
 			return nil
 		}
 
 		containerNUMAAffinity, err := bitmask.NewBitMask(b.NUMAAffinity...)
 		if err != nil {
-			klog.Errorf("[memorymanager] failed to generate NUMA bitmask: %v", err)
+			klog.ErrorS(err, "Failed to generate NUMA bitmask")
 			return nil
 		}
 
-		klog.Infof("[memorymanager] Regenerating TopologyHints, %s was already allocated to (pod %v, container %v)", b.Type, pod.UID, ctn.Name)
+		klog.InfoS("Regenerating TopologyHints, resource was already allocated to pod", "resourceName", b.Type, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", ctn.Name)
 		hints[string(b.Type)] = append(hints[string(b.Type)], topologymanager.TopologyHint{
 			NUMANodeAffinity: containerNUMAAffinity,
 			Preferred:        true,
@@ -326,7 +326,7 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 
 	reqRsrcs, err := getPodRequestedResources(pod)
 	if err != nil {
-		klog.Error(err.Error())
+		klog.ErrorS(err, "Failed to get pod requested resources", "pod", klog.KObj(pod), "podUID", pod.UID)
 		return nil
 	}
 
@@ -352,7 +352,7 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 
 	requestedResources, err := getRequestedResources(container)
 	if err != nil {
-		klog.Error(err.Error())
+		klog.ErrorS(err, "Failed to get container requested resources", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
 		return nil
 	}
 
@@ -570,41 +570,41 @@ func (p *staticPolicy) validateState(s state.State) error {
 
 func areMachineStatesEqual(ms1, ms2 state.NUMANodeMap) bool {
 	if len(ms1) != len(ms2) {
-		klog.Errorf("[memorymanager] node states are different len(ms1) != len(ms2): %d != %d", len(ms1), len(ms2))
+		klog.ErrorS(nil, "Node states are different", "lengthNode1", len(ms1), "lengthNode2", len(ms2))
 		return false
 	}
 
 	for nodeID, nodeState1 := range ms1 {
 		nodeState2, ok := ms2[nodeID]
 		if !ok {
-			klog.Errorf("[memorymanager] node state does not have node ID %d", nodeID)
+			klog.ErrorS(nil, "Node state does not have node ID", "nodeID", nodeID)
 			return false
 		}
 
 		if nodeState1.NumberOfAssignments != nodeState2.NumberOfAssignments {
-			klog.Errorf("[memorymanager] node states number of assignments are different: %d != %d", nodeState1.NumberOfAssignments, nodeState2.NumberOfAssignments)
+			klog.ErrorS(nil, "Node states number of assignments are different", "assignment1", nodeState1.NumberOfAssignments, "assignment2", nodeState2.NumberOfAssignments)
 			return false
 		}
 
 		if !areGroupsEqual(nodeState1.Cells, nodeState2.Cells) {
-			klog.Errorf("[memorymanager] node states groups are different: %v != %v", nodeState1.Cells, nodeState2.Cells)
+			klog.ErrorS(nil, "Node states groups are different", "stateNode1", nodeState1.Cells, "stateNode2", nodeState2.Cells)
 			return false
 		}
 
 		if len(nodeState1.MemoryMap) != len(nodeState2.MemoryMap) {
-			klog.Errorf("[memorymanager] node states memory map have different length: %d != %d", len(nodeState1.MemoryMap), len(nodeState2.MemoryMap))
+			klog.ErrorS(nil, "Node states memory map have different lengths", "lengthNode1", len(nodeState1.MemoryMap), "lengthNode2", len(nodeState2.MemoryMap))
 			return false
 		}
 
 		for resourceName, memoryState1 := range nodeState1.MemoryMap {
 			memoryState2, ok := nodeState2.MemoryMap[resourceName]
 			if !ok {
-				klog.Errorf("[memorymanager] memory state does not have resource %s", resourceName)
+				klog.ErrorS(nil, "Memory state does not have resource", "resource", resourceName)
 				return false
 			}
 
 			if !reflect.DeepEqual(*memoryState1, *memoryState2) {
-				klog.Errorf("[memorymanager] memory states for the NUMA node %d and the resource %s are different: %+v != %+v", nodeID, resourceName, *memoryState1, *memoryState2)
+				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
 				return false
 			}
 		}
