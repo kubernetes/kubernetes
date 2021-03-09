@@ -79,7 +79,7 @@ func init() {
 			f.DefValue = defaultValue
 			f.Value.Set(defaultValue)
 		} else {
-			klog.Errorf("Expected cAdvisor flag %q not found", name)
+			klog.ErrorS(nil, "Expected cAdvisor flag not found", "flag", name)
 		}
 	}
 }
@@ -186,7 +186,7 @@ func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) 
 	}
 	// TODO(vmarmol): Handle this better when a label has more than one image filesystem.
 	if len(res) > 1 {
-		klog.Warningf("More than one filesystem labeled %q: %#v. Only using the first one", label, res)
+		klog.InfoS("More than one filesystem labeled. Only using the first one", "label", label, "fileSystem", res)
 	}
 
 	return res[0], nil
