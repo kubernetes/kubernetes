@@ -109,10 +109,8 @@ func masterUpgrade(f *framework.Framework, v string, extraEnvs []string) error {
 	}
 }
 
-// masterUpgradeGCEWithKubeProxyDaemonSet upgrades master node on GCE with enabling/disabling the daemon set of kube-proxy.
-// TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
-func masterUpgradeGCEWithKubeProxyDaemonSet(v string, enableKubeProxyDaemonSet bool) error {
-	return masterUpgradeGCE(v, []string{fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet)})
+func kubeProxyDaemonSetExtraEnvs(enableKubeProxyDaemonSet bool) []string {
+	return []string{fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet)}
 }
 
 func masterUpgradeGCE(rawV string, extraEnvs []string) error {
@@ -134,6 +132,43 @@ func masterUpgradeGCE(rawV string, extraEnvs []string) error {
 	return err
 }
 
+func masterUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, masterExtraEnvs []string) func() {
+	return func() {
+		start := time.Now()
+		defer finalizeUpgradeTest(start, testCase)
+		target := upgCtx.Versions[1].Version.String()
+		framework.ExpectNoError(masterUpgrade(f, target, masterExtraEnvs))
+		framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+	}
+}
+
+func clusterUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, masterExtraEnvs, nodeExtraEnvs []string) func() {
+	return func() {
+		start := time.Now()
+		defer finalizeUpgradeTest(start, testCase)
+		target := upgCtx.Versions[1].Version.String()
+		image := upgCtx.Versions[1].NodeImage
+		framework.ExpectNoError(masterUpgrade(f, target, masterExtraEnvs))
+		framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+		framework.ExpectNoError(nodeUpgrade(f, target, image, nodeExtraEnvs))
+		framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
+	}
+}
+
+func clusterDowngradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, masterExtraEnvs, nodeExtraEnvs []string) func() {
+	return func() {
+		start := time.Now()
+		defer finalizeUpgradeTest(start, testCase)
+		target := upgCtx.Versions[1].Version.String()
+		image := upgCtx.Versions[1].NodeImage
+		// Yes this really is a downgrade. And nodes must downgrade first.
+		framework.ExpectNoError(nodeUpgrade(f, target, image, nodeExtraEnvs))
+		framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
+		framework.ExpectNoError(masterUpgrade(f, target, masterExtraEnvs))
+		framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+	}
+}
+
 // TODO(#98326): Split the test by SIGs, move to appropriate directories and use SIGDescribe.
 var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-upgrade")
@@ -150,39 +185,10 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 				Name:      "[sig-cloud-provider-gcp] master-upgrade",
 				Classname: "upgrade_tests",
 			}
-			testSuite.TestCases = append(testSuite.TestCases, masterUpgradeTest)
+			testSuite.TestCases = append(testSuite.TestCases, masterUpgradeTest, nil)
 
-			upgradeFunc := func() {
-				start := time.Now()
-				defer finalizeUpgradeTest(start, masterUpgradeTest)
-				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(masterUpgrade(f, target, nil))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-			}
+			upgradeFunc := masterUpgradeFunc(f, upgCtx, masterUpgradeTest, nil)
 			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
-		})
-	})
-
-	ginkgo.Describe("node upgrade", func() {
-		ginkgo.It("should maintain a functioning cluster [Feature:NodeUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
-			framework.ExpectNoError(err)
-
-			testSuite := &junit.TestSuite{Name: "Node upgrade"}
-			nodeUpgradeTest := &junit.TestCase{
-				Name:      "node-upgrade",
-				Classname: "upgrade_tests",
-			}
-
-			upgradeFunc := func() {
-				start := time.Now()
-				defer finalizeUpgradeTest(start, nodeUpgradeTest)
-				target := upgCtx.Versions[1].Version.String()
-				image := upgCtx.Versions[1].NodeImage
-				framework.ExpectNoError(nodeUpgrade(f, target, image, nil))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-			}
-			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.NodeUpgrade, upgradeFunc)
 		})
 	})
 
@@ -194,16 +200,8 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 			testSuite := &junit.TestSuite{Name: "Cluster upgrade"}
 			clusterUpgradeTest := &junit.TestCase{Name: "[sig-cloud-provider-gcp] cluster-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, clusterUpgradeTest)
-			upgradeFunc := func() {
-				start := time.Now()
-				defer finalizeUpgradeTest(start, clusterUpgradeTest)
-				target := upgCtx.Versions[1].Version.String()
-				image := upgCtx.Versions[1].NodeImage
-				framework.ExpectNoError(masterUpgrade(f, target, nil))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(nodeUpgrade(f, target, image, nil))
-				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-			}
+
+			upgradeFunc := clusterUpgradeFunc(f, upgCtx, clusterUpgradeTest, nil, nil)
 			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -222,17 +220,7 @@ var _ = ginkgo.Describe("Downgrade [Feature:Downgrade]", func() {
 			clusterDowngradeTest := &junit.TestCase{Name: "[sig-cloud-provider-gcp] cluster-downgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, clusterDowngradeTest)
 
-			upgradeFunc := func() {
-				start := time.Now()
-				defer finalizeUpgradeTest(start, clusterDowngradeTest)
-				// Yes this really is a downgrade. And nodes must downgrade first.
-				target := upgCtx.Versions[1].Version.String()
-				image := upgCtx.Versions[1].NodeImage
-				framework.ExpectNoError(nodeUpgrade(f, target, image, nil))
-				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-				framework.ExpectNoError(masterUpgrade(f, target, nil))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-			}
+			upgradeFunc := clusterDowngradeFunc(f, upgCtx, clusterDowngradeTest, nil, nil)
 			runUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -272,13 +260,8 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 			testSuite := &junit.TestSuite{Name: "GPU master upgrade"}
 			gpuUpgradeTest := &junit.TestCase{Name: "[sig-node] gpu-master-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, gpuUpgradeTest)
-			upgradeFunc := func() {
-				start := time.Now()
-				defer finalizeUpgradeTest(start, gpuUpgradeTest)
-				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(masterUpgrade(f, target, nil))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-			}
+
+			upgradeFunc := masterUpgradeFunc(f, upgCtx, gpuUpgradeTest, nil)
 			runUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
@@ -290,16 +273,8 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 			testSuite := &junit.TestSuite{Name: "GPU cluster upgrade"}
 			gpuUpgradeTest := &junit.TestCase{Name: "[sig-node] gpu-cluster-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, gpuUpgradeTest)
-			upgradeFunc := func() {
-				start := time.Now()
-				defer finalizeUpgradeTest(start, gpuUpgradeTest)
-				target := upgCtx.Versions[1].Version.String()
-				image := upgCtx.Versions[1].NodeImage
-				framework.ExpectNoError(masterUpgrade(f, target, nil))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(nodeUpgrade(f, target, image, nil))
-				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-			}
+
+			upgradeFunc := clusterUpgradeFunc(f, upgCtx, gpuUpgradeTest, nil, nil)
 			runUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -311,16 +286,8 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 			testSuite := &junit.TestSuite{Name: "GPU cluster downgrade"}
 			gpuDowngradeTest := &junit.TestCase{Name: "[sig-node] gpu-cluster-downgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, gpuDowngradeTest)
-			upgradeFunc := func() {
-				start := time.Now()
-				defer finalizeUpgradeTest(start, gpuDowngradeTest)
-				target := upgCtx.Versions[1].Version.String()
-				image := upgCtx.Versions[1].NodeImage
-				framework.ExpectNoError(nodeUpgrade(f, target, image, nil))
-				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-				framework.ExpectNoError(masterUpgrade(f, target, nil))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-			}
+
+			upgradeFunc := clusterDowngradeFunc(f, upgCtx, gpuDowngradeTest, nil, nil)
 			runUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -338,16 +305,8 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 			testSuite := &junit.TestSuite{Name: "Stateful upgrade"}
 			statefulUpgradeTest := &junit.TestCase{Name: "[sig-apps] stateful-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, statefulUpgradeTest)
-			upgradeFunc := func() {
-				start := time.Now()
-				defer finalizeUpgradeTest(start, statefulUpgradeTest)
-				target := upgCtx.Versions[1].Version.String()
-				image := upgCtx.Versions[1].NodeImage
-				framework.ExpectNoError(masterUpgrade(f, target, nil))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(nodeUpgrade(f, target, image, nil))
-				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-			}
+
+			upgradeFunc := clusterUpgradeFunc(f, upgCtx, statefulUpgradeTest, nil, nil)
 			runUpgradeSuite(upgCtx, statefulsetUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -373,16 +332,8 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 			}
 			testSuite.TestCases = append(testSuite.TestCases, kubeProxyUpgradeTest)
 
-			upgradeFunc := func() {
-				start := time.Now()
-				defer finalizeUpgradeTest(start, kubeProxyUpgradeTest)
-				target := upgCtx.Versions[1].Version.String()
-				image := upgCtx.Versions[1].NodeImage
-				framework.ExpectNoError(masterUpgradeGCEWithKubeProxyDaemonSet(target, true))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(nodeUpgradeGCEWithKubeProxyDaemonSet(f, target, image, true))
-				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-			}
+			extraEnvs := kubeProxyDaemonSetExtraEnvs(true)
+			upgradeFunc := clusterUpgradeFunc(f, upgCtx, kubeProxyUpgradeTest, extraEnvs, extraEnvs)
 			runUpgradeSuite(upgCtx, kubeProxyUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -399,16 +350,8 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 			}
 			testSuite.TestCases = append(testSuite.TestCases, kubeProxyDowngradeTest)
 
-			upgradeFunc := func() {
-				start := time.Now()
-				defer finalizeUpgradeTest(start, kubeProxyDowngradeTest)
-				// Yes this really is a downgrade. And nodes must downgrade first.
-				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(nodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, false))
-				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-				framework.ExpectNoError(masterUpgradeGCEWithKubeProxyDaemonSet(target, false))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
-			}
+			extraEnvs := kubeProxyDaemonSetExtraEnvs(false)
+			upgradeFunc := clusterDowngradeFunc(f, upgCtx, kubeProxyDowngradeTest, extraEnvs, extraEnvs)
 			runUpgradeSuite(upgCtx, kubeProxyDowngradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -430,12 +373,8 @@ var _ = ginkgo.Describe("[sig-auth] ServiceAccount admission controller migratio
 			}
 			testSuite.TestCases = append(testSuite.TestCases, serviceaccountAdmissionControllerMigrationTest)
 
-			upgradeFunc := func() {
-				start := time.Now()
-				defer finalizeUpgradeTest(start, serviceaccountAdmissionControllerMigrationTest)
-				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(masterUpgrade(f, target, []string{"KUBE_FEATURE_GATES=BoundServiceAccountTokenVolume=true"}))
-			}
+			extraEnvs := []string{"KUBE_FEATURE_GATES=BoundServiceAccountTokenVolume=true"}
+			upgradeFunc := masterUpgradeFunc(f, upgCtx, serviceaccountAdmissionControllerMigrationTest, extraEnvs)
 			runUpgradeSuite(upgCtx, serviceaccountAdmissionControllerMigrationTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
@@ -688,16 +627,6 @@ func nodeUpgrade(f *framework.Framework, v string, img string, extraEnvs []strin
 		err = fmt.Errorf("nodeUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
 	}
 	if err != nil {
-		return err
-	}
-	return waitForNodesReadyAfterUpgrade(f)
-}
-
-// nodeUpgradeGCEWithKubeProxyDaemonSet upgrades nodes on GCE with enabling/disabling the daemon set of kube-proxy.
-// TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
-func nodeUpgradeGCEWithKubeProxyDaemonSet(f *framework.Framework, v string, img string, enableKubeProxyDaemonSet bool) error {
-	// Perform the upgrade.
-	if err := nodeUpgradeGCE(v, img, []string{fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet)}); err != nil {
 		return err
 	}
 	return waitForNodesReadyAfterUpgrade(f)
