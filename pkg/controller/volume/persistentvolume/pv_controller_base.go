@@ -366,7 +366,7 @@ func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotations(volume 
 
 // updateMigrationAnnotations takes an Annotations map and checks for a
 // provisioner name using the provisionerKey. It will then add a
-// "volume.beta.kubernetes.io/migrated-to" annotation if migration with the CSI
+// "pv.kubernetes.io/migrated-to" annotation if migration with the CSI
 // driver name for that provisioner is "on" based on feature flags, it will also
 // remove the annotation is migration is "off" for that provisioner in rollback
 // scenarios. Returns true if the annotations map was modified and false otherwise.
