@@ -466,7 +466,7 @@ func GetAdditionalGroups(additionalGroups []string, group io.Reader) ([]int, err
 		// we asked for a group but didn't find it. let's check to see
 		// if we wanted a numeric group
 		if !found {
-			gid, err := strconv.Atoi(ag)
+			gid, err := strconv.ParseInt(ag, 10, 64)
 			if err != nil {
 				return nil, fmt.Errorf("Unable to find group %s", ag)
 			}
@@ -474,7 +474,7 @@ func GetAdditionalGroups(additionalGroups []string, group io.Reader) ([]int, err
 			if gid < minId || gid > maxId {
 				return nil, ErrRange
 			}
-			gidMap[gid] = struct{}{}
+			gidMap[int(gid)] = struct{}{}
 		}
 	}
 	gids := []int{}

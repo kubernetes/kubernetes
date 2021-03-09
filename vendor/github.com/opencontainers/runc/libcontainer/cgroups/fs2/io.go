@@ -5,7 +5,6 @@ package fs2
 import (
 	"bufio"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -60,8 +59,7 @@ func setIo(dirPath string, cgroup *configs.Cgroup) error {
 
 func readCgroup2MapFile(dirPath string, name string) (map[string][]string, error) {
 	ret := map[string][]string{}
-	p := filepath.Join(dirPath, name)
-	f, err := os.Open(p)
+	f, err := fscommon.OpenFile(dirPath, name, os.O_RDONLY)
 	if err != nil {
 		return nil, err
 	}

@@ -2,10 +2,10 @@
 
 *Go language library to map between non-negative integers and boolean values*
 
-[![Master Build Status](https://secure.travis-ci.org/willf/bitset.png?branch=master)](https://travis-ci.org/willf/bitset?branch=master)
+[![Test](https://github.com/willf/bitset/workflows/Test/badge.svg)](https://github.com/willf/bitset/actions?query=workflow%3ATest)
 [![Master Coverage Status](https://coveralls.io/repos/willf/bitset/badge.svg?branch=master&service=github)](https://coveralls.io/github/willf/bitset?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/willf/bitset)](https://goreportcard.com/report/github.com/willf/bitset)
-[![GoDoc](https://godoc.org/github.com/willf/bitset?status.svg)](http://godoc.org/github.com/willf/bitset)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/willf/bitset?tab=doc)](https://pkg.go.dev/github.com/willf/bitset?tab=doc)
 
 
 ## Description
@@ -63,8 +63,11 @@ func main() {
 
 As an alternative to BitSets, one should check out the 'big' package, which provides a (less set-theoretical) view of bitsets.
 
-Godoc documentation is at: https://godoc.org/github.com/willf/bitset
+Package documentation is at: https://pkg.go.dev/github.com/willf/bitset?tab=doc
 
+## Memory Usage
+
+The memory usage of a bitset using N bits is at least N/8 bytes. The number of bits in a bitset is at least as large as one plus the greatest bit index you have accessed. Thus it is possible to run out of memory while using a bitset. If you have lots of bits, you might prefer compressed bitsets, like the [Roaring bitmaps](http://roaringbitmap.org) and its [Go implementation](https://github.com/RoaringBitmap/roaring).
 
 ## Implementation Note
 
@@ -82,15 +85,10 @@ go get github.com/willf/bitset
 
 If you wish to contribute to this project, please branch and issue a pull request against master ("[GitHub Flow](https://guides.github.com/introduction/flow/)")
 
-This project include a Makefile that allows you to test and build the project with simple commands.
-To see all available options:
-```bash
-make help
-```
-
 ## Running all tests
 
-Before committing the code, please check if it passes all tests using (note: this will install some dependencies):
+Before committing the code, please check if it passes tests, has adequate coverage, etc.
 ```bash
-make qa
+go test
+go test -cover
 ```

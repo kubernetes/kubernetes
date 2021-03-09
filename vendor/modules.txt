@@ -212,9 +212,9 @@ github.com/checkpoint-restore/go-criu/v4/rpc
 # github.com/chzyer/logex => github.com/chzyer/logex v1.1.10
 # github.com/chzyer/readline => github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 # github.com/chzyer/test => github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1
-# github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775 => github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775
+# github.com/cilium/ebpf v0.2.0 => github.com/cilium/ebpf v0.2.0
 github.com/cilium/ebpf
-# github.com/cilium/ebpf => github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775
+# github.com/cilium/ebpf => github.com/cilium/ebpf v0.2.0
 github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
 github.com/cilium/ebpf/internal/btf
@@ -231,11 +231,11 @@ github.com/container-storage-interface/spec/lib/go/csi
 # github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59 => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 # github.com/containerd/cgroups => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 github.com/containerd/cgroups/stats/v1
-# github.com/containerd/console v1.0.0 => github.com/containerd/console v1.0.0
+# github.com/containerd/console v1.0.1 => github.com/containerd/console v1.0.1
 github.com/containerd/console
-# github.com/containerd/console => github.com/containerd/console v1.0.0
-# github.com/containerd/containerd v1.4.1 => github.com/containerd/containerd v1.4.1
-# github.com/containerd/containerd => github.com/containerd/containerd v1.4.1
+# github.com/containerd/console => github.com/containerd/console v1.0.1
+# github.com/containerd/containerd v1.4.4 => github.com/containerd/containerd v1.4.4
+# github.com/containerd/containerd => github.com/containerd/containerd v1.4.4
 github.com/containerd/containerd/api/services/containers/v1
 github.com/containerd/containerd/api/services/tasks/v1
 github.com/containerd/containerd/api/services/version/v1
@@ -244,8 +244,10 @@ github.com/containerd/containerd/api/types/task
 github.com/containerd/containerd/containers
 github.com/containerd/containerd/errdefs
 github.com/containerd/containerd/identifiers
+github.com/containerd/containerd/log
 github.com/containerd/containerd/namespaces
 github.com/containerd/containerd/pkg/dialer
+github.com/containerd/containerd/platforms
 # github.com/containerd/continuity => github.com/containerd/continuity v0.0.0-20190426062206-aaeac12a7ffc
 # github.com/containerd/fifo => github.com/containerd/fifo v0.0.0-20190226154929-a9fb20d87448
 # github.com/containerd/go-runc => github.com/containerd/go-runc v0.0.0-20180907222934-5a6d9f37cfa3
@@ -295,7 +297,7 @@ github.com/coreos/pkg/dlopen
 ## explicit
 # github.com/cpuguy83/go-md2man/v2 => github.com/cpuguy83/go-md2man/v2 v2.0.0
 github.com/cpuguy83/go-md2man/v2/md2man
-# github.com/creack/pty => github.com/creack/pty v1.1.9
+# github.com/creack/pty => github.com/creack/pty v1.1.11
 # github.com/cyphar/filepath-securejoin v0.2.2 => github.com/cyphar/filepath-securejoin v0.2.2
 github.com/cyphar/filepath-securejoin
 # github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.2.2
@@ -316,9 +318,9 @@ github.com/dgrijalva/jwt-go
 github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
 github.com/docker/distribution/registry/api/errcode
-# github.com/docker/docker v17.12.0-ce-rc1.0.20200916142827-bd33bbf0497b+incompatible => github.com/docker/docker v17.12.0-ce-rc1.0.20200916142827-bd33bbf0497b+incompatible
+# github.com/docker/docker v20.10.2+incompatible => github.com/docker/docker v20.10.2+incompatible
 ## explicit
-# github.com/docker/docker => github.com/docker/docker v17.12.0-ce-rc1.0.20200916142827-bd33bbf0497b+incompatible
+# github.com/docker/docker => github.com/docker/docker v20.10.2+incompatible
 github.com/docker/docker/api
 github.com/docker/docker/api/types
 github.com/docker/docker/api/types/blkiodev
@@ -339,8 +341,6 @@ github.com/docker/docker/client
 github.com/docker/docker/errdefs
 github.com/docker/docker/pkg/jsonmessage
 github.com/docker/docker/pkg/stdcopy
-github.com/docker/docker/pkg/term
-github.com/docker/docker/pkg/term/windows
 # github.com/docker/go-connections v0.4.0 => github.com/docker/go-connections v0.4.0
 ## explicit
 # github.com/docker/go-connections => github.com/docker/go-connections v0.4.0
@@ -496,9 +496,9 @@ github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.0 => github.com/google/btree v1.0.0
 github.com/google/btree
 # github.com/google/btree => github.com/google/btree v1.0.0
-# github.com/google/cadvisor v0.38.8 => github.com/google/cadvisor v0.38.8
+# github.com/google/cadvisor v0.39.0 => github.com/google/cadvisor v0.39.0
 ## explicit
-# github.com/google/cadvisor => github.com/google/cadvisor v0.38.8
+# github.com/google/cadvisor => github.com/google/cadvisor v0.39.0
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
 github.com/google/cadvisor/client/v2
@@ -710,9 +710,7 @@ github.com/karrick/godirwalk
 # github.com/kisielk/errcheck => github.com/kisielk/errcheck v1.5.0
 # github.com/kisielk/gotool => github.com/kisielk/gotool v1.0.0
 # github.com/klauspost/cpuid => github.com/klauspost/cpuid v1.2.0
-# github.com/konsorten/go-windows-terminal-sequences v1.0.3 => github.com/konsorten/go-windows-terminal-sequences v1.0.3
-github.com/konsorten/go-windows-terminal-sequences
-# github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.3
+# github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.2
 # github.com/kr/logfmt => github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515
 # github.com/kr/pretty => github.com/kr/pretty v0.2.0
 # github.com/kr/text => github.com/kr/text v0.2.0
@@ -787,12 +785,12 @@ github.com/moby/ipvs
 github.com/moby/spdystream
 # github.com/moby/spdystream => github.com/moby/spdystream v0.2.0
 github.com/moby/spdystream/spdy
-# github.com/moby/sys/mountinfo v0.1.3 => github.com/moby/sys/mountinfo v0.1.3
+# github.com/moby/sys/mountinfo v0.4.0 => github.com/moby/sys/mountinfo v0.4.0
 github.com/moby/sys/mountinfo
-# github.com/moby/sys/mountinfo => github.com/moby/sys/mountinfo v0.1.3
-# github.com/moby/term v0.0.0-20200312100748-672ec06f55cd => github.com/moby/term v0.0.0-20200312100748-672ec06f55cd
+# github.com/moby/sys/mountinfo => github.com/moby/sys/mountinfo v0.4.0
+# github.com/moby/term v0.0.0-20201216013528-df9cb8a40635 => github.com/moby/term v0.0.0-20201216013528-df9cb8a40635
 github.com/moby/term
-# github.com/moby/term => github.com/moby/term v0.0.0-20200312100748-672ec06f55cd
+# github.com/moby/term => github.com/moby/term v0.0.0-20201216013528-df9cb8a40635
 github.com/moby/term/windows
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd => github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 github.com/modern-go/concurrent
@@ -810,10 +808,10 @@ github.com/monochromegane/go-gitignore
 # github.com/morikuni/aec v1.0.0 => github.com/morikuni/aec v1.0.0
 github.com/morikuni/aec
 # github.com/morikuni/aec => github.com/morikuni/aec v1.0.0
-# github.com/mrunalp/fileutils v0.0.0-20200520151820-abd8a0e76976 => github.com/mrunalp/fileutils v0.0.0-20200520151820-abd8a0e76976
+# github.com/mrunalp/fileutils v0.5.0 => github.com/mrunalp/fileutils v0.5.0
 ## explicit
 github.com/mrunalp/fileutils
-# github.com/mrunalp/fileutils => github.com/mrunalp/fileutils v0.0.0-20200520151820-abd8a0e76976
+# github.com/mrunalp/fileutils => github.com/mrunalp/fileutils v0.5.0
 # github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 => github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 ## explicit
 github.com/munnerz/goautoneg
@@ -883,11 +881,12 @@ github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.0.0-rc92 => github.com/opencontainers/runc v1.0.0-rc92
+# github.com/opencontainers/runc v1.0.0-rc93 => github.com/opencontainers/runc v1.0.0-rc93
 ## explicit
-# github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc92
+# github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc93
 github.com/opencontainers/runc/libcontainer
 github.com/opencontainers/runc/libcontainer/apparmor
+github.com/opencontainers/runc/libcontainer/capabilities
 github.com/opencontainers/runc/libcontainer/cgroups
 github.com/opencontainers/runc/libcontainer/cgroups/devices
 github.com/opencontainers/runc/libcontainer/cgroups/ebpf
@@ -898,21 +897,23 @@ github.com/opencontainers/runc/libcontainer/cgroups/fscommon
 github.com/opencontainers/runc/libcontainer/cgroups/systemd
 github.com/opencontainers/runc/libcontainer/configs
 github.com/opencontainers/runc/libcontainer/configs/validate
+github.com/opencontainers/runc/libcontainer/devices
 github.com/opencontainers/runc/libcontainer/intelrdt
 github.com/opencontainers/runc/libcontainer/keys
 github.com/opencontainers/runc/libcontainer/logs
 github.com/opencontainers/runc/libcontainer/seccomp
+github.com/opencontainers/runc/libcontainer/seccomp/patchbpf
 github.com/opencontainers/runc/libcontainer/stacktrace
 github.com/opencontainers/runc/libcontainer/system
 github.com/opencontainers/runc/libcontainer/user
 github.com/opencontainers/runc/libcontainer/utils
 github.com/opencontainers/runc/types
-# github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6 => github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6
-# github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6
+# github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d => github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
+# github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
 github.com/opencontainers/runtime-spec/specs-go
-# github.com/opencontainers/selinux v1.6.0 => github.com/opencontainers/selinux v1.6.0
+# github.com/opencontainers/selinux v1.8.0 => github.com/opencontainers/selinux v1.8.0
 ## explicit
-# github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.6.0
+# github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.8.0
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalk
@@ -990,9 +991,9 @@ github.com/seccomp/libseccomp-golang
 # github.com/shurcooL/sanitized_anchor_name v1.0.0 => github.com/shurcooL/sanitized_anchor_name v1.0.0
 github.com/shurcooL/sanitized_anchor_name
 # github.com/shurcooL/sanitized_anchor_name => github.com/shurcooL/sanitized_anchor_name v1.0.0
-# github.com/sirupsen/logrus v1.6.0 => github.com/sirupsen/logrus v1.6.0
+# github.com/sirupsen/logrus v1.7.0 => github.com/sirupsen/logrus v1.7.0
 github.com/sirupsen/logrus
-# github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.6.0
+# github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.7.0
 # github.com/smartystreets/assertions => github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d
 # github.com/smartystreets/goconvey => github.com/smartystreets/goconvey v1.6.4
 # github.com/soheilhy/cmux v0.1.4 => github.com/soheilhy/cmux v0.1.4
@@ -1042,8 +1043,8 @@ github.com/stretchr/testify/require
 # github.com/subosito/gotenv v1.2.0 => github.com/subosito/gotenv v1.2.0
 github.com/subosito/gotenv
 # github.com/subosito/gotenv => github.com/subosito/gotenv v1.2.0
-# github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
-# github.com/syndtr/gocapability => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
+# github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 => github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
+# github.com/syndtr/gocapability => github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
 github.com/syndtr/gocapability/capability
 # github.com/thecodeteam/goscaleio v0.1.0 => github.com/thecodeteam/goscaleio v0.1.0
 ## explicit
@@ -1103,9 +1104,9 @@ github.com/vmware/govmomi/vim25/progress
 github.com/vmware/govmomi/vim25/soap
 github.com/vmware/govmomi/vim25/types
 github.com/vmware/govmomi/vim25/xml
-# github.com/willf/bitset v1.1.11-0.20200630133818-d5bec3311243 => github.com/willf/bitset v1.1.11-0.20200630133818-d5bec3311243
+# github.com/willf/bitset v1.1.11 => github.com/willf/bitset v1.1.11
 github.com/willf/bitset
-# github.com/willf/bitset => github.com/willf/bitset v1.1.11-0.20200630133818-d5bec3311243
+# github.com/willf/bitset => github.com/willf/bitset v1.1.11
 # github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
 github.com/xiang90/probing
 # github.com/xiang90/probing => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
@@ -1574,7 +1575,7 @@ gopkg.in/yaml.v2
 gopkg.in/yaml.v3
 # gopkg.in/yaml.v3 => gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 # gotest.tools => gotest.tools v2.2.0+incompatible
-# gotest.tools/v3 => gotest.tools/v3 v3.0.2
+# gotest.tools/v3 => gotest.tools/v3 v3.0.3
 # honnef.co/go/tools => honnef.co/go/tools v0.0.1-2020.1.3
 # k8s.io/api v0.0.0 => ./staging/src/k8s.io/api
 ## explicit

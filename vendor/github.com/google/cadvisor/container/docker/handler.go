@@ -398,11 +398,14 @@ func (h *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error {
 		fsType string
 	)
 
+	var fsInfo *info.FsInfo
+
 	// Docker does not impose any filesystem limits for containers. So use capacity as limit.
 	for _, fs := range mi.Filesystems {
 		if fs.Device == device {
 			limit = fs.Capacity
 			fsType = fs.Type
+			fsInfo = &fs
 			break
 		}
 	}
@@ -413,9 +416,43 @@ func (h *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error {
 	fsStat.Usage = usage.TotalUsageBytes
 	fsStat.Inodes = usage.InodeUsage
 
+	if fsInfo != nil {
+		fileSystems, err := h.fsInfo.GetGlobalFsInfo()
+
+		if err == nil {
+			addDiskStats(fileSystems, fsInfo, &fsStat)
+		} else {
+			klog.Errorf("Unable to obtain diskstats for filesystem %s: %v", fsStat.Device, err)
+		}
+	}
+
 	stats.Filesystem = append(stats.Filesystem, fsStat)
 
 	return nil
+}
+
+func addDiskStats(fileSystems []fs.Fs, fsInfo *info.FsInfo, fsStats *info.FsStats) {
+	if fsInfo == nil {
+		return
+	}
+
+	for _, fileSys := range fileSystems {
+		if fsInfo.DeviceMajor == fileSys.DiskStats.Major &&
+			fsInfo.DeviceMinor == fileSys.DiskStats.Minor {
+			fsStats.ReadsCompleted = fileSys.DiskStats.ReadsCompleted
+			fsStats.ReadsMerged = fileSys.DiskStats.ReadsMerged
+			fsStats.SectorsRead = fileSys.DiskStats.SectorsRead
+			fsStats.ReadTime = fileSys.DiskStats.ReadTime
+			fsStats.WritesCompleted = fileSys.DiskStats.WritesCompleted
+			fsStats.WritesMerged = fileSys.DiskStats.WritesMerged
+			fsStats.SectorsWritten = fileSys.DiskStats.SectorsWritten
+			fsStats.WriteTime = fileSys.DiskStats.WriteTime
+			fsStats.IoInProgress = fileSys.DiskStats.IoInProgress
+			fsStats.IoTime = fileSys.DiskStats.IoTime
+			fsStats.WeightedIoTime = fileSys.DiskStats.WeightedIoTime
+			break
+		}
+	}
 }
 
 // TODO(vmarmol): Get from libcontainer API instead of cgroup manager when we don't have to support older Dockers.

@@ -3,6 +3,7 @@
 package unix
 
 import (
+	"bytes"
 	"syscall"
 
 	linux "golang.org/x/sys/unix"
@@ -19,6 +20,7 @@ const (
 	EPERM                    = linux.EPERM
 	ESRCH                    = linux.ESRCH
 	ENODEV                   = linux.ENODEV
+	BPF_F_NUMA_NODE          = linux.BPF_F_NUMA_NODE
 	BPF_F_RDONLY_PROG        = linux.BPF_F_RDONLY_PROG
 	BPF_F_WRONLY_PROG        = linux.BPF_F_WRONLY_PROG
 	BPF_OBJ_NAME_LEN         = linux.BPF_OBJ_NAME_LEN
@@ -147,4 +149,16 @@ func Gettid() int {
 // Tgkill is a wrapper
 func Tgkill(tgid int, tid int, sig syscall.Signal) (err error) {
 	return linux.Tgkill(tgid, tid, sig)
+}
+
+func KernelRelease() (string, error) {
+	var uname Utsname
+	err := Uname(&uname)
+	if err != nil {
+		return "", err
+	}
+
+	end := bytes.IndexByte(uname.Release[:], 0)
+	release := string(uname.Release[:end])
+	return release, nil
 }

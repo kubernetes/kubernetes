@@ -3,7 +3,6 @@
 package libcontainer
 
 import (
-	"fmt"
 	"os"
 	"runtime"
 
@@ -25,7 +24,7 @@ type linuxSetnsInit struct {
 }
 
 func (l *linuxSetnsInit) getSessionRingName() string {
-	return fmt.Sprintf("_ses.%s", l.config.ContainerId)
+	return "_ses." + l.config.ContainerId
 }
 
 func (l *linuxSetnsInit) Init() error {

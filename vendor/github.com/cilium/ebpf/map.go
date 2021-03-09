@@ -3,6 +3,8 @@ package ebpf
 import (
 	"errors"
 	"fmt"
+	"io"
+	"path/filepath"
 	"strings"
 
 	"github.com/cilium/ebpf/internal"
@@ -17,6 +19,14 @@ var (
 	ErrIterationAborted = errors.New("iteration aborted")
 )
 
+// MapOptions control loading a map into the kernel.
+type MapOptions struct {
+	// The base path to pin maps in if requested via PinByName.
+	// Existing maps will be re-used if they are compatible, otherwise an
+	// error is returned.
+	PinPath string
+}
+
 // MapID represents the unique ID of an eBPF map
 type MapID uint32
 
@@ -30,6 +40,15 @@ type MapSpec struct {
 	ValueSize  uint32
 	MaxEntries uint32
 	Flags      uint32
+
+	// Automatically pin and load a map from MapOptions.PinPath.
+	// Generates an error if an existing pinned map is incompatible with the MapSpec.
+	Pinning PinType
+
+	// Specify numa node during map creation
+	// (effective only if unix.BPF_F_NUMA_NODE flag is set,
+	// which can be imported from golang.org/x/sys/unix)
+	NumaNode uint32
 
 	// The initial contents of the map. May be nil.
 	Contents []MapKV
@@ -69,6 +88,26 @@ type MapKV struct {
 	Value interface{}
 }
 
+func (ms *MapSpec) checkCompatibility(m *Map) error {
+	switch {
+	case m.abi.Type != ms.Type:
+		return fmt.Errorf("expected type %v, got %v", ms.Type, m.abi.Type)
+
+	case m.abi.KeySize != ms.KeySize:
+		return fmt.Errorf("expected key size %v, got %v", ms.KeySize, m.abi.KeySize)
+
+	case m.abi.ValueSize != ms.ValueSize:
+		return fmt.Errorf("expected value size %v, got %v", ms.ValueSize, m.abi.ValueSize)
+
+	case m.abi.MaxEntries != ms.MaxEntries:
+		return fmt.Errorf("expected max entries %v, got %v", ms.MaxEntries, m.abi.MaxEntries)
+
+	case m.abi.Flags != ms.Flags:
+		return fmt.Errorf("expected flags %v, got %v", ms.Flags, m.abi.Flags)
+	}
+	return nil
+}
+
 // Map represents a Map file descriptor.
 //
 // It is not safe to close a map which is used by other goroutines.
@@ -105,15 +144,22 @@ func NewMapFromFD(fd int) (*Map, error) {
 
 // NewMap creates a new Map.
 //
+// It's equivalent to calling NewMapWithOptions with default options.
+func NewMap(spec *MapSpec) (*Map, error) {
+	return NewMapWithOptions(spec, MapOptions{})
+}
+
+// NewMapWithOptions creates a new Map.
+//
 // Creating a map for the first time will perform feature detection
 // by creating small, temporary maps.
 //
 // The caller is responsible for ensuring the process' rlimit is set
 // sufficiently high for locking memory during map creation. This can be done
-// by calling unix.Setrlimit with unix.RLIMIT_MEMLOCK prior to calling NewMap.
-func NewMap(spec *MapSpec) (*Map, error) {
+// by calling unix.Setrlimit with unix.RLIMIT_MEMLOCK prior to calling NewMapWithOptions.
+func NewMapWithOptions(spec *MapSpec, opts MapOptions) (*Map, error) {
 	if spec.BTF == nil {
-		return newMapWithBTF(spec, nil)
+		return newMapWithBTF(spec, nil, opts)
 	}
 
 	handle, err := btf.NewHandle(btf.MapSpec(spec.BTF))
@@ -121,28 +167,75 @@ func NewMap(spec *MapSpec) (*Map, error) {
 		return nil, fmt.Errorf("can't load BTF: %w", err)
 	}
 
-	return newMapWithBTF(spec, handle)
+	return newMapWithBTF(spec, handle, opts)
 }
 
-func newMapWithBTF(spec *MapSpec, handle *btf.Handle) (*Map, error) {
-	if spec.Type != ArrayOfMaps && spec.Type != HashOfMaps {
-		return createMap(spec, nil, handle)
+func newMapWithBTF(spec *MapSpec, handle *btf.Handle, opts MapOptions) (*Map, error) {
+	switch spec.Pinning {
+	case PinByName:
+		if spec.Name == "" || opts.PinPath == "" {
+			return nil, fmt.Errorf("pin by name: missing Name or PinPath")
+		}
+
+		m, err := LoadPinnedMap(filepath.Join(opts.PinPath, spec.Name))
+		if errors.Is(err, unix.ENOENT) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("load pinned map: %s", err)
+		}
+
+		if err := spec.checkCompatibility(m); err != nil {
+			m.Close()
+			return nil, fmt.Errorf("use pinned map %s: %s", spec.Name, err)
+		}
+
+		return m, nil
+
+	case PinNone:
+		// Nothing to do here
+
+	default:
+		return nil, fmt.Errorf("unsupported pin type %d", int(spec.Pinning))
 	}
 
-	if spec.InnerMap == nil {
-		return nil, fmt.Errorf("%s requires InnerMap", spec.Type)
+	var innerFd *internal.FD
+	if spec.Type == ArrayOfMaps || spec.Type == HashOfMaps {
+		if spec.InnerMap == nil {
+			return nil, fmt.Errorf("%s requires InnerMap", spec.Type)
+		}
+
+		template, err := createMap(spec.InnerMap, nil, handle, opts)
+		if err != nil {
+			return nil, err
+		}
+		defer template.Close()
+
+		innerFd = template.fd
 	}
 
-	template, err := createMap(spec.InnerMap, nil, handle)
+	m, err := createMap(spec, innerFd, handle, opts)
 	if err != nil {
 		return nil, err
 	}
-	defer template.Close()
 
-	return createMap(spec, template.fd, handle)
+	if spec.Pinning == PinByName {
+		if err := m.Pin(filepath.Join(opts.PinPath, spec.Name)); err != nil {
+			m.Close()
+			return nil, fmt.Errorf("pin map: %s", err)
+		}
+	}
+
+	return m, nil
 }
 
-func createMap(spec *MapSpec, inner *internal.FD, handle *btf.Handle) (*Map, error) {
+func createMap(spec *MapSpec, inner *internal.FD, handle *btf.Handle, opts MapOptions) (_ *Map, err error) {
+	closeOnError := func(closer io.Closer) {
+		if err != nil {
+			closer.Close()
+		}
+	}
+
 	abi := newMapABIFromSpec(spec)
 
 	switch spec.Type {
@@ -190,6 +283,7 @@ func createMap(spec *MapSpec, inner *internal.FD, handle *btf.Handle) (*Map, err
 		valueSize:  abi.ValueSize,
 		maxEntries: abi.MaxEntries,
 		flags:      abi.Flags,
+		numaNode:   spec.NumaNode,
 	}
 
 	if inner != nil {
@@ -214,6 +308,7 @@ func createMap(spec *MapSpec, inner *internal.FD, handle *btf.Handle) (*Map, err
 	if err != nil {
 		return nil, fmt.Errorf("map create: %w", err)
 	}
+	defer closeOnError(fd)
 
 	m, err := newMap(fd, spec.Name, abi)
 	if err != nil {
@@ -221,13 +316,11 @@ func createMap(spec *MapSpec, inner *internal.FD, handle *btf.Handle) (*Map, err
 	}
 
 	if err := m.populate(spec.Contents); err != nil {
-		m.Close()
 		return nil, fmt.Errorf("map create: can't set initial contents: %w", err)
 	}
 
 	if spec.Freeze {
 		if err := m.Freeze(); err != nil {
-			m.Close()
 			return nil, fmt.Errorf("can't freeze map: %w", err)
 		}
 	}
@@ -263,7 +356,34 @@ func (m *Map) String() string {
 	return fmt.Sprintf("%s#%v", m.abi.Type, m.fd)
 }
 
-// ABI gets the ABI of the Map
+// Type returns the underlying type of the map.
+func (m *Map) Type() MapType {
+	return m.abi.Type
+}
+
+// KeySize returns the size of the map key in bytes.
+func (m *Map) KeySize() uint32 {
+	return m.abi.KeySize
+}
+
+// ValueSize returns the size of the map value in bytes.
+func (m *Map) ValueSize() uint32 {
+	return m.abi.ValueSize
+}
+
+// MaxEntries returns the maximum number of elements the map can hold.
+func (m *Map) MaxEntries() uint32 {
+	return m.abi.MaxEntries
+}
+
+// Flags returns the flags of the map.
+func (m *Map) Flags() uint32 {
+	return m.abi.Flags
+}
+
+// ABI gets the ABI of the Map.
+//
+// Deprecated: use Type, KeySize, ValueSize, MaxEntries and Flags instead.
 func (m *Map) ABI() MapABI {
 	return m.abi
 }
@@ -544,7 +664,7 @@ func (m *Map) Clone() (*Map, error) {
 
 // Pin persists the map past the lifetime of the process that created it.
 //
-// This requires bpffs to be mounted above fileName. See http://cilium.readthedocs.io/en/doc-1.0/kubernetes/install/#mounting-the-bpf-fs-optional
+// This requires bpffs to be mounted above fileName. See https://docs.cilium.io/en/k8s-doc/admin/#admin-mount-bpffs
 func (m *Map) Pin(fileName string) error {
 	return internal.BPFObjPin(fileName, m.fd)
 }
@@ -789,6 +909,8 @@ func NewMapFromID(id MapID) (*Map, error) {
 }
 
 // ID returns the systemwide unique ID of the map.
+//
+// Requires at least Linux 4.13.
 func (m *Map) ID() (MapID, error) {
 	info, err := bpfGetMapInfoByFD(m.fd)
 	if err != nil {

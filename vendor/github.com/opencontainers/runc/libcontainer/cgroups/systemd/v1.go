@@ -4,7 +4,6 @@ package systemd
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/sirupsen/logrus"
 )
@@ -90,6 +90,11 @@ func genV1ResourcesProperties(c *configs.Cgroup, conn *systemdDbus.Conn) ([]syst
 			newProp("TasksMax", uint64(r.PidsLimit)))
 	}
 
+	err = addCpuset(conn, &properties, r.CpusetCpus, r.CpusetMems)
+	if err != nil {
+		return nil, err
+	}
+
 	return properties, nil
 }
 
@@ -101,20 +106,23 @@ func (m *legacyManager) Apply(pid int) error {
 		properties []systemdDbus.Property
 	)
 
+	if c.Resources.Unified != nil {
+		return cgroups.ErrV1NoUnified
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if c.Paths != nil {
 		paths := make(map[string]string)
+		cgMap, err := cgroups.ParseCgroupFile("/proc/self/cgroup")
+		if err != nil {
+			return err
+		}
+		// XXX(kolyshkin@): why this check is needed?
 		for name, path := range c.Paths {
-			_, err := getSubsystemPath(m.cgroups, name)
-			if err != nil {
-				// Don't fail if a cgroup hierarchy was not found, just skip this subsystem
-				if cgroups.IsNotFound(err) {
-					continue
-				}
-				return err
+			if _, ok := cgMap[name]; ok {
+				paths[name] = path
 			}
-			paths[name] = path
 		}
 		m.paths = paths
 		return cgroups.EnterPid(m.paths, pid)
@@ -179,14 +187,16 @@ func (m *legacyManager) Apply(pid int) error {
 		return err
 	}
 
-	if err := joinCgroups(c, pid); err != nil {
-		return err
-	}
-
 	paths := make(map[string]string)
 	for _, s := range legacySubsystems {
 		subsystemPath, err := getSubsystemPath(m.cgroups, s.Name())
 		if err != nil {
+			// Even if it's `not found` error, we'll return err
+			// because devices cgroup is hard requirement for
+			// container security.
+			if s.Name() == "devices" {
+				return err
+			}
 			// Don't fail if a cgroup hierarchy was not found, just skip this subsystem
 			if cgroups.IsNotFound(err) {
 				continue
@@ -196,6 +206,11 @@ func (m *legacyManager) Apply(pid int) error {
 		paths[s.Name()] = subsystemPath
 	}
 	m.paths = paths
+
+	if err := m.joinCgroups(pid); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -212,17 +227,14 @@ func (m *legacyManager) Destroy() error {
 	}
 	unitName := getUnitName(m.cgroups)
 
-	err = stopUnit(dbusConnection, unitName)
+	stopErr := stopUnit(dbusConnection, unitName)
 	// Both on success and on error, cleanup all the cgroups we are aware of.
 	// Some of them were created directly by Apply() and are not managed by systemd.
 	if err := cgroups.RemovePaths(m.paths); err != nil {
 		return err
 	}
-	if err != nil {
-		return err
-	}
-	m.paths = make(map[string]string)
-	return nil
+
+	return stopErr
 }
 
 func (m *legacyManager) Path(subsys string) string {
@@ -231,48 +243,25 @@ func (m *legacyManager) Path(subsys string) string {
 	return m.paths[subsys]
 }
 
-func join(c *configs.Cgroup, subsystem string, pid int) (string, error) {
-	path, err := getSubsystemPath(c, subsystem)
-	if err != nil {
-		return "", err
-	}
-
-	if err := os.MkdirAll(path, 0755); err != nil {
-		return "", err
-	}
-	if err := cgroups.WriteCgroupProc(path, pid); err != nil {
-		return "", err
-	}
-	return path, nil
-}
-
-func joinCgroups(c *configs.Cgroup, pid int) error {
+func (m *legacyManager) joinCgroups(pid int) error {
 	for _, sys := range legacySubsystems {
 		name := sys.Name()
 		switch name {
 		case "name=systemd":
 			// let systemd handle this
 		case "cpuset":
-			path, err := getSubsystemPath(c, name)
-			if err != nil && !cgroups.IsNotFound(err) {
-				return err
-			}
-			s := &fs.CpusetGroup{}
-			if err := s.ApplyDir(path, c, pid); err != nil {
-				return err
-			}
-		default:
-			_, err := join(c, name, pid)
-			if err != nil {
-				// Even if it's `not found` error, we'll return err
-				// because devices cgroup is hard requirement for
-				// container security.
-				if name == "devices" {
+			if path, ok := m.paths[name]; ok {
+				s := &fs.CpusetGroup{}
+				if err := s.ApplyDir(path, m.cgroups, pid); err != nil {
 					return err
 				}
-				// For other subsystems, omit the `not found` error
-				// because they are optional.
-				if !cgroups.IsNotFound(err) {
+			}
+		default:
+			if path, ok := m.paths[name]; ok {
+				if err := os.MkdirAll(path, 0755); err != nil {
+					return err
+				}
+				if err := cgroups.WriteCgroupProc(path, pid); err != nil {
 					return err
 				}
 			}
@@ -283,7 +272,7 @@ func joinCgroups(c *configs.Cgroup, pid int) error {
 }
 
 func getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
-	mountpoint, err := cgroups.FindCgroupMountpoint(c.Path, subsystem)
+	mountpoint, err := cgroups.FindCgroupMountpoint("", subsystem)
 	if err != nil {
 		return "", err
 	}
@@ -309,15 +298,14 @@ func getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
 }
 
 func (m *legacyManager) Freeze(state configs.FreezerState) error {
-	path, err := getSubsystemPath(m.cgroups, "freezer")
-	if err != nil {
-		return err
+	path, ok := m.paths["freezer"]
+	if !ok {
+		return errSubsystemDoesNotExist
 	}
 	prevState := m.cgroups.Resources.Freezer
 	m.cgroups.Resources.Freezer = state
 	freezer := &fs.FreezerGroup{}
-	err = freezer.Set(path, m.cgroups)
-	if err != nil {
+	if err := freezer.Set(path, m.cgroups); err != nil {
 		m.cgroups.Resources.Freezer = prevState
 		return err
 	}
@@ -325,17 +313,17 @@ func (m *legacyManager) Freeze(state configs.FreezerState) error {
 }
 
 func (m *legacyManager) GetPids() ([]int, error) {
-	path, err := getSubsystemPath(m.cgroups, "devices")
-	if err != nil {
-		return nil, err
+	path, ok := m.paths["devices"]
+	if !ok {
+		return nil, errSubsystemDoesNotExist
 	}
 	return cgroups.GetPids(path)
 }
 
 func (m *legacyManager) GetAllPids() ([]int, error) {
-	path, err := getSubsystemPath(m.cgroups, "devices")
-	if err != nil {
-		return nil, err
+	path, ok := m.paths["devices"]
+	if !ok {
+		return nil, errSubsystemDoesNotExist
 	}
 	return cgroups.GetAllPids(path)
 }
@@ -362,6 +350,9 @@ func (m *legacyManager) Set(container *configs.Config) error {
 	// and there is no need to set any values.
 	if m.cgroups.Paths != nil {
 		return nil
+	}
+	if container.Cgroups.Resources.Unified != nil {
+		return cgroups.ErrV1NoUnified
 	}
 	dbusConnection, err := getDbusConnection(false)
 	if err != nil {
@@ -406,9 +397,9 @@ func (m *legacyManager) Set(container *configs.Config) error {
 
 	for _, sys := range legacySubsystems {
 		// Get the subsystem path, but don't error out for not found cgroups.
-		path, err := getSubsystemPath(container.Cgroups, sys.Name())
-		if err != nil && !cgroups.IsNotFound(err) {
-			return err
+		path, ok := m.paths[sys.Name()]
+		if !ok {
+			continue
 		}
 		if err := sys.Set(path, container.Cgroups); err != nil {
 			return err
@@ -420,7 +411,10 @@ func (m *legacyManager) Set(container *configs.Config) error {
 
 func enableKmem(c *configs.Cgroup) error {
 	path, err := getSubsystemPath(c, "memory")
-	if err != nil && !cgroups.IsNotFound(err) {
+	if err != nil {
+		if cgroups.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 
@@ -429,7 +423,7 @@ func enableKmem(c *configs.Cgroup) error {
 	}
 	// do not try to enable the kernel memory if we already have
 	// tasks in the cgroup.
-	content, err := ioutil.ReadFile(filepath.Join(path, "tasks"))
+	content, err := fscommon.ReadFile(path, "tasks")
 	if err != nil {
 		return err
 	}
@@ -450,9 +444,9 @@ func (m *legacyManager) GetCgroups() (*configs.Cgroup, error) {
 }
 
 func (m *legacyManager) GetFreezerState() (configs.FreezerState, error) {
-	path, err := getSubsystemPath(m.cgroups, "freezer")
-	if err != nil && !cgroups.IsNotFound(err) {
-		return configs.Undefined, err
+	path, ok := m.paths["freezer"]
+	if !ok {
+		return configs.Undefined, nil
 	}
 	freezer := &fs.FreezerGroup{}
 	return freezer.GetState(path)

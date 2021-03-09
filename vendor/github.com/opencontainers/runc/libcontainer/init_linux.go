@@ -3,6 +3,7 @@
 package libcontainer
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,9 +13,8 @@ import (
 	"strings"
 	"unsafe"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/containerd/console"
+	"github.com/opencontainers/runc/libcontainer/capabilities"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/system"
@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 )
 
 type initType string
@@ -128,19 +129,13 @@ func finalizeNamespace(config *initConfig) error {
 		return errors.Wrap(err, "close exec fds")
 	}
 
-	if config.Cwd != "" {
-		if err := unix.Chdir(config.Cwd); err != nil {
-			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %v", config.Cwd, err)
-		}
-	}
-
-	capabilities := &configs.Capabilities{}
+	caps := &configs.Capabilities{}
 	if config.Capabilities != nil {
-		capabilities = config.Capabilities
+		caps = config.Capabilities
 	} else if config.Config.Capabilities != nil {
-		capabilities = config.Config.Capabilities
+		caps = config.Config.Capabilities
 	}
-	w, err := newContainerCapList(capabilities)
+	w, err := capabilities.New(caps)
 	if err != nil {
 		return err
 	}
@@ -154,6 +149,14 @@ func finalizeNamespace(config *initConfig) error {
 	}
 	if err := setupUser(config); err != nil {
 		return errors.Wrap(err, "setup user")
+	}
+	// Change working directory AFTER the user has been set up.
+	// Otherwise, if the cwd is also a volume that's been chowned to the container user (and not the user running runc),
+	// this command will EPERM.
+	if config.Cwd != "" {
+		if err := unix.Chdir(config.Cwd); err != nil {
+			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %v", config.Cwd, err)
+		}
 	}
 	if err := system.ClearKeepCaps(); err != nil {
 		return errors.Wrap(err, "clear keep caps")
@@ -304,7 +307,7 @@ func setupUser(config *initConfig) error {
 	// There's nothing we can do about /etc/group entries, so we silently
 	// ignore setting groups here (since the user didn't explicitly ask us to
 	// set the group).
-	allowSupGroups := !config.RootlessEUID && strings.TrimSpace(string(setgroups)) != "deny"
+	allowSupGroups := !config.RootlessEUID && string(bytes.TrimSpace(setgroups)) != "deny"
 
 	if allowSupGroups {
 		suppGroups := append(execUser.Sgids, addGroups...)
@@ -431,6 +434,7 @@ func setupRlimits(limits []configs.Rlimit, pid int) error {
 
 const _P_PID = 1
 
+//nolint:structcheck,unused
 type siginfo struct {
 	si_signo int32
 	si_errno int32
@@ -480,7 +484,9 @@ func signalAllProcesses(m cgroups.Manager, s os.Signal) error {
 	}
 	pids, err := m.GetAllPids()
 	if err != nil {
-		m.Freeze(configs.Thawed)
+		if err := m.Freeze(configs.Thawed); err != nil {
+			logrus.Warn(err)
+		}
 		return err
 	}
 	for _, pid := range pids {

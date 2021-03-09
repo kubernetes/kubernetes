@@ -31,7 +31,7 @@ var (
 type Spec struct {
 	rawTypes  []rawType
 	strings   stringTable
-	types     map[string][]Type
+	types     map[string][]namedType
 	funcInfos map[string]extInfo
 	lineInfos map[string]extInfo
 	byteOrder binary.ByteOrder
@@ -59,29 +59,9 @@ func LoadSpecFromReader(rd io.ReaderAt) (*Spec, error) {
 	}
 	defer file.Close()
 
-	var (
-		btfSection    *elf.Section
-		btfExtSection *elf.Section
-		sectionSizes  = make(map[string]uint32)
-	)
-
-	for _, sec := range file.Sections {
-		switch sec.Name {
-		case ".BTF":
-			btfSection = sec
-		case ".BTF.ext":
-			btfExtSection = sec
-		default:
-			if sec.Type != elf.SHT_PROGBITS && sec.Type != elf.SHT_NOBITS {
-				break
-			}
-
-			if sec.Size > math.MaxUint32 {
-				return nil, fmt.Errorf("section %s exceeds maximum size", sec.Name)
-			}
-
-			sectionSizes[sec.Name] = uint32(sec.Size)
-		}
+	btfSection, btfExtSection, sectionSizes, err := findBtfSections(file)
+	if err != nil {
+		return nil, err
 	}
 
 	if btfSection == nil {
@@ -127,6 +107,51 @@ func LoadSpecFromReader(rd io.ReaderAt) (*Spec, error) {
 	}
 
 	return spec, nil
+}
+
+func findBtfSections(file *elf.File) (*elf.Section, *elf.Section, map[string]uint32, error) {
+	var (
+		btfSection    *elf.Section
+		btfExtSection *elf.Section
+		sectionSizes  = make(map[string]uint32)
+	)
+
+	for _, sec := range file.Sections {
+		switch sec.Name {
+		case ".BTF":
+			btfSection = sec
+		case ".BTF.ext":
+			btfExtSection = sec
+		default:
+			if sec.Type != elf.SHT_PROGBITS && sec.Type != elf.SHT_NOBITS {
+				break
+			}
+
+			if sec.Size > math.MaxUint32 {
+				return nil, nil, nil, fmt.Errorf("section %s exceeds maximum size", sec.Name)
+			}
+
+			sectionSizes[sec.Name] = uint32(sec.Size)
+		}
+	}
+	return btfSection, btfExtSection, sectionSizes, nil
+}
+
+func loadSpecFromVmlinux(rd io.ReaderAt) (*Spec, error) {
+	file, err := elf.NewFile(rd)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	btfSection, _, _, err := findBtfSections(file)
+	if err != nil {
+		return nil, fmt.Errorf(".BTF ELF section: %s", err)
+	}
+	if btfSection == nil {
+		return nil, fmt.Errorf("unable to find .BTF ELF section")
+	}
+	return loadNakedSpec(btfSection.Open(), file.ByteOrder, nil, nil)
 }
 
 func loadNakedSpec(btf io.ReadSeeker, bo binary.ByteOrder, sectionSizes map[string]uint32, variableOffsets map[variable]uint32) (*Spec, error) {
@@ -176,16 +201,43 @@ func LoadKernelSpec() (*Spec, error) {
 }
 
 func loadKernelSpec() (*Spec, error) {
-	fh, err := os.Open("/sys/kernel/btf/vmlinux")
-	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("can't open kernel BTF at /sys/kernel/btf/vmlinux: %w", ErrNotFound)
-	}
+	release, err := unix.KernelRelease()
 	if err != nil {
-		return nil, fmt.Errorf("can't read kernel BTF: %s", err)
+		return nil, fmt.Errorf("can't read kernel release number: %w", err)
 	}
-	defer fh.Close()
 
-	return loadNakedSpec(fh, internal.NativeEndian, nil, nil)
+	fh, err := os.Open("/sys/kernel/btf/vmlinux")
+	if err == nil {
+		defer fh.Close()
+
+		return loadNakedSpec(fh, internal.NativeEndian, nil, nil)
+	}
+
+	// use same list of locations as libbpf
+	// https://github.com/libbpf/libbpf/blob/9a3a42608dbe3731256a5682a125ac1e23bced8f/src/btf.c#L3114-L3122
+	locations := []string{
+		"/boot/vmlinux-%s",
+		"/lib/modules/%s/vmlinux-%[1]s",
+		"/lib/modules/%s/build/vmlinux",
+		"/usr/lib/modules/%s/kernel/vmlinux",
+		"/usr/lib/debug/boot/vmlinux-%s",
+		"/usr/lib/debug/boot/vmlinux-%s.debug",
+		"/usr/lib/debug/lib/modules/%s/vmlinux",
+	}
+
+	for _, loc := range locations {
+		path := fmt.Sprintf(loc, release)
+
+		fh, err := os.Open(path)
+		if err != nil {
+			continue
+		}
+		defer fh.Close()
+
+		return loadSpecFromVmlinux(fh)
+	}
+
+	return nil, fmt.Errorf("no BTF for kernel version %s: %w", release, internal.ErrNotSupported)
 }
 
 func parseBTF(btf io.ReadSeeker, bo binary.ByteOrder) ([]rawType, stringTable, error) {
@@ -402,9 +454,19 @@ func (s *Spec) Map(name string) (*Map, []Member, error) {
 		switch member.Name {
 		case "key":
 			key = member.Type
+			if pk, isPtr := key.(*Pointer); !isPtr {
+				return nil, nil, fmt.Errorf("key type is not a pointer: %T", key)
+			} else {
+				key = pk.Target
+			}
 
 		case "value":
 			value = member.Type
+			if vk, isPtr := value.(*Pointer); !isPtr {
+				return nil, nil, fmt.Errorf("value type is not a pointer: %T", value)
+			} else {
+				value = vk.Target
+			}
 		}
 	}
 
@@ -441,8 +503,13 @@ func (s *Spec) FindType(name string, typ Type) error {
 		candidate Type
 	)
 
-	for _, typ := range s.types[name] {
+	for _, typ := range s.types[essentialName(name)] {
 		if reflect.TypeOf(typ) != wanted {
+			continue
+		}
+
+		// Match against the full name, not just the essential one.
+		if typ.name() != name {
 			continue
 		}
 
@@ -621,9 +688,7 @@ type bpfLoadBTFAttr struct {
 }
 
 func bpfLoadBTF(attr *bpfLoadBTFAttr) (*internal.FD, error) {
-	const _BTFLoad = 18
-
-	fd, err := internal.BPF(_BTFLoad, unsafe.Pointer(attr), unsafe.Sizeof(*attr))
+	fd, err := internal.BPF(internal.BPF_BTF_LOAD, unsafe.Pointer(attr), unsafe.Sizeof(*attr))
 	if err != nil {
 		return nil, err
 	}

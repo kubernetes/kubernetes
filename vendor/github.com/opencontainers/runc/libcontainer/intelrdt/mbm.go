@@ -9,6 +9,7 @@ var (
 
 // Check if Intel RDT/MBM is enabled.
 func IsMBMEnabled() bool {
+	featuresInit()
 	return mbmEnabled
 }
 

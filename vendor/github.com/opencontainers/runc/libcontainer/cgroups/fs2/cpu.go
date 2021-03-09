@@ -5,7 +5,6 @@ package fs2
 import (
 	"bufio"
 	"os"
-	"path/filepath"
 	"strconv"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
@@ -50,7 +49,7 @@ func setCpu(dirPath string, cgroup *configs.Cgroup) error {
 	return nil
 }
 func statCpu(dirPath string, stats *cgroups.Stats) error {
-	f, err := os.Open(filepath.Join(dirPath, "cpu.stat"))
+	f, err := fscommon.OpenFile(dirPath, "cpu.stat", os.O_RDONLY)
 	if err != nil {
 		return err
 	}
