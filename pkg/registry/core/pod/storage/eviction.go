@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"time"
 
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
+	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	"k8s.io/client-go/util/retry"
 	pdbhelper "k8s.io/component-helpers/apps/poddisruptionbudget"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
@@ -314,7 +314,7 @@ func createTooManyRequestsError(name string) error {
 }
 
 // checkAndDecrement checks if the provided PodDisruptionBudget allows any disruption.
-func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policyv1beta1.PodDisruptionBudget, dryRun bool) error {
+func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policyv1.PodDisruptionBudget, dryRun bool) error {
 	if pdb.Status.ObservedGeneration < pdb.Generation {
 
 		return createTooManyRequestsError(pdb.Name)
@@ -358,17 +358,13 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 }
 
 // getPodDisruptionBudgets returns any PDBs that match the pod or err if there's an error.
-func (r *EvictionREST) getPodDisruptionBudgets(ctx context.Context, pod *api.Pod) ([]policyv1beta1.PodDisruptionBudget, error) {
-	if len(pod.Labels) == 0 {
-		return nil, nil
-	}
-
+func (r *EvictionREST) getPodDisruptionBudgets(ctx context.Context, pod *api.Pod) ([]policyv1.PodDisruptionBudget, error) {
 	pdbList, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(pod.Namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	var pdbs []policyv1beta1.PodDisruptionBudget
+	var pdbs []policyv1.PodDisruptionBudget
 	for _, pdb := range pdbList.Items {
 		if pdb.Namespace != pod.Namespace {
 			continue

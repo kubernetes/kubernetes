@@ -114,8 +114,8 @@ func (podDisruptionBudgetStatusStrategy) ValidateUpdate(ctx context.Context, obj
 	var apiVersion schema.GroupVersion
 	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
 		apiVersion = schema.GroupVersion{
-			Group:   requestInfo.APIVersion,
-			Version: requestInfo.APIGroup,
+			Group:   requestInfo.APIGroup,
+			Version: requestInfo.APIVersion,
 		}
 	}
 	return validation.ValidatePodDisruptionBudgetStatusUpdate(obj.(*policy.PodDisruptionBudget).Status,

@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
@@ -34,16 +33,6 @@ import (
 )
 
 func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error) {
-	var group = "policy"
-	var version = "v1beta1"
-	var resource = "poddisruptionbudgets"
-
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: group, Version: version, Resource: resource}] {
-		klog.Infof(
-			"Refusing to start disruption because resource %q in group %q is not available.",
-			resource, group+"/"+version)
-		return nil, false, nil
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
 		klog.Infof("Refusing to start disruption because the PodDisruptionBudget feature is disabled")
 		return nil, false, nil
@@ -59,7 +48,7 @@ func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error
 
 	go disruption.NewDisruptionController(
 		ctx.InformerFactory.Core().V1().Pods(),
-		ctx.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		ctx.InformerFactory.Policy().V1().PodDisruptionBudgets(),
 		ctx.InformerFactory.Core().V1().ReplicationControllers(),
 		ctx.InformerFactory.Apps().V1().ReplicaSets(),
 		ctx.InformerFactory.Apps().V1().Deployments(),

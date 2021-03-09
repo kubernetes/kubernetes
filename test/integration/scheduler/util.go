@@ -62,7 +62,7 @@ func initDisruptionController(t *testing.T, testCtx *testutils.TestContext) *dis
 
 	dc := disruption.NewDisruptionController(
 		informers.Core().V1().Pods(),
-		informers.Policy().V1beta1().PodDisruptionBudgets(),
+		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),
 		informers.Apps().V1().ReplicaSets(),
 		informers.Apps().V1().Deployments(),

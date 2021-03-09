@@ -21,7 +21,7 @@ import (
 	"errors"
 	"testing"
 
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -52,10 +52,10 @@ func TestEviction(t *testing.T) {
 	}{
 		{
 			name: "matching pdbs with no disruptions allowed, pod running",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
 			}},
 			eviction:    &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t1", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
 			expectError: true,
@@ -64,10 +64,10 @@ func TestEviction(t *testing.T) {
 		},
 		{
 			name: "matching pdbs with no disruptions allowed, pod pending",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
 			}},
 			eviction:      &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t2", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
 			expectError:   false,
@@ -77,10 +77,10 @@ func TestEviction(t *testing.T) {
 		},
 		{
 			name: "matching pdbs with no disruptions allowed, pod succeeded",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
 			}},
 			eviction:      &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t3", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
 			expectError:   false,
@@ -90,10 +90,10 @@ func TestEviction(t *testing.T) {
 		},
 		{
 			name: "matching pdbs with no disruptions allowed, pod failed",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
 			}},
 			eviction:      &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t4", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
 			expectError:   false,
@@ -103,10 +103,10 @@ func TestEviction(t *testing.T) {
 		},
 		{
 			name: "matching pdbs with disruptions allowed",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
 			}},
 			eviction:      &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t5", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
 			expectDeleted: true,
@@ -114,10 +114,10 @@ func TestEviction(t *testing.T) {
 		},
 		{
 			name: "non-matching pdbs",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"b": "true"}}},
-				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"b": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
 			}},
 			eviction:      &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t6", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
 			expectDeleted: true,
@@ -125,10 +125,10 @@ func TestEviction(t *testing.T) {
 		},
 		{
 			name: "matching pdbs with disruptions allowed but bad name in Url",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
 			}},
 			badNameInURL: true,
 			eviction:     &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t7", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
@@ -161,7 +161,7 @@ func TestEviction(t *testing.T) {
 			}
 
 			client := fake.NewSimpleClientset(tc.pdbs...)
-			evictionRest := newEvictionStorage(storage.Store, client.PolicyV1beta1())
+			evictionRest := newEvictionStorage(storage.Store, client.PolicyV1())
 
 			name := pod.Name
 			if tc.badNameInURL {
@@ -225,10 +225,10 @@ func TestEvictionIngorePDB(t *testing.T) {
 	}{
 		{
 			name: "pdbs No disruptions allowed, pod pending, first delete conflict, pod still pending, pod deleted successfully",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
 			}},
 			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t1", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
 			expectError:         false,
@@ -241,10 +241,10 @@ func TestEvictionIngorePDB(t *testing.T) {
 		// pod should not be deleted.
 		{
 			name: "pdbs No disruptions allowed, pod pending, first delete conflict, pod becomes running, continueToPDBs",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
 			}},
 			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t2", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
 			expectError:         true,
@@ -254,10 +254,10 @@ func TestEvictionIngorePDB(t *testing.T) {
 		},
 		{
 			name: "pdbs disruptions allowed, pod pending, first delete conflict, pod becomes running, continueToPDBs",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
 			}},
 			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t3", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
 			expectError:         false,
@@ -267,10 +267,10 @@ func TestEvictionIngorePDB(t *testing.T) {
 		},
 		{
 			name: "pod pending, always conflict on delete",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
 			}},
 			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t4", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
 			expectError:         true,
@@ -280,10 +280,10 @@ func TestEvictionIngorePDB(t *testing.T) {
 		},
 		{
 			name: "pod pending, always conflict on delete, user provided ResourceVersion constraint",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
 			}},
 			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t5", Namespace: "default"}, DeleteOptions: metav1.NewRVDeletionPrecondition("userProvided")},
 			expectError:         true,
@@ -293,10 +293,10 @@ func TestEvictionIngorePDB(t *testing.T) {
 		},
 		{
 			name: "matching pdbs with no disruptions allowed, pod terminating",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
 			}},
 			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t6", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(300)},
 			expectError:         false,
@@ -306,10 +306,10 @@ func TestEvictionIngorePDB(t *testing.T) {
 		},
 		{
 			name: "matching pdbs with no disruptions allowed, pod running, pod healthy, unhealthy pod not ours",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status: policyv1beta1.PodDisruptionBudgetStatus{
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1.PodDisruptionBudgetStatus{
 					// This simulates 3 pods desired, our pod healthy, unhealthy pod is not ours.
 					DisruptionsAllowed: 0,
 					CurrentHealthy:     2,
@@ -329,10 +329,10 @@ func TestEvictionIngorePDB(t *testing.T) {
 		},
 		{
 			name: "matching pdbs with no disruptions allowed, pod running, pod unhealthy, unhealthy pod ours",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status: policyv1beta1.PodDisruptionBudgetStatus{
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1.PodDisruptionBudgetStatus{
 					// This simulates 3 pods desired, our pod unhealthy
 					DisruptionsAllowed: 0,
 					CurrentHealthy:     2,
@@ -353,10 +353,10 @@ func TestEvictionIngorePDB(t *testing.T) {
 		{
 			// This case should return the 529 retry error.
 			name: "matching pdbs with no disruptions allowed, pod running, pod unhealthy, unhealthy pod ours, resource version conflict",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status: policyv1beta1.PodDisruptionBudgetStatus{
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1.PodDisruptionBudgetStatus{
 					// This simulates 3 pods desired, our pod unhealthy
 					DisruptionsAllowed: 0,
 					CurrentHealthy:     2,
@@ -377,10 +377,10 @@ func TestEvictionIngorePDB(t *testing.T) {
 		{
 			// This case should return the 529 retry error.
 			name: "matching pdbs with no disruptions allowed, pod running, pod unhealthy, unhealthy pod ours, other error on delete",
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status: policyv1beta1.PodDisruptionBudgetStatus{
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1.PodDisruptionBudgetStatus{
 					// This simulates 3 pods desired, our pod unhealthy
 					DisruptionsAllowed: 0,
 					CurrentHealthy:     2,
@@ -428,7 +428,7 @@ func TestEvictionIngorePDB(t *testing.T) {
 			}
 
 			client := fake.NewSimpleClientset(tc.pdbs...)
-			evictionRest := newEvictionStorage(ms, client.PolicyV1beta1())
+			evictionRest := newEvictionStorage(ms, client.PolicyV1())
 
 			name := pod.Name
 			ms.pod = pod
@@ -473,10 +473,10 @@ func TestEvictionDryRun(t *testing.T) {
 			name:            "with pdbs",
 			evictionOptions: &metav1.DeleteOptions{DryRun: []string{"All"}},
 			requestOptions:  &metav1.CreateOptions{DryRun: []string{"All"}},
-			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
 			}},
 		},
 	}
@@ -496,7 +496,7 @@ func TestEvictionDryRun(t *testing.T) {
 			}
 
 			client := fake.NewSimpleClientset(tc.pdbs...)
-			evictionRest := newEvictionStorage(storage.Store, client.PolicyV1beta1())
+			evictionRest := newEvictionStorage(storage.Store, client.PolicyV1())
 			eviction := &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: tc.evictionOptions}
 			_, err := evictionRest.Create(testContext, pod.Name, eviction, nil, tc.requestOptions)
 			if err != nil {
@@ -509,47 +509,47 @@ func TestEvictionDryRun(t *testing.T) {
 func TestEvictionPDBStatus(t *testing.T) {
 	testcases := []struct {
 		name                       string
-		pdb                        *policyv1beta1.PodDisruptionBudget
+		pdb                        *policyv1.PodDisruptionBudget
 		expectedDisruptionsAllowed int32
 		expectedReason             string
 	}{
 		{
 			name: "pdb status is updated after eviction",
-			pdb: &policyv1beta1.PodDisruptionBudget{
+			pdb: &policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status: policyv1beta1.PodDisruptionBudgetStatus{
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1.PodDisruptionBudgetStatus{
 					DisruptionsAllowed: 1,
 					Conditions: []metav1.Condition{
 						{
-							Type:   policyv1beta1.DisruptionAllowedCondition,
-							Reason: policyv1beta1.SufficientPodsReason,
+							Type:   policyv1.DisruptionAllowedCondition,
+							Reason: policyv1.SufficientPodsReason,
 							Status: metav1.ConditionTrue,
 						},
 					},
 				},
 			},
 			expectedDisruptionsAllowed: 0,
-			expectedReason:             policyv1beta1.InsufficientPodsReason,
+			expectedReason:             policyv1.InsufficientPodsReason,
 		},
 		{
 			name: "condition reason is only updated if AllowedDisruptions becomes 0",
-			pdb: &policyv1beta1.PodDisruptionBudget{
+			pdb: &policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
-				Status: policyv1beta1.PodDisruptionBudgetStatus{
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1.PodDisruptionBudgetStatus{
 					DisruptionsAllowed: 3,
 					Conditions: []metav1.Condition{
 						{
-							Type:   policyv1beta1.DisruptionAllowedCondition,
-							Reason: policyv1beta1.SufficientPodsReason,
+							Type:   policyv1.DisruptionAllowedCondition,
+							Reason: policyv1.SufficientPodsReason,
 							Status: metav1.ConditionTrue,
 						},
 					},
 				},
 			},
 			expectedDisruptionsAllowed: 2,
-			expectedReason:             policyv1beta1.SufficientPodsReason,
+			expectedReason:             policyv1.SufficientPodsReason,
 		},
 	}
 
@@ -578,14 +578,14 @@ func TestEvictionPDBStatus(t *testing.T) {
 				}
 			}
 
-			evictionRest := newEvictionStorage(storage.Store, client.PolicyV1beta1())
+			evictionRest := newEvictionStorage(storage.Store, client.PolicyV1())
 			eviction := &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo-1", Namespace: "default"}, DeleteOptions: &metav1.DeleteOptions{}}
 			_, err := evictionRest.Create(testContext, "foo-1", eviction, nil, &metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to run eviction: %v", err)
 			}
 
-			existingPDB, err := client.PolicyV1beta1().PodDisruptionBudgets(metav1.NamespaceDefault).Get(context.TODO(), tc.pdb.Name, metav1.GetOptions{})
+			existingPDB, err := client.PolicyV1().PodDisruptionBudgets(metav1.NamespaceDefault).Get(context.TODO(), tc.pdb.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("%#v", err)
 				return
@@ -595,7 +595,7 @@ func TestEvictionPDBStatus(t *testing.T) {
 				t.Errorf("expected DisruptionsAllowed to be %d, but got %d", want, got)
 			}
 
-			cond := apimeta.FindStatusCondition(existingPDB.Status.Conditions, policyv1beta1.DisruptionAllowedCondition)
+			cond := apimeta.FindStatusCondition(existingPDB.Status.Conditions, policyv1.DisruptionAllowedCondition)
 			if want, got := tc.expectedReason, cond.Reason; want != got {
 				t.Errorf("expected Reason to be %q, but got %q", want, got)
 			}

@@ -25,7 +25,7 @@ import (
 	apps "k8s.io/api/apps/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
-	policy "k8s.io/api/policy/v1beta1"
+	policy "k8s.io/api/policy/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -38,13 +38,13 @@ import (
 	"k8s.io/client-go/discovery"
 	appsv1informers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
+	policyinformers "k8s.io/client-go/informers/policy/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	policylisters "k8s.io/client-go/listers/policy/v1beta1"
+	policylisters "k8s.io/client-go/listers/policy/v1"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -506,9 +506,6 @@ func (dc *DisruptionController) getPodsForPdb(pdb *policy.PodDisruptionBudget) (
 	if err != nil {
 		return []*v1.Pod{}, err
 	}
-	if sel.Empty() {
-		return []*v1.Pod{}, nil
-	}
 	pods, err := dc.podLister.Pods(pdb.Namespace).List(sel)
 	if err != nil {
 		return []*v1.Pod{}, err
@@ -835,6 +832,6 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 func (dc *DisruptionController) writePdbStatus(pdb *policy.PodDisruptionBudget) error {
 	// If this update fails, don't retry it. Allow the failure to get handled &
 	// retried in `processNextWorkItem()`.
-	_, err := dc.kubeClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace).UpdateStatus(context.TODO(), pdb, metav1.UpdateOptions{})
+	_, err := dc.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).UpdateStatus(context.TODO(), pdb, metav1.UpdateOptions{})
 	return err
 }

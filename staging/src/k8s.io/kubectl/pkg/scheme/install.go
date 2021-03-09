@@ -38,6 +38,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -74,7 +75,7 @@ func init() {
 	utilruntime.Must(Scheme.SetVersionPriority(extensionsv1beta1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(imagepolicyv1alpha1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(networkingv1.SchemeGroupVersion))
-	utilruntime.Must(Scheme.SetVersionPriority(policyv1beta1.SchemeGroupVersion))
+	utilruntime.Must(Scheme.SetVersionPriority(policyv1beta1.SchemeGroupVersion, policyv1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(rbacv1.SchemeGroupVersion, rbacv1beta1.SchemeGroupVersion, rbacv1alpha1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(schedulingv1alpha1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(storagev1.SchemeGroupVersion, storagev1beta1.SchemeGroupVersion))

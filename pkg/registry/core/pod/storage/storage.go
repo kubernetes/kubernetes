@@ -33,7 +33,7 @@ import (
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
+	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
