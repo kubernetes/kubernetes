@@ -280,6 +280,8 @@ message CustomResourceDefinitionSpec {
 message CustomResourceDefinitionStatus {
   // conditions indicate state for particular aspects of a CustomResourceDefinition
   // +optional
+  // +listType=map
+  // +listMapKey=type
   repeated CustomResourceDefinitionCondition conditions = 1;
 
   // acceptedNames are the names that are actually being used to serve discovery.

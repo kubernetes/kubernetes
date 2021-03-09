@@ -326,6 +326,8 @@ type CustomResourceDefinitionCondition struct {
 // CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition
 type CustomResourceDefinitionStatus struct {
 	// Conditions indicate state for particular aspects of a CustomResourceDefinition
+	// +listType=map
+	// +listMapKey=type
 	Conditions []CustomResourceDefinitionCondition
 
 	// AcceptedNames are the names that are actually being used to serve discovery

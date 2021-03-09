@@ -270,7 +270,6 @@ API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/ap
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,CustomResourceDefinitionNames,Categories
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,CustomResourceDefinitionNames,ShortNames
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,CustomResourceDefinitionSpec,Versions
-API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,CustomResourceDefinitionStatus,Conditions
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,CustomResourceDefinitionStatus,StoredVersions
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,CustomResourceDefinitionVersion,AdditionalPrinterColumns
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSON,Raw
@@ -291,7 +290,6 @@ API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/ap
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceDefinitionNames,ShortNames
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceDefinitionSpec,AdditionalPrinterColumns
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceDefinitionSpec,Versions
-API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceDefinitionStatus,Conditions
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceDefinitionStatus,StoredVersions
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceDefinitionVersion,AdditionalPrinterColumns
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSON,Raw
