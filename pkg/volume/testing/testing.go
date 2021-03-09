@@ -1651,7 +1651,7 @@ func CreateTestPVC(capacity string, accessModes []v1.PersistentVolumeAccessMode)
 	return &claim
 }
 
-func MetricsEqualIgnoreTimestamp(a *Metrics, b *Metrics) bool {
+func MetricsEqualIgnoreTimestamp(a *Stats, b *Stats) bool {
 	available := a.Available == b.Available
 	capacity := a.Capacity == b.Capacity
 	used := a.Used == b.Used

@@ -22,9 +22,9 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
-var _ MetricsProvider = &metricsDu{}
+var _ StatsProvider = &metricsDu{}
 
-// metricsDu represents a MetricsProvider that calculates the used and
+// metricsDu represents a StatsProvider that calculates the used and
 // available Volume space by calling fs.DiskUsage() and gathering
 // filesystem info for the Volume path.
 type metricsDu struct {
@@ -33,67 +33,67 @@ type metricsDu struct {
 }
 
 // NewMetricsDu creates a new metricsDu with the Volume path.
-func NewMetricsDu(path string) MetricsProvider {
+func NewMetricsDu(path string) StatsProvider {
 	return &metricsDu{path}
 }
 
-// GetMetrics calculates the volume usage and device free space by executing "du"
+// GetStats calculates the volume usage and device free space by executing "du"
 // and gathering filesystem info for the Volume path.
-// See MetricsProvider.GetMetrics
-func (md *metricsDu) GetMetrics() (*Metrics, error) {
-	metrics := &Metrics{Time: metav1.Now()}
+// See StatsProvider.GetStats
+func (md *metricsDu) GetStats() (*Stats, error) {
+	stats := &Stats{Time: metav1.Now()}
 	if md.path == "" {
-		return metrics, NewNoPathDefinedError()
+		return stats, NewNoPathDefinedError()
 	}
 
-	err := md.runDiskUsage(metrics)
+	err := md.runDiskUsage(stats)
 	if err != nil {
-		return metrics, err
+		return stats, err
 	}
 
-	err = md.runFind(metrics)
+	err = md.runFind(stats)
 	if err != nil {
-		return metrics, err
+		return stats, err
 	}
 
-	err = md.getFsInfo(metrics)
+	err = md.getFsInfo(stats)
 	if err != nil {
-		return metrics, err
+		return stats, err
 	}
 
-	return metrics, nil
+	return stats, nil
 }
 
-// runDiskUsage gets disk usage of md.path and writes the results to metrics.Used
-func (md *metricsDu) runDiskUsage(metrics *Metrics) error {
+// runDiskUsage gets disk usage of md.path and writes the results to stats.Used
+func (md *metricsDu) runDiskUsage(stats *Stats) error {
 	used, err := fs.DiskUsage(md.path)
 	if err != nil {
 		return err
 	}
-	metrics.Used = used
+	stats.Used = used
 	return nil
 }
 
-// runFind executes the "find" command and writes the results to metrics.InodesUsed
-func (md *metricsDu) runFind(metrics *Metrics) error {
+// runFind executes the "find" command and writes the results to stats.InodesUsed
+func (md *metricsDu) runFind(stats *Stats) error {
 	inodesUsed, err := fs.Find(md.path)
 	if err != nil {
 		return err
 	}
-	metrics.InodesUsed = resource.NewQuantity(inodesUsed, resource.BinarySI)
+	stats.InodesUsed = resource.NewQuantity(inodesUsed, resource.BinarySI)
 	return nil
 }
 
-// getFsInfo writes metrics.Capacity and metrics.Available from the filesystem
+// getFsInfo writes stats.Capacity and stats.Available from the filesystem
 // info
-func (md *metricsDu) getFsInfo(metrics *Metrics) error {
+func (md *metricsDu) getFsInfo(stats *Stats) error {
 	available, capacity, _, inodes, inodesFree, _, err := fs.Info(md.path)
 	if err != nil {
 		return NewFsInfoFailedError(err)
 	}
-	metrics.Available = resource.NewQuantity(available, resource.BinarySI)
-	metrics.Capacity = resource.NewQuantity(capacity, resource.BinarySI)
-	metrics.Inodes = resource.NewQuantity(inodes, resource.BinarySI)
-	metrics.InodesFree = resource.NewQuantity(inodesFree, resource.BinarySI)
+	stats.Available = resource.NewQuantity(available, resource.BinarySI)
+	stats.Capacity = resource.NewQuantity(capacity, resource.BinarySI)
+	stats.Inodes = resource.NewQuantity(inodes, resource.BinarySI)
+	stats.InodesFree = resource.NewQuantity(inodesFree, resource.BinarySI)
 	return nil
 }

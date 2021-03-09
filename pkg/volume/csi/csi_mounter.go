@@ -77,7 +77,7 @@ type csiMountMgr struct {
 	podUID              types.UID
 	publishContext      map[string]string
 	kubeVolHost         volume.KubeletVolumeHost
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 // volume.Volume methods

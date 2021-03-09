@@ -60,7 +60,7 @@ func NewFsInfoFailedError(err error) *MetricsError {
 	}
 }
 
-// MetricsError to distinguish different Metrics Errors.
+// MetricsError to distinguish different Stats Errors.
 type MetricsError struct {
 	Code int
 	Msg  string

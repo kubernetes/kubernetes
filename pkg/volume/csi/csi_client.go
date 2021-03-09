@@ -30,7 +30,9 @@ import (
 	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -75,7 +77,7 @@ type csiClient interface {
 		ctx context.Context,
 		volID string,
 		targetPath string,
-	) (*volume.Metrics, error)
+	) (*volume.Stats, error)
 	NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error
 	NodeSupportsStageUnstage(ctx context.Context) (bool, error)
 	NodeSupportsNodeExpand(ctx context.Context) (bool, error)
@@ -585,7 +587,7 @@ func (c *csiDriverClient) NodeSupportsVolumeStats(ctx context.Context) (bool, er
 	return false, nil
 }
 
-func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, targetPath string) (*volume.Metrics, error) {
+func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, targetPath string) (*volume.Stats, error) {
 	klog.V(4).Info(log("calling NodeGetVolumeStats rpc: [volid=%s, target_path=%s", volID, targetPath))
 	if volID == "" {
 		return nil, errors.New("missing volume id")
@@ -612,11 +614,12 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 	if err != nil {
 		return nil, err
 	}
+
 	usages := resp.GetUsage()
 	if usages == nil {
 		return nil, fmt.Errorf("failed to get usage from response. usage is nil")
 	}
-	metrics := &volume.Metrics{
+	stats := &volume.Stats{
 		Used:       resource.NewQuantity(int64(0), resource.BinarySI),
 		Capacity:   resource.NewQuantity(int64(0), resource.BinarySI),
 		Available:  resource.NewQuantity(int64(0), resource.BinarySI),
@@ -624,6 +627,19 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 		Inodes:     resource.NewQuantity(int64(0), resource.BinarySI),
 		InodesFree: resource.NewQuantity(int64(0), resource.BinarySI),
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
+		isSupportNodeVolumeCondition, err := supportNodeGetVolumeCondition(ctx, nodeClient)
+		if err != nil {
+			return nil, err
+		}
+
+		if isSupportNodeVolumeCondition {
+			abnormal, message := resp.VolumeCondition.GetAbnormal(), resp.VolumeCondition.GetMessage()
+			stats.Abnormal, stats.Message = &abnormal, &message
+		}
+	}
+
 	for _, usage := range usages {
 		if usage == nil {
 			continue
@@ -631,19 +647,44 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 		unit := usage.GetUnit()
 		switch unit {
 		case csipbv1.VolumeUsage_BYTES:
-			metrics.Available = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
-			metrics.Capacity = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
-			metrics.Used = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
+			stats.Available = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
+			stats.Capacity = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
+			stats.Used = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
 		case csipbv1.VolumeUsage_INODES:
-			metrics.InodesFree = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
-			metrics.Inodes = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
-			metrics.InodesUsed = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
+			stats.InodesFree = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
+			stats.Inodes = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
+			stats.InodesUsed = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
 		default:
 			klog.Errorf("unknown key %s in usage", unit.String())
 		}
 
 	}
-	return metrics, nil
+
+	return stats, nil
+}
+
+func supportNodeGetVolumeCondition(ctx context.Context, nodeClient csipbv1.NodeClient) (supportNodeGetVolumeCondition bool, err error) {
+	req := csipbv1.NodeGetCapabilitiesRequest{}
+	rsp, err := nodeClient.NodeGetCapabilities(ctx, &req)
+	if err != nil {
+		return false, err
+	}
+
+	for _, cap := range rsp.GetCapabilities() {
+		if cap == nil {
+			continue
+		}
+		rpc := cap.GetRpc()
+		if rpc == nil {
+			continue
+		}
+		t := rpc.GetType()
+		if t == csipbv1.NodeServiceCapability_RPC_VOLUME_CONDITION {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func isFinalError(err error) bool {

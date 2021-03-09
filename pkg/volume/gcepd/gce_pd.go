@@ -194,14 +194,14 @@ func (plugin *gcePersistentDiskPlugin) newMounterInternal(spec *volume.Spec, pod
 
 	return &gcePersistentDiskMounter{
 		gcePersistentDisk: &gcePersistentDisk{
-			podUID:          podUID,
-			volName:         spec.Name(),
-			pdName:          pdName,
-			partition:       partition,
-			mounter:         mounter,
-			manager:         manager,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
+			podUID:        podUID,
+			volName:       spec.Name(),
+			pdName:        pdName,
+			partition:     partition,
+			mounter:       mounter,
+			manager:       manager,
+			plugin:        plugin,
+			StatsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
 		mountOptions: util.MountOptionFromSpec(spec),
 		readOnly:     readOnly}, nil
@@ -214,12 +214,12 @@ func (plugin *gcePersistentDiskPlugin) NewUnmounter(volName string, podUID types
 
 func (plugin *gcePersistentDiskPlugin) newUnmounterInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Unmounter, error) {
 	return &gcePersistentDiskUnmounter{&gcePersistentDisk{
-		podUID:          podUID,
-		volName:         volName,
-		manager:         manager,
-		mounter:         mounter,
-		plugin:          plugin,
-		MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
+		podUID:        podUID,
+		volName:       volName,
+		manager:       manager,
+		mounter:       mounter,
+		plugin:        plugin,
+		StatsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 	}}, nil
 }
 
@@ -339,7 +339,7 @@ type gcePersistentDisk struct {
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
 	plugin  *gcePersistentDiskPlugin
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 type gcePersistentDiskMounter struct {

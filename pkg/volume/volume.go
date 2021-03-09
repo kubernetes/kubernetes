@@ -32,9 +32,9 @@ type Volume interface {
 	// pod.
 	GetPath() string
 
-	// MetricsProvider embeds methods for exposing metrics (e.g.
+	// StatsProvider embeds methods for exposing metrics (e.g.
 	// used, available space).
-	MetricsProvider
+	StatsProvider
 }
 
 // BlockVolume interface provides methods to generate global map path
@@ -50,16 +50,16 @@ type BlockVolume interface {
 	GetPodDeviceMapPath() (string, string)
 }
 
-// MetricsProvider exposes metrics (e.g. used,available space) related to a
+// StatsProvider exposes metrics (e.g. used,available space) and condition related to a
 // Volume.
-type MetricsProvider interface {
-	// GetMetrics returns the Metrics for the Volume. Maybe expensive for
+type StatsProvider interface {
+	// GetStats returns the stats for the Volume. Maybe expensive for
 	// some implementations.
-	GetMetrics() (*Metrics, error)
+	GetStats() (*Stats, error)
 }
 
-// Metrics represents the used and available bytes of the Volume.
-type Metrics struct {
+// Stats represents the used/available bytes and condition of the Volume.
+type Stats struct {
 	// The time at which these stats were updated.
 	Time metav1.Time
 
@@ -92,6 +92,17 @@ type Metrics struct {
 	// a filesystem with the host (e.g. emptydir, hostpath), this is the free inodes
 	// on the underlying storage, and is shared with host processes and other volumes
 	InodesFree *resource.Quantity
+
+	// Normal volumes are available for use and operating optimally.
+	// An abnormal volume does not meet these criteria.
+	// This field is OPTIONAL. Only some csi drivers which support NodeServiceCapability_RPC_VOLUME_CONDITION
+	// need to fill it.
+	Abnormal *bool
+
+	// The message describing the condition of the volume.
+	// This field is OPTIONAL. Only some csi drivers which support capability_RPC_VOLUME_CONDITION
+	// need to fill it.
+	Message *string
 }
 
 // Attributes represents the attributes of this mounter.

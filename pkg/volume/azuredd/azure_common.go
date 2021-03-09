@@ -45,7 +45,7 @@ const (
 )
 
 type dataDisk struct {
-	volume.MetricsProvider
+	volume.StatsProvider
 	volumeName string
 	diskName   string
 	podUID     types.UID
@@ -88,17 +88,17 @@ func makeGlobalPDPath(host volume.VolumeHost, diskURI string, isManaged bool) (s
 }
 
 func makeDataDisk(volumeName string, podUID types.UID, diskName string, host volume.VolumeHost, plugin *azureDataDiskPlugin) *dataDisk {
-	var metricProvider volume.MetricsProvider
+	var StatsProvider volume.StatsProvider
 	if podUID != "" {
-		metricProvider = volume.NewMetricsStatFS(getPath(podUID, volumeName, host))
+		StatsProvider = volume.NewMetricsStatFS(getPath(podUID, volumeName, host))
 	}
 
 	return &dataDisk{
-		MetricsProvider: metricProvider,
-		volumeName:      volumeName,
-		diskName:        diskName,
-		podUID:          podUID,
-		plugin:          plugin,
+		StatsProvider: StatsProvider,
+		volumeName:    volumeName,
+		diskName:      diskName,
+		podUID:        podUID,
+		plugin:        plugin,
 	}
 }
 

@@ -27,19 +27,19 @@ import (
 
 func TestGetMetricsStatFS(t *testing.T) {
 	metrics := NewMetricsStatFS("")
-	actual, err := metrics.GetMetrics()
-	expected := &Metrics{}
+	actual, err := metrics.GetStats()
+	expected := &Stats{}
 	if !volumetest.MetricsEqualIgnoreTimestamp(actual, expected) {
-		t.Errorf("Expected empty Metrics from uninitialized MetricsStatFS, actual %v", *actual)
+		t.Errorf("Expected empty Stats from uninitialized MetricsStatFS, actual %v", *actual)
 	}
 	if err == nil {
 		t.Errorf("Expected error when calling GetMetrics on uninitialized MetricsStatFS, actual nil")
 	}
 
 	metrics = NewMetricsStatFS("/not/a/real/directory")
-	actual, err = metrics.GetMetrics()
+	actual, err = metrics.GetStats()
 	if !volumetest.MetricsEqualIgnoreTimestamp(actual, expected) {
-		t.Errorf("Expected empty Metrics from incorrectly initialized MetricsStatFS, actual %v", *actual)
+		t.Errorf("Expected empty Stats from incorrectly initialized MetricsStatFS, actual %v", *actual)
 	}
 	if err == nil {
 		t.Errorf("Expected error when calling GetMetrics on incorrectly initialized MetricsStatFS, actual nil")
@@ -52,7 +52,7 @@ func TestGetMetricsStatFS(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	metrics = NewMetricsStatFS(tmpDir)
-	actual, err = metrics.GetMetrics()
+	actual, err = metrics.GetStats()
 	if err != nil {
 		t.Errorf("Unexpected error when calling GetMetrics %v", err)
 	}

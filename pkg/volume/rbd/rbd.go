@@ -764,8 +764,8 @@ type rbd struct {
 	mounter  *mount.SafeFormatAndMount
 	exec     utilexec.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
-	manager                diskManager
-	volume.MetricsProvider `json:"-"`
+	manager              diskManager
+	volume.StatsProvider `json:"-"`
 }
 
 var _ volume.Volume = &rbd{}
@@ -778,16 +778,16 @@ func (rbd *rbd) GetPath() string {
 // newRBD creates a new rbd.
 func newRBD(podUID types.UID, volName string, image string, pool string, readOnly bool, plugin *rbdPlugin, manager diskManager) *rbd {
 	return &rbd{
-		podUID:          podUID,
-		volName:         volName,
-		Image:           image,
-		Pool:            pool,
-		ReadOnly:        readOnly,
-		plugin:          plugin,
-		mounter:         volutil.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
-		exec:            plugin.host.GetExec(plugin.GetPluginName()),
-		manager:         manager,
-		MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
+		podUID:        podUID,
+		volName:       volName,
+		Image:         image,
+		Pool:          pool,
+		ReadOnly:      readOnly,
+		plugin:        plugin,
+		mounter:       volutil.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		exec:          plugin.host.GetExec(plugin.GetPluginName()),
+		manager:       manager,
+		StatsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 	}
 }
 

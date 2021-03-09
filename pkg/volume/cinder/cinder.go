@@ -172,13 +172,13 @@ func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 
 	return &cinderVolumeMounter{
 		cinderVolume: &cinderVolume{
-			podUID:          podUID,
-			volName:         spec.Name(),
-			pdName:          pdName,
-			mounter:         mounter,
-			manager:         manager,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
+			podUID:        podUID,
+			volName:       spec.Name(),
+			pdName:        pdName,
+			mounter:       mounter,
+			manager:       manager,
+			plugin:        plugin,
+			StatsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
 		fsType:             fsType,
 		readOnly:           readOnly,
@@ -194,12 +194,12 @@ func (plugin *cinderPlugin) NewUnmounter(volName string, podUID types.UID) (volu
 func (plugin *cinderPlugin) newUnmounterInternal(volName string, podUID types.UID, manager cdManager, mounter mount.Interface) (volume.Unmounter, error) {
 	return &cinderVolumeUnmounter{
 		&cinderVolume{
-			podUID:          podUID,
-			volName:         volName,
-			manager:         manager,
-			mounter:         mounter,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
+			podUID:        podUID,
+			volName:       volName,
+			manager:       manager,
+			mounter:       mounter,
+			plugin:        plugin,
+			StatsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 		}}, nil
 }
 
@@ -365,7 +365,7 @@ type cinderVolume struct {
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
 	plugin  *cinderPlugin
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 func (b *cinderVolumeMounter) GetAttributes() volume.Attributes {

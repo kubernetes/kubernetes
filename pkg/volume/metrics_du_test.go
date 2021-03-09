@@ -55,7 +55,7 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 		t.Errorf("Unexpected error finding expected empty directory usage on tmpfs: %v", err)
 	}
 
-	actual, err := metrics.GetMetrics()
+	actual, err := metrics.GetStats()
 	if err != nil {
 		t.Errorf("Unexpected error when calling GetMetrics %v", err)
 	}
@@ -74,7 +74,7 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 
 	// Write a file and expect Used to increase
 	ioutil.WriteFile(filepath.Join(tmpDir, "f1"), []byte("Hello World"), os.ModeTemporary)
-	actual, err = metrics.GetMetrics()
+	actual, err = metrics.GetStats()
 	if err != nil {
 		t.Errorf("Unexpected error when calling GetMetrics %v", err)
 	}
@@ -87,10 +87,10 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 // returns an error
 func TestMetricsDuRequirePath(t *testing.T) {
 	metrics := NewMetricsDu("")
-	actual, err := metrics.GetMetrics()
-	expected := &Metrics{}
+	actual, err := metrics.GetStats()
+	expected := &Stats{}
 	if !volumetest.MetricsEqualIgnoreTimestamp(actual, expected) {
-		t.Errorf("Expected empty Metrics from uninitialized MetricsDu, actual %v", *actual)
+		t.Errorf("Expected empty Stats from uninitialized MetricsDu, actual %v", *actual)
 	}
 	if err == nil {
 		t.Errorf("Expected error when calling GetMetrics on uninitialized MetricsDu, actual nil")
@@ -101,10 +101,10 @@ func TestMetricsDuRequirePath(t *testing.T) {
 // returns an error
 func TestMetricsDuRequireRealDirectory(t *testing.T) {
 	metrics := NewMetricsDu("/not/a/real/directory")
-	actual, err := metrics.GetMetrics()
-	expected := &Metrics{}
+	actual, err := metrics.GetStats()
+	expected := &Stats{}
 	if !volumetest.MetricsEqualIgnoreTimestamp(actual, expected) {
-		t.Errorf("Expected empty Metrics from incorrectly initialized MetricsDu, actual %v", *actual)
+		t.Errorf("Expected empty Stats from incorrectly initialized MetricsDu, actual %v", *actual)
 	}
 	if err == nil {
 		t.Errorf("Expected error when calling GetMetrics on incorrectly initialized MetricsDu, actual nil")

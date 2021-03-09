@@ -138,7 +138,7 @@ type secretVolume struct {
 	podUID  types.UID
 	plugin  *secretPlugin
 	mounter mount.Interface
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 var _ volume.Volume = &secretVolume{}

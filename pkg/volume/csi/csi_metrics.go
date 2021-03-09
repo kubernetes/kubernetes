@@ -22,14 +22,15 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
-var _ volume.MetricsProvider = &metricsCsi{}
+var _ volume.StatsProvider = &metricsCsi{}
 
-// metricsCsi represents a MetricsProvider that calculates the used,free and
+// metricsCsi represents a StatsProvider that calculates the used,free and
 // capacity information for volume using volume path.
 
 type metricsCsi struct {
@@ -44,13 +45,13 @@ type metricsCsi struct {
 }
 
 // NewMetricsCsi creates a new metricsCsi with the Volume ID and path.
-func NewMetricsCsi(volumeID string, targetPath string, driverName csiDriverName) volume.MetricsProvider {
+func NewMetricsCsi(volumeID string, targetPath string, driverName csiDriverName) volume.StatsProvider {
 	mc := &metricsCsi{volumeID: volumeID, targetPath: targetPath}
 	mc.csiClientGetter.driverName = driverName
 	return mc
 }
 
-func (mc *metricsCsi) GetMetrics() (*volume.Metrics, error) {
+func (mc *metricsCsi) GetStats() (*volume.Stats, error) {
 	currentTime := metav1.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
@@ -71,16 +72,16 @@ func (mc *metricsCsi) GetMetrics() (*volume.Metrics, error) {
 			string(mc.csiClientGetter.driverName))
 	}
 	// Get Volumestatus
-	metrics, err := csiClient.NodeGetVolumeStats(ctx, mc.volumeID, mc.targetPath)
+	stats, err := csiClient.NodeGetVolumeStats(ctx, mc.volumeID, mc.targetPath)
 	if err != nil {
 		return nil, err
 	}
-	if metrics == nil {
+	if stats == nil {
 		return nil, fmt.Errorf("csi.NodeGetVolumeStats returned nil metrics for volume %s", mc.volumeID)
 	}
 	//set recorded time
-	metrics.Time = currentTime
-	return metrics, nil
+	stats.Time = currentTime
+	return stats, nil
 }
 
 // MetricsManager defines the metrics mananger for CSI operation

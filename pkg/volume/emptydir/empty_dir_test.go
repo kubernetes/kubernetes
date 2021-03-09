@@ -332,8 +332,8 @@ func TestPluginBackCompat(t *testing.T) {
 	}
 }
 
-// TestMetrics tests that MetricProvider methods return sane values.
-func TestMetrics(t *testing.T) {
+// TestStats tests that StatsProvider methods return sane values.
+func TestStats(t *testing.T) {
 	// Create an empty temp directory for the volume
 	tmpDir, err := utiltesting.MkTmpdir("empty_dir_test")
 	if err != nil {
@@ -364,17 +364,17 @@ func TestMetrics(t *testing.T) {
 	}
 
 	// TODO(pwittroc): Move this into a reusable testing utility
-	metrics, err := mounter.GetMetrics()
+	stats, err := mounter.GetStats()
 	if err != nil {
 		t.Errorf("Unexpected error when calling GetMetrics %v", err)
 	}
-	if e, a := expectedEmptyDirUsage.Value(), metrics.Used.Value(); e != a {
+	if e, a := expectedEmptyDirUsage.Value(), stats.Used.Value(); e != a {
 		t.Errorf("Unexpected value for empty directory; expected %v, got %v", e, a)
 	}
-	if metrics.Capacity.Value() <= 0 {
+	if stats.Capacity.Value() <= 0 {
 		t.Errorf("Expected Capacity to be greater than 0")
 	}
-	if metrics.Available.Value() <= 0 {
+	if stats.Available.Value() <= 0 {
 		t.Errorf("Expected Available to be greater than 0")
 	}
 }

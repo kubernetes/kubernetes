@@ -128,14 +128,14 @@ func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ vo
 
 	return &localVolumeMounter{
 		localVolume: &localVolume{
-			pod:             pod,
-			podUID:          pod.UID,
-			volName:         spec.Name(),
-			mounter:         plugin.host.GetMounter(plugin.GetPluginName()),
-			hostUtil:        kvh.GetHostUtil(),
-			plugin:          plugin,
-			globalPath:      globalLocalPath,
-			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(pod.UID, utilstrings.EscapeQualifiedName(localVolumePluginName), spec.Name())),
+			pod:           pod,
+			podUID:        pod.UID,
+			volName:       spec.Name(),
+			mounter:       plugin.host.GetMounter(plugin.GetPluginName()),
+			hostUtil:      kvh.GetHostUtil(),
+			plugin:        plugin,
+			globalPath:    globalLocalPath,
+			StatsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(pod.UID, utilstrings.EscapeQualifiedName(localVolumePluginName), spec.Name())),
 		},
 		mountOptions: util.MountOptionFromSpec(spec),
 		readOnly:     readOnly,
@@ -437,7 +437,7 @@ type localVolume struct {
 	mounter  mount.Interface
 	hostUtil hostutil.HostUtils
 	plugin   *localVolumePlugin
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 func (l *localVolume) GetPath() string {

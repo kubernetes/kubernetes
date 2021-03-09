@@ -22,9 +22,9 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
-var _ MetricsProvider = &metricsStatFS{}
+var _ StatsProvider = &metricsStatFS{}
 
-// metricsStatFS represents a MetricsProvider that calculates the used and available
+// metricsStatFS represents a StatsProvider that calculates the used and available
 // Volume space by stat'ing and gathering filesystem info for the Volume path.
 type metricsStatFS struct {
 	// the directory path the volume is mounted to.
@@ -32,15 +32,15 @@ type metricsStatFS struct {
 }
 
 // NewMetricsStatfs creates a new metricsStatFS with the Volume path.
-func NewMetricsStatFS(path string) MetricsProvider {
+func NewMetricsStatFS(path string) StatsProvider {
 	return &metricsStatFS{path}
 }
 
-// See MetricsProvider.GetMetrics
+// See StatsProvider.GetMetrics
 // GetMetrics calculates the volume usage and device free space by executing "du"
 // and gathering filesystem info for the Volume path.
-func (md *metricsStatFS) GetMetrics() (*Metrics, error) {
-	metrics := &Metrics{Time: metav1.Now()}
+func (md *metricsStatFS) GetStats() (*Stats, error) {
+	metrics := &Stats{Time: metav1.Now()}
 	if md.path == "" {
 		return metrics, NewNoPathDefinedError()
 	}
@@ -54,7 +54,7 @@ func (md *metricsStatFS) GetMetrics() (*Metrics, error) {
 }
 
 // getFsInfo writes metrics.Capacity, metrics.Used and metrics.Available from the filesystem info
-func (md *metricsStatFS) getFsInfo(metrics *Metrics) error {
+func (md *metricsStatFS) getFsInfo(metrics *Stats) error {
 	available, capacity, usage, inodes, inodesFree, inodesUsed, err := fs.Info(md.path)
 	if err != nil {
 		return NewFsInfoFailedError(err)

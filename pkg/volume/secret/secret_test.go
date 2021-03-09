@@ -26,7 +26,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
@@ -352,13 +352,13 @@ func TestPlugin(t *testing.T) {
 	doTestSecretDataInVolume(volumePath, secret, t)
 	defer doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
 
-	// Metrics only supported on linux
-	metrics, err := mounter.GetMetrics()
+	// Stats only supported on linux
+	stats, err := mounter.GetStats()
 	if runtime.GOOS == "linux" {
-		assert.NotEmpty(t, metrics)
+		assert.NotEmpty(t, stats)
 		assert.NoError(t, err)
 	} else {
-		t.Skipf("Volume metrics not supported on %s", runtime.GOOS)
+		t.Skipf("Volume stats not supported on %s", runtime.GOOS)
 	}
 }
 
@@ -628,13 +628,13 @@ func TestPluginOptionalKeys(t *testing.T) {
 	doTestSecretDataInVolume(volumePath, secret, t)
 	defer doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
 
-	// Metrics only supported on linux
-	metrics, err := mounter.GetMetrics()
+	// Stats only supported on linux
+	stats, err := mounter.GetStats()
 	if runtime.GOOS == "linux" {
-		assert.NotEmpty(t, metrics)
+		assert.NotEmpty(t, stats)
 		assert.NoError(t, err)
 	} else {
-		t.Skipf("Volume metrics not supported on %s", runtime.GOOS)
+		t.Skipf("Volume stats not supported on %s", runtime.GOOS)
 	}
 }
 

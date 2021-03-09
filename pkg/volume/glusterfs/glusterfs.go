@@ -197,11 +197,11 @@ func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *v1.Endp
 	}
 	return &glusterfsMounter{
 		glusterfs: &glusterfs{
-			volName:         spec.Name(),
-			mounter:         mounter,
-			pod:             pod,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(pod.UID, utilstrings.EscapeQualifiedName(glusterfsPluginName), spec.Name())),
+			volName:       spec.Name(),
+			mounter:       mounter,
+			pod:           pod,
+			plugin:        plugin,
+			StatsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(pod.UID, utilstrings.EscapeQualifiedName(glusterfsPluginName), spec.Name())),
 		},
 		hosts:        ep,
 		path:         volPath,
@@ -216,11 +216,11 @@ func (plugin *glusterfsPlugin) NewUnmounter(volName string, podUID types.UID) (v
 
 func (plugin *glusterfsPlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Unmounter, error) {
 	return &glusterfsUnmounter{&glusterfs{
-		volName:         volName,
-		mounter:         mounter,
-		pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}},
-		plugin:          plugin,
-		MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedName(glusterfsPluginName), volName)),
+		volName:       volName,
+		mounter:       mounter,
+		pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}},
+		plugin:        plugin,
+		StatsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedName(glusterfsPluginName), volName)),
 	}}, nil
 }
 
@@ -237,7 +237,7 @@ type glusterfs struct {
 	pod     *v1.Pod
 	mounter mount.Interface
 	plugin  *glusterfsPlugin
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 type glusterfsMounter struct {

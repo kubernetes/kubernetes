@@ -99,13 +99,13 @@ func (plugin *vsphereVolumePlugin) newBlockVolumeMapperInternal(spec *volume.Spe
 	volPath := volumeSource.VolumePath
 	return &vsphereBlockVolumeMapper{
 		vsphereVolume: &vsphereVolume{
-			volName:         spec.Name(),
-			podUID:          podUID,
-			volPath:         volPath,
-			manager:         manager,
-			mounter:         mounter,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
+			volName:       spec.Name(),
+			podUID:        podUID,
+			volPath:       volPath,
+			manager:       manager,
+			mounter:       mounter,
+			plugin:        plugin,
+			StatsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
 	}, nil
 

@@ -122,19 +122,19 @@ func (plugin *storageosPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 
 	return &storageosMounter{
 		storageos: &storageos{
-			podUID:          pod.UID,
-			podNamespace:    pod.GetNamespace(),
-			pvName:          spec.Name(),
-			volName:         volName,
-			volNamespace:    volNamespace,
-			fsType:          fsType,
-			readOnly:        readOnly,
-			apiCfg:          apiCfg,
-			manager:         manager,
-			mounter:         mounter,
-			exec:            exec,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(getPath(pod.UID, volNamespace, volName, spec.Name(), plugin.host)),
+			podUID:        pod.UID,
+			podNamespace:  pod.GetNamespace(),
+			pvName:        spec.Name(),
+			volName:       volName,
+			volNamespace:  volNamespace,
+			fsType:        fsType,
+			readOnly:      readOnly,
+			apiCfg:        apiCfg,
+			manager:       manager,
+			mounter:       mounter,
+			exec:          exec,
+			plugin:        plugin,
+			StatsProvider: volume.NewMetricsStatFS(getPath(pod.UID, volNamespace, volName, spec.Name(), plugin.host)),
 		},
 		diskMounter:  &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
 		mountOptions: util.MountOptionFromSpec(spec),
@@ -155,15 +155,15 @@ func (plugin *storageosPlugin) newUnmounterInternal(pvName string, podUID types.
 
 	return &storageosUnmounter{
 		storageos: &storageos{
-			podUID:          podUID,
-			pvName:          pvName,
-			volName:         volName,
-			volNamespace:    volNamespace,
-			manager:         manager,
-			mounter:         mounter,
-			exec:            exec,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volNamespace, volName, pvName, plugin.host)),
+			podUID:        podUID,
+			pvName:        pvName,
+			volName:       volName,
+			volNamespace:  volNamespace,
+			manager:       manager,
+			mounter:       mounter,
+			exec:          exec,
+			plugin:        plugin,
+			StatsProvider: volume.NewMetricsStatFS(getPath(podUID, volNamespace, volName, pvName, plugin.host)),
 		},
 	}, nil
 }
@@ -310,7 +310,7 @@ type storageos struct {
 	mounter      mount.Interface
 	exec         utilexec.Interface
 	plugin       *storageosPlugin
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 type storageosMounter struct {

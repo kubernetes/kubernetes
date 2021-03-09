@@ -158,14 +158,14 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 		}
 	}
 	return &emptyDir{
-		pod:             pod,
-		volName:         spec.Name(),
-		medium:          medium,
-		sizeLimit:       sizeLimit,
-		mounter:         mounter,
-		mountDetector:   mountDetector,
-		plugin:          plugin,
-		MetricsProvider: volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host)),
+		pod:           pod,
+		volName:       spec.Name(),
+		medium:        medium,
+		sizeLimit:     sizeLimit,
+		mounter:       mounter,
+		mountDetector: mountDetector,
+		plugin:        plugin,
+		StatsProvider: volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host)),
 	}, nil
 }
 
@@ -176,13 +176,13 @@ func (plugin *emptyDirPlugin) NewUnmounter(volName string, podUID types.UID) (vo
 
 func (plugin *emptyDirPlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Unmounter, error) {
 	ed := &emptyDir{
-		pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}},
-		volName:         volName,
-		medium:          v1.StorageMediumDefault, // might be changed later
-		mounter:         mounter,
-		mountDetector:   mountDetector,
-		plugin:          plugin,
-		MetricsProvider: volume.NewMetricsDu(getPath(podUID, volName, plugin.host)),
+		pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}},
+		volName:       volName,
+		medium:        v1.StorageMediumDefault, // might be changed later
+		mounter:       mounter,
+		mountDetector: mountDetector,
+		plugin:        plugin,
+		StatsProvider: volume.NewMetricsDu(getPath(podUID, volName, plugin.host)),
 	}
 	return ed, nil
 }
@@ -217,7 +217,7 @@ type emptyDir struct {
 	mounter       mount.Interface
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 func (ed *emptyDir) GetAttributes() volume.Attributes {

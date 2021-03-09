@@ -30,7 +30,7 @@ import (
 )
 
 type fakeHostStatsProvider struct {
-	fakeStats   map[string]*volume.Metrics
+	fakeStats   map[string]*volume.Stats
 	osInterface kubecontainer.OSInterface
 }
 
@@ -42,7 +42,7 @@ func NewFakeHostStatsProvider() HostStatsProvider {
 }
 
 // NewFakeHostStatsProviderWithData provides a way to test with fake host statistics
-func NewFakeHostStatsProviderWithData(fakeStats map[string]*volume.Metrics, osInterface kubecontainer.OSInterface) HostStatsProvider {
+func NewFakeHostStatsProviderWithData(fakeStats map[string]*volume.Stats, osInterface kubecontainer.OSInterface) HostStatsProvider {
 	return &fakeHostStatsProvider{
 		fakeStats:   fakeStats,
 		osInterface: osInterface,
@@ -55,7 +55,7 @@ func (f *fakeHostStatsProvider) getPodLogStats(podNamespace, podName string, pod
 	if err != nil {
 		return nil, err
 	}
-	var results []volume.MetricsProvider
+	var results []volume.StatsProvider
 	for _, file := range files {
 		if file.IsDir() {
 			continue
@@ -64,23 +64,23 @@ func (f *fakeHostStatsProvider) getPodLogStats(podNamespace, podName string, pod
 		fpath := filepath.Join(path, file.Name())
 		results = append(results, NewFakeMetricsDu(fpath, f.fakeStats[fpath]))
 	}
-	return fakeMetricsProvidersToStats(results, rootFsInfo)
+	return fakeStatsProvidersToStats(results, rootFsInfo)
 }
 
 func (f *fakeHostStatsProvider) getPodContainerLogStats(podNamespace, podName string, podUID types.UID, containerName string, rootFsInfo *cadvisorapiv2.FsInfo) (*statsapi.FsStats, error) {
 	path := kuberuntime.BuildContainerLogsDirectory(podNamespace, podName, podUID, containerName)
-	metricsProvider := NewFakeMetricsDu(path, f.fakeStats[path])
-	return fakeMetricsProvidersToStats([]volume.MetricsProvider{metricsProvider}, rootFsInfo)
+	StatsProvider := NewFakeMetricsDu(path, f.fakeStats[path])
+	return fakeStatsProvidersToStats([]volume.StatsProvider{StatsProvider}, rootFsInfo)
 }
 
 func (f *fakeHostStatsProvider) getPodEtcHostsStats(podUID types.UID, rootFsInfo *cadvisorapiv2.FsInfo) (*statsapi.FsStats, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func fakeMetricsProvidersToStats(metricsProviders []volume.MetricsProvider, rootFsInfo *cadvisorapiv2.FsInfo) (*statsapi.FsStats, error) {
+func fakeStatsProvidersToStats(statsProviders []volume.StatsProvider, rootFsInfo *cadvisorapiv2.FsInfo) (*statsapi.FsStats, error) {
 	result := rootFsInfoToFsStats(rootFsInfo)
-	for i, metricsProvider := range metricsProviders {
-		hostMetrics, err := metricsProvider.GetMetrics()
+	for i, StatsProvider := range statsProviders {
+		hostMetrics, err := StatsProvider.GetStats()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get stats for item %d: %v", i, err)
 		}
@@ -93,16 +93,16 @@ func fakeMetricsProvidersToStats(metricsProviders []volume.MetricsProvider, root
 	return result, nil
 }
 
-type fakeMetricsDu struct {
-	fakeStats *volume.Metrics
+type fakeStatsDu struct {
+	fakeStats *volume.Stats
 }
 
-// NewFakeMetricsDu inserts fake statistics when asked for metrics
-func NewFakeMetricsDu(path string, stats *volume.Metrics) volume.MetricsProvider {
-	return &fakeMetricsDu{fakeStats: stats}
+// NewFakeMetricsDu inserts fake statistics when asked for stats
+func NewFakeMetricsDu(path string, stats *volume.Stats) volume.StatsProvider {
+	return &fakeStatsDu{fakeStats: stats}
 }
 
-func (f *fakeMetricsDu) GetMetrics() (*volume.Metrics, error) {
+func (f *fakeStatsDu) GetStats() (*volume.Stats, error) {
 	if f.fakeStats == nil {
 		return nil, fmt.Errorf("no stats provided")
 	}

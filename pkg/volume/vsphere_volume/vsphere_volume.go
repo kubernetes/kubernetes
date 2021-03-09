@@ -123,13 +123,13 @@ func (plugin *vsphereVolumePlugin) newMounterInternal(spec *volume.Spec, podUID 
 
 	return &vsphereVolumeMounter{
 		vsphereVolume: &vsphereVolume{
-			podUID:          podUID,
-			volName:         spec.Name(),
-			volPath:         volPath,
-			manager:         manager,
-			mounter:         mounter,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
+			podUID:        podUID,
+			volName:       spec.Name(),
+			volPath:       volPath,
+			manager:       manager,
+			mounter:       mounter,
+			plugin:        plugin,
+			StatsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
 		fsType:       fsType,
 		diskMounter:  util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
@@ -140,12 +140,12 @@ func (plugin *vsphereVolumePlugin) newMounterInternal(spec *volume.Spec, podUID 
 func (plugin *vsphereVolumePlugin) newUnmounterInternal(volName string, podUID types.UID, manager vdManager, mounter mount.Interface) (volume.Unmounter, error) {
 	return &vsphereVolumeUnmounter{
 		&vsphereVolume{
-			podUID:          podUID,
-			volName:         volName,
-			manager:         manager,
-			mounter:         mounter,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
+			podUID:        podUID,
+			volName:       volName,
+			manager:       manager,
+			mounter:       mounter,
+			plugin:        plugin,
+			StatsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 		}}, nil
 }
 
@@ -193,7 +193,7 @@ type vsphereVolume struct {
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
 	plugin  *vsphereVolumePlugin
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 var _ volume.Mounter = &vsphereVolumeMounter{}

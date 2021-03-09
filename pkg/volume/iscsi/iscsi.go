@@ -122,7 +122,7 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 	if iscsiDisk != nil {
 
 		//Add volume metrics
-		iscsiDisk.MetricsProvider = volume.NewMetricsStatFS(iscsiDisk.GetPath())
+		iscsiDisk.StatsProvider = volume.NewMetricsStatFS(iscsiDisk.GetPath())
 	}
 	return &iscsiDiskMounter{
 		iscsiDisk:    iscsiDisk,
@@ -176,11 +176,11 @@ func (plugin *iscsiPlugin) NewUnmounter(volName string, podUID types.UID) (volum
 func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface, exec utilexec.Interface) (volume.Unmounter, error) {
 	return &iscsiDiskUnmounter{
 		iscsiDisk: &iscsiDisk{
-			podUID:          podUID,
-			VolName:         volName,
-			manager:         manager,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedName(iscsiPluginName), volName)),
+			podUID:        podUID,
+			VolName:       volName,
+			manager:       manager,
+			plugin:        plugin,
+			StatsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedName(iscsiPluginName), volName)),
 		},
 		mounter:    mounter,
 		exec:       exec,
@@ -288,7 +288,7 @@ type iscsiDisk struct {
 	plugin        *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 func (iscsi *iscsiDisk) GetPath() string {

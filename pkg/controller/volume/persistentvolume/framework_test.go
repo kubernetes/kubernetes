@@ -985,7 +985,7 @@ func (plugin *mockVolumePlugin) GetPath() string {
 	return ""
 }
 
-func (plugin *mockVolumePlugin) GetMetrics() (*vol.Metrics, error) {
+func (plugin *mockVolumePlugin) GetStats() (*vol.Stats, error) {
 	return nil, nil
 }
 

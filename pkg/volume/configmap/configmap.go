@@ -133,7 +133,7 @@ type configMapVolume struct {
 	podUID  types.UID
 	plugin  *configMapPlugin
 	mounter mount.Interface
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 var _ volume.Volume = &configMapVolume{}

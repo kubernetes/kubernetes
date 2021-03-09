@@ -32,8 +32,8 @@ import (
 // PodEtcHostsPathFunc is a function to fetch a etc hosts path by pod uid.
 type PodEtcHostsPathFunc func(podUID types.UID) string
 
-// metricsProviderByPath maps a path to its metrics provider
-type metricsProviderByPath map[string]volume.MetricsProvider
+// statsProviderByPath maps a path to its stats provider
+type statsProviderByPath map[string]volume.StatsProvider
 
 // HostStatsProvider defines an interface for providing host stats associated with pod.
 type HostStatsProvider interface {
@@ -61,60 +61,60 @@ func NewHostStatsProvider(osInterface kubecontainer.OSInterface, podEtcHostsPath
 }
 
 func (h hostStatsProvider) getPodLogStats(podNamespace, podName string, podUID types.UID, rootFsInfo *cadvisorapiv2.FsInfo) (*statsapi.FsStats, error) {
-	metricsByPath, err := h.podLogMetrics(podNamespace, podName, podUID)
+	statsByPath, err := h.podLogMetrics(podNamespace, podName, podUID)
 	if err != nil {
 		return nil, err
 	}
-	return metricsByPathToFsStats(metricsByPath, rootFsInfo)
+	return statsByPathToFsStats(statsByPath, rootFsInfo)
 }
 
 // getPodContainerLogStats gets stats for container
 func (h hostStatsProvider) getPodContainerLogStats(podNamespace, podName string, podUID types.UID, containerName string, rootFsInfo *cadvisorapiv2.FsInfo) (*statsapi.FsStats, error) {
-	metricsByPath, err := h.podContainerLogMetrics(podNamespace, podName, podUID, containerName)
+	statsByPath, err := h.podContainerLogMetrics(podNamespace, podName, podUID, containerName)
 	if err != nil {
 		return nil, err
 	}
-	return metricsByPathToFsStats(metricsByPath, rootFsInfo)
+	return statsByPathToFsStats(statsByPath, rootFsInfo)
 }
 
 // getPodEtcHostsStats gets status for pod etc hosts usage
 func (h hostStatsProvider) getPodEtcHostsStats(podUID types.UID, rootFsInfo *cadvisorapiv2.FsInfo) (*statsapi.FsStats, error) {
-	metrics := h.podEtcHostsMetrics(podUID)
-	hostMetrics, err := metrics.GetMetrics()
+	stats := h.podEtcHostsMetrics(podUID)
+	hostStats, err := stats.GetStats()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get stats %v", err)
 	}
 	result := rootFsInfoToFsStats(rootFsInfo)
-	usedBytes := uint64(hostMetrics.Used.Value())
-	inodesUsed := uint64(hostMetrics.InodesUsed.Value())
+	usedBytes := uint64(hostStats.Used.Value())
+	inodesUsed := uint64(hostStats.InodesUsed.Value())
 	result.UsedBytes = addUsage(result.UsedBytes, &usedBytes)
 	result.InodesUsed = addUsage(result.InodesUsed, &inodesUsed)
-	result.Time = maxUpdateTime(&result.Time, &hostMetrics.Time)
+	result.Time = maxUpdateTime(&result.Time, &hostStats.Time)
 	return result, nil
 }
 
-func (h hostStatsProvider) podLogMetrics(podNamespace, podName string, podUID types.UID) (metricsProviderByPath, error) {
+func (h hostStatsProvider) podLogMetrics(podNamespace, podName string, podUID types.UID) (statsProviderByPath, error) {
 	podLogsDirectoryPath := kuberuntime.BuildPodLogsDirectory(podNamespace, podName, podUID)
 	return h.fileMetricsByDir(podLogsDirectoryPath)
 }
 
-func (h hostStatsProvider) podContainerLogMetrics(podNamespace, podName string, podUID types.UID, containerName string) (metricsProviderByPath, error) {
+func (h hostStatsProvider) podContainerLogMetrics(podNamespace, podName string, podUID types.UID, containerName string) (statsProviderByPath, error) {
 	podContainerLogsDirectoryPath := kuberuntime.BuildContainerLogsDirectory(podNamespace, podName, podUID, containerName)
 	return h.fileMetricsByDir(podContainerLogsDirectoryPath)
 }
 
-func (h hostStatsProvider) podEtcHostsMetrics(podUID types.UID) volume.MetricsProvider {
+func (h hostStatsProvider) podEtcHostsMetrics(podUID types.UID) volume.StatsProvider {
 	podEtcHostsPath := h.podEtcHostsPathFunc(podUID)
 	return volume.NewMetricsDu(podEtcHostsPath)
 }
 
-// fileMetricsByDir returns metrics by path for each file under specified directory
-func (h hostStatsProvider) fileMetricsByDir(dirname string) (metricsProviderByPath, error) {
+// fileMetricsByDir returns stats by path for each file under specified directory
+func (h hostStatsProvider) fileMetricsByDir(dirname string) (statsProviderByPath, error) {
 	files, err := h.osInterface.ReadDir(dirname)
 	if err != nil {
 		return nil, err
 	}
-	results := metricsProviderByPath{}
+	results := statsProviderByPath{}
 	for _, f := range files {
 		if f.IsDir() {
 			continue
@@ -126,19 +126,19 @@ func (h hostStatsProvider) fileMetricsByDir(dirname string) (metricsProviderByPa
 	return results, nil
 }
 
-// metricsByPathToFsStats converts a metrics provider by path to fs stats
-func metricsByPathToFsStats(metricsByPath metricsProviderByPath, rootFsInfo *cadvisorapiv2.FsInfo) (*statsapi.FsStats, error) {
+// statsByPathToFsStats converts a stats provider by path to fs stats
+func statsByPathToFsStats(statsByPath statsProviderByPath, rootFsInfo *cadvisorapiv2.FsInfo) (*statsapi.FsStats, error) {
 	result := rootFsInfoToFsStats(rootFsInfo)
-	for fpath, metrics := range metricsByPath {
-		hostMetrics, err := metrics.GetMetrics()
+	for fpath, stats := range statsByPath {
+		hostStats, err := stats.GetStats()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get fsstats for %q: %v", fpath, err)
 		}
-		usedBytes := uint64(hostMetrics.Used.Value())
-		inodesUsed := uint64(hostMetrics.InodesUsed.Value())
+		usedBytes := uint64(hostStats.Used.Value())
+		inodesUsed := uint64(hostStats.InodesUsed.Value())
 		result.UsedBytes = addUsage(result.UsedBytes, &usedBytes)
 		result.InodesUsed = addUsage(result.InodesUsed, &inodesUsed)
-		result.Time = maxUpdateTime(&result.Time, &hostMetrics.Time)
+		result.Time = maxUpdateTime(&result.Time, &hostStats.Time)
 	}
 	return result, nil
 }

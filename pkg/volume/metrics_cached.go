@@ -21,32 +21,32 @@ import (
 	"sync/atomic"
 )
 
-var _ MetricsProvider = &cachedMetrics{}
+var _ StatsProvider = &cachedMetrics{}
 
-// cachedMetrics represents a MetricsProvider that wraps another provider and
+// cachedMetrics represents a StatsProvider that wraps another provider and
 // caches the result.
 type cachedMetrics struct {
-	wrapped       MetricsProvider
-	resultError   error
-	resultMetrics *Metrics
-	once          cacheOnce
+	wrapped     StatsProvider
+	resultError error
+	resultStats *Stats
+	once        cacheOnce
 }
 
 // NewCachedMetrics creates a new cachedMetrics wrapping another
-// MetricsProvider and caching the results.
-func NewCachedMetrics(provider MetricsProvider) MetricsProvider {
+// StatsProvider and caching the results.
+func NewCachedMetrics(provider StatsProvider) StatsProvider {
 	return &cachedMetrics{wrapped: provider}
 }
 
-// GetMetrics runs the wrapped metrics provider's GetMetrics methd once and
+// GetStats runs the wrapped stats provider's GetStats methd once and
 // caches the result. Will not cache result if there is an error.
-// See MetricsProvider.GetMetrics
-func (md *cachedMetrics) GetMetrics() (*Metrics, error) {
+// See StatsProvider.GetStats
+func (md *cachedMetrics) GetStats() (*Stats, error) {
 	md.once.cache(func() error {
-		md.resultMetrics, md.resultError = md.wrapped.GetMetrics()
+		md.resultStats, md.resultError = md.wrapped.GetStats()
 		return md.resultError
 	})
-	return md.resultMetrics, md.resultError
+	return md.resultStats, md.resultError
 }
 
 // Copied from sync.Once but we don't want to cache the results if there is an

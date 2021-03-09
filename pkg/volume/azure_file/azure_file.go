@@ -125,11 +125,11 @@ func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 	}
 	return &azureFileMounter{
 		azureFile: &azureFile{
-			volName:         spec.Name(),
-			mounter:         mounter,
-			pod:             pod,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(getPath(pod.UID, spec.Name(), plugin.host)),
+			volName:       spec.Name(),
+			mounter:       mounter,
+			pod:           pod,
+			plugin:        plugin,
+			StatsProvider: volume.NewMetricsStatFS(getPath(pod.UID, spec.Name(), plugin.host)),
 		},
 		util:            util,
 		secretNamespace: secretNamespace,
@@ -146,11 +146,11 @@ func (plugin *azureFilePlugin) NewUnmounter(volName string, podUID types.UID) (v
 
 func (plugin *azureFilePlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Unmounter, error) {
 	return &azureFileUnmounter{&azureFile{
-		volName:         volName,
-		mounter:         mounter,
-		pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}},
-		plugin:          plugin,
-		MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
+		volName:       volName,
+		mounter:       mounter,
+		pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}},
+		plugin:        plugin,
+		StatsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 	}}, nil
 }
 
@@ -218,7 +218,7 @@ type azureFile struct {
 	pod     *v1.Pod
 	mounter mount.Interface
 	plugin  *azureFilePlugin
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 func (azureFileVolume *azureFile) GetPath() string {

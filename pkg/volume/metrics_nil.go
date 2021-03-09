@@ -16,15 +16,15 @@ limitations under the License.
 
 package volume
 
-var _ MetricsProvider = &MetricsNil{}
+var _ StatsProvider = &MetricsNil{}
 
-// MetricsNil represents a MetricsProvider that does not support returning
-// Metrics.  It serves as a placeholder for Volumes that do not yet support
+// MetricsNil represents a StatsProvider that does not support returning
+// Stats.  It serves as a placeholder for Volumes that do not yet support
 // metrics.
 type MetricsNil struct{}
 
-// GetMetrics returns an empty Metrics and an error.
-// See MetricsProvider.GetMetrics
-func (*MetricsNil) GetMetrics() (*Metrics, error) {
-	return &Metrics{}, NewNotSupportedError()
+// GetMetrics returns an empty Stats and an error.
+// See StatsProvider.GetMetrics
+func (*MetricsNil) GetStats() (*Stats, error) {
+	return &Stats{}, NewNotSupportedError()
 }

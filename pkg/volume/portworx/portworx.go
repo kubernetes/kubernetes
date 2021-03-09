@@ -122,13 +122,13 @@ func (plugin *portworxVolumePlugin) newMounterInternal(spec *volume.Spec, podUID
 
 	return &portworxVolumeMounter{
 		portworxVolume: &portworxVolume{
-			podUID:          podUID,
-			volName:         spec.Name(),
-			volumeID:        volumeID,
-			manager:         manager,
-			mounter:         mounter,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
+			podUID:        podUID,
+			volName:       spec.Name(),
+			volumeID:      volumeID,
+			manager:       manager,
+			mounter:       mounter,
+			plugin:        plugin,
+			StatsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
 		fsType:      fsType,
 		readOnly:    readOnly,
@@ -143,12 +143,12 @@ func (plugin *portworxVolumePlugin) newUnmounterInternal(volName string, podUID 
 	mounter mount.Interface) (volume.Unmounter, error) {
 	return &portworxVolumeUnmounter{
 		&portworxVolume{
-			podUID:          podUID,
-			volName:         volName,
-			manager:         manager,
-			mounter:         mounter,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
+			podUID:        podUID,
+			volName:       volName,
+			manager:       manager,
+			mounter:       mounter,
+			plugin:        plugin,
+			StatsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 		}}, nil
 }
 
@@ -264,7 +264,7 @@ type portworxVolume struct {
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
 	plugin  *portworxVolumePlugin
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 type portworxVolumeMounter struct {

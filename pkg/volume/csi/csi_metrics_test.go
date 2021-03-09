@@ -21,23 +21,38 @@ import (
 	"testing"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
 )
 
-func TestGetMetrics(t *testing.T) {
+func TestGetStats(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)()
 	tests := []struct {
-		name          string
-		volumeID      string
-		targetPath    string
-		expectSuccess bool
+		name               string
+		volumeID           string
+		targetPath         string
+		expectSuccess      bool
+		volumeConditionSet bool
 	}{
 		{
-			name:          "with valid name and volume id",
-			expectSuccess: true,
-			volumeID:      "foobar",
-			targetPath:    "/mnt/foo",
+			name:               "with valid name, volume id and volumeCondition=on",
+			expectSuccess:      true,
+			volumeID:           "foobar",
+			targetPath:         "/mnt/foo",
+			volumeConditionSet: true,
+		},
+		{
+			name:               "with valid name, volume id and volumeCondition=off",
+			expectSuccess:      true,
+			volumeID:           "foobar",
+			targetPath:         "/mnt/foo",
+			volumeConditionSet: false,
 		},
 	}
 
@@ -46,18 +61,18 @@ func TestGetMetrics(t *testing.T) {
 		metricsGetter.csiClient = &csiDriverClient{
 			driverName: "com.google.gcepd",
 			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
-				nodeClient := fake.NewNodeClientWithVolumeStats(true /* VolumeStatsCapable */)
+				nodeClient := fake.NewNodeClientWithVolumeStatsAndCondition(true /* VolumeStatsCapable */, tc.volumeConditionSet /* VolumeConditionSupport */)
 				fakeCloser := fake.NewCloser(t)
 				nodeClient.SetNodeVolumeStatsResp(getRawVolumeInfo())
 				return nodeClient, fakeCloser, nil
 			},
 		}
-		metrics, err := metricsGetter.GetMetrics()
+		stats, err := metricsGetter.GetStats()
 		if err != nil {
 			t.Fatalf("for %s: unexpected error : %v", tc.name, err)
 		}
-		if metrics == nil {
-			t.Fatalf("unexpected nil metrics")
+		if stats == nil {
+			t.Fatalf("unexpected nil stats")
 		}
 		expectedMetrics := getRawVolumeInfo()
 		for _, usage := range expectedMetrics.Usage {
@@ -65,14 +80,14 @@ func TestGetMetrics(t *testing.T) {
 				availableBytes := resource.NewQuantity(usage.Available, resource.BinarySI)
 				totalBytes := resource.NewQuantity(usage.Total, resource.BinarySI)
 				usedBytes := resource.NewQuantity(usage.Used, resource.BinarySI)
-				if metrics.Available.Cmp(*availableBytes) != 0 {
-					t.Fatalf("for %s: error: expected :%v , got: %v", tc.name, *availableBytes, *(metrics.Available))
+				if stats.Available.Cmp(*availableBytes) != 0 {
+					t.Fatalf("for %s: error: expected :%v , got: %v", tc.name, *availableBytes, *(stats.Available))
 				}
-				if metrics.Capacity.Cmp(*totalBytes) != 0 {
-					t.Fatalf("for %s: error: expected :%v , got: %v", tc.name, *totalBytes, *(metrics.Capacity))
+				if stats.Capacity.Cmp(*totalBytes) != 0 {
+					t.Fatalf("for %s: error: expected :%v , got: %v", tc.name, *totalBytes, *(stats.Capacity))
 				}
-				if metrics.Used.Cmp(*usedBytes) != 0 {
-					t.Fatalf("for %s: error: expected :%v , got: %v", tc.name, *usedBytes, *(metrics.Used))
+				if stats.Used.Cmp(*usedBytes) != 0 {
+					t.Fatalf("for %s: error: expected :%v , got: %v", tc.name, *usedBytes, *(stats.Used))
 				}
 			}
 
@@ -80,22 +95,30 @@ func TestGetMetrics(t *testing.T) {
 				freeInodes := resource.NewQuantity(usage.Available, resource.BinarySI)
 				inodes := resource.NewQuantity(usage.Total, resource.BinarySI)
 				usedInodes := resource.NewQuantity(usage.Used, resource.BinarySI)
-				if metrics.InodesFree.Cmp(*freeInodes) != 0 {
-					t.Fatalf("for %s: error: expected :%v , got: %v", tc.name, *freeInodes, *(metrics.InodesFree))
+				if stats.InodesFree.Cmp(*freeInodes) != 0 {
+					t.Fatalf("for %s: error: expected :%v , got: %v", tc.name, *freeInodes, *(stats.InodesFree))
 				}
-				if metrics.Inodes.Cmp(*inodes) != 0 {
-					t.Fatalf("for %s: error: expected :%v , got: %v", tc.name, *inodes, *(metrics.Inodes))
+				if stats.Inodes.Cmp(*inodes) != 0 {
+					t.Fatalf("for %s: error: expected :%v , got: %v", tc.name, *inodes, *(stats.Inodes))
 				}
-				if metrics.InodesUsed.Cmp(*usedInodes) != 0 {
-					t.Fatalf("for %s: error: expected :%v , got: %v", tc.name, *usedInodes, *(metrics.InodesUsed))
+				if stats.InodesUsed.Cmp(*usedInodes) != 0 {
+					t.Fatalf("for %s: error: expected :%v , got: %v", tc.name, *usedInodes, *(stats.InodesUsed))
 				}
 			}
+		}
+
+		if tc.volumeConditionSet {
+			assert.NotNil(t, stats.Abnormal)
+			assert.NotNil(t, stats.Message)
+		} else {
+			assert.Nil(t, stats.Abnormal)
+			assert.Nil(t, stats.Message)
 		}
 	}
 }
 
-// test GetMetrics with a volume that does not support stats
-func TestGetMetricsDriverNotSupportStats(t *testing.T) {
+// test GetStats with a volume that does not support stats
+func TestGetStatsDriverNotSupportStats(t *testing.T) {
 	tests := []struct {
 		name          string
 		volumeID      string
@@ -121,7 +144,7 @@ func TestGetMetricsDriverNotSupportStats(t *testing.T) {
 				return nodeClient, fakeCloser, nil
 			},
 		}
-		metrics, err := metricsGetter.GetMetrics()
+		stats, err := metricsGetter.GetStats()
 		if err == nil {
 			t.Fatalf("for %s: expected error, but got nil error", tc.name)
 		}
@@ -130,8 +153,8 @@ func TestGetMetricsDriverNotSupportStats(t *testing.T) {
 			t.Fatalf("for %s, expected not supported error but got: %v", tc.name, err)
 		}
 
-		if metrics != nil {
-			t.Fatalf("for %s, expected nil metrics, but got: %v", tc.name, metrics)
+		if stats != nil {
+			t.Fatalf("for %s, expected nil stats, but got: %v", tc.name, stats)
 		}
 	}
 

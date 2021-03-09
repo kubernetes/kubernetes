@@ -42,15 +42,15 @@ func (_m *MockVolume) GetPath() string {
 }
 
 // GetMetrics provides a mock function with given fields:
-func (_m *MockVolume) GetMetrics() (*Metrics, error) {
+func (_m *MockVolume) GetStats() (*Stats, error) {
 	ret := _m.Called()
 
-	var r0 *Metrics
-	if rf, ok := ret.Get(0).(func() *Metrics); ok {
+	var r0 *Stats
+	if rf, ok := ret.Get(0).(func() *Stats); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*Metrics)
+			r0 = ret.Get(0).(*Stats)
 		}
 	}
 

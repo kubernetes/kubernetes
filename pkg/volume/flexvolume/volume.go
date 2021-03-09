@@ -45,7 +45,7 @@ type flexVolume struct {
 	// the underlying plugin
 	plugin *flexVolumePlugin
 	// the metric plugin
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 // volume.Volume interface

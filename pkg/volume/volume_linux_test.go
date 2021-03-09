@@ -57,7 +57,7 @@ func (l *localFakeMounter) SetUpAt(dir string, mounterArgs MounterArgs) error {
 	return nil
 }
 
-func (l *localFakeMounter) GetMetrics() (*Metrics, error) {
+func (l *localFakeMounter) GetStats() (*Stats, error) {
 	return nil, nil
 }
 

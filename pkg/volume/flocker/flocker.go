@@ -55,7 +55,7 @@ type flockerVolume struct {
 	manager       volumeManager
 	plugin        *flockerPlugin
 	mounter       mount.Interface
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 var _ volume.VolumePlugin = &flockerPlugin{}
@@ -152,14 +152,14 @@ func (p *flockerPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 
 	return &flockerVolumeMounter{
 		flockerVolume: &flockerVolume{
-			podUID:          podUID,
-			volName:         spec.Name(),
-			datasetName:     datasetName,
-			datasetUUID:     datasetUUID,
-			mounter:         mounter,
-			manager:         manager,
-			plugin:          p,
-			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), p.host)),
+			podUID:        podUID,
+			volName:       spec.Name(),
+			datasetName:   datasetName,
+			datasetUUID:   datasetUUID,
+			mounter:       mounter,
+			manager:       manager,
+			plugin:        p,
+			StatsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), p.host)),
 		},
 		readOnly: readOnly}, nil
 }
@@ -171,12 +171,12 @@ func (p *flockerPlugin) NewUnmounter(volName string, podUID types.UID) (volume.U
 
 func (p *flockerPlugin) newUnmounterInternal(volName string, podUID types.UID, manager volumeManager, mounter mount.Interface) (volume.Unmounter, error) {
 	return &flockerVolumeUnmounter{&flockerVolume{
-		podUID:          podUID,
-		volName:         volName,
-		manager:         manager,
-		mounter:         mounter,
-		plugin:          p,
-		MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, p.host)),
+		podUID:        podUID,
+		volName:       volName,
+		manager:       manager,
+		mounter:       mounter,
+		plugin:        p,
+		StatsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, p.host)),
 	}}, nil
 }
 

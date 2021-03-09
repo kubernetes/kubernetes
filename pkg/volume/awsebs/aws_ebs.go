@@ -168,14 +168,14 @@ func (plugin *awsElasticBlockStorePlugin) newMounterInternal(spec *volume.Spec, 
 
 	return &awsElasticBlockStoreMounter{
 		awsElasticBlockStore: &awsElasticBlockStore{
-			podUID:          podUID,
-			volName:         spec.Name(),
-			volumeID:        volumeID,
-			partition:       partition,
-			manager:         manager,
-			mounter:         mounter,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
+			podUID:        podUID,
+			volName:       spec.Name(),
+			volumeID:      volumeID,
+			partition:     partition,
+			manager:       manager,
+			mounter:       mounter,
+			plugin:        plugin,
+			StatsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
 		fsType:       fsType,
 		readOnly:     readOnly,
@@ -191,12 +191,12 @@ func (plugin *awsElasticBlockStorePlugin) NewUnmounter(volName string, podUID ty
 
 func (plugin *awsElasticBlockStorePlugin) newUnmounterInternal(volName string, podUID types.UID, manager ebsManager, mounter mount.Interface) (volume.Unmounter, error) {
 	return &awsElasticBlockStoreUnmounter{&awsElasticBlockStore{
-		podUID:          podUID,
-		volName:         volName,
-		manager:         manager,
-		mounter:         mounter,
-		plugin:          plugin,
-		MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
+		podUID:        podUID,
+		volName:       volName,
+		manager:       manager,
+		mounter:       mounter,
+		plugin:        plugin,
+		StatsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 	}}, nil
 }
 
@@ -331,7 +331,7 @@ type awsElasticBlockStore struct {
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
 	plugin  *awsElasticBlockStorePlugin
-	volume.MetricsProvider
+	volume.StatsProvider
 }
 
 type awsElasticBlockStoreMounter struct {
