@@ -506,7 +506,7 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 				klog.ErrorS(err, "Failed to get container name for process")
 				return
 			}
-			klog.V(2).InfoS("Discovered runtime cgroup name", "cgroupName", cont
+			klog.V(2).InfoS("Discovered runtime cgroup name", "cgroupName", cont)
 			cm.Lock()
 			defer cm.Unlock()
 			cm.RuntimeCgroupsName = cont
