@@ -524,6 +524,10 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 		failureMessage = "Job was active longer than specified deadline"
 	}
 
+	var succeededIndexes string
+	if job.Spec.CompletionMode == batch.IndexedCompletion {
+		succeededIndexes, succeeded = calculateSucceededIndexes(pods)
+	}
 	jobConditionsChanged := false
 	manageJobCalled := false
 	if jobFailed {
@@ -622,7 +626,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 		job.Status.Succeeded = succeeded
 		job.Status.Failed = failed
 		if job.Spec.CompletionMode == batch.IndexedCompletion {
-			job.Status.CompletedIndexes = calculateCompletedIndexesStr(pods)
+			job.Status.CompletedIndexes = succeededIndexes
 		}
 
 		if err := jm.updateHandler(&job); err != nil {

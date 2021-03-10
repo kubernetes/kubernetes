@@ -26,52 +26,71 @@ import (
 
 const noIndex = "-"
 
-func TestCalculateCompletedIndexesStr(t *testing.T) {
-	cases := map[string][]indexPhase{
+func TestCalculateSucceededIndexes(t *testing.T) {
+	cases := map[string]struct {
+		pods      []indexPhase
+		wantCount int32
+	}{
 		"1": {
-			{"1", v1.PodSucceeded},
+			pods:      []indexPhase{{"1", v1.PodSucceeded}},
+			wantCount: 1,
 		},
 		"5,10": {
-			{"2", v1.PodFailed},
-			{"5", v1.PodSucceeded},
-			{"5", v1.PodSucceeded},
-			{"10", v1.PodFailed},
-			{"10", v1.PodSucceeded},
+			pods: []indexPhase{
+				{"2", v1.PodFailed},
+				{"5", v1.PodSucceeded},
+				{"5", v1.PodSucceeded},
+				{"10", v1.PodFailed},
+				{"10", v1.PodSucceeded},
+			},
+			wantCount: 2,
 		},
 		"2,3,5-7": {
-			{"0", v1.PodRunning},
-			{"1", v1.PodPending},
-			{"2", v1.PodSucceeded},
-			{"3", v1.PodSucceeded},
-			{"5", v1.PodSucceeded},
-			{"6", v1.PodSucceeded},
-			{"7", v1.PodSucceeded},
+			pods: []indexPhase{
+				{"0", v1.PodRunning},
+				{"1", v1.PodPending},
+				{"2", v1.PodSucceeded},
+				{"3", v1.PodSucceeded},
+				{"5", v1.PodSucceeded},
+				{"6", v1.PodSucceeded},
+				{"7", v1.PodSucceeded},
+			},
+			wantCount: 5,
 		},
 		"0-2": {
-			{"0", v1.PodSucceeded},
-			{"1", v1.PodFailed},
-			{"1", v1.PodSucceeded},
-			{"2", v1.PodSucceeded},
-			{"2", v1.PodSucceeded},
-			{"3", v1.PodFailed},
+			pods: []indexPhase{
+				{"0", v1.PodSucceeded},
+				{"1", v1.PodFailed},
+				{"1", v1.PodSucceeded},
+				{"2", v1.PodSucceeded},
+				{"2", v1.PodSucceeded},
+				{"3", v1.PodFailed},
+			},
+			wantCount: 3,
 		},
 		"0,2-5": {
-			{"0", v1.PodSucceeded},
-			{"1", v1.PodFailed},
-			{"2", v1.PodSucceeded},
-			{"3", v1.PodSucceeded},
-			{"4", v1.PodSucceeded},
-			{"5", v1.PodSucceeded},
-			{noIndex, v1.PodSucceeded},
-			{"-2", v1.PodSucceeded},
+			pods: []indexPhase{
+				{"0", v1.PodSucceeded},
+				{"1", v1.PodFailed},
+				{"2", v1.PodSucceeded},
+				{"3", v1.PodSucceeded},
+				{"4", v1.PodSucceeded},
+				{"5", v1.PodSucceeded},
+				{noIndex, v1.PodSucceeded},
+				{"-2", v1.PodSucceeded},
+			},
+			wantCount: 5,
 		},
 	}
 	for want, tc := range cases {
 		t.Run(want, func(t *testing.T) {
-			pods := hollowPodsWithIndexPhase(tc)
-			gotStr := calculateCompletedIndexesStr(pods)
+			pods := hollowPodsWithIndexPhase(tc.pods)
+			gotStr, gotCnt := calculateSucceededIndexes(pods)
 			if diff := cmp.Diff(want, gotStr); diff != "" {
 				t.Errorf("Unexpected completed indexes (-want,+got):\n%s", diff)
+			}
+			if gotCnt != tc.wantCount {
+				t.Errorf("Got number of completed indexes %d, want %d", gotCnt, tc.wantCount)
 			}
 		})
 	}
