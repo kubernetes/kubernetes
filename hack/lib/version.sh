@@ -27,6 +27,27 @@
 #    KUBE_GIT_MAJOR - The major part of the version
 #    KUBE_GIT_MINOR - The minor component of the version
 
+function kube::version::ensure_gnu_date() {
+  if [[ -n "${GNU_DATE:-}" ]]; then
+    return
+  fi
+  GNU_DATE="date"
+  if which gdate &>/dev/null; then
+      GNU_DATE="gdate"
+  elif which gnudate &>/dev/null; then
+      GNU_DATE="gnudate"
+  fi
+  if ! "${GNU_DATE}" --version | grep -q GNU; then
+    if [ -n ${SOURCE_DATE_EPOCH} ]; then
+        echo "  !!! Cannot find GNU tar. Build on Linux or install GNU tar"
+        echo "      on Mac OS X (brew install coreutils)."
+        return 1
+    fi
+  fi
+}
+
+kube::version::ensure_gnu_date
+
 # Grovels through git to set a set of env variables.
 #
 # If KUBE_GIT_VERSION_FILE, this function will load from that file instead of
@@ -162,7 +183,7 @@ kube::version::ldflags() {
     )
   }
 
-  add_ldflag "buildDate" "$(date ${SOURCE_DATE_EPOCH:+"--date=@${SOURCE_DATE_EPOCH}"} -u +'%Y-%m-%dT%H:%M:%SZ')"
+  add_ldflag "buildDate" "$(${GNU_DATE} ${SOURCE_DATE_EPOCH:+"--date=@${SOURCE_DATE_EPOCH}"} -u +'%Y-%m-%dT%H:%M:%SZ')"
   if [[ -n ${KUBE_GIT_COMMIT-} ]]; then
     add_ldflag "gitCommit" "${KUBE_GIT_COMMIT}"
     add_ldflag "gitTreeState" "${KUBE_GIT_TREE_STATE}"
