@@ -307,9 +307,6 @@ func (o *DrainCmdOptions) RunDrain() error {
 				fmt.Fprintf(o.ErrOut, "error: unable to drain node %q due to error:%s, continuing command...\n", info.Name, err)
 				continue
 			}
-			fmt.Fprintf(o.ErrOut, "DEPRECATED WARNING: Aborting the drain command in a list of nodes will be deprecated.\n"+
-				"The new behavior will make the drain command go through all nodes even if one or more nodes failed during the drain.\n"+
-				"For now, users can try such experience via: --ignore-errors\n")
 			fmt.Fprintf(o.ErrOut, "error: unable to drain node %q, aborting command...\n\n", info.Name)
 			remainingNodes := []string{}
 			fatal = err
