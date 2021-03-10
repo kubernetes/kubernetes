@@ -145,7 +145,7 @@ func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptio
 		CmdParent:  parent,
 
 		IOStreams:   streams,
-		ChunkSize:   500,
+		ChunkSize:   cmdutil.DefaultChunkSize,
 		ServerPrint: true,
 	}
 }

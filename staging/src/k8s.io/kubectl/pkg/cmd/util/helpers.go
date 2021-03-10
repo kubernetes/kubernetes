@@ -50,6 +50,7 @@ import (
 const (
 	ApplyAnnotationsFlag = "save-config"
 	DefaultErrorExitCode = 1
+	DefaultChunkSize     = 500
 )
 
 type debugError interface {
