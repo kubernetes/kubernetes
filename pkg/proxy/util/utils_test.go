@@ -403,7 +403,7 @@ type InterfaceAddrsPair struct {
 	addrs []net.Addr
 }
 
-func TestGetNodeAddressses(t *testing.T) {
+func TestGetNodeAddresses(t *testing.T) {
 	testCases := []struct {
 		cidrs         []string
 		nw            *fake.FakeNetwork
