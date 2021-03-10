@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import (
 	"math"
 	"net"
 	"net/http"
-	"os"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -260,6 +259,9 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// add the kubelet config controller to kubeletDeps
 			kubeletDeps.KubeletConfigController = kubeletConfigController
 
+			if err := checkPermissions(); err != nil {
+				klog.ErrorS(err, "kubelet running with insufficient permissions")
+			}
 			// set up signal context here in order to be reused by kubelet and docker shim
 			ctx := genericapiserver.SetupSignalContext()
 
@@ -427,15 +429,6 @@ func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	if err := run(ctx, s, kubeDeps, featureGate); err != nil {
 		return fmt.Errorf("failed to run Kubelet: %v", err)
 	}
-	return nil
-}
-
-func checkPermissions() error {
-	if uid := os.Getuid(); uid != 0 {
-		return fmt.Errorf("kubelet needs to run as uid `0`. It is being run as %d", uid)
-	}
-	// TODO: Check if kubelet is running in the `initial` user namespace.
-	// http://man7.org/linux/man-pages/man7/user_namespaces.7.html
 	return nil
 }
 
@@ -758,10 +751,6 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		if err != nil {
 			return err
 		}
-	}
-
-	if err := checkPermissions(); err != nil {
-		klog.Error(err)
 	}
 
 	utilruntime.ReallyCrash = s.ReallyCrashForTesting
