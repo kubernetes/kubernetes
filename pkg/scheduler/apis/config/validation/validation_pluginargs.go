@@ -240,7 +240,7 @@ func validateFunctionShape(shape []config.UtilizationShapePoint, path *field.Pat
 	return allErrs
 }
 
-// TODO potentially replace with validateResources
+// weight of resource is allowed to exceed 100, this is only applicable to `RequestedToCapacityRatio` plugin for backwards compatibility reason.
 func validateResourcesNoMax(resources []config.ResourceSpec, p *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	for i, r := range resources {
