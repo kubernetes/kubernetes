@@ -214,8 +214,8 @@ func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defa
 		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
 		listerWatcher:                   lw,
 		objectType:                      exampleObject,
-		resyncCheckPeriod:               defaultEventHandlerResyncPeriod,
-		defaultEventHandlerResyncPeriod: defaultEventHandlerResyncPeriod,
+		resyncCheckPeriod:               validateResyncPeriod(defaultEventHandlerResyncPeriod),
+		defaultEventHandlerResyncPeriod: validateResyncPeriod(defaultEventHandlerResyncPeriod),
 		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
 		clock:                           realClock,
 	}
@@ -470,6 +470,17 @@ func determineResyncPeriod(desired, check time.Duration) time.Duration {
 		return check
 	}
 	return desired
+}
+
+func validateResyncPeriod(resyncPeriod time.Duration) time.Duration {
+	if resyncPeriod < 0 {
+		klog.Warning("resyncPeriod %v is less than 0. Changing it to 0")
+		return 0
+	} else if resyncPeriod > 0 && resyncPeriod < minimumResyncPeriod {
+		klog.Warningf("resyncPeriod %v is too small. Changing it to the minimum allowed value of %v", resyncPeriod, minimumResyncPeriod)
+		return minimumResyncPeriod
+	}
+	return resyncPeriod
 }
 
 const minimumResyncPeriod = 1 * time.Second
