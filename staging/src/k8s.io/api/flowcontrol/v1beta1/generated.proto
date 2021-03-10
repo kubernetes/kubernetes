@@ -411,16 +411,20 @@ message ServiceAccountSubject {
 // ways of matching an originator; by user, group, or service account.
 // +union
 message Subject {
+  // The kind of subject
   // Required
   // +unionDiscriminator
   optional string kind = 1;
 
+  // `user` is the detailed information for user-kind subject.
   // +optional
   optional UserSubject user = 2;
 
+  // `group` is the detailed information for group-kind subject.
   // +optional
   optional GroupSubject group = 3;
 
+  // `serviceAccount` is the detailed information for service-account-kind subject.
   // +optional
   optional ServiceAccountSubject serviceAccount = 4;
 }

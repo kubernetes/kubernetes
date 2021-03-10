@@ -185,13 +185,17 @@ type PolicyRulesWithSubjects struct {
 // ways of matching an originator; by user, group, or service account.
 // +union
 type Subject struct {
+	// The kind of subject, one of User, Group, ServiceAccount.
 	// Required
 	// +unionDiscriminator
 	Kind SubjectKind `json:"kind" protobuf:"bytes,1,opt,name=kind"`
+	// `user` is the detailed information for user-kind subject.
 	// +optional
 	User *UserSubject `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`
+	// `group` is the detailed information for group-kind subject.
 	// +optional
 	Group *GroupSubject `json:"group,omitempty" protobuf:"bytes,3,opt,name=group"`
+	// `serviceAccount` is the detailed information for service-account-kind subject.
 	// +optional
 	ServiceAccount *ServiceAccountSubject `json:"serviceAccount,omitempty" protobuf:"bytes,4,opt,name=serviceAccount"`
 }
