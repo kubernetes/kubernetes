@@ -1957,14 +1957,6 @@
     restart count to 1.
   release: v1.9
   file: test/e2e/common/node/container_probe.go
-- testname: Pod liveness probe, container exec timeout, restart
-  codename: '[sig-node] Probing container should be restarted with an exec liveness
-    probe with timeout [NodeConformance] [Conformance]'
-  description: A Pod is created with liveness probe with a Exec action on the Pod.
-    If the liveness probe call does not return within the timeout specified, liveness
-    probe MUST restart the Pod.
-  release: v1.9
-  file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using http endpoint, multiple restarts (slow)
   codename: '[sig-node] Probing container should have monotonically increasing restart
     count [NodeConformance] [Conformance]'
@@ -1976,14 +1968,6 @@
     returns an http error after 10 seconds from the start. Restart counts MUST increment
     everytime health check fails, measure upto 5 restart.
   release: v1.9
-  file: test/e2e/common/node/container_probe.go
-- testname: Pod readiness probe, container exec timeout, not ready
-  codename: '[sig-node] Probing container should not be ready with an exec readiness
-    probe timeout [NodeConformance] [Conformance]'
-  description: A Pod is created with readiness probe with a Exec action on the Pod.
-    If the readiness probe call does not return within the timeout specified, readiness
-    probe MUST not be Ready.
-  release: v1.20
   file: test/e2e/common/node/container_probe.go
 - testname: Pod readiness probe, with initial delay
   codename: '[sig-node] Probing container with readiness probe should not be ready
