@@ -546,7 +546,7 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 				"InterPodAffinity": &config.InterPodAffinityArgs{
 					HardPodAffinityWeight: 1,
 				},
-				"NodeLabel":        &config.NodeLabelArgs{},
+				"NodeLabel":        nil,
 				"NodeResourcesFit": &config.NodeResourcesFitArgs{},
 				"NodeResourcesLeastAllocated": &config.NodeResourcesLeastAllocatedArgs{
 					Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
@@ -609,7 +609,7 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 				"InterPodAffinity": &config.InterPodAffinityArgs{
 					HardPodAffinityWeight: 3,
 				},
-				"NodeLabel": &config.NodeLabelArgs{},
+				"NodeLabel": nil,
 				"NodeResourcesFit": &config.NodeResourcesFitArgs{
 					IgnoredResources: []string{"example.com/foo"},
 				},

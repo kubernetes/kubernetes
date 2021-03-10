@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This plugin has been deprecated and is only configurable through the
+// scheduler policy API and the v1beta1 component config API. It is recommended
+// to use the NodeAffinity plugin instead.
 package nodelabel
 
 import (
@@ -23,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -46,6 +50,7 @@ func New(plArgs runtime.Object, handle framework.Handle) (framework.Plugin, erro
 		return nil, err
 	}
 
+	klog.Warning("NodeLabel plugin is deprecated and will be removed in a future version; use NodeAffinity instead")
 	return &NodeLabel{
 		handle: handle,
 		args:   args,

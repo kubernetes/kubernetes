@@ -30,6 +30,8 @@ import (
 	componentbasevalidation "k8s.io/component-base/config/validation"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
 )
 
 // ValidateKubeSchedulerConfiguration ensures validation of the KubeSchedulerConfiguration struct
@@ -49,7 +51,7 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 		for i := range cc.Profiles {
 			profile := &cc.Profiles[i]
 			path := profilesPath.Index(i)
-			errs = append(errs, validateKubeSchedulerProfile(path, profile)...)
+			errs = append(errs, validateKubeSchedulerProfile(path, cc.APIVersion, profile)...)
 			if idx, ok := existingProfiles[profile.SchedulerName]; ok {
 				errs = append(errs, field.Duplicate(path.Child("schedulerName"), profilesPath.Index(idx).Child("schedulerName")))
 			}
@@ -80,16 +82,61 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 	return utilerrors.Flatten(utilerrors.NewAggregate(errs))
 }
 
-func validateKubeSchedulerProfile(path *field.Path, profile *config.KubeSchedulerProfile) []error {
+type removedPlugins struct {
+	schemeGroupVersion string
+	plugins            []string
+}
+
+// removedPluginsByVersion maintains a list of removed plugins in each version.
+// Remember to add an entry to that list when creating a new component config
+// version (even if the list of removed plugins is empty).
+var removedPluginsByVersion = []removedPlugins{
+	{
+		schemeGroupVersion: v1beta1.SchemeGroupVersion.String(),
+		plugins:            []string{},
+	},
+	{
+		schemeGroupVersion: v1beta2.SchemeGroupVersion.String(),
+		plugins:            []string{"NodeLabel", "ServiceAffinity", "NodePreferAvoidPods"},
+	},
+}
+
+// isPluginRemoved checks if a given plugin was removed in the given component
+// config version or earlier.
+func isPluginRemoved(apiVersion string, name string) (bool, string) {
+	for _, dp := range removedPluginsByVersion {
+		for _, plugin := range dp.plugins {
+			if name == plugin {
+				return true, dp.schemeGroupVersion
+			}
+		}
+		if apiVersion == dp.schemeGroupVersion {
+			break
+		}
+	}
+	return false, ""
+}
+
+func validatePluginSetForRemovedPlugins(path *field.Path, apiVersion string, ps config.PluginSet) []error {
+	var errs []error
+	for i, plugin := range ps.Enabled {
+		if removed, removedVersion := isPluginRemoved(apiVersion, plugin.Name); removed {
+			errs = append(errs, field.Invalid(path.Child("enabled").Index(i), plugin.Name, fmt.Sprintf("was removed in version %q (KubeSchedulerConfiguration is version %q)", removedVersion, apiVersion)))
+		}
+	}
+	return errs
+}
+
+func validateKubeSchedulerProfile(path *field.Path, apiVersion string, profile *config.KubeSchedulerProfile) []error {
 	var errs []error
 	if len(profile.SchedulerName) == 0 {
 		errs = append(errs, field.Required(path.Child("schedulerName"), ""))
 	}
-	errs = append(errs, validatePluginConfig(path, profile)...)
+	errs = append(errs, validatePluginConfig(path, apiVersion, profile)...)
 	return errs
 }
 
-func validatePluginConfig(path *field.Path, profile *config.KubeSchedulerProfile) []error {
+func validatePluginConfig(path *field.Path, apiVersion string, profile *config.KubeSchedulerProfile) []error {
 	var errs []error
 	m := map[string]interface{}{
 		"DefaultPreemption":           ValidateDefaultPreemptionArgs,
@@ -127,6 +174,31 @@ func validatePluginConfig(path *field.Path, profile *config.KubeSchedulerProfile
 				errs = append(errs, res[0].Interface().(error))
 			}
 		}
+	}
+	if profile.Plugins != nil {
+		pluginsPath := path.Child("plugins")
+		errs = append(errs, validatePluginSetForRemovedPlugins(
+			pluginsPath.Child("queueSort"), apiVersion, profile.Plugins.QueueSort)...)
+		errs = append(errs, validatePluginSetForRemovedPlugins(
+			pluginsPath.Child("preFilter"), apiVersion, profile.Plugins.PreFilter)...)
+		errs = append(errs, validatePluginSetForRemovedPlugins(
+			pluginsPath.Child("filter"), apiVersion, profile.Plugins.Filter)...)
+		errs = append(errs, validatePluginSetForRemovedPlugins(
+			pluginsPath.Child("postFilter"), apiVersion, profile.Plugins.PostFilter)...)
+		errs = append(errs, validatePluginSetForRemovedPlugins(
+			pluginsPath.Child("preScore"), apiVersion, profile.Plugins.PreScore)...)
+		errs = append(errs, validatePluginSetForRemovedPlugins(
+			pluginsPath.Child("score"), apiVersion, profile.Plugins.Score)...)
+		errs = append(errs, validatePluginSetForRemovedPlugins(
+			pluginsPath.Child("reserve"), apiVersion, profile.Plugins.Reserve)...)
+		errs = append(errs, validatePluginSetForRemovedPlugins(
+			pluginsPath.Child("permit"), apiVersion, profile.Plugins.Permit)...)
+		errs = append(errs, validatePluginSetForRemovedPlugins(
+			pluginsPath.Child("preBind"), apiVersion, profile.Plugins.PreBind)...)
+		errs = append(errs, validatePluginSetForRemovedPlugins(
+			pluginsPath.Child("bind"), apiVersion, profile.Plugins.Bind)...)
+		errs = append(errs, validatePluginSetForRemovedPlugins(
+			pluginsPath.Child("postBind"), apiVersion, profile.Plugins.PostBind)...)
 	}
 	return errs
 }

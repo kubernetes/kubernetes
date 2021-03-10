@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta2
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -52,30 +52,6 @@ type InterPodAffinityArgs struct {
 	// HardPodAffinityWeight is the scoring weight for existing pods with a
 	// matching hard affinity to the incoming pod.
 	HardPodAffinityWeight *int32 `json:"hardPodAffinityWeight,omitempty"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// NodeLabelArgs holds arguments used to configure the NodeLabel plugin.
-//
-// This plugin has been deprecated and is only configurable through the
-// scheduler policy API and the v1beta1 component config API. It is recommended
-// to use the NodeAffinity plugin instead.
-type NodeLabelArgs struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// PresentLabels should be present for the node to be considered a fit for hosting the pod
-	// +listType=atomic
-	PresentLabels []string `json:"presentLabels,omitempty"`
-	// AbsentLabels should be absent for the node to be considered a fit for hosting the pod
-	// +listType=atomic
-	AbsentLabels []string `json:"absentLabels,omitempty"`
-	// Nodes that have labels in the list will get a higher score.
-	// +listType=atomic
-	PresentLabelsPreference []string `json:"presentLabelsPreference,omitempty"`
-	// Nodes that don't have labels in the list will get a higher score.
-	// +listType=atomic
-	AbsentLabelsPreference []string `json:"absentLabelsPreference,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -190,26 +166,6 @@ type ResourceSpec struct {
 	Name string `json:"name"`
 	// Weight of the resource.
 	Weight int64 `json:"weight,omitempty"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ServiceAffinityArgs holds arguments used to configure the ServiceAffinity plugin.
-//
-// This plugin has been deprecated and is only configurable through the
-// scheduler policy API and the v1beta1 component config API. It is recommended
-// to use the InterPodAffinity plugin instead.
-type ServiceAffinityArgs struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// AffinityLabels are homogeneous for pods that are scheduled to a node.
-	// (i.e. it returns true IFF this pod can be added to this node such that all other pods in
-	// the same service are running on nodes with the exact same values for Labels).
-	// +listType=atomic
-	AffinityLabels []string `json:"affinityLabels,omitempty"`
-	// AntiAffinityLabelsPreference are the labels to consider for service anti affinity scoring.
-	// +listType=atomic
-	AntiAffinityLabelsPreference []string `json:"antiAffinityLabelsPreference,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

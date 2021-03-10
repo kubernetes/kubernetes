@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,30 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta2
 
 import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kube-scheduler/config/v1beta1"
+	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
 )
 
-func TestV1beta1ToConfigKubeSchedulerConfigurationConversion(t *testing.T) {
+func TestV1beta2ToConfigKubeSchedulerConfigurationConversion(t *testing.T) {
 	cases := []struct {
 		name   string
-		config v1beta1.KubeSchedulerConfiguration
+		config v1beta2.KubeSchedulerConfiguration
 		want   config.KubeSchedulerConfiguration
 	}{
 		{
-			name:   "default conversion v1beta1 to config",
-			config: v1beta1.KubeSchedulerConfiguration{},
+			name:   "default conversion v1beta2 to config",
+			config: v1beta2.KubeSchedulerConfiguration{},
 			want: config.KubeSchedulerConfiguration{
 				AlgorithmSource: config.SchedulerAlgorithmSource{
-					Provider: pointer.StringPtr(v1beta1.SchedulerDefaultProviderName),
+					Provider: pointer.StringPtr(v1beta2.SchedulerDefaultProviderName),
 				},
 			},
 		},

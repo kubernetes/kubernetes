@@ -25,12 +25,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
 )
 
 func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	podInitialBackoffSeconds := int64(1)
 	podMaxBackoffSeconds := int64(1)
 	validConfig := &config.KubeSchedulerConfiguration{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: v1beta2.SchemeGroupVersion.String(),
+		},
 		Parallelism:        8,
 		HealthzBindAddress: "0.0.0.0:10254",
 		MetricsBindAddress: "0.0.0.0:10254",
@@ -113,11 +118,17 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	metricsBindAddrPortInvalid := validConfig.DeepCopy()
 	metricsBindAddrPortInvalid.MetricsBindAddress = "0.0.0.0:909090"
 
+	metricsBindAddrHostOnlyInvalid := validConfig.DeepCopy()
+	metricsBindAddrHostOnlyInvalid.MetricsBindAddress = "999.999.999.999"
+
 	healthzBindAddrHostInvalid := validConfig.DeepCopy()
 	healthzBindAddrHostInvalid.HealthzBindAddress = "0.0.0.0.0:9090"
 
 	healthzBindAddrPortInvalid := validConfig.DeepCopy()
 	healthzBindAddrPortInvalid.HealthzBindAddress = "0.0.0.0:909090"
+
+	healthzBindAddrHostOnlyInvalid := validConfig.DeepCopy()
+	healthzBindAddrHostOnlyInvalid.HealthzBindAddress = "999.999.999.999"
 
 	enableContentProfilingSetWithoutEnableProfiling := validConfig.DeepCopy()
 	enableContentProfilingSetWithoutEnableProfiling.EnableProfiling = false
@@ -210,6 +221,20 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		BindVerb:       "bar",
 	})
 
+	badRemovedPlugins1 := validConfig.DeepCopy() // defalt v1beta2
+	badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "ServiceAffinity", Weight: 2})
+
+	badRemovedPlugins2 := validConfig.DeepCopy()
+	badRemovedPlugins2.APIVersion = "kubescheduler.config.k8s.io/v1beta3" // hypothetical, v1beta3 doesn't exist
+	badRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "ServiceAffinity", Weight: 2})
+
+	goodRemovedPlugins1 := validConfig.DeepCopy() // ServiceAffinity is okay in v1beta1.
+	goodRemovedPlugins1.APIVersion = v1beta1.SchemeGroupVersion.String()
+	goodRemovedPlugins1.Profiles[0].Plugins.Score.Enabled = append(goodRemovedPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "ServiceAffinity", Weight: 2})
+
+	goodRemovedPlugins2 := validConfig.DeepCopy()
+	goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
+
 	scenarios := map[string]struct {
 		expectedToFail bool
 		config         *config.KubeSchedulerConfiguration
@@ -238,6 +263,10 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			expectedToFail: true,
 			config:         healthzBindAddrHostInvalid,
 		},
+		"bad-healthz-host-only-invalid": {
+			expectedToFail: true,
+			config:         healthzBindAddrHostOnlyInvalid,
+		},
 		"bad-metrics-port-invalid": {
 			expectedToFail: true,
 			config:         metricsBindAddrPortInvalid,
@@ -245,6 +274,10 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		"bad-metrics-host-invalid": {
 			expectedToFail: true,
 			config:         metricsBindAddrHostInvalid,
+		},
+		"bad-metrics-host-only-invalid": {
+			expectedToFail: true,
+			config:         metricsBindAddrHostOnlyInvalid,
 		},
 		"bad-percentage-of-nodes-to-score": {
 			expectedToFail: true,
@@ -293,6 +326,22 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		"mismatch-queue-sort": {
 			expectedToFail: true,
 			config:         mismatchQueueSort,
+		},
+		"bad-removed-plugins-1": {
+			expectedToFail: true,
+			config:         badRemovedPlugins1,
+		},
+		"bad-removed-plugins-2": {
+			expectedToFail: true,
+			config:         badRemovedPlugins2,
+		},
+		"good-removed-plugins-1": {
+			expectedToFail: false,
+			config:         goodRemovedPlugins1,
+		},
+		"good-removed-plugins-2": {
+			expectedToFail: false,
+			config:         goodRemovedPlugins2,
 		},
 	}
 

@@ -70,6 +70,8 @@ type Configurator struct {
 
 	schedulerCache internalcache.Cache
 
+	componentConfigVersion string
+
 	// Always check all predicates even if the middle of one predicate fails.
 	alwaysCheckAllPredicates bool
 
@@ -138,6 +140,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	// The nominator will be passed all the way to framework instantiation.
 	nominator := internalqueue.NewPodNominator()
 	profiles, err := profile.NewMap(c.profiles, c.registry, c.recorderFactory,
+		frameworkruntime.WithComponentConfigVersion(c.componentConfigVersion),
 		frameworkruntime.WithClientSet(c.client),
 		frameworkruntime.WithKubeConfig(c.kubeConfig),
 		frameworkruntime.WithInformerFactory(c.informerFactory),

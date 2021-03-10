@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,23 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta2
 
 import (
 	"net"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
-	"k8s.io/kube-scheduler/config/v1beta1"
+	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
 )
 
-var defaultResourceSpec = []v1beta1.ResourceSpec{
+var defaultResourceSpec = []v1beta2.ResourceSpec{
 	{Name: string(corev1.ResourceCPU), Weight: 1},
 	{Name: string(corev1.ResourceMemory), Weight: 1},
 }
@@ -40,26 +41,26 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
-func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfiguration) {
+func SetDefaults_KubeSchedulerConfiguration(obj *v1beta2.KubeSchedulerConfiguration) {
 
 	if obj.Parallelism == nil {
 		obj.Parallelism = pointer.Int32Ptr(16)
 	}
 
 	if len(obj.Profiles) == 0 {
-		obj.Profiles = append(obj.Profiles, v1beta1.KubeSchedulerProfile{})
+		obj.Profiles = append(obj.Profiles, v1beta2.KubeSchedulerProfile{})
 	}
 	// Only apply a default scheduler name when there is a single profile.
 	// Validation will ensure that every profile has a non-empty unique name.
 	if len(obj.Profiles) == 1 && obj.Profiles[0].SchedulerName == nil {
-		obj.Profiles[0].SchedulerName = pointer.StringPtr(corev1.DefaultSchedulerName)
+		obj.Profiles[0].SchedulerName = pointer.StringPtr(v1.DefaultSchedulerName)
 	}
 
 	// For Healthz and Metrics bind addresses, we want to check:
 	// 1. If the value is nil, default to 0.0.0.0 and default scheduler port
 	// 2. If there is a value set, attempt to split it. If it's just a port (ie, ":1234"), default to 0.0.0.0 with that port
 	// 3. If splitting the value fails, check if the value is even a valid IP. If so, use that with the default port.
-	// Otherwise use the default bind address
+	// Otherwise leave the address as-is, it will be caught during validation.
 	defaultBindAddress := net.JoinHostPort("0.0.0.0", strconv.Itoa(config.DefaultInsecureSchedulerPort))
 	if obj.HealthzBindAddress == nil {
 		obj.HealthzBindAddress = &defaultBindAddress
@@ -76,9 +77,6 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 			if host := net.ParseIP(*obj.HealthzBindAddress); host != nil {
 				hostPort := net.JoinHostPort(*obj.HealthzBindAddress, strconv.Itoa(config.DefaultInsecureSchedulerPort))
 				obj.HealthzBindAddress = &hostPort
-			} else {
-				// TODO: in v1beta1 we should let this error instead of stomping with a default value
-				obj.HealthzBindAddress = &defaultBindAddress
 			}
 		}
 	}
@@ -98,9 +96,6 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 			if host := net.ParseIP(*obj.MetricsBindAddress); host != nil {
 				hostPort := net.JoinHostPort(*obj.MetricsBindAddress, strconv.Itoa(config.DefaultInsecureSchedulerPort))
 				obj.MetricsBindAddress = &hostPort
-			} else {
-				// TODO: in v1beta1 we should let this error instead of stomping with a default value
-				obj.MetricsBindAddress = &defaultBindAddress
 			}
 		}
 	}
@@ -117,10 +112,10 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 		obj.LeaderElection.ResourceLock = "leases"
 	}
 	if len(obj.LeaderElection.ResourceNamespace) == 0 {
-		obj.LeaderElection.ResourceNamespace = v1beta1.SchedulerDefaultLockObjectNamespace
+		obj.LeaderElection.ResourceNamespace = v1beta2.SchedulerDefaultLockObjectNamespace
 	}
 	if len(obj.LeaderElection.ResourceName) == 0 {
-		obj.LeaderElection.ResourceName = v1beta1.SchedulerDefaultLockObjectName
+		obj.LeaderElection.ResourceName = v1beta2.SchedulerDefaultLockObjectName
 	}
 
 	if len(obj.ClientConnection.ContentType) == 0 {
@@ -160,7 +155,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 	}
 }
 
-func SetDefaults_DefaultPreemptionArgs(obj *v1beta1.DefaultPreemptionArgs) {
+func SetDefaults_DefaultPreemptionArgs(obj *v1beta2.DefaultPreemptionArgs) {
 	if obj.MinCandidateNodesPercentage == nil {
 		obj.MinCandidateNodesPercentage = pointer.Int32Ptr(10)
 	}
@@ -169,7 +164,7 @@ func SetDefaults_DefaultPreemptionArgs(obj *v1beta1.DefaultPreemptionArgs) {
 	}
 }
 
-func SetDefaults_InterPodAffinityArgs(obj *v1beta1.InterPodAffinityArgs) {
+func SetDefaults_InterPodAffinityArgs(obj *v1beta2.InterPodAffinityArgs) {
 	// Note that an object is created manually in cmd/kube-scheduler/app/options/deprecated.go
 	// DeprecatedOptions#ApplyTo.
 	// Update that object if a new default field is added here.
@@ -178,45 +173,41 @@ func SetDefaults_InterPodAffinityArgs(obj *v1beta1.InterPodAffinityArgs) {
 	}
 }
 
-func SetDefaults_NodeResourcesLeastAllocatedArgs(obj *v1beta1.NodeResourcesLeastAllocatedArgs) {
+func SetDefaults_NodeResourcesLeastAllocatedArgs(obj *v1beta2.NodeResourcesLeastAllocatedArgs) {
 	if len(obj.Resources) == 0 {
 		// If no resources specified, used the default set.
 		obj.Resources = append(obj.Resources, defaultResourceSpec...)
 	}
 }
 
-func SetDefaults_NodeResourcesMostAllocatedArgs(obj *v1beta1.NodeResourcesMostAllocatedArgs) {
+func SetDefaults_NodeResourcesMostAllocatedArgs(obj *v1beta2.NodeResourcesMostAllocatedArgs) {
 	if len(obj.Resources) == 0 {
 		// If no resources specified, used the default set.
 		obj.Resources = append(obj.Resources, defaultResourceSpec...)
 	}
 }
 
-func SetDefaults_RequestedToCapacityRatioArgs(obj *v1beta1.RequestedToCapacityRatioArgs) {
+func SetDefaults_RequestedToCapacityRatioArgs(obj *v1beta2.RequestedToCapacityRatioArgs) {
 	if len(obj.Resources) == 0 {
 		// If no resources specified, used the default set.
 		obj.Resources = append(obj.Resources, defaultResourceSpec...)
 	}
 }
 
-func SetDefaults_VolumeBindingArgs(obj *v1beta1.VolumeBindingArgs) {
+func SetDefaults_VolumeBindingArgs(obj *v1beta2.VolumeBindingArgs) {
 	if obj.BindTimeoutSeconds == nil {
 		obj.BindTimeoutSeconds = pointer.Int64Ptr(600)
 	}
 }
 
-func SetDefaults_PodTopologySpreadArgs(obj *v1beta1.PodTopologySpreadArgs) {
+func SetDefaults_PodTopologySpreadArgs(obj *v1beta2.PodTopologySpreadArgs) {
 	if feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
 		if obj.DefaultingType == "" {
-			if len(obj.DefaultConstraints) != 0 {
-				obj.DefaultingType = v1beta1.ListDefaulting
-			} else {
-				obj.DefaultingType = v1beta1.SystemDefaulting
-			}
+			obj.DefaultingType = v1beta2.SystemDefaulting
 		}
 		return
 	}
 	if obj.DefaultingType == "" {
-		obj.DefaultingType = v1beta1.ListDefaulting
+		obj.DefaultingType = v1beta2.ListDefaulting
 	}
 }

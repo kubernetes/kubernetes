@@ -94,6 +94,7 @@ type Scheduler struct {
 }
 
 type schedulerOptions struct {
+	componentConfigVersion   string
 	kubeConfig               *restclient.Config
 	schedulerAlgorithmSource schedulerapi.SchedulerAlgorithmSource
 	percentageOfNodesToScore int32
@@ -109,6 +110,16 @@ type schedulerOptions struct {
 
 // Option configures a Scheduler
 type Option func(*schedulerOptions)
+
+// WithComponentConfigVersion sets the component config version to the
+// KubeSchedulerConfiguration version used. The string should be the full
+// scheme group/version of the external type we converted from (for example
+// "kubescheduler.config.k8s.io/v1beta2")
+func WithComponentConfigVersion(apiVersion string) Option {
+	return func(o *schedulerOptions) {
+		o.componentConfigVersion = apiVersion
+	}
+}
 
 // WithKubeConfig sets the kube config for Scheduler.
 func WithKubeConfig(cfg *restclient.Config) Option {
@@ -227,6 +238,7 @@ func New(client clientset.Interface,
 	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 
 	configurator := &Configurator{
+		componentConfigVersion:   options.componentConfigVersion,
 		client:                   client,
 		kubeConfig:               options.kubeConfig,
 		recorderFactory:          recorderFactory,
