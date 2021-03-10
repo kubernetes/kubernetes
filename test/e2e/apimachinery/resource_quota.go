@@ -335,6 +335,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
+		resourceQuota.Spec.Hard[v1.ResourceConfigMaps] = resource.MustParse(hardConfigMaps)
 		_, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		framework.ExpectNoError(err)
 
@@ -353,9 +354,6 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Ensuring resource quota status captures configMap creation")
 		usedResources = v1.ResourceList{}
 		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
-		// we expect there to be two configmaps because each namespace will receive
-		// a ca.crt configmap by default.
-		// ref:https://github.com/kubernetes/kubernetes/pull/68812
 		usedResources[v1.ResourceConfigMaps] = resource.MustParse(hardConfigMaps)
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		framework.ExpectNoError(err)
@@ -1567,7 +1565,7 @@ func newTestResourceQuota(name string) *v1.ResourceQuota {
 	hard[v1.ResourceQuotas] = resource.MustParse("1")
 	hard[v1.ResourceCPU] = resource.MustParse("1")
 	hard[v1.ResourceMemory] = resource.MustParse("500Mi")
-	hard[v1.ResourceConfigMaps] = resource.MustParse("2")
+	hard[v1.ResourceConfigMaps] = resource.MustParse("10")
 	hard[v1.ResourceSecrets] = resource.MustParse("10")
 	hard[v1.ResourcePersistentVolumeClaims] = resource.MustParse("10")
 	hard[v1.ResourceRequestsStorage] = resource.MustParse("10Gi")
