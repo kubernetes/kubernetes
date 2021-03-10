@@ -48,14 +48,7 @@ func New(followNonLocalRedirects bool) Prober {
 // followNonLocalRedirects configures whether the prober should follow redirects to a different hostname.
 //   If disabled, redirects to other hosts will trigger a warning result.
 func NewWithTLSConfig(config *tls.Config, followNonLocalRedirects bool) Prober {
-	// We do not want the probe use node's local proxy set.
-	transport := utilnet.SetTransportDefaults(
-		&http.Transport{
-			TLSClientConfig:   config,
-			DisableKeepAlives: true,
-			Proxy:             http.ProxyURL(nil),
-		})
-	return httpProber{transport, followNonLocalRedirects}
+	return httpProber{config, followNonLocalRedirects}
 }
 
 // Prober is an interface that defines the Probe function for doing HTTP readiness/liveness checks.
@@ -64,16 +57,24 @@ type Prober interface {
 }
 
 type httpProber struct {
-	transport               *http.Transport
+	config                  *tls.Config
 	followNonLocalRedirects bool
 }
 
 // Probe returns a ProbeRunner capable of running an HTTP check.
 func (pr httpProber) Probe(url *url.URL, headers http.Header, timeout time.Duration) (probe.Result, string, error) {
-	pr.transport.DisableCompression = true // removes Accept-Encoding header
+	// We do not want the probe use node's local proxy set.
+	// Always recreate the transport so golang doesn't cache the connection.
+	transport := utilnet.SetTransportDefaults(
+		&http.Transport{
+			TLSClientConfig:    pr.config,
+			DisableKeepAlives:  true,
+			Proxy:              http.ProxyURL(nil),
+			DisableCompression: true, // removes Accept-Encoding header
+		})
 	client := &http.Client{
 		Timeout:       timeout,
-		Transport:     pr.transport,
+		Transport:     transport,
 		CheckRedirect: redirectChecker(pr.followNonLocalRedirects),
 	}
 	return DoHTTPProbe(url, headers, client)
