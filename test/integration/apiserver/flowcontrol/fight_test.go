@@ -39,23 +39,23 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
-/* fightTest configures a test of how API Priority and Fairness config
-   controllers fight when they disagree on how to set FlowSchemaStatus.
-   In particular, they set the condition that indicates integrity of
-   the reference to the PriorityLevelConfiguration.  The scenario tested is
-   two teams of controllers, where the controllers in one team set the
-   condition normally and the controllers in the other team set the condition
-   to the opposite value.
-
-   This is a behavioral test: it instantiates these controllers and runs them
-   almost normally.  The test aims to run the controllers for a little under
-   2 minutes.  The test takes clock readings to get upper and lower bounds on
-   how long each controller ran, and calculates consequent bounds on the number
-   of writes that should happen to each FlowSchemaStatus.  The test creates
-   an informer to observe the writes.  The calculated lower bound on the
-   number of writes is very lax, assuming only that one write can be done
-   every 10 seconds.
-*/
+// fightTest configures a test of how API Priority and Fairness config
+// controllers fight when they disagree on how to set FlowSchemaStatus.
+// In particular, they set the condition that indicates integrity of
+// the reference to the PriorityLevelConfiguration.  The scenario tested is
+// two teams of controllers, where the controllers in one team set the
+// condition normally and the controllers in the other team set the condition
+// to the opposite value.
+//
+// This is a behavioral test: it instantiates these controllers and runs them
+// almost normally.  The test aims to run the controllers for a little under
+// 2 minutes.  The test takes clock readings to get upper and lower bounds on
+// how long each controller ran, and calculates consequent bounds on the number
+// of writes that should happen to each FlowSchemaStatus.  The test creates
+// an informer to observe the writes.  The calculated lower bound on the
+// number of writes is very lax, assuming only that one write can be done
+// every 10 seconds.
+//
 type fightTest struct {
 	t              *testing.T
 	ctx            context.Context
@@ -63,7 +63,6 @@ type fightTest struct {
 	teamSize       int
 	stopCh         chan struct{}
 	now            time.Time
-	clk            *clock.FakeClock
 	ctlrs          map[bool][]utilfc.Interface
 
 	countsMutex sync.Mutex
@@ -81,7 +80,6 @@ func newFightTest(t *testing.T, loopbackConfig *rest.Config, teamSize int) *figh
 		teamSize:       teamSize,
 		stopCh:         make(chan struct{}),
 		now:            now,
-		clk:            clock.NewFakeClock(now),
 		ctlrs: map[bool][]utilfc.Interface{
 			false: make([]utilfc.Interface, teamSize),
 			true:  make([]utilfc.Interface, teamSize)},
@@ -119,25 +117,22 @@ func (ft *fightTest) countWrite(fs *flowcontrol.FlowSchema) {
 }
 
 func (ft *fightTest) createController(invert bool, i int) {
-	fieldMgr := fmt.Sprintf("testController%d%v", i, invert)
+	fieldMgr := fmt.Sprintf("testController-inverting-is-%v", invert)
+	name := fmt.Sprintf("testController-%d-%v", i, invert)
 	myConfig := rest.CopyConfig(ft.loopbackConfig)
-	myConfig = rest.AddUserAgent(myConfig, fieldMgr)
+	myConfig = rest.AddUserAgent(myConfig, name)
 	myClientset := clientset.NewForConfigOrDie(myConfig)
 	fcIfc := myClientset.FlowcontrolV1beta1()
 	informerFactory := informers.NewSharedInformerFactory(myClientset, 0)
-	foundToDangling := func(found bool) bool { return !found }
-	if invert {
-		foundToDangling = func(found bool) bool { return found }
-	}
 	ctlr := utilfc.NewTestable(utilfc.TestableConfig{
-		Name:                   fieldMgr,
-		FoundToDangling:        foundToDangling,
+		Name:                   name,
+		FoundToDangling:        func(found bool) bool { return invert == found },
 		Clock:                  clock.RealClock{},
 		AsFieldManager:         fieldMgr,
 		InformerFactory:        informerFactory,
 		FlowcontrolClient:      fcIfc,
-		ServerConcurrencyLimit: 200,             // server concurrency limit
-		RequestWaitLimit:       time.Minute / 4, // request wait limit
+		ServerConcurrencyLimit: 200,
+		RequestWaitLimit:       time.Minute / 4,
 		ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
 		QueueSetFactory:        fqtesting.NewNoRestraintFactory(),
 	})
@@ -172,13 +167,13 @@ func TestConfigConsumerFight(t *testing.T) {
 	defer closeFn()
 	const teamSize = 3
 	ft := newFightTest(t, loopbackConfig, teamSize)
+	defer close(ft.stopCh)
 	tBeforeCreate := time.Now()
 	ft.createMainInformer()
 	ft.foreach(ft.createController)
 	tAfterCreate := time.Now()
 	time.Sleep(110 * time.Second)
 	ft.evaluate(tBeforeCreate, tAfterCreate)
-	close(ft.stopCh)
 }
 
 func (ft *fightTest) foreach(visit func(invert bool, i int)) {
