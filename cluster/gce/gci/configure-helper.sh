@@ -1495,6 +1495,8 @@ addockeropt "\"pidfile\": \"/var/run/docker.pid\",
 
   addockeropt "\"mtu\": \"1460\","
 
+  addockeropt "\"storage-driver\": \"overlay2\","
+
   if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
     addockeropt "\"log-level\"": "\"debug\","
   else
