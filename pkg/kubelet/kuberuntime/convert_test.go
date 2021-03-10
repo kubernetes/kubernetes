@@ -26,47 +26,48 @@ import (
 )
 
 func TestConvertToKubeContainerImageSpec(t *testing.T) {
+	fakePodName := "test"
 	testCases := []struct {
 		input    *runtimeapi.Image
 		expected kubecontainer.ImageSpec
 	}{
 		{
 			input: &runtimeapi.Image{
-				Id:   "test",
+				Id:   fakePodName,
 				Spec: nil,
 			},
 			expected: kubecontainer.ImageSpec{
-				Image:       "test",
+				Image:       fakePodName,
 				Annotations: []kubecontainer.Annotation(nil),
 			},
 		},
 		{
 			input: &runtimeapi.Image{
-				Id: "test",
+				Id: fakePodName,
 				Spec: &runtimeapi.ImageSpec{
 					Annotations: nil,
 				},
 			},
 			expected: kubecontainer.ImageSpec{
-				Image:       "test",
+				Image:       fakePodName,
 				Annotations: []kubecontainer.Annotation(nil),
 			},
 		},
 		{
 			input: &runtimeapi.Image{
-				Id: "test",
+				Id: fakePodName,
 				Spec: &runtimeapi.ImageSpec{
 					Annotations: map[string]string{},
 				},
 			},
 			expected: kubecontainer.ImageSpec{
-				Image:       "test",
+				Image:       fakePodName,
 				Annotations: []kubecontainer.Annotation(nil),
 			},
 		},
 		{
 			input: &runtimeapi.Image{
-				Id: "test",
+				Id: fakePodName,
 				Spec: &runtimeapi.ImageSpec{
 					Annotations: map[string]string{
 						"kubernetes.io/os":             "linux",
@@ -75,7 +76,7 @@ func TestConvertToKubeContainerImageSpec(t *testing.T) {
 				},
 			},
 			expected: kubecontainer.ImageSpec{
-				Image: "test",
+				Image: fakePodName,
 				Annotations: []kubecontainer.Annotation{
 					{
 						Name:  "kubernetes.io/os",
@@ -103,27 +104,27 @@ func TestConvertToRuntimeAPIImageSpec(t *testing.T) {
 	}{
 		{
 			input: kubecontainer.ImageSpec{
-				Image:       "test",
+				Image:       fakePodName,
 				Annotations: nil,
 			},
 			expected: &runtimeapi.ImageSpec{
-				Image:       "test",
+				Image:       fakePodName,
 				Annotations: map[string]string{},
 			},
 		},
 		{
 			input: kubecontainer.ImageSpec{
-				Image:       "test",
+				Image:       fakePodName,
 				Annotations: []kubecontainer.Annotation{},
 			},
 			expected: &runtimeapi.ImageSpec{
-				Image:       "test",
+				Image:       fakePodName,
 				Annotations: map[string]string{},
 			},
 		},
 		{
 			input: kubecontainer.ImageSpec{
-				Image: "test",
+				Image: fakePodName,
 				Annotations: []kubecontainer.Annotation{
 					{
 						Name:  "kubernetes.io/os",
@@ -136,7 +137,7 @@ func TestConvertToRuntimeAPIImageSpec(t *testing.T) {
 				},
 			},
 			expected: &runtimeapi.ImageSpec{
-				Image: "test",
+				Image: fakePodName,
 				Annotations: map[string]string{
 					"kubernetes.io/os":             "linux",
 					"kubernetes.io/runtimehandler": "handler",
