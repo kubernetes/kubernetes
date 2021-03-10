@@ -1173,20 +1173,17 @@ rules:
     verbs: ["get", "list"]
     resources:
       - group: "metrics.k8s.io"
-
   # Don't log these read-only URLs.
   - level: None
     nonResourceURLs:
       - /healthz*
       - /version
       - /swagger*
-
   # Don't log events requests because of performance impact.
   - level: None
     resources:
       - group: "" # core
         resources: ["events"]
-
   # node and pod status calls from nodes are high-volume and can be large, don't log responses for expected updates from nodes
   - level: Request
     users: ["kubelet", "system:node-problem-detector", "system:serviceaccount:kube-system:node-problem-detector"]
@@ -1204,14 +1201,12 @@ rules:
         resources: ["nodes/status", "pods/status"]
     omitStages:
       - "RequestReceived"
-
   # deletecollection calls can be large, don't log responses for expected namespace deletions
   - level: Request
     users: ["system:serviceaccount:kube-system:namespace-controller"]
     verbs: ["deletecollection"]
     omitStages:
       - "RequestReceived"
-
   # Secrets, ConfigMaps, and TokenReviews can contain sensitive & binary data,
   # so only log at the Metadata level.
   - level: Metadata
@@ -1453,6 +1448,7 @@ function create-master-etcd-apiserver-auth {
    fi
 }
 
+
 function docker-installed {
     if systemctl cat docker.service &> /dev/null ; then
         return 0
@@ -1461,40 +1457,76 @@ function docker-installed {
     fi
 }
 
+# util function to add a docker option to daemon.json file only if the daemon.json file is present.
+# accepts only one argument (docker options)
+function addockeropt {
+	DOCKER_OPTS_FILE=/etc/docker/daemon.json
+	if [ "$#" -lt 1 ]; then
+	echo "No arguments are passed while adding docker options. Expect one argument"
+	exit 1
+	elif [ "$#" -gt 1 ]; then
+	echo "Only one argument is accepted"
+	exit 1
+	fi
+	# appends the given input to the docker opts file i.e. /etc/docker/daemon.json file
+	if [ -f "$DOCKER_OPTS_FILE" ]; then
+	cat >> "${DOCKER_OPTS_FILE}" <<EOF
+  $1
+EOF
+	fi
+}
+
 function assemble-docker-flags {
-  echo "Assemble docker command line flags"
-  local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
-  if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
-    docker_opts+=" --log-level=debug"
-  else
-    docker_opts+=" --log-level=warn"
-  fi
-  if [[ "${NETWORK_PROVIDER:-}" == "kubenet" || "${NETWORK_PROVIDER:-}" == "cni" ]]; then
-    # set docker0 cidr to private ip address range to avoid conflict with cbr0 cidr range
-    docker_opts+=" --bip=169.254.123.1/24"
-  else
-    docker_opts+=" --bridge=cbr0"
+  echo "Assemble docker options"
+
+    # log the contents of the /etc/docker/daemon.json if already exists
+  if [ -f /etc/docker/daemon.json ]; then
+    echo "Contents of the old docker config"
+    cat /etc/docker/daemon.json
   fi
 
+  cat <<EOF >/etc/docker/daemon.json
+{
+EOF
+
+addockeropt "\"pidfile\": \"/var/run/docker.pid\",
+  \"iptables\": false,
+  \"ip-masq\": false,"
+
+  addockeropt "\"mtu\": \"1460\","
+
+  if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
+    addockeropt "\"log-level\"": "\"debug\","
+  else
+    addockeropt "\"log-level\": \"warn\","
+  fi
+
+  if [[ "${NETWORK_PROVIDER:-}" == "kubenet" || "${NETWORK_PROVIDER:-}" == "cni" ]]; then
+    # set docker0 cidr to private ip address range to avoid conflict with cbr0 cidr range
+    addockeropt "\"bip\": \"169.254.123.1/24\","
+  else
+   addockeropt "\"bridge\": \"cbr0\","
+  fi
   # Decide whether to enable a docker registry mirror. This is taken from
   # the "kube-env" metadata value.
   if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
     echo "Enable docker registry mirror at: ${DOCKER_REGISTRY_MIRROR_URL}"
-    docker_opts+=" --registry-mirror=${DOCKER_REGISTRY_MIRROR_URL}"
+    addockeropt "\"registry-mirrors\": [\"${DOCKER_REGISTRY_MIRROR_URL}\"],"
   fi
-
-  # Configure docker logging
-  docker_opts+=" --log-driver=${DOCKER_LOG_DRIVER:-json-file}"
-  docker_opts+=" --log-opt=max-size=${DOCKER_LOG_MAX_SIZE:-10m}"
-  docker_opts+=" --log-opt=max-file=${DOCKER_LOG_MAX_FILE:-5}"
-
-  # Disable live-restore if the environment variable is set.
-
+    # Disable live-restore if the environment variable is set.
   if [[ "${DISABLE_DOCKER_LIVE_RESTORE:-false}" == "true" ]]; then
-    docker_opts+=" --live-restore=false"
+    addockeropt "\"live-restore\": \"false\","
   fi
-
-  echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
+  # Configure docker logging
+  addockeropt "\"log-driver\": \"${DOCKER_LOG_DRIVER:-json-file}\","
+  addockeropt "\"log-opts\": {
+      \"max-size\": \"${DOCKER_LOG_MAX_SIZE:-10m}\",
+      \"max-file\": \"${DOCKER_LOG_MAX_FILE:-5}\"
+    }"
+  cat <<EOF >>/etc/docker/daemon.json
+}
+EOF
+  echo "DOCKER_OPTS=\"${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
 
   # Ensure TasksMax is sufficient for docker.
   # (https://github.com/kubernetes/kubernetes/issues/51977)
@@ -1543,13 +1575,11 @@ function start-kubelet {
 Description=Kubernetes kubelet
 Requires=network-online.target
 After=network-online.target
-
 [Service]
 Restart=always
 RestartSec=10
 EnvironmentFile=${kubelet_env_file}
 ExecStart=${kubelet_bin} \$KUBELET_OPTS
-
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -1595,12 +1625,10 @@ function start-node-problem-detector {
 Description=Kubernetes node problem detector
 Requires=network-online.target
 After=network-online.target
-
 [Service]
 Restart=always
 RestartSec=10
 ExecStart=${npd_bin} ${flags}
-
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -2816,23 +2844,18 @@ If it isn't, the closest tag is at:
     gitref="${version//*+/}"
   fi
   cat > /etc/motd <<EOF
-
 Welcome to Kubernetes ${version}!
-
 You can find documentation for Kubernetes at:
   http://docs.kubernetes.io/
-
 The source for this release can be found at:
   /home/kubernetes/kubernetes-src.tar.gz
 Or you can download it at:
   https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-src.tar.gz
-
 It is based on the Kubernetes source at:
   https://github.com/kubernetes/kubernetes/tree/${gitref}
 ${devel}
 For Kubernetes copyright and licensing information, see:
   /home/kubernetes/LICENSES
-
 EOF
 }
 
@@ -2949,10 +2972,8 @@ EOF
 # Kubernetes doesn't use containerd restart manager.
 disabled_plugins = ["restart"]
 oom_score = -999
-
 [debug]
   level = "${CONTAINERD_LOG_LEVEL:-"info"}"
-
 [plugins.cri]
   stream_server_address = "127.0.0.1"
   max_container_log_line_size = ${CONTAINERD_MAX_CONTAINER_LOG_LINE:-262144}
