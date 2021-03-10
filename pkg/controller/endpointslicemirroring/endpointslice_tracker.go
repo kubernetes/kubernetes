@@ -19,7 +19,6 @@ package endpointslicemirroring
 import (
 	"sync"
 
-	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -83,11 +82,11 @@ func (est *endpointSliceTracker) ShouldSync(endpointSlice *discovery.EndpointSli
 // StaleSlices returns true if one or more of the provided EndpointSlices
 // have older generations than the corresponding tracked ones or if the tracker
 // is expecting one or more of the provided EndpointSlices to be deleted.
-func (est *endpointSliceTracker) StaleSlices(service *v1.Service, endpointSlices []*discovery.EndpointSlice) bool {
+func (est *endpointSliceTracker) StaleSlices(namespace, name string, endpointSlices []*discovery.EndpointSlice) bool {
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
-	nn := types.NamespacedName{Name: service.Name, Namespace: service.Namespace}
+	nn := types.NamespacedName{Name: name, Namespace: namespace}
 	gfs, ok := est.generationsByService[nn]
 	if !ok {
 		return false
@@ -99,6 +98,51 @@ func (est *endpointSliceTracker) StaleSlices(service *v1.Service, endpointSlices
 		}
 	}
 	return false
+}
+
+// MissingSlices returns true if this tracker is tracking more EndpointSlices
+// for the provided Service than have been provided to this function. If this
+// function returns true, it can be used as an indication that the controller
+// should fall back to a full API list instead of relying on the cache.
+func (est *endpointSliceTracker) MissingSlices(namespace, name string, endpointSlices []*discovery.EndpointSlice) bool {
+	est.lock.Lock()
+	defer est.lock.Unlock()
+
+	nn := types.NamespacedName{Name: name, Namespace: namespace}
+	gfs, ok := est.generationsByService[nn]
+	if !ok {
+		return false
+	}
+	providedSlices := make(map[types.UID]bool, len(endpointSlices))
+	for _, endpointSlice := range endpointSlices {
+		providedSlices[endpointSlice.UID] = true
+	}
+	for trackedUID, gen := range gfs {
+		if gen == deletionExpected {
+			continue
+		}
+		_, ok := providedSlices[trackedUID]
+		if !ok {
+			return true
+		}
+	}
+	return false
+}
+
+// Reset updates the tracker to contain only the provided slices for the
+// specified Service.
+func (est *endpointSliceTracker) Reset(namespace, name string, endpointSlices []*discovery.EndpointSlice) {
+	est.lock.Lock()
+	defer est.lock.Unlock()
+
+	gfs := generationsBySlice{}
+	nn := types.NamespacedName{Name: name, Namespace: namespace}
+
+	for _, endpointSlice := range endpointSlices {
+		gfs[endpointSlice.UID] = endpointSlice.Generation
+	}
+
+	est.generationsByService[nn] = gfs
 }
 
 // Update adds or updates the generation in this endpointSliceTracker for the

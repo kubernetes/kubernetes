@@ -17,9 +17,9 @@ limitations under the License.
 package endpointslicemirroring
 
 import (
+	"reflect"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -125,19 +125,21 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 	epSlice1NewerGen.Generation = 2
 
 	testCases := []struct {
-		name         string
-		tracker      *endpointSliceTracker
-		serviceParam *v1.Service
-		slicesParam  []*discovery.EndpointSlice
-		expectNewer  bool
+		name             string
+		tracker          *endpointSliceTracker
+		serviceName      string
+		serviceNamespace string
+		slicesParam      []*discovery.EndpointSlice
+		expectNewer      bool
 	}{{
 		name: "empty tracker",
 		tracker: &endpointSliceTracker{
 			generationsByService: map[types.NamespacedName]generationsBySlice{},
 		},
-		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
-		slicesParam:  []*discovery.EndpointSlice{},
-		expectNewer:  false,
+		serviceName:      "svc1",
+		serviceNamespace: "ns1",
+		slicesParam:      []*discovery.EndpointSlice{},
+		expectNewer:      false,
 	}, {
 		name: "empty slices",
 		tracker: &endpointSliceTracker{
@@ -145,9 +147,10 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 				{Name: "svc1", Namespace: "ns1"}: {},
 			},
 		},
-		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
-		slicesParam:  []*discovery.EndpointSlice{},
-		expectNewer:  false,
+		serviceName:      "svc1",
+		serviceNamespace: "ns1",
+		slicesParam:      []*discovery.EndpointSlice{},
+		expectNewer:      false,
 	}, {
 		name: "matching slices",
 		tracker: &endpointSliceTracker{
@@ -157,9 +160,10 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 				},
 			},
 		},
-		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
-		slicesParam:  []*discovery.EndpointSlice{epSlice1},
-		expectNewer:  false,
+		serviceName:      "svc1",
+		serviceNamespace: "ns1",
+		slicesParam:      []*discovery.EndpointSlice{epSlice1},
+		expectNewer:      false,
 	}, {
 		name: "newer slice in tracker",
 		tracker: &endpointSliceTracker{
@@ -169,9 +173,10 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 				},
 			},
 		},
-		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
-		slicesParam:  []*discovery.EndpointSlice{epSlice1},
-		expectNewer:  true,
+		serviceName:      "svc1",
+		serviceNamespace: "ns1",
+		slicesParam:      []*discovery.EndpointSlice{epSlice1},
+		expectNewer:      true,
 	}, {
 		name: "newer slice in params",
 		tracker: &endpointSliceTracker{
@@ -181,16 +186,223 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 				},
 			},
 		},
-		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
-		slicesParam:  []*discovery.EndpointSlice{epSlice1NewerGen},
-		expectNewer:  false,
+		serviceName:      "svc1",
+		serviceNamespace: "ns1",
+		slicesParam:      []*discovery.EndpointSlice{epSlice1NewerGen},
+		expectNewer:      false,
 	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actualNewer := tc.tracker.StaleSlices(tc.serviceParam, tc.slicesParam)
+			actualNewer := tc.tracker.StaleSlices(tc.serviceNamespace, tc.serviceName, tc.slicesParam)
 			if actualNewer != tc.expectNewer {
 				t.Errorf("Expected %t, got %t", tc.expectNewer, actualNewer)
+			}
+		})
+	}
+}
+
+func TestEndpointSliceTrackerMissingSlices(t *testing.T) {
+	epSlice1 := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "example-1",
+			Namespace:  "ns1",
+			UID:        "original",
+			Generation: 1,
+			Labels:     map[string]string{discovery.LabelServiceName: "svc1"},
+		},
+	}
+
+	epSlice2 := epSlice1.DeepCopy()
+	epSlice2.UID = "different"
+
+	testCases := []struct {
+		name             string
+		tracker          *endpointSliceTracker
+		serviceName      string
+		serviceNamespace string
+		slicesParam      []*discovery.EndpointSlice
+		expectMissing    bool
+	}{{
+		name: "empty tracker",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{},
+		},
+		serviceName:      "svc1",
+		serviceNamespace: "ns1",
+		slicesParam:      []*discovery.EndpointSlice{},
+		expectMissing:    false,
+	}, {
+		name: "empty slices",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {},
+			},
+		},
+		serviceName:      "svc1",
+		serviceNamespace: "ns1",
+		slicesParam:      []*discovery.EndpointSlice{},
+		expectMissing:    false,
+	}, {
+		name: "a missing slice that is expected to be deleted",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {
+					epSlice1.UID: deletionExpected,
+				},
+			},
+		},
+		serviceName:      "svc1",
+		serviceNamespace: "ns1",
+		slicesParam:      []*discovery.EndpointSlice{},
+		expectMissing:    false,
+	}, {
+		name: "matching slices",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {
+					epSlice1.UID: epSlice1.Generation,
+				},
+			},
+		},
+		serviceName:      "svc1",
+		serviceNamespace: "ns1",
+		slicesParam:      []*discovery.EndpointSlice{epSlice1},
+		expectMissing:    false,
+	}, {
+		name: "different slice in tracker",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {
+					epSlice2.UID: epSlice2.Generation,
+				},
+			},
+		},
+		serviceName:      "svc1",
+		serviceNamespace: "ns1",
+		slicesParam:      []*discovery.EndpointSlice{epSlice1},
+		expectMissing:    true,
+	}, {
+		name: "more slices in params",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {
+					epSlice1.UID: epSlice1.Generation,
+				},
+			},
+		},
+		serviceName:      "svc1",
+		serviceNamespace: "ns1",
+		slicesParam:      []*discovery.EndpointSlice{epSlice1, epSlice2},
+		expectMissing:    false,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actualMissing := tc.tracker.MissingSlices(tc.serviceNamespace, tc.serviceName, tc.slicesParam)
+			if actualMissing != tc.expectMissing {
+				t.Errorf("Expected %t, got %t", tc.expectMissing, actualMissing)
+			}
+		})
+	}
+}
+
+func TestEndpointSliceTrackerReset(t *testing.T) {
+	epSlice1 := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "example-1",
+			Namespace:  "ns1",
+			UID:        "original",
+			Generation: 1,
+			Labels:     map[string]string{discovery.LabelServiceName: "svc1"},
+		},
+	}
+
+	epSlice2 := epSlice1.DeepCopy()
+	epSlice2.UID = "different"
+
+	testCases := []struct {
+		name                     string
+		tracker                  *endpointSliceTracker
+		serviceName              string
+		serviceNamespace         string
+		slicesParam              []*discovery.EndpointSlice
+		expectGenerationsBySlice generationsBySlice
+	}{{
+		name: "empty tracker",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{},
+		},
+		serviceName:              "svc1",
+		serviceNamespace:         "ns1",
+		slicesParam:              []*discovery.EndpointSlice{},
+		expectGenerationsBySlice: generationsBySlice{},
+	}, {
+		name: "empty slices",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {},
+			},
+		},
+		serviceName:              "svc1",
+		serviceNamespace:         "ns1",
+		slicesParam:              []*discovery.EndpointSlice{},
+		expectGenerationsBySlice: generationsBySlice{},
+	}, {
+		name: "matching slices",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {
+					epSlice1.UID: epSlice1.Generation,
+				},
+			},
+		},
+		serviceName:              "svc1",
+		serviceNamespace:         "ns1",
+		slicesParam:              []*discovery.EndpointSlice{epSlice1},
+		expectGenerationsBySlice: generationsBySlice{epSlice1.UID: epSlice1.Generation},
+	}, {
+		name: "different slice in tracker",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {
+					epSlice2.UID: epSlice2.Generation,
+				},
+			},
+		},
+		serviceName:              "svc1",
+		serviceNamespace:         "ns1",
+		slicesParam:              []*discovery.EndpointSlice{epSlice1},
+		expectGenerationsBySlice: generationsBySlice{epSlice1.UID: epSlice1.Generation},
+	}, {
+		name: "more slices in params",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {
+					epSlice1.UID: epSlice1.Generation,
+				},
+			},
+		},
+		serviceName:      "svc1",
+		serviceNamespace: "ns1",
+		slicesParam:      []*discovery.EndpointSlice{epSlice1, epSlice2},
+		expectGenerationsBySlice: generationsBySlice{
+			epSlice1.UID: epSlice1.Generation,
+			epSlice2.UID: epSlice2.Generation,
+		},
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.tracker.Reset(tc.serviceNamespace, tc.serviceName, tc.slicesParam)
+			serviceNN := types.NamespacedName{Name: tc.serviceName, Namespace: tc.serviceNamespace}
+			actualGenerationsBySlice, ok := tc.tracker.generationsByService[serviceNN]
+
+			if !ok {
+				t.Fatalf("Expected generations by slice to exist for %s/%s", tc.serviceNamespace, tc.serviceName)
+			}
+			if !reflect.DeepEqual(actualGenerationsBySlice, tc.expectGenerationsBySlice) {
+				t.Errorf("Expected %+v, got %+v", tc.expectGenerationsBySlice, actualGenerationsBySlice)
 			}
 		})
 	}

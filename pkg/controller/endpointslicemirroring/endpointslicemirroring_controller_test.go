@@ -331,11 +331,14 @@ func TestShouldMirror(t *testing.T) {
 
 func TestEndpointSlicesMirroredForService(t *testing.T) {
 	testCases := []struct {
-		testName       string
-		namespace      string
-		name           string
-		endpointSlice  *discovery.EndpointSlice
-		expectedInList bool
+		testName           string
+		namespace          string
+		name               string
+		endpointSlice      *discovery.EndpointSlice
+		excludeFromCache   bool
+		excludeFromStorage bool
+		excludeFromTracker bool
+		expectedInList     bool
 	}{{
 		testName:  "Service with matching EndpointSlice",
 		namespace: "ns1",
@@ -424,18 +427,97 @@ func TestEndpointSlicesMirroredForService(t *testing.T) {
 			},
 		},
 		expectedInList: false,
+	}, {
+		testName:  "Service with matching EndpointSlice that isn't in cache yet",
+		namespace: "ns1",
+		name:      "svc1",
+		endpointSlice: &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example-1",
+				Namespace: "ns1",
+				Labels: map[string]string{
+					discovery.LabelServiceName: "svc1",
+					discovery.LabelManagedBy:   controllerName,
+				},
+			},
+		},
+		excludeFromCache: true,
+		expectedInList:   true,
+	}, {
+		testName:  "Service with matching EndpointSlice that isn't in cache or storage",
+		namespace: "ns1",
+		name:      "svc1",
+		endpointSlice: &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example-1",
+				Namespace: "ns1",
+				Labels: map[string]string{
+					discovery.LabelServiceName: "svc1",
+					discovery.LabelManagedBy:   controllerName,
+				},
+			},
+		},
+		excludeFromCache:   true,
+		excludeFromStorage: true,
+		expectedInList:     false,
+	}, {
+		testName:  "Service with matching EndpointSlice that isn't in storage (verify that storage lookup doesn't always happen)",
+		namespace: "ns1",
+		name:      "svc1",
+		endpointSlice: &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example-1",
+				Namespace: "ns1",
+				Labels: map[string]string{
+					discovery.LabelServiceName: "svc1",
+					discovery.LabelManagedBy:   controllerName,
+				},
+			},
+		},
+		excludeFromStorage: true,
+		expectedInList:     true,
+	}, {
+		testName:  "Service with matching EndpointSlice that isn't in cache or tracker",
+		namespace: "ns1",
+		name:      "svc1",
+		endpointSlice: &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example-1",
+				Namespace: "ns1",
+				Labels: map[string]string{
+					discovery.LabelServiceName: "svc1",
+					discovery.LabelManagedBy:   controllerName,
+				},
+			},
+		},
+		excludeFromCache:   true,
+		excludeFromTracker: true,
+		expectedInList:     false,
 	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
 			_, c := newController(time.Duration(0))
 
-			err := c.endpointSliceStore.Add(tc.endpointSlice)
-			if err != nil {
-				t.Fatalf("Error adding EndpointSlice to store: %v", err)
+			if !tc.excludeFromCache {
+				err := c.endpointSliceStore.Add(tc.endpointSlice)
+				if err != nil {
+					t.Fatalf("Error adding EndpointSlice to store: %v", err)
+				}
 			}
 
-			endpointSlices, err := endpointSlicesMirroredForService(c.endpointSliceLister, tc.namespace, tc.name)
+			if !tc.excludeFromStorage {
+				_, err := c.client.DiscoveryV1().EndpointSlices(tc.endpointSlice.Namespace).Create(context.TODO(), tc.endpointSlice, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Error creating EndpointSlice: %v", err)
+				}
+			}
+
+			if !tc.excludeFromTracker {
+				c.endpointSliceTracker.Update(tc.endpointSlice)
+			}
+
+			endpointSlices, err := c.endpointSlicesMirroredForService(tc.namespace, tc.name)
 			if err != nil {
 				t.Fatalf("Expected no error, got %v", err)
 			}

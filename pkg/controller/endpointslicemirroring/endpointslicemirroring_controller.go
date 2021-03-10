@@ -17,6 +17,7 @@ limitations under the License.
 package endpointslicemirroring
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -311,13 +313,9 @@ func (c *Controller) syncEndpoints(key string) error {
 		return nil
 	}
 
-	endpointSlices, err := endpointSlicesMirroredForService(c.endpointSliceLister, namespace, name)
+	endpointSlices, err := c.endpointSlicesMirroredForService(namespace, name)
 	if err != nil {
 		return err
-	}
-
-	if c.endpointSliceTracker.StaleSlices(svc, endpointSlices) {
-		return &StaleInformerCache{"EndpointSlice informer cache is out of date"}
 	}
 
 	err = c.reconciler.reconcile(endpoints, endpointSlices)
@@ -508,7 +506,7 @@ func (c *Controller) queueEndpointsForEndpointSlice(endpointSlice *discovery.End
 // deleteMirroredSlices will delete and EndpointSlices that have been mirrored
 // for Endpoints with this namespace and name.
 func (c *Controller) deleteMirroredSlices(namespace, name string) error {
-	endpointSlices, err := endpointSlicesMirroredForService(c.endpointSliceLister, namespace, name)
+	endpointSlices, err := c.endpointSlicesMirroredForService(namespace, name)
 	if err != nil {
 		return err
 	}
@@ -519,10 +517,44 @@ func (c *Controller) deleteMirroredSlices(namespace, name string) error {
 
 // endpointSlicesMirroredForService returns the EndpointSlices that have been
 // mirrored for a Service by this controller.
-func endpointSlicesMirroredForService(endpointSliceLister discoverylisters.EndpointSliceLister, namespace, name string) ([]*discovery.EndpointSlice, error) {
-	esLabelSelector := labels.Set(map[string]string{
+func (c *Controller) endpointSlicesMirroredForService(namespace, name string) ([]*discovery.EndpointSlice, error) {
+	esSelector := labels.Set(map[string]string{
 		discovery.LabelServiceName: name,
 		discovery.LabelManagedBy:   controllerName,
 	}).AsSelectorPreValidated()
-	return endpointSliceLister.EndpointSlices(namespace).List(esLabelSelector)
+
+	endpointSlices, err := c.endpointSliceLister.EndpointSlices(namespace).List(esSelector)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// If this is true it means we likely just need to wait longer for the cache
+	// to catch up to our expected state.
+	if c.endpointSliceTracker.StaleSlices(namespace, name, endpointSlices) {
+		klog.V(2).Infof("EndpointSlice informer cache is out of date for %s/%s", namespace, name)
+		return nil, &StaleInformerCache{"EndpointSlice informer cache is out of date"}
+	}
+
+	// If this is true we need to do a full API lookup. Unlike stale slices
+	// above, this indicates that the tracker has more slices than the cache
+	// does. The cache may catch up to this state, but this could also indicate
+	// that a slice has been unexpectedly deleted. If that were the case, we'd
+	// be waiting indefinitely unless we did this API lookup. This helps catch
+	// an issue where duplicate slices were being created (#100033).
+	if c.endpointSliceTracker.MissingSlices(namespace, name, endpointSlices) {
+		endpointSliceList, err := c.client.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: esSelector.String()})
+		if err != nil {
+			return nil, err
+		}
+		endpointSlices = []*discovery.EndpointSlice{}
+		for _, endpointSlice := range endpointSliceList.Items {
+			endpointSlices = append(endpointSlices, &endpointSlice)
+		}
+		// To avoid repeatedly running into this, reset the slices in the
+		// tracker with what we've received from the API.
+		c.endpointSliceTracker.Reset(namespace, name, endpointSlices)
+	}
+
+	return endpointSlices, nil
 }
