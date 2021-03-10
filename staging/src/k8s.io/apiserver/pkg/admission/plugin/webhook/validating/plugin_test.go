@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -155,6 +156,10 @@ func TestValidate(t *testing.T) {
 		if len(tt.ExpectAnnotations) == 0 {
 			assert.Empty(t, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
 		} else {
+			// avoid failure when system is overloaded
+			if len(fakeAttr.GetAnnotations(auditinternal.LevelMetadata)) == 0 {
+				time.Sleep(10 * time.Second)
+			}
 			assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
 		}
 	}
