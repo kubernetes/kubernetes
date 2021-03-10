@@ -698,6 +698,13 @@
     MUST succeed. It MUST succeed when deleting the Deployment.
   release: v1.20
   file: test/e2e/apps/deployment.go
+- testname: 'PodDisruptionBudget: Status updates'
+  codename: '[sig-apps] DisruptionController should observe PodDisruptionBudget status
+    updated [Conformance]'
+  description: Disruption controller MUST update the PDB status with how many disruptions
+    are allowed.
+  release: v1.21
+  file: test/e2e/apps/disruption.go
 - testname: Jobs, orphan pods, re-adoption
   codename: '[sig-apps] Job should adopt matching orphans and release non-matching
     pods [Conformance]'
