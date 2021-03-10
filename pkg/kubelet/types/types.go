@@ -30,6 +30,8 @@ import (
 type HTTPGetter interface {
 	// Get issues a GET to the specified URL.
 	Get(url string) (*http.Response, error)
+	// Do sends an HTTP request and returns an HTTP response.
+	Do(req *http.Request) (*http.Response, error)
 }
 
 // Timestamp wraps around time.Time and offers utilities to format and parse

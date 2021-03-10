@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -68,7 +68,7 @@ type annotatedContainerInfo struct {
 	PodTerminationGracePeriod *int64
 	TerminationMessagePath    string
 	TerminationMessagePolicy  v1.TerminationMessagePolicy
-	PreStopHandler            *v1.Handler
+	PreStopHandler            *v1.LifecycleAction
 	ContainerPorts            []v1.ContainerPort
 }
 
@@ -204,7 +204,7 @@ func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedCo
 		klog.Errorf("Unable to get %q from annotations %q: %v", podTerminationGracePeriodLabel, annotations, err)
 	}
 
-	preStopHandler := &v1.Handler{}
+	preStopHandler := &v1.LifecycleAction{}
 	if found, err := getJSONObjectFromLabel(annotations, containerPreStopHandlerLabel, preStopHandler); err != nil {
 		klog.Errorf("Unable to get %q from annotations %q: %v", containerPreStopHandlerLabel, annotations, err)
 	} else if found {

@@ -17,12 +17,14 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
 	"strconv"
+	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
@@ -56,27 +58,26 @@ func NewHandlerRunner(httpGetter kubetypes.HTTPGetter, commandRunner kubecontain
 	}
 }
 
-func (hr *handlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
+func (hr *handlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, action *v1.LifecycleAction) (string, error) {
 	switch {
-	case handler.Exec != nil:
+	case action.Exec != nil:
 		var msg string
-		// TODO(tallclair): Pass a proper timeout value.
-		output, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command, 0)
+		output, err := hr.commandRunner.RunInContainer(containerID, action.Exec.Command, time.Duration(action.TimeoutSeconds)*time.Second)
 		if err != nil {
-			msg = fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
+			msg = fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", action.Exec.Command, container.Name, format.Pod(pod), err, string(output))
 			klog.V(1).Infof(msg)
 		}
 		return msg, err
-	case handler.HTTPGet != nil:
-		msg, err := hr.runHTTPHandler(pod, container, handler)
+	case action.HTTPGet != nil:
+		msg, err := hr.runHTTPHandler(pod, container, action)
 		if err != nil {
-			msg = fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), err, msg)
+			msg = fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", action.HTTPGet.Path, container.Name, format.Pod(pod), err, msg)
 			klog.V(1).Infof(msg)
 		}
 		return msg, err
 	default:
-		err := fmt.Errorf("invalid handler: %v", handler)
-		msg := fmt.Sprintf("Cannot run handler: %v", err)
+		err := fmt.Errorf("invalid action: %v", action)
+		msg := fmt.Sprintf("Cannot run action: %v", err)
 		klog.Errorf(msg)
 		return msg, err
 	}
@@ -105,8 +106,8 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
-func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
-	host := handler.HTTPGet.Host
+func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, action *v1.LifecycleAction) (string, error) {
+	host := action.HTTPGet.Host
 	if len(host) == 0 {
 		status, err := hr.containerManager.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
@@ -119,17 +120,26 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 		host = status.IPs[0]
 	}
 	var port int
-	if handler.HTTPGet.Port.Type == intstr.String && len(handler.HTTPGet.Port.StrVal) == 0 {
+	if action.HTTPGet.Port.Type == intstr.String && len(action.HTTPGet.Port.StrVal) == 0 {
 		port = 80
 	} else {
 		var err error
-		port, err = resolvePort(handler.HTTPGet.Port, container)
+		port, err = resolvePort(action.HTTPGet.Port, container)
 		if err != nil {
 			return "", err
 		}
 	}
-	url := fmt.Sprintf("http://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), handler.HTTPGet.Path)
-	resp, err := hr.httpGetter.Get(url)
+	url := fmt.Sprintf("http://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), action.HTTPGet.Path)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	ctx := context.Background()
+	if action.TimeoutSeconds != 0 {
+		ctx, _ = context.WithTimeout(ctx, time.Duration(action.TimeoutSeconds)*time.Second)
+	}
+	req = req.WithContext(ctx)
+	resp, err := hr.httpGetter.Do(req)
 	return getHTTPRespBody(resp), err
 }
 
