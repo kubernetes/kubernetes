@@ -377,13 +377,13 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 
 					if !apiequality.Semantic.DeepEqual(epAddresses, sliceAddresses) {
 						t.Logf("Expected EndpointSlice to have the same IP addresses, expected %v got %v", epAddresses, sliceAddresses)
-						return false, nil
+						continue
 					}
 
 					// check labels were mirrored
 					if !isSubset(customEndpoints.Labels, endpointSlice.Labels) {
 						t.Logf("Expected EndpointSlice to mirror labels, expected %v to be in received %v", customEndpoints.Labels, endpointSlice.Labels)
-						return false, nil
+						continue
 					}
 
 					// check annotations but endpoints.kubernetes.io/last-change-trigger-time were mirrored
@@ -396,10 +396,13 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 					}
 					if !apiequality.Semantic.DeepEqual(annotations, endpointSlice.Annotations) {
 						t.Logf("Expected EndpointSlice to mirror annotations, expected %v received %v", customEndpoints.Annotations, endpointSlice.Annotations)
-						return false, nil
+						continue
 					}
+					// This is a temporary workaround for https://github.com/kubernetes/kubernetes/issues/100033.
+					// TODO(robscott): When that issue is fixed, update this test to expect all EndpointSlices to meet this criteria.
+					return true, nil
 				}
-				return true, nil
+				return false, nil
 			})
 			if err != nil {
 				t.Fatalf("Timed out waiting for conditions: %v", err)
