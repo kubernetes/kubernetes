@@ -109,7 +109,7 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 			cmdutil.CheckErr(o.Run(args))
 		},
 	}
-	cmd.Flags().StringVarP(&o.Container, "container", "c", o.Container, "Container name. If omitted, prefer to use the kubectl.kubernetes.io/default-container annotation or the first container in the pod will be chosen")
+	cmdutil.AddContainerVarFlags(cmd, &o.Container, o.Container)
 	cmd.Flags().BoolVarP(&o.NoPreserve, "no-preserve", "", false, "The copied file/directory's ownership and permissions will not be preserved in the container")
 
 	return cmd
