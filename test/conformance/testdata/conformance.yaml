@@ -698,11 +698,29 @@
     MUST succeed. It MUST succeed when deleting the Deployment.
   release: v1.20
   file: test/e2e/apps/deployment.go
+- testname: 'PodDisruptionBudget: list and delete collection'
+  codename: '[sig-apps] DisruptionController Listing PodDisruptionBudgets for all
+    namespaces should list and delete a collection of PodDisruptionBudgets [Conformance]'
+  description: PodDisruptionBudget API must support list and deletecollection operations.
+  release: v1.21
+  file: test/e2e/apps/disruption.go
+- testname: 'PodDisruptionBudget: create and delete object'
+  codename: '[sig-apps] DisruptionController should create a PodDisruptionBudget [Conformance]'
+  description: PodDisruptionBudget API must support create and delete operations.
+  release: v1.21
+  file: test/e2e/apps/disruption.go
 - testname: 'PodDisruptionBudget: Status updates'
   codename: '[sig-apps] DisruptionController should observe PodDisruptionBudget status
     updated [Conformance]'
   description: Disruption controller MUST update the PDB status with how many disruptions
     are allowed.
+  release: v1.21
+  file: test/e2e/apps/disruption.go
+- testname: 'PodDisruptionBudget: update and patch status'
+  codename: '[sig-apps] DisruptionController should update/patch PodDisruptionBudget
+    status [Conformance]'
+  description: PodDisruptionBudget API must support update and patch operations on
+    status subresource.
   release: v1.21
   file: test/e2e/apps/disruption.go
 - testname: Jobs, orphan pods, re-adoption
