@@ -549,14 +549,15 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		GroupVersion:     groupVersion,
 		MetaGroupVersion: apiGroupInfo.MetaGroupVersion,
 
-		ParameterCodec:  apiGroupInfo.ParameterCodec,
-		Serializer:      apiGroupInfo.NegotiatedSerializer,
-		Creater:         apiGroupInfo.Scheme,
-		Convertor:       apiGroupInfo.Scheme,
-		UnsafeConvertor: runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
-		Defaulter:       apiGroupInfo.Scheme,
-		Typer:           apiGroupInfo.Scheme,
-		Linker:          runtime.SelfLinker(meta.NewAccessor()),
+		ParameterCodec:        apiGroupInfo.ParameterCodec,
+		Serializer:            apiGroupInfo.NegotiatedSerializer,
+		Creater:               apiGroupInfo.Scheme,
+		Convertor:             apiGroupInfo.Scheme,
+		ConvertabilityChecker: apiGroupInfo.Scheme,
+		UnsafeConvertor:       runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
+		Defaulter:             apiGroupInfo.Scheme,
+		Typer:                 apiGroupInfo.Scheme,
+		Linker:                runtime.SelfLinker(meta.NewAccessor()),
 
 		EquivalentResourceRegistry: s.EquivalentResourceRegistry,
 
