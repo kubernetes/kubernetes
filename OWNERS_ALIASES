@@ -308,11 +308,11 @@ aliases:
     - mrhohn
     - rramkumar1
     - thockin
+
   sig-apps-approvers:
     - kow3ns
     - janetkuo
     - soltysh
-    - tnozicka
     - erictune
     - smarterclayton
   sig-apps-reviewers:
@@ -324,8 +324,10 @@ aliases:
     - mortent
     - smarterclayton
     - soltysh
-    - tnozicka
     - krmayankk
+  # sig-apps-emeritus:
+  # - tnozicka
+
   sig-autoscaling-maintainers:
     - aleksandra-malinowska
     - bskiba
