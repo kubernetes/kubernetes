@@ -1025,16 +1025,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Service does not have conflicting configuration such as
 		// externalTrafficPolicy=Local.
 		allEndpoints = proxy.FilterEndpoints(allEndpoints, svcInfo, proxier.nodeLabels)
-
-		readyEndpoints := make([]proxy.Endpoint, 0, len(allEndpoints))
-		for _, endpoint := range allEndpoints {
-			if !endpoint.IsReady() {
-				continue
-			}
-
-			readyEndpoints = append(readyEndpoints, endpoint)
-		}
-		hasEndpoints := len(readyEndpoints) > 0
+		hasEndpoints := len(allEndpoints) > 0
 
 		svcChain := svcInfo.servicePortChainName
 		if hasEndpoints {
@@ -1351,7 +1342,7 @@ func (proxier *Proxier) syncProxyRules() {
 		endpoints = endpoints[:0]
 		endpointChains = endpointChains[:0]
 		var endpointChain utiliptables.Chain
-		for _, ep := range readyEndpoints {
+		for _, ep := range allEndpoints {
 			epInfo, ok := ep.(*endpointsInfo)
 			if !ok {
 				klog.ErrorS(err, "Failed to cast endpointsInfo", "endpointsInfo", ep.String())
