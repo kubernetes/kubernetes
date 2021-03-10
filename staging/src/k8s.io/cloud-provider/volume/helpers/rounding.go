@@ -24,6 +24,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
+/*
+The Cloud Provider's volume plugins provision disks for corresponding
+PersistentVolumeClaims. Cloud Providers use different allocation unit for their
+disk sizes. AWS allows you to specify the size as an integer amount of GiB,
+while Portworx expects bytes for example. On AWS, if you want a volume of
+1500MiB, the actual call to the AWS API should therefore be for a 2GiB disk.
+This file contains functions that help rounding a storage request based on a
+Cloud Provider's allocation unit.
+*/
+
 const (
 	// GB - GigaByte size
 	GB = 1000 * 1000 * 1000
@@ -131,19 +141,22 @@ func roundUpSizeInt32(size resource.Quantity, allocationUnitBytes int64) (int32,
 	return int32(roundedUpInt32), nil
 }
 
-// roundUpSize64 calculates how many allocation units are needed to accommodate
-// a volume of a given size. E.g. when user wants 1500MiB volume, while AWS EBS
-// allocates volumes in gibibyte-sized chunks,
-// roundUpSizeInt64(1500MiB, 1024*1024*1024) returns '2'
-// (2 GiB is the smallest allocatable volume that can hold 1500MiB)
-// It returns an int64 and an error if the size was too great to work with
+// roundUpSizeInt64 calculates how many allocation units are needed to accommodate
+// a volume of a given size. It returns an int64 and an error if there's overflow
 func roundUpSizeInt64(size resource.Quantity, allocationUnitBytes int64) (int64, error) {
-	// CmpInt64() actually returns 0 when comparing an amount bigger than MaxInt64
-	// with MaxInt64
+	// Use CmpInt64() to find out if the value of "size" would overflow an
+	// int64 and therefore have Value() return a wrong result. Then, retrieve
+	// the value as int64 and perform the rounding.
+	// It's not convenient to use AsScale() and related functions as they don't
+	// support BinarySI format, nor can we use AsInt64() directly since it's
+	// only implemented for int64 scaled numbers (int64Amount).
+
+	// CmpInt64() actually returns 0 when comparing an amount bigger than MaxInt64.
 	if size.CmpInt64(math.MaxInt64) >= 0 {
 		return 0, fmt.Errorf("quantity %s is too great, overflows int64", size.String())
 	}
 	volumeSizeBytes := size.Value()
+
 	roundedUp := volumeSizeBytes / allocationUnitBytes
 	if volumeSizeBytes%allocationUnitBytes > 0 {
 		roundedUp++
