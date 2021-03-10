@@ -269,7 +269,11 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		runningContainers := false
 		for _, runningPod := range runningPods {
 			if runningPod.ID == volumeToMount.Pod.UID {
-				if len(runningPod.Containers) > 0 {
+				// runningPod.Containers only include containers in the running state,
+				// excluding containers in the creating process.
+				// By adding a non-empty judgment for runningPod.Sandboxes,
+				// ensure that all containers of the pod have been terminated.
+				if len(runningPod.Sandboxes) > 0 || len(runningPod.Containers) > 0 {
 					runningContainers = true
 				}
 
