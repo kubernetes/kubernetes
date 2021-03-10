@@ -73,6 +73,8 @@ func (kl *Kubelet) registerWithAPIServer() {
 		if registered {
 			klog.Infof("Successfully registered node %s", node.Name)
 			kl.registrationCompleted = true
+			//The node status remains ready when restarting the kubelet when container runtime is running normally.
+			kl.updateRuntimeUp()
 			return
 		}
 	}
