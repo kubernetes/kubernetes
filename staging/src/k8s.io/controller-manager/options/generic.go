@@ -42,7 +42,7 @@ func NewGenericControllerManagerConfigurationOptions(cfg *cmconfig.GenericContro
 	o := &GenericControllerManagerConfigurationOptions{
 		GenericControllerManagerConfiguration: cfg,
 		Debugging:                             RecommendedDebuggingOptions(),
-		LeaderMigration:                       nil,
+		LeaderMigration:                       &migration.LeaderMigrationOptions{},
 	}
 
 	return o
