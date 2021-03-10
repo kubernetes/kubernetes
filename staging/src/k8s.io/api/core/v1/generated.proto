@@ -1935,7 +1935,7 @@ message Lifecycle {
   // Other management of the container blocks until the hook completes.
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
-  optional Handler postStart = 1;
+  optional LifecycleAction postStart = 1;
 
   // PreStop is called immediately before a container is terminated due to an
   // API request or management event such as liveness/startup probe failure,
@@ -1948,7 +1948,18 @@ message Lifecycle {
   // or until the termination grace period is reached.
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
-  optional Handler preStop = 2;
+  optional LifecycleAction preStop = 2;
+}
+
+// LifecycleAction describes a lifecycle action to be performed against a container.
+message LifecycleAction {
+  // The action taken to determine the health of a container
+  optional Handler handler = 1;
+
+  // Number of seconds after which the action times out.
+  // Defaults to 30 second.
+  // +optional
+  optional int32 timeoutSeconds = 2;
 }
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.

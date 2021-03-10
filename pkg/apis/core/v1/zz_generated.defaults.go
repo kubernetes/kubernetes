@@ -125,13 +125,15 @@ func SetObjectDefaults_EphemeralContainers(in *v1.EphemeralContainers) {
 		}
 		if a.EphemeralContainerCommon.Lifecycle != nil {
 			if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
-				if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+				SetDefaults_LifecycleAction(a.EphemeralContainerCommon.Lifecycle.PostStart)
+				if a.EphemeralContainerCommon.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
-				if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+				SetDefaults_LifecycleAction(a.EphemeralContainerCommon.Lifecycle.PreStop)
+				if a.EphemeralContainerCommon.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -324,13 +326,15 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
-				if a.Lifecycle.PostStart.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				SetDefaults_LifecycleAction(a.Lifecycle.PostStart)
+				if a.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				SetDefaults_LifecycleAction(a.Lifecycle.PreStop)
+				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -374,13 +378,15 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
-				if a.Lifecycle.PostStart.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				SetDefaults_LifecycleAction(a.Lifecycle.PostStart)
+				if a.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				SetDefaults_LifecycleAction(a.Lifecycle.PreStop)
+				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -424,13 +430,15 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		}
 		if a.EphemeralContainerCommon.Lifecycle != nil {
 			if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
-				if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+				SetDefaults_LifecycleAction(a.EphemeralContainerCommon.Lifecycle.PostStart)
+				if a.EphemeralContainerCommon.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
-				if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+				SetDefaults_LifecycleAction(a.EphemeralContainerCommon.Lifecycle.PreStop)
+				if a.EphemeralContainerCommon.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -544,13 +552,15 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
-				if a.Lifecycle.PostStart.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				SetDefaults_LifecycleAction(a.Lifecycle.PostStart)
+				if a.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				SetDefaults_LifecycleAction(a.Lifecycle.PreStop)
+				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -594,13 +604,15 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
-				if a.Lifecycle.PostStart.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				SetDefaults_LifecycleAction(a.Lifecycle.PostStart)
+				if a.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				SetDefaults_LifecycleAction(a.Lifecycle.PreStop)
+				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -644,13 +656,15 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		}
 		if a.EphemeralContainerCommon.Lifecycle != nil {
 			if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
-				if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+				SetDefaults_LifecycleAction(a.EphemeralContainerCommon.Lifecycle.PostStart)
+				if a.EphemeralContainerCommon.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
-				if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
-					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+				SetDefaults_LifecycleAction(a.EphemeralContainerCommon.Lifecycle.PreStop)
+				if a.EphemeralContainerCommon.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -766,13 +780,15 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			}
 			if a.Lifecycle != nil {
 				if a.Lifecycle.PostStart != nil {
-					if a.Lifecycle.PostStart.HTTPGet != nil {
-						SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					SetDefaults_LifecycleAction(a.Lifecycle.PostStart)
+					if a.Lifecycle.PostStart.Handler.HTTPGet != nil {
+						SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.Handler.HTTPGet)
 					}
 				}
 				if a.Lifecycle.PreStop != nil {
-					if a.Lifecycle.PreStop.HTTPGet != nil {
-						SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					SetDefaults_LifecycleAction(a.Lifecycle.PreStop)
+					if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
+						SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
 					}
 				}
 			}
@@ -816,13 +832,15 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			}
 			if a.Lifecycle != nil {
 				if a.Lifecycle.PostStart != nil {
-					if a.Lifecycle.PostStart.HTTPGet != nil {
-						SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+					SetDefaults_LifecycleAction(a.Lifecycle.PostStart)
+					if a.Lifecycle.PostStart.Handler.HTTPGet != nil {
+						SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.Handler.HTTPGet)
 					}
 				}
 				if a.Lifecycle.PreStop != nil {
-					if a.Lifecycle.PreStop.HTTPGet != nil {
-						SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+					SetDefaults_LifecycleAction(a.Lifecycle.PreStop)
+					if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
+						SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
 					}
 				}
 			}
@@ -866,13 +884,15 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			}
 			if a.EphemeralContainerCommon.Lifecycle != nil {
 				if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
-					if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
-						SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+					SetDefaults_LifecycleAction(a.EphemeralContainerCommon.Lifecycle.PostStart)
+					if a.EphemeralContainerCommon.Lifecycle.PostStart.Handler.HTTPGet != nil {
+						SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.Handler.HTTPGet)
 					}
 				}
 				if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
-					if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
-						SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+					SetDefaults_LifecycleAction(a.EphemeralContainerCommon.Lifecycle.PreStop)
+					if a.EphemeralContainerCommon.Lifecycle.PreStop.Handler.HTTPGet != nil {
+						SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.Handler.HTTPGet)
 					}
 				}
 			}

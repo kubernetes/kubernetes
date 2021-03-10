@@ -228,7 +228,8 @@
           "tcpSocket": {
             "port": "71",
             "host": "72"
-          }
+          },
+          "timeoutSeconds": 2076966617
         },
         "preStop": {
           "exec": {
@@ -240,7 +241,7 @@
             "path": "74",
             "port": "75",
             "host": "76",
-            "scheme": "鴜Ł%Ũ",
+            "scheme": "Ł%ŨȈ\u003eŅ£趕ã/鈱$-议}ȧ外ĺ稥",
             "httpHeaders": [
               {
                 "name": "77",
@@ -251,18 +252,19 @@
           "tcpSocket": {
             "port": "79",
             "host": "80"
-          }
+          },
+          "timeoutSeconds": -1621875874
         }
       },
       "terminationMessagePath": "81",
-      "terminationMessagePolicy": "Ņ£",
+      "terminationMessagePolicy": "¶鎚¡ Ɠ(嘒ėf倐ȓ圬剴扲ȿQ",
       "securityContext": {
         "capabilities": {
           "add": [
-            "2Ō¾\\ĒP鄸靇杧ž"
+            "燴壩卄蓨MĮ?"
           ],
           "drop": [
-            "娲瘹ɭȊɚɎ(dɅ囥糷磩窮秳ķ蟒苾h^"
+            "ĭÐl恕ɍȇ廄裭4懙"
           ]
         },
         "privileged": false,
@@ -277,18 +279,17 @@
           "gmsaCredentialSpec": "87",
           "runAsUserName": "88"
         },
-        "runAsUser": 4491726672505793472,
-        "runAsGroup": -5441351197948631872,
+        "runAsUser": -2223090651199483232,
+        "runAsGroup": -5058770627837181205,
         "runAsNonRoot": true,
-        "readOnlyRootFilesystem": true,
+        "readOnlyRootFilesystem": false,
         "allowPrivilegeEscalation": true,
-        "procMount": "ĭÐl恕ɍȇ廄裭4懙",
+        "procMount": "n(鲼ƳÐƣKʘńw:5塋訩塶\"=",
         "seccompProfile": {
-          "type": "嵒ƫS捕ɷD¡轫n",
+          "type": "钡n)İ笓珣筩ƐP_痸荎僋",
           "localhostProfile": "89"
         }
       },
-      "stdin": true,
       "targetContainerName": "90"
     }
   ]

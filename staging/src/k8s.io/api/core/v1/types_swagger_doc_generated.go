@@ -905,6 +905,15 @@ func (Lifecycle) SwaggerDoc() map[string]string {
 	return map_Lifecycle
 }
 
+var map_LifecycleAction = map[string]string{
+	"":               "LifecycleAction describes a lifecycle action to be performed against a container.",
+	"timeoutSeconds": "Number of seconds after which the action times out. Defaults to 30 second.",
+}
+
+func (LifecycleAction) SwaggerDoc() map[string]string {
+	return map_LifecycleAction
+}
+
 var map_LimitRange = map[string]string{
 	"":         "LimitRange sets resource usage limits for each kind of resource in a Namespace.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",

@@ -145,13 +145,15 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
-				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.Lifecycle.PostStart)
+				if a.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.Lifecycle.PreStop)
+				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -195,13 +197,15 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
-				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.Lifecycle.PostStart)
+				if a.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.Lifecycle.PreStop)
+				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -245,13 +249,15 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 		}
 		if a.EphemeralContainerCommon.Lifecycle != nil {
 			if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
-				if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.EphemeralContainerCommon.Lifecycle.PostStart)
+				if a.EphemeralContainerCommon.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
-				if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.EphemeralContainerCommon.Lifecycle.PreStop)
+				if a.EphemeralContainerCommon.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -366,13 +372,15 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
-				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.Lifecycle.PostStart)
+				if a.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.Lifecycle.PreStop)
+				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -416,13 +424,15 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
-				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.Lifecycle.PostStart)
+				if a.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.Lifecycle.PreStop)
+				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -466,13 +476,15 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 		}
 		if a.EphemeralContainerCommon.Lifecycle != nil {
 			if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
-				if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.EphemeralContainerCommon.Lifecycle.PostStart)
+				if a.EphemeralContainerCommon.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
-				if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.EphemeralContainerCommon.Lifecycle.PreStop)
+				if a.EphemeralContainerCommon.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -628,13 +640,15 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
-				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.Lifecycle.PostStart)
+				if a.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.Lifecycle.PreStop)
+				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -678,13 +692,15 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 		}
 		if a.Lifecycle != nil {
 			if a.Lifecycle.PostStart != nil {
-				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.Lifecycle.PostStart)
+				if a.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.Lifecycle.PreStop)
+				if a.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}
@@ -728,13 +744,15 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 		}
 		if a.EphemeralContainerCommon.Lifecycle != nil {
 			if a.EphemeralContainerCommon.Lifecycle.PostStart != nil {
-				if a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.EphemeralContainerCommon.Lifecycle.PostStart)
+				if a.EphemeralContainerCommon.Lifecycle.PostStart.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PostStart.Handler.HTTPGet)
 				}
 			}
 			if a.EphemeralContainerCommon.Lifecycle.PreStop != nil {
-				if a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet)
+				v1.SetDefaults_LifecycleAction(a.EphemeralContainerCommon.Lifecycle.PreStop)
+				if a.EphemeralContainerCommon.Lifecycle.PreStop.Handler.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.Lifecycle.PreStop.Handler.HTTPGet)
 				}
 			}
 		}

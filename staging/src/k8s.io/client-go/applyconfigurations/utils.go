@@ -557,6 +557,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.KeyToPathApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Lifecycle"):
 		return &applyconfigurationscorev1.LifecycleApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("LifecycleAction"):
+		return &applyconfigurationscorev1.LifecycleActionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LimitRange"):
 		return &applyconfigurationscorev1.LimitRangeApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LimitRangeItem"):
