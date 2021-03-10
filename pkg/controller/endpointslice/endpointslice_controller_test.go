@@ -1144,7 +1144,7 @@ func TestPodAddsBatching(t *testing.T) {
 			}
 
 			time.Sleep(tc.finalDelay)
-			assert.Len(t, client.Actions(), tc.wantRequestCount)
+			assert.Equal(t, numNonListActions(client.Actions()), tc.wantRequestCount)
 			// In case of error, make debugging easier.
 			for _, action := range client.Actions() {
 				t.Logf("action: %v %v", action.GetVerb(), action.GetResource())
@@ -1292,7 +1292,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 			}
 
 			time.Sleep(tc.finalDelay)
-			assert.Len(t, client.Actions(), tc.wantRequestCount)
+			assert.Equal(t, numNonListActions(client.Actions()), tc.wantRequestCount)
 			// In case of error, make debugging easier.
 			for _, action := range client.Actions() {
 				t.Logf("action: %v %v", action.GetVerb(), action.GetResource())
@@ -1419,7 +1419,7 @@ func TestPodDeleteBatching(t *testing.T) {
 			}
 
 			time.Sleep(tc.finalDelay)
-			assert.Len(t, client.Actions(), tc.wantRequestCount)
+			assert.Equal(t, numNonListActions(client.Actions()), tc.wantRequestCount)
 			// In case of error, make debugging easier.
 			for _, action := range client.Actions() {
 				t.Logf("action: %v %v", action.GetVerb(), action.GetResource())
@@ -1680,6 +1680,216 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 	}
 }
 
+func TestEndpointSlicesForService(t *testing.T) {
+	testCases := []struct {
+		testName           string
+		namespace          string
+		name               string
+		endpointSlice      *discovery.EndpointSlice
+		excludeFromCache   bool
+		excludeFromStorage bool
+		excludeFromTracker bool
+		expectedInList     bool
+	}{{
+		testName:  "Service with matching EndpointSlice",
+		namespace: "ns1",
+		name:      "svc1",
+		endpointSlice: &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example-1",
+				Namespace: "ns1",
+				Labels: map[string]string{
+					discovery.LabelServiceName: "svc1",
+					discovery.LabelManagedBy:   controllerName,
+				},
+			},
+		},
+		expectedInList: true,
+	}, {
+		testName:  "Service with EndpointSlice that has different namespace",
+		namespace: "ns1",
+		name:      "svc1",
+		endpointSlice: &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example-1",
+				Namespace: "ns2",
+				Labels: map[string]string{
+					discovery.LabelServiceName: "svc1",
+					discovery.LabelManagedBy:   controllerName,
+				},
+			},
+		},
+		expectedInList: false,
+	}, {
+		testName:  "Service with EndpointSlice that has different service name",
+		namespace: "ns1",
+		name:      "svc1",
+		endpointSlice: &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example-1",
+				Namespace: "ns1",
+				Labels: map[string]string{
+					discovery.LabelServiceName: "svc2",
+					discovery.LabelManagedBy:   controllerName,
+				},
+			},
+		},
+		expectedInList: false,
+	}, {
+		testName:  "Service with EndpointSlice that has different controller name",
+		namespace: "ns1",
+		name:      "svc1",
+		endpointSlice: &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example-1",
+				Namespace: "ns1",
+				Labels: map[string]string{
+					discovery.LabelServiceName: "svc1",
+					discovery.LabelManagedBy:   controllerName + "foo",
+				},
+			},
+		},
+		expectedInList: false,
+	}, {
+		testName:  "Service with EndpointSlice that has missing controller name",
+		namespace: "ns1",
+		name:      "svc1",
+		endpointSlice: &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example-1",
+				Namespace: "ns1",
+				Labels: map[string]string{
+					discovery.LabelServiceName: "svc1",
+				},
+			},
+		},
+		expectedInList: false,
+	}, {
+		testName:  "Service with EndpointSlice that has missing service name",
+		namespace: "ns1",
+		name:      "svc1",
+		endpointSlice: &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example-1",
+				Namespace: "ns1",
+				Labels: map[string]string{
+					discovery.LabelManagedBy: controllerName,
+				},
+			},
+		},
+		expectedInList: false,
+	}, {
+		testName:  "Service with matching EndpointSlice that isn't in cache yet",
+		namespace: "ns1",
+		name:      "svc1",
+		endpointSlice: &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example-1",
+				Namespace: "ns1",
+				Labels: map[string]string{
+					discovery.LabelServiceName: "svc1",
+					discovery.LabelManagedBy:   controllerName,
+				},
+			},
+		},
+		excludeFromCache: true,
+		expectedInList:   true,
+	}, {
+		testName:  "Service with matching EndpointSlice that isn't in cache or storage",
+		namespace: "ns1",
+		name:      "svc1",
+		endpointSlice: &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example-1",
+				Namespace: "ns1",
+				Labels: map[string]string{
+					discovery.LabelServiceName: "svc1",
+					discovery.LabelManagedBy:   controllerName,
+				},
+			},
+		},
+		excludeFromCache:   true,
+		excludeFromStorage: true,
+		expectedInList:     false,
+	}, {
+		testName:  "Service with matching EndpointSlice that isn't in storage (verify that storage lookup doesn't always happen)",
+		namespace: "ns1",
+		name:      "svc1",
+		endpointSlice: &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example-1",
+				Namespace: "ns1",
+				Labels: map[string]string{
+					discovery.LabelServiceName: "svc1",
+					discovery.LabelManagedBy:   controllerName,
+				},
+			},
+		},
+		excludeFromStorage: true,
+		expectedInList:     true,
+	}, {
+		testName:  "Service with matching EndpointSlice that isn't in cache or tracker",
+		namespace: "ns1",
+		name:      "svc1",
+		endpointSlice: &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example-1",
+				Namespace: "ns1",
+				Labels: map[string]string{
+					discovery.LabelServiceName: "svc1",
+					discovery.LabelManagedBy:   controllerName,
+				},
+			},
+		},
+		excludeFromCache:   true,
+		excludeFromTracker: true,
+		expectedInList:     false,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			_, c := newController([]string{}, time.Duration(0))
+
+			if !tc.excludeFromCache {
+				err := c.endpointSliceStore.Add(tc.endpointSlice)
+				if err != nil {
+					t.Fatalf("Error adding EndpointSlice to store: %v", err)
+				}
+			}
+
+			if !tc.excludeFromStorage {
+				_, err := c.client.DiscoveryV1().EndpointSlices(tc.endpointSlice.Namespace).Create(context.TODO(), tc.endpointSlice, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Error creating EndpointSlice: %v", err)
+				}
+			}
+
+			if !tc.excludeFromTracker {
+				c.endpointSliceTracker.Update(tc.endpointSlice)
+			}
+
+			endpointSlices, err := c.endpointSlicesForService(tc.namespace, tc.name)
+			if err != nil {
+				t.Fatalf("Expected no error, got %v", err)
+			}
+
+			if tc.expectedInList {
+				if len(endpointSlices) != 1 {
+					t.Fatalf("Expected 1 EndpointSlice to be in list, got %d", len(endpointSlices))
+				}
+
+				if endpointSlices[0].Name != tc.endpointSlice.Name {
+					t.Fatalf("Expected %s EndpointSlice to be in list, got %s", tc.endpointSlice.Name, endpointSlices[0].Name)
+				}
+			} else {
+				if len(endpointSlices) != 0 {
+					t.Fatalf("Expected no EndpointSlices to be in list, got %d", len(endpointSlices))
+				}
+			}
+		})
+	}
+}
+
 // Test helpers
 func addPods(t *testing.T, esController *endpointSliceController, namespace string, podsCount int) {
 	t.Helper()
@@ -1737,6 +1947,16 @@ func expectAction(t *testing.T, actions []k8stesting.Action, index int, verb, re
 // protoPtr takes a Protocol and returns a pointer to it.
 func protoPtr(proto v1.Protocol) *v1.Protocol {
 	return &proto
+}
+
+func numNonListActions(actions []k8stesting.Action) int {
+	num := 0
+	for _, action := range actions {
+		if action.GetVerb() != "list" {
+			num++
+		}
+	}
+	return num
 }
 
 // cacheMutationCheck helps ensure that cached objects have not been changed

@@ -17,6 +17,7 @@ limitations under the License.
 package endpointslice
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -353,22 +355,9 @@ func (c *Controller) syncService(key string) error {
 		return err
 	}
 
-	esLabelSelector := labels.Set(map[string]string{
-		discovery.LabelServiceName: service.Name,
-		discovery.LabelManagedBy:   controllerName,
-	}).AsSelectorPreValidated()
-	endpointSlices, err := c.endpointSliceLister.EndpointSlices(service.Namespace).List(esLabelSelector)
-
+	endpointSlices, err := c.endpointSlicesForService(service.Namespace, service.Name)
 	if err != nil {
-		// Since we're getting stuff from a local cache, it is basically
-		// impossible to get this error.
-		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToListEndpointSlices",
-			"Error listing Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
 		return err
-	}
-
-	if c.endpointSliceTracker.StaleSlices(service, endpointSlices) {
-		return &StaleInformerCache{"EndpointSlice informer cache is out of date"}
 	}
 
 	// We call ComputeEndpointLastChangeTriggerTime here to make sure that the
@@ -482,6 +471,50 @@ func (c *Controller) queueServiceForEndpointSlice(endpointSlice *discovery.Endpo
 		delay = c.endpointUpdatesBatchPeriod
 	}
 	c.queue.AddAfter(key, delay)
+}
+
+// endpointSlicesForService returns the EndpointSlices that have been created
+// for a Service by this controller.
+func (c *Controller) endpointSlicesForService(namespace, name string) ([]*discovery.EndpointSlice, error) {
+	esSelector := labels.Set(map[string]string{
+		discovery.LabelServiceName: name,
+		discovery.LabelManagedBy:   controllerName,
+	}).AsSelectorPreValidated()
+
+	endpointSlices, err := c.endpointSliceLister.EndpointSlices(namespace).List(esSelector)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// If this is true it means we likely just need to wait longer for the cache
+	// to catch up to our expected state.
+	if c.endpointSliceTracker.StaleSlices(namespace, name, endpointSlices) {
+		klog.V(2).Infof("EndpointSlice informer cache is out of date for %s/%s", namespace, name)
+		return nil, &StaleInformerCache{"EndpointSlice informer cache is out of date"}
+	}
+
+	// If this is true we need to do a full API lookup. Unlike stale slices
+	// above, this indicates that the tracker has more slices than the cache
+	// does. The cache may catch up to this state, but this could also indicate
+	// that a slice has been unexpectedly deleted. If that were the case, we'd
+	// be waiting indefinitely unless we did this API lookup. This helps catch
+	// an issue where duplicate slices were being created (#100033).
+	if c.endpointSliceTracker.MissingSlices(namespace, name, endpointSlices) {
+		endpointSliceList, err := c.client.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: esSelector.String()})
+		if err != nil {
+			return nil, err
+		}
+		endpointSlices = []*discovery.EndpointSlice{}
+		for _, endpointSlice := range endpointSliceList.Items {
+			endpointSlices = append(endpointSlices, &endpointSlice)
+		}
+		// To avoid repeatedly running into this, reset the slices in the
+		// tracker with what we've received from the API.
+		c.endpointSliceTracker.Reset(namespace, name, endpointSlices)
+	}
+
+	return endpointSlices, nil
 }
 
 func (c *Controller) addPod(obj interface{}) {
