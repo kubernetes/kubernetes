@@ -1076,7 +1076,6 @@ func printEphemeralVolumeSource(ephemeral *corev1.EphemeralVolumeSource, w Prefi
 				Spec:       ephemeral.VolumeClaimTemplate.Spec,
 			}, false /* not a full PVC */)
 	}
-	w.Write(LEVEL_2, "ReadOnly:\t%v\n", ephemeral.ReadOnly)
 }
 
 func printRBDVolumeSource(rbd *corev1.RBDVolumeSource, w PrefixWriter) {

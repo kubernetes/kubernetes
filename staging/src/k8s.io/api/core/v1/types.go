@@ -156,7 +156,7 @@ type VolumeSource struct {
 	// CSI (Container Storage Interface) represents ephemeral storage that is handled by certain external CSI drivers (Beta feature).
 	// +optional
 	CSI *CSIVolumeSource `json:"csi,omitempty" protobuf:"bytes,28,opt,name=csi"`
-	// Ephemeral represents a volume that is handled by a cluster storage driver (Alpha feature).
+	// Ephemeral represents a volume that is handled by a cluster storage driver.
 	// The volume's lifecycle is tied to the pod that defines it - it will be created before the pod starts,
 	// and deleted when the pod is removed.
 	//
@@ -180,6 +180,9 @@ type VolumeSource struct {
 	//
 	// A pod can use both types of ephemeral volumes and
 	// persistent volumes at the same time.
+	//
+	// This is a beta feature and only available when the GenericEphemeralVolume
+	// feature gate is enabled.
 	//
 	// +optional
 	Ephemeral *EphemeralVolumeSource `json:"ephemeral,omitempty" protobuf:"bytes,29,opt,name=ephemeral"`
@@ -1795,10 +1798,8 @@ type EphemeralVolumeSource struct {
 	// Required, must not be nil.
 	VolumeClaimTemplate *PersistentVolumeClaimTemplate `json:"volumeClaimTemplate,omitempty" protobuf:"bytes,1,opt,name=volumeClaimTemplate"`
 
-	// Specifies a read-only configuration for the volume.
-	// Defaults to false (read/write).
-	// +optional
-	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
+	// ReadOnly is tombstoned to show why 2 is a reserved protobuf tag.
+	// ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
 }
 
 // PersistentVolumeClaimTemplate is used to produce

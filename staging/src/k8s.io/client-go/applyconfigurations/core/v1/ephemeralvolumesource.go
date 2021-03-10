@@ -22,7 +22,6 @@ package v1
 // with apply.
 type EphemeralVolumeSourceApplyConfiguration struct {
 	VolumeClaimTemplate *PersistentVolumeClaimTemplateApplyConfiguration `json:"volumeClaimTemplate,omitempty"`
-	ReadOnly            *bool                                            `json:"readOnly,omitempty"`
 }
 
 // EphemeralVolumeSourceApplyConfiguration constructs an declarative configuration of the EphemeralVolumeSource type for use with
@@ -36,13 +35,5 @@ func EphemeralVolumeSource() *EphemeralVolumeSourceApplyConfiguration {
 // If called multiple times, the VolumeClaimTemplate field is set to the value of the last call.
 func (b *EphemeralVolumeSourceApplyConfiguration) WithVolumeClaimTemplate(value *PersistentVolumeClaimTemplateApplyConfiguration) *EphemeralVolumeSourceApplyConfiguration {
 	b.VolumeClaimTemplate = value
-	return b
-}
-
-// WithReadOnly sets the ReadOnly field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ReadOnly field is set to the value of the last call.
-func (b *EphemeralVolumeSourceApplyConfiguration) WithReadOnly(value bool) *EphemeralVolumeSourceApplyConfiguration {
-	b.ReadOnly = &value
 	return b
 }
