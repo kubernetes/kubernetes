@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	autoscaling "k8s.io/api/autoscaling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -733,34 +734,20 @@ func TestSubresourcePatch(t *testing.T) {
 			expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 999, "status", "num") // .status.num should be 999
 			expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 10, "spec", "num")    // .spec.num should remain 10
 
+			// server-side-apply increments resouceVersion if the resource is unchanged for 1 second after the previous write,
+			// and by waiting a second we ensure that resourceVersion will be updated if the no-op patch increments resourceVersion
+			time.Sleep(time.Second)
 			// no-op patch
-			rv := ""
+			rv := patchedNoxuInstance.GetResourceVersion()
 			found := false
-			// TODO: remove this retry once http://issue.k8s.io/75564 is resolved, and expect the resourceVersion to remain unchanged 100% of the time.
-			// server-side-apply incorrectly considers spec fields in patches submitted to /status when updating managedFields timestamps, so this patch is racy:
-			// if it spans a 1-second boundary from the last write, server-side-apply updates the managedField timestamp and increments resourceVersion.
-			for i := 0; i < 10; i++ {
-				rv, found, err = unstructured.NestedString(patchedNoxuInstance.UnstructuredContent(), "metadata", "resourceVersion")
-				if err != nil {
-					t.Fatal(err)
-				}
-				if !found {
-					t.Fatalf("metadata.resourceVersion not found")
-				}
-
-				t.Logf("Patching .status.num again to 999")
-				patchedNoxuInstance, err = noxuResourceClient.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{}, "status")
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				// make sure no-op patch does not increment resourceVersion
-				expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 999, "status", "num")
-				expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 10, "spec", "num")
-				if patchedNoxuInstance.GetResourceVersion() == rv {
-					break
-				}
-				t.Logf("resource version changed - retrying")
+			t.Logf("Patching .status.num again to 999")
+			patchedNoxuInstance, err = noxuResourceClient.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{}, "status")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
+			// make sure no-op patch does not increment resourceVersion
+			expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 999, "status", "num")
+			expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 10, "spec", "num")
 			expectString(t, patchedNoxuInstance.UnstructuredContent(), rv, "metadata", "resourceVersion")
 
 			// empty patch
