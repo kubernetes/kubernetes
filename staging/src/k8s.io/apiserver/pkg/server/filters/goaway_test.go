@@ -384,7 +384,7 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 				select {
 				case watchResp := <-watchCh:
 					if watchResp.err != nil {
-						t.Fatalf("watch response got an unexepct error: %v", watchResp.err)
+						t.Fatalf("watch response got an unexpect error: %v", watchResp.err)
 					}
 					if !reflect.DeepEqual(responseBody, watchResp.body) {
 						t.Fatalf("in-flight watch was broken by GOAWAY frame, expect response body: %s, got: %s", responseBody, watchResp.body)
@@ -514,7 +514,7 @@ func TestGOAWAYConcurrency(t *testing.T) {
 		select {
 		case watchResp := <-watcher:
 			if watchResp.err != nil {
-				t.Fatalf("watch response got an unexepct error: %v", watchResp.err)
+				t.Fatalf("watch response got an unexpect error: %v", watchResp.err)
 			}
 			if !reflect.DeepEqual(responseBody, watchResp.body) {
 				t.Fatalf("in-flight watch was broken by GOAWAY frame, expect response body: %s, got: %s", responseBody, watchResp.body)

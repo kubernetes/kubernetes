@@ -34,7 +34,7 @@ import (
 )
 
 // PortForwardProtocolV1Name is the subprotocol used for port forwarding.
-// TODO move to API machinery and re-unify with kubelet/server/portfoward
+// TODO move to API machinery and re-unify with kubelet/server/portforward
 const PortForwardProtocolV1Name = "portforward.k8s.io"
 
 // PortForwarder knows how to listen for local connections and forward them to
