@@ -26,9 +26,14 @@ import (
 	"testing"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/stretchr/testify/assert"
+
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -60,6 +65,13 @@ func newFakeCsiDriverClientWithVolumeStats(t *testing.T, volumeStatsSet bool) *f
 	}
 }
 
+func newFakeCsiDriverClientWithVolumeStatsAndCondition(t *testing.T, volumeStatsSet, volumeConditionSet bool) *fakeCsiDriverClient {
+	return &fakeCsiDriverClient{
+		t:          t,
+		nodeClient: fake.NewNodeClientWithVolumeStatsAndCondition(volumeStatsSet, volumeConditionSet),
+	}
+}
+
 func (c *fakeCsiDriverClient) NodeGetInfo(ctx context.Context) (
 	nodeID string,
 	maxVolumePerNode int64,
@@ -80,15 +92,30 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 		VolumeId:   volID,
 		VolumePath: targetPath,
 	}
+
+	c.nodeClient.SetNodeVolumeStatsResp(getRawVolumeInfo())
 	resp, err := c.nodeClient.NodeGetVolumeStats(ctx, req)
 	if err != nil {
 		return nil, err
 	}
+
 	usages := resp.GetUsage()
-	metrics := &volume.Metrics{}
 	if usages == nil {
 		return nil, nil
 	}
+
+	metrics := &volume.Metrics{}
+
+	isSupportNodeVolumeCondition, err := supportNodeGetVolumeCondition(ctx, c.nodeClient)
+	if err != nil {
+		return nil, err
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) && isSupportNodeVolumeCondition {
+		abnormal, message := resp.VolumeCondition.GetAbnormal(), resp.VolumeCondition.GetMessage()
+		metrics.Abnormal, metrics.Message = &abnormal, &message
+	}
+
 	for _, usage := range usages {
 		if usage == nil {
 			continue
@@ -323,6 +350,10 @@ func setupClient(t *testing.T, stageUnstageSet bool) csiClient {
 
 func setupClientWithExpansion(t *testing.T, stageUnstageSet bool, expansionSet bool) csiClient {
 	return newFakeCsiDriverClientWithExpansion(t, stageUnstageSet, expansionSet)
+}
+
+func setupClientWithVolumeStatsAndCondition(t *testing.T, volumeStatsSet, volumeConditionSet bool) csiClient {
+	return newFakeCsiDriverClientWithVolumeStatsAndCondition(t, volumeStatsSet, volumeConditionSet)
 }
 
 func setupClientWithVolumeStats(t *testing.T, volumeStatsSet bool) csiClient {
@@ -674,13 +705,108 @@ type VolumeStatsOptions struct {
 	DeviceMountPath string
 }
 
-func TestVolumeStats(t *testing.T) {
+func TestVolumeHealthEnable(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)()
+	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
+	tests := []struct {
+		name               string
+		volumeStatsSet     bool
+		volumeConditionSet bool
+		volumeData         VolumeStatsOptions
+		success            bool
+	}{
+		{
+			name:               "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=on, VolumeCondition=on",
+			volumeStatsSet:     true,
+			volumeConditionSet: true,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "volume1",
+				DeviceMountPath: "/foo/bar",
+			},
+			success: true,
+		},
+		{
+			name:               "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=on, VolumeCondition=off",
+			volumeStatsSet:     true,
+			volumeConditionSet: false,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "volume1",
+				DeviceMountPath: "/foo/bar",
+			},
+			success: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+			defer cancel()
+			csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
+			csClient := setupClientWithVolumeStatsAndCondition(t, tc.volumeStatsSet, tc.volumeConditionSet)
+			metrics, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
+			if tc.success {
+				assert.Nil(t, err)
+			}
+
+			if tc.volumeConditionSet {
+				assert.NotNil(t, metrics.Abnormal)
+				assert.NotNil(t, metrics.Message)
+			} else {
+				assert.Nil(t, metrics.Abnormal)
+				assert.Nil(t, metrics.Message)
+			}
+		})
+	}
+}
+
+func TestVolumeHealthDisable(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, false)()
 	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
 	tests := []struct {
 		name           string
 		volumeStatsSet bool
 		volumeData     VolumeStatsOptions
 		success        bool
+	}{
+		{
+			name:           "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=on, VolumeCondition=off",
+			volumeStatsSet: true,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "volume1",
+				DeviceMountPath: "/foo/bar",
+			},
+			success: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+			defer cancel()
+			csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
+			csClient := setupClientWithVolumeStatsAndCondition(t, tc.volumeStatsSet, false)
+			metrics, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
+			if tc.success {
+				assert.Nil(t, err)
+			}
+
+			assert.Nil(t, metrics.Abnormal)
+			assert.Nil(t, metrics.Message)
+		})
+	}
+}
+
+func TestVolumeStats(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)()
+	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
+	tests := []struct {
+		name               string
+		volumeStatsSet     bool
+		volumeConditionSet bool
+		volumeData         VolumeStatsOptions
+		success            bool
 	}{
 		{
 			name:           "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=on",
