@@ -2364,6 +2364,16 @@ type Handler struct {
 	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
 }
 
+// LifecycleAction describes a lifecycle action to be performed against a container.
+type LifecycleAction struct {
+	// The action taken to determine the health of a container
+	Handler `json:",inline" protobuf:"bytes,1,opt,name=handler"`
+	// Number of seconds after which the action times out.
+	// Defaults to 30 second.
+	// +optional
+	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,2,opt,name=timeoutSeconds"`
+}
+
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events. For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
@@ -2373,7 +2383,7 @@ type Lifecycle struct {
 	// Other management of the container blocks until the hook completes.
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
-	PostStart *Handler `json:"postStart,omitempty" protobuf:"bytes,1,opt,name=postStart"`
+	PostStart *LifecycleAction `json:"postStart,omitempty" protobuf:"bytes,1,opt,name=postStart"`
 	// PreStop is called immediately before a container is terminated due to an
 	// API request or management event such as liveness/startup probe failure,
 	// preemption, resource contention, etc. The handler is not called if the
@@ -2385,7 +2395,7 @@ type Lifecycle struct {
 	// or until the termination grace period is reached.
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
-	PreStop *Handler `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
+	PreStop *LifecycleAction `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
 }
 
 type ConditionStatus string
@@ -2600,6 +2610,12 @@ const (
 	// DefaultTerminationGracePeriodSeconds indicates the default duration in
 	// seconds a pod needs to terminate gracefully.
 	DefaultTerminationGracePeriodSeconds = 30
+)
+
+const (
+	// DefaultLifecycleActionSeconds indicates the default duration in
+	// seconds a pod needs to lifecycle action.
+	DefaultLifecycleActionSeconds = 30
 )
 
 // A node selector represents the union of the results of one or more label queries

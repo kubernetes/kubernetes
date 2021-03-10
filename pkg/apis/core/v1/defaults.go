@@ -458,3 +458,9 @@ func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
 		obj.Type = &typeVol
 	}
 }
+
+func SetDefaults_LifecycleAction(obj *v1.LifecycleAction) {
+	if obj.TimeoutSeconds == 0 {
+		obj.TimeoutSeconds = v1.DefaultLifecycleActionSeconds
+	}
+}

@@ -2689,13 +2689,23 @@ func validateHandler(handler *core.Handler, fldPath *field.Path) field.ErrorList
 	return allErrors
 }
 
+func validateLifecycleAction(lifecycle *core.LifecycleAction, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if lifecycle == nil {
+		return allErrs
+	}
+	allErrs = append(allErrs, validateHandler(&lifecycle.Handler, fldPath)...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(lifecycle.TimeoutSeconds), fldPath.Child("timeoutSeconds"))...)
+	return allErrs
+}
+
 func validateLifecycle(lifecycle *core.Lifecycle, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if lifecycle.PostStart != nil {
-		allErrs = append(allErrs, validateHandler(lifecycle.PostStart, fldPath.Child("postStart"))...)
+		allErrs = append(allErrs, validateLifecycleAction(lifecycle.PostStart, fldPath.Child("postStart"))...)
 	}
 	if lifecycle.PreStop != nil {
-		allErrs = append(allErrs, validateHandler(lifecycle.PreStop, fldPath.Child("preStop"))...)
+		allErrs = append(allErrs, validateLifecycleAction(lifecycle.PreStop, fldPath.Child("preStop"))...)
 	}
 	return allErrs
 }

@@ -2172,6 +2172,16 @@ type Handler struct {
 	TCPSocket *TCPSocketAction
 }
 
+// LifecycleAction describes a lifecycle action to be performed against a container.
+type LifecycleAction struct {
+	// The action taken to determine the health of a container
+	Handler
+	// Number of seconds after which the action times out.
+	// Defaults to 30 second.
+	// +optional
+	TimeoutSeconds int32
+}
+
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events.  For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
@@ -2179,7 +2189,7 @@ type Lifecycle struct {
 	// PostStart is called immediately after a container is created.  If the handler fails, the container
 	// is terminated and restarted.
 	// +optional
-	PostStart *Handler
+	PostStart *LifecycleAction
 	// PreStop is called immediately before a container is terminated due to an
 	// API request or management event such as liveness/startup probe failure,
 	// preemption, resource contention, etc. The handler is not called if the
@@ -2190,7 +2200,7 @@ type Lifecycle struct {
 	// period. Other management of the container blocks until the hook completes
 	// or until the termination grace period is reached.
 	// +optional
-	PreStop *Handler
+	PreStop *LifecycleAction
 }
 
 // The below types are used by kube_client and api_server.
