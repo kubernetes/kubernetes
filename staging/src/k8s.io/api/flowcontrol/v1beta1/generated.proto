@@ -411,7 +411,7 @@ message ServiceAccountSubject {
 // ways of matching an originator; by user, group, or service account.
 // +union
 message Subject {
-  // The kind of subject
+  // The kind of subject, one of User, Group, ServiceAccount.
   // Required
   // +unionDiscriminator
   optional string kind = 1;
