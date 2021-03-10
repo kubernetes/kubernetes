@@ -142,7 +142,7 @@ func (f *ConfigFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 
 func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	loadingRules.Warner = klog.Warning
+	loadingRules.WarningHandler = klog.Warning
 
 	// use the standard defaults for this client command
 	// DEPRECATED: remove and replace with something more accurate
