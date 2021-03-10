@@ -80,6 +80,45 @@ func NewRandomNameV1CustomResourceDefinition(scope apiextensionsv1.ResourceScope
 	}
 }
 
+// NewRandomNameMultipleCustomResourceDefinition generates a multi version CRD with random name to avoid name conflict in e2e tests
+func NewRandomNameMultipleVersionCustomResourceDefinition(scope apiextensionsv1.ResourceScope) *apiextensionsv1.CustomResourceDefinition {
+	// ensure the singular doesn't end in an s for now
+	gName := names.SimpleNameGenerator.GenerateName("foo") + "a"
+	return &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: gName + "s.mygroup.example.com"},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "mygroup.example.com",
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: false,
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					},
+					Schema: AllowAllSchema(),
+				},
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					},
+					Schema: AllowAllSchema(),
+				},
+			},
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural:   gName + "s",
+				Singular: gName,
+				Kind:     gName,
+				ListKind: gName + "List",
+			},
+			Scope: scope,
+		},
+	}
+}
+
 // NewNoxuV1CustomResourceDefinition returns a WishIHadChosenNoxu CRD.
 func NewNoxuV1CustomResourceDefinition(scope apiextensionsv1.ResourceScope) *apiextensionsv1.CustomResourceDefinition {
 	return &apiextensionsv1.CustomResourceDefinition{
