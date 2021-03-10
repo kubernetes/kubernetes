@@ -1173,17 +1173,20 @@ rules:
     verbs: ["get", "list"]
     resources:
       - group: "metrics.k8s.io"
+
   # Don't log these read-only URLs.
   - level: None
     nonResourceURLs:
       - /healthz*
       - /version
       - /swagger*
+
   # Don't log events requests because of performance impact.
   - level: None
     resources:
       - group: "" # core
         resources: ["events"]
+
   # node and pod status calls from nodes are high-volume and can be large, don't log responses for expected updates from nodes
   - level: Request
     users: ["kubelet", "system:node-problem-detector", "system:serviceaccount:kube-system:node-problem-detector"]
@@ -1201,12 +1204,14 @@ rules:
         resources: ["nodes/status", "pods/status"]
     omitStages:
       - "RequestReceived"
+
   # deletecollection calls can be large, don't log responses for expected namespace deletions
   - level: Request
     users: ["system:serviceaccount:kube-system:namespace-controller"]
     verbs: ["deletecollection"]
     omitStages:
       - "RequestReceived"
+
   # Secrets, ConfigMaps, and TokenReviews can contain sensitive & binary data,
   # so only log at the Metadata level.
   - level: Metadata
@@ -1476,6 +1481,24 @@ EOF
 	fi
 }
 
+function set_docker_options_non_ubuntu() {
+  # set docker options mtu and storage driver for non-ubuntu
+  # as it is default for ubuntu
+   if [[ -n "$(command -v lsb_release)" && $(lsb_release -si) == "Ubuntu" ]]; then
+      echo "Not adding docker options on ubuntu, as these are default on ubuntu. Bailing out..."
+      return
+   fi
+
+   addockeropt "\"mtu\": 1460,"
+   addockeropt "\"storage_driver\": \"overlay2\","
+
+   echo "setting live restore"
+   # Disable live-restore if the environment variable is set.
+   if [[ "${DISABLE_DOCKER_LIVE_RESTORE:-false}" == "true" ]]; then
+      addockeropt "\"live-restore\": \"false\","
+   fi
+}
+
 function assemble-docker-flags {
   echo "Assemble docker options"
 
@@ -1493,30 +1516,33 @@ addockeropt "\"pidfile\": \"/var/run/docker.pid\",
   \"iptables\": false,
   \"ip-masq\": false,"
 
-  addockeropt "\"mtu\": \"1460\","
-
+  echo "setting log-level"
   if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
-    addockeropt "\"log-level\"": "\"debug\","
+    addockeropt "\"log-level\": \"debug\","
   else
     addockeropt "\"log-level\": \"warn\","
   fi
 
+  echo "setting network bridge"
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" || "${NETWORK_PROVIDER:-}" == "cni" ]]; then
     # set docker0 cidr to private ip address range to avoid conflict with cbr0 cidr range
     addockeropt "\"bip\": \"169.254.123.1/24\","
   else
-   addockeropt "\"bridge\": \"cbr0\","
+    addockeropt "\"bridge\": \"cbr0\","
   fi
+
+  echo "setting registry mirror"
+  # TODO (vteratipally)  move the registry-mirror completely to /etc/docker/daemon.json
+  local docker_opts=""
   # Decide whether to enable a docker registry mirror. This is taken from
   # the "kube-env" metadata value.
   if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
-    echo "Enable docker registry mirror at: ${DOCKER_REGISTRY_MIRROR_URL}"
-    addockeropt "\"registry-mirrors\": [\"${DOCKER_REGISTRY_MIRROR_URL}\"],"
+      docker_opts+="--registry-mirror=${DOCKER_REGISTRY_MIRROR_URL} "
   fi
-    # Disable live-restore if the environment variable is set.
-  if [[ "${DISABLE_DOCKER_LIVE_RESTORE:-false}" == "true" ]]; then
-    addockeropt "\"live-restore\": \"false\","
-  fi
+
+  set_docker_options_non_ubuntu
+
+  echo "setting docker logging options"
   # Configure docker logging
   addockeropt "\"log-driver\": \"${DOCKER_LOG_DRIVER:-json-file}\","
   addockeropt "\"log-opts\": {
@@ -1526,7 +1552,7 @@ addockeropt "\"pidfile\": \"/var/run/docker.pid\",
   cat <<EOF >>/etc/docker/daemon.json
 }
 EOF
-  echo "DOCKER_OPTS=\"${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
+  echo "DOCKER_OPTS=\"${docker_opts}${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
 
   # Ensure TasksMax is sufficient for docker.
   # (https://github.com/kubernetes/kubernetes/issues/51977)
@@ -1575,11 +1601,13 @@ function start-kubelet {
 Description=Kubernetes kubelet
 Requires=network-online.target
 After=network-online.target
+
 [Service]
 Restart=always
 RestartSec=10
 EnvironmentFile=${kubelet_env_file}
 ExecStart=${kubelet_bin} \$KUBELET_OPTS
+
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -1625,10 +1653,12 @@ function start-node-problem-detector {
 Description=Kubernetes node problem detector
 Requires=network-online.target
 After=network-online.target
+
 [Service]
 Restart=always
 RestartSec=10
 ExecStart=${npd_bin} ${flags}
+
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -2844,18 +2874,23 @@ If it isn't, the closest tag is at:
     gitref="${version//*+/}"
   fi
   cat > /etc/motd <<EOF
+
 Welcome to Kubernetes ${version}!
+
 You can find documentation for Kubernetes at:
   http://docs.kubernetes.io/
+
 The source for this release can be found at:
   /home/kubernetes/kubernetes-src.tar.gz
 Or you can download it at:
   https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-src.tar.gz
+
 It is based on the Kubernetes source at:
   https://github.com/kubernetes/kubernetes/tree/${gitref}
 ${devel}
 For Kubernetes copyright and licensing information, see:
   /home/kubernetes/LICENSES
+
 EOF
 }
 
@@ -2972,8 +3007,10 @@ EOF
 # Kubernetes doesn't use containerd restart manager.
 disabled_plugins = ["restart"]
 oom_score = -999
+
 [debug]
   level = "${CONTAINERD_LOG_LEVEL:-"info"}"
+
 [plugins.cri]
   stream_server_address = "127.0.0.1"
   max_container_log_line_size = ${CONTAINERD_MAX_CONTAINER_LOG_LINE:-262144}
