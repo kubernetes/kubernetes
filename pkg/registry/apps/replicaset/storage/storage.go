@@ -40,6 +40,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/apps/replicaset"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // ReplicaSetStorage includes dummy storage for ReplicaSets and for Scale subresource.
@@ -77,9 +78,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		PredicateFunc:            replicaset.MatchReplicaSet,
 		DefaultQualifiedResource: apps.Resource("replicasets"),
 
-		CreateStrategy: replicaset.Strategy,
-		UpdateStrategy: replicaset.Strategy,
-		DeleteStrategy: replicaset.Strategy,
+		CreateStrategy:      replicaset.Strategy,
+		UpdateStrategy:      replicaset.Strategy,
+		DeleteStrategy:      replicaset.Strategy,
+		ResetFieldsStrategy: replicaset.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -90,6 +92,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 	statusStore := *store
 	statusStore.UpdateStrategy = replicaset.StatusStrategy
+	statusStore.ResetFieldsStrategy = replicaset.StatusStrategy
 
 	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, nil
 }
@@ -136,6 +139,11 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }
 
 // ScaleREST implements a Scale for ReplicaSet.

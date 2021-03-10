@@ -36,18 +36,17 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	netutil "k8s.io/utils/net"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // REST adapts a service registry into apiserver's RESTStorage model.
@@ -80,6 +79,7 @@ type ServiceStorage interface {
 	rest.GracefulDeleter
 	rest.Watcher
 	rest.StorageVersionProvider
+	rest.ResetFieldsStrategy
 }
 
 type EndpointsStorage interface {
@@ -512,6 +512,11 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	performRelease = true // if something that should be released then go ahead and release it
 
 	return out, created, err
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (rs *REST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return rs.services.GetResetFields()
 }
 
 // Implement Redirector.

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol/validation"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // flowSchemaStrategy implements verification logic for FlowSchema.
@@ -40,6 +41,21 @@ var Strategy = flowSchemaStrategy{legacyscheme.Scheme, names.SimpleNameGenerator
 // NamespaceScoped returns false because all PriorityClasses are global.
 func (flowSchemaStrategy) NamespaceScoped() bool {
 	return false
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (flowSchemaStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"flowcontrol.apiserver.k8s.io/v1alpha1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"flowcontrol.apiserver.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
 }
 
 // PrepareForCreate clears the status of a flow-schema before creation.
@@ -90,6 +106,23 @@ type flowSchemaStatusStrategy struct {
 
 // StatusStrategy is the default logic that applies when updating flow-schema objects' status.
 var StatusStrategy = flowSchemaStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (flowSchemaStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"flowcontrol.apiserver.k8s.io/v1alpha1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"flowcontrol.apiserver.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+
+	return fields
+}
 
 func (flowSchemaStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newFlowSchema := obj.(*flowcontrol.FlowSchema)

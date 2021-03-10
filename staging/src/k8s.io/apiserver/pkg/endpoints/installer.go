@@ -46,6 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versioninfo "k8s.io/component-base/version"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 const (
@@ -256,6 +257,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	if isNamedCreater {
 		isCreater = true
+	}
+
+	var resetFields map[fieldpath.APIVersion]*fieldpath.Set
+	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
+			resetFields = resetFieldsStrategy.GetResetFields()
+		}
 	}
 
 	var versionedList interface{}
@@ -597,6 +605,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			fqKindToRegister,
 			reqScope.HubGroupVersion,
 			isSubresource,
+			resetFields,
 		)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create field manager: %v", err)
