@@ -52,7 +52,8 @@ done < <(cat "${migrated_packages_file}")
 # TODO: Improve concurrancy here
 ret=0
 for package in "${migrated_packages[@]}"; do
-  logcheck "$KUBE_ROOT/$package" || ret=$?
+    GOOS=linux    logcheck "$KUBE_ROOT/$package" || ret=$?
+    GOOS=windows  logcheck "$KUBE_ROOT/$package" || ret=$?
 done
 
 if [ $ret -eq 0 ]; then
