@@ -281,21 +281,6 @@ func (hist *Histogram) Average() float64 {
 	return hist.GetSampleSum() / float64(hist.GetSampleCount())
 }
 
-// Clear clears all fields of the wrapped histogram
-func (hist *Histogram) Clear() {
-	if hist.SampleCount != nil {
-		*hist.SampleCount = 0
-	}
-	if hist.SampleSum != nil {
-		*hist.SampleSum = 0
-	}
-	for _, b := range hist.Bucket {
-		if b.CumulativeCount != nil {
-			*b.CumulativeCount = 0
-		}
-	}
-}
-
 // Validate makes sure the wrapped histogram has all necessary fields set and with valid values.
 func (hist *Histogram) Validate() error {
 	if hist.SampleCount == nil || hist.GetSampleCount() == 0 {

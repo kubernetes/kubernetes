@@ -205,10 +205,6 @@ func collectHistogram(metric string, labels map[string]string) *DataItem {
 	q99 := hist.Quantile(0.95)
 	avg := hist.Average()
 
-	// clear the metrics so that next test always starts with empty prometheus
-	// metrics (since the metrics are shared among all tests run inside the same binary)
-	hist.Clear()
-
 	msFactor := float64(time.Second) / float64(time.Millisecond)
 
 	// Copy labels and add "Metric" label for this metric.

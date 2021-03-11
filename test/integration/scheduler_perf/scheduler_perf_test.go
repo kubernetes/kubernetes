@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -363,6 +364,9 @@ func BenchmarkPerfScheduling(b *testing.B) {
 						defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
 					}
 					dataItems.DataItems = append(dataItems.DataItems, runWorkload(b, tc, w)...)
+					// Reset metrics to prevent metrics generated in current workload gets
+					// carried over to the next workload.
+					legacyregistry.Reset()
 				})
 			}
 		})
@@ -452,6 +456,13 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 					dataItems = append(dataItems, collector.collect()...)
 				}
 				mu.Unlock()
+			}
+
+			if !concreteOp.SkipWaitToCompletion {
+				// SkipWaitToCompletion=false indicates this step has waited for the Pods to be scheduled.
+				// So we reset the metrics in global registry; otherwise metrics gathered in this step
+				// will be carried over to next step.
+				legacyregistry.Reset()
 			}
 
 		case *churnOp:

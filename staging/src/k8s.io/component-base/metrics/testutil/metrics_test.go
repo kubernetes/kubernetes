@@ -121,48 +121,6 @@ func TestHistogramQuantile(t *testing.T) {
 	}
 }
 
-func TestHistogramClear(t *testing.T) {
-	samples := []float64{0.5, 0.5, 0.5, 0.5, 1.5, 1.5, 1.5, 1.5, 3, 3, 3, 3, 6, 6, 6, 6}
-	bounds := []float64{1, 2, 4, 8}
-	h := samples2Histogram(samples, bounds)
-
-	if *h.SampleCount == 0 {
-		t.Errorf("Expected histogram .SampleCount to be non-zero")
-	}
-	if *h.SampleSum == 0 {
-		t.Errorf("Expected histogram .SampleSum to be non-zero")
-	}
-
-	for _, b := range h.Bucket {
-		if b.CumulativeCount != nil {
-			if *b.CumulativeCount == 0 {
-				t.Errorf("Expected histogram bucket to have non-zero comulative count")
-			}
-		}
-	}
-
-	h.Clear()
-
-	if *h.SampleCount != 0 {
-		t.Errorf("Expected histogram .SampleCount to be zero, have %v instead", *h.SampleCount)
-	}
-
-	if *h.SampleSum != 0 {
-		t.Errorf("Expected histogram .SampleSum to be zero, have %v instead", *h.SampleSum)
-	}
-
-	for _, b := range h.Bucket {
-		if b.CumulativeCount != nil {
-			if *b.CumulativeCount != 0 {
-				t.Errorf("Expected histogram bucket to have zero comulative count, have %v instead", *b.CumulativeCount)
-			}
-		}
-		if b.UpperBound != nil {
-			*b.UpperBound = 0
-		}
-	}
-}
-
 func TestHistogramValidate(t *testing.T) {
 	tests := []struct {
 		name string
