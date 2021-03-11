@@ -878,7 +878,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	genericfeatures.APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.DryRun:                  {Default: true, PreRelease: featuregate.GA},
-	genericfeatures.ServerSideApply:         {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.ServerSideApply:         {Default: true, PreRelease: featuregate.GA},
 	genericfeatures.APIPriorityAndFairness:  {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.WarningHeaders:          {Default: true, PreRelease: featuregate.Beta},
 
