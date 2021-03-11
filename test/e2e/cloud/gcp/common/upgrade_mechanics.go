@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gcp
+package common
 
 import (
 	"fmt"
@@ -71,6 +71,8 @@ func ClusterDowngradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContex
 		framework.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
 	}
 }
+
+const etcdImage = "3.4.9-1"
 
 // controlPlaneUpgrade upgrades control plane node on GCE/GKE.
 func controlPlaneUpgrade(f *framework.Framework, v string, extraEnvs []string) error {
