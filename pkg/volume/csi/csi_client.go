@@ -82,6 +82,7 @@ type csiClient interface {
 	NodeSupportsStageUnstage(ctx context.Context) (bool, error)
 	NodeSupportsNodeExpand(ctx context.Context) (bool, error)
 	NodeSupportsVolumeStats(ctx context.Context) (bool, error)
+	NodeSupportsSingleNodeMultiWriterAccessMode(ctx context.Context) (bool, error)
 }
 
 // Strongly typed address
@@ -119,6 +120,8 @@ type nodeV1ClientCreator func(addr csiAddr, metricsManager *MetricsManager) (
 	closer io.Closer,
 	err error,
 )
+
+type nodeV1AccessModeMapper func(am api.PersistentVolumeAccessMode) csipbv1.VolumeCapability_AccessMode_Mode
 
 // newV1NodeClient creates a new NodeClient with the internally used gRPC
 // connection set up. It also returns a closer which must to be called to close
@@ -217,7 +220,11 @@ func (c *csiDriverClient) NodePublishVolume(
 
 	if c.nodeV1ClientCreator == nil {
 		return errors.New("failed to call NodePublishVolume. nodeV1ClientCreator is nil")
+	}
 
+	accessModeMapper, err := c.getNodeV1AccessModeMapper(ctx)
+	if err != nil {
+		return err
 	}
 
 	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
@@ -235,7 +242,7 @@ func (c *csiDriverClient) NodePublishVolume(
 		Secrets:        secrets,
 		VolumeCapability: &csipbv1.VolumeCapability{
 			AccessMode: &csipbv1.VolumeCapability_AccessMode{
-				Mode: asCSIAccessModeV1(accessMode),
+				Mode: accessModeMapper(accessMode),
 			},
 		},
 	}
@@ -279,6 +286,11 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOp
 		return opts.newSize, errors.New("size can not be less than 0")
 	}
 
+	accessModeMapper, err := c.getNodeV1AccessModeMapper(ctx)
+	if err != nil {
+		return opts.newSize, err
+	}
+
 	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
 		return opts.newSize, err
@@ -291,7 +303,7 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOp
 		CapacityRange: &csipbv1.CapacityRange{RequiredBytes: opts.newSize.Value()},
 		VolumeCapability: &csipbv1.VolumeCapability{
 			AccessMode: &csipbv1.VolumeCapability_AccessMode{
-				Mode: asCSIAccessModeV1(opts.accessMode),
+				Mode: accessModeMapper(opts.accessMode),
 			},
 		},
 	}
@@ -371,6 +383,11 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 		return errors.New("nodeV1ClientCreate is nil")
 	}
 
+	accessModeMapper, err := c.getNodeV1AccessModeMapper(ctx)
+	if err != nil {
+		return err
+	}
+
 	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
 		return err
@@ -383,7 +400,7 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 		StagingTargetPath: stagingTargetPath,
 		VolumeCapability: &csipbv1.VolumeCapability{
 			AccessMode: &csipbv1.VolumeCapability_AccessMode{
-				Mode: asCSIAccessModeV1(accessMode),
+				Mode: accessModeMapper(accessMode),
 			},
 		},
 		Secrets:       secrets,
@@ -446,6 +463,17 @@ func (c *csiDriverClient) NodeSupportsStageUnstage(ctx context.Context) (bool, e
 	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME)
 }
 
+func (c *csiDriverClient) getNodeV1AccessModeMapper(ctx context.Context) (nodeV1AccessModeMapper, error) {
+	supported, err := c.NodeSupportsSingleNodeMultiWriterAccessMode(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if supported {
+		return asSingleNodeMultiWriterCapableCSIAccessModeV1, nil
+	}
+	return asCSIAccessModeV1, nil
+}
+
 func asCSIAccessModeV1(am api.PersistentVolumeAccessMode) csipbv1.VolumeCapability_AccessMode_Mode {
 	switch am {
 	case api.ReadWriteOnce:
@@ -454,6 +482,25 @@ func asCSIAccessModeV1(am api.PersistentVolumeAccessMode) csipbv1.VolumeCapabili
 		return csipbv1.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
 	case api.ReadWriteMany:
 		return csipbv1.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
+	// This mapping exists to enable CSI drivers that lack the
+	// SINGLE_NODE_MULTI_WRITER capability to work with the
+	// ReadWriteOncePod access mode.
+	case api.ReadWriteOncePod:
+		return csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_WRITER
+	}
+	return csipbv1.VolumeCapability_AccessMode_UNKNOWN
+}
+
+func asSingleNodeMultiWriterCapableCSIAccessModeV1(am api.PersistentVolumeAccessMode) csipbv1.VolumeCapability_AccessMode_Mode {
+	switch am {
+	case api.ReadWriteOnce:
+		return csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER
+	case api.ReadOnlyMany:
+		return csipbv1.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
+	case api.ReadWriteMany:
+		return csipbv1.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
+	case api.ReadWriteOncePod:
+		return csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER
 	}
 	return csipbv1.VolumeCapability_AccessMode_UNKNOWN
 }
@@ -508,6 +555,11 @@ func (c *csiClientGetter) Get() (csiClient, error) {
 func (c *csiDriverClient) NodeSupportsVolumeStats(ctx context.Context) (bool, error) {
 	klog.V(5).Info(log("calling NodeGetCapabilities rpc to determine if NodeSupportsVolumeStats"))
 	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_GET_VOLUME_STATS)
+}
+
+func (c *csiDriverClient) NodeSupportsSingleNodeMultiWriterAccessMode(ctx context.Context) (bool, error) {
+	klog.V(4).Info(log("calling NodeGetCapabilities rpc to determine if NodeSupportsSingleNodeMultiWriterAccessMode"))
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER)
 }
 
 func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, targetPath string) (*volume.Metrics, error) {

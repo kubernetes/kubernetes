@@ -301,6 +301,11 @@ func (c *fakeCsiDriverClient) nodeSupportsVolumeCondition(ctx context.Context) (
 	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_VOLUME_CONDITION)
 }
 
+func (c *fakeCsiDriverClient) NodeSupportsSingleNodeMultiWriterAccessMode(ctx context.Context) (bool, error) {
+	c.t.Log("calling fake.NodeSupportsSingleNodeMultiWriterAccessMode...")
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER)
+}
+
 func (c *fakeCsiDriverClient) nodeSupportsCapability(ctx context.Context, capabilityType csipbv1.NodeServiceCapability_RPC_Type) (bool, error) {
 	capabilities, err := c.nodeGetCapabilities(ctx)
 	if err != nil {
@@ -864,4 +869,84 @@ func TestVolumeStats(t *testing.T) {
 		})
 	}
 
+}
+
+func TestAccessModeMapping(t *testing.T) {
+	tests := []struct {
+		name                     string
+		singleNodeMultiWriterSet bool
+		accessMode               api.PersistentVolumeAccessMode
+		expectedMappedAccessMode csipbv1.VolumeCapability_AccessMode_Mode
+	}{
+		{
+			name:                     "with ReadWriteOnce and incapable driver",
+			singleNodeMultiWriterSet: false,
+			accessMode:               api.ReadWriteOnce,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		},
+		{
+			name:                     "with ReadOnlyMany and incapable driver",
+			singleNodeMultiWriterSet: false,
+			accessMode:               api.ReadOnlyMany,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
+		},
+		{
+			name:                     "with ReadWriteMany and incapable driver",
+			singleNodeMultiWriterSet: false,
+			accessMode:               api.ReadWriteMany,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
+		},
+		{
+			name:                     "with ReadWriteOncePod and incapable driver",
+			singleNodeMultiWriterSet: false,
+			accessMode:               api.ReadWriteOncePod,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		},
+		{
+			name:                     "with ReadWriteOnce and capable driver",
+			singleNodeMultiWriterSet: true,
+			accessMode:               api.ReadWriteOnce,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+		},
+		{
+			name:                     "with ReadOnlyMany and capable driver",
+			singleNodeMultiWriterSet: true,
+			accessMode:               api.ReadOnlyMany,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
+		},
+		{
+			name:                     "with ReadWriteMany and capable driver",
+			singleNodeMultiWriterSet: true,
+			accessMode:               api.ReadWriteMany,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
+		},
+		{
+			name:                     "with ReadWriteOncePod and capable driver",
+			singleNodeMultiWriterSet: true,
+			accessMode:               api.ReadWriteOncePod,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeCloser := fake.NewCloser(t)
+			client := &csiDriverClient{
+				driverName: "Fake Driver Name",
+				nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+					nodeClient := fake.NewNodeClientWithSingleNodeMultiWriter(tc.singleNodeMultiWriterSet)
+					return nodeClient, fakeCloser, nil
+				},
+			}
+
+			accessModeMapper, err := client.getNodeV1AccessModeMapper(context.Background())
+			if err != nil {
+				t.Error(err)
+			}
+
+			mappedAccessMode := accessModeMapper(tc.accessMode)
+			if mappedAccessMode != tc.expectedMappedAccessMode {
+				t.Errorf("expected access mode: %v; got: %v", tc.expectedMappedAccessMode, mappedAccessMode)
+			}
+		})
+	}
 }
