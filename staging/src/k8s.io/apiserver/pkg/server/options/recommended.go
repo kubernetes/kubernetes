@@ -28,6 +28,7 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/klog/v2"
 )
 
 // RecommendedOptions contains the recommended options for running an API server.
@@ -124,12 +125,16 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 		return err
 	}
 	if feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
-		config.FlowControl = utilflowcontrol.New(
-			config.SharedInformerFactory,
-			kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1beta1(),
-			config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
-			config.RequestTimeout/4,
-		)
+		if config.ClientConfig != nil {
+			config.FlowControl = utilflowcontrol.New(
+				config.SharedInformerFactory,
+				kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1beta1(),
+				config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
+				config.RequestTimeout/4,
+			)
+		} else {
+			klog.Warningf("Neither kubeconfig is provided nor service-account is mounted, so APIPriorityAndFairness will be disabled")
+		}
 	}
 	return nil
 }
