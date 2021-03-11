@@ -442,7 +442,7 @@ func benchmarkScheduling(numExistingPods, minPods int,
 		//lint:ignore SA3001 Set a minimum for b.N to get more meaningful results
 		b.N = minPods
 	}
-	finalFunc, podInformer, clientset := mustSetupScheduler()
+	finalFunc, podInformer, clientset, _ := mustSetupScheduler()
 	defer finalFunc()
 
 	nodePreparer := framework.NewIntegrationTestNodePreparer(

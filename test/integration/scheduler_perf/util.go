@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/dynamic"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -55,20 +56,25 @@ var dataItemsDir = flag.String("data-items-dir", "", "destination directory for 
 // mustSetupScheduler starts the following components:
 // - k8s api server (a.k.a. master)
 // - scheduler
-// It returns clientset and destroyFunc which should be used to
+// It returns regular and dynamic clients, and destroyFunc which should be used to
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface) {
+func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
 	apiURL, apiShutdown := util.StartApiserver()
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
+
+	cfg := &restclient.Config{
 		Host:          apiURL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
 		QPS:           5000.0,
 		Burst:         5000,
-	})
-	_, podInformer, schedulerShutdown := util.StartScheduler(clientSet)
-	fakePVControllerShutdown := util.StartFakePVController(clientSet)
+	}
+
+	client := clientset.NewForConfigOrDie(cfg)
+	dynClient := dynamic.NewForConfigOrDie(cfg)
+
+	_, podInformer, schedulerShutdown := util.StartScheduler(client)
+	fakePVControllerShutdown := util.StartFakePVController(client)
 
 	shutdownFunc := func() {
 		fakePVControllerShutdown()
@@ -76,7 +82,7 @@ func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clients
 		apiShutdown()
 	}
 
-	return shutdownFunc, podInformer, clientSet
+	return shutdownFunc, podInformer, client, dynClient
 }
 
 // Returns the list of scheduled pods in the specified namespaces.
