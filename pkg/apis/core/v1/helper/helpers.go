@@ -170,7 +170,7 @@ func ingressEqual(lhs, rhs *v1.LoadBalancerIngress) bool {
 }
 
 // GetAccessModesAsString returns a string representation of an array of access modes.
-// modes, when present, are always in the same order: RWO,ROX,RWX.
+// modes, when present, are always in the same order: RWO,ROX,RWX,RWOP.
 func GetAccessModesAsString(modes []v1.PersistentVolumeAccessMode) string {
 	modes = removeDuplicateAccessModes(modes)
 	modesStr := []string{}
@@ -182,6 +182,9 @@ func GetAccessModesAsString(modes []v1.PersistentVolumeAccessMode) string {
 	}
 	if ContainsAccessMode(modes, v1.ReadWriteMany) {
 		modesStr = append(modesStr, "RWX")
+	}
+	if ContainsAccessMode(modes, v1.ReadWriteOncePod) {
+		modesStr = append(modesStr, "RWOP")
 	}
 	return strings.Join(modesStr, ",")
 }
@@ -199,6 +202,8 @@ func GetAccessModesFromString(modes string) []v1.PersistentVolumeAccessMode {
 			accessModes = append(accessModes, v1.ReadOnlyMany)
 		case s == "RWX":
 			accessModes = append(accessModes, v1.ReadWriteMany)
+		case s == "RWOP":
+			accessModes = append(accessModes, v1.ReadWriteOncePod)
 		}
 	}
 	return accessModes

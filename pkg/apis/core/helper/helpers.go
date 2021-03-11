@@ -303,7 +303,7 @@ func IsStandardFinalizerName(str string) bool {
 }
 
 // GetAccessModesAsString returns a string representation of an array of access modes.
-// modes, when present, are always in the same order: RWO,ROX,RWX.
+// modes, when present, are always in the same order: RWO,ROX,RWX,RWOP.
 func GetAccessModesAsString(modes []core.PersistentVolumeAccessMode) string {
 	modes = removeDuplicateAccessModes(modes)
 	modesStr := []string{}
@@ -315,6 +315,9 @@ func GetAccessModesAsString(modes []core.PersistentVolumeAccessMode) string {
 	}
 	if ContainsAccessMode(modes, core.ReadWriteMany) {
 		modesStr = append(modesStr, "RWX")
+	}
+	if ContainsAccessMode(modes, core.ReadWriteOncePod) {
+		modesStr = append(modesStr, "RWOP")
 	}
 	return strings.Join(modesStr, ",")
 }
@@ -332,6 +335,8 @@ func GetAccessModesFromString(modes string) []core.PersistentVolumeAccessMode {
 			accessModes = append(accessModes, core.ReadOnlyMany)
 		case s == "RWX":
 			accessModes = append(accessModes, core.ReadWriteMany)
+		case s == "RWOP":
+			accessModes = append(accessModes, core.ReadWriteOncePod)
 		}
 	}
 	return accessModes
