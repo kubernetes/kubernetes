@@ -36,16 +36,15 @@ import (
 var _ = common.SIGDescribe("Netpol API", func() {
 	f := framework.NewDefaultFramework("netpol")
 	/*
-		Release: v1.20
-		Testname: NetworkPolicies API
+		Release: v1.21
+		Testname: NetworkPolicies API Create, List, Replace, Patch and Delete operations
 		Description:
 		- The networking.k8s.io API group MUST exist in the /apis discovery document.
 		- The networking.k8s.io/v1 API group/version MUST exist in the /apis/networking.k8s.io discovery document.
 		- The NetworkPolicies resources MUST exist in the /apis/networking.k8s.io/v1 discovery document.
 		- The NetworkPolicies resource must support create, get, list, watch, update, patch, delete, and deletecollection.
 	*/
-
-	ginkgo.It("should support creating NetworkPolicy API operations", func() {
+	framework.ConformanceIt("should support creating NetworkPolicy API operations", func() {
 		// Setup
 		ns := f.Namespace.Name
 		npVersion := "v1"
