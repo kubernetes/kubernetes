@@ -133,6 +133,7 @@ type CarpSpec struct {
 	// Selector which must match a node's labels for the carp to be scheduled on that node.
 	// More info: http://kubernetes.io/docs/user-guide/node-selection/README
 	// +optional
+	// +mapType=atomic
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 
 	// ServiceAccountName is the name of the ServiceAccount to use to run this carp.
