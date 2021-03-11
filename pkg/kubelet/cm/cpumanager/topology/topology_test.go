@@ -21,26 +21,23 @@ import (
 	"testing"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 func Test_Discover(t *testing.T) {
 
 	tests := []struct {
-		name         string
-		machineInfo  cadvisorapi.MachineInfo
-		numaNodeInfo NUMANodeInfo
-		want         *CPUTopology
-		wantErr      bool
+		name        string
+		machineInfo cadvisorapi.MachineInfo
+		want        *CPUTopology
+		wantErr     bool
 	}{
 		{
 			name: "FailNumCores",
 			machineInfo: cadvisorapi.MachineInfo{
 				NumCores: 0,
 			},
-			numaNodeInfo: NUMANodeInfo{},
-			want:         &CPUTopology{},
-			wantErr:      true,
+			want:    &CPUTopology{},
+			wantErr: true,
 		},
 		{
 			name: "OneSocketHT",
@@ -49,16 +46,13 @@ func Test_Discover(t *testing.T) {
 				Topology: []cadvisorapi.Node{
 					{Id: 0,
 						Cores: []cadvisorapi.Core{
-							{Id: 0, Threads: []int{0, 4}},
-							{Id: 1, Threads: []int{1, 5}},
-							{Id: 2, Threads: []int{2, 6}},
-							{Id: 3, Threads: []int{3, 7}},
+							{SocketID: 0, Id: 0, Threads: []int{0, 4}},
+							{SocketID: 0, Id: 1, Threads: []int{1, 5}},
+							{SocketID: 0, Id: 2, Threads: []int{2, 6}},
+							{SocketID: 0, Id: 3, Threads: []int{3, 7}},
 						},
 					},
 				},
-			},
-			numaNodeInfo: NUMANodeInfo{
-				0: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
 			},
 			want: &CPUTopology{
 				NumCPUs:    8,
@@ -84,21 +78,17 @@ func Test_Discover(t *testing.T) {
 				Topology: []cadvisorapi.Node{
 					{Id: 0,
 						Cores: []cadvisorapi.Core{
-							{Id: 0, Threads: []int{0}},
-							{Id: 2, Threads: []int{2}},
+							{SocketID: 0, Id: 0, Threads: []int{0}},
+							{SocketID: 0, Id: 2, Threads: []int{2}},
 						},
 					},
 					{Id: 1,
 						Cores: []cadvisorapi.Core{
-							{Id: 1, Threads: []int{1}},
-							{Id: 3, Threads: []int{3}},
+							{SocketID: 1, Id: 1, Threads: []int{1}},
+							{SocketID: 1, Id: 3, Threads: []int{3}},
 						},
 					},
 				},
-			},
-			numaNodeInfo: NUMANodeInfo{
-				0: cpuset.NewCPUSet(0, 2),
-				1: cpuset.NewCPUSet(1, 3),
 			},
 			want: &CPUTopology{
 				NumCPUs:    4,
@@ -120,23 +110,19 @@ func Test_Discover(t *testing.T) {
 				Topology: []cadvisorapi.Node{
 					{Id: 0,
 						Cores: []cadvisorapi.Core{
-							{Id: 0, Threads: []int{0, 6}},
-							{Id: 1, Threads: []int{1, 7}},
-							{Id: 2, Threads: []int{2, 8}},
+							{SocketID: 0, Id: 0, Threads: []int{0, 6}},
+							{SocketID: 0, Id: 1, Threads: []int{1, 7}},
+							{SocketID: 0, Id: 2, Threads: []int{2, 8}},
 						},
 					},
 					{Id: 1,
 						Cores: []cadvisorapi.Core{
-							{Id: 0, Threads: []int{3, 9}},
-							{Id: 1, Threads: []int{4, 10}},
-							{Id: 2, Threads: []int{5, 11}},
+							{SocketID: 1, Id: 0, Threads: []int{3, 9}},
+							{SocketID: 1, Id: 1, Threads: []int{4, 10}},
+							{SocketID: 1, Id: 2, Threads: []int{5, 11}},
 						},
 					},
 				},
-			},
-			numaNodeInfo: NUMANodeInfo{
-				0: cpuset.NewCPUSet(0, 6, 1, 7, 2, 8),
-				1: cpuset.NewCPUSet(3, 9, 4, 10, 5, 11),
 			},
 			want: &CPUTopology{
 				NumCPUs:    12,
@@ -166,17 +152,16 @@ func Test_Discover(t *testing.T) {
 				Topology: []cadvisorapi.Node{
 					{Id: 0,
 						Cores: []cadvisorapi.Core{
-							{Id: 0, Threads: []int{0, 4}},
-							{Id: 1, Threads: []int{1, 5}},
-							{Id: 2, Threads: []int{2, 2}}, // Wrong case - should fail here
-							{Id: 3, Threads: []int{3, 7}},
+							{SocketID: 0, Id: 0, Threads: []int{0, 4}},
+							{SocketID: 0, Id: 1, Threads: []int{1, 5}},
+							{SocketID: 0, Id: 2, Threads: []int{2, 2}}, // Wrong case - should fail here
+							{SocketID: 0, Id: 3, Threads: []int{3, 7}},
 						},
 					},
 				},
 			},
-			numaNodeInfo: NUMANodeInfo{},
-			want:         &CPUTopology{},
-			wantErr:      true,
+			want:    &CPUTopology{},
+			wantErr: true,
 		},
 		{
 			name: "OneSocketHT fail",
@@ -185,22 +170,21 @@ func Test_Discover(t *testing.T) {
 				Topology: []cadvisorapi.Node{
 					{Id: 0,
 						Cores: []cadvisorapi.Core{
-							{Id: 0, Threads: []int{0, 4}},
-							{Id: 1, Threads: []int{1, 5}},
-							{Id: 2, Threads: []int{2, 6}},
-							{Id: 3, Threads: []int{}}, // Wrong case - should fail here
+							{SocketID: 0, Id: 0, Threads: []int{0, 4}},
+							{SocketID: 0, Id: 1, Threads: []int{1, 5}},
+							{SocketID: 0, Id: 2, Threads: []int{2, 6}},
+							{SocketID: 0, Id: 3, Threads: []int{}}, // Wrong case - should fail here
 						},
 					},
 				},
 			},
-			numaNodeInfo: NUMANodeInfo{},
-			want:         &CPUTopology{},
-			wantErr:      true,
+			want:    &CPUTopology{},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Discover(&tt.machineInfo, tt.numaNodeInfo)
+			got, err := Discover(&tt.machineInfo)
 			if err != nil {
 				if tt.wantErr {
 					t.Logf("Discover() expected error = %v", err)
