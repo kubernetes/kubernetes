@@ -53,6 +53,27 @@ const (
 	// ImageRepository sets the container registry to pull control plane images from.
 	ImageRepository = "image-repository"
 
+	// components images infix, e.g.: if image path is "cs.io:8888/csrepo/cs-cri-kube-apiserver", so ImageInfix="csrepo/cs-cri-"
+	ImageInfix = "image-infix"
+
+	// kube-apiserver image version tag. If empty, use KubernetesVersion
+	KubeApiserverVersion = "kube-apiserver-version"
+
+	// kube-controller-manager image version tag. If empty, use KubernetesVersion
+	KubeControllerManagerVersion = "kube-controller-manager-version"
+
+	// kube-scheduler image version tag. If empty, use KubernetesVersion
+	KubeSchedulerVersion = "kube-scheduler-version"
+
+	// kube-proxy image version tag. If empty, use KubernetesVersion
+	KubeProxyVersion = "kube-proxy-version"
+
+	// pause image version tag. If empty, use kubeadm default version (constants.PauseVersion).
+	PauseVersion = "pause-version"
+
+	// CoreDNSVersion image version tag. If empty, use kubeadm default version (constants.CoreDNSVersion).
+	CoreDNSVersion = "coredns-version"
+
 	// KubeconfigDir flag sets the path where to save the kubeconfig file.
 	KubeconfigDir = "kubeconfig-dir"
 

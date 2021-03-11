@@ -401,6 +401,13 @@ func autoConvert_v1beta2_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in
 	}
 	out.CertificatesDir = in.CertificatesDir
 	out.ImageRepository = in.ImageRepository
+	out.ImageInfix = in.ImageInfix
+	out.KubeApiserverVersion = in.KubeApiserverVersion
+	out.KubeControllerManagerVersion = in.KubeControllerManagerVersion
+	out.KubeSchedulerVersion = in.KubeSchedulerVersion
+	out.KubeProxyVersion = in.KubeProxyVersion
+	out.PauseVersion = in.PauseVersion
+	out.CoreDNSVersion = in.CoreDNSVersion
 	out.UseHyperKubeImage = in.UseHyperKubeImage
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.ClusterName = in.ClusterName
@@ -436,6 +443,13 @@ func autoConvert_kubeadm_ClusterConfiguration_To_v1beta2_ClusterConfiguration(in
 	}
 	out.CertificatesDir = in.CertificatesDir
 	out.ImageRepository = in.ImageRepository
+	out.ImageInfix = in.ImageInfix
+	out.KubeApiserverVersion = in.KubeApiserverVersion
+	out.KubeControllerManagerVersion = in.KubeControllerManagerVersion
+	out.KubeSchedulerVersion = in.KubeSchedulerVersion
+	out.KubeProxyVersion = in.KubeProxyVersion
+	out.PauseVersion = in.PauseVersion
+	out.CoreDNSVersion = in.CoreDNSVersion
 	// INFO: in.CIImageRepository opted out of conversion generation
 	out.UseHyperKubeImage = in.UseHyperKubeImage
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))

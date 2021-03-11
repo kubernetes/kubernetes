@@ -105,6 +105,27 @@ type ClusterConfiguration struct {
 	// will be used for all the other images.
 	ImageRepository string `json:"imageRepository"`
 
+	// components images infix, e.g.: if image path is "cs.io:8888/csrepo/cs-cri-kube-apiserver", so ImageInfix="csrepo/cs-cri-"
+	ImageInfix string `json:"imageInfix,omitempty"`
+
+	// kube-apiserver image version tag. If empty, use KubernetesVersion
+	KubeApiserverVersion string `json:"kubeApiserverVersion,omitempty"`
+
+	// kube-controller-manager image version tag. If empty, use KubernetesVersion
+	KubeControllerManagerVersion string `json:"kubeControllerManagerVersion,omitempty"`
+
+	// kube-scheduler image version tag. If empty, use KubernetesVersion
+	KubeSchedulerVersion string `json:"kubeSchedulerVersion,omitempty"`
+
+	// kube-proxy image version tag. If empty, use KubernetesVersion
+	KubeProxyVersion string `json:"kubeProxyVersion,omitempty"`
+
+	// pause image version tag. If empty, use kubeadm default version (constants.PauseVersion).
+	PauseVersion string `json:"pauseVersion,omitempty"`
+
+	// CoreDNSVersion image version tag. If empty, use kubeadm default version (constants.CoreDNSVersion).
+	CoreDNSVersion string `json:"coreDNSVersion,omitempty"`
+
 	// UseHyperKubeImage controls if hyperkube should be used for Kubernetes components instead of their respective separate images
 	// DEPRECATED: As hyperkube is itself deprecated, this fields is too. It will be removed in future kubeadm config versions, kubeadm
 	// will print multiple warnings when set to true, and at some point it may become ignored.

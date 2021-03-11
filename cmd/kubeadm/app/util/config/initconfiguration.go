@@ -313,6 +313,7 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 			if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), fileContent, clustercfg); err != nil {
 				return nil, err
 			}
+			fmt.Printf("clustercfg: %+v\n", clustercfg)
 			continue
 		}
 

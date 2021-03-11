@@ -490,4 +490,12 @@ func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.Cl
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 	options.AddImageMetaFlags(flagSet, &cfg.ImageRepository)
 	options.AddConfigFlag(flagSet, cfgPath)
+
+	options.AddImageInfixFlag(flagSet, &cfg.ImageInfix)
+	options.AddKubeApiserverVersionFlag(flagSet, &cfg.KubeApiserverVersion)
+	options.AddKubeControllerManagerVersionFlag(flagSet, &cfg.KubeControllerManagerVersion)
+	options.AddKubeSchedulerVersionFlag(flagSet, &cfg.KubeSchedulerVersion)
+	options.AddKubeProxyVersionFlag(flagSet, &cfg.KubeProxyVersion)
+	options.AddPauseVersionFlag(flagSet, &cfg.PauseVersion)
+	options.AddCoreDNSVersionFlag(flagSet, &cfg.CoreDNSVersion)
 }
