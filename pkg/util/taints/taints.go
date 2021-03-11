@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -266,25 +266,25 @@ func DeleteTaint(taints []v1.Taint, taintToDelete *v1.Taint) ([]v1.Taint, bool) 
 
 // RemoveTaint tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
-func RemoveTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
+func RemoveTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool) {
 	newNode := node.DeepCopy()
 	nodeTaints := newNode.Spec.Taints
 	if len(nodeTaints) == 0 {
-		return newNode, false, nil
+		return newNode, false
 	}
 
 	if !TaintExists(nodeTaints, taint) {
-		return newNode, false, nil
+		return newNode, false
 	}
 
 	newTaints, _ := DeleteTaint(nodeTaints, taint)
 	newNode.Spec.Taints = newTaints
-	return newNode, true, nil
+	return newNode, true
 }
 
 // AddOrUpdateTaint tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
-func AddOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
+func AddOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool) {
 	newNode := node.DeepCopy()
 	nodeTaints := newNode.Spec.Taints
 
@@ -293,7 +293,7 @@ func AddOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 	for i := range nodeTaints {
 		if taint.MatchTaint(&nodeTaints[i]) {
 			if helper.Semantic.DeepEqual(*taint, nodeTaints[i]) {
-				return newNode, false, nil
+				return newNode, false
 			}
 			newTaints = append(newTaints, *taint)
 			updated = true
@@ -308,7 +308,7 @@ func AddOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 	}
 
 	newNode.Spec.Taints = newTaints
-	return newNode, true, nil
+	return newNode, true
 }
 
 // TaintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.

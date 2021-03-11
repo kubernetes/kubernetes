@@ -1087,10 +1087,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		oldNodeCopy := oldNode
 		updated := false
 		for _, taint := range taints {
-			curNewNode, ok, err := taintutils.AddOrUpdateTaint(oldNodeCopy, taint)
-			if err != nil {
-				return fmt.Errorf("failed to update taint of node")
-			}
+			curNewNode, ok := taintutils.AddOrUpdateTaint(oldNodeCopy, taint)
 			updated = updated || ok
 			newNode = curNewNode
 			oldNodeCopy = curNewNode
@@ -1144,10 +1141,7 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, t
 		oldNodeCopy := oldNode
 		updated := false
 		for _, taint := range taints {
-			curNewNode, ok, err := taintutils.RemoveTaint(oldNodeCopy, taint)
-			if err != nil {
-				return fmt.Errorf("failed to remove taint of node")
-			}
+			curNewNode, ok := taintutils.RemoveTaint(oldNodeCopy, taint)
 			updated = updated || ok
 			newNode = curNewNode
 			oldNodeCopy = curNewNode
