@@ -449,3 +449,33 @@
       initNodes: 5000
       initPods: 2000
       measurePods: 5000
+
+- name: ServiceAffinity
+  schedulerConfigFile: config/kube-scheduler-serviceaffinity.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: config/pod-default.yaml
+    skipWaitToCompletion: true
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/pod-default.yaml
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes/200InitPods
+    params:
+      initNodes: 500
+      initPods: 200
+      measurePods: 1000
+  - name: 5000Nodes/200InitPods
+    params:
+      initNodes: 5000
+      initPods: 200
+      measurePods: 5000
+  - name: 5000Nodes/2000InitPods
+    params:
+      initNodes: 5000
+      initPods: 2000
+      measurePods: 5000

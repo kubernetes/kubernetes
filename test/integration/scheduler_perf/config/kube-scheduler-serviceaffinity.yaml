@@ -1,0 +1,39 @@
+apiVersion: kubescheduler.config.k8s.io/v1beta1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  acceptContentTypes: ""
+  burst: 100
+  contentType: application/vnd.kubernetes.protobuf
+  kubeconfig: /etc/kubernetes/scheduler.conf
+  qps: 50
+enableContentionProfiling: true
+enableProfiling: true
+extenders: null
+healthzBindAddress: 0.0.0.0:10251
+leaderElection:
+  leaderElect: true
+  leaseDuration: 15s
+  renewDeadline: 10s
+  resourceLock: endpointsleases
+  resourceName: kube-scheduler
+  resourceNamespace: kube-system
+  retryPeriod: 2s
+metricsBindAddress: 0.0.0.0:10251
+percentageOfNodesToScore: 0
+podInitialBackoffSeconds: 1
+podMaxBackoffSeconds: 10
+profiles:
+- schedulerName: default-scheduler
+  plugins:
+    preFilter:
+      enabled:
+        - name: ServiceAffinity
+
+    filter:
+      enabled:
+        - name: ServiceAffinity
+
+  pluginConfig:
+   - name: ServiceAffinity
+     args:
+       affinityLabels: ["bar"]
