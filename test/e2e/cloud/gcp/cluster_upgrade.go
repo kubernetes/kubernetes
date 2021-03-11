@@ -18,7 +18,6 @@ package gcp
 
 import (
 	"fmt"
-	"time"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -132,28 +131,6 @@ var _ = ginkgo.Describe("Downgrade [Feature:Downgrade]", func() {
 
 			upgradeFunc := ClusterDowngradeFunc(f, upgCtx, clusterDowngradeTest, nil, nil)
 			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
-		})
-	})
-})
-
-var _ = ginkgo.Describe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
-	f := framework.NewDefaultFramework("etc-upgrade")
-
-	ginkgo.Describe("etcd upgrade", func() {
-		ginkgo.It("should maintain a functioning cluster", func() {
-			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
-			framework.ExpectNoError(err)
-
-			testSuite := &junit.TestSuite{Name: "Etcd upgrade"}
-			etcdTest := &junit.TestCase{Name: "[sig-cloud-provider-gcp] etcd-upgrade", Classname: "upgrade_tests"}
-			testSuite.TestCases = append(testSuite.TestCases, etcdTest)
-
-			upgradeFunc := func() {
-				start := time.Now()
-				defer upgrades.FinalizeUpgradeTest(start, etcdTest)
-				framework.ExpectNoError(framework.EtcdUpgrade(framework.TestContext.EtcdUpgradeStorage, framework.TestContext.EtcdUpgradeVersion))
-			}
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.EtcdUpgrade, upgradeFunc)
 		})
 	})
 })
