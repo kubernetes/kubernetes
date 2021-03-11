@@ -62,6 +62,30 @@ func AddImageMetaFlags(fs *pflag.FlagSet, imageRepository *string) {
 	fs.StringVar(imageRepository, ImageRepository, *imageRepository, "Choose a container registry to pull control plane images from")
 }
 
+func AddImageInfixFlag(fs *pflag.FlagSet, imageInfix *string) {
+	fs.StringVar(imageInfix, ImageInfix, *imageInfix, "components images infix, e.g.:\nif image path is \"cs.io:8888/csrepo/cs-cri-kube-apiserver\", so ImageInfix=\"csrepo/cs-cri-\"")
+}
+
+func AddKubeApiserverVersionFlag(fs *pflag.FlagSet, kubeApiserverVersion *string) {
+	fs.StringVar(kubeApiserverVersion, KubeApiserverVersion, *kubeApiserverVersion, "kube-apiserver image version tag. If empty, use KubernetesVersion")
+}
+
+func AddKubeControllerManagerVersionFlag(fs *pflag.FlagSet, kubeControllerManagerVersion *string) {
+	fs.StringVar(kubeControllerManagerVersion, KubeControllerManagerVersion, *kubeControllerManagerVersion, "kube-controller-manager image version tag. If empty, use KubernetesVersion")
+}
+
+func AddKubeSchedulerVersionFlag(fs *pflag.FlagSet, kubeSchedulerVersion *string) {
+	fs.StringVar(kubeSchedulerVersion, KubeSchedulerVersion, *kubeSchedulerVersion, "kube-scheduler image version tag. If empty, use KubernetesVersion")
+}
+
+func AddKubeProxyVersionFlag(fs *pflag.FlagSet, kubeProxyVersion *string) {
+	fs.StringVar(kubeProxyVersion, KubeProxyVersion, *kubeProxyVersion, "kube-proxy image version tag. If empty, use KubernetesVersion.")
+}
+
+func AddPauseVersionFlag(fs *pflag.FlagSet, pauseVersion *string) {
+	fs.StringVar(pauseVersion, PauseVersion, *pauseVersion, "pause image version tag. If empty, use kubeadm default version.")
+}
+
 // AddFeatureGatesStringFlag adds the --feature-gates flag to the given flagset
 func AddFeatureGatesStringFlag(fs *pflag.FlagSet, featureGatesString *string) {
 	if knownFeatures := features.KnownFeatures(&features.InitFeatureGates); len(knownFeatures) > 0 {

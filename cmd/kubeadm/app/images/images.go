@@ -35,12 +35,34 @@ func GetGenericImage(prefix, image, tag string) string {
 // GetKubernetesImage generates and returns the image for the components managed in the Kubernetes main repository,
 // including the control-plane components and kube-proxy. If specified, the HyperKube image will be used.
 func GetKubernetesImage(image string, cfg *kubeadmapi.ClusterConfiguration) string {
+	repoPrefix := cfg.GetControlPlaneImageRepository()
+	kubernetesImageTag := kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion)
+
+	switch image {
+	case constants.KubeAPIServer:
+		if cfg.KubeApiserverVersion != "" {
+			kubernetesImageTag = cfg.KubeApiserverVersion
+		}
+	case constants.KubeControllerManager:
+		if cfg.KubeControllerManagerVersion != "" {
+			kubernetesImageTag = cfg.KubeControllerManagerVersion
+		}
+	case constants.KubeScheduler:
+		if cfg.KubeSchedulerVersion != "" {
+			kubernetesImageTag = cfg.KubeSchedulerVersion
+		}
+	case constants.KubeProxy:
+		if cfg.KubeProxyVersion != "" {
+			kubernetesImageTag = cfg.KubeProxyVersion
+		}
+	}
+
 	if cfg.UseHyperKubeImage && image != constants.HyperKube {
 		klog.Warningf(`WARNING: DEPRECATED use of the "hyperkube" image in place of %q.`+extraHyperKubeNote, image)
 		image = constants.HyperKube
+	} else {
+		image = cfg.ImageInfix + image
 	}
-	repoPrefix := cfg.GetControlPlaneImageRepository()
-	kubernetesImageTag := kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion)
 	return GetGenericImage(repoPrefix, image, kubernetesImageTag)
 }
 
@@ -59,7 +81,12 @@ func GetDNSImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	if cfg.DNS.ImageTag != "" {
 		dnsImageTag = cfg.DNS.ImageTag
 	}
-	return GetGenericImage(dnsImageRepository, constants.CoreDNSImageName, dnsImageTag)
+	image := constants.CoreDNSImageName
+	if cfg.DNS.ImageTag != "" && cfg.ImageInfix != "" {
+		image = cfg.ImageInfix + "coredns"
+	}
+
+	return GetGenericImage(dnsImageRepository, image, dnsImageTag)
 }
 
 // GetEtcdImage generates and returns the image for etcd
@@ -119,5 +146,10 @@ func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 
 // GetPauseImage returns the image for the "pause" container
 func GetPauseImage(cfg *kubeadmapi.ClusterConfiguration) string {
-	return GetGenericImage(cfg.ImageRepository, "pause", constants.PauseVersion)
+	image := cfg.ImageInfix + "pause"
+	version := constants.PauseVersion
+	if cfg.PauseVersion != "" {
+		version = cfg.PauseVersion
+	}
+	return GetGenericImage(cfg.ImageRepository, image, version)
 }

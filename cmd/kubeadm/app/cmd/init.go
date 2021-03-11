@@ -167,6 +167,13 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initOptions.bto.AddTTLFlag(cmd.Flags())
 	options.AddImageMetaFlags(cmd.Flags(), &initOptions.externalClusterCfg.ImageRepository)
 
+	options.AddImageInfixFlag(cmd.Flags(), &initOptions.externalClusterCfg.ImageInfix)
+	options.AddKubeApiserverVersionFlag(cmd.Flags(), &initOptions.externalClusterCfg.KubeApiserverVersion)
+	options.AddKubeControllerManagerVersionFlag(cmd.Flags(), &initOptions.externalClusterCfg.KubeControllerManagerVersion)
+	options.AddKubeSchedulerVersionFlag(cmd.Flags(), &initOptions.externalClusterCfg.KubeSchedulerVersion)
+	options.AddKubeProxyVersionFlag(cmd.Flags(), &initOptions.externalClusterCfg.KubeProxyVersion)
+	options.AddPauseVersionFlag(cmd.Flags(), &initOptions.externalClusterCfg.PauseVersion)
+
 	// defines additional flag that are not used by the init command but that could be eventually used
 	// by the sub-commands automatically generated for phases
 	initRunner.SetAdditionalFlags(func(flags *flag.FlagSet) {
