@@ -75,7 +75,12 @@ var _ = SIGDescribe("DisruptionController", func() {
 	ginkgo.Context("Listing PodDisruptionBudgets for all namespaces", func() {
 		anotherFramework := framework.NewDefaultFramework("disruption-2")
 
-		ginkgo.It("should list and delete a collection of PodDisruptionBudgets", func() {
+		/*
+		   Release : v1.21
+		   Testname: PodDisruptionBudget: list and delete collection
+		   Description: PodDisruptionBudget API must support list and deletecollection operations.
+		*/
+		framework.ConformanceIt("should list and delete a collection of PodDisruptionBudgets", func() {
 			specialLabels := map[string]string{"foo_pdb": "bar_pdb"}
 			labelSelector := labels.SelectorFromSet(specialLabels).String()
 			createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(2), specialLabels)
@@ -91,8 +96,14 @@ var _ = SIGDescribe("DisruptionController", func() {
 		})
 	})
 
-	ginkgo.It("should create a PodDisruptionBudget", func() {
+	/*
+		Release : v1.21
+		Testname: PodDisruptionBudget: create and delete object
+		Description: PodDisruptionBudget API must support create and delete operations.
+	*/
+	framework.ConformanceIt("should create a PodDisruptionBudget", func() {
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromString("1%"), defaultLabels)
+		deletePDBOrDie(cs, ns, defaultName)
 	})
 
 	/*
@@ -119,7 +130,12 @@ var _ = SIGDescribe("DisruptionController", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should update/patch PodDisruptionBudget status", func() {
+	/*
+		Release : v1.21
+		Testname: PodDisruptionBudget: update and patch status
+		Description: PodDisruptionBudget API must support update and patch operations on status subresource.
+	*/
+	framework.ConformanceIt("should update/patch PodDisruptionBudget status", func() {
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(1), defaultLabels)
 
 		ginkgo.By("Updating PodDisruptionBudget status")
