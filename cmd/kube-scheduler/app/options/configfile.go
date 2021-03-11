@@ -19,16 +19,18 @@ package options
 import (
 	"fmt"
 	"io/ioutil"
-	"k8s.io/klog/v2"
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	kubeschedulerconfigv1beta1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
 )
 
-func loadConfigFromFile(file string) (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
+// LoadConfigFromFile will load the file passed in and decode the file into `config.KubeSchedulerConfiguration`.
+// This method is used in two places (main scheduler bootstrapping, scheduler_perf) in order to build ComponentConfig.
+func LoadConfigFromFile(file string) (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
