@@ -1190,7 +1190,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", "6", "<unknown>"}}},
 		},
 		{
 			// Test container error overwrites pod phase
@@ -1205,7 +1205,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", "6", "<unknown>"}}},
 		},
 		{
 			// Test the same as the above but with Terminated state and the first container overwrites the rest
@@ -1220,7 +1220,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1.TableRow{{Cells: []interface{}{"test3", "0/2", "ContainerWaitingReason", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test3", "0/2", "ContainerWaitingReason", "6", "<unknown>"}}},
 		},
 		{
 			// Test ready is not enough for reporting running
@@ -1235,7 +1235,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1.TableRow{{Cells: []interface{}{"test4", "1/2", "podPhase", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test4", "1/2", "podPhase", "6", "<unknown>"}}},
 		},
 		{
 			// Test ready is not enough for reporting running
@@ -1251,7 +1251,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", "6", "<unknown>"}}},
 		},
 		{
 			// Test pod has 2 containers, one is running and the other is completed, w/o ready condition
@@ -1267,7 +1267,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1.TableRow{{Cells: []interface{}{"test6", "1/2", "NotReady", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test6", "1/2", "NotReady", "6", "<unknown>"}}},
 		},
 		{
 			// Test pod has 2 containers, one is running and the other is completed, with ready condition
@@ -1286,7 +1286,217 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1.TableRow{{Cells: []interface{}{"test6", "1/2", "Running", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test6", "1/2", "Running", "6", "<unknown>"}}},
+		},
+		{
+			// Test pod has 1 init container restarting and 1 container not running
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test7"},
+				Spec:       api.PodSpec{InitContainers: make([]api.Container, 1), Containers: make([]api.Container, 1)},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					InitContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:                false,
+							RestartCount:         3,
+							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+						},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:        false,
+							RestartCount: 0,
+							State:        api.ContainerState{Waiting: &api.ContainerStateWaiting{}},
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test7", "0/1", "Init:0/1", "3 (10s ago)", "<unknown>"}}},
+		},
+		{
+			// Test pod has 2 init containers, one restarting and the other not running, and 1 container not running
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test8"},
+				Spec:       api.PodSpec{InitContainers: make([]api.Container, 2), Containers: make([]api.Container, 1)},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					InitContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:                false,
+							RestartCount:         3,
+							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+						},
+						{
+							Ready: false,
+							State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}},
+						},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready: false,
+							State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}},
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test8", "0/1", "Init:0/2", "3 (10s ago)", "<unknown>"}}},
+		},
+		{
+			// Test pod has 2 init containers, one completed without restarts and the other restarting, and 1 container not running
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test9"},
+				Spec:       api.PodSpec{InitContainers: make([]api.Container, 2), Containers: make([]api.Container, 1)},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					InitContainerStatuses: []api.ContainerStatus{
+						{
+							Ready: false,
+							State: api.ContainerState{Terminated: &api.ContainerStateTerminated{}},
+						},
+						{
+							Ready:                false,
+							RestartCount:         3,
+							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+						},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready: false,
+							State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}},
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test9", "0/1", "Init:1/2", "3 (10s ago)", "<unknown>"}}},
+		},
+		{
+			// Test pod has 2 init containers, one completed with restarts and the other restarting, and 1 container not running
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test10"},
+				Spec:       api.PodSpec{InitContainers: make([]api.Container, 2), Containers: make([]api.Container, 1)},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					InitContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:                false,
+							RestartCount:         2,
+							State:                api.ContainerState{Terminated: &api.ContainerStateTerminated{}},
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-2 * time.Minute))}},
+						},
+						{
+							Ready:                false,
+							RestartCount:         3,
+							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
+						},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready: false,
+							State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}},
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test10", "0/1", "Init:1/2", "5 (10s ago)", "<unknown>"}}},
+		},
+		{
+			// Test pod has 1 init container completed with restarts and one container restarting
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test11"},
+				Spec:       api.PodSpec{InitContainers: make([]api.Container, 1), Containers: make([]api.Container, 1)},
+				Status: api.PodStatus{
+					Phase: "Running",
+					InitContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:                false,
+							RestartCount:         2,
+							State:                api.ContainerState{Terminated: &api.ContainerStateTerminated{}},
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-2 * time.Minute))}},
+						},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:                false,
+							RestartCount:         4,
+							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-20 * time.Second))}},
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test11", "0/1", "Running", "4 (20s ago)", "<unknown>"}}},
+		},
+		{
+			// Test pod has 1 container that restarted 5d ago
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test12"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 1)},
+				Status: api.PodStatus{
+					Phase: "Running",
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:                true,
+							RestartCount:         3,
+							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-5 * 24 * time.Hour))}},
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test12", "1/1", "Running", "3 (5d ago)", "<unknown>"}}},
+		},
+		{
+			// Test pod has 2 containers, one has never restarted and the other has restarted 10d ago
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test13"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+				Status: api.PodStatus{
+					Phase: "Running",
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:        true,
+							RestartCount: 0,
+							State:        api.ContainerState{Running: &api.ContainerStateRunning{}},
+						},
+						{
+							Ready:                true,
+							RestartCount:         3,
+							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * 24 * time.Hour))}},
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test13", "2/2", "Running", "3 (10d ago)", "<unknown>"}}},
+		},
+		{
+			// Test pod has 2 containers, one restarted 5d ago and the other restarted 20d ago
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test14"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+				Status: api.PodStatus{
+					Phase: "Running",
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready:                true,
+							RestartCount:         6,
+							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-5 * 24 * time.Hour))}},
+						},
+						{
+							Ready:                true,
+							RestartCount:         3,
+							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
+							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-20 * 24 * time.Hour))}},
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test14", "2/2", "Running", "9 (5d ago)", "<unknown>"}}},
 		},
 	}
 
@@ -1351,7 +1561,7 @@ func TestPrintPodwide(t *testing.T) {
 					NominatedNodeName: "node1",
 				},
 			},
-			[]metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1", "1/3"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", "6", "<unknown>", "1.1.1.1", "test1", "node1", "1/3"}}},
 		},
 		{
 			// Test when the NodeName and PodIP are not none
@@ -1392,7 +1602,7 @@ func TestPrintPodwide(t *testing.T) {
 					NominatedNodeName: "node1",
 				},
 			},
-			[]metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1", "1/3"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", "6", "<unknown>", "1.1.1.1", "test1", "node1", "1/3"}}},
 		},
 		{
 			// Test when the NodeName and PodIP are none
@@ -1410,7 +1620,7 @@ func TestPrintPodwide(t *testing.T) {
 					},
 				},
 			},
-			[]metav1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>", "<none>", "<none>", "<none>", "<none>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", "6", "<unknown>", "<none>", "<none>", "<none>", "<none>"}}},
 		},
 	}
 
@@ -1470,7 +1680,7 @@ func TestPrintPodConditions(t *testing.T) {
 		{
 			pod: runningPod,
 			// Columns: Name, Ready, Reason, Restarts, Age
-			expect: []metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", int64(6), "<unknown>"}}},
+			expect: []metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", "6", "<unknown>"}}},
 		},
 		// Should have TableRowCondition: podSuccessConditions
 		{
@@ -1478,7 +1688,7 @@ func TestPrintPodConditions(t *testing.T) {
 			expect: []metav1.TableRow{
 				{
 					// Columns: Name, Ready, Reason, Restarts, Age
-					Cells:      []interface{}{"test1", "1/2", "Succeeded", int64(6), "<unknown>"},
+					Cells:      []interface{}{"test1", "1/2", "Succeeded", "6", "<unknown>"},
 					Conditions: podSuccessConditions,
 				},
 			},
@@ -1489,7 +1699,7 @@ func TestPrintPodConditions(t *testing.T) {
 			expect: []metav1.TableRow{
 				{
 					// Columns: Name, Ready, Reason, Restarts, Age
-					Cells:      []interface{}{"test2", "1/2", "Failed", int64(6), "<unknown>"},
+					Cells:      []interface{}{"test2", "1/2", "Failed", "6", "<unknown>"},
 					Conditions: podFailedConditions,
 				},
 			},
@@ -1542,7 +1752,7 @@ func TestPrintPodList(t *testing.T) {
 					},
 				},
 			},
-			[]metav1.TableRow{{Cells: []interface{}{"test1", "2/2", "podPhase", int64(6), "<unknown>"}}, {Cells: []interface{}{"test2", "1/1", "podPhase", int64(1), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test1", "2/2", "podPhase", "6", "<unknown>"}}, {Cells: []interface{}{"test2", "1/1", "podPhase", "1", "<unknown>"}}},
 		},
 	}
 
@@ -1580,7 +1790,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 				},
 			},
 			// Columns: Name, Ready, Reason, Restarts, Age
-			[]metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", "6", "<unknown>"}}},
 		},
 		{
 			// Test pod phase Pending should be printed
@@ -1596,7 +1806,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 				},
 			},
 			// Columns: Name, Ready, Reason, Restarts, Age
-			[]metav1.TableRow{{Cells: []interface{}{"test2", "1/2", "Pending", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test2", "1/2", "Pending", "6", "<unknown>"}}},
 		},
 		{
 			// Test pod phase Unknown should be printed
@@ -1612,7 +1822,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 				},
 			},
 			// Columns: Name, Ready, Reason, Restarts, Age
-			[]metav1.TableRow{{Cells: []interface{}{"test3", "1/2", "Unknown", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test3", "1/2", "Unknown", "6", "<unknown>"}}},
 		},
 		{
 			// Test pod phase Succeeded should be printed
@@ -1630,7 +1840,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 			// Columns: Name, Ready, Reason, Restarts, Age
 			[]metav1.TableRow{
 				{
-					Cells:      []interface{}{"test4", "1/2", "Succeeded", int64(6), "<unknown>"},
+					Cells:      []interface{}{"test4", "1/2", "Succeeded", "6", "<unknown>"},
 					Conditions: podSuccessConditions,
 				},
 			},
@@ -1651,7 +1861,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 			// Columns: Name, Ready, Reason, Restarts, Age
 			[]metav1.TableRow{
 				{
-					Cells:      []interface{}{"test5", "1/2", "Failed", int64(6), "<unknown>"},
+					Cells:      []interface{}{"test5", "1/2", "Failed", "6", "<unknown>"},
 					Conditions: podFailedConditions,
 				},
 			},
