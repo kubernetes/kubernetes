@@ -75,6 +75,7 @@ type StorageClass struct {
 	// An empty TopologySelectorTerm list means there is no topology restriction.
 	// This field is only honored by servers that enable the VolumeScheduling feature.
 	// +optional
+	// +listType=atomic
 	AllowedTopologies []v1.TopologySelectorTerm `json:"allowedTopologies,omitempty" protobuf:"bytes,8,rep,name=allowedTopologies"`
 }
 
