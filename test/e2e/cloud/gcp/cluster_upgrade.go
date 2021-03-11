@@ -18,14 +18,8 @@ package gcp
 
 import (
 	"fmt"
-	"path"
-	"strings"
-	"time"
 
-	utilversion "k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	"k8s.io/kubernetes/test/e2e/upgrades/apps"
@@ -37,11 +31,6 @@ import (
 	"k8s.io/kubernetes/test/utils/junit"
 
 	"github.com/onsi/ginkgo"
-)
-
-var (
-	upgradeTarget = e2econfig.Flags.String("upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
-	upgradeImage  = e2econfig.Flags.String("upgrade-image", "", "Image to upgrade to (e.g. 'container_vm' or 'gci') if doing an upgrade test.")
 )
 
 const etcdImage = "3.4.9-1"
@@ -97,7 +86,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 	// in a "Describe".
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:MasterUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
+			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Master upgrade"}
@@ -114,7 +103,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 
 	ginkgo.Describe("cluster upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:ClusterUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
+			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Cluster upgrade"}
@@ -133,7 +122,7 @@ var _ = ginkgo.Describe("Downgrade [Feature:Downgrade]", func() {
 
 	ginkgo.Describe("cluster downgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:ClusterDowngrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
+			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Cluster downgrade"}
@@ -146,35 +135,13 @@ var _ = ginkgo.Describe("Downgrade [Feature:Downgrade]", func() {
 	})
 })
 
-var _ = ginkgo.Describe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
-	f := framework.NewDefaultFramework("etc-upgrade")
-
-	ginkgo.Describe("etcd upgrade", func() {
-		ginkgo.It("should maintain a functioning cluster", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
-			framework.ExpectNoError(err)
-
-			testSuite := &junit.TestSuite{Name: "Etcd upgrade"}
-			etcdTest := &junit.TestCase{Name: "[sig-cloud-provider-gcp] etcd-upgrade", Classname: "upgrade_tests"}
-			testSuite.TestCases = append(testSuite.TestCases, etcdTest)
-
-			upgradeFunc := func() {
-				start := time.Now()
-				defer upgrades.FinalizeUpgradeTest(start, etcdTest)
-				framework.ExpectNoError(framework.EtcdUpgrade(framework.TestContext.EtcdUpgradeStorage, framework.TestContext.EtcdUpgradeVersion))
-			}
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.EtcdUpgrade, upgradeFunc)
-		})
-	})
-})
-
 // TODO(#98326): Split the test by SIGs, move to appropriate directories and use SIGDescribe.
 var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	f := framework.NewDefaultFramework("gpu-upgrade")
 
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should NOT disrupt gpu pod [Feature:GPUMasterUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
+			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "GPU master upgrade"}
@@ -187,7 +154,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	})
 	ginkgo.Describe("cluster upgrade", func() {
 		ginkgo.It("should be able to run gpu pod after upgrade [Feature:GPUClusterUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
+			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "GPU cluster upgrade"}
@@ -200,7 +167,7 @@ var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	})
 	ginkgo.Describe("cluster downgrade", func() {
 		ginkgo.It("should be able to run gpu pod after downgrade [Feature:GPUClusterDowngrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
+			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "GPU cluster downgrade"}
@@ -219,7 +186,7 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 
 	ginkgo.Describe("stateful upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
+			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Stateful upgrade"}
@@ -242,7 +209,7 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 
 	ginkgo.Describe("Upgrade kube-proxy from static pods to a DaemonSet", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
+			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "kube-proxy upgrade"}
@@ -260,7 +227,7 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 
 	ginkgo.Describe("Downgrade kube-proxy from a DaemonSet to static pods", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetDowngrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
+			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "kube-proxy downgrade"}
@@ -283,7 +250,7 @@ var _ = ginkgo.Describe("[sig-auth] ServiceAccount admission controller migratio
 
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget, *upgradeImage)
+			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "ServiceAccount admission controller migration"}
@@ -299,57 +266,3 @@ var _ = ginkgo.Describe("[sig-auth] ServiceAccount admission controller migratio
 		})
 	})
 })
-
-func getUpgradeContext(c discovery.DiscoveryInterface, upgradeTarget, upgradeImage string) (*upgrades.UpgradeContext, error) {
-	current, err := c.ServerVersion()
-	if err != nil {
-		return nil, err
-	}
-
-	curVer, err := utilversion.ParseSemantic(current.String())
-	if err != nil {
-		return nil, err
-	}
-
-	upgCtx := &upgrades.UpgradeContext{
-		Versions: []upgrades.VersionContext{
-			{
-				Version:   *curVer,
-				NodeImage: framework.TestContext.NodeOSDistro,
-			},
-		},
-	}
-
-	if len(upgradeTarget) == 0 {
-		return upgCtx, nil
-	}
-
-	next, err := realVersion(upgradeTarget)
-	if err != nil {
-		return nil, err
-	}
-
-	nextVer, err := utilversion.ParseSemantic(next)
-	if err != nil {
-		return nil, err
-	}
-
-	upgCtx.Versions = append(upgCtx.Versions, upgrades.VersionContext{
-		Version:   *nextVer,
-		NodeImage: upgradeImage,
-	})
-
-	return upgCtx, nil
-}
-
-// realVersion turns a version constants into a version string deployable on
-// GKE.  See hack/get-build.sh for more information.
-func realVersion(s string) (string, error) {
-	framework.Logf("Getting real version for %q", s)
-	v, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/get-build.sh"), "-v", s)
-	if err != nil {
-		return v, fmt.Errorf("error getting real version for %q: %v", s, err)
-	}
-	framework.Logf("Version for %q is %q", s, v)
-	return strings.TrimPrefix(strings.TrimSpace(v), "v"), nil
-}
