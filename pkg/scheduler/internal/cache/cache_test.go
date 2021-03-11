@@ -869,9 +869,7 @@ func TestRemovePod(t *testing.T) {
 				t.Error(err)
 			}
 			for _, n := range tt.nodes {
-				if err := cache.AddNode(n); err != nil {
-					t.Error(err)
-				}
+				cache.AddNode(n)
 			}
 
 			if err := cache.RemovePod(tt.pod); err != nil {
@@ -1080,9 +1078,7 @@ func TestNodeOperators(t *testing.T) {
 			node := test.node
 
 			cache := newSchedulerCache(time.Second, time.Second, nil)
-			if err := cache.AddNode(node); err != nil {
-				t.Fatal(err)
-			}
+			cache.AddNode(node)
 			for _, pod := range test.pods {
 				if err := cache.AddPod(pod); err != nil {
 					t.Fatal(err)
@@ -1126,9 +1122,7 @@ func TestNodeOperators(t *testing.T) {
 			node.Status.Allocatable[v1.ResourceMemory] = mem50m
 			expected.Allocatable.Memory = mem50m.Value()
 
-			if err := cache.UpdateNode(nil, node); err != nil {
-				t.Error(err)
-			}
+			cache.UpdateNode(nil, node)
 			got, found = cache.nodes[node.Name]
 			if !found {
 				t.Errorf("Failed to find node %v in schedulertypes after UpdateNode.", node.Name)
@@ -1265,9 +1259,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 
 	addNode := func(i int) operation {
 		return func(t *testing.T) {
-			if err := cache.AddNode(nodes[i]); err != nil {
-				t.Error(err)
-			}
+			cache.AddNode(nodes[i])
 		}
 	}
 	removeNode := func(i int) operation {
@@ -1279,9 +1271,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	}
 	updateNode := func(i int) operation {
 		return func(t *testing.T) {
-			if err := cache.UpdateNode(nodes[i], updatedNodes[i]); err != nil {
-				t.Error(err)
-			}
+			cache.UpdateNode(nodes[i], updatedNodes[i])
 		}
 	}
 	addPod := func(i int) operation {
@@ -1589,9 +1579,7 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 	var snapshot *Snapshot
 
 	addNode := func(t *testing.T, i int) {
-		if err := cache.AddNode(nodes[i]); err != nil {
-			t.Error(err)
-		}
+		cache.AddNode(nodes[i])
 		_, ok := snapshot.nodeInfoMap[nodes[i].Name]
 		if !ok {
 			snapshot.nodeInfoMap[nodes[i].Name] = cache.nodes[nodes[i].Name].info

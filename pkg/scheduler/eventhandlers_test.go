@@ -22,12 +22,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func TestSkipPodUpdate(t *testing.T) {
@@ -442,4 +445,108 @@ func TestUpdatePodInCache(t *testing.T) {
 func withPodName(pod *v1.Pod, name string) *v1.Pod {
 	pod.Name = name
 	return pod
+}
+
+func TestPreCheckForNode(t *testing.T) {
+	cpu4 := map[v1.ResourceName]string{v1.ResourceCPU: "4"}
+	cpu8 := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
+	cpu16 := map[v1.ResourceName]string{v1.ResourceCPU: "16"}
+	tests := []struct {
+		name               string
+		nodeFn             func() *v1.Node
+		existingPods, pods []*v1.Pod
+		want               []bool
+	}{
+		{
+			name: "regular node, pods with a single constraint",
+			nodeFn: func() *v1.Node {
+				return st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p").HostPort(80).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Req(cpu4).Obj(),
+				st.MakePod().Name("p2").Req(cpu16).Obj(),
+				st.MakePod().Name("p3").Req(cpu4).Req(cpu8).Obj(),
+				st.MakePod().Name("p4").NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p5").NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p6").Obj(),
+				st.MakePod().Name("p7").Node("invalid-node").Obj(),
+				st.MakePod().Name("p8").HostPort(8080).Obj(),
+				st.MakePod().Name("p9").HostPort(80).Obj(),
+			},
+			want: []bool{true, false, false, true, false, true, false, true, false},
+		},
+		{
+			name: "tainted node, pods with a single constraint",
+			nodeFn: func() *v1.Node {
+				node := st.MakeNode().Name("fake-node").Obj()
+				node.Spec.Taints = []v1.Taint{
+					{Key: "foo", Effect: v1.TaintEffectNoSchedule},
+					{Key: "bar", Effect: v1.TaintEffectPreferNoSchedule},
+				}
+				return node
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Toleration("foo").Obj(),
+				st.MakePod().Name("p3").Toleration("bar").Obj(),
+				st.MakePod().Name("p4").Toleration("bar").Toleration("foo").Obj(),
+			},
+			want: []bool{false, true, false, true},
+		},
+		{
+			name: "regular node, pods with multiple constraints",
+			nodeFn: func() *v1.Node {
+				return st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p").HostPort(80).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Req(cpu4).NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p2").Req(cpu16).NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p3").Req(cpu8).NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p4").HostPort(8080).Node("invalid-node").Obj(),
+				st.MakePod().Name("p5").Req(cpu4).NodeAffinityIn("hostname", []string{"fake-node"}).HostPort(80).Obj(),
+			},
+			want: []bool{false, false, true, false, false},
+		},
+		{
+			name: "tainted node, pods with multiple constraints",
+			nodeFn: func() *v1.Node {
+				node := st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
+				node.Spec.Taints = []v1.Taint{
+					{Key: "foo", Effect: v1.TaintEffectNoSchedule},
+					{Key: "bar", Effect: v1.TaintEffectPreferNoSchedule},
+				}
+				return node
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Req(cpu4).Toleration("bar").Obj(),
+				st.MakePod().Name("p2").Req(cpu4).Toleration("bar").Toleration("foo").Obj(),
+				st.MakePod().Name("p3").Req(cpu16).Toleration("foo").Obj(),
+				st.MakePod().Name("p3").Req(cpu16).Toleration("bar").Obj(),
+			},
+			want: []bool{false, true, false, false},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
+			nodeInfo.SetNode(tt.nodeFn())
+			preCheckFn := preCheckForNode(nodeInfo)
+
+			var got []bool
+			for _, pod := range tt.pods {
+				got = append(got, preCheckFn(pod))
+			}
+
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
+			}
+		})
+	}
 }

@@ -250,6 +250,25 @@ func (p *PodWrapper) NominatedNodeName(n string) *PodWrapper {
 	return p
 }
 
+// Toleration creates a toleration (with the operator Exists)
+// and injects into the inner pod.
+func (p *PodWrapper) Toleration(key string) *PodWrapper {
+	p.Spec.Tolerations = append(p.Spec.Tolerations, v1.Toleration{
+		Key:      key,
+		Operator: v1.TolerationOpExists,
+	})
+	return p
+}
+
+// HostPort creates a container with a hostPort valued `hostPort`,
+// and injects into the inner pod.
+func (p *PodWrapper) HostPort(port int32) *PodWrapper {
+	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
+		Ports: []v1.ContainerPort{{HostPort: port}},
+	})
+	return p
+}
+
 // PodAffinityKind represents different kinds of PodAffinity.
 type PodAffinityKind int
 
