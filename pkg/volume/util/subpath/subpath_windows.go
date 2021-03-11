@@ -75,7 +75,7 @@ func getUpperPath(path string) string {
 // Check whether a directory/file is a link type or not
 // LinkType could be SymbolicLink, Junction, or HardLink
 func isLinkPath(path string) (bool, error) {
-	cmd := fmt.Sprintf("(Get-Item -Path %s).LinkType", path)
+	cmd := fmt.Sprintf("(Get-Item -LiteralPath %q).LinkType", path)
 	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
 		return false, err
@@ -113,7 +113,7 @@ func evalSymlink(path string) (string, error) {
 		}
 	}
 	// This command will give the target path of a given symlink
-	cmd := fmt.Sprintf("(Get-Item -Path %s).Target", upperpath)
+	cmd := fmt.Sprintf("(Get-Item -LiteralPath %q).Target", upperpath)
 	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
 		return "", err
