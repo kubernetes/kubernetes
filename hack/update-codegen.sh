@@ -26,11 +26,13 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
+go install k8s.io/kubernetes/pkg/generated/openapi/cmd/models-schema
 go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/client-gen
 go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/lister-gen
 go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/informer-gen
 go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/applyconfiguration-gen
 
+modelsschema=$(kube::util::find-binary "models-schema")
 clientgen=$(kube::util::find-binary "client-gen")
 listergen=$(kube::util::find-binary "lister-gen")
 informergen=$(kube::util::find-binary "informer-gen")
@@ -66,6 +68,7 @@ applyconfigurationgen_external_apis+=("k8s.io/apimachinery/pkg/apis/meta/v1")
 applyconfigurationgen_external_apis_csv=$(IFS=,; echo "${applyconfigurationgen_external_apis[*]}")
 applyconfigurations_package="k8s.io/client-go/applyconfigurations"
 ${applyconfigurationgen} \
+  --openapi-schema <(${modelsschema}) \
   --output-base "${KUBE_ROOT}/vendor" \
   --output-package "${applyconfigurations_package}" \
   --input-dirs "${applyconfigurationgen_external_apis_csv}" \

@@ -19,8 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	apiappsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -42,6 +45,31 @@ func Deployment(name, namespace string) *DeploymentApplyConfiguration {
 	b.WithKind("Deployment")
 	b.WithAPIVersion("apps/v1")
 	return b
+}
+
+// ExtractDeployment extracts the applied configuration owned by fieldManager from
+// deployment. If no managedFields are found in deployment for fieldManager, a
+// DeploymentApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// deployment must be a unmodified Deployment API object that was retrieved from the Kubernetes API.
+// ExtractDeployment provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractDeployment(deployment *apiappsv1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
+	b := &DeploymentApplyConfiguration{}
+	err := managedfields.ExtractInto(deployment, internal.Parser().Type("io.k8s.api.apps.v1.Deployment"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(deployment.Name)
+	b.WithNamespace(deployment.Namespace)
+
+	b.WithKind("Deployment")
+	b.WithAPIVersion("apps/v1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

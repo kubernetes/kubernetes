@@ -19,8 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -42,6 +45,31 @@ func Pod(name, namespace string) *PodApplyConfiguration {
 	b.WithKind("Pod")
 	b.WithAPIVersion("v1")
 	return b
+}
+
+// ExtractPod extracts the applied configuration owned by fieldManager from
+// pod. If no managedFields are found in pod for fieldManager, a
+// PodApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// pod must be a unmodified Pod API object that was retrieved from the Kubernetes API.
+// ExtractPod provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractPod(pod *apicorev1.Pod, fieldManager string) (*PodApplyConfiguration, error) {
+	b := &PodApplyConfiguration{}
+	err := managedfields.ExtractInto(pod, internal.Parser().Type("io.k8s.api.core.v1.Pod"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(pod.Name)
+	b.WithNamespace(pod.Namespace)
+
+	b.WithKind("Pod")
+	b.WithAPIVersion("v1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

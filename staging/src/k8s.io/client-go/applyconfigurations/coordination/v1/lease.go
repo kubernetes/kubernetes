@@ -19,8 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	apicoordinationv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -41,6 +44,31 @@ func Lease(name, namespace string) *LeaseApplyConfiguration {
 	b.WithKind("Lease")
 	b.WithAPIVersion("coordination.k8s.io/v1")
 	return b
+}
+
+// ExtractLease extracts the applied configuration owned by fieldManager from
+// lease. If no managedFields are found in lease for fieldManager, a
+// LeaseApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// lease must be a unmodified Lease API object that was retrieved from the Kubernetes API.
+// ExtractLease provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractLease(lease *apicoordinationv1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
+	b := &LeaseApplyConfiguration{}
+	err := managedfields.ExtractInto(lease, internal.Parser().Type("io.k8s.api.coordination.v1.Lease"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(lease.Name)
+	b.WithNamespace(lease.Namespace)
+
+	b.WithKind("Lease")
+	b.WithAPIVersion("coordination.k8s.io/v1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

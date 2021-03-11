@@ -19,8 +19,11 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -41,6 +44,31 @@ func Eviction(name, namespace string) *EvictionApplyConfiguration {
 	b.WithKind("Eviction")
 	b.WithAPIVersion("policy/v1beta1")
 	return b
+}
+
+// ExtractEviction extracts the applied configuration owned by fieldManager from
+// eviction. If no managedFields are found in eviction for fieldManager, a
+// EvictionApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// eviction must be a unmodified Eviction API object that was retrieved from the Kubernetes API.
+// ExtractEviction provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractEviction(eviction *v1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
+	b := &EvictionApplyConfiguration{}
+	err := managedfields.ExtractInto(eviction, internal.Parser().Type("io.k8s.api.policy.v1beta1.Eviction"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(eviction.Name)
+	b.WithNamespace(eviction.Namespace)
+
+	b.WithKind("Eviction")
+	b.WithAPIVersion("policy/v1beta1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

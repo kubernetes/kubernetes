@@ -37,6 +37,7 @@ type applyConfigurationGenerator struct {
 	applyConfig   applyConfig
 	imports       namer.ImportTracker
 	refGraph      refGraph
+	openAPIType   *string // if absent, extraction function cannot be generated
 }
 
 var _ generator.Generator = &applyConfigurationGenerator{}
@@ -64,6 +65,9 @@ type TypeParams struct {
 	ApplyConfig applyConfig
 	Tags        util.Tags
 	APIVersion  string
+	ExtractInto *types.Type
+	ParserFunc  *types.Type
+	OpenAPIType *string
 }
 
 type memberParams struct {
@@ -84,6 +88,9 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 		ApplyConfig: g.applyConfig,
 		Tags:        genclientTags(t),
 		APIVersion:  g.groupVersion.ToAPIVersion(),
+		ExtractInto: extractInto,
+		ParserFunc:  types.Ref(g.outputPackage+"/internal", "Parser"),
+		OpenAPIType: g.openAPIType,
 	}
 
 	g.generateStruct(sw, typeParams)
@@ -93,6 +100,9 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 			sw.Do(clientgenTypeConstructorNonNamespaced, typeParams)
 		} else {
 			sw.Do(clientgenTypeConstructorNamespaced, typeParams)
+		}
+		if typeParams.OpenAPIType != nil {
+			g.generateClientgenExtract(sw, typeParams)
 		}
 	} else {
 		sw.Do(constructor, typeParams)
@@ -306,3 +316,35 @@ func $.ApplyConfig.Type|public$() *$.ApplyConfig.ApplyConfiguration|public$ {
   return &$.ApplyConfig.ApplyConfiguration|public${}
 }
 `
+
+func (g *applyConfigurationGenerator) generateClientgenExtract(sw *generator.SnippetWriter, typeParams TypeParams) {
+	sw.Do(`
+// Extract$.ApplyConfig.Type|public$ extracts the applied configuration owned by fieldManager from
+// $.Struct|private$. If no managedFields are found in $.Struct|private$ for fieldManager, a
+// $.ApplyConfig.ApplyConfiguration|public$ is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// $.Struct|private$ must be a unmodified $.Struct|public$ API object that was retrieved from the Kubernetes API.
+// Extract$.ApplyConfig.Type|public$ provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func Extract$.ApplyConfig.Type|public$($.Struct|private$ *$.Struct|raw$, fieldManager string) (*$.ApplyConfig.ApplyConfiguration|public$ , error) {
+	b := &$.ApplyConfig.ApplyConfiguration|public${}
+	err := $.ExtractInto|raw$($.Struct|private$, $.ParserFunc|raw$().Type("$.OpenAPIType$"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName($.Struct|private$.Name)
+`, typeParams)
+	if !typeParams.Tags.NonNamespaced {
+		sw.Do("b.WithNamespace($.Struct|private$.Namespace)\n", typeParams)
+	}
+	sw.Do(`
+	b.WithKind("$.ApplyConfig.Type|singularKind$")
+	b.WithAPIVersion("$.APIVersion$")
+	return b, nil
+}
+`, typeParams)
+}

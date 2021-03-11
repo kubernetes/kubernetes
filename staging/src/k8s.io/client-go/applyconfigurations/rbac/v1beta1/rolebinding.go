@@ -19,8 +19,11 @@ limitations under the License.
 package v1beta1
 
 import (
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -42,6 +45,31 @@ func RoleBinding(name, namespace string) *RoleBindingApplyConfiguration {
 	b.WithKind("RoleBinding")
 	b.WithAPIVersion("rbac.authorization.k8s.io/v1beta1")
 	return b
+}
+
+// ExtractRoleBinding extracts the applied configuration owned by fieldManager from
+// roleBinding. If no managedFields are found in roleBinding for fieldManager, a
+// RoleBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// roleBinding must be a unmodified RoleBinding API object that was retrieved from the Kubernetes API.
+// ExtractRoleBinding provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractRoleBinding(roleBinding *rbacv1beta1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
+	b := &RoleBindingApplyConfiguration{}
+	err := managedfields.ExtractInto(roleBinding, internal.Parser().Type("io.k8s.api.rbac.v1beta1.RoleBinding"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(roleBinding.Name)
+	b.WithNamespace(roleBinding.Namespace)
+
+	b.WithKind("RoleBinding")
+	b.WithAPIVersion("rbac.authorization.k8s.io/v1beta1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

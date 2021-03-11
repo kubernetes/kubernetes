@@ -19,8 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	apinodev1 "k8s.io/api/node/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -42,6 +45,30 @@ func RuntimeClass(name string) *RuntimeClassApplyConfiguration {
 	b.WithKind("RuntimeClass")
 	b.WithAPIVersion("node.k8s.io/v1")
 	return b
+}
+
+// ExtractRuntimeClass extracts the applied configuration owned by fieldManager from
+// runtimeClass. If no managedFields are found in runtimeClass for fieldManager, a
+// RuntimeClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// runtimeClass must be a unmodified RuntimeClass API object that was retrieved from the Kubernetes API.
+// ExtractRuntimeClass provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractRuntimeClass(runtimeClass *apinodev1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
+	b := &RuntimeClassApplyConfiguration{}
+	err := managedfields.ExtractInto(runtimeClass, internal.Parser().Type("io.k8s.api.node.v1.RuntimeClass"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(runtimeClass.Name)
+
+	b.WithKind("RuntimeClass")
+	b.WithAPIVersion("node.k8s.io/v1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

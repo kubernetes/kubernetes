@@ -22,6 +22,8 @@ import (
 	v1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -42,6 +44,30 @@ func StorageVersion(name string) *StorageVersionApplyConfiguration {
 	b.WithKind("StorageVersion")
 	b.WithAPIVersion("internal.apiserver.k8s.io/v1alpha1")
 	return b
+}
+
+// ExtractStorageVersion extracts the applied configuration owned by fieldManager from
+// storageVersion. If no managedFields are found in storageVersion for fieldManager, a
+// StorageVersionApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// storageVersion must be a unmodified StorageVersion API object that was retrieved from the Kubernetes API.
+// ExtractStorageVersion provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractStorageVersion(storageVersion *v1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
+	b := &StorageVersionApplyConfiguration{}
+	err := managedfields.ExtractInto(storageVersion, internal.Parser().Type("io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(storageVersion.Name)
+
+	b.WithKind("StorageVersion")
+	b.WithAPIVersion("internal.apiserver.k8s.io/v1alpha1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

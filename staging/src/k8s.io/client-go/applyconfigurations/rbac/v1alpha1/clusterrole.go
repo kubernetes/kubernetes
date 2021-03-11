@@ -19,8 +19,11 @@ limitations under the License.
 package v1alpha1
 
 import (
+	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -41,6 +44,30 @@ func ClusterRole(name string) *ClusterRoleApplyConfiguration {
 	b.WithKind("ClusterRole")
 	b.WithAPIVersion("rbac.authorization.k8s.io/v1alpha1")
 	return b
+}
+
+// ExtractClusterRole extracts the applied configuration owned by fieldManager from
+// clusterRole. If no managedFields are found in clusterRole for fieldManager, a
+// ClusterRoleApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// clusterRole must be a unmodified ClusterRole API object that was retrieved from the Kubernetes API.
+// ExtractClusterRole provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractClusterRole(clusterRole *rbacv1alpha1.ClusterRole, fieldManager string) (*ClusterRoleApplyConfiguration, error) {
+	b := &ClusterRoleApplyConfiguration{}
+	err := managedfields.ExtractInto(clusterRole, internal.Parser().Type("io.k8s.api.rbac.v1alpha1.ClusterRole"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(clusterRole.Name)
+
+	b.WithKind("ClusterRole")
+	b.WithAPIVersion("rbac.authorization.k8s.io/v1alpha1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

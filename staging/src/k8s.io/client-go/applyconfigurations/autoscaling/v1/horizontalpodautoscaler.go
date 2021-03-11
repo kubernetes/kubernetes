@@ -19,8 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	apiautoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -42,6 +45,31 @@ func HorizontalPodAutoscaler(name, namespace string) *HorizontalPodAutoscalerApp
 	b.WithKind("HorizontalPodAutoscaler")
 	b.WithAPIVersion("autoscaling/v1")
 	return b
+}
+
+// ExtractHorizontalPodAutoscaler extracts the applied configuration owned by fieldManager from
+// horizontalPodAutoscaler. If no managedFields are found in horizontalPodAutoscaler for fieldManager, a
+// HorizontalPodAutoscalerApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// horizontalPodAutoscaler must be a unmodified HorizontalPodAutoscaler API object that was retrieved from the Kubernetes API.
+// ExtractHorizontalPodAutoscaler provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractHorizontalPodAutoscaler(horizontalPodAutoscaler *apiautoscalingv1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
+	b := &HorizontalPodAutoscalerApplyConfiguration{}
+	err := managedfields.ExtractInto(horizontalPodAutoscaler, internal.Parser().Type("io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(horizontalPodAutoscaler.Name)
+	b.WithNamespace(horizontalPodAutoscaler.Namespace)
+
+	b.WithKind("HorizontalPodAutoscaler")
+	b.WithAPIVersion("autoscaling/v1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

@@ -19,8 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	apistoragev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -40,6 +43,30 @@ func CSIDriver(name string) *CSIDriverApplyConfiguration {
 	b.WithKind("CSIDriver")
 	b.WithAPIVersion("storage.k8s.io/v1")
 	return b
+}
+
+// ExtractCSIDriver extracts the applied configuration owned by fieldManager from
+// cSIDriver. If no managedFields are found in cSIDriver for fieldManager, a
+// CSIDriverApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// cSIDriver must be a unmodified CSIDriver API object that was retrieved from the Kubernetes API.
+// ExtractCSIDriver provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractCSIDriver(cSIDriver *apistoragev1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
+	b := &CSIDriverApplyConfiguration{}
+	err := managedfields.ExtractInto(cSIDriver, internal.Parser().Type("io.k8s.api.storage.v1.CSIDriver"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(cSIDriver.Name)
+
+	b.WithKind("CSIDriver")
+	b.WithAPIVersion("storage.k8s.io/v1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

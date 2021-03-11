@@ -23,7 +23,9 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -49,6 +51,30 @@ func StorageClass(name string) *StorageClassApplyConfiguration {
 	b.WithKind("StorageClass")
 	b.WithAPIVersion("storage.k8s.io/v1")
 	return b
+}
+
+// ExtractStorageClass extracts the applied configuration owned by fieldManager from
+// storageClass. If no managedFields are found in storageClass for fieldManager, a
+// StorageClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// storageClass must be a unmodified StorageClass API object that was retrieved from the Kubernetes API.
+// ExtractStorageClass provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractStorageClass(storageClass *storagev1.StorageClass, fieldManager string) (*StorageClassApplyConfiguration, error) {
+	b := &StorageClassApplyConfiguration{}
+	err := managedfields.ExtractInto(storageClass, internal.Parser().Type("io.k8s.api.storage.v1.StorageClass"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(storageClass.Name)
+
+	b.WithKind("StorageClass")
+	b.WithAPIVersion("storage.k8s.io/v1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

@@ -20,8 +20,11 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	v1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -44,6 +47,30 @@ func PriorityClass(name string) *PriorityClassApplyConfiguration {
 	b.WithKind("PriorityClass")
 	b.WithAPIVersion("scheduling.k8s.io/v1alpha1")
 	return b
+}
+
+// ExtractPriorityClass extracts the applied configuration owned by fieldManager from
+// priorityClass. If no managedFields are found in priorityClass for fieldManager, a
+// PriorityClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// priorityClass must be a unmodified PriorityClass API object that was retrieved from the Kubernetes API.
+// ExtractPriorityClass provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractPriorityClass(priorityClass *v1alpha1.PriorityClass, fieldManager string) (*PriorityClassApplyConfiguration, error) {
+	b := &PriorityClassApplyConfiguration{}
+	err := managedfields.ExtractInto(priorityClass, internal.Parser().Type("io.k8s.api.scheduling.v1alpha1.PriorityClass"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(priorityClass.Name)
+
+	b.WithKind("PriorityClass")
+	b.WithAPIVersion("scheduling.k8s.io/v1alpha1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

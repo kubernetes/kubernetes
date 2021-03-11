@@ -19,9 +19,12 @@ limitations under the License.
 package v1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -43,6 +46,31 @@ func ControllerRevision(name, namespace string) *ControllerRevisionApplyConfigur
 	b.WithKind("ControllerRevision")
 	b.WithAPIVersion("apps/v1")
 	return b
+}
+
+// ExtractControllerRevision extracts the applied configuration owned by fieldManager from
+// controllerRevision. If no managedFields are found in controllerRevision for fieldManager, a
+// ControllerRevisionApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// controllerRevision must be a unmodified ControllerRevision API object that was retrieved from the Kubernetes API.
+// ExtractControllerRevision provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractControllerRevision(controllerRevision *appsv1.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
+	b := &ControllerRevisionApplyConfiguration{}
+	err := managedfields.ExtractInto(controllerRevision, internal.Parser().Type("io.k8s.api.apps.v1.ControllerRevision"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(controllerRevision.Name)
+	b.WithNamespace(controllerRevision.Namespace)
+
+	b.WithKind("ControllerRevision")
+	b.WithAPIVersion("apps/v1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value

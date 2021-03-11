@@ -19,8 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	apibatchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -42,6 +45,31 @@ func Job(name, namespace string) *JobApplyConfiguration {
 	b.WithKind("Job")
 	b.WithAPIVersion("batch/v1")
 	return b
+}
+
+// ExtractJob extracts the applied configuration owned by fieldManager from
+// job. If no managedFields are found in job for fieldManager, a
+// JobApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// job must be a unmodified Job API object that was retrieved from the Kubernetes API.
+// ExtractJob provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractJob(job *apibatchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
+	b := &JobApplyConfiguration{}
+	err := managedfields.ExtractInto(job, internal.Parser().Type("io.k8s.api.batch.v1.Job"), fieldManager, b)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(job.Name)
+	b.WithNamespace(job.Namespace)
+
+	b.WithKind("Job")
+	b.WithAPIVersion("batch/v1")
+	return b, nil
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value
