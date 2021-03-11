@@ -226,11 +226,28 @@ func TestGetAccessModesFromString(t *testing.T) {
 	}
 
 	modes = GetAccessModesFromString("RWO,ROX,RWX")
+	if !ContainsAccessMode(modes, v1.ReadWriteOnce) {
+		t.Errorf("Expected mode %s, but got %+v", v1.ReadWriteOnce, modes)
+	}
 	if !ContainsAccessMode(modes, v1.ReadOnlyMany) {
 		t.Errorf("Expected mode %s, but got %+v", v1.ReadOnlyMany, modes)
 	}
 	if !ContainsAccessMode(modes, v1.ReadWriteMany) {
 		t.Errorf("Expected mode %s, but got %+v", v1.ReadWriteMany, modes)
+	}
+
+	modes = GetAccessModesFromString("RWO,ROX,RWX,RWOP")
+	if !ContainsAccessMode(modes, v1.ReadWriteOnce) {
+		t.Errorf("Expected mode %s, but got %+v", v1.ReadWriteOnce, modes)
+	}
+	if !ContainsAccessMode(modes, v1.ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", v1.ReadOnlyMany, modes)
+	}
+	if !ContainsAccessMode(modes, v1.ReadWriteMany) {
+		t.Errorf("Expected mode %s, but got %+v", v1.ReadWriteMany, modes)
+	}
+	if !ContainsAccessMode(modes, v1.ReadWriteOncePod) {
+		t.Errorf("Expected mode %s, but got %+v", v1.ReadWriteOncePod, modes)
 	}
 }
 
