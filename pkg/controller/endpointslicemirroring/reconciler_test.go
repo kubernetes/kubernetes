@@ -25,8 +25,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
 	utilpointer "k8s.io/utils/pointer"
@@ -55,7 +54,7 @@ func TestReconcile(t *testing.T) {
 		subsets:                []corev1.EndpointSubset{},
 		existingEndpointSlices: []*discovery.EndpointSlice{},
 		expectedNumSlices:      0,
-		expectedClientActions:  0,
+		expectedClientActions:  1,
 		expectedMetrics:        &expectedMetrics{},
 	}, {
 		testName: "Endpoints with no addresses",
@@ -68,7 +67,7 @@ func TestReconcile(t *testing.T) {
 		}},
 		existingEndpointSlices: []*discovery.EndpointSlice{},
 		expectedNumSlices:      0,
-		expectedClientActions:  0,
+		expectedClientActions:  1,
 		expectedMetrics:        &expectedMetrics{},
 	}, {
 		testName: "Endpoints with 1 subset, port, and address",
@@ -86,7 +85,7 @@ func TestReconcile(t *testing.T) {
 		}},
 		existingEndpointSlices: []*discovery.EndpointSlice{},
 		expectedNumSlices:      1,
-		expectedClientActions:  1,
+		expectedClientActions:  2,
 		expectedMetrics:        &expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 1, addedPerSync: 1, numCreated: 1},
 	}, {
 		testName: "Endpoints with 1 subset, port, and address, pending deletion",
@@ -105,7 +104,7 @@ func TestReconcile(t *testing.T) {
 		endpointsDeletionPending: true,
 		existingEndpointSlices:   []*discovery.EndpointSlice{},
 		expectedNumSlices:        0,
-		expectedClientActions:    0,
+		expectedClientActions:    1,
 	}, {
 		testName: "Endpoints with 1 subset, port, and address and existing slice with same fields",
 		subsets: []corev1.EndpointSubset{{
@@ -136,7 +135,7 @@ func TestReconcile(t *testing.T) {
 			}},
 		}},
 		expectedNumSlices:     1,
-		expectedClientActions: 0,
+		expectedClientActions: 1,
 	}, {
 		testName: "Endpoints with 1 subset, port, and address and existing slice with an additional annotation",
 		subsets: []corev1.EndpointSubset{{
@@ -168,7 +167,7 @@ func TestReconcile(t *testing.T) {
 			}},
 		}},
 		expectedNumSlices:     1,
-		expectedClientActions: 1,
+		expectedClientActions: 2,
 	}, {
 		testName: "Endpoints with 1 subset, port, label and address and existing slice with same fields but the label",
 		subsets: []corev1.EndpointSubset{{
@@ -201,7 +200,7 @@ func TestReconcile(t *testing.T) {
 			}},
 		}},
 		expectedNumSlices:     1,
-		expectedClientActions: 1,
+		expectedClientActions: 2,
 	}, {
 		testName: "Endpoints with 1 subset, 2 ports, and 2 addresses",
 		subsets: []corev1.EndpointSubset{{
@@ -226,7 +225,7 @@ func TestReconcile(t *testing.T) {
 		}},
 		existingEndpointSlices: []*discovery.EndpointSlice{},
 		expectedNumSlices:      1,
-		expectedClientActions:  1,
+		expectedClientActions:  2,
 		expectedMetrics:        &expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 2, addedPerSync: 2, numCreated: 1},
 	}, {
 		testName: "Endpoints with 2 subsets, multiple ports and addresses",
@@ -275,7 +274,7 @@ func TestReconcile(t *testing.T) {
 		}},
 		existingEndpointSlices: []*discovery.EndpointSlice{},
 		expectedNumSlices:      2,
-		expectedClientActions:  2,
+		expectedClientActions:  3,
 		expectedMetrics:        &expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 5, addedPerSync: 5, numCreated: 2},
 	}, {
 		testName: "Endpoints with 2 subsets, multiple ports and addresses, existing empty EndpointSlice",
@@ -338,7 +337,7 @@ func TestReconcile(t *testing.T) {
 			}},
 		}},
 		expectedNumSlices:     2,
-		expectedClientActions: 2,
+		expectedClientActions: 3,
 		expectedMetrics:       &expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 5, addedPerSync: 5, numCreated: 1, numUpdated: 1},
 	}, {
 		testName: "Endpoints with 2 subsets, multiple ports and addresses, existing EndpointSlice with some addresses",
@@ -408,7 +407,7 @@ func TestReconcile(t *testing.T) {
 			}},
 		}},
 		expectedNumSlices:     2,
-		expectedClientActions: 2,
+		expectedClientActions: 3,
 		expectedMetrics:       &expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 5, addedPerSync: 4, updatedPerSync: 1, removedPerSync: 1, numCreated: 1, numUpdated: 1},
 	}, {
 		testName: "Endpoints with 2 subsets, multiple ports and addresses, existing EndpointSlice identical to subset",
@@ -482,7 +481,7 @@ func TestReconcile(t *testing.T) {
 			}},
 		}},
 		expectedNumSlices:     2,
-		expectedClientActions: 1,
+		expectedClientActions: 2,
 		expectedMetrics:       &expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 5, addedPerSync: 3, numCreated: 1},
 	}, {
 		testName: "Endpoints with 2 subsets, multiple ports, and dual stack addresses",
@@ -531,7 +530,7 @@ func TestReconcile(t *testing.T) {
 		}},
 		existingEndpointSlices: []*discovery.EndpointSlice{},
 		expectedNumSlices:      4,
-		expectedClientActions:  4,
+		expectedClientActions:  5,
 		expectedMetrics:        &expectedMetrics{desiredSlices: 4, actualSlices: 4, desiredEndpoints: 5, addedPerSync: 5, numCreated: 4},
 	}, {
 		testName: "Endpoints with 2 subsets, multiple ports, ipv6 only addresses",
@@ -580,7 +579,7 @@ func TestReconcile(t *testing.T) {
 		}},
 		existingEndpointSlices: []*discovery.EndpointSlice{},
 		expectedNumSlices:      2,
-		expectedClientActions:  2,
+		expectedClientActions:  3,
 		expectedMetrics:        &expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 5, addedPerSync: 5, numCreated: 2},
 	}, {
 		testName: "Endpoints with 2 subsets, multiple ports, some invalid addresses",
@@ -629,7 +628,7 @@ func TestReconcile(t *testing.T) {
 		}},
 		existingEndpointSlices: []*discovery.EndpointSlice{},
 		expectedNumSlices:      2,
-		expectedClientActions:  2,
+		expectedClientActions:  3,
 		expectedMetrics:        &expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 3, addedPerSync: 3, skippedPerSync: 2, numCreated: 2},
 	}, {
 		testName: "Endpoints with 2 subsets, multiple ports, all invalid addresses",
@@ -678,7 +677,7 @@ func TestReconcile(t *testing.T) {
 		}},
 		existingEndpointSlices: []*discovery.EndpointSlice{},
 		expectedNumSlices:      0,
-		expectedClientActions:  0,
+		expectedClientActions:  1,
 		expectedMetrics:        &expectedMetrics{desiredSlices: 0, actualSlices: 0, desiredEndpoints: 0, addedPerSync: 0, skippedPerSync: 5, numCreated: 0},
 	}, {
 		testName: "Endpoints with 2 subsets, 1 exceeding maxEndpointsPerSubset",
@@ -727,7 +726,7 @@ func TestReconcile(t *testing.T) {
 		}},
 		existingEndpointSlices: []*discovery.EndpointSlice{},
 		expectedNumSlices:      2,
-		expectedClientActions:  2,
+		expectedClientActions:  3,
 		maxEndpointsPerSubset:  2,
 		expectedMetrics:        &expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 4, addedPerSync: 4, updatedPerSync: 0, removedPerSync: 0, skippedPerSync: 1, numCreated: 2, numUpdated: 0},
 	}}
@@ -785,8 +784,8 @@ func TestReconcile(t *testing.T) {
 // Test Helpers
 
 func newReconciler(client *fake.Clientset, maxEndpointsPerSubset int32) *reconciler {
-	broadcaster := record.NewBroadcaster()
-	recorder := broadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "endpoint-slice-mirroring-controller"})
+	broadcaster := events.NewEventBroadcasterAdapter(client)
+	recorder := broadcaster.NewRecorder("endpoint-slice-mirroring-controller")
 
 	return &reconciler{
 		client:                client,

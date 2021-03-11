@@ -184,6 +184,7 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 		secondaryServiceCIDR,
 		nodeCIDRMaskSizes,
 		ipam.CIDRAllocatorType(ctx.ComponentConfig.KubeCloudShared.CIDRAllocatorType),
+		ctx.Stop,
 	)
 	if err != nil {
 		return nil, true, err
@@ -209,6 +210,7 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 		ctx.ComponentConfig.NodeLifecycleController.LargeClusterSizeThreshold,
 		ctx.ComponentConfig.NodeLifecycleController.UnhealthyZoneThreshold,
 		ctx.ComponentConfig.NodeLifecycleController.EnableTaintManager,
+		ctx.Stop,
 	)
 	if err != nil {
 		return nil, true, err
@@ -306,7 +308,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 		EnableDynamicProvisioning: ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration.EnableDynamicProvisioning,
 		FilteredDialOptions:       filteredDialOptions,
 	}
-	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
+	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params, ctx.Stop)
 	if volumeControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to construct persistentvolume controller: %v", volumeControllerErr)
 	}
@@ -351,6 +353,7 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 			ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
 			attachdetach.DefaultTimerConfig,
 			filteredDialOptions,
+			ctx.Stop,
 		)
 	if attachDetachControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
@@ -381,6 +384,7 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 			csiTranslator,
 			csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
 			filteredDialOptions,
+			ctx.Stop,
 		)
 
 		if expandControllerErr != nil {
@@ -397,7 +401,8 @@ func startEphemeralVolumeController(ctx ControllerContext) (http.Handler, bool, 
 		ephemeralController, err := ephemeral.NewController(
 			ctx.ClientBuilder.ClientOrDie("ephemeral-volume-controller"),
 			ctx.InformerFactory.Core().V1().Pods(),
-			ctx.InformerFactory.Core().V1().PersistentVolumeClaims())
+			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
+			ctx.Stop)
 		if err != nil {
 			return nil, true, fmt.Errorf("failed to start ephemeral volume controller: %v", err)
 		}
@@ -415,6 +420,7 @@ func startEndpointController(ctx ControllerContext) (http.Handler, bool, error) 
 		ctx.InformerFactory.Core().V1().Endpoints(),
 		ctx.ClientBuilder.ClientOrDie("endpoint-controller"),
 		ctx.ComponentConfig.EndpointController.EndpointUpdatesBatchPeriod.Duration,
+		ctx.Stop,
 	).Run(int(ctx.ComponentConfig.EndpointController.ConcurrentEndpointSyncs), ctx.Stop)
 	return nil, true, nil
 }
@@ -425,6 +431,7 @@ func startReplicationController(ctx ControllerContext) (http.Handler, bool, erro
 		ctx.InformerFactory.Core().V1().ReplicationControllers(),
 		ctx.ClientBuilder.ClientOrDie("replication-controller"),
 		replicationcontroller.BurstReplicas,
+		ctx.Stop,
 	).Run(int(ctx.ComponentConfig.ReplicationController.ConcurrentRCSyncs), ctx.Stop)
 	return nil, true, nil
 }
@@ -555,6 +562,7 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 		ignoredResources,
 		ctx.ObjectOrMetadataInformerFactory,
 		ctx.InformersStarted,
+		ctx.Stop,
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start the generic garbage collector: %v", err)

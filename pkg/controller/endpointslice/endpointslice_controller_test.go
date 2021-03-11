@@ -69,6 +69,7 @@ func newController(nodeNames []string, batchPeriod time.Duration) (*fake.Clients
 		indexer.Add(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}})
 	}
 
+	stopCh := make(chan struct{})
 	esController := NewController(
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Services(),
@@ -76,7 +77,8 @@ func newController(nodeNames []string, batchPeriod time.Duration) (*fake.Clients
 		informerFactory.Discovery().V1().EndpointSlices(),
 		int32(100),
 		client,
-		batchPeriod)
+		batchPeriod,
+		stopCh)
 
 	esController.nodesSynced = alwaysReady
 	esController.podsSynced = alwaysReady
@@ -106,7 +108,7 @@ func TestSyncServiceNoSelector(t *testing.T) {
 
 	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
 	assert.NoError(t, err)
-	assert.Len(t, client.Actions(), 0)
+	assert.Len(t, client.Actions(), 1)
 }
 
 // Ensure SyncService for service with pending deletion results in no action
@@ -125,7 +127,7 @@ func TestSyncServicePendingDeletion(t *testing.T) {
 
 	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
 	assert.NoError(t, err)
-	assert.Len(t, client.Actions(), 0)
+	assert.Len(t, client.Actions(), 1)
 }
 
 // Ensure SyncService for service with selector but no pods results in placeholder EndpointSlice
@@ -177,7 +179,7 @@ func TestSyncServiceMissing(t *testing.T) {
 	assert.Nil(t, err, "Expected no error syncing service")
 
 	// That should mean no client actions were performed
-	assert.Len(t, client.Actions(), 0)
+	assert.Len(t, client.Actions(), 1)
 
 	// TriggerTimeTracker should have removed the reference to the missing service
 	assert.NotContains(t, esController.triggerTimeTracker.ServiceStates, missingServiceKey)
@@ -1077,7 +1079,7 @@ func TestPodAddsBatching(t *testing.T) {
 				},
 			},
 			finalDelay:       3 * time.Second,
-			wantRequestCount: 3,
+			wantRequestCount: 4,
 		},
 		{
 			name:        "three adds in one batch",
@@ -1095,7 +1097,7 @@ func TestPodAddsBatching(t *testing.T) {
 				},
 			},
 			finalDelay:       3 * time.Second,
-			wantRequestCount: 1,
+			wantRequestCount: 2,
 		},
 		{
 			name:        "three adds in two batches",
@@ -1113,7 +1115,7 @@ func TestPodAddsBatching(t *testing.T) {
 				},
 			},
 			finalDelay:       3 * time.Second,
-			wantRequestCount: 2,
+			wantRequestCount: 3,
 		},
 	}
 
@@ -1197,7 +1199,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 				},
 			},
 			finalDelay:       3 * time.Second,
-			wantRequestCount: 3,
+			wantRequestCount: 4,
 		},
 		{
 			name:        "three updates in one batch",
@@ -1222,7 +1224,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 				},
 			},
 			finalDelay:       3 * time.Second,
-			wantRequestCount: 1,
+			wantRequestCount: 2,
 		},
 		{
 			name:        "three updates in two batches",
@@ -1247,7 +1249,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 				},
 			},
 			finalDelay:       3 * time.Second,
-			wantRequestCount: 2,
+			wantRequestCount: 3,
 		},
 	}
 
@@ -1340,7 +1342,7 @@ func TestPodDeleteBatching(t *testing.T) {
 				},
 			},
 			finalDelay:       3 * time.Second,
-			wantRequestCount: 3,
+			wantRequestCount: 4,
 		},
 		{
 			name:        "three deletes in one batch",
@@ -1362,7 +1364,7 @@ func TestPodDeleteBatching(t *testing.T) {
 				},
 			},
 			finalDelay:       3 * time.Second,
-			wantRequestCount: 1,
+			wantRequestCount: 2,
 		},
 		{
 			name:        "three deletes in two batches",
@@ -1384,7 +1386,7 @@ func TestPodDeleteBatching(t *testing.T) {
 				},
 			},
 			finalDelay:       3 * time.Second,
-			wantRequestCount: 2,
+			wantRequestCount: 3,
 		},
 	}
 

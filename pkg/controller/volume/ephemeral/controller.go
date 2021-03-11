@@ -30,12 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	kcache "k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	clientevents "k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	ephemeralvolumemetrics "k8s.io/kubernetes/pkg/controller/volume/ephemeral/metrics"
@@ -70,7 +68,7 @@ type ephemeralController struct {
 	podIndexer cache.Indexer
 
 	// recorder is used to record events in the API server
-	recorder record.EventRecorder
+	recorder clientevents.EventRecorder
 
 	queue workqueue.RateLimitingInterface
 }
@@ -79,7 +77,8 @@ type ephemeralController struct {
 func NewController(
 	kubeClient clientset.Interface,
 	podInformer coreinformers.PodInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer) (Controller, error) {
+	pvcInformer coreinformers.PersistentVolumeClaimInformer,
+	stopCh <-chan struct{}) (Controller, error) {
 
 	ec := &ephemeralController{
 		kubeClient: kubeClient,
@@ -93,10 +92,9 @@ func NewController(
 
 	ephemeralvolumemetrics.RegisterMetrics()
 
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ephemeral_volume"})
+	eventBroadcaster := clientevents.NewEventBroadcasterAdapter(kubeClient)
+	eventBroadcaster.StartRecordingToSink(stopCh)
+	ec.recorder = eventBroadcaster.NewRecorder("ephemeral_volume")
 
 	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc: ec.enqueuePod,
@@ -230,7 +228,7 @@ func (ec *ephemeralController) syncHandler(key string) error {
 
 	for _, vol := range pod.Spec.Volumes {
 		if err := ec.handleVolume(pod, vol); err != nil {
-			ec.recorder.Event(pod, v1.EventTypeWarning, events.FailedBinding, fmt.Sprintf("ephemeral volume %s: %v", vol.Name, err))
+			ec.recorder.Eventf(pod, nil, v1.EventTypeWarning, events.FailedBinding, "Bind", fmt.Sprintf("ephemeral volume %s: %v", vol.Name, err))
 			return fmt.Errorf("pod %s, ephemeral volume %s: %v", key, vol.Name, err)
 		}
 	}

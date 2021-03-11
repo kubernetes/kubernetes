@@ -270,11 +270,11 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 			// these reasons as well. Related issue: https://github.com/kubernetes/kubernetes/issues/18568
 			_, _ = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
 		}
-		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, deploymentutil.FailedRSCreateReason, msg)
+		dc.eventRecorder.Eventf(d, nil, v1.EventTypeWarning, deploymentutil.FailedRSCreateReason, "Create", msg)
 		return nil, err
 	}
 	if !alreadyExists && newReplicasCount > 0 {
-		dc.eventRecorder.Eventf(d, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled up replica set %s to %d", createdRS.Name, newReplicasCount)
+		dc.eventRecorder.Eventf(d, nil, v1.EventTypeNormal, "ScalingReplicaSet", "Scale", "Scaled up replica set %s to %d", createdRS.Name, newReplicasCount)
 	}
 
 	needsUpdate := deploymentutil.SetDeploymentRevision(d, newRevision)
@@ -423,7 +423,7 @@ func (dc *DeploymentController) scaleReplicaSet(rs *apps.ReplicaSet, newScale in
 		rs, err = dc.client.AppsV1().ReplicaSets(rsCopy.Namespace).Update(context.TODO(), rsCopy, metav1.UpdateOptions{})
 		if err == nil && sizeNeedsUpdate {
 			scaled = true
-			dc.eventRecorder.Eventf(deployment, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", scalingOperation, rs.Name, newScale)
+			dc.eventRecorder.Eventf(deployment, nil, v1.EventTypeNormal, "ScalingReplicaSet", "Scale", "Scaled %s replica set %s to %d", scalingOperation, rs.Name, newScale)
 		}
 	}
 	return scaled, rs, err

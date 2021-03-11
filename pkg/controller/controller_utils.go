@@ -43,7 +43,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+
+	// "k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	clientretry "k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -412,7 +414,8 @@ type RSControlInterface interface {
 // RealRSControl is the default implementation of RSControllerInterface.
 type RealRSControl struct {
 	KubeClient clientset.Interface
-	Recorder   record.EventRecorder
+	// Recorder   record.EventRecorder
+	Recorder events.EventRecorder
 }
 
 var _ RSControlInterface = &RealRSControl{}
@@ -461,7 +464,8 @@ type PodControlInterface interface {
 // RealPodControl is the default implementation of PodControlInterface.
 type RealPodControl struct {
 	KubeClient clientset.Interface
-	Recorder   record.EventRecorder
+	// Recorder   record.EventRecorder
+	Recorder events.EventRecorder
 }
 
 var _ PodControlInterface = &RealPodControl{}
@@ -579,7 +583,7 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 	if err != nil {
 		// only send an event if the namespace isn't terminating
 		if !apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
-			r.Recorder.Eventf(object, v1.EventTypeWarning, FailedCreatePodReason, "Error creating: %v", err)
+			r.Recorder.Eventf(object, nil, v1.EventTypeWarning, FailedCreatePodReason, "Creating", "Error creating: %v", err)
 		}
 		return err
 	}
@@ -589,7 +593,7 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 		return nil
 	}
 	klog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
-	r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulCreatePodReason, "Created pod: %v", newPod.Name)
+	r.Recorder.Eventf(object, nil, v1.EventTypeNormal, SuccessfulCreatePodReason, "Created", "Created pod: %v", newPod.Name)
 
 	return nil
 }
@@ -605,10 +609,10 @@ func (r RealPodControl) DeletePod(namespace string, podID string, object runtime
 			klog.V(4).Infof("pod %v/%v has already been deleted.", namespace, podID)
 			return err
 		}
-		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedDeletePodReason, "Error deleting: %v", err)
+		r.Recorder.Eventf(object, nil, v1.EventTypeWarning, FailedDeletePodReason, "Deleting", "Error deleting: %v", err)
 		return fmt.Errorf("unable to delete pods: %v", err)
 	}
-	r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulDeletePodReason, "Deleted pod: %v", podID)
+	r.Recorder.Eventf(object, nil, v1.EventTypeNormal, SuccessfulDeletePodReason, "Deleted", "Deleted pod: %v", podID)
 
 	return nil
 }

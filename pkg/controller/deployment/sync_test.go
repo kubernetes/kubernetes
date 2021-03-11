@@ -28,7 +28,10 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/record"
+
+	// "k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
+
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
@@ -275,7 +278,7 @@ func TestScale(t *testing.T) {
 			fake := fake.Clientset{}
 			dc := &DeploymentController{
 				client:        &fake,
-				eventRecorder: &record.FakeRecorder{},
+				eventRecorder: &events.FakeRecorder{},
 			}
 
 			if test.newRS != nil {
@@ -371,7 +374,6 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 			revisionHistoryLimit: 0,
 			expectedDeletions:    1,
 		},
-
 		{
 			oldRSs: []*apps.ReplicaSet{
 				newRSWithStatus("foo-1", 0, 0, selector),
@@ -411,14 +413,15 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		test := tests[i]
 		t.Logf("scenario %d", i)
 
-		fake := &fake.Clientset{}
+		fake := fake.NewSimpleClientset()
 		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-		controller, err := NewDeploymentController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
+		stopCh := make(chan struct{})
+		controller, err := NewDeploymentController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake, stopCh)
 		if err != nil {
 			t.Fatalf("error creating Deployment controller: %v", err)
 		}
 
-		controller.eventRecorder = &record.FakeRecorder{}
+		controller.eventRecorder = &events.FakeRecorder{}
 		controller.dListerSynced = alwaysReady
 		controller.rsListerSynced = alwaysReady
 		controller.podListerSynced = alwaysReady
@@ -426,7 +429,6 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 			informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs)
 		}
 
-		stopCh := make(chan struct{})
 		defer close(stopCh)
 		informers.Start(stopCh)
 		informers.WaitForCacheSync(stopCh)
@@ -545,14 +547,15 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 		test := tests[i]
 		t.Logf("scenario %d", i)
 
-		fake := &fake.Clientset{}
+		fake := fake.NewSimpleClientset()
 		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-		controller, err := NewDeploymentController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
+		stopCh := make(chan struct{})
+		controller, err := NewDeploymentController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake, stopCh)
 		if err != nil {
 			t.Fatalf("error creating Deployment controller: %v", err)
 		}
 
-		controller.eventRecorder = &record.FakeRecorder{}
+		controller.eventRecorder = &events.FakeRecorder{}
 		controller.dListerSynced = alwaysReady
 		controller.rsListerSynced = alwaysReady
 		controller.podListerSynced = alwaysReady
@@ -560,7 +563,6 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 			informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs)
 		}
 
-		stopCh := make(chan struct{})
 		defer close(stopCh)
 		informers.Start(stopCh)
 

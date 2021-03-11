@@ -119,7 +119,8 @@ func TestSyncHandler(t *testing.T) {
 		allPlugins := []volume.VolumePlugin{}
 		allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
 		translator := csitrans.New()
-		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate), nil)
+		stopCh := make(chan struct{})
+		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate), nil, stopCh)
 		if err != nil {
 			t.Fatalf("error creating expand controller : %v", err)
 		}
@@ -141,11 +142,11 @@ func TestSyncHandler(t *testing.T) {
 		})
 
 		if test.pv != nil {
-			fakeKubeClient.AddReactor("get", "persistentvolumes", func(action coretesting.Action) (bool, runtime.Object, error) {
+			fakeKubeClient.PrependReactor("get", "persistentvolumes", func(action coretesting.Action) (bool, runtime.Object, error) {
 				return true, test.pv, nil
 			})
 		}
-		fakeKubeClient.AddReactor("patch", "persistentvolumeclaims", func(action coretesting.Action) (bool, runtime.Object, error) {
+		fakeKubeClient.PrependReactor("patch", "persistentvolumeclaims", func(action coretesting.Action) (bool, runtime.Object, error) {
 			if action.GetSubresource() == "status" {
 				patchActionaction, _ := action.(coretesting.PatchAction)
 				pvc, err = applyPVCPatch(pvc, patchActionaction.GetPatch())

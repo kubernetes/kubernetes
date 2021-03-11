@@ -149,7 +149,8 @@ func TestSyncHandler(t *testing.T) {
 			podInformer := informerFactory.Core().V1().Pods()
 			pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 
-			c, err := NewController(fakeKubeClient, podInformer, pvcInformer)
+			stopCh := make(chan struct{})
+			c, err := NewController(fakeKubeClient, podInformer, pvcInformer, stopCh)
 			if err != nil {
 				t.Fatalf("error creating ephemeral controller : %v", err)
 			}

@@ -28,7 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -313,7 +313,7 @@ func TestGetNextScheduleTime(t *testing.T) {
 		}
 		return sched
 	}
-	recorder := record.NewFakeRecorder(50)
+	recorder := events.NewFakeRecorder(50)
 	// T1 is a scheduled start time of that schedule
 	T1, err := time.Parse(time.RFC3339, "2016-05-19T10:00:00Z")
 	if err != nil {

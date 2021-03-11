@@ -39,7 +39,9 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+
+	// "k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
@@ -177,7 +179,7 @@ func checkEvents(t *testing.T, expectedEvents []string, ctrl *PersistentVolumeCo
 	timer := time.NewTimer(time.Minute)
 	defer timer.Stop()
 
-	fakeRecorder := ctrl.eventRecorder.(*record.FakeRecorder)
+	fakeRecorder := ctrl.eventRecorder.(*events.FakeRecorder)
 	gotEvents := []string{}
 	finished := false
 	for len(gotEvents) < len(expectedEvents) && !finished {
@@ -231,10 +233,11 @@ func newTestController(kubeClient clientset.Interface, informerFactory informers
 		ClassInformer:             informerFactory.Storage().V1().StorageClasses(),
 		PodInformer:               informerFactory.Core().V1().Pods(),
 		NodeInformer:              informerFactory.Core().V1().Nodes(),
-		EventRecorder:             record.NewFakeRecorder(1000),
+		EventRecorder:             events.NewFakeRecorder(1000),
 		EnableDynamicProvisioning: enableDynamicProvisioning,
 	}
-	ctrl, err := NewController(params)
+	stopCh := make(chan struct{})
+	ctrl, err := NewController(params, stopCh)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct persistentvolume controller: %v", err)
 	}

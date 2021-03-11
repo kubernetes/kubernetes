@@ -31,6 +31,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	cpoptions "k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -440,12 +441,13 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		return nil, err
 	}
 
-	eventRecorder := createRecorder(client, KubeControllerManagerUserAgent)
+	// eventRecorder := createRecorder(client, KubeControllerManagerUserAgent)
+	eventBroadcaster := events.NewEventBroadcasterAdapter(client)
 
 	c := &kubecontrollerconfig.Config{
-		Client:        client,
-		Kubeconfig:    kubeconfig,
-		EventRecorder: eventRecorder,
+		Client:           client,
+		Kubeconfig:       kubeconfig,
+		EventBroadcaster: eventBroadcaster,
 	}
 	if err := s.ApplyTo(c); err != nil {
 		return nil, err

@@ -687,8 +687,8 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		testEMClient,
 	)
 
-	eventClient := &fake.Clientset{}
-	eventClient.AddReactor("create", "events", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	eventClient := fake.NewSimpleClientset()
+	eventClient.PrependReactor("create", "events", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		tc.Lock()
 		defer tc.Unlock()
 
@@ -713,8 +713,11 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 	defaultDownscalestabilizationWindow := 5 * time.Minute
 
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
 	hpaController := NewHorizontalController(
-		eventClient.CoreV1(),
+		eventClient,
 		testScaleClient,
 		testClient.AutoscalingV1(),
 		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
@@ -726,6 +729,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
+		stopCh,
 	)
 	hpaController.hpaListerSynced = alwaysReady
 	if tc.recommendations != nil {

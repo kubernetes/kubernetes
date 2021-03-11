@@ -56,7 +56,9 @@ import (
 	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
 	clientgotesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/record"
+
+	// "k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -92,8 +94,9 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	// construction will not fail.
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
+	stopCh := make(chan struct{})
 	gc, err := NewGarbageCollector(client, metadataClient, rm, map[schema.GroupResource]struct{}{},
-		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), alwaysStarted)
+		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), alwaysStarted, stopCh)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +117,6 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
 
 	// Make sure the syncing mechanism also works after Run() has been called
-	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go gc.Run(1, stopCh)
 
@@ -213,11 +215,12 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
+	stop := make(chan struct{})
+	gc, err := NewGarbageCollector(client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted, stop)
 	if err != nil {
 		t.Fatal(err)
 	}
-	stop := make(chan struct{})
+
 	go sharedInformers.Start(stop)
 	return garbageCollector{gc, stop}
 }
@@ -846,12 +849,12 @@ func TestGarbageCollectorSync(t *testing.T) {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
+	stopCh := make(chan struct{})
+	gc, err := NewGarbageCollector(client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted, stopCh)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go gc.Run(1, stopCh)
 	// The pseudo-code of GarbageCollector.Sync():
@@ -1063,7 +1066,7 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes:             []*node{makeNode(pod1ns1, withOwners(pod2ns2)), makeNode(pod2ns2)}, // pod2 is no longer virtual, namespace coordinate is corrected
 					pendingAttemptToDelete: []*node{makeNode(pod2ns1, virtual), makeNode(pod1ns1)},             // virtual pod2 still queued for attempted delete, bad child pod1 queued because it disagreed with observed parent
-					events:                 []string{`Warning OwnerRefInvalidNamespace ownerRef [v1/Pod, namespace: ns1, name: podname2, uid: poduid2] does not exist in namespace "ns1" involvedObject{kind=Pod,apiVersion=v1}`},
+					events:                 []string{`Warning OwnerRefInvalidNamespace ownerRef [v1/Pod, namespace: ns1, name: podname2, uid: poduid2] does not exist in namespace "ns1"`},
 				}),
 				// 6,7: handle queued delete of virtual parent
 				processAttemptToDelete(1),
@@ -1107,7 +1110,7 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes:             []*node{makeNode(pod1ns1, withOwners(pod2ns1)), makeNode(pod2ns2)},
 					pendingAttemptToDelete: []*node{makeNode(pod1ns1)}, // bad child queued for attempted delete
-					events:                 []string{`Warning OwnerRefInvalidNamespace ownerRef [v1/Pod, namespace: ns1, name: podname2, uid: poduid2] does not exist in namespace "ns1" involvedObject{kind=Pod,apiVersion=v1}`},
+					events:                 []string{`Warning OwnerRefInvalidNamespace ownerRef [v1/Pod, namespace: ns1, name: podname2, uid: poduid2] does not exist in namespace "ns1"`},
 				}),
 				// 6,7: handle queued delete of bad child
 				processAttemptToDelete(1),
@@ -1155,7 +1158,7 @@ func TestConflictingData(t *testing.T) {
 				processEvent(makeAddEvent(pod1ns1)),
 				assertState(state{
 					graphNodes:             []*node{makeNode(node1, withOwners(pod1nonamespace)), makeNode(pod1ns1)}, // pod1 namespace coordinate corrected, made non-virtual
-					events:                 []string{`Warning OwnerRefInvalidNamespace ownerRef [v1/Pod, namespace: , name: podname1, uid: poduid1] does not exist in namespace "" involvedObject{kind=Node,apiVersion=v1}`},
+					events:                 []string{`Warning OwnerRefInvalidNamespace ownerRef [v1/Pod, namespace: , name: podname1, uid: poduid1] does not exist in namespace ""`},
 					pendingAttemptToDelete: []*node{makeNode(node1, withOwners(pod1ns1))}, // bad cluster-scoped child added to attemptToDelete queue
 				}),
 				// 8,9: handle queued attempted delete of bad cluster-scoped child
@@ -1184,7 +1187,7 @@ func TestConflictingData(t *testing.T) {
 				processEvent(makeAddEvent(node1, pod1ns1)),
 				assertState(state{
 					graphNodes:             []*node{makeNode(node1, withOwners(pod1nonamespace)), makeNode(pod1ns1)},
-					events:                 []string{`Warning OwnerRefInvalidNamespace ownerRef [v1/Pod, namespace: , name: podname1, uid: poduid1] does not exist in namespace "" involvedObject{kind=Node,apiVersion=v1}`},
+					events:                 []string{`Warning OwnerRefInvalidNamespace ownerRef [v1/Pod, namespace: , name: podname1, uid: poduid1] does not exist in namespace ""`},
 					pendingAttemptToDelete: []*node{makeNode(node1, withOwners(pod1ns1))}, // bad cluster-scoped child added to attemptToDelete queue
 				}),
 				// 6,7: handle queued attempted delete of bad cluster-scoped child
@@ -2087,7 +2090,7 @@ func TestConflictingData(t *testing.T) {
 						makeNode(pod2ns1, withOwners(pod1ns1)),
 						makeNode(pod1ns1)},
 					// warn about bad node reference
-					events: []string{`Warning OwnerRefInvalidNamespace ownerRef [v1/Pod, namespace: , name: podname1, uid: poduid1] does not exist in namespace "" involvedObject{kind=Node,apiVersion=v1}`},
+					events: []string{`Warning OwnerRefInvalidNamespace ownerRef [v1/Pod, namespace: , name: podname1, uid: poduid1] does not exist in namespace ""`},
 					pendingAttemptToDelete: []*node{
 						makeNode(node1, withOwners(pod1nonamespace))}, // queue bad cluster-scoped child for delete attempt
 				}),
@@ -2229,8 +2232,7 @@ func TestConflictingData(t *testing.T) {
 
 			absentOwnerCache := NewReferenceCache(100)
 
-			eventRecorder := record.NewFakeRecorder(100)
-			eventRecorder.IncludeObject = true
+			eventRecorder := events.NewFakeRecorder(100)
 
 			metadataClient := fakemetadata.NewSimpleMetadataClient(legacyscheme.Scheme)
 
@@ -2391,7 +2393,7 @@ func makeMetadataObj(identity objectReference, owners ...objectReference) *metav
 type stepContext struct {
 	t               *testing.T
 	gc              *GarbageCollector
-	eventRecorder   *record.FakeRecorder
+	eventRecorder   *events.FakeRecorder
 	metadataClient  *fakemetadata.FakeMetadataClient
 	attemptToDelete *trackingWorkqueue
 	attemptToOrphan *trackingWorkqueue

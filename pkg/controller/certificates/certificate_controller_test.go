@@ -55,15 +55,16 @@ func TestCertificateController(t *testing.T) {
 		return nil
 	}
 
+	stopCh := make(chan struct{})
 	controller := NewCertificateController(
 		"test",
 		client,
 		informerFactory.Certificates().V1().CertificateSigningRequests(),
 		handler,
+		stopCh,
 	)
 	controller.csrsSynced = func() bool { return true }
 
-	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informerFactory.Start(stopCh)
 	informerFactory.WaitForCacheSync(stopCh)
@@ -74,10 +75,10 @@ func TestCertificateController(t *testing.T) {
 	controller.processNextWorkItem()
 
 	actions := client.Actions()
-	if len(actions) != 1 {
-		t.Errorf("expected 1 actions")
+	if len(actions) != 2 {
+		t.Errorf("expected 2 actions")
 	}
-	if a := actions[0]; !a.Matches("update", "certificatesigningrequests") ||
+	if a := actions[1]; !a.Matches("update", "certificatesigningrequests") ||
 		a.GetSubresource() != "approval" {
 		t.Errorf("unexpected action: %#v", a)
 	}

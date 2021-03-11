@@ -27,7 +27,7 @@ import (
 	"time"
 
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -37,12 +37,12 @@ import (
 	batchinformers "k8s.io/client-go/informers/batch/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	batchv1listers "k8s.io/client-go/listers/batch/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+
+	// "k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
@@ -91,15 +91,18 @@ type Controller struct {
 	// Jobs that need to be updated
 	queue workqueue.RateLimitingInterface
 
-	recorder record.EventRecorder
+	// recorder record.EventRecorder
+	recorder events.EventRecorder
 }
 
 // NewController creates a new Job controller that keeps the relevant pods
 // in sync with their corresponding Job objects.
-func NewController(podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface) *Controller {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+func NewController(podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface, stopCh <-chan struct{}) *Controller {
+	// eventBroadcaster := record.NewBroadcaster()
+	// eventBroadcaster.StartStructuredLogging(0)
+	// eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	eventBroadcaster := events.NewEventBroadcasterAdapter(kubeClient)
+	eventBroadcaster.StartRecordingToSink(stopCh)
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("job_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
@@ -109,11 +112,11 @@ func NewController(podInformer coreinformers.PodInformer, jobInformer batchinfor
 		kubeClient: kubeClient,
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
+			Recorder:   eventBroadcaster.NewRecorder("job-controller"),
 		},
 		expectations: controller.NewControllerExpectations(),
 		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff), "job"),
-		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
+		recorder:     eventBroadcaster.NewRecorder("job-controller"),
 	}
 
 	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -471,7 +474,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 
 	// Cannot create Pods if this is an Indexed Job and the feature is disabled.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) && job.Spec.CompletionMode == batch.IndexedCompletion {
-		jm.recorder.Event(&job, v1.EventTypeWarning, "IndexedJobDisabled", "Skipped Indexed Job sync because feature is disabled.")
+		jm.recorder.Eventf(&job, nil, v1.EventTypeWarning, "IndexedJobDisabled", "", "Skipped Indexed Job sync because feature is disabled.")
 		return false, nil
 	}
 
@@ -540,7 +543,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 		active = 0
 		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, v1.ConditionTrue, failureReason, failureMessage))
 		jobConditionsChanged = true
-		jm.recorder.Event(&job, v1.EventTypeWarning, failureReason, failureMessage)
+		jm.recorder.Eventf(&job, nil, v1.EventTypeWarning, failureReason, "", failureMessage)
 	} else {
 		if jobNeedsSync && job.DeletionTimestamp == nil {
 			active, manageJobErr = jm.manageJob(&job, activePods, succeeded, pods)
@@ -566,10 +569,10 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 			if completions >= *job.Spec.Completions {
 				complete = true
 				if active > 0 {
-					jm.recorder.Event(&job, v1.EventTypeWarning, "TooManyActivePods", "Too many active pods running after completion count reached")
+					jm.recorder.Eventf(&job, nil, v1.EventTypeWarning, "TooManyActivePods", "", "Too many active pods running after completion count reached")
 				}
 				if completions > *job.Spec.Completions {
-					jm.recorder.Event(&job, v1.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
+					jm.recorder.Eventf(&job, nil, v1.EventTypeWarning, "TooManySucceededPods", "", "Too many succeeded pods running after completion count reached")
 				}
 			}
 		}
@@ -578,7 +581,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 			jobConditionsChanged = true
 			now := metav1.Now()
 			job.Status.CompletionTime = &now
-			jm.recorder.Event(&job, v1.EventTypeNormal, "Completed", "Job completed")
+			jm.recorder.Eventf(&job, nil, v1.EventTypeNormal, "Completed", "", "Job completed")
 		} else if utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) && manageJobCalled {
 			// Update the conditions / emit events only if manageJob was called in
 			// this syncJob. Otherwise wait for the right syncJob call to make
@@ -589,7 +592,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 				job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionTrue, "JobSuspended", "Job suspended")
 				if isUpdated {
 					jobConditionsChanged = true
-					jm.recorder.Event(&job, v1.EventTypeNormal, "Suspended", "Job suspended")
+					jm.recorder.Eventf(&job, nil, v1.EventTypeNormal, "Suspended", "", "Job suspended")
 				}
 			} else {
 				// Job not suspended.
@@ -597,7 +600,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 				job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionFalse, "JobResumed", "Job resumed")
 				if isUpdated {
 					jobConditionsChanged = true
-					jm.recorder.Event(&job, v1.EventTypeNormal, "Resumed", "Job resumed")
+					jm.recorder.Eventf(&job, nil, v1.EventTypeNormal, "Resumed", "", "Job resumed")
 					// Resumed jobs will always reset StartTime to current time. This is
 					// done because the ActiveDeadlineSeconds timer shouldn't go off
 					// whilst the Job is still suspended and resetting StartTime is

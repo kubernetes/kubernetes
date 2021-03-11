@@ -34,7 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	cloudprovider "k8s.io/cloud-provider"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	. "k8s.io/kubernetes/pkg/volume"
@@ -230,7 +230,7 @@ func (f *fakeVolumeHost) GetNodeName() types.NodeName {
 	return types.NodeName(f.nodeName)
 }
 
-func (f *fakeVolumeHost) GetEventRecorder() record.EventRecorder {
+func (f *fakeVolumeHost) GetEventRecorder() events.EventRecorder {
 	return nil
 }
 

@@ -50,13 +50,15 @@ func newController(batchPeriod time.Duration) (*fake.Clientset, *endpointSliceMi
 	client := newClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 
+	stopCh := make(chan struct{})
 	esController := NewController(
 		informerFactory.Core().V1().Endpoints(),
 		informerFactory.Discovery().V1().EndpointSlices(),
 		informerFactory.Core().V1().Services(),
 		int32(1000),
 		client,
-		batchPeriod)
+		batchPeriod,
+		stopCh)
 
 	esController.endpointsSynced = alwaysReady
 	esController.endpointSlicesSynced = alwaysReady
@@ -90,7 +92,7 @@ func TestSyncEndpoints(t *testing.T) {
 			}},
 		},
 		endpointSlices:     []*discovery.EndpointSlice{},
-		expectedNumActions: 0,
+		expectedNumActions: 1,
 		expectedNumSlices:  0,
 	}, {
 		testName: "Endpoints with skip label true",
@@ -105,7 +107,7 @@ func TestSyncEndpoints(t *testing.T) {
 			}},
 		},
 		endpointSlices:     []*discovery.EndpointSlice{},
-		expectedNumActions: 0,
+		expectedNumActions: 1,
 		expectedNumSlices:  0,
 	}, {
 		testName: "Endpoints with skip label false",
@@ -120,7 +122,7 @@ func TestSyncEndpoints(t *testing.T) {
 			}},
 		},
 		endpointSlices:     []*discovery.EndpointSlice{},
-		expectedNumActions: 1,
+		expectedNumActions: 2,
 		expectedNumSlices:  1,
 	}, {
 		testName: "Endpoints with missing Service",
@@ -132,7 +134,7 @@ func TestSyncEndpoints(t *testing.T) {
 			}},
 		},
 		endpointSlices:     []*discovery.EndpointSlice{},
-		expectedNumActions: 0,
+		expectedNumActions: 1,
 		expectedNumSlices:  0,
 	}, {
 		testName: "Endpoints with Service with selector specified",
@@ -148,7 +150,7 @@ func TestSyncEndpoints(t *testing.T) {
 			}},
 		},
 		endpointSlices:     []*discovery.EndpointSlice{},
-		expectedNumActions: 0,
+		expectedNumActions: 1,
 		expectedNumSlices:  0,
 	}, {
 		testName: "Existing EndpointSlices that need to be cleaned up",
@@ -167,7 +169,7 @@ func TestSyncEndpoints(t *testing.T) {
 				},
 			},
 		}},
-		expectedNumActions: 1,
+		expectedNumActions: 2,
 		expectedNumSlices:  0,
 	}, {
 		testName: "Existing EndpointSlices managed by a different controller, no addresses to sync",
@@ -185,7 +187,7 @@ func TestSyncEndpoints(t *testing.T) {
 				},
 			},
 		}},
-		expectedNumActions: 0,
+		expectedNumActions: 1,
 		// This only queries for EndpointSlices managed by this controller.
 		expectedNumSlices: 0,
 	}, {
@@ -198,7 +200,7 @@ func TestSyncEndpoints(t *testing.T) {
 			}},
 		},
 		endpointSlices:     []*discovery.EndpointSlice{},
-		expectedNumActions: 1,
+		expectedNumActions: 2,
 		expectedNumSlices:  1,
 	}, {
 		testName: "Endpoints with 1001 addresses - 1 should not be mirrored",
@@ -210,7 +212,7 @@ func TestSyncEndpoints(t *testing.T) {
 			}},
 		},
 		endpointSlices:     []*discovery.EndpointSlice{},
-		expectedNumActions: 2, // extra action for creating warning event
+		expectedNumActions: 3, // extra action for creating warning event
 		expectedNumSlices:  1,
 	}}
 

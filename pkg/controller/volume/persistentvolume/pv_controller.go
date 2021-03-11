@@ -35,7 +35,9 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+
+	// "k8s.io/client-go/tools/record"
+	clientevents "k8s.io/client-go/tools/events"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
@@ -165,7 +167,7 @@ type PersistentVolumeController struct {
 	NodeListerSynced   cache.InformerSynced
 
 	kubeClient                clientset.Interface
-	eventRecorder             record.EventRecorder
+	eventRecorder             clientevents.EventRecorder
 	cloud                     cloudprovider.Interface
 	volumePluginMgr           vol.VolumePluginMgr
 	enableDynamicProvisioning bool
@@ -324,7 +326,7 @@ func (ctrl *PersistentVolumeController) emitEventForUnboundDelayBindingClaim(cla
 			message = fmt.Sprintf("waiting for pod %s to be scheduled", podNames[0])
 		}
 	}
-	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, reason, message)
+	ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeNormal, reason, "", message)
 	return nil
 }
 
@@ -361,7 +363,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				}
 				return nil
 			default:
-				ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.FailedBinding, "no persistent volumes available for this claim and no storage class is set")
+				ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeNormal, events.FailedBinding, "Bind", "no persistent volumes available for this claim and no storage class is set")
 			}
 
 			// Mark the claim as Pending and try to find a match in the next
@@ -421,7 +423,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 					klog.V(4).Infof("Can't bind the claim to volume %q: %v", volume.Name, err)
 					// send an event
 					msg := fmt.Sprintf("Cannot bind to requested volume %q: %s", volume.Name, err)
-					ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.VolumeMismatch, msg)
+					ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeWarning, events.VolumeMismatch, "Match", msg)
 					// volume does not satisfy the requirements of the claim
 					if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
 						return err
@@ -450,7 +452,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				if !metav1.HasAnnotation(claim.ObjectMeta, pvutil.AnnBoundByController) {
 					klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim by user, will retry later", claimToClaimKey(claim))
 					claimMsg := fmt.Sprintf("volume %q already bound to a different claim.", volume.Name)
-					ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.FailedBinding, claimMsg)
+					ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeWarning, events.FailedBinding, "Bind", claimMsg)
 					// User asked for a specific PV, retry later
 					if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
 						return err
@@ -461,7 +463,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 					// AnnBindCompleted annotation on the claim.
 					klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim %q by controller, THIS SHOULD NEVER HAPPEN", claimToClaimKey(claim), claimrefToClaimKey(volume.Spec.ClaimRef))
 					claimMsg := fmt.Sprintf("volume %q already bound to a different claim.", volume.Name)
-					ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.FailedBinding, claimMsg)
+					ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeWarning, events.FailedBinding, "Bind", claimMsg)
 
 					return fmt.Errorf("Invalid binding of claim %q to volume %q: volume already claimed by %q", claimToClaimKey(claim), claim.Spec.VolumeName, claimrefToClaimKey(volume.Spec.ClaimRef))
 				}
@@ -659,9 +661,9 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 				// Binding for the volume won't be called in syncUnboundClaim,
 				// because findBestMatchForClaim won't return the volume due to volumeMode mismatch.
 				volumeMsg := fmt.Sprintf("Cannot bind PersistentVolume to requested PersistentVolumeClaim %q due to incompatible volumeMode.", claim.Name)
-				ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, events.VolumeMismatch, volumeMsg)
+				ctrl.eventRecorder.Eventf(volume, nil, v1.EventTypeWarning, events.VolumeMismatch, "Match", volumeMsg)
 				claimMsg := fmt.Sprintf("Cannot bind PersistentVolume %q to requested PersistentVolumeClaim due to incompatible volumeMode.", volume.Name)
-				ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.VolumeMismatch, claimMsg)
+				ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeWarning, events.VolumeMismatch, "Match", claimMsg)
 				// Skipping syncClaim
 				return nil
 			}
@@ -848,7 +850,7 @@ func (ctrl *PersistentVolumeController) updateClaimStatusWithEvent(claim *v1.Per
 	// Emit the event only when the status change happens, not every time
 	// syncClaim is called.
 	klog.V(3).Infof("claim %q changed status to %q: %s", claimToClaimKey(claim), phase, message)
-	ctrl.eventRecorder.Event(newClaim, eventtype, reason, message)
+	ctrl.eventRecorder.Eventf(newClaim, nil, eventtype, reason, "", message)
 
 	return newClaim, nil
 }
@@ -899,7 +901,7 @@ func (ctrl *PersistentVolumeController) updateVolumePhaseWithEvent(volume *v1.Pe
 	// Emit the event only when the status change happens, not every time
 	// syncClaim is called.
 	klog.V(3).Infof("volume %q changed status to %q: %s", volume.Name, phase, message)
-	ctrl.eventRecorder.Event(newVol, eventtype, reason, message)
+	ctrl.eventRecorder.Eventf(newVol, nil, eventtype, reason, "", message)
 
 	return newVol, nil
 }
@@ -1172,7 +1174,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(volume *v1.Persis
 	if used && !claimCached {
 		msg := fmt.Sprintf("Volume is used by pods: %s", strings.Join(pods, ","))
 		klog.V(3).Infof("can't recycle volume %q: %s", volume.Name, msg)
-		ctrl.eventRecorder.Event(volume, v1.EventTypeNormal, events.VolumeFailedRecycle, msg)
+		ctrl.eventRecorder.Eventf(volume, nil, v1.EventTypeNormal, events.VolumeFailedRecycle, "Recycle", msg)
 		return
 	}
 
@@ -1213,7 +1215,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(volume *v1.Persis
 
 	klog.V(2).Infof("volume %q recycled", volume.Name)
 	// Send an event
-	ctrl.eventRecorder.Event(volume, v1.EventTypeNormal, events.VolumeRecycled, "Volume recycled")
+	ctrl.eventRecorder.Eventf(volume, nil, v1.EventTypeNormal, events.VolumeRecycled, "Recycle", "Volume recycled")
 	// Make the volume available again
 	if err = ctrl.unbindVolume(volume); err != nil {
 		// Oops, could not save the volume and therefore the controller will
@@ -1261,7 +1263,7 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(volume *v1.Persist
 		if volerr.IsDeletedVolumeInUse(err) {
 			// The plugin needs more time, don't mark the volume as Failed
 			// and send Normal event only
-			ctrl.eventRecorder.Event(volume, v1.EventTypeNormal, events.VolumeDelete, err.Error())
+			ctrl.eventRecorder.Eventf(volume, nil, v1.EventTypeNormal, events.VolumeDelete, "Delete", err.Error())
 		} else {
 			// The plugin failed, mark the volume as Failed and send Warning
 			// event
@@ -1448,7 +1450,7 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 	plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
 	// findProvisionablePlugin does not return err for external provisioners
 	if err != nil {
-		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, err.Error())
+		ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeWarning, events.ProvisioningFailed, "Provisioning", err.Error())
 		klog.Errorf("error finding provisioning plugin for claim %s: %v", claimToClaimKey(claim), err)
 		// failed to find the requested provisioning plugin, directly return err for now.
 		// controller will retry the provisioning in every syncUnboundClaim() call
@@ -1493,7 +1495,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 		// if Datasource in Claim is not nil and it is not a CSI plugin,
 		strerr := fmt.Sprintf("plugin %q is not a CSI plugin. Only CSI plugin can provision a claim with a datasource", pluginName)
 		klog.V(2).Infof(strerr)
-		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+		ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeWarning, events.ProvisioningFailed, "Provisioning", strerr)
 		return pluginName, fmt.Errorf(strerr)
 
 	}
@@ -1556,7 +1558,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	if !plugin.SupportsMountOption() && len(options.MountOptions) > 0 {
 		strerr := fmt.Sprintf("Mount options are not supported by the provisioner but StorageClass %q has mount options %v", storageClass.Name, options.MountOptions)
 		klog.V(2).Infof("Mount options are not supported by the provisioner but claim %q's StorageClass %q has mount options %v", claimToClaimKey(claim), storageClass.Name, options.MountOptions)
-		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+		ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeWarning, events.ProvisioningFailed, "Provisioning", strerr)
 		return pluginName, fmt.Errorf("provisioner %q doesn't support mount options", plugin.GetPluginName())
 	}
 
@@ -1565,7 +1567,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	if err != nil {
 		strerr := fmt.Sprintf("Failed to create provisioner: %v", err)
 		klog.V(2).Infof("failed to create provisioner for claim %q with StorageClass %q: %v", claimToClaimKey(claim), storageClass.Name, err)
-		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+		ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeWarning, events.ProvisioningFailed, "Provisioning", strerr)
 		return pluginName, err
 	}
 
@@ -1575,7 +1577,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 		if err != nil {
 			strerr := fmt.Sprintf("Failed to get target node: %v", err)
 			klog.V(3).Infof("unexpected error getting target node %q for claim %q: %v", nodeName, claimToClaimKey(claim), err)
-			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+			ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeWarning, events.ProvisioningFailed, "Provisioning", strerr)
 			return pluginName, err
 		}
 	}
@@ -1592,7 +1594,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 
 		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
 		klog.V(2).Infof("failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), storageClass.Name, err)
-		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+		ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeWarning, events.ProvisioningFailed, "Provisioning", strerr)
 		return pluginName, err
 	}
 
@@ -1643,7 +1645,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 		// times.
 		strerr := fmt.Sprintf("Error creating provisioned PV object for claim %s: %v. Deleting the volume.", claimToClaimKey(claim), err)
 		klog.V(3).Info(strerr)
-		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+		ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeWarning, events.ProvisioningFailed, "Provisioning", strerr)
 
 		var deleteErr error
 		var deleted bool
@@ -1671,12 +1673,12 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 			// is nothing we can do about it.
 			strerr := fmt.Sprintf("Error cleaning provisioned volume for claim %s: %v. Please delete manually.", claimToClaimKey(claim), deleteErr)
 			klog.V(2).Info(strerr)
-			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningCleanupFailed, strerr)
+			ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeWarning, events.ProvisioningCleanupFailed, "Provisioning", strerr)
 		}
 	} else {
 		klog.V(2).Infof("volume %q provisioned for claim %q", volume.Name, claimToClaimKey(claim))
 		msg := fmt.Sprintf("Successfully provisioned volume %s using %s", volume.Name, plugin.GetPluginName())
-		ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.ProvisioningSucceeded, msg)
+		ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeNormal, events.ProvisioningSucceeded, "Provisioning", msg)
 	}
 	return pluginName, nil
 }
@@ -1697,7 +1699,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 		if err != nil {
 			strerr := fmt.Sprintf("error getting CSI name for In tree plugin %s: %v", storageClass.Provisioner, err)
 			klog.V(2).Infof("%s", strerr)
-			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+			ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeWarning, events.ProvisioningFailed, "Provisioning", strerr)
 			return provisionerName, err
 		}
 	}
@@ -1712,7 +1714,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 	msg := fmt.Sprintf("waiting for a volume to be created, either by external provisioner %q or manually created by system administrator", provisionerName)
 	// External provisioner has been requested for provisioning the volume
 	// Report an event and wait for external provisioner to finish
-	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.ExternalProvisioning, msg)
+	ctrl.eventRecorder.Eventf(claim, nil, v1.EventTypeNormal, events.ExternalProvisioning, "Provisioning", msg)
 	klog.V(3).Infof("provisionClaimOperationExternal provisioning claim %q: %s", claimToClaimKey(claim), msg)
 	// return provisioner name here for metric reporting
 	return provisionerName, nil
@@ -1774,7 +1776,7 @@ func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, 
 // to given volume.
 func (ctrl *PersistentVolumeController) newRecyclerEventRecorder(volume *v1.PersistentVolume) recyclerclient.RecycleEventRecorder {
 	return func(eventtype, message string) {
-		ctrl.eventRecorder.Eventf(volume, eventtype, events.RecyclerPod, "Recycler pod: %s", message)
+		ctrl.eventRecorder.Eventf(volume, nil, eventtype, events.RecyclerPod, "Recycle", "Recycler pod: %s", message)
 	}
 }
 

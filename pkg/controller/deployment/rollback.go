@@ -102,11 +102,11 @@ func (dc *DeploymentController) rollbackToTemplate(d *apps.Deployment, rs *apps.
 }
 
 func (dc *DeploymentController) emitRollbackWarningEvent(d *apps.Deployment, reason, message string) {
-	dc.eventRecorder.Eventf(d, v1.EventTypeWarning, reason, message)
+	dc.eventRecorder.Eventf(d, nil, v1.EventTypeWarning, reason, "Rollback", message)
 }
 
 func (dc *DeploymentController) emitRollbackNormalEvent(d *apps.Deployment, message string) {
-	dc.eventRecorder.Eventf(d, v1.EventTypeNormal, deploymentutil.RollbackDone, message)
+	dc.eventRecorder.Eventf(d, nil, v1.EventTypeNormal, deploymentutil.RollbackDone, "Rollback", message)
 }
 
 // updateDeploymentAndClearRollbackTo sets .spec.rollbackTo to nil and update the input deployment

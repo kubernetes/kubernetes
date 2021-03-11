@@ -22,9 +22,9 @@ import (
 	"net"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -107,7 +107,7 @@ type CIDRAllocatorParams struct {
 }
 
 // New creates a new CIDR range allocator.
-func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, allocatorParams CIDRAllocatorParams) (CIDRAllocator, error) {
+func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, allocatorParams CIDRAllocatorParams, stopCh <-chan struct{}) (CIDRAllocator, error) {
 	nodeList, err := listNodes(kubeClient)
 	if err != nil {
 		return nil, err
@@ -115,9 +115,9 @@ func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInfo
 
 	switch allocatorType {
 	case RangeAllocatorType:
-		return NewCIDRRangeAllocator(kubeClient, nodeInformer, allocatorParams, nodeList)
+		return NewCIDRRangeAllocator(kubeClient, nodeInformer, allocatorParams, nodeList, stopCh)
 	case CloudAllocatorType:
-		return NewCloudCIDRAllocator(kubeClient, cloud, nodeInformer)
+		return NewCloudCIDRAllocator(kubeClient, cloud, nodeInformer, stopCh)
 	default:
 		return nil, fmt.Errorf("invalid CIDR allocator type: %v", allocatorType)
 	}

@@ -42,7 +42,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -327,13 +327,14 @@ type daemonSetsController struct {
 	historyStore cache.Store
 	podStore     cache.Store
 	nodeStore    cache.Store
-	fakeRecorder *record.FakeRecorder
+	fakeRecorder *events.FakeRecorder
 }
 
 func newTestController(initialObjects ...runtime.Object) (*daemonSetsController, *fakePodControl, *fake.Clientset, error) {
 	clientset := fake.NewSimpleClientset(initialObjects...)
 	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 
+	stopCh := make(chan struct{})
 	dsc, err := NewDaemonSetsController(
 		informerFactory.Apps().V1().DaemonSets(),
 		informerFactory.Apps().V1().ControllerRevisions(),
@@ -341,12 +342,13 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 		informerFactory.Core().V1().Nodes(),
 		clientset,
 		flowcontrol.NewFakeBackOff(50*time.Millisecond, 500*time.Millisecond, clock.NewFakeClock(time.Now())),
+		stopCh,
 	)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	fakeRecorder := record.NewFakeRecorder(100)
+	fakeRecorder := events.NewFakeRecorder(100)
 	dsc.eventRecorder = fakeRecorder
 
 	dsc.podStoreSynced = alwaysReady
@@ -373,7 +375,7 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 
 func resetCounters(manager *daemonSetsController) {
 	manager.podControl.(*fakePodControl).Clear()
-	fakeRecorder := record.NewFakeRecorder(100)
+	fakeRecorder := events.NewFakeRecorder(100)
 	manager.eventRecorder = fakeRecorder
 	manager.fakeRecorder = fakeRecorder
 }
@@ -501,6 +503,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		f.Core().V1().Nodes(),
 		client,
 		flowcontrol.NewFakeBackOff(50*time.Millisecond, 500*time.Millisecond, clock.NewFakeClock(time.Now())),
+		stopCh,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -539,7 +542,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		expectStableQueueLength(expected)
 	}
 
-	fakeRecorder := record.NewFakeRecorder(100)
+	fakeRecorder := events.NewFakeRecorder(100)
 	dsc.eventRecorder = fakeRecorder
 
 	fakePodControl := newFakePodControl()

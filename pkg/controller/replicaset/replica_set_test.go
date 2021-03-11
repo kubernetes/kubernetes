@@ -66,6 +66,7 @@ func testNewReplicaSetControllerFromClient(client clientset.Interface, stopCh ch
 		informers.Core().V1().Pods(),
 		client,
 		burstReplicas,
+		stopCh,
 	)
 
 	ret.podListerSynced = alwaysReady
@@ -373,7 +374,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 
 	// 2 PUT for the ReplicaSet status during dormancy window.
 	// Note that the pod creates go through pod control so they're not recorded.
-	fakeHandler.ValidateRequestCount(t, 2)
+	fakeHandler.ValidateRequestCount(t, 3)
 }
 
 func TestGetReplicaSetsWithSameController(t *testing.T) {
@@ -597,6 +598,7 @@ func TestWatchControllers(t *testing.T) {
 		informers.Core().V1().Pods(),
 		client,
 		BurstReplicas,
+		stopCh,
 	)
 	informers.Start(stopCh)
 	informers.WaitForCacheSync(stopCh)
@@ -1154,6 +1156,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		f.Core().V1().Pods(),
 		client,
 		100,
+		stopCh,
 	)
 	f.Start(stopCh)
 	f.WaitForCacheSync(stopCh)

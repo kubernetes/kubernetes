@@ -35,7 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+
+	// "k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
@@ -94,7 +96,8 @@ type GraphBuilder struct {
 	// it is protected by monitorLock.
 	running bool
 
-	eventRecorder record.EventRecorder
+	// eventRecorder record.EventRecorder
+	eventRecorder events.EventRecorder
 
 	metadataClient metadata.Interface
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
@@ -439,7 +442,8 @@ func (gb *GraphBuilder) reportInvalidNamespaceOwnerRef(n *node, invalidOwnerUID 
 		},
 		Namespace: n.identity.Namespace,
 	}
-	gb.eventRecorder.Eventf(ref, v1.EventTypeWarning, "OwnerRefInvalidNamespace", "ownerRef %s does not exist in namespace %q", invalidIdentity, n.identity.Namespace)
+	gb.eventRecorder.Eventf(ref, nil, v1.EventTypeWarning, "OwnerRefInvalidNamespace", "", "ownerRef %s does not exist in namespace %q", invalidIdentity, n.identity.Namespace)
+
 }
 
 // insertNode insert the node to gb.uidToNode; then it finds all owners as listed

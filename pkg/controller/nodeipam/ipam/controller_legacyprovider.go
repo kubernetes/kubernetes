@@ -67,7 +67,8 @@ func NewController(
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
 	clusterCIDR, serviceCIDR *net.IPNet,
-	nodeCIDRMaskSize int) (*Controller, error) {
+	nodeCIDRMaskSize int,
+	stopCh <-chan struct{}) (*Controller, error) {
 
 	if !nodesync.IsValidMode(config.Mode) {
 		return nil, fmt.Errorf("invalid IPAM controller mode %q", config.Mode)
@@ -85,7 +86,7 @@ func NewController(
 
 	c := &Controller{
 		config:  config,
-		adapter: newAdapter(kubeClient, gceCloud),
+		adapter: newAdapter(kubeClient, gceCloud, stopCh),
 		syncers: make(map[string]*nodesync.NodeSync),
 		set:     set,
 	}

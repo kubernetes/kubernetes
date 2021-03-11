@@ -148,12 +148,14 @@ func makeTestServer(t *testing.T, namespace string) (*httptest.Server, *utiltest
 		StatusCode:   http.StatusOK,
 		ResponseBody: runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{}),
 	}
+
 	mux := http.NewServeMux()
 	if namespace == "" {
 		t.Fatal("namespace cannot be empty")
 	}
 	mux.Handle("/api/v1/namespaces/"+namespace+"/endpoints", &fakeEndpointsHandler)
 	mux.Handle("/api/v1/namespaces/"+namespace+"/endpoints/", &fakeEndpointsHandler)
+	mux.HandleFunc("/apis/events.k8s.io/v1", func(res http.ResponseWriter, req *http.Request) {})
 	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
 		t.Errorf("unexpected request: %v", req.RequestURI)
 		http.Error(res, "", http.StatusNotFound)
@@ -196,6 +198,7 @@ func makeBlockingEndpointDeleteTestServer(t *testing.T, controller *endpointCont
 	mux.HandleFunc("/api/v1/namespaces/"+namespace+"/endpoints", handlerFunc)
 	mux.HandleFunc("/api/v1/namespaces/"+namespace+"/endpoints/", handlerFunc)
 	mux.HandleFunc("/api/v1/namespaces/"+namespace+"/events", func(res http.ResponseWriter, req *http.Request) {})
+	mux.HandleFunc("/apis/events.k8s.io/v1", func(res http.ResponseWriter, req *http.Request) {})
 	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
 		t.Errorf("unexpected request: %v", req.RequestURI)
 		http.Error(res, "", http.StatusNotFound)
@@ -214,8 +217,9 @@ type endpointController struct {
 func newController(url string, batchPeriod time.Duration) *endpointController {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: url, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	informerFactory := informers.NewSharedInformerFactory(client, controllerpkg.NoResyncPeriodFunc())
+	stopCh := make(chan struct{})
 	endpoints := NewEndpointController(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
-		informerFactory.Core().V1().Endpoints(), client, batchPeriod)
+		informerFactory.Core().V1().Endpoints(), client, batchPeriod, stopCh)
 	endpoints.podsSynced = alwaysReady
 	endpoints.servicesSynced = alwaysReady
 	endpoints.endpointsSynced = alwaysReady
@@ -231,12 +235,14 @@ func newFakeController(batchPeriod time.Duration) (*fake.Clientset, *endpointCon
 	client := fake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, controllerpkg.NoResyncPeriodFunc())
 
+	stopCh := make(chan struct{})
 	eController := NewEndpointController(
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Services(),
 		informerFactory.Core().V1().Endpoints(),
 		client,
-		batchPeriod)
+		batchPeriod,
+		stopCh)
 
 	eController.podsSynced = alwaysReady
 	eController.servicesSynced = alwaysReady

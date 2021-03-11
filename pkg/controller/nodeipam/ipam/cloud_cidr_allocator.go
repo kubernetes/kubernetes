@@ -35,11 +35,9 @@ import (
 	informers "k8s.io/client-go/informers/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -71,7 +69,7 @@ type cloudCIDRAllocator struct {
 	// and not blocking on long operations (which shouldn't be done from
 	// event handlers anyway).
 	nodeUpdateChannel chan string
-	recorder          record.EventRecorder
+	recorder          events.EventRecorder
 
 	// Keep a set of nodes that are currectly being processed to avoid races in CIDR allocation
 	lock              sync.Mutex
@@ -81,16 +79,20 @@ type cloudCIDRAllocator struct {
 var _ CIDRAllocator = (*cloudCIDRAllocator)(nil)
 
 // NewCloudCIDRAllocator creates a new cloud CIDR allocator.
-func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer) (CIDRAllocator, error) {
+func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, stopCh <-chan struct{}) (CIDRAllocator, error) {
 	if client == nil {
 		klog.Fatalf("kubeClient is nil when starting NodeController")
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
-	eventBroadcaster.StartStructuredLogging(0)
+	// eventBroadcaster := record.NewBroadcaster()
+	// recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
+	// eventBroadcaster.StartStructuredLogging(0)
+	eventBroadcaster := events.NewEventBroadcasterAdapter(client)
+	recorder := eventBroadcaster.NewRecorder("cidrAllocator")
 	klog.V(0).Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
+	eventBroadcaster.StartRecordingToSink(stopCh)
+
+	// eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	gceCloud, ok := cloud.(*gce.Cloud)
 	if !ok {

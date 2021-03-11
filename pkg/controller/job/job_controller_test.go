@@ -98,7 +98,8 @@ func newJob(parallelism, completions, backoffLimit int32, completionMode batch.C
 
 func newControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) (*Controller, informers.SharedInformerFactory) {
 	sharedInformers := informers.NewSharedInformerFactory(kubeClient, resyncPeriod())
-	jm := NewController(sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), kubeClient)
+	stopCh := make(chan struct{})
+	jm := NewController(sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), kubeClient, stopCh)
 	jm.podControl = &controller.FakePodControl{}
 
 	return jm, sharedInformers

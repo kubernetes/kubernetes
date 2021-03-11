@@ -39,13 +39,11 @@ import (
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	unversionedapps "k8s.io/client-go/kubernetes/typed/apps/v1"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
@@ -86,7 +84,7 @@ var controllerKind = apps.SchemeGroupVersion.WithKind("DaemonSet")
 // in the system with actual running pods.
 type DaemonSetsController struct {
 	kubeClient    clientset.Interface
-	eventRecorder record.EventRecorder
+	eventRecorder events.EventRecorder
 	podControl    controller.PodControlInterface
 	crControl     controller.ControllerRevisionControlInterface
 
@@ -137,10 +135,10 @@ func NewDaemonSetsController(
 	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	failedPodsBackoff *flowcontrol.Backoff,
+	stopCh <-chan struct{},
 ) (*DaemonSetsController, error) {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	eventBroadcaster := events.NewEventBroadcasterAdapter(kubeClient)
+	eventBroadcaster.StartRecordingToSink(stopCh)
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("daemon_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
@@ -149,10 +147,10 @@ func NewDaemonSetsController(
 	}
 	dsc := &DaemonSetsController{
 		kubeClient:    kubeClient,
-		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
+		eventRecorder: eventBroadcaster.NewRecorder("daemonset-controller"),
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
+			Recorder:   eventBroadcaster.NewRecorder("daemonset-controller"),
 		},
 		crControl: controller.RealControllerRevisionControl{
 			KubeClient: kubeClient,
@@ -834,7 +832,7 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 				msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, pod.Name, node.Name)
 				klog.V(2).Infof(msg)
 				// Emit an event so that it's discoverable to users.
-				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedDaemonPodReason, msg)
+				dsc.eventRecorder.Eventf(ds, nil, v1.EventTypeWarning, FailedDaemonPodReason, "", msg)
 				podsToDelete = append(podsToDelete, pod.Name)
 			} else {
 				daemonPodsRunning = append(daemonPodsRunning, pod)
@@ -1180,7 +1178,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 
 	everything := metav1.LabelSelector{}
 	if reflect.DeepEqual(ds.Spec.Selector, &everything) {
-		dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, SelectingAllReason, "This daemon set is selecting all pods. A non-empty selector is required.")
+		dsc.eventRecorder.Eventf(ds, nil, v1.EventTypeWarning, SelectingAllReason, "", "This daemon set is selecting all pods. A non-empty selector is required.")
 		return nil
 	}
 

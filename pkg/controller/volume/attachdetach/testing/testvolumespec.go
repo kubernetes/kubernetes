@@ -65,10 +65,10 @@ var pvs *v1.PersistentVolumeList
 var nodes *v1.NodeList
 
 func CreateTestClient() *fake.Clientset {
-	fakeClient := &fake.Clientset{}
+	fakeClient := fake.NewSimpleClientset()
 
 	extraPods = &v1.PodList{}
-	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.PrependReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.PodList{}
 		podNamePrefix := "mypod"
 		namespace := "mynamespace"
@@ -120,13 +120,13 @@ func CreateTestClient() *fake.Clientset {
 		obj.Items = append(obj.Items, extraPods.Items...)
 		return true, obj, nil
 	})
-	fakeClient.AddReactor("create", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.PrependReactor("create", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		createAction := action.(core.CreateAction)
 		pod := createAction.GetObject().(*v1.Pod)
 		extraPods.Items = append(extraPods.Items, *pod)
 		return true, createAction.GetObject(), nil
 	})
-	fakeClient.AddReactor("list", "csinodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.PrependReactor("list", "csinodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &storagev1.CSINodeList{}
 		nodeNamePrefix := "mynode"
 		for i := 0; i < 5; i++ {
@@ -158,18 +158,18 @@ func CreateTestClient() *fake.Clientset {
 		}
 		attachVolumeToNode("lostVolumeName", nodeName)
 	}
-	fakeClient.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.PrependReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.NodeList{}
 		obj.Items = append(obj.Items, nodes.Items...)
 		return true, obj, nil
 	})
 	volumeAttachments = &storagev1.VolumeAttachmentList{}
-	fakeClient.AddReactor("list", "volumeattachments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.PrependReactor("list", "volumeattachments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &storagev1.VolumeAttachmentList{}
 		obj.Items = append(obj.Items, volumeAttachments.Items...)
 		return true, obj, nil
 	})
-	fakeClient.AddReactor("create", "volumeattachments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.PrependReactor("create", "volumeattachments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		createAction := action.(core.CreateAction)
 		va := createAction.GetObject().(*storagev1.VolumeAttachment)
 		volumeAttachments.Items = append(volumeAttachments.Items, *va)
@@ -177,16 +177,22 @@ func CreateTestClient() *fake.Clientset {
 	})
 
 	pvs = &v1.PersistentVolumeList{}
-	fakeClient.AddReactor("list", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.PrependReactor("list", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.PersistentVolumeList{}
 		obj.Items = append(obj.Items, pvs.Items...)
 		return true, obj, nil
 	})
-	fakeClient.AddReactor("create", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	fakeClient.PrependReactor("create", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		createAction := action.(core.CreateAction)
 		pv := createAction.GetObject().(*v1.PersistentVolume)
 		pvs.Items = append(pvs.Items, *pv)
 		return true, createAction.GetObject(), nil
+	})
+	fakeClient.PrependReactor("patch", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return true, &v1.Node{}, nil
+	})
+	fakeClient.PrependReactor("patch", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return true, &v1.PersistentVolume{}, nil
 	})
 
 	fakeWatch := watch.NewFake()

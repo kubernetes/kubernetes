@@ -306,7 +306,8 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 			// Initialize the range allocator.
 			fakeNodeInformer := getFakeNodeInformer(tc.fakeNodeHandler)
 			nodeList, _ := tc.fakeNodeHandler.List(context.TODO(), metav1.ListOptions{})
-			_, err := NewCIDRRangeAllocator(tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList)
+			stopCh := make(chan struct{})
+			_, err := NewCIDRRangeAllocator(tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList, stopCh)
 			if err == nil && tc.ctrlCreateFail {
 				t.Fatalf("creating range allocator was expected to fail, but it did not")
 			}
@@ -538,8 +539,9 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 	testFunc := func(tc testCase) {
 		fakeNodeInformer := getFakeNodeInformer(tc.fakeNodeHandler)
 		nodeList, _ := tc.fakeNodeHandler.List(context.TODO(), metav1.ListOptions{})
+		stopCh := make(chan struct{})
 		// Initialize the range allocator.
-		allocator, err := NewCIDRRangeAllocator(tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList)
+		allocator, err := NewCIDRRangeAllocator(tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList, stopCh)
 		if err != nil {
 			t.Errorf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
 			return
@@ -637,8 +639,9 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 	}
 
 	testFunc := func(tc testCase) {
+		stopCh := make(chan struct{})
 		// Initialize the range allocator.
-		allocator, err := NewCIDRRangeAllocator(tc.fakeNodeHandler, getFakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
+		allocator, err := NewCIDRRangeAllocator(tc.fakeNodeHandler, getFakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil, stopCh)
 		if err != nil {
 			t.Logf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
 		}
@@ -782,8 +785,9 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 	}
 
 	testFunc := func(tc releaseTestCase) {
+		stopCh := make(chan struct{})
 		// Initialize the range allocator.
-		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, getFakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
+		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, getFakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil, stopCh)
 		rangeAllocator, ok := allocator.(*rangeAllocator)
 		if !ok {
 			t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)

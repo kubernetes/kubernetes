@@ -214,6 +214,8 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 	run := func(ctx context.Context, startSATokenController InitFunc, initializersFunc ControllerInitializersFunc) {
 
+		c.EventBroadcaster.StartRecordingToSink(ctx.Done())
+
 		controllerContext, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, ctx.Done())
 		if err != nil {
 			klog.Fatalf("error building controller context: %v", err)
@@ -674,7 +676,7 @@ func leaderElectAndRun(c *config.CompletedConfig, lockIdentity string, electionC
 		leaseName,
 		resourcelock.ResourceLockConfig{
 			Identity:      lockIdentity,
-			EventRecorder: c.EventRecorder,
+			EventRecorder: c.EventBroadcaster.DeprecatedNewLegacyRecorder("kube-controller-manager"),
 		},
 		c.Kubeconfig,
 		c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration)

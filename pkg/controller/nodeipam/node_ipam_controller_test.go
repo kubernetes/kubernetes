@@ -53,9 +53,10 @@ func newTestNodeIpamController(clusterCIDR []*net.IPNet, serviceCIDR *net.IPNet,
 	}
 
 	fakeGCE := gce.NewFakeGCECloud(gce.DefaultTestClusterValues())
+	stopCh := make(chan struct{})
 	return NewNodeIpamController(
 		fakeNodeInformer, fakeGCE, clientSet,
-		clusterCIDR, serviceCIDR, secondaryServiceCIDR, nodeCIDRMaskSizes, allocatorType,
+		clusterCIDR, serviceCIDR, secondaryServiceCIDR, nodeCIDRMaskSizes, allocatorType, stopCh,
 	)
 }
 

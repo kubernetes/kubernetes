@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
@@ -172,6 +172,11 @@ func (f *fixture) expectCreateRSAction(rs *apps.ReplicaSet) {
 	f.actions = append(f.actions, core.NewCreateAction(schema.GroupVersionResource{Resource: "replicasets"}, rs.Namespace, rs))
 }
 
+func (f *fixture) expectGetResourceAction() {
+	action := core.NewRootGetAction(schema.GroupVersionResource{Resource: "resource"}, "")
+	f.actions = append(f.actions, action)
+}
+
 func newFixture(t testing.TB) *fixture {
 	f := &fixture{}
 	f.t = t
@@ -182,11 +187,12 @@ func newFixture(t testing.TB) *fixture {
 func (f *fixture) newController() (*DeploymentController, informers.SharedInformerFactory, error) {
 	f.client = fake.NewSimpleClientset(f.objects...)
 	informers := informers.NewSharedInformerFactory(f.client, controller.NoResyncPeriodFunc())
-	c, err := NewDeploymentController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), f.client)
+	stopCh := make(chan struct{})
+	c, err := NewDeploymentController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), f.client, stopCh)
 	if err != nil {
 		return nil, nil, err
 	}
-	c.eventRecorder = &record.FakeRecorder{}
+	c.eventRecorder = &events.FakeRecorder{}
 	c.dListerSynced = alwaysReady
 	c.rsListerSynced = alwaysReady
 	c.podListerSynced = alwaysReady
@@ -274,6 +280,7 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 
 	rs := newReplicaSet(d, "deploymentrs-4186632231", 1)
 
+	f.expectGetResourceAction()
 	f.expectCreateRSAction(rs)
 	f.expectUpdateDeploymentStatusAction(d)
 	f.expectUpdateDeploymentStatusAction(d)
@@ -290,6 +297,7 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 	f.dLister = append(f.dLister, d)
 	f.objects = append(f.objects, d)
 
+	f.expectGetResourceAction()
 	f.expectUpdateDeploymentStatusAction(d)
 	f.run(testutil.GetKey(d, t))
 }
@@ -312,6 +320,7 @@ func TestSyncDeploymentDeletionRace(t *testing.T) {
 	f.objects = append(f.objects, rs)
 	f.rsLister = append(f.rsLister, rs)
 
+	f.expectGetResourceAction()
 	// Expect to only recheck DeletionTimestamp.
 	f.expectGetDeploymentAction(d)
 	// Sync should fail and requeue to let cache catch up.
@@ -327,6 +336,8 @@ func TestDontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
 	d.Spec.Selector = &metav1.LabelSelector{}
 	f.dLister = append(f.dLister, d)
 	f.objects = append(f.objects, d)
+
+	f.expectGetResourceAction()
 
 	// Normally there should be a status update to sync observedGeneration but the fake
 	// deployment has no generation set so there is no action happening here.
@@ -354,6 +365,7 @@ func TestReentrantRollback(t *testing.T) {
 	f.rsLister = append(f.rsLister, rs1, rs2)
 	f.objects = append(f.objects, d, rs1, rs2)
 
+	f.expectGetResourceAction()
 	// Rollback is done here
 	f.expectUpdateDeploymentAction(d)
 	// Expect no update on replica sets though

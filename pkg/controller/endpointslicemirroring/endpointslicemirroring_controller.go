@@ -31,12 +31,10 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	discoveryinformers "k8s.io/client-go/informers/discovery/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	discoverylisters "k8s.io/client-go/listers/discovery/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
@@ -72,11 +70,11 @@ func NewController(endpointsInformer coreinformers.EndpointsInformer,
 	maxEndpointsPerSubset int32,
 	client clientset.Interface,
 	endpointUpdatesBatchPeriod time.Duration,
+	stopCh <-chan struct{},
 ) *Controller {
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(klog.Infof)
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-mirroring-controller"})
+	broadcaster := events.NewEventBroadcasterAdapter(client)
+	recorder := broadcaster.NewRecorder("endpoint-slice-mirroring-controller")
+	broadcaster.StartRecordingToSink(stopCh)
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("endpoint_slice_mirroring_controller", client.DiscoveryV1().RESTClient().GetRateLimiter())
@@ -147,8 +145,8 @@ func NewController(endpointsInformer coreinformers.EndpointsInformer,
 // Controller manages selector-based service endpoint slices
 type Controller struct {
 	client           clientset.Interface
-	eventBroadcaster record.EventBroadcaster
-	eventRecorder    record.EventRecorder
+	eventBroadcaster events.EventBroadcasterAdapter
+	eventRecorder    events.EventRecorder
 
 	// endpointsLister is able to list/get endpoints and is populated by the
 	// shared informer passed to NewController.

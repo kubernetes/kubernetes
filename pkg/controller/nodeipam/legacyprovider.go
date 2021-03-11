@@ -38,6 +38,7 @@ func startLegacyIPAM(
 	clusterCIDRs []*net.IPNet,
 	serviceCIDR *net.IPNet,
 	nodeCIDRMaskSizes []int,
+	stopCh <-chan struct{},
 ) {
 	cfg := &ipam.Config{
 		Resync:       ipamResyncInterval,
@@ -59,7 +60,7 @@ func startLegacyIPAM(
 	if len(clusterCIDRs) > 1 {
 		klog.Warningf("Multiple cidrs were configured with FromCluster or FromCloud. cidrs except first one were discarded")
 	}
-	ipamc, err := ipam.NewController(cfg, kubeClient, cloud, cidr, serviceCIDR, nodeCIDRMaskSizes[0])
+	ipamc, err := ipam.NewController(cfg, kubeClient, cloud, cidr, serviceCIDR, nodeCIDRMaskSizes[0], stopCh)
 	if err != nil {
 		klog.Fatalf("Error creating ipam controller: %v", err)
 	}

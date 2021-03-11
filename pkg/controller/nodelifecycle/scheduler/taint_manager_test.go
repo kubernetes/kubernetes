@@ -219,7 +219,7 @@ func TestCreatePod(t *testing.T) {
 	for _, item := range testCases {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset()
-		controller := NewNoExecuteTaintManager(fakeClientset, (&podHolder{pod: item.pod}).getPod, getNodeFromClientset(fakeClientset), getPodsAssignedToNode(fakeClientset))
+		controller := NewNoExecuteTaintManager(fakeClientset, (&podHolder{pod: item.pod}).getPod, getNodeFromClientset(fakeClientset), getPodsAssignedToNode(fakeClientset), stopCh)
 		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(stopCh)
 		controller.taintedNodes = item.taintedNodes
@@ -243,7 +243,7 @@ func TestCreatePod(t *testing.T) {
 func TestDeletePod(t *testing.T) {
 	stopCh := make(chan struct{})
 	fakeClientset := fake.NewSimpleClientset()
-	controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), getNodeFromClientset(fakeClientset), getPodsAssignedToNode(fakeClientset))
+	controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), getNodeFromClientset(fakeClientset), getPodsAssignedToNode(fakeClientset), stopCh)
 	controller.recorder = testutil.NewFakeRecorder()
 	go controller.Run(stopCh)
 	controller.taintedNodes = map[string][]v1.Taint{
@@ -307,7 +307,7 @@ func TestUpdatePod(t *testing.T) {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset()
 		holder := &podHolder{}
-		controller := NewNoExecuteTaintManager(fakeClientset, holder.getPod, getNodeFromClientset(fakeClientset), getPodsAssignedToNode(fakeClientset))
+		controller := NewNoExecuteTaintManager(fakeClientset, holder.getPod, getNodeFromClientset(fakeClientset), getPodsAssignedToNode(fakeClientset), stopCh)
 		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(stopCh)
 		controller.taintedNodes = item.taintedNodes
@@ -373,7 +373,7 @@ func TestCreateNode(t *testing.T) {
 	for _, item := range testCases {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
-		controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{node: item.node}).getNode, getPodsAssignedToNode(fakeClientset))
+		controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{node: item.node}).getNode, getPodsAssignedToNode(fakeClientset), stopCh)
 		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(stopCh)
 		controller.NodeUpdated(nil, item.node)
@@ -396,7 +396,7 @@ func TestCreateNode(t *testing.T) {
 func TestDeleteNode(t *testing.T) {
 	stopCh := make(chan struct{})
 	fakeClientset := fake.NewSimpleClientset()
-	controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), getNodeFromClientset(fakeClientset), getPodsAssignedToNode(fakeClientset))
+	controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), getNodeFromClientset(fakeClientset), getPodsAssignedToNode(fakeClientset), stopCh)
 	controller.recorder = testutil.NewFakeRecorder()
 	controller.taintedNodes = map[string][]v1.Taint{
 		"node1": {createNoExecuteTaint(1)},
@@ -494,7 +494,7 @@ func TestUpdateNode(t *testing.T) {
 	for _, item := range testCases {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
-		controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
+		controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset), stopCh)
 		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(stopCh)
 		controller.NodeUpdated(item.oldNode, item.newNode)
@@ -540,7 +540,7 @@ func TestUpdateNodeWithMultipleTaints(t *testing.T) {
 	stopCh := make(chan struct{})
 	fakeClientset := fake.NewSimpleClientset(pod)
 	holder := &nodeHolder{node: untaintedNode}
-	controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (holder).getNode, getPodsAssignedToNode(fakeClientset))
+	controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (holder).getNode, getPodsAssignedToNode(fakeClientset), stopCh)
 	controller.recorder = testutil.NewFakeRecorder()
 	go controller.Run(stopCh)
 
@@ -628,7 +628,7 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
 		sort.Sort(item.expectedDeleteTimes)
-		controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
+		controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset), stopCh)
 		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(stopCh)
 		controller.NodeUpdated(item.oldNode, item.newNode)
@@ -828,7 +828,7 @@ func TestEventualConsistency(t *testing.T) {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
 		holder := &podHolder{}
-		controller := NewNoExecuteTaintManager(fakeClientset, holder.getPod, (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
+		controller := NewNoExecuteTaintManager(fakeClientset, holder.getPod, (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset), stopCh)
 		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(stopCh)
 

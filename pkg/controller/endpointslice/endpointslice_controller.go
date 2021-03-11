@@ -32,12 +32,15 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	discoveryinformers "k8s.io/client-go/informers/discovery/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+
+	// "k8s.io/client-go/kubernetes/scheme"
+	// v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	discoverylisters "k8s.io/client-go/listers/discovery/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+
+	// "k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
@@ -83,11 +86,15 @@ func NewController(podInformer coreinformers.PodInformer,
 	maxEndpointsPerSlice int32,
 	client clientset.Interface,
 	endpointUpdatesBatchPeriod time.Duration,
+	stopCh <-chan struct{},
 ) *Controller {
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartStructuredLogging(0)
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-controller"})
+	// broadcaster := record.NewBroadcaster()
+	// broadcaster.StartStructuredLogging(0)
+	// broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
+	// recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-controller"})
+	broadcaster := events.NewEventBroadcasterAdapter(client)
+	recorder := broadcaster.NewRecorder("endpoint-slice-controller")
+	broadcaster.StartRecordingToSink(stopCh)
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("endpoint_slice_controller", client.DiscoveryV1().RESTClient().GetRateLimiter())
@@ -177,9 +184,11 @@ func NewController(podInformer coreinformers.PodInformer,
 
 // Controller manages selector-based service endpoint slices
 type Controller struct {
-	client           clientset.Interface
-	eventBroadcaster record.EventBroadcaster
-	eventRecorder    record.EventRecorder
+	client clientset.Interface
+	// eventBroadcaster record.EventBroadcaster
+	// eventRecorder    record.EventRecorder
+	eventBroadcaster events.EventBroadcasterAdapter
+	eventRecorder    events.EventRecorder
 
 	// serviceLister is able to list/get services and is populated by the
 	// shared informer passed to NewController
@@ -348,8 +357,11 @@ func (c *Controller) syncService(key string) error {
 	if err != nil {
 		// Since we're getting stuff from a local cache, it is basically
 		// impossible to get this error.
-		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToListPods",
+		// c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToListPods",
+		// "Error listing Pods for Service %s/%s: %v", service.Namespace, service.Name, err)
+		c.eventRecorder.Eventf(service, nil, v1.EventTypeWarning, "FailedToListPods", "Listing",
 			"Error listing Pods for Service %s/%s: %v", service.Namespace, service.Name, err)
+
 		return err
 	}
 
@@ -362,7 +374,9 @@ func (c *Controller) syncService(key string) error {
 	if err != nil {
 		// Since we're getting stuff from a local cache, it is basically
 		// impossible to get this error.
-		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToListEndpointSlices",
+		// c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToListEndpointSlices",
+		// "Error listing Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
+		c.eventRecorder.Eventf(service, nil, v1.EventTypeWarning, "FailedToListEndpointSlices", "Listing",
 			"Error listing Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
 		return err
 	}
@@ -379,7 +393,9 @@ func (c *Controller) syncService(key string) error {
 
 	err = c.reconciler.reconcile(service, pods, endpointSlices, lastChangeTriggerTime)
 	if err != nil {
-		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToUpdateEndpointSlices",
+		// c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToUpdateEndpointSlices",
+		// "Error updating Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
+		c.eventRecorder.Eventf(service, nil, v1.EventTypeWarning, "FailedToUpdateEndpointSlices", "Updating",
 			"Error updating Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
 		return err
 	}

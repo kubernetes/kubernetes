@@ -20,7 +20,7 @@ import (
 	apiserver "k8s.io/apiserver/pkg/server"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
@@ -44,7 +44,8 @@ type Config struct {
 	Kubeconfig *restclient.Config
 
 	// the event sink
-	EventRecorder record.EventRecorder
+	// EventRecorder record.EventRecorder
+	EventBroadcaster events.EventBroadcasterAdapter
 }
 
 type completedConfig struct {

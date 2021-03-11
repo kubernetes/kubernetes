@@ -39,6 +39,8 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 
+	stopCh := make(chan struct{})
+
 	// Act
 	_, err := NewAttachDetachController(
 		fakeKubeClient,
@@ -56,6 +58,7 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		5*time.Second,
 		DefaultTimerConfig,
 		nil, /* filteredDialOptions */
+		stopCh,
 	)
 
 	// Assert
@@ -156,13 +159,14 @@ func Test_AttachDetachControllerRecovery(t *testing.T) {
 func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2 []*v1.Pod) {
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
-	//informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	plugins := controllervolumetesting.CreateTestPlugin()
 	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
 	csiNodeInformer := informerFactory.Storage().V1().CSINodes().Informer()
 	podInformer := informerFactory.Core().V1().Pods().Informer()
 	var podsNum, extraPodsNum, nodesNum, i int
+
+	stopCh := make(chan struct{})
 
 	// Create the controller
 	adcObj, err := NewAttachDetachController(
@@ -181,6 +185,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		1*time.Second,
 		DefaultTimerConfig,
 		nil, /* filteredDialOptions */
+		stopCh,
 	)
 
 	if err != nil {
@@ -188,8 +193,6 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	}
 
 	adc := adcObj.(*attachDetachController)
-
-	stopCh := make(chan struct{})
 
 	pods, err := fakeKubeClient.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -210,7 +213,6 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		nodeInformer.GetIndexer().Add(&nodeToAdd)
 		nodesNum++
 	}
-
 	csiNodes, err := fakeKubeClient.StorageV1().CSINodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
@@ -219,6 +221,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		csiNodeToAdd := csiNode
 		csiNodeInformer.GetIndexer().Add(&csiNodeToAdd)
 	}
+	t.Logf("podsNum: %v, nodesNum: %v, csiNodes: %v", podsNum, nodesNum, len(csiNodes.Items))
 
 	informerFactory.Start(stopCh)
 
@@ -317,9 +320,11 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		time.Sleep(time.Second * 1) // Wait for a second
 		for _, volumeList := range testPlugin.GetAttachedVolumes() {
 			attachedVolumesNum += len(volumeList)
+			t.Logf("attachedVolumesNum: %v", attachedVolumesNum)
 		}
 		for _, volumeList := range testPlugin.GetDetachedVolumes() {
 			detachedVolumesNum += len(volumeList)
+			t.Logf("detachedVolumesNum: %v", detachedVolumesNum)
 		}
 
 		// All the "extra pods" should result in volume to be attached, the pods all share one volume
@@ -402,6 +407,8 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	pvInformer := informerFactory.Core().V1().PersistentVolumes().Informer()
 	vaInformer := informerFactory.Storage().V1().VolumeAttachments().Informer()
 
+	stopCh := make(chan struct{})
+
 	// Create the controller
 	adcObj, err := NewAttachDetachController(
 		fakeKubeClient,
@@ -419,6 +426,7 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		1*time.Second,
 		DefaultTimerConfig,
 		nil, /* filteredDialOptions */
+		stopCh,
 	)
 	if err != nil {
 		t.Fatalf("NewAttachDetachController failed with error. Expected: <no error> Actual: <%v>", err)
@@ -470,7 +478,6 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	}
 
 	// Makesure the informer cache is synced
-	stopCh := make(chan struct{})
 	informerFactory.Start(stopCh)
 
 	if !kcache.WaitForNamedCacheSync("attach detach", stopCh,

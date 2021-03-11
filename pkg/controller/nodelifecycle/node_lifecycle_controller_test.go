@@ -34,6 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/events"
+
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -162,6 +164,7 @@ func newNodeLifecycleControllerFromClient(
 	nodeInformer := factory.Core().V1().Nodes()
 	daemonSetInformer := factory.Apps().V1().DaemonSets()
 
+	stopCh := make(chan struct{})
 	nc, err := NewNodeLifecycleController(
 		leaseInformer,
 		factory.Core().V1().Pods(),
@@ -177,6 +180,7 @@ func newNodeLifecycleControllerFromClient(
 		largeClusterThreshold,
 		unhealthyZoneThreshold,
 		useTaints,
+		stopCh,
 	)
 	if err != nil {
 		return nil, err
@@ -690,7 +694,7 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 			testNodeMonitorPeriod,
 			false)
 		nodeController.now = func() metav1.Time { return fakeNow }
-		nodeController.recorder = testutil.NewFakeRecorder()
+		nodeController.recorder = events.NewFakeRecorder(100)
 		nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(item.fakeNodeHandler.Clientset)
 		for _, ds := range item.daemonSets {
 			nodeController.daemonSetInformer.Informer().GetStore().Add(&ds)
@@ -858,7 +862,7 @@ func TestPodStatusChange(t *testing.T) {
 			testNodeMonitorPeriod,
 			false)
 		nodeController.now = func() metav1.Time { return fakeNow }
-		nodeController.recorder = testutil.NewFakeRecorder()
+		nodeController.recorder = events.NewFakeRecorder(100)
 		nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(item.fakeNodeHandler.Clientset)
 		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -1419,7 +1423,7 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 			testNodeMonitorPeriod,
 			false)
 		nodeController.now = func() metav1.Time { return fakeNow }
-		nodeController.recorder = testutil.NewFakeRecorder()
+		nodeController.recorder = events.NewFakeRecorder(100)
 		nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
 		nodeController.enterPartialDisruptionFunc = func(nodeNum int) float32 {
 			return testRateLimiterQPS
@@ -1705,7 +1709,7 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 			testNodeMonitorPeriod,
 			false)
 		nodeController.now = func() metav1.Time { return fakeNow }
-		nodeController.recorder = testutil.NewFakeRecorder()
+		nodeController.recorder = events.NewFakeRecorder(100)
 		nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(item.fakeNodeHandler.Clientset)
 		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -2248,7 +2252,7 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 				testNodeMonitorPeriod,
 				false)
 			nodeController.now = func() metav1.Time { return fakeNow }
-			nodeController.recorder = testutil.NewFakeRecorder()
+			nodeController.recorder = events.NewFakeRecorder(100)
 			nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(item.fakeNodeHandler.Clientset)
 			if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -2412,7 +2416,7 @@ func TestMonitorNodeHealthMarkPodsNotReady(t *testing.T) {
 			testNodeMonitorPeriod,
 			false)
 		nodeController.now = func() metav1.Time { return fakeNow }
-		nodeController.recorder = testutil.NewFakeRecorder()
+		nodeController.recorder = events.NewFakeRecorder(100)
 		nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(item.fakeNodeHandler.Clientset)
 		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -2598,7 +2602,7 @@ func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 				item.fakeNodeHandler.Clientset.PrependReactor("update", "pods", item.updateReactor)
 			}
 			nodeController.now = func() metav1.Time { return timeNow }
-			nodeController.recorder = testutil.NewFakeRecorder()
+			nodeController.recorder = events.NewFakeRecorder(100)
 			nodeController.getPodsAssignedToNode = item.fakeGetPodsAssignedToNode(item.fakeNodeHandler.Clientset)
 			for _, itertion := range item.nodeIterations {
 				nodeController.now = func() metav1.Time { return metav1.Time{Time: timeNow.Add(itertion.timeToPass)} }
@@ -2729,7 +2733,7 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 		testNodeMonitorPeriod,
 		true)
 	nodeController.now = func() metav1.Time { return fakeNow }
-	nodeController.recorder = testutil.NewFakeRecorder()
+	nodeController.recorder = events.NewFakeRecorder(100)
 	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
 	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2883,7 +2887,7 @@ func TestApplyNoExecuteTaintsToNodesEnqueueTwice(t *testing.T) {
 		testNodeMonitorPeriod,
 		true)
 	nodeController.now = func() metav1.Time { return fakeNow }
-	nodeController.recorder = testutil.NewFakeRecorder()
+	nodeController.recorder = events.NewFakeRecorder(100)
 	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
 	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -3107,7 +3111,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 		testNodeMonitorPeriod,
 		true)
 	nodeController.now = func() metav1.Time { return fakeNow }
-	nodeController.recorder = testutil.NewFakeRecorder()
+	nodeController.recorder = events.NewFakeRecorder(100)
 	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
 	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -3211,7 +3215,7 @@ func TestTaintsNodeByCondition(t *testing.T) {
 		testNodeMonitorPeriod,
 		true)
 	nodeController.now = func() metav1.Time { return fakeNow }
-	nodeController.recorder = testutil.NewFakeRecorder()
+	nodeController.recorder = events.NewFakeRecorder(100)
 	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
 
 	networkUnavailableTaint := &v1.Taint{
@@ -3426,6 +3430,7 @@ func TestNodeEventGeneration(t *testing.T) {
 	if len(fakeRecorder.Events) != 1 {
 		t.Fatalf("unexpected events, got %v, expected %v: %+v", len(fakeRecorder.Events), 1, fakeRecorder.Events)
 	}
+
 	if fakeRecorder.Events[0].Reason != "RegisteredNode" {
 		var reasons []string
 		for _, event := range fakeRecorder.Events {
@@ -3434,7 +3439,7 @@ func TestNodeEventGeneration(t *testing.T) {
 		t.Fatalf("unexpected events generation: %v", strings.Join(reasons, ","))
 	}
 	for _, event := range fakeRecorder.Events {
-		involvedObject := event.InvolvedObject
+		involvedObject := event.Regarding
 		actualUID := string(involvedObject.UID)
 		if actualUID != "1234567890" {
 			t.Fatalf("unexpected event uid: %v", actualUID)
@@ -3486,7 +3491,7 @@ func TestReconcileNodeLabels(t *testing.T) {
 		testNodeMonitorPeriod,
 		true)
 	nodeController.now = func() metav1.Time { return fakeNow }
-	nodeController.recorder = testutil.NewFakeRecorder()
+	nodeController.recorder = events.NewFakeRecorder(100)
 	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
 
 	tests := []struct {
@@ -3629,7 +3634,7 @@ func TestTryUpdateNodeHealth(t *testing.T) {
 		testNodeMonitorPeriod,
 		true)
 	nodeController.now = func() metav1.Time { return fakeNow }
-	nodeController.recorder = testutil.NewFakeRecorder()
+	nodeController.recorder = events.NewFakeRecorder(100)
 	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
 
 	getStatus := func(cond *v1.NodeCondition) *v1.ConditionStatus {

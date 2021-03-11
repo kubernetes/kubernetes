@@ -32,12 +32,15 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+
+	// "k8s.io/client-go/kubernetes/scheme"
+	// v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/client-go/tools/record"
+
+	// "k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
@@ -82,11 +85,15 @@ const (
 
 // NewEndpointController returns a new *Controller.
 func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
-	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *Controller {
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartStructuredLogging(0)
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-controller"})
+	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface,
+	endpointUpdatesBatchPeriod time.Duration, stopCh <-chan struct{}) *Controller {
+	// broadcaster := record.NewBroadcaster()
+	// broadcaster.StartStructuredLogging(0)
+	// broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
+	// recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-controller"})
+	broadcaster := events.NewEventBroadcasterAdapter(client)
+	broadcaster.StartRecordingToSink(stopCh)
+	recorder := broadcaster.NewRecorder("endpoint-controller")
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.CoreV1().RESTClient().GetRateLimiter())
@@ -134,9 +141,11 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 
 // Controller manages selector-based service endpoints.
 type Controller struct {
-	client           clientset.Interface
-	eventBroadcaster record.EventBroadcaster
-	eventRecorder    record.EventRecorder
+	client clientset.Interface
+	// eventBroadcaster record.EventBroadcaster
+	// eventRecorder    record.EventRecorder
+	eventBroadcaster events.EventBroadcasterAdapter
+	eventRecorder    events.EventRecorder
 
 	// serviceLister is able to list/get services and is populated by the shared informer passed to
 	// NewEndpointController.
@@ -573,9 +582,11 @@ func (e *Controller) syncService(key string) error {
 		}
 
 		if createEndpoints {
-			e.eventRecorder.Eventf(newEndpoints, v1.EventTypeWarning, "FailedToCreateEndpoint", "Failed to create endpoint for service %v/%v: %v", service.Namespace, service.Name, err)
+			// e.eventRecorder.Eventf(newEndpoints, v1.EventTypeWarning, "FailedToCreateEndpoint", "Failed to create endpoint for service %v/%v: %v", service.Namespace, service.Name, err)
+			e.eventRecorder.Eventf(newEndpoints, service, v1.EventTypeWarning, "FailedToCreateEndpoint", "Creating", "Failed to create endpoint for service %v/%v: %v", service.Namespace, service.Name, err)
 		} else {
-			e.eventRecorder.Eventf(newEndpoints, v1.EventTypeWarning, "FailedToUpdateEndpoint", "Failed to update endpoint %v/%v: %v", service.Namespace, service.Name, err)
+			// e.eventRecorder.Eventf(newEndpoints, v1.EventTypeWarning, "FailedToUpdateEndpoint", "Failed to update endpoint %v/%v: %v", service.Namespace, service.Name, err)
+			e.eventRecorder.Eventf(newEndpoints, service, v1.EventTypeWarning, "FailedToUpdateEndpoint", "Failed to update endpoint %v/%v: %v", service.Namespace, service.Name, err)
 		}
 
 		return err

@@ -34,11 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	batchv1informers "k8s.io/client-go/informers/batch/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	covev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	batchv1listers "k8s.io/client-go/listers/batch/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
@@ -54,7 +52,7 @@ var (
 // Refactored Cronjob controller that uses DelayingQueue and informers
 type ControllerV2 struct {
 	queue    workqueue.RateLimitingInterface
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 
 	jobControl     jobControlInterface
 	cronJobControl cjControlInterface
@@ -70,10 +68,9 @@ type ControllerV2 struct {
 }
 
 // NewControllerV2 creates and initializes a new Controller.
-func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer batchv1informers.CronJobInformer, kubeClient clientset.Interface) (*ControllerV2, error) {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&covev1client.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer batchv1informers.CronJobInformer, kubeClient clientset.Interface, stopCh <-chan struct{}) (*ControllerV2, error) {
+	eventBroadcaster := events.NewEventBroadcasterAdapter(kubeClient)
+	eventBroadcaster.StartRecordingToSink(stopCh)
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
@@ -83,7 +80,7 @@ func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer 
 
 	jm := &ControllerV2{
 		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cronjob"),
-		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "cronjob-controller"}),
+		recorder: eventBroadcaster.NewRecorder("cronjob-controller"),
 
 		jobControl:     realJobControl{KubeClient: kubeClient},
 		cronJobControl: &realCJControl{KubeClient: kubeClient},
@@ -373,7 +370,7 @@ func (jm *ControllerV2) updateCronJob(old interface{}, curr interface{}) {
 			// this is likely a user error in defining the spec value
 			// we should log the error and not reconcile this cronjob until an update to spec
 			klog.V(2).InfoS("unparseable schedule for cronjob", "cronjob", klog.KRef(newCJ.GetNamespace(), newCJ.GetName()), "schedule", newCJ.Spec.Schedule, "err", err)
-			jm.recorder.Eventf(newCJ, corev1.EventTypeWarning, "UnParseableCronJobSchedule", "unparseable schedule for cronjob: %s", newCJ.Spec.Schedule)
+			jm.recorder.Eventf(newCJ, nil, corev1.EventTypeWarning, "UnParseableCronJobSchedule", "", "unparseable schedule for cronjob: %s", newCJ.Spec.Schedule)
 			return
 		}
 		now := jm.now()
@@ -416,7 +413,7 @@ func (jm *ControllerV2) syncCronJob(
 				cj = cjCopy
 				continue
 			}
-			jm.recorder.Eventf(cj, corev1.EventTypeWarning, "UnexpectedJob", "Saw a job that the controller did not create or forgot: %s", j.Name)
+			jm.recorder.Eventf(cj, nil, corev1.EventTypeWarning, "UnexpectedJob", "", "Saw a job that the controller did not create or forgot: %s", j.Name)
 			// We found an unfinished job that has us as the parent, but it is not in our Active list.
 			// This could happen if we crashed right after creating the Job and before updating the status,
 			// or if our jobs list is newer than our cj status after a relist, or if someone intentionally created
@@ -424,7 +421,7 @@ func (jm *ControllerV2) syncCronJob(
 		} else if found && IsJobFinished(j) {
 			_, status := getFinishedStatus(j)
 			deleteFromActiveList(cj, j.ObjectMeta.UID)
-			jm.recorder.Eventf(cj, corev1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %s, status: %v", j.Name, status)
+			jm.recorder.Eventf(cj, nil, corev1.EventTypeNormal, "SawCompletedJob", "", "Saw completed job: %s, status: %v", j.Name, status)
 		}
 	}
 
@@ -443,7 +440,7 @@ func (jm *ControllerV2) syncCronJob(
 		case errors.IsNotFound(err):
 			// The job is actually missing, delete from active list and schedule a new one if within
 			// deadline
-			jm.recorder.Eventf(cj, corev1.EventTypeNormal, "MissingJob", "Active job went missing: %v", j.Name)
+			jm.recorder.Eventf(cj, nil, corev1.EventTypeNormal, "MissingJob", "", "Active job went missing: %v", j.Name)
 			deleteFromActiveList(cj, j.UID)
 		case err != nil:
 			return cj, nil, err
@@ -474,7 +471,7 @@ func (jm *ControllerV2) syncCronJob(
 		// this is likely a user error in defining the spec value
 		// we should log the error and not reconcile this cronjob until an update to spec
 		klog.V(2).InfoS("unparseable schedule", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "schedule", cj.Spec.Schedule, "err", err)
-		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "UnparseableSchedule", "unparseable schedule: %s : %s", cj.Spec.Schedule, err)
+		jm.recorder.Eventf(cj, nil, corev1.EventTypeWarning, "UnparseableSchedule", "", "unparseable schedule: %s : %s", cj.Spec.Schedule, err)
 		return cj, nil, nil
 	}
 	scheduledTime, err := getNextScheduleTime(*cj, now, sched, jm.recorder)
@@ -482,7 +479,7 @@ func (jm *ControllerV2) syncCronJob(
 		// this is likely a user error in defining the spec value
 		// we should log the error and not reconcile this cronjob until an update to spec
 		klog.V(2).InfoS("invalid schedule", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "schedule", cj.Spec.Schedule, "err", err)
-		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "InvalidSchedule", "invalid schedule schedule: %s : %s", cj.Spec.Schedule, err)
+		jm.recorder.Eventf(cj, nil, corev1.EventTypeWarning, "InvalidSchedule", "", "invalid schedule schedule: %s : %s", cj.Spec.Schedule, err)
 		return cj, nil, nil
 	}
 	if scheduledTime == nil {
@@ -501,7 +498,7 @@ func (jm *ControllerV2) syncCronJob(
 	}
 	if tooLate {
 		klog.V(4).InfoS("Missed starting window", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
-		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "MissSchedule", "Missed scheduled time to start a job: %s", scheduledTime.Format(time.RFC1123Z))
+		jm.recorder.Eventf(cj, nil, corev1.EventTypeWarning, "MissSchedule", "Schedule", "Missed scheduled time to start a job: %s", scheduledTime.Format(time.RFC1123Z))
 
 		// TODO: Since we don't set LastScheduleTime when not scheduling, we are going to keep noticing
 		// the miss every cycle.  In order to avoid sending multiple events, and to avoid processing
@@ -533,7 +530,7 @@ func (jm *ControllerV2) syncCronJob(
 		// With replace, we could use a name that is deterministic per execution time.
 		// But that would mean that you could not inspect prior successes or failures of Forbid jobs.
 		klog.V(4).InfoS("Not starting job because prior execution is still running and concurrency policy is Forbid", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
-		jm.recorder.Eventf(cj, corev1.EventTypeNormal, "JobAlreadyActive", "Not starting job because prior execution is running and concurrency policy is Forbid")
+		jm.recorder.Eventf(cj, nil, corev1.EventTypeNormal, "JobAlreadyActive", "", "Not starting job because prior execution is running and concurrency policy is Forbid")
 		t := nextScheduledTimeDuration(sched, now)
 		return cj, t, nil
 	}
@@ -543,7 +540,7 @@ func (jm *ControllerV2) syncCronJob(
 
 			job, err := jm.jobControl.GetJob(j.Namespace, j.Name)
 			if err != nil {
-				jm.recorder.Eventf(cj, corev1.EventTypeWarning, "FailedGet", "Get job: %v", err)
+				jm.recorder.Eventf(cj, nil, corev1.EventTypeWarning, "FailedGet", "Get", "Get job: %v", err)
 				return cj, nil, err
 			}
 			if !deleteJob(cj, job, jm.jobControl, jm.recorder) {
@@ -566,13 +563,13 @@ func (jm *ControllerV2) syncCronJob(
 		return cj, nil, err
 	case err != nil:
 		// default error handling
-		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
+		jm.recorder.Eventf(cj, nil, corev1.EventTypeWarning, "FailedCreate", "Create", "Error creating job: %v", err)
 		return cj, nil, err
 	}
 
 	metrics.CronJobCreationSkew.Observe(jobResp.ObjectMeta.GetCreationTimestamp().Sub(*scheduledTime).Seconds())
 	klog.V(4).InfoS("Created Job", "job", klog.KRef(jobResp.GetNamespace(), jobResp.GetName()), "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
-	jm.recorder.Eventf(cj, corev1.EventTypeNormal, "SuccessfulCreate", "Created job %v", jobResp.Name)
+	jm.recorder.Eventf(cj, nil, corev1.EventTypeNormal, "SuccessfulCreate", "Create", "Created job %v", jobResp.Name)
 
 	// ------------------------------------------------------------------ //
 

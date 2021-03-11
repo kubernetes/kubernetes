@@ -47,8 +47,9 @@ func NewKubeletServingCSRSigningController(
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
+	stopCh <-chan struct{},
 ) (*CSRSigningController, error) {
-	return NewCSRSigningController("csrsigning-kubelet-serving", capi.KubeletServingSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
+	return NewCSRSigningController("csrsigning-kubelet-serving", capi.KubeletServingSignerName, client, csrInformer, caFile, caKeyFile, certTTL, stopCh)
 }
 
 func NewKubeletClientCSRSigningController(
@@ -56,8 +57,9 @@ func NewKubeletClientCSRSigningController(
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
+	stopCh <-chan struct{},
 ) (*CSRSigningController, error) {
-	return NewCSRSigningController("csrsigning-kubelet-client", capi.KubeAPIServerClientKubeletSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
+	return NewCSRSigningController("csrsigning-kubelet-client", capi.KubeAPIServerClientKubeletSignerName, client, csrInformer, caFile, caKeyFile, certTTL, stopCh)
 }
 
 func NewKubeAPIServerClientCSRSigningController(
@@ -65,8 +67,9 @@ func NewKubeAPIServerClientCSRSigningController(
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
+	stopCh <-chan struct{},
 ) (*CSRSigningController, error) {
-	return NewCSRSigningController("csrsigning-kube-apiserver-client", capi.KubeAPIServerClientSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
+	return NewCSRSigningController("csrsigning-kube-apiserver-client", capi.KubeAPIServerClientSignerName, client, csrInformer, caFile, caKeyFile, certTTL, stopCh)
 }
 
 func NewLegacyUnknownCSRSigningController(
@@ -74,8 +77,9 @@ func NewLegacyUnknownCSRSigningController(
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
+	stopCh <-chan struct{},
 ) (*CSRSigningController, error) {
-	return NewCSRSigningController("csrsigning-legacy-unknown", capiv1beta1.LegacyUnknownSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
+	return NewCSRSigningController("csrsigning-legacy-unknown", capiv1beta1.LegacyUnknownSignerName, client, csrInformer, caFile, caKeyFile, certTTL, stopCh)
 }
 
 func NewCSRSigningController(
@@ -85,6 +89,7 @@ func NewCSRSigningController(
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
+	stopCh <-chan struct{},
 ) (*CSRSigningController, error) {
 	signer, err := newSigner(signerName, caFile, caKeyFile, client, certTTL)
 	if err != nil {
@@ -97,6 +102,7 @@ func NewCSRSigningController(
 			client,
 			csrInformer,
 			signer.handle,
+			stopCh,
 		),
 		dynamicCertReloader: signer.caProvider.caLoader,
 	}, nil

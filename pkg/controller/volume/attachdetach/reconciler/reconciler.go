@@ -27,7 +27,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/tools/record"
+
+	// "k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
@@ -69,7 +71,7 @@ func NewReconciler(
 	actualStateOfWorld cache.ActualStateOfWorld,
 	attacherDetacher operationexecutor.OperationExecutor,
 	nodeStatusUpdater statusupdater.NodeStatusUpdater,
-	recorder record.EventRecorder) Reconciler {
+	recorder events.EventRecorder) Reconciler {
 	return &reconciler{
 		loopPeriod:                loopPeriod,
 		maxWaitForUnmountDuration: maxWaitForUnmountDuration,
@@ -94,7 +96,7 @@ type reconciler struct {
 	nodeStatusUpdater         statusupdater.NodeStatusUpdater
 	timeOfLastSync            time.Time
 	disableReconciliationSync bool
-	recorder                  record.EventRecorder
+	recorder                  events.EventRecorder
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
@@ -327,7 +329,7 @@ func (rc *reconciler) reportMultiAttachError(volumeToAttach cache.VolumeToAttach
 		// We did not find any pods that requests the volume. The pod must have been deleted already.
 		simpleMsg, _ := volumeToAttach.GenerateMsg("Multi-Attach error", "Volume is already exclusively attached to one node and can't be attached to another")
 		for _, pod := range volumeToAttach.ScheduledPods {
-			rc.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedAttachVolume, simpleMsg)
+			rc.recorder.Eventf(pod, nil, v1.EventTypeWarning, kevents.FailedAttachVolume, "Attach", simpleMsg)
 		}
 		// Log detailed message to system admin
 		nodeList := strings.Join(otherNodesStr, ", ")
@@ -364,7 +366,7 @@ func (rc *reconciler) reportMultiAttachError(volumeToAttach cache.VolumeToAttach
 			msg = fmt.Sprintf("Volume is already used by %d pod(s) in different namespaces", otherPods)
 		}
 		simpleMsg, _ := volumeToAttach.GenerateMsg("Multi-Attach error", msg)
-		rc.recorder.Eventf(scheduledPod, v1.EventTypeWarning, kevents.FailedAttachVolume, simpleMsg)
+		rc.recorder.Eventf(scheduledPod, nil, v1.EventTypeWarning, kevents.FailedAttachVolume, "Attach", simpleMsg)
 	}
 
 	// Log all pods for system admin

@@ -467,8 +467,8 @@ func (tc *legacyTestCase) verifyResults(t *testing.T) {
 func (tc *legacyTestCase) runTest(t *testing.T) {
 	testClient, testScaleClient := tc.prepareTestClient(t)
 	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
-	eventClient := &fake.Clientset{}
-	eventClient.AddReactor("*", "events", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	eventClient := fake.NewSimpleClientset()
+	eventClient.PrependReactor("*", "events", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		tc.Lock()
 		defer tc.Unlock()
 
@@ -500,8 +500,11 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 	defaultDownscaleStabilisationWindow := 5 * time.Minute
 
+	stop := make(chan struct{})
+	defer close(stop)
+
 	hpaController := NewHorizontalController(
-		eventClient.CoreV1(),
+		eventClient,
 		testScaleClient,
 		testClient.AutoscalingV1(),
 		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
@@ -513,6 +516,7 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
+		stop,
 	)
 	hpaController.hpaListerSynced = alwaysReady
 
@@ -520,8 +524,6 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 		hpaController.recommendations["test-namespace/test-hpa"] = tc.recommendations
 	}
 
-	stop := make(chan struct{})
-	defer close(stop)
 	informerFactory.Start(stop)
 	go hpaController.Run(stop)
 

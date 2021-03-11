@@ -44,7 +44,7 @@ import (
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -296,7 +296,7 @@ func TestCreatePods(t *testing.T) {
 
 	podControl := RealPodControl{
 		KubeClient: clientset,
-		Recorder:   &record.FakeRecorder{},
+		Recorder:   &events.FakeRecorder{},
 	}
 
 	controllerSpec := newReplicationController(1)
@@ -324,7 +324,7 @@ func TestDeletePodsAllowsMissing(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
 	podControl := RealPodControl{
 		KubeClient: fakeClient,
-		Recorder:   &record.FakeRecorder{},
+		Recorder:   &events.FakeRecorder{},
 	}
 
 	controllerSpec := newReplicationController(1)

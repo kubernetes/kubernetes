@@ -46,7 +46,7 @@ type sarApprover struct {
 }
 
 // NewCSRApprovingController creates a new CSRApprovingController.
-func NewCSRApprovingController(client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) *certificates.CertificateController {
+func NewCSRApprovingController(client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer, stopCh <-chan struct{}) *certificates.CertificateController {
 	approver := &sarApprover{
 		client:      client,
 		recognizers: recognizers(),
@@ -56,6 +56,7 @@ func NewCSRApprovingController(client clientset.Interface, csrInformer certifica
 		client,
 		csrInformer,
 		approver.handle,
+		stopCh,
 	)
 }
 

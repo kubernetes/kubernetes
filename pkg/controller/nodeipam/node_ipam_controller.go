@@ -24,9 +24,9 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+
+	"k8s.io/client-go/tools/events"
 
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -79,20 +79,16 @@ func NewNodeIpamController(
 	serviceCIDR *net.IPNet,
 	secondaryServiceCIDR *net.IPNet,
 	nodeCIDRMaskSizes []int,
-	allocatorType ipam.CIDRAllocatorType) (*Controller, error) {
+	allocatorType ipam.CIDRAllocatorType,
+	stopCh <-chan struct{}) (*Controller, error) {
 
 	if kubeClient == nil {
 		klog.Fatalf("kubeClient is nil when starting Controller")
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-
+	eventBroadcaster := events.NewEventBroadcasterAdapter(kubeClient)
 	klog.Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(
-		&v1core.EventSinkImpl{
-			Interface: kubeClient.CoreV1().Events(""),
-		})
+	eventBroadcaster.StartRecordingToSink(stopCh)
 
 	if kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("node_ipam_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
@@ -124,7 +120,7 @@ func NewNodeIpamController(
 
 	// TODO: Abstract this check into a generic controller manager should run method.
 	if ic.allocatorType == ipam.IPAMFromClusterAllocatorType || ic.allocatorType == ipam.IPAMFromCloudAllocatorType {
-		startLegacyIPAM(ic, nodeInformer, cloud, kubeClient, clusterCIDRs, serviceCIDR, nodeCIDRMaskSizes)
+		startLegacyIPAM(ic, nodeInformer, cloud, kubeClient, clusterCIDRs, serviceCIDR, nodeCIDRMaskSizes, stopCh)
 	} else {
 		var err error
 
@@ -135,7 +131,7 @@ func NewNodeIpamController(
 			NodeCIDRMaskSizes:    nodeCIDRMaskSizes,
 		}
 
-		ic.cidrAllocator, err = ipam.New(kubeClient, cloud, nodeInformer, ic.allocatorType, allocatorParams)
+		ic.cidrAllocator, err = ipam.New(kubeClient, cloud, nodeInformer, ic.allocatorType, allocatorParams, stopCh)
 		if err != nil {
 			return nil, err
 		}

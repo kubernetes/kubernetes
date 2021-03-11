@@ -30,33 +30,28 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/legacy-cloud-providers/gce"
-	"k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
 
 type adapter struct {
 	k8s   clientset.Interface
 	cloud *gce.Cloud
 
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 }
 
-func newAdapter(k8s clientset.Interface, cloud *gce.Cloud) *adapter {
+func newAdapter(k8s clientset.Interface, cloud *gce.Cloud, stopCh <-chan struct{}) *adapter {
 	ret := &adapter{
 		k8s:   k8s,
 		cloud: cloud,
 	}
 
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartStructuredLogging(0)
-	ret.recorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloudCIDRAllocator"})
+	broadcaster := events.NewEventBroadcasterAdapter(k8s)
+	ret.recorder = broadcaster.NewRecorder("cloudCIDRAllocator")
 	klog.V(0).Infof("Sending events to api server.")
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{
-		Interface: k8s.CoreV1().Events(""),
-	})
+	broadcaster.StartRecordingToSink(stopCh)
 
 	return ret
 }
@@ -132,5 +127,5 @@ func (a *adapter) UpdateNodeNetworkUnavailable(nodeName string, unavailable bool
 
 func (a *adapter) EmitNodeWarningEvent(nodeName, reason, fmt string, args ...interface{}) {
 	ref := &v1.ObjectReference{Kind: "Node", Name: nodeName}
-	a.recorder.Eventf(ref, v1.EventTypeNormal, reason, fmt, args...)
+	a.recorder.Eventf(ref, nil, v1.EventTypeNormal, reason, "", fmt, args...)
 }

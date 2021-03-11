@@ -44,6 +44,7 @@ func startDaemonSetController(ctx ControllerContext) (http.Handler, bool, error)
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),
 		flowcontrol.NewBackOff(1*time.Second, 15*time.Minute),
+		ctx.Stop,
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating DaemonSets controller: %v", err)
@@ -62,6 +63,7 @@ func startStatefulSetController(ctx ControllerContext) (http.Handler, bool, erro
 		ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		ctx.InformerFactory.Apps().V1().ControllerRevisions(),
 		ctx.ClientBuilder.ClientOrDie("statefulset-controller"),
+		ctx.Stop,
 	).Run(int(ctx.ComponentConfig.StatefulSetController.ConcurrentStatefulSetSyncs), ctx.Stop)
 	return nil, true, nil
 }
@@ -75,6 +77,7 @@ func startReplicaSetController(ctx ControllerContext) (http.Handler, bool, error
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
 		replicaset.BurstReplicas,
+		ctx.Stop,
 	).Run(int(ctx.ComponentConfig.ReplicaSetController.ConcurrentRSSyncs), ctx.Stop)
 	return nil, true, nil
 }
@@ -88,6 +91,7 @@ func startDeploymentController(ctx ControllerContext) (http.Handler, bool, error
 		ctx.InformerFactory.Apps().V1().ReplicaSets(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("deployment-controller"),
+		ctx.Stop,
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating Deployment controller: %v", err)

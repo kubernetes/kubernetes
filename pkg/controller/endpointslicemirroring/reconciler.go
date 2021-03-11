@@ -27,7 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/record"
+
+	// "k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
@@ -45,7 +47,7 @@ type reconciler struct {
 
 	// eventRecorder allows reconciler to record an event if it finds an invalid
 	// IP address in an Endpoints resource.
-	eventRecorder record.EventRecorder
+	eventRecorder events.EventRecorder
 
 	// maxEndpointsPerSubset references the maximum number of endpoints that
 	// should be added to an EndpointSlice for an EndpointSubset. This allows
@@ -113,7 +115,7 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 	// Record an event on the Endpoints resource if we skipped mirroring for any
 	// invalid IP addresses.
 	if numInvalidAddresses > 0 {
-		r.eventRecorder.Eventf(endpoints, corev1.EventTypeWarning, InvalidIPAddress,
+		r.eventRecorder.Eventf(endpoints, nil, corev1.EventTypeWarning, InvalidIPAddress, "Mirror",
 			"Skipped %d invalid IP addresses when mirroring to EndpointSlices", numInvalidAddresses)
 	}
 
@@ -121,7 +123,7 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 	// addresses exceeding MaxEndpointsPerSubset.
 	if addressesSkipped > numInvalidAddresses {
 		klog.Warningf("%d addresses in %s/%s Endpoints were skipped due to exceeding MaxEndpointsPerSubset", addressesSkipped, endpoints.Namespace, endpoints.Name)
-		r.eventRecorder.Eventf(endpoints, corev1.EventTypeWarning, TooManyAddressesToMirror,
+		r.eventRecorder.Eventf(endpoints, nil, corev1.EventTypeWarning, TooManyAddressesToMirror, "Mirror",
 			"A max of %d addresses can be mirrored to EndpointSlices per Endpoints subset. %d addresses were skipped", r.maxEndpointsPerSubset, addressesSkipped)
 	}
 

@@ -38,12 +38,12 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	kcache "k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+
+	// "k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	csitrans "k8s.io/csi-translation-lib"
@@ -119,7 +119,8 @@ func NewAttachDetachController(
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
 	timerConfig TimerConfig,
-	filteredDialOptions *proxyutil.FilteredDialOptions) (AttachDetachController, error) {
+	filteredDialOptions *proxyutil.FilteredDialOptions,
+	stopCh <-chan struct{}) (AttachDetachController, error) {
 
 	adc := &attachDetachController{
 		kubeClient:          kubeClient,
@@ -152,10 +153,13 @@ func NewAttachDetachController(
 		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
+	// eventBroadcaster := record.NewBroadcaster()
+	// eventBroadcaster.StartStructuredLogging(0)
+	// eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	// recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
+	eventBroadcaster := events.NewEventBroadcasterAdapter(kubeClient)
+	eventBroadcaster.StartRecordingToSink(stopCh)
+	recorder := eventBroadcaster.NewRecorder("attachdetach-controller")
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
@@ -305,7 +309,7 @@ type attachDetachController struct {
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
 
 	// recorder is used to record events in the API server
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 
 	// pvcQueue is used to queue pvc objects
 	pvcQueue workqueue.RateLimitingInterface
@@ -879,7 +883,7 @@ func (adc *attachDetachController) GetNodeName() types.NodeName {
 	return ""
 }
 
-func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
+func (adc *attachDetachController) GetEventRecorder() events.EventRecorder {
 	return adc.recorder
 }
 

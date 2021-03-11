@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -205,7 +205,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 
 			jc := &fakeJobControl{Job: job, CreateErr: tc.jobCreateError}
 			cjc := &fakeCJControl{CronJob: realCJ}
-			recorder := record.NewFakeRecorder(10)
+			recorder := events.NewFakeRecorder(10)
 
 			jm := ControllerV2{
 				jobControl:     jc,
@@ -390,7 +390,8 @@ func TestControllerV2UpdateCronJob(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			kubeClient := fake.NewSimpleClientset()
 			sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-			jm, err := NewControllerV2(sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
+			stopCh := make(chan struct{})
+			jm, err := NewControllerV2(sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient, stopCh)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
 				return
@@ -400,7 +401,7 @@ func TestControllerV2UpdateCronJob(t *testing.T) {
 			jm.queue = queue
 			jm.jobControl = &fakeJobControl{}
 			jm.cronJobControl = &fakeCJControl{}
-			jm.recorder = record.NewFakeRecorder(10)
+			jm.recorder = events.NewFakeRecorder(10)
 
 			jm.updateCronJob(tt.oldCronJob, tt.newCronJob)
 			if queue.delay.Seconds() != tt.expectedDelay.Seconds() {
@@ -460,7 +461,8 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 			for _, job := range tt.jobs {
 				sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			}
-			jm, err := NewControllerV2(sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
+			stopCh := make(chan struct{})
+			jm, err := NewControllerV2(sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient, stopCh)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
 				return
