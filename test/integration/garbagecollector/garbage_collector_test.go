@@ -598,6 +598,7 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	}
 	orphan := false
 	switch {
+	//lint:file-ignore SA1019 Keep testing deprecated OrphanDependents option until it's being removed
 	case options.OrphanDependents == nil && options.PropagationPolicy == nil && len(initialFinalizers) == 0:
 		// if there are no deletion options, the default policy for replication controllers is orphan
 		orphan = true
@@ -1024,12 +1025,7 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 	// dependency graph before handling the foreground deletion of the rc.
 	ctx.startGC(5)
 	timeout := make(chan struct{})
-	go func() {
-		select {
-		case <-time.After(5 * time.Second):
-			close(timeout)
-		}
-	}()
+	time.AfterFunc(5*time.Second, func() { close(timeout) })
 	if !cache.WaitForCacheSync(timeout, gc.IsSynced) {
 		t.Fatalf("failed to wait for garbage collector to be synced")
 	}
