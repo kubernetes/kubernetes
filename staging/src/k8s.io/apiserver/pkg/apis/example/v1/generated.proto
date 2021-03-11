@@ -118,6 +118,7 @@ message PodSpec {
   // Selector which must match a node's labels for the pod to be scheduled on that node.
   // More info: http://kubernetes.io/docs/user-guide/node-selection/README
   // +optional
+  // +mapType=atomic
   map<string, string> nodeSelector = 7;
 
   // ServiceAccountName is the name of the ServiceAccount to use to run this pod.

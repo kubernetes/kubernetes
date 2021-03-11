@@ -498,6 +498,7 @@ message ConfigMapEnvSource {
 }
 
 // Selects a key from a ConfigMap.
+// +structType=atomic
 message ConfigMapKeySelector {
   // The ConfigMap to select from.
   optional LocalObjectReference localObjectReference = 1;
@@ -2330,6 +2331,7 @@ message NodeResources {
 // A node selector represents the union of the results of one or more label queries
 // over a set of nodes; that is, it represents the OR of the selectors represented
 // by the node selector terms.
+// +structType=atomic
 message NodeSelector {
   // Required. A list of node selector terms. The terms are ORed.
   repeated NodeSelectorTerm nodeSelectorTerms = 1;
@@ -2504,6 +2506,7 @@ message NodeSystemInfo {
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
+// +structType=atomic
 message ObjectFieldSelector {
   // Version of the schema the FieldPath is written in terms of, defaults to "v1".
   // +optional
@@ -3449,6 +3452,7 @@ message PodSpec {
   // Selector which must match a node's labels for the pod to be scheduled on that node.
   // More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
   // +optional
+  // +mapType=atomic
   map<string, string> nodeSelector = 7;
 
   // ServiceAccountName is the name of the ServiceAccount to use to run this pod.
@@ -4125,6 +4129,7 @@ message ReplicationControllerSpec {
   // controller, if empty defaulted to labels on Pod template.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   // +optional
+  // +mapType=atomic
   map<string, string> selector = 2;
 
   // Template is the object that describes the pod that will be created if
@@ -4165,6 +4170,7 @@ message ReplicationControllerStatus {
 }
 
 // ResourceFieldSelector represents container resources (cpu, memory) and their output format
+// +structType=atomic
 message ResourceFieldSelector {
   // Container name: required for volumes, optional for env vars
   // +optional
@@ -4367,6 +4373,7 @@ message ScaleIOVolumeSource {
 
 // A scope selector represents the AND of the selectors represented
 // by the scoped-resource selector requirements.
+// +structType=atomic
 message ScopeSelector {
   // A list of scope selector requirements by scope of the resources.
   // +optional
@@ -4462,6 +4469,7 @@ message SecretEnvSource {
 }
 
 // SecretKeySelector selects a key of a Secret.
+// +structType=atomic
 message SecretKeySelector {
   // The name of the secret in the pod's namespace to select from.
   optional LocalObjectReference localObjectReference = 1;
@@ -4828,6 +4836,7 @@ message ServiceSpec {
   // Ignored if type is ExternalName.
   // More info: https://kubernetes.io/docs/concepts/services-networking/service/
   // +optional
+  // +mapType=atomic
   map<string, string> selector = 2;
 
   // clusterIP is the IP address of the service and is usually assigned
@@ -5233,6 +5242,7 @@ message TopologySelectorLabelRequirement {
 // The requirements of them are ANDed.
 // It provides a subset of functionality as NodeSelectorTerm.
 // This is an alpha feature and may change in the future.
+// +structType=atomic
 message TopologySelectorTerm {
   // A list of topology selector requirements by labels.
   // +optional
