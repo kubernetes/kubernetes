@@ -2675,7 +2675,7 @@ const (
 // The requirements of them are ANDed.
 // It provides a subset of functionality as NodeSelectorTerm.
 // This is an alpha feature and may change in the future.
-// +structType=atomic.
+// +structType=atomic
 type TopologySelectorTerm struct {
 	// Usage: Fields of type []TopologySelectorTerm must be listType=atomic.
 

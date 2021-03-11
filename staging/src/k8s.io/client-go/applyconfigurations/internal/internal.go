@@ -1759,6 +1759,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    elementRelationship: atomic
 - name: io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler
   map:
     fields:
@@ -3335,6 +3336,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: optional
       type:
         scalar: boolean
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.ConfigMapNodeConfigSource
   map:
     fields:
@@ -3683,6 +3685,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: targetRef
       type:
         namedType: io.k8s.api.core.v1.ObjectReference
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.EndpointPort
   map:
     fields:
@@ -3699,6 +3702,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: protocol
       type:
         scalar: string
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.EndpointSubset
   map:
     fields:
@@ -4373,6 +4377,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.LocalVolumeSource
   map:
     fields:
@@ -4568,6 +4573,7 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.core.v1.NodeSelectorTerm
           elementRelationship: atomic
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.NodeSelectorRequirement
   map:
     fields:
@@ -4600,6 +4606,7 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.core.v1.NodeSelectorRequirement
           elementRelationship: atomic
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.NodeSpec
   map:
     fields:
@@ -4744,6 +4751,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.ObjectReference
   map:
     fields:
@@ -4768,6 +4776,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: uid
       type:
         scalar: string
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.PersistentVolume
   map:
     fields:
@@ -5717,6 +5726,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.ResourceQuota
   map:
     fields:
@@ -5875,6 +5885,7 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.core.v1.ScopedResourceSelectorRequirement
           elementRelationship: atomic
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.ScopedResourceSelectorRequirement
   map:
     fields:
@@ -5958,6 +5969,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: optional
       type:
         scalar: boolean
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.SecretProjection
   map:
     fields:
@@ -5982,6 +5994,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: namespace
       type:
         scalar: string
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.SecretVolumeSource
   map:
     fields:
@@ -6345,6 +6358,7 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.core.v1.TopologySelectorLabelRequirement
           elementRelationship: atomic
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.TopologySpreadConstraint
   map:
     fields:
@@ -6377,6 +6391,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    elementRelationship: atomic
 - name: io.k8s.api.core.v1.Volume
   map:
     fields:
@@ -6634,6 +6649,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: protocol
       type:
         scalar: string
+    elementRelationship: atomic
 - name: io.k8s.api.discovery.v1.EndpointSlice
   map:
     fields:
@@ -9504,6 +9520,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    elementRelationship: atomic
 - name: io.k8s.api.rbac.v1.Subject
   map:
     fields:
@@ -9521,6 +9538,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: namespace
       type:
         scalar: string
+    elementRelationship: atomic
 - name: io.k8s.api.rbac.v1alpha1.AggregationRule
   map:
     fields:
@@ -10714,6 +10732,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    elementRelationship: atomic
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions
   map:
     fields:
