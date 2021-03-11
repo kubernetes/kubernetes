@@ -39,17 +39,17 @@ type ResourcePathMappings map[string]fieldpath.Path
 // ScaleHandler manages the conversion of managed fields between a main
 // resource and the scale subresource
 type ScaleHandler struct {
-	parentEntries       []metav1.ManagedFieldsEntry
-	defaultGroupVersion schema.GroupVersion
-	mappings            ResourcePathMappings
+	parentEntries []metav1.ManagedFieldsEntry
+	groupVersion  schema.GroupVersion
+	mappings      ResourcePathMappings
 }
 
 // NewScaleHandler creates a new ScaleHandler
-func NewScaleHandler(parentEntries []metav1.ManagedFieldsEntry, defaultGroupVersion schema.GroupVersion, mappings ResourcePathMappings) *ScaleHandler {
+func NewScaleHandler(parentEntries []metav1.ManagedFieldsEntry, groupVersion schema.GroupVersion, mappings ResourcePathMappings) *ScaleHandler {
 	return &ScaleHandler{
-		parentEntries:       parentEntries,
-		defaultGroupVersion: defaultGroupVersion,
-		mappings:            mappings,
+		parentEntries: parentEntries,
+		groupVersion:  groupVersion,
+		mappings:      mappings,
 	}
 }
 
@@ -136,8 +136,8 @@ func (h *ScaleHandler) ToParent(scaleEntries []metav1.ManagedFieldsEntry) ([]met
 
 	for manager, versionedSet := range scaleFields {
 		newVersionedSet := fieldpath.NewVersionedSet(
-			fieldpath.NewSet(h.mappings[h.defaultGroupVersion.String()]),
-			fieldpath.APIVersion(h.defaultGroupVersion.String()),
+			fieldpath.NewSet(h.mappings[h.groupVersion.String()]),
+			fieldpath.APIVersion(h.groupVersion.String()),
 			versionedSet.Applied(),
 		)
 		f[manager] = newVersionedSet

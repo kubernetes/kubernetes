@@ -27,11 +27,18 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	deploymentstorage "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
+	replicasetstorage "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
+	statefulsetstorage "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
+	replicationcontrollerstorage "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
 )
 
 type scaleTest struct {
@@ -228,6 +235,87 @@ func TestScaleAllResources(t *testing.T) {
 			assertReplicasValue(t, obj, 5)
 			assertReplicasOwnership(t, obj, "scale_test")
 		})
+	}
+}
+
+func TestScaleUpdateOnlyStatus(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	resource := "deployments"
+	path := "/apis/apps/v1"
+	validObject := []byte(validAppsV1("Deployment"))
+
+	// Create the object
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath(path).
+		Namespace("default").
+		Resource(resource).
+		Name("test").
+		Param("fieldManager", "apply_test").
+		Body(validObject).
+		Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using apply: %v", err)
+	}
+	obj := retrieveObject(t, client, path, resource)
+	assertReplicasValue(t, obj, 1)
+	assertReplicasOwnership(t, obj, "apply_test")
+
+	// Call scale subresource to update replicas
+	_, err = client.CoreV1().RESTClient().
+		Patch(types.MergePatchType).
+		AbsPath(path).
+		Namespace("default").
+		Resource(resource).
+		Name("test").
+		SubResource("scale").
+		Param("fieldManager", "scale_test").
+		Body([]byte(`{"status":{"replicas": 42}}`)).
+		Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatalf("Failed to scale object: %v", err)
+	}
+	obj = retrieveObject(t, client, path, resource)
+	assertReplicasValue(t, obj, 1)
+	assertReplicasOwnership(t, obj, "apply_test")
+}
+
+func TestAllKnownVersionsAreInMappings(t *testing.T) {
+	cases := []struct {
+		groupKind schema.GroupKind
+		mappings  fieldmanager.ResourcePathMappings
+	}{
+		{
+			groupKind: schema.GroupKind{Group: "apps", Kind: "ReplicaSet"},
+			mappings:  replicasetstorage.ReplicasPathMappings(),
+		},
+		{
+			groupKind: schema.GroupKind{Group: "apps", Kind: "StatefulSet"},
+			mappings:  statefulsetstorage.ReplicasPathMappings(),
+		},
+		{
+			groupKind: schema.GroupKind{Group: "apps", Kind: "Deployment"},
+			mappings:  deploymentstorage.ReplicasPathMappings(),
+		},
+		{
+			groupKind: schema.GroupKind{Group: "", Kind: "ReplicationController"},
+			mappings:  replicationcontrollerstorage.ReplicasPathMappings(),
+		},
+	}
+	for _, c := range cases {
+		knownVersions := scheme.Scheme.VersionsForGroupKind(c.groupKind)
+		for _, version := range knownVersions {
+			if _, ok := c.mappings[version.String()]; !ok {
+				t.Errorf("missing version %v for %v mappings", version, c.groupKind)
+			}
+		}
+
+		if len(knownVersions) != len(c.mappings) {
+			t.Errorf("%v mappings has extra items: %v vs %v", c.groupKind, c.mappings, knownVersions)
+		}
 	}
 }
 
