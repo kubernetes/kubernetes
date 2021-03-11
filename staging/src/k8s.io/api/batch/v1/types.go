@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const JobCompletionIndexAnnotationAlpha = "batch.alpha.kubernetes.io/job-completion-index"
+const JobCompletionIndexAnnotationAlpha = "batch.kubernetes.io/job-completion-index"
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -157,7 +157,7 @@ type JobSpec struct {
 	//
 	// `Indexed` means that the Pods of a
 	// Job get an associated completion index from 0 to (.spec.completions - 1),
-	// available in the annotation batch.alpha.kubernetes.io/job-completion-index.
+	// available in the annotation batch.kubernetes.io/job-completion-index.
 	// The Job is considered complete when there is one successfully completed Pod
 	// for each index.
 	// When value is `Indexed`, .spec.completions must be specified and
