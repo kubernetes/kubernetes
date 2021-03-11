@@ -335,93 +335,50 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 	}
 }
 
-func Test_filterEndpointsInternalTrafficPolicy(t *testing.T) {
-	cluster := v1.ServiceInternalTrafficPolicyCluster
-	local := v1.ServiceInternalTrafficPolicyLocal
-
+func TestFilterLocalEndpoint(t *testing.T) {
 	testCases := []struct {
-		name                  string
-		internalTrafficPolicy *v1.ServiceInternalTrafficPolicyType
-		endpoints             []Endpoint
-		expected              []Endpoint
-		featureGateOn         bool
+		name      string
+		endpoints []Endpoint
+		expected  []Endpoint
 	}{
 		{
-			name:                  "no internalTrafficPolicy with empty endpoints",
-			internalTrafficPolicy: nil,
-			endpoints:             []Endpoint{},
-			expected:              []Endpoint{},
-			featureGateOn:         true,
+			name:      "with empty endpoints",
+			endpoints: []Endpoint{},
+			expected:  nil,
 		},
 		{
-			name:                  "no internalTrafficPolicy with non-empty endpoints",
-			internalTrafficPolicy: nil,
-			endpoints: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-			},
-			expected: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-			},
-			featureGateOn: true,
-		},
-		{
-			name:                  "internalTrafficPolicy is cluster",
-			internalTrafficPolicy: &cluster,
-			endpoints: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-			},
-			expected: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-			},
-			featureGateOn: true,
-		},
-		{
-			name:                  "internalTrafficPolicy is local with non-zero local endpoints",
-			internalTrafficPolicy: &local,
-			endpoints: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-			},
-			expected: []Endpoint{
-				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-			},
-			featureGateOn: true,
-		},
-		{
-			name:                  "internalTrafficPolicy is local with zero local endpoints",
-			internalTrafficPolicy: &local,
+			name: "all endpoints not local",
 			endpoints: []Endpoint{
 				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: false},
 				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-				&BaseEndpointInfo{Endpoint: "10.0.0.2:80", IsLocal: false},
 			},
-			expected:      nil,
-			featureGateOn: true,
+			expected: nil,
 		},
 		{
-			name:                  "feature gate is off, internalTrafficPolicy is local with non-empty endpoints",
-			internalTrafficPolicy: &local,
+			name: "all endpoints are local",
 			endpoints: []Endpoint{
 				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-				&BaseEndpointInfo{Endpoint: "10.0.0.2:80", IsLocal: false},
+				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: true},
 			},
 			expected: []Endpoint{
 				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
-				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
-				&BaseEndpointInfo{Endpoint: "10.0.0.2:80", IsLocal: false},
+				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: true},
 			},
-			featureGateOn: false,
+		},
+		{
+			name: "some endpoints are local",
+			endpoints: []Endpoint{
+				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
+			},
+			expected: []Endpoint{
+				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
+			},
 		},
 	}
 	for _, tc := range testCases {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, tc.featureGateOn)()
 		t.Run(tc.name, func(t *testing.T) {
-			filteredEndpoint := filterEndpointsInternalTrafficPolicy(tc.internalTrafficPolicy, tc.endpoints)
+			filteredEndpoint := FilterLocalEndpoint(tc.endpoints)
 			if !reflect.DeepEqual(filteredEndpoint, tc.expected) {
 				t.Errorf("expected %v, got %v", tc.expected, filteredEndpoint)
 			}
