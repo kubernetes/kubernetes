@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -48,6 +49,11 @@ type ReplicaSetStorage struct {
 	ReplicaSet *REST
 	Status     *StatusREST
 	Scale      *ScaleREST
+}
+
+// maps a group version to the replicas path in a replicaset object
+var replicasPathInReplicaSet = fieldmanager.ResourcePathMappings{
+	schema.GroupVersion{Group: "apps", Version: "v1"}.String(): fieldpath.MakePathOrDie("spec", "replicas"),
 }
 
 // NewStorage returns new instance of ReplicaSetStorage.
@@ -279,11 +285,23 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		return nil, errors.NewNotFound(apps.Resource("replicasets/scale"), i.name)
 	}
 
+	managedFieldsHandler := fieldmanager.NewScaleHandler(
+		replicaset.ManagedFields,
+		schema.GroupVersion{Group: "apps", Version: "v1"},
+		replicasPathInReplicaSet,
+	)
+
 	// replicaset -> old scale
 	oldScale, err := scaleFromReplicaSet(replicaset)
 	if err != nil {
 		return nil, err
 	}
+
+	scaleManagedFields, err := managedFieldsHandler.ToSubresource()
+	if err != nil {
+		return nil, err
+	}
+	oldScale.ManagedFields = scaleManagedFields
 
 	// old scale -> new scale
 	newScaleObj, err := i.reqObjInfo.UpdatedObject(ctx, oldScale)
@@ -315,5 +333,12 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 	// move replicas/resourceVersion fields to object and return
 	replicaset.Spec.Replicas = scale.Spec.Replicas
 	replicaset.ResourceVersion = scale.ResourceVersion
+
+	updatedEntries, err := managedFieldsHandler.ToParent(scale.ManagedFields)
+	if err != nil {
+		return nil, err
+	}
+	replicaset.ManagedFields = updatedEntries
+
 	return replicaset, nil
 }
