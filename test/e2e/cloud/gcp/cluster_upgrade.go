@@ -19,6 +19,7 @@ package gcp
 import (
 	"fmt"
 
+	"k8s.io/kubernetes/test/e2e/cloud/gcp/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/upgrades"
@@ -33,8 +34,6 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-const etcdImage = "3.4.9-1"
-
 var upgradeTests = []upgrades.Test{
 	&network.ServiceUpgradeTest{},
 	&node.SecretUpgradeTest{},
@@ -48,10 +47,6 @@ var upgradeTests = []upgrades.Test{
 	&apps.DaemonSetUpgradeTest{},
 	&node.AppArmorUpgradeTest{},
 	&storage.VolumeModeDowngradeTest{},
-}
-
-var gpuUpgradeTests = []upgrades.Test{
-	&node.NvidiaGPUUpgradeTest{},
 }
 
 var statefulsetUpgradeTests = []upgrades.Test{
@@ -86,7 +81,7 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 	// in a "Describe".
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:MasterUpgrade]", func() {
-			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
+			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Master upgrade"}
@@ -96,21 +91,21 @@ var _ = ginkgo.Describe("Upgrade [Feature:Upgrade]", func() {
 			}
 			testSuite.TestCases = append(testSuite.TestCases, masterUpgradeTest, nil)
 
-			upgradeFunc := ControlPlaneUpgradeFunc(f, upgCtx, masterUpgradeTest, nil)
+			upgradeFunc := common.ControlPlaneUpgradeFunc(f, upgCtx, masterUpgradeTest, nil)
 			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 
 	ginkgo.Describe("cluster upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:ClusterUpgrade]", func() {
-			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
+			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Cluster upgrade"}
 			clusterUpgradeTest := &junit.TestCase{Name: "[sig-cloud-provider-gcp] cluster-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, clusterUpgradeTest)
 
-			upgradeFunc := ClusterUpgradeFunc(f, upgCtx, clusterUpgradeTest, nil, nil)
+			upgradeFunc := common.ClusterUpgradeFunc(f, upgCtx, clusterUpgradeTest, nil, nil)
 			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -122,60 +117,15 @@ var _ = ginkgo.Describe("Downgrade [Feature:Downgrade]", func() {
 
 	ginkgo.Describe("cluster downgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:ClusterDowngrade]", func() {
-			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
+			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Cluster downgrade"}
 			clusterDowngradeTest := &junit.TestCase{Name: "[sig-cloud-provider-gcp] cluster-downgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, clusterDowngradeTest)
 
-			upgradeFunc := ClusterDowngradeFunc(f, upgCtx, clusterDowngradeTest, nil, nil)
+			upgradeFunc := common.ClusterDowngradeFunc(f, upgCtx, clusterDowngradeTest, nil, nil)
 			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
-		})
-	})
-})
-
-// TODO(#98326): Split the test by SIGs, move to appropriate directories and use SIGDescribe.
-var _ = ginkgo.Describe("gpu Upgrade [Feature:GPUUpgrade]", func() {
-	f := framework.NewDefaultFramework("gpu-upgrade")
-
-	ginkgo.Describe("master upgrade", func() {
-		ginkgo.It("should NOT disrupt gpu pod [Feature:GPUMasterUpgrade]", func() {
-			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
-			framework.ExpectNoError(err)
-
-			testSuite := &junit.TestSuite{Name: "GPU master upgrade"}
-			gpuUpgradeTest := &junit.TestCase{Name: "[sig-node] gpu-master-upgrade", Classname: "upgrade_tests"}
-			testSuite.TestCases = append(testSuite.TestCases, gpuUpgradeTest)
-
-			upgradeFunc := ControlPlaneUpgradeFunc(f, upgCtx, gpuUpgradeTest, nil)
-			upgrades.RunUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
-		})
-	})
-	ginkgo.Describe("cluster upgrade", func() {
-		ginkgo.It("should be able to run gpu pod after upgrade [Feature:GPUClusterUpgrade]", func() {
-			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
-			framework.ExpectNoError(err)
-
-			testSuite := &junit.TestSuite{Name: "GPU cluster upgrade"}
-			gpuUpgradeTest := &junit.TestCase{Name: "[sig-node] gpu-cluster-upgrade", Classname: "upgrade_tests"}
-			testSuite.TestCases = append(testSuite.TestCases, gpuUpgradeTest)
-
-			upgradeFunc := ClusterUpgradeFunc(f, upgCtx, gpuUpgradeTest, nil, nil)
-			upgrades.RunUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
-		})
-	})
-	ginkgo.Describe("cluster downgrade", func() {
-		ginkgo.It("should be able to run gpu pod after downgrade [Feature:GPUClusterDowngrade]", func() {
-			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
-			framework.ExpectNoError(err)
-
-			testSuite := &junit.TestSuite{Name: "GPU cluster downgrade"}
-			gpuDowngradeTest := &junit.TestCase{Name: "[sig-node] gpu-cluster-downgrade", Classname: "upgrade_tests"}
-			testSuite.TestCases = append(testSuite.TestCases, gpuDowngradeTest)
-
-			upgradeFunc := ClusterDowngradeFunc(f, upgCtx, gpuDowngradeTest, nil, nil)
-			upgrades.RunUpgradeSuite(upgCtx, gpuUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -186,14 +136,14 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 
 	ginkgo.Describe("stateful upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
-			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
+			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Stateful upgrade"}
 			statefulUpgradeTest := &junit.TestCase{Name: "[sig-apps] stateful-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, statefulUpgradeTest)
 
-			upgradeFunc := ClusterUpgradeFunc(f, upgCtx, statefulUpgradeTest, nil, nil)
+			upgradeFunc := common.ClusterUpgradeFunc(f, upgCtx, statefulUpgradeTest, nil, nil)
 			upgrades.RunUpgradeSuite(upgCtx, statefulsetUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -209,7 +159,7 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 
 	ginkgo.Describe("Upgrade kube-proxy from static pods to a DaemonSet", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetUpgrade]", func() {
-			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
+			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "kube-proxy upgrade"}
@@ -220,14 +170,14 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 			testSuite.TestCases = append(testSuite.TestCases, kubeProxyUpgradeTest)
 
 			extraEnvs := kubeProxyDaemonSetExtraEnvs(true)
-			upgradeFunc := ClusterUpgradeFunc(f, upgCtx, kubeProxyUpgradeTest, extraEnvs, extraEnvs)
+			upgradeFunc := common.ClusterUpgradeFunc(f, upgCtx, kubeProxyUpgradeTest, extraEnvs, extraEnvs)
 			upgrades.RunUpgradeSuite(upgCtx, kubeProxyUpgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 
 	ginkgo.Describe("Downgrade kube-proxy from a DaemonSet to static pods", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetDowngrade]", func() {
-			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
+			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "kube-proxy downgrade"}
@@ -238,7 +188,7 @@ var _ = ginkgo.Describe("kube-proxy migration [Feature:KubeProxyDaemonSetMigrati
 			testSuite.TestCases = append(testSuite.TestCases, kubeProxyDowngradeTest)
 
 			extraEnvs := kubeProxyDaemonSetExtraEnvs(false)
-			upgradeFunc := ClusterDowngradeFunc(f, upgCtx, kubeProxyDowngradeTest, extraEnvs, extraEnvs)
+			upgradeFunc := common.ClusterDowngradeFunc(f, upgCtx, kubeProxyDowngradeTest, extraEnvs, extraEnvs)
 			upgrades.RunUpgradeSuite(upgCtx, kubeProxyDowngradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
@@ -250,7 +200,7 @@ var _ = ginkgo.Describe("[sig-auth] ServiceAccount admission controller migratio
 
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
-			upgCtx, err := GetUpgradeContext(f.ClientSet.Discovery())
+			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "ServiceAccount admission controller migration"}
@@ -261,7 +211,7 @@ var _ = ginkgo.Describe("[sig-auth] ServiceAccount admission controller migratio
 			testSuite.TestCases = append(testSuite.TestCases, serviceaccountAdmissionControllerMigrationTest)
 
 			extraEnvs := []string{"KUBE_FEATURE_GATES=BoundServiceAccountTokenVolume=true"}
-			upgradeFunc := ControlPlaneUpgradeFunc(f, upgCtx, serviceaccountAdmissionControllerMigrationTest, extraEnvs)
+			upgradeFunc := common.ControlPlaneUpgradeFunc(f, upgCtx, serviceaccountAdmissionControllerMigrationTest, extraEnvs)
 			upgrades.RunUpgradeSuite(upgCtx, serviceaccountAdmissionControllerMigrationTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
