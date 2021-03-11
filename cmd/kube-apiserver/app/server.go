@@ -72,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/controlplane/tunneler"
+	"k8s.io/kubernetes/pkg/features"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
@@ -243,6 +244,14 @@ func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Tra
 	if len(s.SSHUser) > 0 {
 		// Get ssh key distribution func, if supported
 		var installSSHKey tunneler.InstallSSHKey
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) && cloudprovider.IsDeprecatedInternal(s.CloudProvider.CloudProvider) {
+			cloudprovider.DisableWarningForProvider(s.CloudProvider.CloudProvider)
+			return nil, nil, fmt.Errorf("cloud provider %q and ssh-user %q was specified, but built-in cloud providers are disabled. "+
+				"Please set --cloud-provider=external and use an external network proxy, see https://github.com/kubernetes-sigs/apiserver-network-proxy",
+				s.CloudProvider.CloudProvider, s.SSHUser)
+
+		}
 
 		cloudprovider.DeprecationWarningForProvider(s.CloudProvider.CloudProvider)
 		cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider.CloudProvider, s.CloudProvider.CloudConfigFile)
