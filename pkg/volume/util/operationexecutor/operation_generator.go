@@ -35,6 +35,7 @@ import (
 	volerr "k8s.io/cloud-provider/volume/errors"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/volume"
@@ -537,9 +538,20 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 
 		mountCheckError := checkMountOptionSupport(og, volumeToMount, volumePlugin)
-
 		if mountCheckError != nil {
 			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.MountOptionSupport check failed", mountCheckError)
+			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		}
+
+		// Enforce ReadWriteOncePod access mode if it is the only one present. This is also enforced during scheduling.
+		if utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod) &&
+			actualStateOfWorld.IsVolumeMountedElsewhere(volumeToMount.VolumeName, volumeToMount.PodName) &&
+			// Because we do not know what access mode the pod intends to use if there are multiple.
+			len(volumeToMount.VolumeSpec.PersistentVolume.Spec.AccessModes) == 1 &&
+			v1helper.ContainsAccessMode(volumeToMount.VolumeSpec.PersistentVolume.Spec.AccessModes, v1.ReadWriteOncePod) {
+
+			err = goerrors.New("volume uses the ReadWriteOncePod access mode and is already in use by another pod")
+			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.SetUp failed", err)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
@@ -1026,6 +1038,18 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		var stagingPath string
 
 		migrated := getMigratedStatusBySpec(volumeToMount.VolumeSpec)
+
+		// Enforce ReadWriteOncePod access mode. This is also enforced during scheduling.
+		if utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod) &&
+			actualStateOfWorld.IsVolumeMountedElsewhere(volumeToMount.VolumeName, volumeToMount.PodName) &&
+			// Because we do not know what access mode the pod intends to use if there are multiple.
+			len(volumeToMount.VolumeSpec.PersistentVolume.Spec.AccessModes) == 1 &&
+			v1helper.ContainsAccessMode(volumeToMount.VolumeSpec.PersistentVolume.Spec.AccessModes, v1.ReadWriteOncePod) {
+
+			err = goerrors.New("volume uses the ReadWriteOncePod access mode and is already in use by another pod")
+			eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.SetUpDevice failed", err)
+			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		}
 
 		// Set up global map path under the given plugin directory using symbolic link
 		globalMapPath, err :=
