@@ -195,6 +195,9 @@ func (m *Manager) aquireInhibitLock() error {
 	if err != nil {
 		return err
 	}
+	if m.inhibitLock != 0 {
+		m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
+	}
 	m.inhibitLock = lock
 	return nil
 }
