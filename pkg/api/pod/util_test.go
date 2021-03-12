@@ -1140,6 +1140,103 @@ func TestDropSubPathExpr(t *testing.T) {
 	}
 }
 
+func TestDropProbeGracePeriod(t *testing.T) {
+	gracePeriod := int64(10)
+	probe := api.Probe{TerminationGracePeriodSeconds: &gracePeriod}
+	podWithProbeGracePeriod := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyNever,
+				Containers:    []api.Container{{Name: "container1", Image: "testimage", LivenessProbe: &probe, StartupProbe: &probe}},
+			},
+		}
+	}
+	podWithoutProbeGracePeriod := func() *api.Pod {
+		p := podWithProbeGracePeriod()
+		p.Spec.Containers[0].LivenessProbe.TerminationGracePeriodSeconds = nil
+		p.Spec.Containers[0].StartupProbe.TerminationGracePeriodSeconds = nil
+		return p
+	}
+
+	podInfo := []struct {
+		description    string
+		hasGracePeriod bool
+		pod            func() *api.Pod
+	}{
+		{
+			description:    "has probe-level terminationGracePeriod",
+			hasGracePeriod: true,
+			pod:            podWithProbeGracePeriod,
+		},
+		{
+			description:    "does not have probe-level terminationGracePeriod",
+			hasGracePeriod: false,
+			pod:            podWithoutProbeGracePeriod,
+		},
+		{
+			description:    "only has liveness probe-level terminationGracePeriod",
+			hasGracePeriod: true,
+			pod: func() *api.Pod {
+				p := podWithProbeGracePeriod()
+				p.Spec.Containers[0].StartupProbe.TerminationGracePeriodSeconds = nil
+				return p
+			},
+		},
+		{
+			description:    "is nil",
+			hasGracePeriod: false,
+			pod:            func() *api.Pod { return nil },
+		},
+	}
+
+	enabled := true
+	for _, oldPodInfo := range podInfo {
+		for _, newPodInfo := range podInfo {
+			oldPodHasGracePeriod, oldPod := oldPodInfo.hasGracePeriod, oldPodInfo.pod()
+			newPodHasGracePeriod, newPod := newPodInfo.hasGracePeriod, newPodInfo.pod()
+			if newPod == nil {
+				continue
+			}
+
+			t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+
+				var oldPodSpec *api.PodSpec
+				if oldPod != nil {
+					oldPodSpec = &oldPod.Spec
+				}
+				dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+				// old pod should never be changed
+				if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+					t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+				}
+
+				switch {
+				case enabled || oldPodHasGracePeriod:
+					// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
+					if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+						t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+					}
+				case newPodHasGracePeriod:
+					// new pod should be changed
+					if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+						t.Errorf("new pod was not changed")
+					}
+					// new pod should not have subpaths
+					if !reflect.DeepEqual(newPod, podWithoutProbeGracePeriod()) {
+						t.Errorf("new pod had probe-level terminationGracePeriod: %v", diff.ObjectReflectDiff(newPod, podWithoutProbeGracePeriod()))
+					}
+				default:
+					// new pod should not need to be changed
+					if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+						t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+					}
+				}
+			})
+		}
+	}
+}
+
 // helper creates a podStatus with list of PodIPs
 func makePodStatus(podIPs []api.PodIP) *api.PodStatus {
 	return &api.PodStatus{
