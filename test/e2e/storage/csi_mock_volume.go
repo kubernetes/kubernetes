@@ -897,6 +897,128 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 	})
 
+	ginkgo.Context("CSI NodeUnstage error cases [Slow]", func() {
+		trackedCalls := []string{
+			"NodeStageVolume",
+			"NodeUnstageVolume",
+		}
+
+		// Each test starts two pods in sequence.
+		// The first pod always runs successfully, but NodeUnstage hook can set various error conditions.
+		// The test then checks how NodeStage of the second pod is called.
+		tests := []struct {
+			name          string
+			expectedCalls []csiCall
+
+			// Called for each NodeStageVolume calls, with counter incremented atomically before
+			// the invocation (i.e. first value will be 1) and index of deleted pod (the first pod
+			// has index 1)
+			nodeUnstageHook func(counter, pod int64) error
+		}{
+			{
+				// This is already tested elsewhere, adding simple good case here to test the test framework.
+				name: "should call NodeStage after NodeUnstage success",
+				expectedCalls: []csiCall{
+					{expectedMethod: "NodeStageVolume", expectedError: codes.OK},
+					{expectedMethod: "NodeUnstageVolume", expectedError: codes.OK},
+					{expectedMethod: "NodeStageVolume", expectedError: codes.OK},
+					{expectedMethod: "NodeUnstageVolume", expectedError: codes.OK},
+				},
+			},
+			{
+				name: "two pods: should call NodeStage after previous NodeUnstage final error",
+				expectedCalls: []csiCall{
+					{expectedMethod: "NodeStageVolume", expectedError: codes.OK},
+					{expectedMethod: "NodeUnstageVolume", expectedError: codes.InvalidArgument},
+					{expectedMethod: "NodeStageVolume", expectedError: codes.OK},
+					{expectedMethod: "NodeUnstageVolume", expectedError: codes.OK},
+				},
+				nodeUnstageHook: func(counter, pod int64) error {
+					if pod == 1 {
+						return status.Error(codes.InvalidArgument, "fake final error")
+					}
+					return nil
+				},
+			},
+			{
+				name: "two pods: should call NodeStage after previous NodeUnstage transient error",
+				expectedCalls: []csiCall{
+					{expectedMethod: "NodeStageVolume", expectedError: codes.OK},
+					{expectedMethod: "NodeUnstageVolume", expectedError: codes.DeadlineExceeded},
+					{expectedMethod: "NodeStageVolume", expectedError: codes.OK},
+					{expectedMethod: "NodeUnstageVolume", expectedError: codes.OK},
+				},
+				nodeUnstageHook: func(counter, pod int64) error {
+					if pod == 1 {
+						return status.Error(codes.DeadlineExceeded, "fake transient error")
+					}
+					return nil
+				},
+			},
+		}
+		for _, t := range tests {
+			test := t
+			ginkgo.It(test.name, func() {
+				// Index of the last deleted pod. NodeUnstage calls are then related to this pod.
+				var deletedPodNumber int64 = 1
+				var hooks *drivers.Hooks
+				if test.nodeUnstageHook != nil {
+					hooks = createPreHook("NodeUnstageVolume", func(counter int64) error {
+						pod := atomic.LoadInt64(&deletedPodNumber)
+						return test.nodeUnstageHook(counter, pod)
+					})
+				}
+				init(testParameters{
+					disableAttach:  true,
+					registerDriver: true,
+					hooks:          hooks,
+				})
+				defer cleanup()
+
+				_, claim, pod := createPod(false)
+				if pod == nil {
+					return
+				}
+				// Wait for PVC to get bound to make sure the CSI driver is fully started.
+				err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, framework.ClaimProvisionTimeout)
+				framework.ExpectNoError(err, "while waiting for PVC to get provisioned")
+				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "while waiting for the first pod to start")
+				err = e2epod.DeletePodWithWait(m.cs, pod)
+				framework.ExpectNoError(err, "while deleting the first pod")
+
+				// Create the second pod
+				pod, err = createPodWithPVC(claim)
+				framework.ExpectNoError(err, "while creating the second pod")
+				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "while waiting for the second pod to start")
+				// The second pod is running and kubelet can't call NodeUnstage of the first one.
+				// Therefore incrementing the pod counter is safe here.
+				atomic.AddInt64(&deletedPodNumber, 1)
+				err = e2epod.DeletePodWithWait(m.cs, pod)
+				framework.ExpectNoError(err, "while deleting the second pod")
+
+				ginkgo.By("Waiting for all remaining expected CSI calls")
+				err = wait.Poll(time.Second, csiUnstageWaitTimeout, func() (done bool, err error) {
+					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.driver.GetCalls)
+					if err != nil {
+						return true, err
+					}
+					if index == 0 {
+						// No CSI call received yet
+						return false, nil
+					}
+					if len(test.expectedCalls) == index {
+						// all calls received
+						return true, nil
+					}
+					return false, nil
+				})
+				framework.ExpectNoError(err, "while waiting for all CSI calls")
+			})
+		}
+	})
+
 	ginkgo.Context("storage capacity", func() {
 		tests := []struct {
 			name              string
