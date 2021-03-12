@@ -6,6 +6,7 @@ go_library(
         "endpointset.go",
         "endpointslice_controller.go",
         "endpointslice_tracker.go",
+        "errors.go",
         "reconciler.go",
         "utils.go",
     ],
