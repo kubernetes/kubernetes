@@ -168,7 +168,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			if err != nil {
 				klog.Fatal(`"help" flag is non-bool, programmer error, please correct`)
 			}
-			if help {
+			if help || cleanFlagSet.NFlag() == 0 {
 				cmd.Help()
 				return
 			}
