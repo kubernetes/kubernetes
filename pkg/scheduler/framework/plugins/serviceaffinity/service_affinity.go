@@ -82,6 +82,9 @@ func getArgs(obj runtime.Object) (config.ServiceAffinityArgs, error) {
 	if !ok {
 		return config.ServiceAffinityArgs{}, fmt.Errorf("want args to be of type ServiceAffinityArgs, got %T", obj)
 	}
+	if len(ptr.AffinityLabels) == 0 {
+		return *ptr, fmt.Errorf("args.affinityLabels cannot be empty")
+	}
 	return *ptr, nil
 }
 
@@ -127,10 +130,6 @@ func (pl *ServiceAffinity) createPreFilterState(pod *v1.Pod) (*preFilterState, e
 
 // PreFilter invoked at the prefilter extension point.
 func (pl *ServiceAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
-	if len(pl.args.AffinityLabels) == 0 {
-		return nil
-	}
-
 	s, err := pl.createPreFilterState(pod)
 	if err != nil {
 		return framework.AsStatus(fmt.Errorf("could not create preFilterState: %w", err))
@@ -141,9 +140,6 @@ func (pl *ServiceAffinity) PreFilter(ctx context.Context, cycleState *framework.
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
 func (pl *ServiceAffinity) PreFilterExtensions() framework.PreFilterExtensions {
-	if len(pl.args.AffinityLabels) == 0 {
-		return nil
-	}
 	return pl
 }
 
@@ -233,10 +229,6 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 // 		- L is not defined in the pod itself already.
 // 		- and SOME pod, from a service, in the same namespace, ALREADY scheduled onto a node, has a matching value.
 func (pl *ServiceAffinity) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	if len(pl.args.AffinityLabels) == 0 {
-		return nil
-	}
-
 	node := nodeInfo.Node()
 	if node == nil {
 		return framework.AsStatus(fmt.Errorf("node not found"))
