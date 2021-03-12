@@ -425,11 +425,14 @@ func ValidateCSIDriver(csiDriver *storage.CSIDriver) field.ErrorList {
 func ValidateCSIDriverUpdate(new, old *storage.CSIDriver) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 
-	// Spec is read-only
-	// If this ever relaxes in the future, make sure to increment the Generation number in PrepareForUpdate
-	if !apiequality.Semantic.DeepEqual(old.Spec, new.Spec) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec"), new.Spec, "field is immutable"))
-	}
+	// immutable fields should not be mutated.
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.AttachRequired, old.Spec.AttachRequired, field.NewPath("spec", "attachedRequired"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.FSGroupPolicy, old.Spec.FSGroupPolicy, field.NewPath("spec", "fsGroupPolicy"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.PodInfoOnMount, old.Spec.PodInfoOnMount, field.NewPath("spec", "podInfoOnMount"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.VolumeLifecycleModes, old.Spec.VolumeLifecycleModes, field.NewPath("spec", "volumeLifecycleModes"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.StorageCapacity, old.Spec.StorageCapacity, field.NewPath("spec", "storageCapacity"))...)
+
+	allErrs = append(allErrs, validateTokenRequests(new.Spec.TokenRequests, field.NewPath("spec", "tokenRequests"))...)
 	return allErrs
 }
 
