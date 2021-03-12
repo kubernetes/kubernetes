@@ -21,7 +21,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: kibana-logging
-          image: docker.elastic.co/kibana/kibana-oss:7.4.2
+          image: docker.elastic.co/kibana/kibana-oss:7.10.2
           resources:
             # need more cpu upon initialization, therefore burstable class
             limits:
@@ -53,3 +53,28 @@ spec:
               port: ui
             initialDelaySeconds: 5
             timeoutSeconds: 10
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: kubernetes-dashboard-anonymous
+rules:
+- apiGroups: [""]
+  resources: ["services/proxy"]
+  resourceNames: ["kibana-logging"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- nonResourceURLs: ["/ui", "/ui/*", "/api/v1/namespaces/kube-system/services/kibana-logging/proxy/*"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubernetes-dashboard-anonymous
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubernetes-dashboard-anonymous
+subjects:
+- kind: User
+  name: system:anonymous
