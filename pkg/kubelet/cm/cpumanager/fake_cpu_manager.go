@@ -56,12 +56,12 @@ func (m *fakeManager) RemoveContainer(containerID string) error {
 }
 
 func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	klog.InfoS("Get Container Topology Hints")
+	klog.InfoS("Get container topology hints")
 	return map[string][]topologymanager.TopologyHint{}
 }
 
 func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	klog.InfoS("Get Pod Topology Hints")
+	klog.InfoS("Get pod topology hints")
 	return map[string][]topologymanager.TopologyHint{}
 }
 
@@ -70,12 +70,12 @@ func (m *fakeManager) State() state.Reader {
 }
 
 func (m *fakeManager) GetCPUs(podUID, containerName string) cpuset.CPUSet {
-	klog.InfoS("GetCPUs", "podUID", podUID, "containerName", container.Name)
+	klog.InfoS("GetCPUs", "podUID", podUID, "containerName", containerName)
 	return cpuset.CPUSet{}
 }
 
 func (m *fakeManager) GetAllocatableCPUs() cpuset.CPUSet {
-	klog.InfoS("Get Allocatable Cpus")
+	klog.InfoS("Get Allocatable CPUs")
 	return cpuset.CPUSet{}
 }
 
