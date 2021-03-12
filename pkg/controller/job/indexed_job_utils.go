@@ -34,6 +34,10 @@ const (
 	unknownCompletionIndex = -1
 )
 
+func isIndexedJob(job *batch.Job) bool {
+	return job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batch.IndexedCompletion
+}
+
 // calculateSucceededIndexes returns a string representation of the list of
 // succeeded indexes in compressed format and the number of succeeded indexes.
 func calculateSucceededIndexes(pods []*v1.Pod) (string, int32) {

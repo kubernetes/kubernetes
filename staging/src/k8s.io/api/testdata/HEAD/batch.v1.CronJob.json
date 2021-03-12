@@ -1577,11 +1577,12 @@
           }
         },
         "ttlSecondsAfterFinished": -1285029915,
-        "suspend": true
+        "completionMode": "{ȃ騑ȫ(踶ǊđƟÝɹ橽ƴåj}c殶",
+        "suspend": false
       }
     },
-    "successfulJobsHistoryLimit": 1729066291,
-    "failedJobsHistoryLimit": -908823020
+    "successfulJobsHistoryLimit": -2006986560,
+    "failedJobsHistoryLimit": -380889943
   },
   "status": {
     "active": [
@@ -1589,7 +1590,7 @@
         "kind": "505",
         "namespace": "506",
         "name": "507",
-        "uid": "`",
+        "uid": "暉Ŝ!ȣ绰",
         "apiVersion": "508",
         "resourceVersion": "509",
         "fieldPath": "510"

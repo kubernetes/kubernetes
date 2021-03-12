@@ -86,7 +86,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
-				ManualSelector: newBool(true),
+				ManualSelector: pointer.BoolPtr(true),
 				Template:       validPodTemplateSpecForManual,
 			},
 		},
@@ -110,7 +110,7 @@ func TestValidateJob(t *testing.T) {
 			Spec: batch.JobSpec{
 				Selector:       validGeneratedSelector,
 				Template:       validPodTemplateSpecForGenerated,
-				CompletionMode: batch.NonIndexedCompletion,
+				CompletionMode: completionModePtr(batch.NonIndexedCompletion),
 			},
 		},
 		"valid Indexed completion mode": {
@@ -122,7 +122,7 @@ func TestValidateJob(t *testing.T) {
 			Spec: batch.JobSpec{
 				Selector:       validGeneratedSelector,
 				Template:       validPodTemplateSpecForGenerated,
-				CompletionMode: batch.IndexedCompletion,
+				CompletionMode: completionModePtr(batch.IndexedCompletion),
 				Completions:    pointer.Int32Ptr(2),
 				Parallelism:    pointer.Int32Ptr(100000),
 			},
@@ -192,7 +192,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
-				ManualSelector: newBool(true),
+				ManualSelector: pointer.BoolPtr(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{"y": "z"},
@@ -213,7 +213,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
-				ManualSelector: newBool(true),
+				ManualSelector: pointer.BoolPtr(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{"controller-uid": "4d5e6f"},
@@ -234,7 +234,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
-				ManualSelector: newBool(true),
+				ManualSelector: pointer.BoolPtr(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validManualSelector.MatchLabels,
@@ -255,7 +255,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
-				ManualSelector: newBool(true),
+				ManualSelector: pointer.BoolPtr(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validManualSelector.MatchLabels,
@@ -289,7 +289,7 @@ func TestValidateJob(t *testing.T) {
 			Spec: batch.JobSpec{
 				Selector:       validGeneratedSelector,
 				Template:       validPodTemplateSpecForGenerated,
-				CompletionMode: batch.IndexedCompletion,
+				CompletionMode: completionModePtr(batch.IndexedCompletion),
 			},
 		},
 		"spec.parallelism: must be less than or equal to 100000 when completion mode is Indexed": {
@@ -301,7 +301,7 @@ func TestValidateJob(t *testing.T) {
 			Spec: batch.JobSpec{
 				Selector:       validGeneratedSelector,
 				Template:       validPodTemplateSpecForGenerated,
-				CompletionMode: batch.IndexedCompletion,
+				CompletionMode: completionModePtr(batch.IndexedCompletion),
 				Completions:    pointer.Int32Ptr(2),
 				Parallelism:    pointer.Int32Ptr(100001),
 			},
@@ -404,12 +404,12 @@ func TestValidateJobUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validGeneratedSelector,
 					Template:       validPodTemplateSpecForGenerated,
-					CompletionMode: batch.IndexedCompletion,
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
 					Completions:    pointer.Int32Ptr(2),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.CompletionMode = batch.NonIndexedCompletion
+				job.Spec.CompletionMode = completionModePtr(batch.NonIndexedCompletion)
 			},
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
@@ -762,7 +762,7 @@ func TestValidateCronJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						ManualSelector: newBool(true),
+						ManualSelector: pointer.BoolPtr(true),
 						Template:       validPodTemplateSpec,
 					},
 				},
@@ -865,8 +865,6 @@ func TestValidateCronJob(t *testing.T) {
 	}
 }
 
-func newBool(val bool) *bool {
-	p := new(bool)
-	*p = val
-	return p
+func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {
+	return &m
 }

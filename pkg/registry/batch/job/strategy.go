@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -95,11 +94,11 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) {
-		job.Spec.CompletionMode = batch.NonIndexedCompletion
+		job.Spec.CompletionMode = nil
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) {
-		job.Spec.Suspend = pointer.BoolPtr(false)
+		job.Spec.Suspend = nil
 	}
 
 	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
@@ -115,8 +114,8 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 		newJob.Spec.TTLSecondsAfterFinished = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) && oldJob.Spec.CompletionMode == batch.NonIndexedCompletion {
-		newJob.Spec.CompletionMode = batch.NonIndexedCompletion
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) && oldJob.Spec.CompletionMode == nil {
+		newJob.Spec.CompletionMode = nil
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) {

@@ -470,8 +470,12 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 	}
 
 	// Cannot create Pods if this is an Indexed Job and the feature is disabled.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) && job.Spec.CompletionMode == batch.IndexedCompletion {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) && isIndexedJob(&job) {
 		jm.recorder.Event(&job, v1.EventTypeWarning, "IndexedJobDisabled", "Skipped Indexed Job sync because feature is disabled.")
+		return false, nil
+	}
+	if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode != batch.NonIndexedCompletion && *job.Spec.CompletionMode != batch.IndexedCompletion {
+		jm.recorder.Event(&job, v1.EventTypeWarning, "UnknownCompletionMode", "Skipped Job sync because completion mode is unknown")
 		return false, nil
 	}
 
@@ -525,7 +529,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 	}
 
 	var succeededIndexes string
-	if job.Spec.CompletionMode == batch.IndexedCompletion {
+	if isIndexedJob(&job) {
 		succeededIndexes, succeeded = calculateSucceededIndexes(pods)
 	}
 	jobConditionsChanged := false
@@ -625,7 +629,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 		job.Status.Active = active
 		job.Status.Succeeded = succeeded
 		job.Status.Failed = failed
-		if job.Spec.CompletionMode == batch.IndexedCompletion {
+		if isIndexedJob(&job) {
 			job.Status.CompletedIndexes = succeededIndexes
 		}
 
@@ -807,14 +811,14 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 		wait := sync.WaitGroup{}
 
 		var indexesToAdd []int
-		if job.Spec.Completions != nil && job.Spec.CompletionMode == batch.IndexedCompletion {
+		if job.Spec.Completions != nil && isIndexedJob(job) {
 			indexesToAdd = firstPendingIndexes(allPods, int(diff), int(*job.Spec.Completions))
 			diff = int32(len(indexesToAdd))
 		}
 		active += diff
 
 		podTemplate := job.Spec.Template.DeepCopy()
-		if job.Spec.CompletionMode == batch.IndexedCompletion {
+		if isIndexedJob(job) {
 			addCompletionIndexEnvVariables(podTemplate)
 		}
 
@@ -893,7 +897,7 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 func activePodsForRemoval(job *batch.Job, pods []*v1.Pod, rmAtLeast int) []*v1.Pod {
 	var rm, left []*v1.Pod
 
-	if job.Spec.CompletionMode == batch.IndexedCompletion {
+	if isIndexedJob(job) {
 		rm = make([]*v1.Pod, 0, rmAtLeast)
 		left = make([]*v1.Pod, 0, len(pods)-rmAtLeast)
 		rm, left = appendDuplicatedIndexPodsForRemoval(rm, left, pods)
@@ -950,7 +954,7 @@ func getBackoff(queue workqueue.RateLimitingInterface, key interface{}) time.Dur
 func countPodsByPhase(job *batch.Job, pods []*v1.Pod, phase v1.PodPhase) int {
 	result := 0
 	for _, p := range pods {
-		if phase == p.Status.Phase && (job.Spec.CompletionMode != batch.IndexedCompletion || getCompletionIndex(p.Annotations) != unknownCompletionIndex) {
+		if phase == p.Status.Phase && (!isIndexedJob(job) || getCompletionIndex(p.Annotations) != unknownCompletionIndex) {
 			result++
 		}
 	}
