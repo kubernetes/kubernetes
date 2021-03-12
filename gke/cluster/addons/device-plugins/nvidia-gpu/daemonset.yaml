@@ -35,17 +35,30 @@ spec:
       - name: dev
         hostPath:
           path: /dev
+      - name: nvidia
+        hostPath:
+            path: /home/kubernetes/bin/nvidia
+            type: Directory
+      - name: pod-resources
+        hostPath:
+            path: /var/lib/kubelet/pod-resources
       containers:
-      - image: "k8s.gcr.io/nvidia-gpu-device-plugin@sha256:4b036e8844920336fa48f36edeb7d4398f426d6a934ba022848deed2edbf09aa"
-        command: ["/usr/bin/nvidia-gpu-device-plugin", "-logtostderr"]
+      - image: "gcr.io/gke-release/nvidia-gpu-device-plugin@sha256:ae85f370bdb6cacf499fce591cd51fd5f5f02bf22f5f32075e19fb356bf809c0"
+        command: ["/usr/bin/nvidia-gpu-device-plugin", "-logtostderr", "--enable-container-gpu-metrics"]
         name: nvidia-gpu-device-plugin
+        ports:
+        - name: "metrics"
+          containerPort: 2112
+        env:
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/nvidia/lib64
         resources:
           requests:
             cpu: 50m
-            memory: 10Mi
+            memory: 20Mi
           limits:
             cpu: 50m
-            memory: 10Mi
+            memory: 20Mi
         securityContext:
           privileged: true
         volumeMounts:
@@ -53,5 +66,9 @@ spec:
           mountPath: /device-plugin
         - name: dev
           mountPath: /dev
+        - name: nvidia
+          mountPath: /usr/local/nvidia
+        - name: pod-resources
+          mountPath: /var/lib/kubelet/pod-resources
   updateStrategy:
     type: RollingUpdate
