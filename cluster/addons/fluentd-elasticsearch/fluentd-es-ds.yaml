@@ -55,12 +55,12 @@ spec:
   selector:
     matchLabels:
       k8s-app: fluentd-es
-      version: v3.1.0
+      version: v3.2.0
   template:
     metadata:
       labels:
         k8s-app: fluentd-es
-        version: v3.1.0
+        version: v3.2.0
     spec:
       securityContext:
         seccompProfile:
