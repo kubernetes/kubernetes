@@ -100,3 +100,7 @@ func IsConflict(err error) bool {
 	_, ok := err.(ErrConflict)
 	return ok
 }
+
+func ErrNilSchema(key string) error {
+	return fmt.Errorf("attempting to get the subschema and the patch metadata from a nil schema with key %s", key)
+}

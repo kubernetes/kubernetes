@@ -260,6 +260,9 @@ func handleDirectiveMarker(key string, originalValue, modifiedValue interface{},
 // diffOptions contains multiple options to control how we do the diff.
 func handleMapDiff(key string, originalValue, modifiedValue, patch map[string]interface{},
 	schema LookupPatchMeta, diffOptions DiffOptions) error {
+	if schema == nil {
+		return mergepatch.ErrNilSchema(key)
+	}
 	subschema, patchMeta, err := schema.LookupPatchMetadataForStruct(key)
 
 	if err != nil {
@@ -303,6 +306,9 @@ func handleMapDiff(key string, originalValue, modifiedValue, patch map[string]in
 // diffOptions contains multiple options to control how we do the diff.
 func handleSliceDiff(key string, originalValue, modifiedValue []interface{}, patch map[string]interface{},
 	schema LookupPatchMeta, diffOptions DiffOptions) error {
+	if schema == nil {
+		return mergepatch.ErrNilSchema(key)
+	}
 	subschema, patchMeta, err := schema.LookupPatchMetadataForSlice(key)
 	if err != nil {
 		// We couldn't look up metadata for the field
@@ -1163,6 +1169,9 @@ func mergePatchIntoOriginal(original, patch map[string]interface{}, schema Looku
 				return mergepatch.ErrBadArgType(patchFieldValue, patchList)
 			}
 		}
+		if schema == nil {
+			return mergepatch.ErrNilSchema(originalKey)
+		}
 		subschema, patchMeta, err = schema.LookupPatchMetadataForSlice(originalKey)
 		if err != nil {
 			return err
@@ -1341,6 +1350,9 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 			continue
 		}
 		// If they're both maps or lists, recurse into the value.
+		if schema == nil {
+			return nil, mergepatch.ErrNilSchema(k)
+		}
 		switch originalType.Kind() {
 		case reflect.Map:
 			subschema, patchMeta, err2 := schema.LookupPatchMetadataForStruct(k)
@@ -1624,6 +1636,9 @@ func sortMergeListsByNameMap(s map[string]interface{}, schema LookupPatchMeta) (
 			}
 		} else if k != directiveMarker {
 			// recurse for map and slice.
+			if schema == nil {
+				return nil, mergepatch.ErrNilSchema(k)
+			}
 			switch typedV := v.(type) {
 			case map[string]interface{}:
 				subschema, _, err := schema.LookupPatchMetadataForStruct(k)
@@ -1889,6 +1904,9 @@ func mapsHaveConflicts(typedLeft, typedRight map[string]interface{}, schema Look
 				var patchMeta PatchMeta
 				var patchStrategy string
 				var err error
+				if schema == nil {
+					return true, mergepatch.ErrNilSchema(key)
+				}
 				switch leftValue.(type) {
 				case []interface{}:
 					subschema, patchMeta, err = schema.LookupPatchMetadataForSlice(key)
