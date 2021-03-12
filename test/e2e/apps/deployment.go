@@ -164,6 +164,9 @@ var _ = SIGDescribe("Deployment", func() {
 	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 	// See https://github.com/kubernetes/kubernetes/issues/29229
+	// Add UnavailableReplicas check because ReadyReplicas or UpdatedReplicas might not represent
+	// the actual number of pods running successfully if some pods failed to start after update or patch.
+	// See issue ##100192
 
 	/*
 		Release: v1.20
@@ -271,9 +274,8 @@ var _ = SIGDescribe("Deployment", func() {
 					"spec": map[string]interface{}{
 						"TerminationGracePeriodSeconds": &zero,
 						"containers": [1]map[string]interface{}{{
-							"name":    testDeploymentName,
-							"image":   testDeploymentPatchImage,
-							"command": []string{"/bin/sleep", "100000"},
+							"name":  testDeploymentName,
+							"image": testDeploymentPatchImage,
 						}},
 					},
 				},
@@ -310,6 +312,8 @@ var _ = SIGDescribe("Deployment", func() {
 				found := deployment.ObjectMeta.Name == testDeployment.Name &&
 					deployment.ObjectMeta.Labels["test-deployment-static"] == "true" &&
 					deployment.Status.ReadyReplicas == testDeploymentMinimumReplicas &&
+					deployment.Status.UpdatedReplicas == testDeploymentMinimumReplicas &&
+					deployment.Status.UnavailableReplicas == 0 &&
 					deployment.Spec.Template.Spec.Containers[0].Image == testDeploymentPatchImage
 				if !found {
 					framework.Logf("observed Deployment %v in namespace %v with ReadyReplicas %v", deployment.ObjectMeta.Name, deployment.ObjectMeta.Namespace, deployment.Status.ReadyReplicas)
@@ -386,7 +390,9 @@ var _ = SIGDescribe("Deployment", func() {
 			if deployment, ok := event.Object.(*appsv1.Deployment); ok {
 				found := deployment.ObjectMeta.Name == testDeployment.Name &&
 					deployment.ObjectMeta.Labels["test-deployment-static"] == "true" &&
-					deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas
+					deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas &&
+					deployment.Status.UpdatedReplicas == testDeploymentDefaultReplicas &&
+					deployment.Status.UnavailableReplicas == 0
 				if !found {
 					framework.Logf("observed Deployment %v in namespace %v with ReadyReplicas %v and labels %v", deployment.ObjectMeta.Name, deployment.ObjectMeta.Namespace, deployment.Status.ReadyReplicas, deployment.ObjectMeta.Labels)
 				}
@@ -439,6 +445,8 @@ var _ = SIGDescribe("Deployment", func() {
 				found := deployment.ObjectMeta.Name == testDeployment.Name &&
 					deployment.ObjectMeta.Labels["test-deployment-static"] == "true" &&
 					deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas &&
+					deployment.Status.UpdatedReplicas == testDeploymentDefaultReplicas &&
+					deployment.Status.UnavailableReplicas == 0 &&
 					deployment.Spec.Template.Spec.Containers[0].Image == testDeploymentUpdateImage
 				if !found {
 					framework.Logf("observed Deployment %v in namespace %v with ReadyReplicas %v", deployment.ObjectMeta.Name, deployment.ObjectMeta.Namespace, deployment.Status.ReadyReplicas)
