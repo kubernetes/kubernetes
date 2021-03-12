@@ -30,7 +30,7 @@ rules:
 # https://github.com/kubernetes/ingress-gce/blob/4918eb2f0f484f09ac9e5a975907a9b16ed2b344/pkg/neg/controller.go#L339-L342
 # https://github.com/kubernetes/ingress-gce/blob/4918eb2f0f484f09ac9e5a975907a9b16ed2b344/pkg/neg/controller.go#L359-L361
 - apiGroups: [""]
-  resources: ["services"]
+  resources: ["services", "services/status"]
   verbs: ["update", "patch"]
 - apiGroups: ["extensions", "networking.k8s.io"]
   resources: ["ingresses"]
