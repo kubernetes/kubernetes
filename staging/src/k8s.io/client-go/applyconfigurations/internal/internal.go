@@ -5514,6 +5514,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: tcpSocket
       type:
         namedType: io.k8s.api.core.v1.TCPSocketAction
+    - name: terminationGracePeriodSeconds
+      type:
+        scalar: numeric
     - name: timeoutSeconds
       type:
         scalar: numeric
