@@ -41,7 +41,7 @@ func (p *nonePolicy) Name() string {
 }
 
 func (p *nonePolicy) Start(s state.State) error {
-	klog.Info("[cpumanager] none policy: Start")
+	klog.InfoS("None policy: Start")
 	return nil
 }
 
