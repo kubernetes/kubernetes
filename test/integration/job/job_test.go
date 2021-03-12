@@ -200,11 +200,12 @@ func TestIndexedJob(t *testing.T) {
 		cancel()
 	}()
 
+	mode := batchv1.IndexedCompletion
 	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 		Spec: batchv1.JobSpec{
 			Parallelism:    pointer.Int32Ptr(3),
 			Completions:    pointer.Int32Ptr(4),
-			CompletionMode: batchv1.IndexedCompletion,
+			CompletionMode: &mode,
 		},
 	})
 	if err != nil {

@@ -168,7 +168,7 @@ type JobSpec struct {
 	// If the Job controller observes a mode that it doesn't recognize, the
 	// controller skips updates for the Job.
 	// +optional
-	CompletionMode CompletionMode `json:"completionMode,omitempty" protobuf:"bytes,9,opt,name=completionMode,casttype=CompletionMode"`
+	CompletionMode *CompletionMode `json:"completionMode,omitempty" protobuf:"bytes,9,opt,name=completionMode,casttype=CompletionMode"`
 
 	// Suspend specifies whether the Job controller should create Pods or not. If
 	// a Job is created with suspend set to true, no Pods are created by the Job

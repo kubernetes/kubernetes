@@ -47,11 +47,11 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			} else {
 				j.ManualSelector = nil
 			}
-			if c.Rand.Int31()%2 == 0 {
-				j.CompletionMode = batch.NonIndexedCompletion
-			} else {
-				j.CompletionMode = batch.IndexedCompletion
+			mode := batch.NonIndexedCompletion
+			if c.RandBool() {
+				mode = batch.IndexedCompletion
 			}
+			j.CompletionMode = &mode
 			// We're fuzzing the internal JobSpec type, not the v1 type, so we don't
 			// need to fuzz the nil value.
 			j.Suspend = pointer.BoolPtr(c.RandBool())
