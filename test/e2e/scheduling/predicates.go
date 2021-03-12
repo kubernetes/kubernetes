@@ -882,8 +882,8 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            conf.Name,
 			Namespace:       conf.Namespace,
-			Labels:          conf.Labels,
-			Annotations:     conf.Annotations,
+			Labels:          map[string]string{},
+			Annotations:     map[string]string{},
 			OwnerReferences: conf.OwnerReferences,
 		},
 		Spec: v1.PodSpec{
@@ -902,6 +902,12 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 			PriorityClassName:             conf.PriorityClassName,
 			TerminationGracePeriodSeconds: &gracePeriod,
 		},
+	}
+	for key, value := range conf.Labels {
+		pod.ObjectMeta.Labels[key] = value
+	}
+	for key, value := range conf.Annotations {
+		pod.ObjectMeta.Annotations[key] = value
 	}
 	// TODO: setting the Pod's nodeAffinity instead of setting .spec.nodeName works around the
 	// Preemption e2e flake (#88441), but we should investigate deeper to get to the bottom of it.

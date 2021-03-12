@@ -32,6 +32,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -52,7 +53,7 @@ type Resource struct {
 	Memory   int64
 }
 
-var balancePodLabel = map[string]string{"name": "priority-balanced-memory"}
+var balancePodLabel = map[string]string{"podname": "priority-balanced-memory"}
 
 var podRequestedResource = &v1.ResourceRequirements{
 	Limits: v1.ResourceList{
@@ -187,7 +188,8 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		}
 
 		// make the nodes have balanced cpu,mem usage
-		err = createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.6)
+		cleanUp, err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.6)
+		defer cleanUp()
 		framework.ExpectNoError(err)
 		ginkgo.By("Trying to launch the pod with podAntiAffinity.")
 		labelPodName := "pod-with-pod-antiaffinity"
@@ -236,7 +238,8 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 	ginkgo.It("Pod should avoid nodes that have avoidPod annotation", func() {
 		nodeName := nodeList.Items[0].Name
 		// make the nodes have balanced cpu,mem usage
-		err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
+		cleanUp, err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
+		defer cleanUp()
 		framework.ExpectNoError(err)
 		ginkgo.By("Create a RC, with 0 replicas")
 		rc := createRC(ns, "scheduler-priority-avoid-pod", int32(0), map[string]string{"name": "scheduler-priority-avoid-pod"}, f, podRequestedResource)
@@ -298,7 +301,8 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 
 	ginkgo.It("Pod should be preferably scheduled to nodes pod can tolerate", func() {
 		// make the nodes have balanced cpu,mem usage ratio
-		err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
+		cleanUp, err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
+		defer cleanUp()
 		framework.ExpectNoError(err)
 		// Apply 10 taints to first node
 		nodeName := nodeList.Items[0].Name
@@ -360,7 +364,8 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			}
 
 			// Make the nodes have balanced cpu,mem usage.
-			err := createBalancedPodForNodes(f, cs, ns, nodes, podRequestedResource, 0.5)
+			cleanUp, err := createBalancedPodForNodes(f, cs, ns, nodes, podRequestedResource, 0.5)
+			defer cleanUp()
 			framework.ExpectNoError(err)
 
 			replicas := 4
@@ -425,7 +430,34 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 })
 
 // createBalancedPodForNodes creates a pod per node that asks for enough resources to make all nodes have the same mem/cpu usage ratio.
-func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, ns string, nodes []v1.Node, requestedResource *v1.ResourceRequirements, ratio float64) error {
+func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, ns string, nodes []v1.Node, requestedResource *v1.ResourceRequirements, ratio float64) (func(), error) {
+	cleanUp := func() {
+		// Delete all remaining pods
+		err := cs.CoreV1().Pods(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+			LabelSelector: labels.SelectorFromSet(labels.Set(balancePodLabel)).String(),
+		})
+		if err != nil {
+			framework.Logf("Failed to delete memory balanced pods: %v.", err)
+		} else {
+			err := wait.PollImmediate(2*time.Second, time.Minute, func() (bool, error) {
+				podList, err := cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
+					LabelSelector: labels.SelectorFromSet(labels.Set(balancePodLabel)).String(),
+				})
+				if err != nil {
+					framework.Logf("Failed to list memory balanced pods: %v.", err)
+					return false, nil
+				}
+				if len(podList.Items) > 0 {
+					return false, nil
+				}
+				return true, nil
+			})
+			if err != nil {
+				framework.Logf("Failed to wait until all memory balanced pods are deleted: %v.", err)
+			}
+		}
+	}
+
 	// find the max, if the node has the max,use the one, if not,use the ratio parameter
 	var maxCPUFraction, maxMemFraction float64 = ratio, ratio
 	var cpuFractionMap = make(map[string]float64)
@@ -485,7 +517,7 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 			*initPausePod(f, *podConfig), true, framework.Logf)
 
 		if err != nil {
-			return err
+			return cleanUp, err
 		}
 	}
 
@@ -494,7 +526,7 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 		computeCPUMemFraction(cs, node, requestedResource)
 	}
 
-	return nil
+	return cleanUp, nil
 }
 
 func computeCPUMemFraction(cs clientset.Interface, node v1.Node, resource *v1.ResourceRequirements) (float64, float64) {
