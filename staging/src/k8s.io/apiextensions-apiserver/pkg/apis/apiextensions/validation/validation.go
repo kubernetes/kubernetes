@@ -223,7 +223,7 @@ func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 	allErrs = append(allErrs, validateEnumStrings(fldPath.Child("scope"), string(spec.Scope), []string{string(apiextensions.ClusterScoped), string(apiextensions.NamespaceScoped)}, true)...)
 
 	// enabling pruning requires structural schemas
-	if spec.PreserveUnknownFields == nil || *spec.PreserveUnknownFields == false {
+	if spec.PreserveUnknownFields == nil || !(*spec.PreserveUnknownFields) {
 		opts.requireStructuralSchema = true
 	}
 
@@ -236,7 +236,7 @@ func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 				}
 			}
 		}
-	} else if spec.PreserveUnknownFields == nil || *spec.PreserveUnknownFields == false {
+	} else if spec.PreserveUnknownFields == nil || !(*spec.PreserveUnknownFields) {
 		// check that either a global schema or versioned schemas are set in served versions
 		if spec.Validation == nil || spec.Validation.OpenAPIV3Schema == nil {
 			for i, v := range spec.Versions {
@@ -761,7 +761,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	//       restricted like additionalProperties.
 	if schema.AdditionalProperties != nil {
 		if len(schema.Properties) != 0 {
-			if schema.AdditionalProperties.Allows == false || schema.AdditionalProperties.Schema != nil {
+			if !schema.AdditionalProperties.Allows || schema.AdditionalProperties.Schema != nil {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("additionalProperties"), "additionalProperties and properties are mutual exclusive"))
 			}
 		}
@@ -831,7 +831,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		}
 	}
 
-	if schema.XPreserveUnknownFields != nil && *schema.XPreserveUnknownFields == false {
+	if schema.XPreserveUnknownFields != nil && !(*schema.XPreserveUnknownFields) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-preserve-unknown-fields"), *schema.XPreserveUnknownFields, "must be true or undefined"))
 	}
 
@@ -954,7 +954,7 @@ func validateMapListKeysMapSet(schema *apiextensions.JSONSchemaProps, fldPath *f
 				continue
 			}
 
-			if isRequired[k] == false && obj.Default == nil {
+			if !isRequired[k] && obj.Default == nil {
 				allErrs = append(allErrs, field.Required(fldPath.Child("items").Child("properties").Key(k).Child("default"), "this property is in x-kubernetes-list-map-keys, so it must have a default or be a required property"))
 			}
 

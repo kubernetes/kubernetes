@@ -1042,7 +1042,7 @@ func (c *conversionTestContext) waitForServed(t *testing.T, version string, serv
 	waitCh := time.After(timeout)
 	for {
 		obj, err := versionedClient.Get(context.TODO(), obj.GetName(), metav1.GetOptions{})
-		if (err == nil && served) || (errors.IsNotFound(err) && served == false) {
+		if (err == nil && served) || (errors.IsNotFound(err) && !served) {
 			return
 		}
 		select {
