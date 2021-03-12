@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"fmt"
+	"syscall"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -120,25 +121,49 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 			klog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up", uid)
 			continue
 		}
-		// If there are still volume directories, do not delete directory
+
+		allVolumesCleanedUp := true
+
+		// If there are still volume directories, attempt to rmdir them
 		volumePaths, err := kl.getPodVolumePathListFromDisk(uid)
 		if err != nil {
 			orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but error %v occurred during reading volume dir from disk", uid, err))
 			continue
 		}
 		if len(volumePaths) > 0 {
-			orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but volume paths are still present on disk", uid))
-			continue
+			for _, volumePath := range volumePaths {
+				if err := syscall.Rmdir(volumePath); err != nil {
+					orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but failed to rmdir() volume at path %v: %v", uid, volumePath, err))
+					allVolumesCleanedUp = false
+				} else {
+					klog.Warningf("Cleaned up orphaned volume from pod %q at %s", uid, volumePath)
+				}
+			}
 		}
 
-		// If there are any volume-subpaths, do not cleanup directories
-		volumeSubpathExists, err := kl.podVolumeSubpathsDirExists(uid)
+		// If there are any volume-subpaths, attempt to rmdir them
+		subpathVolumePaths, err := kl.getPodVolumeSubpathListFromDisk(uid)
 		if err != nil {
 			orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but error %v occurred during reading of volume-subpaths dir from disk", uid, err))
 			continue
 		}
-		if volumeSubpathExists {
-			orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but volume subpaths are still present on disk", uid))
+		if len(subpathVolumePaths) > 0 {
+			for _, subpathVolumePath := range subpathVolumePaths {
+				if err := syscall.Rmdir(subpathVolumePath); err != nil {
+					orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but failed to rmdir() subpath at path %v: %v", uid, subpathVolumePath, err))
+					allVolumesCleanedUp = false
+				} else {
+					klog.Warningf("Cleaned up orphaned volume subpath from pod %q at %s", uid, subpathVolumePath)
+				}
+			}
+		}
+
+		if !allVolumesCleanedUp {
+			// Not all volumes were removed, so don't clean up the pod directory yet. It is likely
+			// that there are still mountpoints left which could stall RemoveAllOneFilesystem which
+			// would otherwise be called below.
+			// Errors for all removal operations have already been recorded, so don't add another
+			// one here.
 			continue
 		}
 

@@ -101,7 +101,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
-				return validateDirExists(filepath.Join(podDir, "volumes/plugin/name"))
+				return validateDirNotExists(podDir)
 			},
 		},
 		"pod-doesnot-exist-with-subpath": {
@@ -111,7 +111,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
-				return validateDirExists(filepath.Join(podDir, "volume-subpaths/volume/container/index"))
+				return validateDirNotExists(podDir)
 			},
 		},
 		"pod-doesnot-exist-with-subpath-top": {
@@ -121,7 +121,35 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 			},
 			validateFunc: func(kubelet *Kubelet) error {
 				podDir := kubelet.getPodDir("pod1uid")
-				return validateDirExists(filepath.Join(podDir, "volume-subpaths"))
+				return validateDirNotExists(podDir)
+			},
+		},
+		"pod-doesnot-exists-with-populated-volume": {
+			prepareFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				volumePath := filepath.Join(podDir, "volumes/plugin/name")
+				if err := os.MkdirAll(volumePath, 0750); err != nil {
+					return err
+				}
+				return ioutil.WriteFile(filepath.Join(volumePath, "test.txt"), []byte("test1"), 0640)
+			},
+			validateFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				return validateDirExists(filepath.Join(podDir, "volumes/plugin/name"))
+			},
+		},
+		"pod-doesnot-exists-with-populated-subpath": {
+			prepareFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				subPath := filepath.Join(podDir, "volume-subpaths/volume/container/index")
+				if err := os.MkdirAll(subPath, 0750); err != nil {
+					return err
+				}
+				return ioutil.WriteFile(filepath.Join(subPath, "test.txt"), []byte("test1"), 0640)
+			},
+			validateFunc: func(kubelet *Kubelet) error {
+				podDir := kubelet.getPodDir("pod1uid")
+				return validateDirExists(filepath.Join(podDir, "volume-subpaths/volume/container/index"))
 			},
 		},
 		// TODO: test volume in volume-manager

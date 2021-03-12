@@ -368,17 +368,46 @@ func (kl *Kubelet) getMountedVolumePathListFromDisk(podUID types.UID) ([]string,
 	return mountedVolumes, nil
 }
 
-// podVolumesSubpathsDirExists returns true if the pod volume-subpaths directory for
-// a given pod exists
-func (kl *Kubelet) podVolumeSubpathsDirExists(podUID types.UID) (bool, error) {
-	podVolDir := kl.getPodVolumeSubpathsDir(podUID)
+// getPodVolumeSubpathListFromDisk returns a list of the volume-subpath paths by reading the
+// subpath directories for the given pod from the disk.
+func (kl *Kubelet) getPodVolumeSubpathListFromDisk(podUID types.UID) ([]string, error) {
+	volumes := []string{}
+	podSubpathsDir := kl.getPodVolumeSubpathsDir(podUID)
 
-	if pathExists, pathErr := mount.PathExists(podVolDir); pathErr != nil {
-		return true, fmt.Errorf("error checking if path %q exists: %v", podVolDir, pathErr)
+	if pathExists, pathErr := mount.PathExists(podSubpathsDir); pathErr != nil {
+		return nil, fmt.Errorf("error checking if path %q exists: %v", podSubpathsDir, pathErr)
 	} else if !pathExists {
-		return false, nil
+		return volumes, nil
 	}
-	return true, nil
+
+	// Explicitly walks /<volume>/<container name>/<subPathIndex>
+	volumePluginDirs, err := ioutil.ReadDir(podSubpathsDir)
+	if err != nil {
+		klog.Errorf("Could not read directory %s: %v", podSubpathsDir, err)
+		return volumes, err
+	}
+	for _, volumePluginDir := range volumePluginDirs {
+		volumePluginName := volumePluginDir.Name()
+		volumePluginPath := filepath.Join(podSubpathsDir, volumePluginName)
+		containerDirs, err := ioutil.ReadDir(volumePluginPath)
+		if err != nil {
+			return volumes, fmt.Errorf("could not read directory %s: %v", volumePluginPath, err)
+		}
+		for _, containerDir := range containerDirs {
+			containerName := containerDir.Name()
+			containerPath := filepath.Join(volumePluginPath, containerName)
+			// Switch to ReadDirNoStat at the subPathIndex level to prevent issues with stat'ing
+			// mount points that may not be responsive
+			subPaths, err := utilpath.ReadDirNoStat(containerPath)
+			if err != nil {
+				return volumes, fmt.Errorf("could not read directory %s: %v", containerPath, err)
+			}
+			for _, subPathDir := range subPaths {
+				volumes = append(volumes, filepath.Join(containerPath, subPathDir))
+			}
+		}
+	}
+	return volumes, nil
 }
 
 // GetRequestedContainersInfo returns container info.
