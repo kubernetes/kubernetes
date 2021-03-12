@@ -202,7 +202,8 @@ func collectHistogram(metric string, labels map[string]string) *DataItem {
 
 	q50 := hist.Quantile(0.50)
 	q90 := hist.Quantile(0.90)
-	q99 := hist.Quantile(0.95)
+	q95 := hist.Quantile(0.95)
+	q99 := hist.Quantile(0.99)
 	avg := hist.Average()
 
 	msFactor := float64(time.Second) / float64(time.Millisecond)
@@ -217,6 +218,7 @@ func collectHistogram(metric string, labels map[string]string) *DataItem {
 		Data: map[string]float64{
 			"Perc50":  q50 * msFactor,
 			"Perc90":  q90 * msFactor,
+			"Perc95":  q95 * msFactor,
 			"Perc99":  q99 * msFactor,
 			"Average": avg * msFactor,
 		},
@@ -285,6 +287,7 @@ func (tc *throughputCollector) collect() []DataItem {
 			"Average": sum / float64(length),
 			"Perc50":  tc.schedulingThroughputs[int(math.Ceil(float64(length*50)/100))-1],
 			"Perc90":  tc.schedulingThroughputs[int(math.Ceil(float64(length*90)/100))-1],
+			"Perc95":  tc.schedulingThroughputs[int(math.Ceil(float64(length*95)/100))-1],
 			"Perc99":  tc.schedulingThroughputs[int(math.Ceil(float64(length*99)/100))-1],
 		}
 		throughputSummary.Unit = "pods/s"
