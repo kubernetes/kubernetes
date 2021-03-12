@@ -146,7 +146,7 @@ func TestToleratingMissingFiles(t *testing.T) {
 
 	expectedLog := fmt.Sprintf("Config not found: %s", envVarvalue)
 	if !strings.Contains(buffer.String(), expectedLog) {
-		t.Fatalf("expected log: \"%s\"", expectedLog)
+		t.Fatalf("actual log \"%s\" not matching with the expected one: \"%s\"", buffer.String(), expectedLog)
 	}
 }
 
@@ -172,7 +172,7 @@ func TestWarningMissingFiles(t *testing.T) {
 
 	expectedLog := fmt.Sprintf("Config not found: %s", envVarvalue)
 	if !strings.Contains(buffer.String(), expectedLog) {
-		t.Fatalf("expected log: \"%s\"", expectedLog)
+		t.Fatalf("actual log \"%s\" not matching with the expected one: \"%s\"", buffer.String(), expectedLog)
 	}
 }
 
