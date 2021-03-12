@@ -41,6 +41,12 @@ func (t *testCertsData) CertificateDir() string             { return t.cfg.Certi
 func (t *testCertsData) CertificateWriteDir() string        { return t.cfg.CertificatesDir }
 
 func TestCertsWithCSRs(t *testing.T) {
+	// restore global variables
+	defer func() {
+		csrOnly = false
+		csrDir = ""
+	}()
+
 	csrDir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(csrDir)
 	certDir := testutil.SetupTempDir(t)
@@ -52,12 +58,9 @@ func TestCertsWithCSRs(t *testing.T) {
 	}
 	certsData.cfg.CertificatesDir = certDir
 
-	// global vars
+	// set global vars for the test
 	csrOnly = true
 	csrDir = certDir
-	defer func() {
-		csrOnly = false
-	}()
 
 	phase := NewCertsPhase()
 	// find the api cert phase
