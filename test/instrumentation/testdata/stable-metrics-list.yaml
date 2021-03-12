@@ -65,7 +65,7 @@
   - subresource
   - verb
   - version
-- name: apiserver_storage_object_counts
+- name: apiserver_storage_objects
   help: Number of stored objects at the time of last check split by kind.
   type: Gauge
   stabilityLevel: STABLE
